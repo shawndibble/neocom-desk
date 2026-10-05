@@ -35,7 +35,6 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { EmptyState, Panel, Modal, Spinner } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
 import { formatIsk } from '@/lib/isk';
@@ -98,6 +97,7 @@ import {
   customsRateSource,
   defaultCustomsRate,
   loadCustomsCodeExpertise,
+  customsSourceText,
   type CustomsRateSource,
 } from './customsRate';
 import { loadAccountingLevel } from './salesTaxRate';
@@ -128,24 +128,6 @@ interface SystemGroup {
    */
   customsRate: number;
   customsSource: CustomsRateSource;
-}
-
-/**
- * Where the customs rate came from, in words. One branch per source, each
- * passing only the values its own sentence uses — feeding every key every
- * placeholder means shipping a `level: 0` to a sentence with no level in it.
- */
-function customsTooltip(source: CustomsRateSource, t: TFunction): string {
-  switch (source.kind) {
-    case 'highsec-skill':
-      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
-    case 'highsec-unknown-skill':
-      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
-    case 'player-poco':
-      return t('piAdvisor.customsRateSource.player-poco', {
-        space: t(`common.spaceOption.${source.space}`),
-      });
-  }
 }
 
 interface Snapshot {
@@ -923,7 +905,7 @@ export function AdvisorPanel({
 
   // Edits made since the snapshot loaded, layered over it rather than copied
   // into their own state. Copying would mean a `setState` in an effect keyed
-  // on the snapshot (which `PlanPanel` avoids for the same reason) and would
+  // on the snapshot (which `GoalPlannerPanel` avoids the same way) and would
   // silently drop an edit made while a reload was in flight. Layering keeps
   // the picker repainting immediately — ticking a resource re-sizes the build
   // plan without a page reload — with no second source of truth.
@@ -947,8 +929,8 @@ export function AdvisorPanel({
   // unreachable: after "12", typing "." parses back to 12, the prop never
   // changes, and React restores "12" — so `step={0.5}` invited a precision the
   // control silently refused. Held per system, so switching systems shows that
-  // system's own figure rather than the last one typed. `PlanPanel` holds its
-  // rate the same way.
+  // system's own figure rather than the last one typed. The Goal Planner's
+  // number boxes hold their text the same way.
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
 
   const writeCustoms = useCallback(
@@ -1294,7 +1276,7 @@ export function AdvisorPanel({
             customsTooltip={
               customsEdited
                 ? t('piAdvisor.customsRateEdited')
-                : customsTooltip(activeSystem.customsSource, t)
+                : customsSourceText(activeSystem.customsSource, t)
             }
             onCustomsChange={(percent) =>
               writeCustoms(

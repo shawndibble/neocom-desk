@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
@@ -25,7 +25,10 @@ import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { PlanPanel } from '@/features/pi/PlanPanel';
+import { GoalPlannerPanel } from '@/features/pi/GoalPlannerPanel';
+import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
+import { loadPlannableTypeIds } from '@/features/pi/products';
+import type { Goal } from '@/engine/pi/goalTypes';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { builtAdvice } from '@/features/pi/advisorModel';
 import { colonyHoursToFull } from '@/features/pi/colonyThroughput';
@@ -78,15 +81,8 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDuration } from '@/lib/duration';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams } from '@/lib/useUrlState';
-import {
-  boolParam,
-  enumParam,
-  textParam,
-  TEXT_DEBOUNCE_MS,
-  type UrlParamCodec,
-} from '@/lib/urlState';
+import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
-import { COLONY_SPACES, type ColonySpace } from '@/features/pi/customsRate';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 
@@ -910,7 +906,7 @@ function parsePositiveInt(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-/** `type` (the planned commodity) and `system` (the Advisor's system) — present only once chosen. */
+/** `type` (a goal to seed) and `system` (the Advisor's system) — present only once chosen. */
 function positiveIntParam(): UrlParamCodec<number | null> {
   return {
     parse: (raw) => parsePositiveInt(raw),
@@ -918,31 +914,14 @@ function positiveIntParam(): UrlParamCodec<number | null> {
   };
 }
 
-/**
- * `rate`'s override text: `null` means "follow the band default", same as
- * `PlanPanel`'s own state did. Anything that isn't a finite number — blank,
- * garbage, a hand-edited link — degrades to that default too, the same rule
- * every other codec here follows.
- */
-function nullableNumberTextParam(): UrlParamCodec<string | null> {
-  return {
-    parse: (raw) =>
-      raw !== null && raw.trim() !== '' && Number.isFinite(Number(raw)) ? raw : null,
-    serialize: (value) => value,
-    debounceMs: TEXT_DEBOUNCE_MS,
-  };
-}
-
 const PI_URL_PARAMS = {
+  // The Industry "PI Plan" context menu's deep link: seeds a goal, then clears.
   type: positiveIntParam(),
+  goals: goalsParam(),
+  off: idListParam(),
+  // A colony to open on the Colonies tab — the Goal Planner's colony links.
+  colony: positiveIntParam(),
   system: positiveIntParam(),
-  perDay: textParam({ defaultValue: '10' }),
-  space: enumParam<ColonySpace>(COLONY_SPACES, 'highsec'),
-  rate: nullableNumberTextParam(),
-  // Not named in the ticket's "perDay/space/rate" list, but the same cited
-  // state (`PlanPanel.tsx:113-117`) and the same "result-defining view state"
-  // rule — it feeds `costPlan` exactly like the other three.
-  extractionRate: textParam({ defaultValue: '' }),
   includeRebuilds: boolParam(),
 };
 
@@ -959,10 +938,10 @@ const PI_URL_PARAMS = {
  *
  * The tab is a path segment (`/planetary-industry/plan`,
  * `/planetary-industry/advisor`); every input each peer tab needs to redraw
- * its answer stays a scoped query param on top of it — Plan's commodity,
- * output rate, space, customs-rate override and extraction-rate override
- * (`?type=`, `?perDay=`, `?space=`, `?rate=`, `?extractionRate=`), Advisor's
- * system and rebuilds toggle (`?system=`, `?includeRebuilds=`) — so a plan or
+ * its answer stays a scoped query param on top of it — Plan's goals and
+ * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
+ * cleared), Advisor's system and rebuilds toggle (`?system=`,
+ * `?includeRebuilds=`) — so a plan or
  * a worklist survives a reload and can be deep-linked into later. All fall
  * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
  * unknown value is handled by each param's own default rather than rendering
@@ -985,12 +964,11 @@ export function PlanetaryIndustry() {
   const { haulHours } = cadenceHours(useCadence((state) => state.value));
   const [
     {
-      type: plannedTypeId,
+      type: seedTypeId,
+      goals,
+      off: disabledColonies,
+      colony: linkedColonyId,
       system: advisorSystemId,
-      perDay: perDayText,
-      space,
-      rate: ratePercentText,
-      extractionRate: extractionRateText,
       includeRebuilds,
     },
     setPiParams,
@@ -1005,6 +983,35 @@ export function PlanetaryIndustry() {
   // screen at once. Keyed by `${characterId}:${planetId}`, not the planet id
   // alone — two characters can each hold a colony on the same planet.
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  // `?colony=` opens that colony's row, without owning it: toggling it closed
+  // drops the param, so the link is a way in, not a lock.
+  const linkedKey =
+    linkedColonyId !== null && activeCharacterId !== null
+      ? `${activeCharacterId}:${linkedColonyId}`
+      : null;
+  const isExpanded = (key: string) => expandedKeys.has(key) || key === linkedKey;
+  // Scrolled to and focused once per link, not on every refresh of `data`.
+  const focusedLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (tab !== 'colonies' || linkedColonyId === null || !data) return;
+    const id = `pi-colony-${activeCharacterId}-${linkedColonyId}-trigger`;
+    if (focusedLink.current === id) return;
+    const trigger = document.getElementById(id);
+    if (!trigger) return;
+    focusedLink.current = id;
+    trigger.scrollIntoView?.({ block: 'center' });
+    trigger.focus({ preventScroll: true });
+  }, [tab, linkedColonyId, data, activeCharacterId]);
+  const toggleColony = (key: string) => {
+    if (key === linkedKey) {
+      setPiParams({ colony: null });
+      setExpandedKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    } else toggleExpandedKey(key);
+  };
   const toggleExpandedKey = useCallback((key: string) => {
     setExpandedKeys((current) => {
       const next = new Set(current);
@@ -1026,8 +1033,27 @@ export function PlanetaryIndustry() {
     void hydrateShowAltColonies();
   }, [hydrateShowAltColonies]);
 
-  const setPlannedTypeId = useCallback(
-    (next: number) => setPiParams({ type: next }),
+  // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
+  // Plan tab only, and only for a type the planner can plan.
+  useEffect(() => {
+    if (seedTypeId === null || tab !== 'plan') return;
+    let cancelled = false;
+    void loadPlannableTypeIds()
+      .catch(() => new Set<number>())
+      .then((plannable) => {
+        if (cancelled) return;
+        setPiParams({
+          goals: plannable.has(seedTypeId) ? seedGoal(goals, seedTypeId) : goals,
+          type: null,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [seedTypeId, goals, setPiParams, tab]);
+  const setGoals = useCallback((next: Goal[]) => setPiParams({ goals: next }), [setPiParams]);
+  const setDisabledColonies = useCallback(
+    (next: number[]) => setPiParams({ off: next }),
     [setPiParams]
   );
 
@@ -1036,16 +1062,6 @@ export function PlanetaryIndustry() {
     [setPiParams]
   );
 
-  const setPerDayText = useCallback((next: string) => setPiParams({ perDay: next }), [setPiParams]);
-  const setSpace = useCallback((next: ColonySpace) => setPiParams({ space: next }), [setPiParams]);
-  const setRatePercentText = useCallback(
-    (next: string | null) => setPiParams({ rate: next }),
-    [setPiParams]
-  );
-  const setExtractionRateText = useCallback(
-    (next: string) => setPiParams({ extractionRate: next }),
-    [setPiParams]
-  );
   const setIncludeRebuilds = useCallback(
     (next: boolean) => setPiParams({ includeRebuilds: next }),
     [setPiParams]
@@ -1279,18 +1295,12 @@ export function PlanetaryIndustry() {
           onIncludeRebuildsChange={setIncludeRebuilds}
         />
       ) : tab === 'plan' ? (
-        <PlanPanel
+        <GoalPlannerPanel
           characterId={activeCharacterId}
-          typeId={plannedTypeId}
-          onTypeIdChange={setPlannedTypeId}
-          perDayText={perDayText}
-          onPerDayTextChange={setPerDayText}
-          space={space}
-          onSpaceChange={setSpace}
-          ratePercentText={ratePercentText}
-          onRatePercentTextChange={setRatePercentText}
-          extractionRateText={extractionRateText}
-          onExtractionRateTextChange={setExtractionRateText}
+          goals={goals}
+          onGoalsChange={setGoals}
+          disabled={disabledColonies}
+          onDisabledChange={setDisabledColonies}
         />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
@@ -1376,8 +1386,8 @@ export function PlanetaryIndustry() {
                           planet={planet}
                           detail={details.get(planet.planet_id)?.cached?.data ?? null}
                           status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
-                          expanded={expandedKeys.has(key)}
-                          onToggle={() => toggleExpandedKey(key)}
+                          expanded={isExpanded(key)}
+                          onToggle={() => toggleColony(key)}
                           planetNames={planetNames}
                           pinTypeNames={pinTypeNames}
                           productNames={productNames}
@@ -1425,8 +1435,8 @@ export function PlanetaryIndustry() {
                               planet={colony.planet}
                               detail={colony.detail}
                               status={status}
-                              expanded={expandedKeys.has(key)}
-                              onToggle={() => toggleExpandedKey(key)}
+                              expanded={isExpanded(key)}
+                              onToggle={() => toggleColony(key)}
                               planetNames={planetNames}
                               pinTypeNames={pinTypeNames}
                               productNames={productNames}

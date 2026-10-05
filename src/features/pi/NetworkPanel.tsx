@@ -5,7 +5,7 @@
  * Its own file rather than another component inside `AdvisorPanel.tsx`, which
  * already carries the per-planet cards: this answers about the *set*, takes
  * only a finished plan and a name lookup, and touches nothing a card touches.
- * The same seam `PlanResults.tsx` sits on.
+ * The same seam `GoalPlannerResults.tsx` sits on.
  *
  * ## Why it reads as directives now
  *

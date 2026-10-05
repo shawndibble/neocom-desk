@@ -1,12 +1,11 @@
 /**
  * Which planetary commodities the chain planner can be pointed at.
  *
- * One list, two callers: `PlanPanel`'s product picker and the item context
- * menu's "PI Plan" action. They must agree exactly, because `PlanPanel`
- * resolves an unrecognised `?type=` by silently falling back to another
- * commodity — a menu entry offered on a type the picker doesn't hold would
- * plan the wrong item rather than fail. Deriving both from `productOptions`
- * is what makes that impossible.
+ * One list, two callers: the Goal Planner's product search and the item
+ * context menu's "PI Plan" action. They must agree exactly, because the
+ * planner drops a `?type=` / `?goals=` entry it cannot plan — a menu entry
+ * offered on a type the search doesn't hold would seed a goal that silently
+ * vanishes. Deriving both from `productOptions` is what makes that impossible.
  *
  * Membership is the graph's answer, not a table: a schematic whose tier
  * `piTier` refuses to resolve (a cycle, or a depth the game doesn't define)

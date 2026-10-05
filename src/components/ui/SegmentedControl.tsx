@@ -19,6 +19,8 @@ interface SegmentedControlProps<T extends string> {
   fill?: boolean;
   /** Micro-label casing (default). Turn off for labels that are units or codes, like `30d`. */
   uppercase?: boolean;
+  /** Id(s) of a hint describing the group, for `aria-describedby`. */
+  describedBy?: string;
   className?: string;
 }
 
@@ -39,12 +41,14 @@ export function SegmentedControl<T extends string>({
   size = 'md',
   fill = false,
   uppercase = true,
+  describedBy,
   className = '',
 }: SegmentedControlProps<T>) {
   return (
     <div
       role="group"
       aria-label={label}
+      aria-describedby={describedBy}
       className={cx(
         'overflow-hidden rounded-xs border border-line',
         fill ? 'flex w-full' : 'inline-flex',

@@ -35,13 +35,18 @@ import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 
 /** What an instruction does. The set is closed; the colour carries the meaning. */
-export type DirectiveVerb = 'add' | 'remove' | 'swap' | 'rebuild' | 'asIs' | 'build';
+export type DirectiveVerb =
+  'add' | 'remove' | 'swap' | 'rebuild' | 'asIs' | 'build' | 'start' | 'stop';
 
 const VERB_CLASS: Record<DirectiveVerb, string> = {
   add: 'border-accent/45 bg-accent/10 text-accent',
   build: 'border-accent/45 bg-accent/10 text-accent',
   swap: 'border-accent/45 bg-accent/10 text-accent',
   remove: 'border-warning/45 bg-warning/10 text-warning',
+  // The Goal Planner's change list: begin extracting on a colony that runs
+  // none, or stop one P0 of what it runs.
+  start: 'border-accent/45 bg-accent/10 text-accent',
+  stop: 'border-warning/45 bg-warning/10 text-warning',
   // Outlined: a course of action the pilot could take, and a real one.
   rebuild: 'border-line-bright text-text-dim',
   // Flat and borderless, because it is not an action at all. It shared
@@ -229,6 +234,19 @@ export function EstimateBadge() {
   return (
     <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
       {t('piAdvisor.estimateBadge')}
+    </span>
+  );
+}
+
+/**
+ * "P2" — a planetary commodity's tier, as a quiet chip beside the verb and
+ * estimate tags. Text, never colour alone: the tier is the label.
+ */
+export function TierChip({ tier }: { tier: number }) {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      {t('piPlan.tierChip', { tier })}
     </span>
   );
 }

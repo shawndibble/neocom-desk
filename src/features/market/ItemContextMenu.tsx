@@ -19,6 +19,7 @@ import {
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
+import { piPlanHref } from '@/features/pi/piPlanLink';
 import { useCompareSet } from './compareSet';
 import { useItemActions } from './itemActions';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
@@ -137,6 +138,7 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
   } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
   const { canAddToQuickbar, addToQuickbar, blueprintFor } = useItemActions();
@@ -208,7 +210,7 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
         </MenuItem>
       )}
       {piPlannable && (
-        <MenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
+        <MenuItem onSelect={() => navigate(piPlanHref(typeId, location.pathname, location.search))}>
           {t('market.contextMenu.piPlan')}
         </MenuItem>
       )}

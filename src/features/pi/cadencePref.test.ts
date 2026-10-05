@@ -77,7 +77,7 @@ describe('parsePiCadence', () => {
 
   /**
    * Whole-record reject rather than a per-field merge, matching
-   * `planControlsPref`: half a restored cadence — the pilot's haul window
+   * `market/locationMode.ts`: half a restored cadence — the pilot's haul window
    * against somebody else's restart — is worse than a wholly default one,
    * because every figure on the tab is derived from the pair.
    */

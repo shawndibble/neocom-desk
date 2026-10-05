@@ -76,9 +76,9 @@
  *
  * `salesTaxPct` defaults to 0, unlike `taxRate`: this module's own callers
  * disagree on whether the target is actually sold. `stopTier.ts` and
- * `network.ts` score a sale and pass the pilot's real rate; `planModel.ts`
- * asks a make-or-buy question with no sale in it and leaves it unset, same
- * as before this parameter existed.
+ * `network.ts` score a sale and pass the pilot's real rate; a make-or-buy
+ * question with no sale in it leaves it unset, same as before this parameter
+ * existed.
  *
  * Pure: prices, tax rate, sales tax rate, layout and extraction rate are all
  * parameters. No
