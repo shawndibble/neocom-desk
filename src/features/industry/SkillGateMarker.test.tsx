@@ -98,7 +98,7 @@ describe('SkillGateMarker', () => {
       await screen.findByText('No character on this account can install this job')
     ).toBeInTheDocument();
     // The skill name is a link into the Skill modal.
-    expect(screen.getByRole('button', { name: 'Electronic Engineering' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Electronic Engineering' })).toBeInTheDocument();
     expect(screen.getByText('— → III')).toBeInTheDocument();
     expect(screen.getByText(/Closest: Vex Kado · .* to train/)).toBeInTheDocument();
   });
