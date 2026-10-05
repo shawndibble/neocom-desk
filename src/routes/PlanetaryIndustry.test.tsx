@@ -812,7 +812,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const strip = screen.getByTestId('pi-header-strip');
-    expect(within(strip).getByRole('combobox', { name: 'Sell at' })).toBeInTheDocument();
+    expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
     expect(within(strip).getByText('Colonies')).toBeInTheDocument();
   });
 

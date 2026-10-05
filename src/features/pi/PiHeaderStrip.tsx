@@ -101,22 +101,6 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           />
         )}
         <StatChip label={t('piPlan.strip.colonies')} value={colonySystemIds.length} />
-        {figures && (
-          <StatChip
-            label={t('piPlan.strip.route')}
-            value={
-              <>
-                {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}
-                {figures.lowsecJumps > 0 && (
-                  <span className="text-warning">
-                    {' · '}
-                    {t('piPlan.strip.lowsecJumps', { count: figures.lowsecJumps })}
-                  </span>
-                )}
-              </>
-            }
-          />
-        )}
       </StatChips>
       <label className="flex items-center gap-2">
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -135,6 +119,24 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           </SelectContent>
         </Select>
       </label>
+      {figures && (
+        <StatChips>
+          <StatChip
+            label={t('piPlan.strip.route')}
+            value={
+              <>
+                {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}
+                {figures.lowsecJumps > 0 && (
+                  <span className="text-warning">
+                    {' · '}
+                    {t('piPlan.strip.lowsecJumps', { count: figures.lowsecJumps })}
+                  </span>
+                )}
+              </>
+            }
+          />
+        </StatChips>
+      )}
       {estimate && <EstimateBadge />}
     </div>
   );
