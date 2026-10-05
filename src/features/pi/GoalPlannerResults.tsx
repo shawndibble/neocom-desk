@@ -896,6 +896,8 @@ function sourceText(source: DemandSource, t: TFunction): string {
       return t('piPlan.sourceExtracted');
     case 'not-extracted':
       return t('piPlan.sourceNotExtracted');
+    case 'blocked':
+      return t('piPlan.sourceBlocked');
   }
 }
 
@@ -905,6 +907,7 @@ const SOURCE_TONE: Record<DemandSource, string> = {
   'not-extracted': 'text-text-dim',
   bought: 'text-warning',
   short: 'text-danger',
+  blocked: 'text-text-dim',
 };
 
 export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: PlanNames }) {
@@ -994,7 +997,7 @@ export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: 
         label={t('piPlan.flowTableLabel')}
         columns={columns}
         rows={demand}
-        rowKey={(line) => line.typeId}
+        rowKey={(line) => `${line.typeId}:${line.source}`}
         density="compact"
         stackColumns={2}
         rowContextMenu={(line, tr) => (

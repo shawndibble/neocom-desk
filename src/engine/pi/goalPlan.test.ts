@@ -118,9 +118,11 @@ describe('planGoals — factory host', () => {
     const result = plan([goal(WETWARE_MAINFRAME, 1)], [colony(1, 'lava'), colony(2, 'gas')]);
     expect(result.factoryHost).toBeNull();
     expect(result.shortfalls).toContainEqual({ kind: 'no-factory-host', facility: 'highTech' });
-    expect(result.demand).toEqual([
-      expect.objectContaining({ typeId: WETWARE_MAINFRAME, source: 'short' }),
-    ]);
+    // A type gap blocks it too, so its chain is listed as blocked.
+    expect(result.demand.find((l) => l.typeId === WETWARE_MAINFRAME)).toMatchObject({
+      source: 'blocked',
+      madeFraction: 0,
+    });
   });
 
   it('hosts on the colony whose extraction is least needed, not the lowest id', () => {
@@ -469,6 +471,21 @@ describe('planGoals — the plan describes itself consistently', () => {
         fraction: expect.closeTo(1, 6),
       },
       { typeId: ROBOTICS, unitsPerHour: 0, fraction: 0 },
+    ]);
+    // The blocked goal's whole chain is still in the demand — what Robotics
+    // needs — marked blocked, made by nothing.
+    const blocked = result.demand.filter((l) => l.source === 'blocked');
+    expect(blocked.map((l) => l.typeId)).toEqual(
+      expect.arrayContaining([ROBOTICS, 9836, 3689, 2398, 2399, 2400, 2401, BASE_METALS])
+    );
+    expect(blocked.every((l) => l.madeFraction === 0)).toBe(true);
+    expect(blocked.find((l) => l.typeId === ROBOTICS)).toMatchObject({
+      tier: 3,
+      unitsPerHour: expect.closeTo(30 / 24, 6),
+    });
+    // Coolant's own lines are untouched by it.
+    expect(result.demand.filter((l) => l.typeId === COOLANT)).toEqual([
+      expect.objectContaining({ source: 'made', madeFraction: expect.closeTo(1, 6) }),
     ]);
     // Nothing extracts for the blocked goal.
     const extracted = result.assignments

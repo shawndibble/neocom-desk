@@ -129,9 +129,12 @@ export type FitLimit = 'cpu' | 'powergrid';
  *   `madeFraction`);
  * - `'made'` / `'extracted'` — no gap of its own. `madeFraction` under 1 then
  *   means it is rationed by a scarcer input elsewhere, not short itself;
- * - `'not-extracted'` — a P0 whose P1 is bought in full: nothing is extracted.
+ * - `'not-extracted'` — a P0 whose P1 is bought in full: nothing is extracted;
+ * - `'blocked'` — part of a goal a type gap blocks: listed so the plan still
+ *   says what that goal needs, but made, consumed and priced by nothing. A
+ *   type a live goal also needs has a second, non-blocked line.
  */
-export type DemandSource = 'made' | 'bought' | 'short' | 'extracted' | 'not-extracted';
+export type DemandSource = 'made' | 'bought' | 'short' | 'extracted' | 'not-extracted' | 'blocked';
 
 /** One type the goals need, summed across every goal that needs it. */
 export interface DemandLine {

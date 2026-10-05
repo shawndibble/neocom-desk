@@ -797,7 +797,28 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
       madeFraction: unitsPerHour <= EPSILON ? 1 : Math.min(1, made / unitsPerHour),
     };
   });
+  // A goal a type gap blocks keeps its whole chain in the demand, so the plan
+  // still answers "what would it need" — every line 'blocked', made by
+  // nothing, consuming and pricing nothing. A type both a live goal and a
+  // blocked one need gets two lines: (typeId, source) is unique, typeId alone
+  // is not.
+  const blockedDemand = new Map<number, number>();
+  expandInto(
+    blockedDemand,
+    triage.blocked.filter((g) => !boughtOutright.has(g))
+  );
+  for (const [typeId, unitsPerHour] of blockedDemand) {
+    lines.push({
+      typeId,
+      tier: tierOf(typeId),
+      unitsPerHour,
+      factories: factoriesFor(typeId, unitsPerHour, pi),
+      source: 'blocked',
+      madeFraction: 0,
+    });
+  }
   for (const g of dead) {
+    if (triage.blocked.includes(g) && !boughtOutright.has(g)) continue;
     const tier = tierOf(g.typeId);
     const unitsPerHour = perHour(g);
     lines.push({
@@ -809,7 +830,8 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
       madeFraction: 0,
     });
   }
-  lines.sort((a, b) => b.tier - a.tier || a.typeId - b.typeId);
+  const blockedLast = (l: DemandLine) => (l.source === 'blocked' ? 1 : 0);
+  lines.sort((a, b) => b.tier - a.tier || a.typeId - b.typeId || blockedLast(a) - blockedLast(b));
 
   // --- Achieved ------------------------------------------------------------
   const achieved: GoalPlan['achieved'] = goals.map((g) => {

@@ -4690,6 +4690,7 @@
     "sourceNotExtracted": "Not extracted (P1 bought)",
     "sourceBought": "Bought",
     "sourceShort": "Short",
+    "sourceBlocked": "Blocked",
     "sourceShortPartial": "Short — {{percent}}% made",
     "sourceHeldBack": "{{percent}}% made",
     "sourceHeldBackTooltip": "Only this share is made: a scarcer input elsewhere in the chain holds it back.",
