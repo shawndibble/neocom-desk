@@ -130,8 +130,8 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
 /**
  * Right-click menu around `trigger`, publishing the same items for
  * `RowMoreActions`. Touch-and-hold anywhere in the row opens it, so the
- * tooltips of the controls inside give that gesture up (`tooltipHold.ts`) —
- * all but one that asks to keep it (`holdToReveal`, as `IskAmount` does).
+ * tooltips of the controls inside give that gesture up (`tooltipHold.ts`):
+ * a hold inside a row menu never reveals a tooltip.
  *
  * With `tooltip`, the trigger itself explains itself on hover and focus too
  * (a Fittings Ring tile); its touch-and-hold is the menu's alone, so what the

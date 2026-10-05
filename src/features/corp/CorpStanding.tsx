@@ -133,7 +133,7 @@ export function CorpStanding({ clocks, money }: CorpStandingProps) {
               <span aria-hidden="true" className="hidden w-px shrink-0 bg-line sm:block" />
               <Figure
                 label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-                value={<IskAmount value={money.net} revealOn="tap" />}
+                value={<IskAmount value={money.net} />}
                 note={t('corp.standing.heldNote', {
                   total: formatIskCompact(money.total),
                   count: money.divisionCount,

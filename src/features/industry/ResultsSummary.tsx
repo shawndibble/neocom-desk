@@ -202,14 +202,14 @@ export function ResultsSummary({
         header: t('industry.unitPrice'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => <IskAmount value={row.unitPrice} revealOn="longPress" decimals={0} />,
+        render: (row) => <IskAmount value={row.unitPrice} decimals={0} />,
       },
       {
         id: 'total',
         header: t('industry.total'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => <IskAmount value={row.total} revealOn="longPress" decimals={0} />,
+        render: (row) => <IskAmount value={row.total} decimals={0} />,
       },
     ],
     [t]

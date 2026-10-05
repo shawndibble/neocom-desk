@@ -8,7 +8,12 @@ import {
 } from 'react';
 import { cx } from '@/lib/cx';
 
-const NARROW_MENU_QUERY = '(max-width: 47.99rem)';
+/**
+ * In place on a phone-width viewport *or* a coarse pointer: a finger on a wide
+ * touch tablet has no hover to bring a side panel up either. The `max-width`
+ * half keeps a non-matching `matchMedia` (jsdom) reading as "side panel".
+ */
+const NARROW_MENU_QUERY = '(max-width: 47.99rem), (pointer: coarse)';
 
 function subscribeNarrow(onChange: () => void): () => void {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
@@ -25,7 +30,7 @@ function isNarrow(): boolean {
   );
 }
 
-/** Whether submenus open in place (a phone-width viewport). */
+/** Whether submenus open in place (a phone-width viewport or a coarse pointer). */
 export function useInlineSubmenus(): boolean {
   return useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
 }

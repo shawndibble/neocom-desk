@@ -870,7 +870,7 @@ function GoalResults({
                           i18nKey="fittings.implantFinder.moreHeadroom"
                           values={{ value: n(fix.headroom - firstFix.headroom), unit }}
                           components={{
-                            cost: <IskAmount value={fix.cost - firstFix.cost} revealOn="tap" />,
+                            cost: <IskAmount value={fix.cost - firstFix.cost} />,
                           }}
                         />
                       </span>
@@ -889,7 +889,7 @@ function GoalResults({
                 <span className="font-semibold whitespace-nowrap tabular-nums">
                   <Trans
                     i18nKey="fittings.implantFinder.isk"
-                    components={{ value: <IskAmount value={fix.cost} revealOn="tap" /> }}
+                    components={{ value: <IskAmount value={fix.cost} /> }}
                   />
                 </span>
                 <Button variant="primary" disabled={busy} onClick={() => onAdd(fix.typeIds)}>
@@ -962,7 +962,7 @@ function SourceLine({ source }: { source: Source }) {
         }
         count={source.volume}
         values={{ hub: hubName(source.hubId) }}
-        components={{ price: <IskAmount value={source.price} revealOn="tap" decimals={0} /> }}
+        components={{ price: <IskAmount value={source.price} decimals={0} /> }}
       />
     );
   }
@@ -997,7 +997,7 @@ function SourceLine({ source }: { source: Source }) {
           tags ? 'fittings.implantFinder.sourceLpWithTags' : 'fittings.implantFinder.sourceLp'
         }
         values={{ corp: source.corpName, lp: fmt(source.lpCost, 0), tags }}
-        components={{ isk: <IskAmount value={source.iskCost} revealOn="tap" decimals={0} /> }}
+        components={{ isk: <IskAmount value={source.iskCost} decimals={0} /> }}
       />{' '}
       {source.cost === null ? (
         t('fittings.implantFinder.lpUnpriced')
@@ -1005,7 +1005,7 @@ function SourceLine({ source }: { source: Source }) {
         <Trans
           i18nKey="fittings.implantFinder.lpTotal"
           values={{ rate: fmt(source.lpRate ?? 0, 0) }}
-          components={{ total: <IskAmount value={source.cost} revealOn="tap" decimals={0} /> }}
+          components={{ total: <IskAmount value={source.cost} decimals={0} /> }}
         />
       )}
       {status.length > 0 && (

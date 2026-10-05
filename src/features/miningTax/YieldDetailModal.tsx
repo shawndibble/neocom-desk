@@ -208,7 +208,6 @@ export function YieldDetailModal({
         line.rawValue > 0 ? (
           <IskAmount
             value={line.rawValue}
-            revealOn="tap"
             decimals={0}
             className={lineWinner(line) === 'raw' ? 'text-isk-pos' : undefined}
           />
@@ -228,7 +227,6 @@ export function YieldDetailModal({
               line.refineValue > 0 ? (
                 <IskAmount
                   value={line.refineValue}
-                  revealOn="tap"
                   decimals={0}
                   className={lineWinner(line) === 'refined' ? 'text-isk-pos' : undefined}
                 />
@@ -263,11 +261,7 @@ export function YieldDetailModal({
       align: 'right',
       className: 'whitespace-nowrap text-text-dim',
       render: (material) =>
-        material.value === null ? (
-          '—'
-        ) : (
-          <IskAmount value={material.value} revealOn="tap" decimals={0} />
-        ),
+        material.value === null ? '—' : <IskAmount value={material.value} decimals={0} />,
       sortValue: (material) => material.value ?? undefined,
     },
   ];
@@ -346,7 +340,7 @@ export function YieldDetailModal({
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
             <p className="mt-1 text-xl font-semibold tabular-nums">
-              <IskAmount value={valuation.rawValue} revealOn="tap" decimals={0} />
+              <IskAmount value={valuation.rawValue} decimals={0} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
@@ -362,7 +356,7 @@ export function YieldDetailModal({
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">
-                  <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
+                  <IskAmount value={valuation.refineValue} decimals={0} />
                 </p>
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {
@@ -388,7 +382,7 @@ export function YieldDetailModal({
                   ) : (
                     <>
                       {totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
-                      <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
+                      <IskAmount value={Math.abs(totals.delta)} decimals={0} />
                     </>
                   )}
                 </p>

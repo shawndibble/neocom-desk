@@ -74,7 +74,7 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
             node: (
               <>
                 {row.iskPerHour > 0 ? '+' : ''}
-                <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+                <IskAmount value={row.iskPerHour} decimals={0} />
               </>
             ),
             toneClassName: iskToneClass(row.iskPerHour),
@@ -89,7 +89,7 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
     case 'duration':
       return { node: formatDuration(row.seconds) };
     case 'buildCost':
-      return { node: <IskAmount value={row.buildCost} revealOn="tap" decimals={0} /> };
+      return { node: <IskAmount value={row.buildCost} decimals={0} /> };
   }
 }
 

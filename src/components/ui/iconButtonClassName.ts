@@ -35,9 +35,9 @@ export interface IconButtonClassNameOptions {
  * that navigates rather than acting, say — can match it exactly instead of
  * hand-copying the cascade. Mirrors `buttonClassName` for the same reason.
  *
- * The size classes are the 44px touch tier below `md` and the standard 36px
- * control above it (DESIGN.md §3): a pointer never gets the phone-sized box
- * and a thumb never gets the mouse-sized one.
+ * The size classes are the 44px touch tier below `md` or on a coarse pointer
+ * (`touch:`) and the standard 36px control above it (DESIGN.md §3): a pointer
+ * never gets the phone-sized box and a thumb never gets the mouse-sized one.
  */
 export function iconButtonClassName({
   variant = 'ghost',
@@ -52,7 +52,11 @@ export function iconButtonClassName({
     interactiveClassName,
     focusRingClassName,
     disabledClassName,
-    size === 'md' ? 'size-11 md:size-9' : size === 'row' ? 'size-11 md:size-7' : 'size-9 md:size-7',
+    size === 'md'
+      ? 'size-11 md:size-9 touch:size-11'
+      : size === 'row'
+        ? 'size-11 md:size-7 touch:size-11'
+        : 'size-9 md:size-7 touch:size-9',
     // `border` alone here: each state below names its own border colour, so no
     // two border-colour utilities ever land on the element at once. Tailwind
     // resolves same-property utilities by stylesheet order, not by their order

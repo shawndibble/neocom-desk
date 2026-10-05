@@ -18,3 +18,11 @@ export function useMediaQuery(query: string): boolean {
   }, [query]);
   return matches;
 }
+
+/**
+ * The primary input is a finger. Written as `coarse` rather than "not fine" so
+ * the non-matching `matchMedia` stub in tests reads as a mouse. Use it where
+ * the *behaviour* is touch-specific (drag vs long-press, inline submenus);
+ * layout-only breakpoints stay on width.
+ */
+export const COARSE_POINTER_QUERY = '(pointer: coarse)';

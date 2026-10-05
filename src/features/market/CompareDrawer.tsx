@@ -290,7 +290,6 @@ export function CompareDrawer({
           ) : row.summary?.bestSell != null ? (
             <IskAmount
               value={row.summary.bestSell}
-              revealOn="tap"
               decimals={marketIskDecimals(row.summary.bestSell)}
             />
           ) : (
@@ -310,7 +309,6 @@ export function CompareDrawer({
           ) : row.summary?.bestBuy != null ? (
             <IskAmount
               value={row.summary.bestBuy}
-              revealOn="tap"
               decimals={marketIskDecimals(row.summary.bestBuy)}
             />
           ) : (
@@ -330,7 +328,6 @@ export function CompareDrawer({
           ) : row.summary?.spread != null ? (
             <IskAmount
               value={row.summary.spread}
-              revealOn="tap"
               decimals={marketIskDecimals(row.summary.spread)}
             />
           ) : (
@@ -361,7 +358,7 @@ export function CompareDrawer({
           if (row.loading) return '…';
           const { afterFees } = marginFor(row);
           return afterFees != null ? (
-            <IskAmount value={afterFees} revealOn="tap" decimals={marketIskDecimals(afterFees)} />
+            <IskAmount value={afterFees} decimals={marketIskDecimals(afterFees)} />
           ) : (
             '—'
           );
@@ -433,7 +430,7 @@ export function CompareDrawer({
               tabIndex={mode === 'open' ? 0 : -1}
               onPointerDown={startDrag}
               onKeyDown={onHandleKeyDown}
-              className={`h-1.5 shrink-0 border-b border-line ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
+              className={`h-1.5 shrink-0 touch-none border-b border-line touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-11 touch:before:-translate-y-1/2 touch:before:content-[''] ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
             />
           )}
           <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">

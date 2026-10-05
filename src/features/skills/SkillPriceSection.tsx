@@ -82,7 +82,7 @@ export function SkillPriceSection({
     return value === null ? (
       <span className="text-text-dim">{t('skills.inspector.priceNoSellOrders')}</span>
     ) : (
-      <IskAmount value={value} revealOn="tap" />
+      <IskAmount value={value} />
     );
   }
 
@@ -117,7 +117,7 @@ export function SkillPriceSection({
               />
             </dt>
             <dd>
-              <IskAmount value={npcPrice} revealOn="tap" />
+              <IskAmount value={npcPrice} />
             </dd>
           </div>
         )}

@@ -111,13 +111,10 @@ export function CorpVitalsRail({
           })}
         </div>
         <StatChips>
-          <StatChip
-            label={t('corp.vitals.total')}
-            value={<IskAmount value={total} revealOn="tap" />}
-          />
+          <StatChip label={t('corp.vitals.total')} value={<IskAmount value={total} />} />
           <StatChip
             label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-            value={<IskAmount value={net} revealOn="tap" />}
+            value={<IskAmount value={net} />}
             tone={net < 0 ? 'danger' : 'success'}
           />
           <StatChip

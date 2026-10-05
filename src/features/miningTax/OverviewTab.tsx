@@ -410,7 +410,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
       // Dense phone card's headline figure (`stackLayout="dense"` below) —
       // this is the column that's on by default, so it's the number a
@@ -422,7 +422,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.totalColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
       stackAffix: { before: `${t('miningTax.overview.totalColumn')} ` },
     },
@@ -431,7 +431,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.refineValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.refineValue} decimals={0} />,
       sortValue: (row) => row.valuation.refineValue,
       // Short, dense-meta-line label ("Refined 91.6M"): the full column
       // header ("Refined value") is right for a desktop table but repeats
@@ -645,12 +645,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.totalValueStat')}
                   </p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
-                    <IskAmount value={totals.rawValue} revealOn="tap" decimals={0} />
+                    <IskAmount value={totals.rawValue} decimals={0} />
                   </p>
                   {showRefining && (
                     <p className="text-[0.6875rem] text-text-dim">
                       {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
-                      <IskAmount value={totals.refineValue} revealOn="tap" decimals={0} />
+                      <IskAmount value={totals.refineValue} decimals={0} />
                     </p>
                   )}
                 </Panel>
@@ -660,7 +660,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   </p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
                     {totals.iskPerHour !== null ? (
-                      <IskAmount value={totals.iskPerHour} revealOn="tap" decimals={0} />
+                      <IskAmount value={totals.iskPerHour} decimals={0} />
                     ) : (
                       '—'
                     )}

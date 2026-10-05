@@ -55,7 +55,10 @@ export const disabledClassName =
 
 /**
  * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
- * step up on a touch viewport so a thumb gets a 44px target. `IconButton`
+ * step up on a touch viewport so a thumb gets a 44px target. Touch means below
+ * `md` *or* a coarse primary pointer (`touch:`, see `index.css`), so a touch
+ * tablet keeps the touch tier at every width; `touch:` is declared after `md:`
+ * and wins above it, and a fine pointer renders exactly as before. `IconButton`
  * shipped this tier first (`size-11 md:size-9`); it lives here now so the text
  * controls beside it match at *both* breakpoints instead of only on desktop.
  *
@@ -63,8 +66,8 @@ export const disabledClassName =
  * readouts, not targets, and growing them on a phone would only cost rows.
  */
 export const controlHeightClassName: Record<ControlSize, string> = {
-  sm: 'h-9 md:h-7',
-  md: 'h-11 md:h-9',
+  sm: 'h-9 md:h-7 touch:h-9',
+  md: 'h-11 md:h-9 touch:h-11',
 };
 
 /**
@@ -97,7 +100,24 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
  * `min-h-11` / `md:min-h-7` shape #1055's Balances-strip fix established).
  * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
  */
-export const tappableRowClassName = 'min-h-11 md:min-h-7';
+export const tappableRowClassName = 'min-h-11 md:min-h-7 touch:min-h-11';
+
+/**
+ * A 44px hit area on a coarse pointer for a small native control (a checkbox,
+ * a radio) without moving anything: an invisible `::before` 14px past the 16px
+ * box on every side. Pseudo-elements belong to their element, so a tap on the
+ * padding checks the box, and layout is untouched.
+ */
+export const touchHitAreaClassName =
+  "touch:relative touch:before:absolute touch:before:-inset-3.5 touch:before:content-['']";
+
+/**
+ * A 44px hit area on a coarse pointer for a small drag grip: an invisible
+ * `::before` square centred on the grip, so a thumb finds a 16px glyph without
+ * the row growing. The grip keeps `touch-none` itself (drag only from a grip).
+ */
+export const gripHitAreaClassName =
+  "touch:relative touch:before:absolute touch:before:top-1/2 touch:before:left-1/2 touch:before:size-11 touch:before:-translate-x-1/2 touch:before:-translate-y-1/2 touch:before:content-['']";
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
 export const inlineLinkClassName = cx(

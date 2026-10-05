@@ -25,7 +25,7 @@ import {
   Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { controlHeightClassName, gripHitAreaClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
@@ -469,7 +469,7 @@ const EntryRow = memo(function EntryRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.reorderEntry', { name: rowLabel })}
-      className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
     >
       <Icon.DragHandle />
     </button>
@@ -678,7 +678,7 @@ const PrereqRow = memo(function PrereqRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.dragPrereq', { name: label })}
-      className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
     >
       <Icon.DragHandle />
     </button>
@@ -825,7 +825,7 @@ const MarkerRow = memo(function MarkerRow({
         type="button"
         {...handleProps}
         aria-label={t('plans.reorderMarker')}
-        className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={`cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
       >
         <Icon.DragHandle />
       </button>

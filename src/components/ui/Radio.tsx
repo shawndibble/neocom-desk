@@ -1,6 +1,6 @@
 import { forwardRef, type InputHTMLAttributes } from 'react';
 import { cx } from '@/lib/cx';
-import { disabledClassName, focusRingClassName } from './controlStyles';
+import { disabledClassName, focusRingClassName, touchHitAreaClassName } from './controlStyles';
 
 type RadioProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
@@ -23,6 +23,7 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
       type="radio"
       className={cx(
         'size-4 shrink-0 cursor-pointer accent-accent',
+        touchHitAreaClassName,
         focusRingClassName,
         disabledClassName,
         className

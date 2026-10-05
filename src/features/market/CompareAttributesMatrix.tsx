@@ -60,7 +60,7 @@ export interface CompareAttributesMatrixProps {
 /** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): ReactNode {
   if (kind === 'price')
-    return <IskAmount value={cell.value} revealOn="tap" decimals={marketIskDecimals(cell.value)} />;
+    return <IskAmount value={cell.value} decimals={marketIskDecimals(cell.value)} />;
   return (
     cell.displayValue ??
     `${formatAttributeValue(cell.value, cell.unit)}${cell.unit ? ` ${cell.unit}` : ''}`

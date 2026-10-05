@@ -127,6 +127,7 @@ export function NavItem({
       onClick={onClick}
       onMouseEnter={warm}
       onFocus={warm}
+      onPointerDown={warm}
       className={(state) => cx(linkClass(state), className)}
       title={locked ? t('reauth.navLocked') : undefined}
       aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}

@@ -30,6 +30,7 @@ import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
+import { RowTappableContext } from './tooltipHold';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
 import { ExportTableItems, TableExportProvider } from './TableExport';
@@ -1476,12 +1477,18 @@ export function DataTable<T>({
 
   // No wrapper element either way, so `className` and every caller's layout
   // (a flex/grid parent sizing the table) see the same `<table>` child.
-  return sortBar ? (
-    <>
-      {sortBar}
-      {body}
-    </>
-  ) : (
-    body
+  // A clickable row owns its tap, so an `IskAmount` inside it stops claiming it
+  // (see `RowTappableContext`).
+  return (
+    <RowTappableContext.Provider value={clickable}>
+      {sortBar ? (
+        <>
+          {sortBar}
+          {body}
+        </>
+      ) : (
+        body
+      )}
+    </RowTappableContext.Provider>
   );
 }

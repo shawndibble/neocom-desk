@@ -753,11 +753,7 @@ export function BuildGroupPanel({
                         {row?.result ? (
                           // Long press, not tap: the whole row is a button
                           // that opens the plan.
-                          <IskAmount
-                            value={row.result.totalCost}
-                            revealOn="longPress"
-                            decimals={0}
-                          />
+                          <IskAmount value={row.result.totalCost} decimals={0} />
                         ) : (
                           '—'
                         )}

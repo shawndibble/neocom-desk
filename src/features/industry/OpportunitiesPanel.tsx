@@ -410,7 +410,7 @@ export function OpportunitiesPanel({
         numericCell(
           unitMargin(row),
           // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -442,7 +442,7 @@ export function OpportunitiesPanel({
         numericCell(
           row.result.iskPerHour,
           // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },

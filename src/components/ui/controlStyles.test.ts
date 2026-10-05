@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { iconButtonClassName } from './iconButtonClassName';
+import { menuItemClassName } from './menuStyles';
 import {
+  controlHeightClassName,
+  gripHitAreaClassName,
+  tappableRowClassName,
+  touchHitAreaClassName,
   disabledClassName,
   focusRingClassName,
   focusRingInsetClassName,
@@ -90,5 +96,50 @@ describe('primitives compose the shared recipe', () => {
     expect(readFileSync('src/components/ui/buttonClassName.ts', 'utf8')).not.toContain(
       'pointer-events-none'
     );
+  });
+});
+
+describe('touch tier', () => {
+  it('keeps the touch height on a coarse pointer above md, and the pointer height otherwise', () => {
+    expect(controlHeightClassName.sm).toBe('h-9 md:h-7 touch:h-9');
+    expect(controlHeightClassName.md).toBe('h-11 md:h-9 touch:h-11');
+    expect(tappableRowClassName).toBe('min-h-11 md:min-h-7 touch:min-h-11');
+  });
+
+  it('puts `touch:` after `md:` in every sized class, so it wins above md', () => {
+    for (const size of ['md', 'sm', 'row'] as const) {
+      const classes = iconButtonClassName({ size }).split(' ');
+      const md = classes.findIndex((c) => c.startsWith('md:size-'));
+      const touch = classes.findIndex((c) => c.startsWith('touch:size-'));
+      expect(md).toBeGreaterThan(-1);
+      expect(touch).toBeGreaterThan(md);
+    }
+    expect(iconButtonClassName({ size: 'md' })).toContain('touch:size-11');
+    expect(iconButtonClassName({ size: 'row' })).toContain('touch:size-11');
+    expect(iconButtonClassName({ size: 'sm' })).toContain('touch:size-9');
+  });
+
+  it('gives menu items a 44px target on touch', () => {
+    expect(menuItemClassName).toContain('touch:min-h-11');
+  });
+
+  it('gives checkboxes and grips a padded pseudo-element, not a layout change', () => {
+    expect(touchHitAreaClassName).toContain('touch:before:-inset-3.5');
+    expect(gripHitAreaClassName).toContain('touch:before:size-11');
+    expect(`${touchHitAreaClassName} ${gripHitAreaClassName}`).not.toMatch(/(^| )(p|m|size|h|w)-/);
+  });
+
+  it('declares the touch variant against a coarse pointer', () => {
+    const css = readFileSync('src/styles/index.css', 'utf8');
+    expect(css).toContain('@custom-variant touch (@media (pointer: coarse));');
+  });
+
+  it('has no long-press tooltip override left in app source', () => {
+    const offenders = ['src']
+      .flatMap((dir) => sourceFiles(dir))
+      .filter((file) =>
+        /holdToReveal|revealOn="longPress"|'longPress'/.test(readFileSync(file, 'utf8'))
+      );
+    expect(offenders).toEqual([]);
   });
 });
