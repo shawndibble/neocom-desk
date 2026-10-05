@@ -486,7 +486,7 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
       };
     }
     const own = ctx.baselines.get(c.planetId);
-    if (own?.status === 'ok') {
+    if (own?.status === 'ok' && own.slots.length > 0) {
       // The Baseline was picked from fitting options, so this refit fits.
       const keep = colonyExtraction(
         c,

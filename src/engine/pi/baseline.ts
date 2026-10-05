@@ -28,7 +28,9 @@
  * `needs-price` — never scored at zero, and never quietly skipped while the
  * best of the *priced* options is returned, because the unpriced one may well
  * be the best. A colony where no option fits at all (a Command Center too
- * small for one ECU and its heads) is `nothing-fits`.
+ * small for one ECU and its heads) is `nothing-fits`. A colony where every
+ * option nets negative (customs above the bid) is `ok` with no slots and
+ * zero: the pilot would leave it idle rather than sell at a loss.
  *
  * Pure: prices, colonies and policy are parameters.
  */
@@ -112,7 +114,10 @@ export function colonyBaseline(
       best = { slots: option.slots, iskPerHour };
     }
   }
-  // `options` is non-empty, so `best` is set.
+  // `options` is non-empty, so `best` is set. Selling at a loss is not what a
+  // pilot does with a colony: one whose best P1 nets below its own customs
+  // sells nothing, and its Baseline is zero, never negative.
+  if (best!.iskPerHour <= 0) return { status: 'ok', slots: [], iskPerHour: 0 };
   return { status: 'ok', ...best! };
 }
 

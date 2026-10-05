@@ -111,6 +111,17 @@ describe('colonyBaseline', () => {
     });
   });
 
+  it('floors at zero: a colony whose best P1 nets below its customs sells nothing', () => {
+    // At 100% customs every P1 here costs 400 ISK a unit to export and fetches 100.
+    const result = colonyBaseline(
+      colony({ taxRate: 1 }),
+      pi,
+      POLICY,
+      books({ [REACTIVE_METALS]: 100, [PRECIOUS_METALS]: 100 })
+    );
+    expect(result).toEqual({ status: 'ok', slots: [], iskPerHour: 0 });
+  });
+
   it('says when nothing fits', () => {
     // CC0's 6000 MW cannot carry one 10-head ECU (8100 MW).
     expect(
