@@ -29,25 +29,35 @@ export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
       : null,
 });
 
-/** Folds a ledger load into the log — every character whose fetch is newer than the last one recorded. */
+/**
+ * Folds a ledger load into the log — every character whose fetch is newer than
+ * the last one recorded. Never throws: this is a side record, and a failed
+ * write (storage full, private browsing) must not fail the Tax tab's load. The
+ * store applies the new log in memory before it writes, so this session still
+ * has it.
+ */
 export async function recordLedgerArrivals(
   ledgers: readonly CharacterMiningLedger[]
 ): Promise<void> {
-  await useOreArrivalLog.getState().hydrate();
-  const before = useOreArrivalLog.getState().value;
-  let log = before;
-  for (const ledger of ledgers) {
-    if (!ledger.fetchedAt) continue;
-    log = recordLedgerFetch(
-      log,
-      ledger.characterId,
-      ledger.entries.map((entry) => ({
-        date: entry.date,
-        solarSystemId: entry.solarSystemId,
-        quantity: entry.oreLines.reduce((sum, line) => sum + line.quantity, 0),
-      })),
-      ledger.fetchedAt.getTime()
-    );
+  try {
+    await useOreArrivalLog.getState().hydrate();
+    const before = useOreArrivalLog.getState().value;
+    let log = before;
+    for (const ledger of ledgers) {
+      if (!ledger.fetchedAt) continue;
+      log = recordLedgerFetch(
+        log,
+        ledger.characterId,
+        ledger.entries.map((entry) => ({
+          date: entry.date,
+          solarSystemId: entry.solarSystemId,
+          quantity: entry.oreLines.reduce((sum, line) => sum + line.quantity, 0),
+        })),
+        ledger.fetchedAt.getTime()
+      );
+    }
+    if (log !== before) await useOreArrivalLog.getState().setValue(log);
+  } catch {
+    // Settle up then has less to compare against: it falls back to small print.
   }
-  if (log !== before) await useOreArrivalLog.getState().setValue(log);
 }

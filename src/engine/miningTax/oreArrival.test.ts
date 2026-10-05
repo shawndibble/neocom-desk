@@ -147,7 +147,13 @@ describe('arrivalNotice', () => {
     });
   });
 
-  it('counts how many of the settled entries are still growing, and waits for the latest', () => {
+  it('counts an entry settled as several Assignments once', () => {
+    expect(
+      arrivalNotice([...settled(), ...settled()], growing(), at('2026-10-04T12:20:00Z'))
+    ).toMatchObject({ kind: 'arriving', arriving: 1, of: 1 });
+  });
+
+  it('counts how many of the entries that can still grow are growing, and waits for the latest', () => {
     const other = { characterId: CHAR, date: '2026-10-04', solarSystemId: 1 };
     let log = recordLedgerFetch(
       EMPTY_ORE_ARRIVAL_LOG,
@@ -167,7 +173,7 @@ describe('arrivalNotice', () => {
         log,
         at('2026-10-04T12:20:00Z')
       )
-    ).toEqual({ kind: 'arriving', arriving: 1, of: 3, waitMs: ARRIVAL_WINDOW_MS - 10 * MIN });
+    ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: ARRIVAL_WINDOW_MS - 10 * MIN });
   });
 });
 

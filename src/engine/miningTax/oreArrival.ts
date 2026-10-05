@@ -105,7 +105,11 @@ export type ArrivalNotice =
   | { kind: 'none' }
   /** Some can, but none has grown in the last hour (or the app can't tell yet). */
   | { kind: 'quiet' }
-  /** `arriving` of the `of` entries being settled grew within the hour; wait `waitMs` for the last. */
+  /**
+   * `arriving` of the `of` entries that can still grow did so within the hour;
+   * wait `waitMs` for the last. Counted per Mining Ledger Entry, however many
+   * Assignments it is settled as.
+   */
   | { kind: 'arriving'; arriving: number; of: number; waitMs: number };
 
 export function arrivalNotice(
@@ -113,19 +117,23 @@ export function arrivalNotice(
   log: OreArrivalLog,
   nowMs: number
 ): ArrivalNotice {
-  const inWindow = settled.filter((ref) => isInArrivalWindow(ref.date, nowMs));
-  if (inWindow.length === 0) return { kind: 'none' };
+  const inWindow = new Set(
+    settled
+      .filter((ref) => isInArrivalWindow(ref.date, nowMs))
+      .map((ref) => entryKey(ref.characterId, ref.date, ref.solarSystemId))
+  );
+  if (inWindow.size === 0) return { kind: 'none' };
 
   let arriving = 0;
   let waitMs = 0;
-  for (const ref of inWindow) {
-    const grewAt = log.entries[entryKey(ref.characterId, ref.date, ref.solarSystemId)]?.grewAt;
+  for (const key of inWindow) {
+    const grewAt = log.entries[key]?.grewAt;
     if (grewAt == null || nowMs - grewAt >= ARRIVAL_WINDOW_MS) continue;
     arriving += 1;
     waitMs = Math.max(waitMs, grewAt + ARRIVAL_WINDOW_MS - nowMs);
   }
   if (arriving === 0) return { kind: 'quiet' };
-  return { kind: 'arriving', arriving, of: settled.length, waitMs };
+  return { kind: 'arriving', arriving, of: inWindow.size, waitMs };
 }
 
 /** Whether any entry that can still grow belongs to a character whose ledger wasn't fetched since `sinceMs`. */

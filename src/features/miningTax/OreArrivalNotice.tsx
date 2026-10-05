@@ -34,25 +34,30 @@ export function OreArrivalNotice({ entries, checking, pullStartedAt }: OreArriva
   const notice = arrivalNotice(entries, log, now);
   if (notice.kind === 'none') return null;
 
-  if (notice.kind === 'arriving') {
+  const arriving = notice.kind === 'arriving';
+  let text: string;
+  if (arriving) {
     const minutes = Math.max(1, Math.ceil(notice.waitMs / MINUTE_MS));
-    return (
-      <p role="status" className="flex items-center gap-1.5 text-xs text-warning">
-        <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-        {notice.arriving === notice.of
-          ? t('miningTax.settleUp.arrival.arriving', { minutes })
-          : t('miningTax.settleUp.arrival.arrivingSome', { count: notice.arriving, minutes })}
-      </p>
-    );
-  }
-
-  let key = 'miningTax.settleUp.arrival.quiet';
-  if (checking) key = 'miningTax.settleUp.arrival.checking';
+    text =
+      notice.arriving === notice.of
+        ? t('miningTax.settleUp.arrival.arriving', { minutes })
+        : t('miningTax.settleUp.arrival.arrivingSome', { count: notice.arriving, minutes });
+  } else if (checking) text = t('miningTax.settleUp.arrival.checking');
   else if (pullStartedAt !== null && uncheckedSince(entries, log, pullStartedAt, now))
-    key = 'miningTax.settleUp.arrival.unchecked';
+    text = t('miningTax.settleUp.arrival.unchecked');
+  else text = t('miningTax.settleUp.arrival.quiet');
+
+  // One element whatever it says, so a screen reader's live region survives
+  // the switch between the warning and the small print.
   return (
-    <p role="status" className="text-xs text-text-dim">
-      {t(key)}
+    <p
+      role="status"
+      className={
+        arriving ? 'flex items-center gap-1.5 text-xs text-warning' : 'text-xs text-text-dim'
+      }
+    >
+      {arriving && <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />}
+      {text}
     </p>
   );
 }
