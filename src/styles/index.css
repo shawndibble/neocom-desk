@@ -557,14 +557,19 @@
      The row pads its right side to clear it. Not the default because the
      other dense tables with actions (Hauling, Contract Search, Mining Tax)
      carry chevrons and `end` edge boxes this has not been checked against. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned td.dt-actions {
+  .dt-stacked.dt-stack-dense.dt-actions-pinned td.dt-actions,
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
     position: absolute;
     top: 50%;
     right: 0.25rem;
     transform: translateY(-50%);
   }
 
-  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
+  /* `dt-actions-pinned-only`: same pinned button, headline figure left in
+     flow on line one (Market order book: a long ISK price would not fit the
+     pinned corner's fixed width). */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions),
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
     padding-right: 3rem;
   }
 

@@ -337,6 +337,7 @@ export function OrderSideCard({
               // not read.
               stackLayout="dense"
               stacked={cards}
+              className="dt-actions-pinned-only"
               rowContextMenu={rowContextMenu}
               rowMoreActions
               rowClassName={rowClassName}
