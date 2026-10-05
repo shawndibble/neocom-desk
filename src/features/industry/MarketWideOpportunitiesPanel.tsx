@@ -344,7 +344,7 @@ export function MarketWideOpportunitiesPanel({
           t('common.unknown')
         ) : (
           <span className="inline-flex items-center justify-end gap-1">
-            <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+            <IskAmount value={row.iskPerHour} decimals={0} />
             {row.priceCapped && (
               <InfoTooltip
                 label={t('industry.marketOpportunitiesPriceCapped')}
@@ -360,7 +360,7 @@ export function MarketWideOpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.buildCost,
-      render: (row) => <IskAmount value={row.buildCost} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.buildCost} decimals={0} />,
     },
     {
       id: 'orderDepth',

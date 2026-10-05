@@ -380,11 +380,7 @@ function OpenInMarketLink({ typeId, onNavigate }: { typeId: number; onNavigate: 
  * The line is inert, so a tap is free to be the reveal.
  */
 function priceCell(price: number | null): ReactNode {
-  return price != null ? (
-    <IskAmount value={price} revealOn="tap" decimals={marketIskDecimals(price)} />
-  ) : (
-    '—'
-  );
+  return price != null ? <IskAmount value={price} decimals={marketIskDecimals(price)} /> : '—';
 }
 
 /**

@@ -42,9 +42,8 @@ interface BuildPlanCompareProps {
 /**
  * A numeric cell: "…" while its row is still fetching, else the formatted
  * value or "—" when unresolved (row.error) or unpriceable (BuildResult's own
- * null). ISK cells pass an `IskAmount` node rather than a string — `revealOn`
- * is "tap" throughout, because nothing in this table takes a row tap of its
- * own. Sorting still reads `sortValue` off the raw number.
+ * null). ISK cells pass an `IskAmount` node rather than a string. Sorting still
+ * reads `sortValue` off the raw number.
  */
 function numericCell(
   row: ComparedBuildRow,
@@ -165,7 +164,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.totalCost ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -181,7 +180,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.profit ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -203,7 +202,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.iskPerHour ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -217,7 +216,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.breakEvenPrice ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },

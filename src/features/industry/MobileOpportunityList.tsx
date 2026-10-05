@@ -107,7 +107,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
           node: (
             <>
               {value > 0 ? '+' : ''}
-              <IskAmount value={value} revealOn="tap" decimals={0} />
+              <IskAmount value={value} decimals={0} />
             </>
           ),
           toneClassName: iskToneClass(value),
@@ -124,7 +124,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
           node: (
             <>
               {value > 0 ? '+' : ''}
-              <IskAmount value={value} revealOn="tap" decimals={0} />
+              <IskAmount value={value} decimals={0} />
             </>
           ),
           toneClassName: iskToneClass(value),

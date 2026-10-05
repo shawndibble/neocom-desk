@@ -216,11 +216,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         className: 'tabular-nums',
         sortValue: (order) => order.price,
         render: (order) => (
-          <IskAmount
-            value={order.price}
-            revealOn="longPress"
-            decimals={marketIskDecimals(order.price)}
-          />
+          <IskAmount value={order.price} decimals={marketIskDecimals(order.price)} />
         ),
       },
       {

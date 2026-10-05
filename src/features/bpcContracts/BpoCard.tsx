@@ -46,7 +46,6 @@ export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: Bp
       <span className="flex min-w-0 items-center gap-1">
         <IskAmount
           value={bpo.price}
-          revealOn="tap"
           className={cx('text-sm tabular-nums', cheapest && 'text-accent')}
         />
         {mayBeCheaper && (

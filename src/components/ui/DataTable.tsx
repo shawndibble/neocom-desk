@@ -32,6 +32,7 @@ import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
+import { RowTappableContext } from './tooltipHold';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
 import { ExportTableItems, TableExportProvider } from './TableExport';
@@ -482,6 +483,8 @@ interface DataTableRowProps<T> {
   /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
   renderDetail: ((row: T) => ReactNode) | undefined;
   clickable: boolean;
+  /** A tap on the row runs `onRowClick`; an expand-only row does not count (see `RowTappableContext`). */
+  tapOpensRow: boolean;
   focusable: boolean;
   /** Stable (see `DataTable`'s `activateRow`). */
   onActivate: (row: T, key: string | number) => void;
@@ -530,6 +533,7 @@ function DataTableRowImpl<T>({
   hideExpandIcon,
   renderDetail,
   clickable,
+  tapOpensRow,
   focusable,
   onActivate,
   rowClassName,
@@ -651,7 +655,11 @@ function DataTableRowImpl<T>({
               column.cellClassName?.(row)
             )}
           >
-            {column.render(row)}
+            {/* Only the body cell is "inside a tappable row": the detail row, header,
+                footer and group headers sit outside this provider. */}
+            <RowTappableContext.Provider value={tapOpensRow}>
+              {column.render(row)}
+            </RowTappableContext.Provider>
           </td>
         );
       })}
@@ -1225,6 +1233,7 @@ export function DataTable<T>({
         hideExpandIcon={expandableRow?.hideIcon ?? false}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
         clickable={clickable}
+        tapOpensRow={Boolean(onRowClick)}
         focusable={focusable}
         onActivate={activateRow}
         rowClassName={rowClassName}

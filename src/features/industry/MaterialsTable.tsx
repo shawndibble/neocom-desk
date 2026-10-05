@@ -1054,7 +1054,7 @@ export function MaterialsTable({
           t('common.unknown')
         ) : (
           // Long press, not tap: the row's own tap belongs to its context menu.
-          <IskAmount value={state.lineCost} revealOn="longPress" decimals={0} />
+          <IskAmount value={state.lineCost} decimals={0} />
         )}
       </span>
     );
@@ -1234,7 +1234,7 @@ export function MaterialsTable({
                   {t('industry.errands.unpricedCount', { count: subtotal.unpricedCount })}
                 </span>
               )}
-              <IskAmount value={subtotal.total} revealOn="longPress" decimals={0} />
+              <IskAmount value={subtotal.total} decimals={0} />
             </span>
           )
         )}

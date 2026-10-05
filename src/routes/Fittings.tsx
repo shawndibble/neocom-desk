@@ -84,7 +84,7 @@ import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
@@ -123,6 +123,9 @@ function FittingsPage() {
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
+  // The HTML5 drag gate follows the input, not just the width: a touch laptop
+  // is wide, but a long-press there belongs to the row menu, not a drag.
+  const coarsePointer = useMediaQuery(COARSE_POINTER_QUERY);
   const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
     ? 'docked'
     : isDesktop
@@ -349,7 +352,7 @@ function FittingsPage() {
       moduleResults={moduleResults}
       onLoadCharge={(chargeTypeId) => charges.load(chargeTypeId)}
       onAddCargo={(typeId, quantity) => edit((f) => addCargo(f, typeId, quantity))}
-      dragToRing={isDesktop}
+      dragToRing={isDesktop && !coarsePointer}
       showDrones={dronesShown}
     />
   );

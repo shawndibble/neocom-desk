@@ -223,7 +223,7 @@ export function LocationRow({
             <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums text-isk-pos">
-              <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
+              <IskAmount value={estimatedValue} decimals={0} />
             </span>
           </span>
         </span>
@@ -473,7 +473,7 @@ export function ItemRow({
                 ·
               </span>
               <span className={cx('text-isk-pos', ITEM_VALUE_CELL)}>
-                <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
+                <IskAmount value={estimatedValue} decimals={0} />
               </span>
             </span>
           </span>
@@ -541,7 +541,7 @@ export function SearchResultRow({
             <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
           </span>
           <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
-            <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
+            <IskAmount value={estimatedValue} decimals={0} />
           </span>
         </span>
       </Link>

@@ -164,7 +164,7 @@ function OfferDetail({
         align: 'right',
         className: 'tabular-nums text-text',
         sortValue: (material) => material.lineCost,
-        render: (material) => <IskAmount value={material.lineCost} revealOn="tap" decimals={0} />,
+        render: (material) => <IskAmount value={material.lineCost} decimals={0} />,
       },
     ],
     [t, catalog, hubId]
@@ -227,11 +227,7 @@ function OfferDetail({
             {t('loyaltyStore.netProfit')}
           </div>
           <div className={`text-xl font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>
-            {profit.profit === null ? (
-              '—'
-            ) : (
-              <IskAmount value={profit.profit} revealOn="tap" decimals={0} />
-            )}
+            {profit.profit === null ? '—' : <IskAmount value={profit.profit} decimals={0} />}
           </div>
         </div>
       </div>
@@ -535,11 +531,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         sortValue: (row) => row.profit.profit ?? undefined,
         cellClassName: (row) => iskPerLpTone(row.profit.profit),
         render: (row) =>
-          row.profit.profit === null ? (
-            '—'
-          ) : (
-            <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
-          ),
+          row.profit.profit === null ? '—' : <IskAmount value={row.profit.profit} decimals={0} />,
       },
       iskPerLp: {
         id: 'iskPerLp',
@@ -574,7 +566,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           </span>
           <span className="text-[0.6875rem] text-text-dim">
             {row.offer.lp_cost.toLocaleString()} LP +{' '}
-            <IskAmount value={row.offer.isk_cost} revealOn="longPress" decimals={0} />
+            <IskAmount value={row.offer.isk_cost} decimals={0} />
           </span>
         </span>
       ),

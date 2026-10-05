@@ -31,7 +31,7 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
@@ -1369,11 +1369,14 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             stackEdge: 'start',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
-                <Checkbox
-                  aria-label={t('miningTax.selectForBulkAction')}
-                  checked={selection.has(dr.key)}
-                  onChange={() => toggleRowSelected(dr.key)}
-                />
+                // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
+                <label className={touchCheckboxLabelClassName}>
+                  <Checkbox
+                    aria-label={t('miningTax.selectForBulkAction')}
+                    checked={selection.has(dr.key)}
+                    onChange={() => toggleRowSelected(dr.key)}
+                  />
+                </label>
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,
         ]

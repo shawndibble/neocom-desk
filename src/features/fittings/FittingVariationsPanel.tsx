@@ -134,7 +134,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
         row.price === null ? (
           <span className="text-text-dim">{t('fittings.variations.priceUnknown')}</span>
         ) : (
-          <IskAmount value={row.price} revealOn="longPress" />
+          <IskAmount value={row.price} />
         ),
     },
   ];

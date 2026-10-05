@@ -12,6 +12,10 @@ type RadioProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
  * About thirty sites each hand-copied this string, and four had already grown
  * their own disabled treatment. Layout nudges (`mt-0.5` on a multi-line row)
  * and focus outlines stay the caller's `className`.
+ *
+ * No touch hit area of its own: a pseudo-element on a native control is not
+ * drawn everywhere, so the 44px target is the wrapping label's
+ * (`tappableRowClassName` rows, or `touchCheckboxLabelClassName` for a bare one).
  */
 export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(
   { className, ...rest },

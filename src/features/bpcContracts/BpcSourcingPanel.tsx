@@ -1359,7 +1359,7 @@ export function BpcSourcingPanel() {
           return effectivePrice(contract);
         },
         render: (row) => {
-          if (row.source === 'market') return <IskAmount value={row.price} revealOn="longPress" />;
+          if (row.source === 'market') return <IskAmount value={row.price} />;
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
           // An auction's figure carries a short "buyout"/"bid" tag after
@@ -1387,7 +1387,7 @@ export function BpcSourcingPanel() {
             )
           ) : contract.isAuction ? (
             <>
-              <IskAmount value={contract.buyout ?? contract.price} revealOn="longPress" />
+              <IskAmount value={contract.buyout ?? contract.price} />
               <span className="ml-1 text-[0.6875rem] font-normal text-text-dim uppercase">
                 {contract.buyout !== undefined
                   ? t('contractSearch.buyoutShort')
@@ -1395,7 +1395,7 @@ export function BpcSourcingPanel() {
               </span>
             </>
           ) : (
-            <IskAmount value={contract.price} revealOn="longPress" />
+            <IskAmount value={contract.price} />
           );
           // A multi-type contract's ask is real but indivisible (issue
           // #1076) — marked rather than attributed to this one blueprint;
@@ -1823,19 +1823,19 @@ export function BpcSourcingPanel() {
                     <StatChip
                       className={CHEAPEST_HEADLINE_CHIP}
                       label={t('bpcContracts.cheapestLabel')}
-                      value={<IskAmount value={summary.cheapest} revealOn="tap" />}
+                      value={<IskAmount value={summary.cheapest} />}
                     />
                   )}
                   {summary.cheapestPerRun !== null && (
                     <StatChip
                       label={t('bpcContracts.cheapestPerRunLabel')}
-                      value={<IskAmount value={summary.cheapestPerRun} revealOn="tap" />}
+                      value={<IskAmount value={summary.cheapestPerRun} />}
                     />
                   )}
                   {summary.median !== null && (
                     <StatChip
                       label={t('bpcContracts.medianLabel')}
-                      value={<IskAmount value={summary.median} revealOn="tap" />}
+                      value={<IskAmount value={summary.median} />}
                     />
                   )}
                   {summary.bestMe !== null && summary.bestTe !== null && (
@@ -1906,7 +1906,7 @@ export function BpcSourcingPanel() {
                             index === 0 && cheapestCard === 'region' && 'text-accent'
                           )}
                         >
-                          <IskAmount value={region.cheapest} revealOn="tap" />
+                          <IskAmount value={region.cheapest} />
                         </span>
                         <span className="text-[0.6875rem] tabular-nums text-text-dim">
                           {t('bpcContracts.regionOffers', { count: region.offerCount })}

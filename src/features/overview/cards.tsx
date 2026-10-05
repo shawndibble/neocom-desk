@@ -233,7 +233,7 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
             ) : data === null || data.unpaidIsk === 0 ? (
               0
             ) : (
-              <IskAmount value={data.unpaidIsk} revealOn="tap" decimals={0} />
+              <IskAmount value={data.unpaidIsk} decimals={0} />
             )
           }
           severity="warning"

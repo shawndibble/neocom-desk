@@ -30,7 +30,6 @@ import {
   TextArea,
   TextInput,
   type DataTableColumn,
-  type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -102,9 +101,9 @@ function eachCell(value: number | null): string {
 }
 
 /** A line or hub total as scannable shorthand, exact value one gesture away. */
-function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode {
+function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
-  return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
+  return <IskAmount value={value} decimals={0} />;
 }
 
 /**
@@ -338,7 +337,7 @@ export function AppraisalPanel({
       className: 'whitespace-nowrap tabular-nums',
       render: (row) =>
         comparisonCell(
-          totalCell(row.buyTotal, 'longPress'),
+          totalCell(row.buyTotal),
           row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
@@ -348,7 +347,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sellTotal, 'longPress'),
+      render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
     refineTotal: {
@@ -360,7 +359,7 @@ export function AppraisalPanel({
         row.refineTotal === undefined
           ? '—'
           : comparisonCell(
-              totalCell(row.refineTotal, 'longPress'),
+              totalCell(row.refineTotal),
               refineBeatsSellAsIs(row),
               row.refinePricedAll === false && (
                 <span
@@ -391,7 +390,7 @@ export function AppraisalPanel({
         });
         return comparisonCell(
           <span className="inline-flex items-center gap-1">
-            {totalCell(row.lpIskCost ?? null, 'longPress')}
+            {totalCell(row.lpIskCost ?? null)}
             <LpStoreLink corporationId={row.lpCorporationId} label={label} />
           </span>,
           lpBeatsMarket(row),
@@ -644,7 +643,7 @@ export function AppraisalPanel({
                       label={t('market.appraisal.instantNet')}
                       value={
                         <span className={iskToneClass(net.instantNet)}>
-                          <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
+                          <IskAmount value={net.instantNet} decimals={0} />
                         </span>
                       }
                       tooltip={t('market.appraisal.instantNetHelp', {
@@ -657,7 +656,7 @@ export function AppraisalPanel({
                       label={t('market.appraisal.listNet')}
                       value={
                         <span className={iskToneClass(net.listNet)}>
-                          <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
+                          <IskAmount value={net.listNet} decimals={0} />
                         </span>
                       }
                       tooltip={t('market.appraisal.listNetHelp', {
@@ -670,14 +669,14 @@ export function AppraisalPanel({
                     label={t('market.appraisal.spread')}
                     value={
                       <span className={iskToneClass(totals.spread)}>
-                        <IskAmount value={totals.spread} revealOn="tap" decimals={0} />
+                        <IskAmount value={totals.spread} decimals={0} />
                       </span>
                     }
                   />
                   {hasRefine && (
                     <StatChip
                       label={t('market.appraisal.refineTotal')}
-                      value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
+                      value={<IskAmount value={totals.refine} decimals={0} />}
                       tooltip={
                         implantBonusPct > 0
                           ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
@@ -688,7 +687,7 @@ export function AppraisalPanel({
                   {hasLpOption && (
                     <StatChip
                       label={t('market.appraisal.cheapestBuy')}
-                      value={<IskAmount value={totals.cheapestBuy} revealOn="tap" decimals={0} />}
+                      value={<IskAmount value={totals.cheapestBuy} decimals={0} />}
                       tone="accent"
                       tooltip={t('market.appraisal.cheapestBuyHelp')}
                     />

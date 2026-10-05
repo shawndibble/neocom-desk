@@ -310,11 +310,7 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
-        numericCell(
-          row.iskPerHour,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
-          unknown
-        ),
+        numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
     },
     {
       id: 'action',

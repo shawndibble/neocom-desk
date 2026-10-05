@@ -1836,11 +1836,7 @@ export function Assets() {
                           {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                         </span>
                         <span className="text-isk-pos">
-                          <IskAmount
-                            value={currentTotals.estimatedValue}
-                            revealOn="tap"
-                            decimals={0}
-                          />
+                          <IskAmount value={currentTotals.estimatedValue} decimals={0} />
                         </span>
                       </span>
                     )}

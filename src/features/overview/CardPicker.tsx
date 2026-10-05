@@ -26,6 +26,7 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { gripHitAreaClassName } from '@/components/ui/controlStyles';
 import { isCardShown, OVERVIEW_CARD_LABEL, type OverviewCardKey } from './hiddenCards';
 
 function CardToggle({
@@ -70,7 +71,7 @@ function SortableCardRow({
         {...attributes}
         {...listeners}
         aria-label={t('overview.board.reorderCard', { name: t(OVERVIEW_CARD_LABEL[cardKey]) })}
-        className="cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={`cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${gripHitAreaClassName}`}
       >
         <Icon.DragHandle />
       </button>
@@ -112,7 +113,8 @@ export function CardPicker({
 }) {
   const { t } = useTranslation();
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // A 4px travel before a drag starts, so a tap on the grip is not a drag (as EntryList).
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const titleId = useId();

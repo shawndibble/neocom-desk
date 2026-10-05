@@ -415,11 +415,7 @@ function CharacterCard({
         <StatChip
           label={t('characters.walletLabel')}
           value={
-            stats?.wallet === undefined ? (
-              t('common.unknown')
-            ) : (
-              <IskAmount value={stats.wallet} revealOn="tap" />
-            )
+            stats?.wallet === undefined ? t('common.unknown') : <IskAmount value={stats.wallet} />
           }
         />
         {queue && (
@@ -704,7 +700,7 @@ function buildColumns(
         row.stats?.wallet === undefined ? (
           t('common.unknown')
         ) : (
-          <IskAmount value={row.stats.wallet} revealOn="longPress" />
+          <IskAmount value={row.stats.wallet} />
         ),
     },
     lastSynced: {
