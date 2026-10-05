@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { piTier } from './chain';
-import { planGoals } from './goalPlan';
+import { planGoals, rawOf, schematicOf } from './goalPlan';
 import type {
   Goal,
   GoalPlan,
@@ -634,5 +634,14 @@ describe('planGoals — what a gap can be fixed with', () => {
     expect(result.demand.filter((l) => l.source !== 'blocked').every((l) => !l.blockedBy)).toBe(
       true
     );
+  });
+});
+
+describe('SDE lookups', () => {
+  it('name the type id when the data has no entry for it', () => {
+    expect(schematicOf(COOLANT, pi).name).toBe('Coolant');
+    expect(rawOf(BASE_METALS, pi).typeID).toBe(BASE_METALS);
+    expect(() => schematicOf(34, pi)).toThrow('pi.json has no planetary schematic for type 34');
+    expect(() => rawOf(34, pi)).toThrow('pi.json has no P0 resource for type 34');
   });
 });

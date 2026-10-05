@@ -91,7 +91,7 @@
  * assignment for the goals themselves is price-free.
  */
 
-import type { PiData, PiFactoryKind } from '@/sde/types';
+import type { PiData, PiFactoryKind, PiRawResource, PiSchematic } from '@/sde/types';
 import { bidOf, colonyBaseline, p1NetPerUnit, type ColonyBaseline } from './baseline';
 import { expandChain, isP0, piTier } from './chain';
 import {
@@ -150,6 +150,23 @@ function byId(a: number, b: number): number {
   return a - b;
 }
 
+/**
+ * SDE lookups the planner never expects to miss: every id it asks about came
+ * out of the same `PiData`. A miss is broken data, so it throws naming the type
+ * rather than letting `undefined` surface as a NaN somewhere downstream.
+ */
+function sdeMiss(what: string, typeId: number): never {
+  throw new Error(`pi.json has no ${what} for type ${typeId}`);
+}
+
+export function schematicOf(typeId: number, pi: PiData): PiSchematic {
+  return pi.schematics[String(typeId)] ?? sdeMiss('planetary schematic', typeId);
+}
+
+export function rawOf(typeId: number, pi: PiData): PiRawResource {
+  return pi.raw.find((r) => r.typeID === typeId) ?? sdeMiss('P0 resource', typeId);
+}
+
 function factoriesFor(typeId: number, unitsPerHour: number, pi: PiData): number | null {
   const rate = singleFactoryRate(typeId, pi);
   return rate === null ? null : Math.ceil(unitsPerHour / rate - EPSILON);
@@ -193,7 +210,7 @@ function eligibleHosts(
   colonies: readonly PlannerColony[],
   pi: PiData
 ): PlannerColony[] {
-  const schematics = madeHigh.map((id) => pi.schematics[String(id)]);
+  const schematics = madeHigh.map((id) => schematicOf(id, pi));
   return colonies.filter((c) => schematics.every((s) => s.planetTypes.includes(c.planetType)));
 }
 
@@ -241,7 +258,7 @@ function triageGoals(
     const gaps = buyP1
       ? []
       : chain.nodes.filter(
-          (n) => n.tier === 1 && !yieldable(pi.schematics[String(n.typeId)].inputs[0].typeID)
+          (n) => n.tier === 1 && !yieldable(schematicOf(n.typeId, pi).inputs[0].typeID)
         );
     if (gaps.length === 0) {
       live.push(g);
@@ -250,7 +267,7 @@ function triageGoals(
     blocked.push(g);
     blockedBy.set(
       g,
-      [...new Set(gaps.map((n) => pi.schematics[String(n.typeId)].inputs[0].typeID))].sort(
+      [...new Set(gaps.map((n) => schematicOf(n.typeId, pi).inputs[0].typeID))].sort(
         (a, b) => a - b
       )
     );
@@ -259,9 +276,9 @@ function triageGoals(
   const typeGaps: Shortfall[] = [...gapUnits]
     .sort(([a], [b]) => a - b)
     .map(([p1TypeId, p1UnitsPerHour]) => {
-      const schematic = pi.schematics[String(p1TypeId)];
+      const schematic = schematicOf(p1TypeId, pi);
       const input = schematic.inputs[0];
-      const raw = pi.raw.find((r) => r.typeID === input.typeID)!;
+      const raw = rawOf(input.typeID, pi);
       return {
         kind: 'type-gap',
         p0TypeId: input.typeID,
@@ -299,7 +316,7 @@ function chooseHost(
   ctx: SolveContext
 ): { host: PlannerColony; reason: FactoryHostReason } | { host: null; facility: PiFactoryKind } {
   const { colonies, pi } = ctx;
-  const schematics = madeHigh.map((id) => pi.schematics[String(id)]);
+  const schematics = madeHigh.map((id) => schematicOf(id, pi));
   const eligible = eligibleHosts(madeHigh, colonies, pi);
   if (ctx.hostPlanetId !== undefined) {
     const forced = eligible.find((c) => c.planetId === ctx.hostPlanetId);
@@ -424,8 +441,9 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     const out: Partial<Record<PiFactoryKind, number>> = {};
     for (const [id, units] of rates) {
       if (tierOf(id) < 2 || units <= EPSILON) continue;
-      const facility = pi.schematics[String(id)].facility;
-      out[facility] = (out[facility] ?? 0) + factoriesFor(id, units, pi)!;
+      const facility = schematicOf(id, pi).facility;
+      out[facility] =
+        (out[facility] ?? 0) + (factoriesFor(id, units, pi) ?? sdeMiss('factory rate', id));
     }
     return out;
   };
@@ -478,7 +496,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   const p1Rows = [...demand]
     .filter(([id]) => tierOf(id) === 1)
     .map(([p1, units]) => {
-      const schematic = pi.schematics[String(p1)];
+      const schematic = schematicOf(p1, pi);
       const input = schematic.inputs[0];
       const eligible = sortedColonies.filter((c) => c.ratePerEcu.has(input.typeID));
       return {
