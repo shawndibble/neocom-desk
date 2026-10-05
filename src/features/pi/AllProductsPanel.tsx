@@ -7,7 +7,7 @@
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel, TypeIcon } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
@@ -68,7 +68,7 @@ function Tile({ tile }: { tile: ProductTile }) {
             <HintText
               content={t('piPlan.find.cmpHint', {
                 item: comparison.versus.name,
-                isk: formatIskCompact(comparison.versus.iskPerDay),
+                isk: formatIsk(comparison.versus.iskPerDay, 0),
                 type: t(`pi.planetType.${comparison.versus.planetType}`),
               })}
             >
@@ -95,8 +95,9 @@ export function AllProductsPanel({
   return (
     <Panel
       title={t('piPlan.find.allTitle')}
+      wrapMeta
       meta={
-        <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
+        <span className="text-[0.6875rem] text-text-dim max-md:basis-full">
           {t('piPlan.find.picksMeta', { hub: hubName })}
         </span>
       }

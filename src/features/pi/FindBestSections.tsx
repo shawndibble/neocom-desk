@@ -17,7 +17,7 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
@@ -249,7 +249,7 @@ function Comparison({ card }: { card: RecipeCardView }) {
       <HintText
         content={t('piPlan.find.cmpHint', {
           item: versus.name,
-          isk: formatIskCompact(versus.iskPerDay),
+          isk: formatIsk(versus.iskPerDay, 0),
           type: typeName(versus.planetType),
         })}
       >
@@ -288,7 +288,7 @@ function RecipeCard({
   return (
     <div
       className={cx(
-        'grid gap-x-4 gap-y-2 px-3 py-3 md:items-center',
+        'grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-2 px-3 py-3 md:items-center',
         'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_auto_7rem_minmax(0,1.1fr)_auto]'
       )}
     >
@@ -385,8 +385,9 @@ export function RecipeListPanel({
       {banner}
       <Panel
         title={t('piPlan.find.picksTitle')}
+        wrapMeta
         meta={
-          <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
+          <span className="text-[0.6875rem] text-text-dim max-md:basis-full">
             {t('piPlan.find.picksMeta', { hub: hubName })}
           </span>
         }

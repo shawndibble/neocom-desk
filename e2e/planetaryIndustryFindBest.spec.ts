@@ -17,11 +17,21 @@ const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1440, height: 900 };
 
 async function assertNoOverflow(page: Page): Promise<void> {
-  const doc = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  const doc = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    // On failure the offenders are the useful part of the message.
+    const wide = [...document.querySelectorAll('main *')]
+      .filter((el) => el.getBoundingClientRect().right > width + 0.5)
+      .slice(0, 6)
+      .map(
+        (el) =>
+          `${el.tagName} ${String(el.className).slice(0, 80)} "${el.textContent?.slice(0, 40)}"`
+      );
+    return { scrollWidth: document.documentElement.scrollWidth, clientWidth: width, wide };
+  });
+  expect(doc.scrollWidth, `overflowing: ${doc.wide.join(' | ')}`).toBeLessThanOrEqual(
+    doc.clientWidth
+  );
 }
 
 async function shot(page: Page, name: string): Promise<void> {
