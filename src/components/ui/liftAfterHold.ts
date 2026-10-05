@@ -50,10 +50,21 @@ export function useLiftAfterHoldGuard(holdMs: number = CONTEXT_MENU_HOLD_MS) {
       onContextMenu() {
         if (press.current) press.current.menu = true;
       },
+      // The browser took the gesture over (a scroll): no click follows it, so
+      // the record must not outlive it and swallow a later, unrelated click.
+      onPointerCancel() {
+        press.current = null;
+      },
+      // A keyboard activation is not a lift: drop any stale record.
+      onKeyDown() {
+        press.current = null;
+      },
     },
     swallowClick(event: MouseEvent): boolean {
       const p = press.current;
       press.current = null;
+      // `detail` 0 is a keyboard or programmatic click, never a finger lifting.
+      if (event.detail === 0) return false;
       return isLiftAfterHold(p, event.timeStamp, holdMs);
     },
   };
