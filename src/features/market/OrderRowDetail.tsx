@@ -19,6 +19,7 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
+import { SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -115,7 +116,12 @@ export function OrderRowDetail({
       <p className="text-text">
         <span className="font-semibold">{placeName}</span>
         {location.systemName !== '' && (
-          <span className="text-text-dim"> · {location.systemName}</span>
+          <span className="text-text-dim">
+            {' · '}
+            <SystemLink systemId={npcStations.get(order.location_id)?.systemId ?? order.system_id}>
+              {location.systemName}
+            </SystemLink>
+          </span>
         )}
       </p>
 

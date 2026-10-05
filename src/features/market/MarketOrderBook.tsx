@@ -338,6 +338,7 @@ export function OrderSideCard({
               stackLayout="dense"
               stacked={cards}
               rowContextMenu={rowContextMenu}
+              rowMoreActions
               rowClassName={rowClassName}
               expandableRow={{ renderDetail }}
             />

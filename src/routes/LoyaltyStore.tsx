@@ -89,21 +89,25 @@ function iskPerLpTone(value: number | null): string {
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
 
 /**
+ * Item name: Market link (§6c); plain when the product type is unknown. A
+ * blueprint row is labelled with the product the link opens, so the label
+ * says where it goes; the BP badge beside it still marks the row as a blueprint.
+ */
+function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
+  const { typeId, itemName } = resolveLoyaltyRowItem(row);
+  return typeId === null ? (
+    <span className="text-text">{row.itemName}</span>
+  ) : (
+    <MarketItemLink typeId={typeId}>{itemName}</MarketItemLink>
+  );
+}
+
+/**
  * A blueprint offer's row is the *blueprint*, but every market/menu action on
  * it targets the manufactured product — shared by `OfferDetail`'s own
  * View in Market/Plan in Industry buttons and the row's context menu, so the
  * two can't drift on which field means "the real item".
  */
-/** Item name: Market link (§6c); plain when the product type is unknown. */
-function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
-  const { typeId } = resolveLoyaltyRowItem(row);
-  return typeId === null ? (
-    <span className="text-text">{row.itemName}</span>
-  ) : (
-    <MarketItemLink typeId={typeId}>{row.itemName}</MarketItemLink>
-  );
-}
-
 function resolveLoyaltyRowItem(row: LoyaltyOfferRow): { typeId: number | null; itemName: string } {
   if (!row.isBlueprint) return { typeId: row.offer.type_id, itemName: row.itemName };
   return { typeId: row.productTypeId, itemName: row.productName ?? row.itemName };

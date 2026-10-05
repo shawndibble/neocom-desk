@@ -93,7 +93,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
             onClick={() => onSelect(item.typeId)}
             aria-current={selected ? 'true' : undefined}
             className={cx(
-              'dt-primary flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-accent hover:underline',
+              'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-accent hover:underline',
               interactiveClassName,
               focusRingClassName
             )}

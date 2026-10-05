@@ -25,7 +25,7 @@
  */
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, DataTable, TypeIcon } from '@/components/ui';
+import { Checkbox, DataTable, Tooltip, TypeIcon } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import type { DataTableColumn } from '@/components/ui';
@@ -205,16 +205,18 @@ export function CompareAttributesMatrix({
                     <TypeIcon typeId={row.typeId} size={64} className="size-7 rounded-xs" />
                   )}
                   <span className="max-w-full break-words hyphens-auto">
-                    <MarketItemLink typeId={row.typeId}>
-                      {labels.shared ? (
-                        <>
+                    {labels.shared ? (
+                      // The column shows only the shared-words-stripped label;
+                      // the tooltip carries the full name on hover or focus.
+                      <Tooltip content={row.itemName}>
+                        <MarketItemLink typeId={row.typeId}>
                           <span aria-hidden="true">{labels.labels[index]}</span>
                           <span className="sr-only">{row.itemName}</span>
-                        </>
-                      ) : (
-                        row.itemName
-                      )}
-                    </MarketItemLink>
+                        </MarketItemLink>
+                      </Tooltip>
+                    ) : (
+                      <MarketItemLink typeId={row.typeId}>{row.itemName}</MarketItemLink>
+                    )}
                   </span>
                 </span>
               </th>

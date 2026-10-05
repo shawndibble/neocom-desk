@@ -398,7 +398,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
   it('acts on the manufactured product, not the blueprint copy, for a blueprint offer', async () => {
     const user = userEvent.setup();
     renderStore();
-    const row = screen.getByText('Republic Fleet Firetail Blueprint').closest('tr');
+    const row = screen.getAllByText('Republic Fleet Firetail')[0].closest('tr');
     if (!row) throw new Error('expected a blueprint row');
     fireEvent.contextMenu(row);
 
@@ -647,7 +647,7 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText(BLUEPRINT_ROW.itemName).closest('tr')!);
+    await user.click(screen.getAllByText(BLUEPRINT_ROW.productName!)[0].closest('tr')!);
 
     const link = screen.getByRole('link', { name: /View in Market/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('type=300'));
@@ -659,7 +659,9 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText(BUILD_ROW.itemName).closest('tr')!);
+    await user.click(
+      screen.getAllByText(BUILD_ROW.productName ?? BUILD_ROW.itemName)[0].closest('tr')!
+    );
 
     const link = screen.getByRole('link', { name: '#40500' });
     expect(link).toHaveAttribute('href', expect.stringContaining('type=40500'));

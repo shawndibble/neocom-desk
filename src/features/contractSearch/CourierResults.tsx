@@ -741,6 +741,16 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
   return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }
 
+/** A system name that links to Route Safety when the system is known; plain otherwise (station, structure, unplaced). */
+function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
+  const name = endpointSystemName(endpoint);
+  return endpoint.systemId == null ? (
+    <>{name}</>
+  ) : (
+    <SystemLink systemId={endpoint.systemId}>{name}</SystemLink>
+  );
+}
+
 /**
  * A folded lane's toggle on a phone: the lane itself, how many hauls run it,
  * the best ISK/jump among them, and every warning any of them carries.
@@ -759,16 +769,6 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
  * no `IskAmount` long-press reveal, which would be a control inside a control.
  * Documented exception to the IskAmount rule: `formatIskCompact` stays here.
  */
-/** A system name that links to Route Safety when the system is known; plain otherwise (station, structure, unplaced). */
-function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
-  const name = endpointSystemName(endpoint);
-  return endpoint.systemId == null ? (
-    <>{name}</>
-  ) : (
-    <SystemLink systemId={endpoint.systemId}>{name}</SystemLink>
-  );
-}
-
 function LaneGroupHeader({
   rows,
   regionNames,
