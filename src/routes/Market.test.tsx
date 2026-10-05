@@ -1735,6 +1735,19 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await waitFor(() => expect(window.location.search).toBe('?browser.q=rifter'));
   });
 
+  it('keeps the selected item when an item is picked before the search text has settled', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    // Past the search debounce: a late write must not undo the selection.
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const params = Object.fromEntries(new URLSearchParams(window.location.search));
+    expect(params).toEqual({ 'browser.q': 'rift', type: '587', hub: 'jita' });
+  });
+
   it('offers close spellings when a typo matches nothing', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup();
