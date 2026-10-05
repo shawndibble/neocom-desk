@@ -13,6 +13,7 @@
  * structure fills the facility, system and security the way it does there, and
  * a structure also shows its rig slots and tax.
  */
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -314,11 +315,13 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
           <ul className="max-h-64 divide-y divide-line overflow-y-auto">
             {plans.map((plan) => (
               <li key={plan.id} className="flex items-center gap-2 px-1 py-1.5">
-                <Checkbox
-                  id={`retarget-plan-${plan.id}`}
-                  checked={checked.has(plan.id)}
-                  onChange={() => toggle(plan.id)}
-                />
+                <label className={touchCheckboxLabelClassName}>
+                  <Checkbox
+                    id={`retarget-plan-${plan.id}`}
+                    checked={checked.has(plan.id)}
+                    onChange={() => toggle(plan.id)}
+                  />
+                </label>
                 <label htmlFor={`retarget-plan-${plan.id}`} className="flex flex-1 flex-col">
                   <span>{plan.name}</span>
                   <span className="text-text-dim">

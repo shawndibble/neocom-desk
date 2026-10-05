@@ -39,6 +39,7 @@ import {
   focusRingClassName,
   gripHitAreaClassName,
   interactiveClassName,
+  tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
@@ -279,7 +280,7 @@ export function StopsPanel({
 
         <fieldset className="space-y-1.5 border-t border-line pt-3">
           <legend className="sr-only">{t('travel.stops.orderLegend')}</legend>
-          <label className="flex items-center gap-2 font-semibold">
+          <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
             <Checkbox
               role="switch"
               checked={settings.optimize}
@@ -289,7 +290,7 @@ export function StopsPanel({
             {t('travel.stops.optimize')}
           </label>
           <div className="space-y-1.5 pl-6">
-            <label className="flex items-center gap-2">
+            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
               <Checkbox
                 checked={optionsOn && settings.returnToStart}
                 disabled={!optionsOn}
@@ -297,7 +298,7 @@ export function StopsPanel({
               />
               {t('travel.stops.returnToStart')}
             </label>
-            <label className="flex items-center gap-2">
+            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
               <Checkbox
                 checked={optionsOn && settings.keepLastStopLast}
                 disabled={!optionsOn}

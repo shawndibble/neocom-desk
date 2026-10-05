@@ -130,6 +130,15 @@ export function useMarketBrowser({
   const [query, setQueryText] = useState(urlQuery);
   const queryWritten = useRef(urlQuery);
   const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The debounced write below runs from a stale render's closure, and
+  // react-router's functional `setSearchParams` updater hands it that render's
+  // `searchParams` as `prev`. A navigation inside the debounce window (View in
+  // Market from the item menu, which drops `q`) would be overwritten by the
+  // pre-navigation params, losing `type`. Read the latest instead.
+  const latestSearchParams = useRef(searchParams);
+  useEffect(() => {
+    latestSearchParams.current = searchParams;
+  });
 
   function cancelQueryTimer() {
     if (queryTimer.current !== null) clearTimeout(queryTimer.current);
@@ -151,15 +160,10 @@ export function useMarketBrowser({
     queryTimer.current = setTimeout(() => {
       queryTimer.current = null;
       queryWritten.current = next;
-      setSearchParams(
-        (prev) => {
-          const params = new URLSearchParams(prev);
-          if (next === '') params.delete(BROWSER_SEARCH_KEY);
-          else params.set(BROWSER_SEARCH_KEY, next);
-          return params;
-        },
-        { replace: true }
-      );
+      const params = new URLSearchParams(latestSearchParams.current);
+      if (next === '') params.delete(BROWSER_SEARCH_KEY);
+      else params.set(BROWSER_SEARCH_KEY, next);
+      setSearchParams(params, { replace: true });
     }, TEXT_DEBOUNCE_MS);
   }
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());

@@ -9,7 +9,11 @@ import {
   SegmentedControl,
   TypeIcon,
 } from '@/components/ui';
-import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { setModuleCharge } from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fittings/types';
@@ -75,7 +79,8 @@ export function ListChargePicker({
       className={cx(
         fieldBaseClassName,
         fieldSizeClassName.sm,
-        'relative flex min-h-11 min-w-0 items-center gap-1.5 pr-6 text-left md:min-h-7',
+        'relative flex min-w-0 items-center gap-1.5 pr-6 text-left',
+        tappableRowClassName,
         className
       )}
     >

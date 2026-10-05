@@ -94,7 +94,7 @@ function SideEffectSwitches({
       {effects.map((effect) => (
         <label
           key={effect.effectId}
-          className="flex min-h-11 cursor-pointer items-center gap-2 text-xs md:min-h-7"
+          className={`flex cursor-pointer items-center gap-2 text-xs ${tappableRowClassName}`}
         >
           <Checkbox
             checked={switchedOn.includes(effect.effectId)}

@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Field, Fields, Spinner, TextInput } from '@/components/ui';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
@@ -97,11 +98,13 @@ export function IndustrySettingsForm({
               inline
               note={t('settings.includeBlueprintCostHint')}
             >
-              <Checkbox
-                id="settings-include-blueprint-cost"
-                checked={includeBlueprintCost}
-                onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
-              />
+              <label className={touchCheckboxLabelClassName}>
+                <Checkbox
+                  id="settings-include-blueprint-cost"
+                  checked={includeBlueprintCost}
+                  onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
+                />
+              </label>
             </Field>
           </>
         )}

@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
   Fragment,
@@ -1862,7 +1863,7 @@ export function PlanEditor({
             </p>
           )}
 
-          <label className="flex items-center gap-1.5">
+          <label className={`flex items-center gap-1.5 ${tappableRowClassName}`}>
             <Checkbox
               checked={cloneState === 'alpha'}
               disabled={!cloneStatesHydrated}

@@ -2,6 +2,7 @@ import {
   focusRingClassName,
   interactiveClassName,
   selectedRowClassName,
+  touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -456,11 +457,13 @@ function PlanRow({
         </button>
       )}
       {compareMode && (
-        <Checkbox
-          checked={compareSelected}
-          onChange={() => onToggleCompareSelected(plan.id)}
-          aria-label={t('industry.compareSelectFor', { name: plan.name })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={compareSelected}
+            onChange={() => onToggleCompareSelected(plan.id)}
+            aria-label={t('industry.compareSelectFor', { name: plan.name })}
+          />
+        </label>
       )}
       {renaming ? (
         <RenameField
@@ -583,14 +586,16 @@ function GroupHeader({
           collapsed group's members are unreachable without this — it selects
           every member at once rather than making the pilot expand first. */}
       {compareMode && (
-        <Checkbox
-          checked={membersSelected === 'all'}
-          ref={(el) => {
-            if (el) el.indeterminate = membersSelected === 'some';
-          }}
-          onChange={() => onToggleAllMembers(membersSelected !== 'all')}
-          aria-label={t('industry.selectGroupMembers', { name: group.name })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={membersSelected === 'all'}
+            ref={(el) => {
+              if (el) el.indeterminate = membersSelected === 'some';
+            }}
+            onChange={() => onToggleAllMembers(membersSelected !== 'all')}
+            aria-label={t('industry.selectGroupMembers', { name: group.name })}
+          />
+        </label>
       )}
       <IconButton
         size="sm"
