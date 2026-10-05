@@ -176,6 +176,7 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/mining': loadMoonMiningTax,
   '/clones': loadClones,
   '/planetary-industry': loadPlanetaryIndustry,
+  '/planetary-industry/advisor': loadPlanetaryIndustry,
   '/employment-history': loadEmploymentHistory,
   '/corp': loadCorp,
   '/corp/members': loadCorpMembers,

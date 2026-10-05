@@ -286,7 +286,7 @@ async function resetSession(): Promise<void> {
     scopes: ['esi-planets.manage_planets.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/planetary-industry');
+  window.history.pushState({}, '', '/planetary-industry/colonies');
 }
 
 beforeAll(async () => {
@@ -355,7 +355,7 @@ async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
 
 /** The whole Colonies panel (every character's rows once the toggle is on), found by its own "N colony/colonies" header — as opposed to `colonyPanelFor`'s single-colony wrapper. */
 function coloniesPanel(): HTMLElement {
-  const heading = screen.getByRole('heading', { name: /colon(y|ies)$/i });
+  const heading = screen.getByRole('heading', { name: /^\d+ colon(y|ies)$/i });
   const panel = heading.closest('section');
   if (!(panel instanceof HTMLElement)) throw new Error('no colonies panel found');
   return panel;
@@ -460,7 +460,7 @@ describe('PlanetaryIndustry', () => {
     // key and DOM ids end to end, not just that the row renders collapsed.
     await user.click(altRow);
     expect(altRow).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('region')).toBeInTheDocument();
+    expect(within(coloniesPanel()).getByRole('region')).toBeInTheDocument();
   });
 
   it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
@@ -773,11 +773,47 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByRole('checkbox', { name: /^Jita IV/ })).toBeDisabled();
   });
 
-  it('falls back to the colony view rather than crashing on a tab it does not know', async () => {
+  it('falls back to the Plan tab rather than crashing on a tab it does not know', async () => {
     window.history.pushState({}, '', '/planetary-industry/nonsense?type=not-a-number');
     render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens on Plan, with the tabs in Plan, Map, Colonies order', async () => {
+    window.history.pushState({}, '', '/planetary-industry');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Plan',
+      'Map',
+      'Colonies',
+    ]);
+    expect(window.location.pathname).toBe('/planetary-industry/plan');
+  });
+
+  it('shows a placeholder on the Map tab', async () => {
+    window.history.pushState({}, '', '/planetary-industry/map');
+    render(<App />);
+    expect(await screen.findByText('The PI map is coming')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('redirects the retired Advisor URL to Colonies, keeping the query, and still shows the Advisor there', async () => {
+    window.history.pushState({}, '', '/planetary-industry/advisor?system=30000142');
+    render(<App />);
     await colonyPanelFor(/Jita IV/);
-    expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.pathname).toBe('/planetary-industry/colonies');
+    expect(window.location.search).toBe('?system=30000142');
+    expect(screen.getByRole('heading', { name: 'Advisor' })).toBeInTheDocument();
+  });
+
+  it('puts the shared header strip, with the Sell at picker, under the tabs on every tab', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const strip = screen.getByTestId('pi-header-strip');
+    expect(within(strip).getByRole('combobox', { name: 'Sell at' })).toBeInTheDocument();
+    expect(within(strip).getByText('Colonies')).toBeInTheDocument();
   });
 
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {

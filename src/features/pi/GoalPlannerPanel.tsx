@@ -30,7 +30,6 @@ import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
-import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -38,6 +37,7 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useCadence } from './cadencePref';
 import { useMarketSourcing } from './marketSourcingPref';
+import { useSellHub } from './sellHub';
 import {
   SYNCED_PI_CUSTOMS_KEY,
   withCustomsOverride,
@@ -172,12 +172,7 @@ function GoalPlanner({
   // Buying is the shared sourcing pref: when it names a hub, that hub prices
   // the plan too, so the Advisor and the planner never disagree on a market.
   const buyP1 = sourcing !== 'none';
-  const hub: TradeHub =
-    (buyP1 ? getTradeHub(sourcing) : getTradeHub(prefs.priceHub)) ?? DEFAULT_TRADE_HUB;
-  const setHub = (id: TradeHub['id']) => {
-    void setPrefs({ ...prefs, priceHub: id });
-    if (buyP1) void setSourcing(id);
-  };
+  const { hub, setHub } = useSellHub();
   const setBuyP1 = (buy: boolean) => void setSourcing(buy ? hub.id : 'none');
 
   // --- Prices, keyed on the hub so a hub switch never refetches colonies ---

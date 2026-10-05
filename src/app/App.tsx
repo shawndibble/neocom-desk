@@ -181,6 +181,8 @@ const ROUTE_ELEMENTS = {
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
+  // The Advisor tab retired; the old path redirects for good.
+  '/planetary-industry/advisor': <LegacyPathRedirect />,
   '/employment-history': <EmploymentHistory />,
   '/corp': <Corp />,
   '/corp/members': <CorpMembers />,
