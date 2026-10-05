@@ -9,11 +9,13 @@ import { Button, SegmentedControl, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
+  selectedRowClassName,
   toggleChipStateClassName,
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
+import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from './PlanetImage';
 import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
 import type { MapGraph, MapTier, ProductFigure } from './mapModel';
@@ -86,9 +88,11 @@ export function MapPhone(props: MapPhoneProps) {
               />
               <span aria-hidden="true">{planetName(t, type)}</span>
               {pressed && (
-                <span aria-hidden="true" className="absolute top-0.5 right-1 text-[11px]">
-                  ✓
-                </span>
+                <Icon.Done
+                  size={Icon.ICON_SIZE.sm}
+                  aria-hidden="true"
+                  className="absolute top-0.5 right-1"
+                />
               )}
             </button>
           );
@@ -138,10 +142,10 @@ export function MapPhone(props: MapPhoneProps) {
                   aria-current={traced ? 'true' : undefined}
                   onClick={() => props.onProduct(product.typeId)}
                   className={cx(
-                    'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm hover:bg-panel-2',
+                    'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
                     interactiveClassName,
                     focusRingClassName,
-                    traced && 'border-l-2 border-l-accent bg-panel-2',
+                    traced && selectedRowClassName,
                     isNew && 'bg-map-whatif/10'
                   )}
                 >

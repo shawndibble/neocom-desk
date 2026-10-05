@@ -4,6 +4,8 @@
  * one-planet recipe, free slots, nearby planets). The same content fills the
  * docked panel, the right-hand drawer and the phone's bottom sheet.
  */
+import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -118,11 +120,20 @@ export function ProductDetail(props: ProductDetailProps) {
                 <div>
                   <span className="font-semibold">{planetName(t, planet.type)}</span>{' '}
                   <span className={planet.have ? 'text-success' : 'text-danger'}>
-                    {planet.have
-                      ? `✓ ${t('piMap.detail.have', {
+                    {planet.have ? (
+                      <>
+                        <Icon.Done
+                          size={Icon.ICON_SIZE.sm}
+                          aria-hidden="true"
+                          className="mr-0.5 inline align-text-bottom"
+                        />
+                        {t('piMap.detail.have', {
                           colonies: colonyList.length > 0 ? ` (${colonyList.join(', ')})` : '',
-                        })}`
-                      : `✕ ${t('piMap.detail.findOne')}`}
+                        })}
+                      </>
+                    ) : (
+                      `✕ ${t('piMap.detail.findOne')}`
+                    )}
                   </span>
                 </div>
                 <div className="text-text-dim">{names(graph, planet.made).join(' → ')}</div>
@@ -230,7 +241,11 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           <button
             type="button"
             onClick={() => props.onTraceRecipe(recipe.typeId)}
-            className="flex min-h-11 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={cx(
+              'flex min-h-11 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left [@media(hover:hover)]:hover:bg-panel-2',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <TypeIcon typeId={recipe.typeId} size={64} width={28} height={28} />
             <span className="min-w-0 text-left text-xs">

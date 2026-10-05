@@ -103,19 +103,32 @@ export function useMapAdvice(
   }, [hydratePrefs, hydrateCadence]);
 
   const { hub, buybackPct } = useSellHub();
-  const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices } | null>(null);
+  // Keyed by hub AND the snapshot's `pi` (one per character load), so a switch of
+  // either never shows the other's prices.
+  const [priced, setPriced] = useState<{
+    hubId: string;
+    pi: unknown;
+    prices: PlanPrices | null;
+  } | null>(null);
   const pi = snapshot?.pi ?? null;
   useEffect(() => {
     if (!pi) return;
     let cancelled = false;
-    void loadGoalPlannerPrices(hub, pi).then((prices) => {
-      if (!cancelled) setPriced({ hubId: hub.id, prices });
-    });
+    loadGoalPlannerPrices(hub, pi).then(
+      (prices) => {
+        if (!cancelled) setPriced({ hubId: hub.id, pi, prices });
+      },
+      () => {
+        if (!cancelled) setPriced({ hubId: hub.id, pi, prices: null });
+      }
+    );
     return () => {
       cancelled = true;
     };
   }, [pi, hub]);
-  const prices = priced?.hubId === hub.id ? priced.prices : null;
+  const pricedNow = priced && priced.hubId === hub.id && priced.pi === pi ? priced : null;
+  const prices = pricedNow?.prices ?? null;
+  const pricesFailed = pricedNow !== null && pricedNow.prices === null;
 
   const input = useMemo((): PlanAdviceInput | null => {
     if (!snapshot || !prices || !loadedSkills) return null;
@@ -165,7 +178,7 @@ export function useMapAdvice(
     return { systemId: id, name: id === null ? null : (snapshot?.systemNames.get(id) ?? null) };
   }, [snapshot]);
 
-  if (failedFor === characterId) return { status: 'failed' };
+  if (failedFor === characterId || pricesFailed) return { status: 'failed' };
   if (snapshot?.needsReauth) return { status: 'reauth' };
   if (!built || !graph) return { status: 'loading' };
   return { status: 'ready', graph, ...built, colonies, finder };

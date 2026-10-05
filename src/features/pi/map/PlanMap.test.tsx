@@ -7,7 +7,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIskCompact } from '@/lib/isk';
 import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
-import { adviceInput, pi } from './mapFixtures';
+import { adviceInput, pi } from './mapFixtures.testutil';
 import { MAP_HINT_KEY } from './mapHintPref';
 import { buildMapGraph, DOCK_MIN_PANEL_WIDTH, productFigure } from './mapModel';
 import { PlanMap, type PlanMapProps } from './PlanMap';
@@ -159,6 +159,20 @@ describe('PlanMap: what if I add a planet', () => {
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
   });
 
+  it('keeps the preview, and the focused tile, when ArrowRight leaves an unowned planet', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    act(() => planet('Lava').focus());
+    await user.keyboard('{ArrowRight}');
+    const active = document.activeElement as HTMLElement;
+    expect(active.dataset.mapKey).toMatch(/^p:/);
+    expect(active.isConnected).toBe(true);
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+    // Focus leaving the board ends the preview.
+    act(() => (document.activeElement as HTMLElement).blur());
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+  });
+
   it('also previews on keyboard focus', () => {
     renderMap();
     act(() => planet('Plasma').focus());
@@ -305,7 +319,7 @@ describe('PlanMap: the detail drawer', () => {
     const user = userEvent.setup();
     renderMap();
     await user.click(planet('Lava'));
-    const dialog = screen.getByRole('dialog', { name: 'Where to put a new colony' });
+    const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Add a Lava planet')).toBeInTheDocument();
     expect(within(dialog).getByText(/Unlocks \d+ products/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Best one-planet recipe:/)).toBeInTheDocument();
@@ -318,6 +332,30 @@ describe('PlanMap: the detail drawer', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+  });
+
+  it('tracing the best recipe from the add-planet drawer keeps the opener and clears the what-if', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    await user.click(planet('Lava'));
+    const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
+    await user.click(within(dialog).getByRole('button', { name: /Best one-planet recipe:/ }));
+    expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(planet('Lava')).toHaveFocus());
+  });
+
+  it('gives focus back after Clear trace in the drawer', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    const tile = product('Biofuels');
+    await user.click(tile);
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Clear trace' })
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(tile).toHaveFocus());
   });
 
   it.each([
@@ -375,12 +413,49 @@ describe("PlanMap: docked or drawer, by the map panel's own width", () => {
     reportWidth(1200);
     expect(layout).toHaveAttribute('data-detail-mode', 'drawer');
     expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('observes the layout box, which does not change size when the panel docks', () => {
     const { container } = renderMap();
     const layout = container.querySelector('[data-detail-mode]')!;
     expect(observers.some((o) => o.el === layout)).toBe(true);
+  });
+});
+
+describe('PlanMap: starting state follows the data until the pilot acts', () => {
+  const firstPickName = (a: PlanAdvice) => graphName(planPicks(a).picks[0].typeId);
+
+  it('re-derives the starting trace and ticks when the picks and colonies change', () => {
+    const view = renderMap();
+    expect(product(firstPickName(advice))).toHaveAttribute('aria-current', 'true');
+    view.rerender(
+      <MemoryRouter>
+        <PlanMap
+          {...props({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') })}
+        />
+      </MemoryRouter>
+    );
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
+    expect(product(firstPickName(adviceNone))).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('never overrides what the pilot chose', async () => {
+    const user = userEvent.setup();
+    const view = renderMap();
+    await user.click(planet('Temperate'));
+    await user.click(planet('Temperate'));
+    await user.click(product('Proteins'));
+    await user.keyboard('{Escape}');
+    view.rerender(
+      <MemoryRouter>
+        <PlanMap
+          {...props({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') })}
+        />
+      </MemoryRouter>
+    );
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
+    expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
   });
 });
 

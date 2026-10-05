@@ -93,12 +93,22 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   }, [picks]);
 
   // --- State ---------------------------------------------------------------
-  const [ticked, setTicked] = useState<ReadonlySet<PlanetType>>(
-    () => new Set(noColonies ? graph.planetTypes : owned)
+  // The starting ticks and trace follow the data (colonies, picks) until the
+  // pilot touches them; their own choice, once made, is never overridden.
+  const defaultTicked = useMemo<ReadonlySet<PlanetType>>(
+    () => new Set(noColonies ? graph.planetTypes : owned),
+    [noColonies, graph, owned]
   );
-  const [traced, setTraced] = useState<{ id: number; explicit: boolean } | null>(() =>
-    picks.picks[0] ? { id: picks.picks[0].typeId, explicit: false } : null
+  const [userTicked, setUserTicked] = useState<ReadonlySet<PlanetType> | null>(null);
+  const ticked = userTicked ?? defaultTicked;
+  type Traced = { id: number; explicit: boolean } | null;
+  const defaultTraced = useMemo<Traced>(
+    () => (picks.picks[0] ? { id: picks.picks[0].typeId, explicit: false } : null),
+    [picks]
   );
+  const [userTraced, setUserTraced] = useState<Traced | undefined>(undefined);
+  const traced = userTraced === undefined ? defaultTraced : userTraced;
+  const setTraced = setUserTraced;
   const [whatIf, setWhatIf] = useState<PlanetType | null>(null);
   const [preview, setPreview] = useState<PlanetType | null>(null);
   const [detailKind, setDetailKind] = useState<DetailKind>('product');
@@ -183,16 +193,23 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   // --- Actions ---------------------------------------------------------------
+  const drawerShown = !docked && detailOpen;
   const openProduct = (typeId: number) => {
-    remember();
+    // Already in a drawer (the add-planet "best recipe" button): keep the
+    // original opener as the place focus returns to.
+    if (!docked && !drawerShown) remember();
     setTraced({ id: typeId, explicit: true });
+    // Tracing a product answers the what-if question; board and panel agree.
+    setWhatIf(null);
     setDetailKind('product');
-    setDetailOpen(true);
+    // Docked, the panel is always on screen: a flag set now would pop a stale
+    // drawer open when the layout narrows.
+    if (!docked) setDetailOpen(true);
   };
   const clickPlanet = (type: PlanetType) => {
     if (isHave(type)) {
-      setTicked((current) => {
-        const next = new Set(current);
+      setUserTicked((current) => {
+        const next = new Set(current ?? defaultTicked);
         if (next.has(type)) next.delete(type);
         else next.add(type);
         return next;
@@ -201,13 +218,13 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     }
     if (whatIf === type) {
       setWhatIf(null);
-      setDetailOpen(false);
+      closeDetail();
       return;
     }
-    remember();
+    if (!docked && !drawerShown) remember();
     setWhatIf(type);
     setDetailKind('planet');
-    setDetailOpen(true);
+    if (!docked) setDetailOpen(true);
   };
   const dismissHint = () => {
     writeMapHintDismissed();
@@ -215,7 +232,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   };
   const clearTrace = () => {
     setTraced(null);
-    setDetailOpen(false);
+    closeDetail();
   };
 
   const tracedProduct = traced ? graph.byId.get(traced.id) : null;
@@ -285,7 +302,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   })();
   const detailTitle =
     detailKind === 'planet' && whatIf
-      ? t('piMap.add.panelTitle')
+      ? t('piMap.add.panelTitleFor', { type: planetName(t, whatIf) })
       : traced && tracedProduct
         ? t('piMap.detail.panelTitle')
         : t('piMap.detail.panelTitleEmpty');

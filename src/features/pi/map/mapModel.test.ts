@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { buildPlanAdvice } from '../planAdviceModel';
-import { adviceInput, pi } from './mapFixtures';
+import { adviceInput, pi } from './mapFixtures.testutil';
 import {
   buildMapGraph,
   canMake,

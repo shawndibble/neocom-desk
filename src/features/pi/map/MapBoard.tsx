@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, Tooltip, TypeIcon } from '@/components/ui';
@@ -262,6 +263,11 @@ export function MapBoard(props: MapBoardProps) {
       <div
         ref={boardRef}
         role="group"
+        onBlur={(event) => {
+          // The what-if preview lives while focus moves within the board (a
+          // planet to a tile it unlocked); it ends only when focus leaves.
+          if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
+        }}
         aria-labelledby={headingId}
         className="relative mx-auto grid w-max grid-cols-[72px_116px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
       >
@@ -310,6 +316,7 @@ export function MapBoard(props: MapBoardProps) {
                   registerNode={register(planetKey(type))}
                   tabbable={activeKey === planetKey(type)}
                   onFocusKey={() => setFocusKey(planetKey(type))}
+                  boardRef={boardRef}
                   onKeyDown={(e) => move(planetKey(type), e)}
                   onClick={() => props.onPlanet(type)}
                   onPreview={props.onPreview}
@@ -415,7 +422,7 @@ export function MapBoard(props: MapBoardProps) {
                           >
                             <span
                               className={cx(
-                                'text-[10px] leading-[11px] font-bold',
+                                'text-[11px] leading-[11px] font-bold',
                                 glyph === '▲' && 'text-success',
                                 glyph === '▼' && 'text-danger',
                                 glyph === '≈' && 'text-text-dim'
@@ -499,6 +506,7 @@ function PlanetToggle({
   whatIf: boolean;
   tabbable: boolean;
   registerNode: (el: HTMLElement | null) => void;
+  boardRef: RefObject<HTMLElement | null>;
   onFocusKey: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onClick: () => void;
@@ -527,11 +535,19 @@ function PlanetToggle({
         aria-label={label}
         onFocus={() => {
           props.onFocusKey();
-          if (previewable) props.onPreview(type);
+          // Landing on a planet the pilot has ends any other planet's preview.
+          props.onPreview(previewable ? type : null);
         }}
-        onBlur={() => previewable && props.onPreview(null)}
         onMouseEnter={() => previewable && props.onPreview(type)}
-        onMouseLeave={() => previewable && props.onPreview(null)}
+        onMouseLeave={() => {
+          if (!previewable) return;
+          // A focused tile this preview unlocked must not vanish under the pointer.
+          const active = document.activeElement;
+          if (active instanceof HTMLElement && active.dataset.mapKey?.startsWith('p:')) {
+            if (props.boardRef.current?.contains(active)) return;
+          }
+          props.onPreview(null);
+        }}
         onKeyDown={props.onKeyDown}
         onClick={props.onClick}
         className={cx(
@@ -545,13 +561,13 @@ function PlanetToggle({
         <span
           aria-hidden="true"
           className={cx(
-            'absolute top-0.5 right-1.5 z-[1] grid size-3.5 place-items-center rounded-xs border text-[10px] leading-none',
+            'absolute top-0.5 right-1.5 z-[1] grid size-3.5 place-items-center rounded-xs border text-[11px] leading-none',
             pressed
               ? 'border-accent bg-accent text-accent-contrast'
               : 'border-line-bright bg-panel-2'
           )}
         >
-          {pressed ? '✓' : ''}
+          {pressed && <Icon.Done size="100%" aria-hidden="true" />}
         </span>
         <PlanetImage
           type={type}
@@ -570,25 +586,25 @@ function PlanetToggle({
         </span>
         <span aria-hidden="true" className="flex min-h-[14px] flex-wrap justify-center gap-0.5">
           {have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[3px] text-[10px] font-semibold tracking-wider text-success uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-success/50 px-[3px] text-[11px] font-semibold tracking-wider text-success uppercase">
               {t('piMap.tagHave')}
             </span>
           )}
           {props.ranks.map((rank) => (
             <span
               key={rank}
-              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[3px] text-[10px] font-semibold text-warning"
+              className="inline-flex h-3.5 items-center rounded-xs border border-warning/60 px-[3px] text-[11px] font-semibold text-warning"
             >
               #{rank}
             </span>
           ))}
           {props.tracedNeed && !props.tracedNeed.have && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[3px] text-[10px] font-semibold tracking-wider text-danger uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-danger/50 px-[3px] text-[11px] font-semibold tracking-wider text-danger uppercase">
               {t('piMap.tagNeed')}
             </span>
           )}
           {props.whatIf && (
-            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[3px] text-[10px] font-semibold tracking-wider text-map-whatif uppercase">
+            <span className="inline-flex h-3.5 items-center rounded-xs border border-map-whatif/60 px-[3px] text-[11px] font-semibold tracking-wider text-map-whatif uppercase">
               {t('piMap.tagWhatIf')}
             </span>
           )}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildPlanAdvice } from './planAdviceModel';
 import { planPicks } from './planPicks';
-import { adviceInput } from './map/mapFixtures';
+import { adviceInput } from './map/mapFixtures.testutil';
 
 describe('planPicks', () => {
   it('lists each distinct rebuild once, biggest total gain first, at most three', () => {
