@@ -83,7 +83,7 @@ describe('MakeMorePlan', () => {
     expect(cards[0]).toHaveTextContent(/Rebuild/);
     expect(cards[1]).toHaveTextContent(/Keep Uttindar II \(Barren\) on/);
     expect(cards[1]).toHaveTextContent(/already the best earner/);
-    expect(cards[1]).toHaveTextContent(/As is/);
+    expect(cards[1]).toHaveTextContent(/As-is/);
   });
 
   it('opens an alternative in place and says what it trades', async () => {
