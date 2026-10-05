@@ -23,6 +23,7 @@ import { securityStatusColor } from '@/engine/securityStatus';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
 import { useSystemName } from '@/features/route/useSolarSystems';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { BrowserFilterValue } from './useOrderBookOrchestration';
 
 /** A Min quantity box's text as a count; blank or junk is no minimum. */
@@ -211,6 +212,11 @@ export function OrderBookScopeBar({
   const { t } = useTranslation();
   const originName = useSystemName(currentSystem.systemId);
   const ranged = scope.kind === 'range';
+  // From `sm` up the range sits on the bar, not in the funnel, so the
+  // funnel's badge leaves it out; a phone's sheet still holds it.
+  const isPhone = useIsPhone();
+  const funnelCount =
+    !isPhone && filterValue.jumps !== DEFAULT_JUMP_RANGE ? activeCount - 1 : activeCount;
 
   const summary = (() => {
     switch (scope.kind) {
@@ -317,7 +323,7 @@ export function OrderBookScopeBar({
         <FilterBar
           value={filterValue}
           onChange={onFilterChange}
-          activeCount={activeCount}
+          activeCount={funnelCount}
           title={t('market.scope.sheetTitle')}
           pointerSurface="popover"
         >

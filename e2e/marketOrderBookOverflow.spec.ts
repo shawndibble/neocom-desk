@@ -3,7 +3,7 @@
  * horizontally (#2093): both `DataTable` call sites in `Market.tsx` were
  * missing the `overflow-x-auto` wrapper some other `DataTable` callers use
  * (`MaterialsTable.tsx`, `Characters.tsx`) — with the default all-columns
- * column set (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`, all 8 ids) and a long
+ * column set (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`) and a long
  * station name, the bare `<table>` forced `<html>` itself to scroll sideways
  * instead of just the table.
  *
@@ -11,7 +11,7 @@
  * the wider table — this asserts on the page opened with mocked orders for
  * both, all columns visible (the default), a long NPC station name, and
  * checks the page-level scrollWidth bound `expectNoPageOverflow` already
- * uses for this exact failure mode (#1708) at three pointer-input widths —
+ * uses for this exact failure mode (#1708) at pointer-input widths —
  * and, since the order book rework, that neither table scrolls sideways
  * inside its own wrapper either.
  */
@@ -24,7 +24,14 @@ import type { MarketOrder } from '../src/esi/endpoints';
 const WIDTHS = [
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
+  // Either side of where the rows become cards with every column showing
+  // (`orderBookWidthsRem`), and of where Location narrows before that.
+  { width: 1400, height: 900 },
+  // The tightest table: the book just over its `cards` width.
+  { width: 1415, height: 900 },
   { width: 1440, height: 900 },
+  { width: 1500, height: 900 },
+  { width: 1560, height: 900 },
 ];
 
 const REGION = 10000002;
@@ -50,7 +57,13 @@ function order(
 }
 
 /** Tritanium (type_id 34) is in `public/data/types.json`, so name resolution never needs a live ESI call. */
-const SELL_ORDER = order({ order_id: 301, type_id: 34, price: 5.5, is_buy_order: false });
+// A ten-digit price: Price is the one column sized by its figure, not its header.
+const SELL_ORDER = order({
+  order_id: 301,
+  type_id: 34,
+  price: 1_234_567_890.5,
+  is_buy_order: false,
+});
 const BUY_ORDER = order({
   order_id: 302,
   type_id: 34,
@@ -89,9 +102,9 @@ for (const viewport of WIDTHS) {
     await expectNoPageOverflow(page);
 
     // Buy is the wider table (it carries `range` on top of Sell's columns).
-    // Since the order book rework it no longer scrolls sideways at all: its
-    // widest columns drop out below ~1680px and, once the book's own column
-    // is too narrow for the rest, the rows become two-line cards — so the
+    // Since the order book rework it no longer scrolls sideways at all:
+    // Location narrows first and, once the book's own column is too narrow
+    // for the picked columns, the rows become two-line cards — so the
     // station and every figure stay in view without a horizontal scroller.
     for (const name of ['Sell Orders', 'Buy Orders']) {
       const scroller = page.getByRole('table', { name }).locator('xpath=..');

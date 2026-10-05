@@ -10,10 +10,10 @@
  * pairing the short figures two per line.
  *
  * The order book rework (2026-10-04) went further: an order is now the dense
- * two-line card — station and price, then quantity, distance and security —
- * and a phone shows one side at a time behind a Sell | Buy toggle. The card is
- * picked by the order book's own width, not the viewport, so a desktop whose
- * finder column leaves the book narrow (1280px) gets it too.
+ * two-line card — station and price, then quantity, distance, security and
+ * expiry — and a phone shows one side at a time behind a Sell | Buy toggle.
+ * The card is picked by the order book's own width, not the viewport, so a
+ * desktop whose finder column leaves the book narrow (1280px) gets it too.
  *
  * Playwright rather than jsdom, same reasoning `miningTaxYieldDetailNarrow.spec.ts`
  * gives: the card lives in `.dt-stack-dense` (`.dt-stacked`,
@@ -189,13 +189,13 @@ test.describe('Market Browser — order book stacked cards', () => {
     await seedOrderBook(page);
   });
 
-  /** The two-line order card: station and price, then quantity, distance and security (and a buy's range). */
+  /** The two-line order card: station and price, then quantity, distance, security and expiry (and a buy's range). */
   async function expectTwoLineCards(page: Page) {
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(sell.display).toBe('flex');
     expect(labelLines(sell.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security'],
+      ['Quantity', 'Jumps', 'Security', 'Expires'],
     ]);
     // The real station, not the "Unknown Structure" fallback — truncated on
     // the card's title line, in full in the DOM (and the expanded row).
@@ -221,7 +221,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(labelLines(buy.cells, 8)).toEqual([
       ['Location', 'Price'],
-      ['Quantity', 'Jumps', 'Security', 'Range'],
+      ['Quantity', 'Jumps', 'Security', 'Expires', 'Range'],
     ]);
 
     const overflow = await page.evaluate(
@@ -238,6 +238,69 @@ test.describe('Market Browser — order book stacked cards', () => {
     await expectTwoLineCards(page);
     // Both sides at once off a phone — the toggle is phone-only.
     await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeVisible();
+  });
+
+  test('the column picker on a card chooses what the card carries, and enough unticks bring the table back (1280px)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await openTritanium(page);
+    const sellSide = page.getByRole('region', { name: 'Sell Orders' });
+
+    await sellSide.getByRole('button', { name: 'Columns' }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Security' }).click();
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(sell.display).toBe('flex');
+    expect(labelLines(sell.cells, 8)).toEqual([
+      ['Location', 'Price'],
+      ['Quantity', 'Jumps', 'Expires'],
+    ]);
+
+    // Fewer columns need less width (`orderBookWidthsRem`): this book fits them as a table.
+    await page.getByRole('menuitemcheckbox', { name: 'Jumps' }).click();
+    await page.keyboard.press('Escape');
+    const table = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(table.display).toBe('table-row');
+    expect(lines(table.cells)).toHaveLength(1);
+  });
+
+  test('with Location unticked, Price titles the card rather than doubling as its corner (390px)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openTritanium(page);
+    await page
+      .getByRole('region', { name: 'Sell Orders' })
+      .getByRole('button', { name: 'Columns' })
+      .click();
+    await page.getByRole('menuitemcheckbox', { name: 'Location' }).click();
+    await page.keyboard.press('Escape');
+
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(labelLines(sell.cells, 8)).toEqual([
+      ['Price'],
+      ['Quantity', 'Jumps', 'Security', 'Expires'],
+    ]);
+    const priceCell = page.locator(
+      `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"] td.dt-primary`
+    );
+    await expect(priceCell).not.toHaveClass(/dt-corner/);
+  });
+
+  test('Min. Volume, once ticked, rides on the buy card (390px)', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await openTritanium(page);
+    await page.getByRole('button', { name: /^Buy · 1/ }).click();
+    const buySide = page.getByRole('region', { name: 'Buy Orders' });
+    await buySide.getByRole('button', { name: 'Columns' }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Min. Volume' }).click();
+    await page.keyboard.press('Escape');
+
+    const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
+    expect(buy.cells.find((c) => c.label === 'Min. Volume')?.text).toContain('500,000');
+    for (const cell of buy.cells.filter((c) => c.label !== 'Location')) {
+      expect(cell.clipped, cell.label).toBe(false);
+    }
   });
 
   test('a wide desktop keeps one real row per order (1440px)', async ({ page }) => {

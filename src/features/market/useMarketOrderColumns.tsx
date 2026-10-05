@@ -10,6 +10,7 @@ import {
   SELL_ORDER_COLUMN_IDS,
   BUY_ORDER_COLUMN_IDS,
   useVisibleMarketOrderColumns,
+  ORDER_BOOK_LOCATION_CLASS,
   type MarketOrderColumnId,
 } from '@/features/market/marketOrderColumns';
 import { formatVolume } from '@/features/market/format';
@@ -55,6 +56,8 @@ export interface UseMarketOrderColumnsArgs {
    * book's own width, so card-only touches can't follow the viewport (ADR 0017).
    */
   cards: boolean;
+  /** The book is short of room for Location's full cap: `ORDER_BOOK_LOCATION_REM.squeezed`. */
+  locationSqueezed: boolean;
 }
 
 export interface MarketOrderColumns {
@@ -75,6 +78,7 @@ export function useMarketOrderColumns({
   jumpRangeFilter,
   bestSell,
   cards,
+  locationSqueezed,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
   const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
@@ -113,7 +117,9 @@ export function useMarketOrderColumns({
         align: 'right',
         className: 'tabular-nums',
         // The phone card's headline figure: a book is scanned by price.
-        cardCorner: true,
+        // With Location unticked, Price is the card's title instead
+        // (DataTable falls back to the first column), not both at once.
+        cardCorner: visibleOrderColumns.includes('location'),
         render: (o) => (
           <>
             {/* Left of the figure, so the prices stay right-aligned in one column. */}
@@ -155,7 +161,8 @@ export function useMarketOrderColumns({
         // scrolls sideways beside the finder column.
         // Chosen with `cards` (ADR 0017): a card forced on a desktop is
         // titled by the station, uncapped; a table row caps it.
-        className: cards ? '' : 'max-w-[16rem] truncate',
+        // Squeezed before the rows give up to cards (`orderBookWidthsRem`).
+        className: cards ? '' : ORDER_BOOK_LOCATION_CLASS[locationSqueezed ? 'squeezed' : 'roomy'],
         // The phone card's title: the station a pilot would fly to.
         primary: true,
         sortValue: (o) =>
@@ -205,10 +212,11 @@ export function useMarketOrderColumns({
       expiry: {
         id: 'expiry',
         header: t('market.expiry'),
-        // Same room rule as Cum. qty; the expanded row states it in full.
-        className: 'whitespace-nowrap text-text-dim max-[105rem]:hidden',
-        headerCellClassName: 'max-[105rem]:hidden',
-        render: (o) => <span data-dense-omit="">{orderExpiry(o).toLocaleDateString()}</span>,
+        // Shown or hidden by the column picker alone, never by width; the
+        // card keeps it too, behind a word saying what the date is.
+        className: 'whitespace-nowrap text-text-dim',
+        stackAffix: { before: t('market.expiryAffix') },
+        render: (o) => orderExpiry(o).toLocaleDateString(),
         sortValue: (o) => orderExpiry(o).getTime(),
       },
       range: {
@@ -225,15 +233,25 @@ export function useMarketOrderColumns({
         id: 'minVolume',
         header: t('market.minVolume'),
         align: 'right',
-        // Almost always 1: a column only a very wide screen spends on it,
-        // never a card. The expanded row states it for every buy order.
-        className: 'tabular-nums max-[120rem]:hidden',
-        headerCellClassName: 'max-[120rem]:hidden',
-        render: (o) => <span data-dense-omit="">{formatVolume(o.min_volume)}</span>,
+        // Off by default (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`), then
+        // shown or hidden by the column picker alone, as Expires is.
+        className: 'tabular-nums',
+        stackAffix: { before: t('market.minVolumeAffix') },
+        render: (o) => formatVolume(o.min_volume),
         sortValue: (o) => o.min_volume,
       },
     }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps, bestSell, cards]
+    [
+      t,
+      npcStationMap,
+      solarSystemMap,
+      myOrderIds,
+      orderJumps,
+      bestSell,
+      cards,
+      locationSqueezed,
+      visibleOrderColumns,
+    ]
   );
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(

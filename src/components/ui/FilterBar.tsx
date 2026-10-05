@@ -32,7 +32,15 @@ interface FilterFieldProps {
  */
 export function FilterField({ label, children, stretch = true, className = '' }: FilterFieldProps) {
   const surface = useFilterSurface();
-  if (surface === 'inline') return <>{children}</>;
+  // Inline there is no caption box, but a caller's class (a responsive
+  // `sm:hidden`, say) still has to land: `contents` keeps the children in
+  // the row's own flex flow while giving the class an element to sit on.
+  if (surface === 'inline')
+    return className ? (
+      <div className={cx('contents', className)}>{children}</div>
+    ) : (
+      <>{children}</>
+    );
   // A `<div>`, not a `<label>`: most of what goes in here is a button — a
   // Radix `SelectTrigger`, a chip, an `IconButton` — and a button is not a
   // labelable element, so the caption would name nothing. The control's own

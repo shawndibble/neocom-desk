@@ -6457,7 +6457,9 @@
       "count_one": "{{count}} skill",
       "count_other": "{{count}} skills"
     },
-    "quantityAffix": "×"
+    "quantityAffix": "×",
+    "expiryAffix": "Exp ",
+    "minVolumeAffix": "Min "
   },
   "error": {
     "title": "Something went wrong",
