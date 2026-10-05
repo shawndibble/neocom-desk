@@ -7,7 +7,9 @@ import {
   focusRingClassName,
   focusRingInsetClassName,
   interactiveClassName,
+  rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -97,8 +99,8 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                   <Link
                     to={tabPath(SETTINGS_TABS, id)}
                     className={cx(
-                      'flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-panel-2 active:bg-panel',
-                      interactiveClassName,
+                      'group flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm',
+                      rowInteractiveClassName,
                       focusRingInsetClassName
                     )}
                   >
@@ -108,9 +110,11 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                         <span className="block truncate text-xs text-text-dim">{summary}</span>
                       )}
                     </span>
-                    <span aria-hidden="true" className="text-text-dim">
-                      ›
-                    </span>
+                    <Icon.Descend
+                      size={Icon.ICON_SIZE.sm}
+                      aria-hidden="true"
+                      className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
+                    />
                   </Link>
                 </li>
               );

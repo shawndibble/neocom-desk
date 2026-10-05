@@ -11,8 +11,21 @@ import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
 import { useSyncStatus } from './useSyncStatus';
-import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Spinner } from '@/components/ui';
+import {
+  CharacterAvatar,
+  characterAvatarBoxClassName,
+  LogoMark,
+  Spinner,
+  Tooltip,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
@@ -76,12 +89,13 @@ function PrefetchIndicator() {
   if (!running) return null;
   const label = t('prefetch.running');
   return (
-    <span
-      role="status"
-      title={label}
-      aria-label={label}
-      className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
-    />
+    <Tooltip content={label}>
+      <span
+        role="status"
+        aria-label={label}
+        className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
+      />
+    </Tooltip>
   );
 }
 
@@ -140,8 +154,11 @@ function characterTriggerLabel(
   return activeCharacter ? undefined : t('nav.switchCharacter');
 }
 
-const CHARACTER_TRIGGER =
-  'flex w-full items-center gap-2 p-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
+const CHARACTER_TRIGGER = cx(
+  'flex w-full items-center gap-2 p-2 text-left',
+  rowInteractiveClassName,
+  focusRingInsetClassName
+);
 
 /**
  * The active Character, as a plain link to `/characters` — the one dedicated
@@ -341,7 +358,11 @@ export const Layout = memo(function Layout() {
               that navigates is nobody's expectation. */}
           <Link
             to="/overview"
-            className="flex min-w-0 flex-1 items-center gap-2 text-text transition-colors hover:text-accent"
+            className={cx(
+              'flex min-w-0 flex-1 items-center gap-2 rounded-xs text-text hover:text-accent',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <LogoMark className="size-7 shrink-0" />
             <span className="min-w-0 truncate text-xs font-semibold tracking-widest uppercase">

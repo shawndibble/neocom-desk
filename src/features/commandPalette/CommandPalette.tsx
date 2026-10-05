@@ -301,7 +301,6 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                           id={optionDomId(index)}
                           role="option"
                           aria-selected={highlighted}
-                          title={result.locked ? t('reauth.navLocked') : undefined}
                           // Keeps focus in the input, as every combobox here does.
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => activate(result)}
