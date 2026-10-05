@@ -19,7 +19,7 @@ import {
   TypeIcon,
   textActionClassName,
 } from '@/components/ui';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
@@ -73,11 +73,11 @@ function ItemList({ items }: { items: readonly NamedItem[] }) {
   );
 }
 
-/** "+95k" and its unit: an ISK a day gain, signed. */
+/** "+95k/day": a signed ISK a day figure, green when it adds and red when it costs. */
 function Gain({ value, className }: { value: number; className?: string }) {
   const { t } = useTranslation();
   return (
-    <span className={cx('tabular-nums', className)}>
+    <span className={cx('tabular-nums', value < 0 ? 'text-isk-neg' : 'text-isk-pos', className)}>
       {value < 0 ? '−' : '+'}
       <IskAmount value={Math.abs(value)} decimals={0} />
       {t('piPlan.make.perDay')}
@@ -96,19 +96,23 @@ function Minutes({ value }: { value: number }) {
 
 // --- Your planets ----------------------------------------------------------------
 
-function Hero({ value, caption }: { value: ReactNode; caption: ReactNode }) {
+function Hero({ value, caption }: { value: number; caption: ReactNode }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-3xl font-semibold text-isk-pos tabular-nums">{value}</span>
+      <span
+        className={cx(
+          'text-3xl font-semibold tabular-nums',
+          value < 0 ? 'text-isk-neg' : 'text-isk-pos'
+        )}
+      >
+        {value < 0 ? '−' : '+'}
+        <IskAmount value={Math.abs(value)} decimals={0} />
+      </span>
       <span className="max-w-60 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {caption}
       </span>
     </div>
   );
-}
-
-function compactIsk(value: number) {
-  return <IskAmount value={value} decimals={0} />;
 }
 
 export function YourPlanetsPanel({
@@ -132,7 +136,10 @@ export function YourPlanetsPanel({
       title={t('piPlan.make.planetsTitle')}
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
-          {t('piPlan.make.planetsCount', { used: view.slots.used, allowed: view.slots.allowed })}
+          {t('piPlan.make.planetsCount', {
+            used: view.slots.used,
+            allowed: Math.max(view.slots.allowed, view.slots.used),
+          })}
         </span>
       }
       actions={
@@ -158,7 +165,7 @@ export function YourPlanetsPanel({
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {headline.quickWinPerDay > 0 || view.quickWins.length > 0 ? (
             <Hero
-              value={<>+{compactIsk(headline.quickWinPerDay)}</>}
+              value={headline.quickWinPerDay}
               caption={t('piPlan.make.heroQuickWins', { count: headline.quickWinMinutes })}
             />
           ) : (
@@ -166,8 +173,11 @@ export function YourPlanetsPanel({
           )}
           {headline.rebuildCount > 0 ? (
             <Hero
-              value={<>+{compactIsk(headline.rebuildGainPerDay)}</>}
-              caption={t('piPlan.make.heroRebuild', { count: headline.rebuildCount })}
+              value={headline.rebuildGainPerDay}
+              caption={t(
+                preference === 'haul' ? 'piPlan.make.heroRebuildHaul' : 'piPlan.make.heroRebuild',
+                { count: headline.rebuildCount }
+              )}
             />
           ) : (
             <p className="text-sm text-text-dim">{t('piPlan.make.noRebuild')}</p>
@@ -199,7 +209,9 @@ export function YourPlanetsPanel({
             value={
               stats.m3PerWeek === null
                 ? '—'
-                : t('piPlan.make.m3PerWeek', { value: Math.round(stats.m3PerWeek) })
+                : t('piPlan.make.m3PerWeek', {
+                    value: Math.round(stats.m3PerWeek).toLocaleString(),
+                  })
             }
           />
           <EstimateBadge />
@@ -225,7 +237,7 @@ export function YourPlanetsPanel({
                 {strip.rebuild.kind === 'change' ? (
                   <span className="text-text-dim">
                     {t('piPlan.make.stripRebuild')}{' '}
-                    <span className="text-isk-pos normal-case">
+                    <span className="normal-case">
                       <Gain value={strip.rebuild.gainPerDay} className="tracking-normal" />
                     </span>
                   </span>
@@ -301,7 +313,7 @@ function SlotNudge({ view, onFindBest }: { view: PlanView; onFindBest: () => voi
             slots={{
               gain:
                 slots.gainPerPlanetPerDay === null ? null : (
-                  <Gain value={slots.gainPerPlanetPerDay} className="text-isk-pos" />
+                  <Gain value={slots.gainPerPlanetPerDay} />
                 ),
               skill: (
                 <SkillLink typeId={INTERPLANETARY_CONSOLIDATION_SKILL_ID}>
@@ -429,9 +441,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('piPlan.make.minutesTotal', { count: headline.quickWinMinutes })}
           {' · '}
-          <span className="text-isk-pos">
-            <Gain value={headline.quickWinPerDay} />
-          </span>
+          <Gain value={headline.quickWinPerDay} />
         </span>
       }
       padded={false}
@@ -442,7 +452,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
           const sentenceId = `${baseId}-${win.id}`;
           return (
             <li key={win.id} className="flex items-center gap-3 px-3 py-2">
-              <label className={touchCheckboxLabelClassName}>
+              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-11')}>
                 <Checkbox
                   checked={ticked}
                   onChange={() => ticks.toggle(win.id)}
@@ -470,7 +480,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
                     {t('piPlan.make.saves')} <IskAmount value={win.gainPerDay} decimals={0} />
                   </span>
                 ) : (
-                  <Gain value={win.gainPerDay} className="text-isk-pos" />
+                  <Gain value={win.gainPerDay} />
                 )}
                 <Minutes value={win.minutes} />
               </span>
@@ -522,7 +532,7 @@ function RebuildSentence({
             planet,
             type,
             item: <ItemLink item={card.target} />,
-            gain: <Gain value={card.gainPerDay} className="text-isk-pos" />,
+            gain: <Gain value={card.gainPerDay} />,
           }}
         />
         {upgradeFrom !== null && <> {t('piPlan.make.rebuild.upgradeFirst')}</>}
@@ -557,6 +567,7 @@ function RebuildSentence({
 function AlternativeBody({ alt }: { alt: AlternativeView }) {
   const { t } = useTranslation();
   const delta = alt.iskPerDayDelta;
+  const same = Math.round(Math.abs(delta)) === 0;
   const hauls =
     alt.haulRatio === null
       ? null
@@ -573,17 +584,21 @@ function AlternativeBody({ alt }: { alt: AlternativeView }) {
           text={t(alt.tier === 2 ? 'piPlan.make.altP2' : 'piPlan.make.altP1', {
             item: '{item}',
             delta: '{delta}',
-            direction: delta >= 0 ? 'more' : 'less',
             hauls: hauls ?? '',
             context: hauls === null ? 'nohaul' : undefined,
           })}
           slots={{
             item: <ItemLink item={alt} />,
-            delta: (
-              <b className={delta >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
-                <IskAmount value={Math.abs(delta)} decimals={0} />
-                {t('piPlan.make.perDay')}
-              </b>
+            delta: same ? (
+              t('piPlan.make.altSame')
+            ) : (
+              <>
+                <b className={delta >= 0 ? 'text-isk-pos' : 'text-isk-neg'}>
+                  <IskAmount value={Math.abs(delta)} decimals={0} />
+                  {t('piPlan.make.perDay')}
+                </b>{' '}
+                {delta >= 0 ? t('piPlan.make.altMore') : t('piPlan.make.altLess')}
+              </>
             ),
           }}
         />
@@ -714,7 +729,9 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
   const { t } = useTranslation();
   const { route, fit } = hauling;
   const m3 = (value: number | null) =>
-    value === null ? '—' : t('piPlan.make.m3PerTrip', { value: Math.round(value) });
+    value === null
+      ? '—'
+      : t('piPlan.make.m3PerTrip', { value: Math.round(value).toLocaleString() });
   const fitKey =
     fit.kind === 'unknown'
       ? 'piPlan.make.fitUnknown'
@@ -818,7 +835,10 @@ const PIN_ICON: Record<PiPinKind, ReactNode> = {
 
 function StepText({ step }: { step: ChecklistStep }) {
   const { t } = useTranslation();
-  const pin = step.pin ? t(`piPlan.make.pin.${PIN_KEY[step.pin]}`, { count: step.count ?? 1 }) : '';
+  const rawPin = step.pin
+    ? t(`piPlan.make.pin.${PIN_KEY[step.pin]}`, { count: step.count ?? 1 })
+    : '';
+  const pin = rawPin.charAt(0).toUpperCase() + rawPin.slice(1);
   switch (step.verb) {
     case 'upgrade':
       return <>{t('piPlan.make.step.upgrade', { level: step.toLevel })}</>;
@@ -854,7 +874,6 @@ function StepText({ step }: { step: ChecklistStep }) {
             text={t('piPlan.make.step.route', { item: '{item}' })}
             slots={{ item: <b className="font-semibold">{step.carries}</b> }}
           />
-          {(step.count ?? 1) > 1 && <> {t('piPlan.make.step.routeCount', { count: step.count })}</>}
         </>
       );
   }
@@ -914,8 +933,11 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
           const ticked = ticks.has(step.id);
           const textId = `${baseId}-${step.id}`;
           return (
-            <li key={step.id} className="flex items-center gap-2 px-3 py-1.5">
-              <label className={touchCheckboxLabelClassName}>
+            <li
+              key={step.id}
+              className={cx(tappableRowClassName, 'flex items-center gap-2 px-3 py-1.5')}
+            >
+              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-11')}>
                 <Checkbox
                   checked={ticked}
                   onChange={() => ticks.toggle(step.id)}
