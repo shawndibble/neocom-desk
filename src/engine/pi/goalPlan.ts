@@ -92,11 +92,13 @@
  *
  * ## Steps
  *
- * `planGoals` only composes; each step is a pure function in `goalPlanSteps/`
- * with its own tests: `triage` (normalise, type gaps), `host` (place, then
- * settle), `extraction` (fill, release/refill), `shortfalls` (budget gaps,
- * report order), `assignments` (roles, spare slots), `demand` (demand lines,
- * achieved) and `flows` (the ledger, surplus, buys, hauling).
+ * `planGoals` only composes the numbered steps above, each a function over
+ * explicit inputs in `goalPlanSteps/`: `triage` (normalise, type gaps), `host`
+ * (place, then settle), `extraction` (fill, release/refill), `shortfalls`
+ * (budget gaps, report order), `assignments` (roles, spare slots), `demand`
+ * (demand lines, achieved) and `flows` (the ledger, surplus, buys, hauling).
+ * Steps with logic worth pinning on their own have their own tests;
+ * `goalPlan.test.ts` covers the composition.
  */
 
 import type { PiData } from '@/sde/types';
@@ -167,7 +169,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   // 1. Type gaps.
   const triage = triageGoals(goals, colonies, policy, pi);
 
-  // 2. Factory host, at the goals' full rates.
+  // 3. Factory host, at the goals' full rates.
   const placed = placeHost(goals, triage, {
     colonies,
     pi,
@@ -180,7 +182,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     [...dead].filter((g) => policy.buyTiers.includes(piTier(g.typeId, pi)))
   );
 
-  // 3–4. Extraction, then release and refill.
+  // 2, 4, 5. Demand, extraction, then release and refill.
   const problem = extractionProblem({
     planned: goals.filter((g) => !dead.has(g)),
     colonies,
@@ -192,10 +194,10 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
   const solved = solveExtraction(problem);
   const { wants, extracted, hostUse, highFraction, p1GoalReach, consumption } = solved;
 
-  // 5. Gaps: bought, or budget gaps.
+  // 6. Gaps: bought, or budget gaps.
   const gaps = findGaps(problem, wants, extracted);
 
-  // 6. The host at what it actually makes.
+  // The host at what it actually makes, now step 5 has settled the rates.
   const settled = settleHost(problem.plannedHigh, highFraction, placed.host, placed.reason, pi);
   const { host } = settled;
 

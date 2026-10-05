@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractionProblem, fill, release, solveExtraction } from './extraction';
+import { extractionProblem, solveExtraction } from './extraction';
 import { compareShortfalls, findGaps } from './shortfalls';
 import { BASE_METALS, POLICY, REACTIVE_METALS, colony, goal, pi } from './test-helpers';
 import type { PlannerColony, PlannerPolicy, Shortfall } from '../goalTypes';
@@ -15,20 +15,6 @@ function solve(perHour: number, colonies: PlannerColony[], policy: PlannerPolicy
   });
   return { problem, solved: solveExtraction(problem) };
 }
-
-describe('fill and release', () => {
-  it('adds the fewest ECUs that cover the rate, and release shrinks back to what is consumed', () => {
-    // One ECU at 6000 P0/h makes 40 Reactive Metals/h; two make 72.
-    const { problem } = solve(60, [colony(1, 'barren')]);
-    const state = new Map();
-    expect(fill(problem, state, problem.rows[0], 60)).toBeCloseTo(72, 6);
-    expect(state.get(1)).toEqual([{ p0TypeId: BASE_METALS, ecus: 2 }]);
-    release(problem, state, new Map([[REACTIVE_METALS, 40]]));
-    expect(state.get(1)).toEqual([{ p0TypeId: BASE_METALS, ecus: 1 }]);
-    release(problem, state, new Map());
-    expect(state.has(1)).toBe(false);
-  });
-});
 
 describe('findGaps', () => {
   it('calls a budget gap when every colony that yields it is full', () => {

@@ -1,6 +1,6 @@
 /**
- * Steps 0 and 1 of `planGoals`: normalise the goals, then set aside those a
- * **type gap** blocks before anything is assigned.
+ * Step 1 of `planGoals`: normalise the goals, then set aside those a
+ * **type gap** blocks before anything is assigned. Step numbers follow the module header of `../goalPlan.ts`.
  */
 import type { PiData } from '@/sde/types';
 import { expandChain, isP0 } from '../chain';

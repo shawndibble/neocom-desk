@@ -4,6 +4,7 @@ import {
   AQUEOUS_LIQUIDS,
   BASE_METALS,
   COOLANT,
+  IONIC_SOLUTIONS,
   POLICY,
   REACTIVE_METALS,
   WATER,
@@ -11,8 +12,6 @@ import {
   goal,
   pi,
 } from './test-helpers';
-
-const IONIC_SOLUTIONS = 2309;
 
 describe('normaliseGoals', () => {
   it('merges goals by type, drops zero rates, and sorts by type id', () => {

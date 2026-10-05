@@ -22,7 +22,7 @@ import { EPSILON, HOURS_PER_DAY, HOURS_PER_WEEK, perHour } from './shared';
 export function planFlows(args: {
   problem: ExtractionProblem;
   wants: Wants;
-  /** The settled host (step 5), or null. */
+  /** The settled host (`settleHost`), or null. */
   host: PlannerColony | null;
   /** P1/P2+ units/h the host consumes. */
   hostUse: ReadonlyMap<number, number>;

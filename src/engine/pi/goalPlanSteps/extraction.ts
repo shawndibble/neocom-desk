@@ -1,11 +1,11 @@
 /**
- * Steps 3 and 4 of `planGoals`: greedy extraction (`fill`), then release and
+ * Steps 4 and 5 of `planGoals`: greedy extraction (`fill`), then release and
  * refill until no goal gets further (`solveExtraction`). The fill order and
  * the release/refill rule are in the module header of `../goalPlan.ts`.
  *
  * Every function takes the `ExtractionProblem` it works on explicitly. Its
- * `host` is the one the factories were placed on in step 2 — not the settled
- * host of step 5, which may differ.
+ * `host` is the one the factories were placed on in step 3 (`placeHost`) — not
+ * the settled host (`settleHost`), which may differ.
  */
 import type { PiData } from '@/sde/types';
 import { expandChain, piTier } from '../chain';
@@ -41,7 +41,7 @@ export interface ExtractionProblem {
   /** Demanded P1s, scarcest P0 first (fewest eligible colonies, then typeId). */
   rows: readonly P1Row[];
   rowByP0: ReadonlyMap<number, P1Row>;
-  /** Step 2's host and the factories it carries, or null and `{}`. */
+  /** The placed host (step 3) and the factories it carries, or null and `{}`. */
   host: PlannerColony | null;
   hostFactories: PinCounts;
   buyP1: boolean;

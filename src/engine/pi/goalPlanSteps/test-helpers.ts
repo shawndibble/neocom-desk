@@ -14,6 +14,7 @@ export const pi = JSON.parse(
 
 export const BASE_METALS = 2267;
 export const AQUEOUS_LIQUIDS = 2268;
+export const IONIC_SOLUTIONS = 2309;
 export const REACTIVE_METALS = 2398;
 export const WATER = 3645;
 export const COOLANT = 9832;

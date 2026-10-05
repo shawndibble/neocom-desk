@@ -1,5 +1,5 @@
 /**
- * Step 6 of `planGoals` — what extraction leaves uncovered is bought or is a
+ * Step 6 of `planGoals` (numbered as in `../goalPlan.ts`) — what extraction leaves uncovered is bought or is a
  * **budget gap** — and the order shortfalls are reported in.
  */
 import type { Shortfall } from '../goalTypes';

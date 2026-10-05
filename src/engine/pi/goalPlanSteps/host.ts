@@ -1,7 +1,8 @@
 /**
- * Step 2 of `planGoals` — where the P2+ factories go — and its settle-up once
- * extraction shows what is actually made. Host ranking is in the module header
- * of `../goalPlan.ts`.
+ * Step 3 of `planGoals` — where the P2+ factories go (`placeHost`) — and its
+ * settle-up once release and refill (step 5) show what is actually made
+ * (`settleHost`). Host ranking and step numbers are in the module header of
+ * `../goalPlan.ts`.
  */
 import type { PiData, PiFactoryKind } from '@/sde/types';
 import type { ColonyBaseline } from '../baseline';
@@ -164,7 +165,7 @@ export interface SettledHost {
 }
 
 /**
- * Step 5 of `planGoals`: the host at what it actually makes. Factories are
+ * After release and refill (step 5): the host at what it actually makes. Factories are
  * re-counted on the achieved rates, and a host that ends up making nothing is
  * an ordinary colony again.
  */

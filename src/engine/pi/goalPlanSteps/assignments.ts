@@ -1,5 +1,5 @@
 /**
- * Step 7 of `planGoals`: every colony's role in the final plan. A used colony
+ * Step 7 of `planGoals` (numbered as in `../goalPlan.ts`): every colony's role in the final plan. A used colony
  * with room sells one more slot; a colony the plan leaves alone keeps its
  * **Baseline**; only one with nothing worth selling is idle.
  */
@@ -63,7 +63,7 @@ export interface Assigned {
 
 /**
  * Roles for every colony on the final extraction. `host` and `hostFactories`
- * are the settled host (step 5), which may be null.
+ * are the settled host (`settleHost`), which may be null.
  */
 export function assignColonies(args: {
   /** By planet id. */
