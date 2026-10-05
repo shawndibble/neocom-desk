@@ -71,3 +71,22 @@ describe('IconButton', () => {
     expect(button).toHaveClass('md:size-9');
   });
 });
+
+describe('IconButton states', () => {
+  it('gives every tone a hover and a pressed step', () => {
+    for (const tone of ['default', 'danger', 'positive', 'warning'] as const) {
+      const { unmount } = render(<IconButton icon="x" label={tone} tone={tone} />);
+      const { className } = screen.getByRole('button', { name: tone });
+      expect(className).toContain('hover:');
+      expect(className).toContain('active:bg-');
+      unmount();
+    }
+  });
+
+  it('keeps a hover on a pressed toggle, and none while disabled', () => {
+    const { rerender } = render(<IconButton icon="x" label="Pin" pressed />);
+    expect(screen.getByRole('button').className).toContain('hover:bg-accent/20');
+    rerender(<IconButton icon="x" label="Pin" pressed disabled />);
+    expect(screen.getByRole('button').className).not.toContain('hover:');
+  });
+});

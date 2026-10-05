@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { cx } from '@/lib/cx';
+import { focusRingClassName, focusRingInsetClassName, interactiveClassName } from './controlStyles';
 import * as Icon from './icons';
 
 interface DisclosureProps {
@@ -64,12 +66,15 @@ export function Disclosure({
       <div className={className}>
         <div
           onClick={onToggle}
-          className="flex min-h-11 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 hover:bg-panel-2 md:min-h-0"
+          className={cx(
+            'flex min-h-11 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 hover:bg-panel-2 active:bg-panel md:min-h-0',
+            interactiveClassName
+          )}
         >
           <button
             type="button"
             aria-expanded={expanded}
-            className="text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={cx('text-left', focusRingClassName)}
           >
             {labelContent}
             {/* The value sits outside the button for layout; keep it in the
@@ -94,7 +99,11 @@ export function Disclosure({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+        className={cx(
+          'flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 active:bg-panel md:min-h-0',
+          interactiveClassName,
+          focusRingInsetClassName
+        )}
       >
         {labelContent}
         {trailingContent}
