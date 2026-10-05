@@ -31,7 +31,7 @@ const COPIED_MS = 1500;
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 
 const hubBadgeClassName =
-  'rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest text-text-dim uppercase';
+  'shrink-0 rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
 
 function useColumns(): DataTableColumn<TheraConnectionRow>[] {
   const { t } = useTranslation();
