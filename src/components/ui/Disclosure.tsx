@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
-import { focusRingClassName, focusRingInsetClassName, interactiveClassName } from './controlStyles';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+} from './controlStyles';
 import * as Icon from './icons';
 
 interface DisclosureProps {
@@ -67,8 +71,8 @@ export function Disclosure({
         <div
           onClick={onToggle}
           className={cx(
-            'flex min-h-11 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 hover:bg-panel-2 active:bg-panel md:min-h-0',
-            interactiveClassName
+            'flex min-h-11 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 md:min-h-0',
+            rowInteractiveClassName
           )}
         >
           <button
@@ -100,8 +104,8 @@ export function Disclosure({
         aria-expanded={expanded}
         onClick={onToggle}
         className={cx(
-          'flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 active:bg-panel md:min-h-0',
-          interactiveClassName,
+          'flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left md:min-h-0',
+          rowInteractiveClassName,
           focusRingInsetClassName
         )}
       >

@@ -79,9 +79,10 @@ describe('shared interaction recipe (DESIGN.md §6c)', () => {
 
 describe('primitives compose the shared recipe', () => {
   it('has no ad-hoc transition-colors or press scale, and no pointer-events-none on a button', () => {
-    const adHoc = ['src/components/ui', 'src/features/settings', 'src/app']
-      .flatMap((dir) => sourceFiles(dir))
+    // Layout.tsx keeps one ad-hoc transition-colors (its own chrome, outside the primitives).
+    const adHoc = sourceFiles('src')
       .filter((file) => !file.endsWith('Layout.tsx'))
+      .filter((file) => !file.endsWith('controlStyles.test.ts'))
       .filter((file) =>
         new RegExp('transition-colors|active:' + 'scale').test(readFileSync(file, 'utf8'))
       );

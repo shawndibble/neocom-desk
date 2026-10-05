@@ -1145,9 +1145,6 @@
        height plus the safe-area inset. Also the Build Opportunities
        compare bar's offset. */
     --bottom-nav-clearance: calc(3.5rem + env(safe-area-inset-bottom));
-    /* The sticky headers a focused row can hide behind (the Skills toolbar,
-       a table's group header): enough that Tab never lands under one. */
-    scroll-padding-top: 3.5rem;
   }
   @media (width < 48rem) {
     :root {

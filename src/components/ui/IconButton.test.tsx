@@ -83,6 +83,13 @@ describe('IconButton states', () => {
     }
   });
 
+  it('shows no hover or press while aria-disabled', () => {
+    render(<IconButton icon="x" label="Soon" tone="danger" aria-disabled="true" />);
+    const { className } = screen.getByRole('button', { name: 'Soon' });
+    expect(className).not.toContain('hover:');
+    expect(className).not.toContain('active:bg-');
+  });
+
   it('keeps a hover on a pressed toggle, and none while disabled', () => {
     const { rerender } = render(<IconButton icon="x" label="Pin" pressed />);
     expect(screen.getByRole('button').className).toContain('hover:bg-accent/20');

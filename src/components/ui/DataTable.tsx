@@ -23,6 +23,7 @@ import {
   fieldBaseClassName,
   focusRingInsetClassName,
   interactiveClassName,
+  rowInteractiveClassName,
   type ControlSize,
 } from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
@@ -1418,13 +1419,7 @@ export function DataTable<T>({
               const Chevron = expanded ? Icon.Expanded : Icon.Descend;
               return (
                 <Fragment key={`dt-group:${key}`}>
-                  <tr
-                    role="row"
-                    className={cx(
-                      'dt-group-header hover:bg-panel-2 active:bg-panel',
-                      interactiveClassName
-                    )}
-                  >
+                  <tr role="row" className={cx('dt-group-header', rowInteractiveClassName)}>
                     <td role="cell" colSpan={columns.length + trailingColumns} className="p-0">
                       <button
                         type="button"

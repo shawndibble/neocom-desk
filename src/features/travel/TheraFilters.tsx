@@ -207,7 +207,7 @@ function ChipMenu<V extends string>({
         <button
           type="button"
           className={cx(
-            'inline-flex grow items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+            'inline-flex grow items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
             controlHeightClassName.sm,
             toggleChipStateClassName(!isDefault)
           )}

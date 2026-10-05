@@ -43,6 +43,13 @@ export const focusRingClassName =
 export const focusRingInsetClassName =
   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 
+/**
+ * A full-width row or list item that is itself the control: the `panel-2` hover
+ * fill, a step darker while pressed, and the shared transition. Compose the
+ * focus ring (inset for rows) separately.
+ */
+export const rowInteractiveClassName = cx('hover:bg-panel-2 active:bg-panel', interactiveClassName);
+
 export const disabledClassName =
   'disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
 

@@ -9,6 +9,7 @@ import {
   focusRingClassName,
   focusRingInsetClassName,
   interactiveClassName,
+  rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
@@ -279,8 +280,8 @@ const RailNavBody = memo(function RailNavBody({
             type="button"
             onClick={() => setEditing(true)}
             className={cx(
-              'mt-3 flex min-h-7 items-center gap-1.5 rounded-xs px-2 text-left text-[0.6875rem] text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel',
-              interactiveClassName,
+              'mt-3 flex min-h-7 items-center gap-1.5 rounded-xs px-2 text-left text-[0.6875rem] text-text-dim hover:text-text',
+              rowInteractiveClassName,
               focusRingClassName
             )}
           >
