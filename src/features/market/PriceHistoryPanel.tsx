@@ -22,6 +22,7 @@ import {
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
 import { usePriceHistoryRange } from './priceHistoryRangePref';
+import { marketIskDecimals } from '@/lib/isk';
 
 const MOVING_AVERAGE_WINDOW_DAYS = 7;
 const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
@@ -207,13 +208,25 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
           {summary ? (
             <>
               <Stat label={t('market.priceHistory.summaryHi')}>
-                <IskAmount value={summary.hi} revealOn="tap" />
+                <IskAmount
+                  value={summary.hi}
+                  revealOn="tap"
+                  decimals={marketIskDecimals(summary.hi)}
+                />
               </Stat>
               <Stat label={t('market.priceHistory.summaryLo')}>
-                <IskAmount value={summary.lo} revealOn="tap" />
+                <IskAmount
+                  value={summary.lo}
+                  revealOn="tap"
+                  decimals={marketIskDecimals(summary.lo)}
+                />
               </Stat>
               <Stat label={t('market.priceHistory.summaryMedian')}>
-                <IskAmount value={summary.median} revealOn="tap" />
+                <IskAmount
+                  value={summary.median}
+                  revealOn="tap"
+                  decimals={marketIskDecimals(summary.median)}
+                />
               </Stat>
               {/* Units and orders, not ISK — plain figures, so no `IskAmount`
                   and nothing for its privacy blur to hide. */}

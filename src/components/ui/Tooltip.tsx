@@ -326,15 +326,18 @@ interface InfoTooltipProps {
   'aria-haspopup'?: 'dialog';
   /** `accent` tints the trigger like the value it annotates; default is the dim glyph. */
   tone?: 'dim' | 'accent';
+  /** `info` draws an "i" instead of "?": a note on a value, not jargon to explain. */
+  glyph?: 'help' | 'info';
   className?: string;
 }
 
-/** Small "?" icon button + Tooltip, for labeling jargon next to a heading/label that isn't itself focusable. */
+/** Small "?" (or "i") icon button + Tooltip, for labeling jargon next to a heading/label that isn't itself focusable. */
 export function InfoTooltip({
   label,
   content,
   onClick,
   tone = 'dim',
+  glyph = 'help',
   className = '',
   'aria-haspopup': ariaHasPopup,
 }: InfoTooltipProps) {
@@ -347,7 +350,7 @@ export function InfoTooltip({
         aria-haspopup={ariaHasPopup}
         className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
-        ?
+        {glyph === 'info' ? 'i' : '?'}
       </button>
     </Tooltip>
   );

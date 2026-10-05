@@ -429,6 +429,18 @@ describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => 
     expect(bpcRow?.remainingQuantity).toBe(0);
     expect(bpcRow?.ownedQuantity).toBe(2);
   });
+
+  // The marker is what keeps "Use assets" off the row (issue #2541's
+  // owned-stock offer), so the merged row has to keep it — a group of two
+  // identical plans must not offer what a single one doesn't.
+  it('keeps the Blueprint Acquisition marker on a row two members merge', () => {
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', tableMaterials: [acquisitionLine(11185)] }),
+      member({ planId: 'b', tableMaterials: [acquisitionLine(11185)] }),
+    ]);
+    const bpcRow = rollup.tableMaterials.find((m) => m.typeID === 11185);
+    expect(bpcRow?.acquisitionTier).toEqual({ me: 0, te: 0 });
+  });
 });
 
 describe('rollUpBuildGroup — mixed hubs', () => {

@@ -22,9 +22,10 @@
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
  * ESI returns the same schema for both.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  CollapsiblePanel,
   DataAgeBadge,
   EmptyState,
   IconButton,
@@ -87,6 +88,7 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { formatIsk } from '@/lib/isk';
 import { enumParam, intParam } from '@/lib/urlState';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -173,11 +175,42 @@ function CorpDivisionsPanel({
   offlineTitleKey,
 }: CorpDivisionsPanelProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  const [expanded, setExpanded] = useState(false);
   const walletsResult = balances?.walletsResult.cached ?? null;
+  const selectedEntry = divisions.find((entry) => entry.division === selected) ?? divisions[0];
+  // Seven full-width cards push the journal below the fold on a phone: fold to
+  // the selected division there. Loading, empty and one-division panels have
+  // nothing worth folding.
+  const foldable = isPhone && !loading && !!walletsResult && divisions.length > 1;
+  const offlineNote = walletsResult?.fromCache ? (
+    <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+  ) : null;
   return (
-    <Panel
+    <CollapsiblePanel
       title={t('corp.wallet.divisionsTitle')}
       actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
+      expanded={expanded}
+      onToggle={() => setExpanded((open) => !open)}
+      collapsible={foldable}
+      labels={{ show: t('corp.wallet.divisionsShow'), hide: t('corp.wallet.divisionsHide') }}
+      collapsedSummary={
+        selectedEntry ? (
+          <>
+            <p className="flex min-w-0 items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {divisionLabel(selectedEntry)}
+              </span>
+              <span
+                className={`shrink-0 text-lg font-medium tabular-nums ${iskToneClass(selectedEntry.balance)}`}
+              >
+                {formatIsk(selectedEntry.balance, 2)}
+              </span>
+            </p>
+            {offlineNote}
+          </>
+        ) : undefined
+      }
     >
       {loading ? (
         <div className="flex justify-center py-8">
@@ -199,12 +232,18 @@ function CorpDivisionsPanel({
                   key={entry.division}
                   type="button"
                   aria-pressed={isSelected}
-                  onClick={() => onSelect(entry.division)}
+                  onClick={() => {
+                    onSelect(entry.division);
+                    setExpanded(false);
+                  }}
                   className={`min-h-11 rounded-xs border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                     isSelected ? 'border-accent bg-accent/15' : 'border-line hover:border-text-dim'
                   }`}
                 >
-                  <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span
+                    title={divisionLabel(entry)}
+                    className="block truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  >
                     {divisionLabel(entry)}
                   </span>
                   <span
@@ -216,12 +255,10 @@ function CorpDivisionsPanel({
               );
             })}
           </div>
-          {walletsResult.fromCache && (
-            <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
-          )}
+          {offlineNote}
         </>
       )}
-    </Panel>
+    </CollapsiblePanel>
   );
 }
 

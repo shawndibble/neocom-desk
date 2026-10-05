@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { avoidListKey, effectiveAvoid, type AvoidRules } from './avoidRules';
+import {
+  avoidListKey,
+  avoidPreviewOutcome,
+  candidateAvoid,
+  effectiveAvoid,
+  listOnlyOutcome,
+  type AvoidRules,
+} from './avoidRules';
+import { buildRouteSafetyRows } from './routeSafety';
 
 const UEDAMA = 30045328;
 const TAMA = 30002813;
@@ -76,5 +84,102 @@ describe('avoidListKey', () => {
     expect(avoidListKey(long).length).toBeLessThan(16);
     expect(avoidListKey([1, 2])).not.toBe(avoidListKey([1, 3]));
     expect(avoidListKey([1, 2])).toBe(avoidListKey([1, 2]));
+  });
+});
+
+describe('candidateAvoid', () => {
+  it('adds the system to the avoid list the route already uses, sorted', () => {
+    expect(
+      candidateAvoid({
+        effective: [30, 10],
+        systemId: 20,
+        avoidList: [10],
+        avoidListEnabled: true,
+      })
+    ).toEqual([10, 20, 30]);
+  });
+
+  it('does not list a system twice', () => {
+    expect(
+      candidateAvoid({ effective: [10, 20], systemId: 20, avoidList: [20], avoidListEnabled: true })
+    ).toEqual([10, 20]);
+  });
+
+  it('brings in the whole stored list when the switch is off, since turning it on does', () => {
+    expect(
+      candidateAvoid({
+        effective: [5],
+        systemId: 20,
+        avoidList: [40, 10],
+        avoidListEnabled: false,
+      })
+    ).toEqual([5, 10, 20, 40]);
+  });
+});
+
+describe('avoidPreviewOutcome', () => {
+  const SYSTEMS = new Map([
+    [1, { id: 1, name: 'One', security: 0.9, regionId: 10 }],
+    [2, { id: 2, name: 'Two', security: 0.9, regionId: 10 }],
+    [3, { id: 3, name: 'Three', security: 0.9, regionId: 10 }],
+    [4, { id: 4, name: 'Four', security: 0.46, regionId: 10 }],
+    [5, { id: 5, name: 'Five', security: 0.7, regionId: 10 }],
+  ]);
+  const rows = (route: number[]) =>
+    buildRouteSafetyRows(route, {
+      systems: SYSTEMS,
+      regionNames: new Map(),
+      kills: null,
+      jumps: null,
+    });
+
+  it('counts the whole trip, every leg, new less current', () => {
+    expect(
+      avoidPreviewOutcome({
+        current: [rows([1, 2, 3]), rows([3, 2])],
+        next: [rows([1, 4, 5, 3]), rows([3, 2])],
+        systemId: 2,
+      })
+    ).toEqual({ jumps: 4, jumpDelta: 1, lowestSecurity: 0.5, stillCrosses: true });
+  });
+
+  it('tells a trip that goes round the system from one that still crosses it', () => {
+    expect(
+      avoidPreviewOutcome({ current: [rows([1, 2, 3])], next: [rows([1, 4, 3])], systemId: 2 })
+    ).toMatchObject({ jumpDelta: 0, stillCrosses: false });
+  });
+
+  it('counts only the legs a route flies, on both sides alike', () => {
+    expect(
+      avoidPreviewOutcome({
+        current: [rows([1, 2, 3]), null],
+        next: [rows([1, 4, 5, 3]), null],
+        systemId: 2,
+      })
+    ).toMatchObject({ jumps: 3, jumpDelta: 1 });
+  });
+});
+
+describe('listOnlyOutcome', () => {
+  const SYSTEMS = new Map([
+    [1, { id: 1, name: 'One', security: 0.9, regionId: 10 }],
+    [2, { id: 2, name: 'Two', security: 0.9, regionId: 10 }],
+    [3, { id: 3, name: 'Three', security: 0.9, regionId: 10 }],
+  ]);
+  const rows = (route: number[]) =>
+    buildRouteSafetyRows(route, {
+      systems: SYSTEMS,
+      regionNames: new Map(),
+      kills: null,
+      jumps: null,
+    });
+
+  it('leaves the trip as drawn: the switch stays off, so the list changes nothing', () => {
+    expect(listOnlyOutcome([rows([1, 2, 3]), rows([3, 2]), null])).toEqual({
+      jumps: 3,
+      jumpDelta: 0,
+      lowestSecurity: null,
+      stillCrosses: false,
+    });
   });
 });

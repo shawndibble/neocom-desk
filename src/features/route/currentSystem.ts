@@ -17,7 +17,7 @@ import {
 } from '@/engine/route/jumpRange';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { localJumpDistances } from '@/features/route/localRoute';
-import { useRouteQuery } from '@/features/route/routeRules';
+import { useJumpBasis } from '@/features/route/jumpBasis';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -147,8 +147,9 @@ export function useJumpRangeFilter(
   range: JumpRange
 ): JumpRangeFilter {
   const originSystemId = current.systemId;
-  // The pilot's Travel default in full: "within 5 jumps" counts the trip they would fly.
-  const { rules, key: routeKey, hydrated } = useRouteQuery();
+  // The pilot's jump basis in full (Travel Settings and Route Safety's holes and
+  // bridges): "within 5 jumps" counts the trip Route Safety would draw.
+  const { rules, network, key: routeKey, hydrated } = useJumpBasis();
   const [distances, setDistances] = useState<{
     origin: number;
     routeKey: string;
@@ -158,7 +159,7 @@ export function useJumpRangeFilter(
   useEffect(() => {
     if (originSystemId === null || !hydrated) return;
     let cancelled = false;
-    void localJumpDistances(originSystemId, rules).then((result) => {
+    void localJumpDistances(originSystemId, rules, network).then((result) => {
       if (cancelled) return;
       setDistances({
         origin: originSystemId,
@@ -169,7 +170,7 @@ export function useJumpRangeFilter(
     return () => {
       cancelled = true;
     };
-  }, [originSystemId, rules, routeKey, hydrated]);
+  }, [originSystemId, rules, network, routeKey, hydrated]);
 
   const settled = distances?.origin === originSystemId && distances.routeKey === routeKey;
   const jumps = settled ? distances.jumps : null;

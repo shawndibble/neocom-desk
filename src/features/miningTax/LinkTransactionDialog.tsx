@@ -5,6 +5,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
+import { LedgerActionError } from './LedgerActionError';
 
 interface LinkTransactionDialogProps {
   open: boolean;
@@ -14,6 +15,8 @@ interface LinkTransactionDialogProps {
   /** The payment's own recorded amount — what an exact-match suggestion is measured against. */
   targetAmount: number;
   busy: boolean;
+  /** Why the last confirm wrote nothing — `useLedgerAction`'s message. */
+  saveError?: string | null;
   onConfirm: (payment: MadePayment, source: 'auto' | 'manual') => void;
 }
 
@@ -35,6 +38,7 @@ export function LinkTransactionDialog({
   candidates,
   targetAmount,
   busy,
+  saveError,
   onConfirm,
 }: LinkTransactionDialogProps) {
   const { t } = useTranslation();
@@ -124,6 +128,7 @@ export function LinkTransactionDialog({
           </ul>
         )}
 
+        <LedgerActionError error={saveError} />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button variant="primary" size="sm" disabled={!selected || busy} onClick={confirm}>
             {t('miningTax.linkTransactionConfirmAction')}

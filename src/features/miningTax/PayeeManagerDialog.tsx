@@ -1,7 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Field,
+  Fields,
   IconButton,
   Modal,
   Select,
@@ -13,8 +19,11 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
+import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
+import { deletePayee } from './ledgerActions';
+import { createPayee, loadPayees, updatePayee } from './payees';
+import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
 
@@ -32,6 +41,27 @@ interface PayeeManagerDialogProps {
    */
   initialCharacterId: number;
   onChanged: () => void;
+  /**
+   * What each Payee is still owed — outstanding Assignments only — keyed by
+   * Payee id. Drives the row's balance and the delete
+   * confirmation's "move them first" offer; absent reads as nothing owed.
+   */
+  owedByPayee?: ReadonlyMap<string, PayeeOwed>;
+  /** The systems each Payee has been mined for, learned from Assignments (`suggestPayeeForSystem`'s `systemsByPayee`). */
+  systemsByPayee?: ReadonlyMap<string, ReadonlySet<number>>;
+  /** Display names for the ids in `systemsByPayee`; an id without one is left out of the row. */
+  systemNames?: ReadonlyMap<number, string>;
+}
+
+export interface PayeeOwed {
+  amount: number;
+  /** How many owed entries make up `amount`. */
+  count: number;
+  /**
+   * How many entries "Move and delete" takes — `count` plus the other days of
+   * any Combined Entry those are in (`assignmentsMovedWithPayee`).
+   */
+  moving: number;
 }
 
 interface DraftPayee {
@@ -84,12 +114,26 @@ export function PayeeManagerDialog({
   payeesByCharacter,
   initialCharacterId,
   onChanged,
+  owedByPayee,
+  systemsByPayee,
+  systemNames,
 }: PayeeManagerDialogProps) {
   const { t } = useTranslation();
+  const formId = useId();
   const [payeesByCharacterState, setPayeesByCharacterState] = useState(payeesByCharacter);
   const [draft, setDraft] = useState<DraftPayee>(EMPTY_DRAFT);
+  // The add/edit form stays out of the way until asked for — the list is what
+  // the dialog is for. An empty list shows it regardless (see `showForm`).
+  const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown above the list: the add/edit form (and its own error line) may be closed.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
+  const [moveTargetId, setMoveTargetId] = useState<string>('');
+  // Set by the row menu's Delete item, acted on once the menu has closed: the
+  // menu hands focus back to its trigger as it closes, which would pull focus
+  // out of a confirmation opened any earlier (and Escape with it).
+  const deleteChosen = useRef<PayeeRecord | null>(null);
 
   // Deduped by id: the same corp Payee, however it's stored per-character
   // under the hood, must not show up twice just because two alts happen to
@@ -101,6 +145,8 @@ export function PayeeManagerDialog({
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [payeesByCharacterState]);
+
+  const showForm = formOpen || payees.length === 0;
 
   // A genuinely fresh read after a mutation, since the parent's snapshot map
   // is a point-in-time seed and won't reflect this dialog's own edit until
@@ -114,6 +160,18 @@ export function PayeeManagerDialog({
     setPayeesByCharacterState(new Map(entries));
   }
 
+  function closeForm() {
+    setDraft(EMPTY_DRAFT);
+    setError(null);
+    setFormOpen(false);
+  }
+
+  function startAdd() {
+    setDraft(EMPTY_DRAFT);
+    setError(null);
+    setFormOpen(true);
+  }
+
   function startEdit(payee: PayeeRecord) {
     setDraft({
       id: payee.id,
@@ -125,6 +183,7 @@ export function PayeeManagerDialog({
       systemId: payee.systemId,
     });
     setError(null);
+    setFormOpen(true);
   }
 
   async function handleSave() {
@@ -153,152 +212,281 @@ export function PayeeManagerDialog({
     } else {
       await createPayee(initialCharacterId, input);
     }
-    setDraft(EMPTY_DRAFT);
-    setError(null);
+    closeForm();
     await refresh();
     onChanged();
   }
 
-  async function handleDelete(payee: PayeeRecord) {
-    await deletePayee(payee);
-    if (draft.id === payee.id) setDraft(EMPTY_DRAFT);
+  async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
+    // One transaction: a failure leaves the Payee and every entry's label intact.
+    setDeleteError(null);
+    if (!(await deletePayee(payee, moveToPayeeId)).ok) {
+      setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
+      return;
+    }
+    if (draft.id === payee.id) closeForm();
     await refresh();
     onChanged();
   }
 
-  function confirmDelete() {
+  function openDelete(payee: PayeeRecord) {
+    setDeletingPayee(payee);
+    setMoveTargetId('');
+  }
+
+  function confirmDelete(moveAndDelete = false) {
     const payee = deletingPayee;
     setDeletingPayee(null);
-    if (payee) void handleDelete(payee);
+    if (!payee) return;
+    const owed = owedByPayee?.get(payee.id);
+    void handleDelete(payee, moveAndDelete && owed && moveTargetId ? moveTargetId : undefined);
   }
+
+  const deletingOwed =
+    deletingPayee && (owedByPayee?.get(deletingPayee.id)?.count ?? 0) > 0
+      ? owedByPayee?.get(deletingPayee.id)
+      : undefined;
+  const moveTargets = deletingPayee ? payees.filter((p) => p.id !== deletingPayee.id) : [];
 
   return (
     <Modal
       open={open}
       onClose={() => {
-        setDraft(EMPTY_DRAFT);
-        setError(null);
+        closeForm();
         onClose();
       }}
       title={t('miningTax.managePayeesTitle')}
     >
       <div className="space-y-3">
+        {!showForm && (
+          <div className="flex justify-end">
+            <Button variant="primary" size="sm" onClick={startAdd}>
+              <Icon.AddRow aria-hidden="true" />
+              {t('miningTax.payees.addButton')}
+            </Button>
+          </div>
+        )}
+
+        {deleteError && (
+          <p role="alert" className="text-xs text-danger">
+            {deleteError}
+          </p>
+        )}
         {payees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (
           <ul className="divide-y divide-line">
-            {payees.map((payee) => (
-              <li key={payee.id} className="flex items-center gap-2 py-1.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{payee.name}</p>
-                  <p className="mt-0.5 text-[0.6875rem] text-text-dim">
-                    {t('miningTax.payeeSummary', {
-                      pct: payee.defaultTaxPct,
-                      hub: hubForPayee(payee.hubId).systemName,
-                    })}
-                  </p>
-                </div>
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  icon={<Icon.Rename />}
-                  label={t('miningTax.editPayee', { name: payee.name })}
-                  onClick={() => startEdit(payee)}
-                />
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  tone="danger"
-                  icon={<Icon.Close />}
-                  label={t('miningTax.deletePayee', { name: payee.name })}
-                  onClick={() => setDeletingPayee(payee)}
-                />
-              </li>
-            ))}
+            {payees.map((payee) => {
+              const owed = owedByPayee?.get(payee.id);
+              const systems = payeeSystemNames(systemsByPayee?.get(payee.id), systemNames);
+              const hub = hubForPayee(payee.hubId).systemName;
+              return (
+                <li key={payee.id} className="flex items-center gap-1 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm" title={payee.name}>
+                        {payee.name}
+                      </p>
+                      {owed && owed.amount > 0 ? (
+                        <span className="shrink-0 text-xs text-isk-neg tabular-nums">
+                          {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
+                        </span>
+                      ) : owedByPayee ? (
+                        <span className="shrink-0 text-xs text-text-dim">
+                          {t('miningTax.payees.settled')}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 truncate text-[0.6875rem] text-text-dim">
+                      {systems.length > 0
+                        ? t('miningTax.payees.detailWithSystems', {
+                            pct: payee.defaultTaxPct,
+                            hub,
+                            systems: systems.join(', '),
+                          })
+                        : t('miningTax.payees.detail', { pct: payee.defaultTaxPct, hub })}
+                    </p>
+                  </div>
+                  <IconButton
+                    variant="plain"
+                    size="row"
+                    icon={<Icon.Rename />}
+                    label={t('miningTax.editPayee', { name: payee.name })}
+                    onClick={() => startEdit(payee)}
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton
+                        variant="plain"
+                        size="row"
+                        icon={<Icon.More />}
+                        label={t('common.moreActionsLabel', { name: payee.name })}
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      onCloseAutoFocus={(e) => {
+                        const chosen = deleteChosen.current;
+                        if (!chosen) return;
+                        e.preventDefault();
+                        deleteChosen.current = null;
+                        openDelete(chosen);
+                      }}
+                    >
+                      <DropdownMenuItem
+                        className="text-danger data-[highlighted]:text-danger"
+                        onSelect={() => {
+                          deleteChosen.current = payee;
+                        }}
+                      >
+                        {t('miningTax.deletePayeeAction')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </li>
+              );
+            })}
           </ul>
         )}
 
-        <div className="space-y-2 border-t border-line pt-3">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {draft.id ? t('miningTax.editPayeeTitle') : t('miningTax.addPayeeTitle')}
-          </p>
-          <TextInput
-            className="w-full"
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            placeholder={t('miningTax.payeeNamePlaceholder')}
-            aria-label={t('miningTax.payeeNamePlaceholder')}
-          />
-          <TextInput
-            className="w-full"
-            type="number"
-            min={0}
-            max={100}
-            step="0.1"
-            value={draft.defaultTaxPct}
-            onChange={(e) => setDraft({ ...draft, defaultTaxPct: e.target.value })}
-            placeholder={t('miningTax.defaultTaxPctPlaceholder')}
-            aria-label={t('miningTax.defaultTaxPctPlaceholder')}
-          />
-          <div className="space-y-1">
-            <Select
-              value={draft.hubId}
-              onValueChange={(value) => setDraft({ ...draft, hubId: value as TradeHub['id'] })}
-            >
-              <SelectTrigger aria-label={t('miningTax.payeeHubLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRADE_HUBS.map((hub) => (
-                  <SelectItem key={hub.id} value={hub.id}>
-                    {hub.id === DEFAULT_TRADE_HUB.id
-                      ? t('miningTax.payeeHubDefaultOption', { hub: hub.systemName })
-                      : hub.systemName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[0.6875rem] text-text-dim">{t('miningTax.payeeHubHint')}</p>
-          </div>
-          {error && (
-            <p role="alert" className="text-xs text-danger">
-              {error}
+        {showForm && (
+          <div className="space-y-3 border-t border-line pt-3">
+            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {draft.id ? t('miningTax.editPayeeTitle') : t('miningTax.addPayeeTitle')}
             </p>
-          )}
-          <div className="flex gap-2">
-            <Button variant="primary" size="sm" onClick={() => void handleSave()}>
-              {draft.id ? t('common.save') : t('miningTax.addPayee')}
-            </Button>
-            {draft.id && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  setDraft(EMPTY_DRAFT);
-                  setError(null);
-                }}
-              >
-                {t('filters.cancel')}
-              </Button>
+            <Fields>
+              <Field label={t('miningTax.payees.nameLabel')} htmlFor={`${formId}-name`}>
+                <TextInput
+                  id={`${formId}-name`}
+                  className="w-full"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  placeholder={t('miningTax.payeeNamePlaceholder')}
+                />
+              </Field>
+              <Field label={t('miningTax.payees.taxPctLabel')} htmlFor={`${formId}-pct`}>
+                <TextInput
+                  id={`${formId}-pct`}
+                  className="w-24"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={draft.defaultTaxPct}
+                  onChange={(e) => setDraft({ ...draft, defaultTaxPct: e.target.value })}
+                />
+              </Field>
+              <Field label={t('miningTax.payeeHubLabel')} note={t('miningTax.payeeHubHint')}>
+                <Select
+                  value={draft.hubId}
+                  onValueChange={(value) => setDraft({ ...draft, hubId: value as TradeHub['id'] })}
+                >
+                  <SelectTrigger aria-label={t('miningTax.payeeHubLabel')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_HUBS.map((hub) => (
+                      <SelectItem key={hub.id} value={hub.id}>
+                        {hub.id === DEFAULT_TRADE_HUB.id
+                          ? t('miningTax.payeeHubDefaultOption', { hub: hub.systemName })
+                          : hub.systemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </Fields>
+            {error && (
+              <p role="alert" className="text-xs text-danger">
+                {error}
+              </p>
             )}
+            <div className="flex justify-end gap-2">
+              {payees.length > 0 && (
+                <Button size="sm" onClick={closeForm}>
+                  {t('filters.cancel')}
+                </Button>
+              )}
+              <Button variant="primary" size="sm" onClick={() => void handleSave()}>
+                {t('common.save')}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <Modal
         open={deletingPayee !== null}
         onClose={() => setDeletingPayee(null)}
         title={t('miningTax.deletePayeeAction')}
       >
-        <p className="text-xs text-text-dim">
-          {t('miningTax.deletePayeeConfirm', { name: deletingPayee?.name ?? '' })}
-        </p>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setDeletingPayee(null)}>
-            {t('filters.cancel')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={confirmDelete}>
-            {t('miningTax.deletePayeeAction')}
-          </Button>
-        </div>
+        {deletingOwed ? (
+          <div className="space-y-3">
+            <p className="text-xs">
+              {t('miningTax.payees.deleteOwed', {
+                name: deletingPayee?.name ?? '',
+                count: deletingOwed.count,
+                amount: formatIsk(deletingOwed.amount, 0),
+              })}
+            </p>
+            {moveTargets.length > 0 && deletingOwed.moving > deletingOwed.count && (
+              <p className="text-xs">
+                {t('miningTax.payees.moveTakesCombined', { count: deletingOwed.moving })}
+              </p>
+            )}
+            {moveTargets.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={moveTargetId} onValueChange={setMoveTargetId}>
+                  <SelectTrigger
+                    aria-label={t('miningTax.payees.moveToLabel')}
+                    className="min-w-0 flex-1"
+                  >
+                    <SelectValue placeholder={t('miningTax.payees.moveToLabel')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moveTargets.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={!moveTargetId}
+                  onClick={() => confirmDelete(true)}
+                >
+                  {t('miningTax.payees.moveAndDelete')}
+                </Button>
+              </div>
+            )}
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('miningTax.payees.deleteAnywayHint')}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" onClick={() => setDeletingPayee(null)}>
+                {t('filters.cancel')}
+              </Button>
+              <Button size="sm" onClick={() => confirmDelete(false)}>
+                {t('miningTax.payees.deleteAnyway')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-text-dim">
+              {t('miningTax.deletePayeeConfirm', { name: deletingPayee?.name ?? '' })}
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button size="sm" onClick={() => setDeletingPayee(null)}>
+                {t('filters.cancel')}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => confirmDelete(false)}>
+                {t('miningTax.deletePayeeAction')}
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </Modal>
   );

@@ -9,7 +9,7 @@
  */
 import { packCheck } from '@/engine/fittings/hullFitKey';
 import type { CandidateRack } from '@/engine/fittings/candidates';
-import { checkHullCandidate, hullRacks, loadDogmaEngine } from './dogmaFittingEngine';
+import { loadDogmaEngine } from './dogmaFittingEngine';
 
 export interface HullFitRequest {
   id: number;
@@ -36,9 +36,9 @@ export async function runHullFit(
   { id, shipTypeId, jobs, skillLevels }: HullFitRequest,
   isLatest: (id: number) => boolean
 ): Promise<HullFitReply> {
-  await loadDogmaEngine();
+  const engine = await loadDogmaEngine();
   const skills = new Map(skillLevels);
-  const racks = hullRacks(shipTypeId, skills);
+  const racks = engine.hullRacks(shipTypeId, skills);
   const entries: [number, number][] = [];
   const noRackAtAll = packCheck({ fitsHull: false, canFly: false, fitsResources: false });
   for (const [rack, typeIds] of jobs) {
@@ -51,7 +51,10 @@ export async function runHullFit(
     for (let i = 0; i < typeIds.length; i += BATCH) {
       if (!isLatest(id)) return { id, aborted: true };
       for (const typeId of typeIds.slice(i, i + BATCH)) {
-        entries.push([typeId, packCheck(checkHullCandidate(shipTypeId, rack, typeId, skills))]);
+        entries.push([
+          typeId,
+          packCheck(engine.checkHullCandidate(shipTypeId, rack, typeId, skills)),
+        ]);
       }
       await yieldToQueue();
     }

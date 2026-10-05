@@ -14,19 +14,24 @@
  *   Payee and then moved back becomes. They are written back as one record,
  *   quantities and snapshots summed.
  *
+ * A safety net, not the rule's enforcement: every write now goes through
+ * `ledgerActions.ts`, which keeps a Combined Entry whole on write. This still
+ * repairs data written before that, or arriving from another device's sync.
+ *
  * Run as eject, fuse, eject: a dissolved group's two halves have to be free
  * of their `groupId` before they can fuse, and fusing can itself leave a group
  * holding a single member, which is no longer a group. Both steps are
  * idempotent, so a healthy ledger writes nothing and triggers no sync.
  */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
-import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
+import { scheduleSync } from '@/sync';
 import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
   planEntryMerges,
   planGroupEjections,
   type CoalescableAssignment,
 } from '@/engine/miningTax/coalesce';
+import { deleteAssignments } from './assignments';
 
 function coalescable(a: MiningTaxAssignmentRecord): CoalescableAssignment {
   return {
@@ -101,10 +106,13 @@ export async function coalesceAssignments(
 
   if (rewritten.size === 0 && absorbedIds.length === 0) return;
 
-  await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
-  // Tombstoned rather than plainly dropped: the absorbed halves may already
-  // have synced, and a bare local delete would let the next pull resurrect
-  // them beside the record that now holds their ore.
-  for (const id of absorbedIds) await markMiningTaxAssignmentDeleted(characterId, id);
+  // One transaction, so a repair never lands half-done. Tombstoned rather than
+  // plainly dropped: the absorbed halves may already have synced, and a bare
+  // local delete would let the next pull resurrect them beside the record
+  // that now holds their ore.
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
+    await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
+    await deleteAssignments(absorbedIds.map((id) => ({ id, characterId })));
+  });
   scheduleSync(characterId);
 }

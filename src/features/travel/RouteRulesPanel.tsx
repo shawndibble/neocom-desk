@@ -11,6 +11,8 @@
  * - Route Safety only (issue #2476): routing through the Thera / Turnur
  *   holes. Saved as this page's default and overridable in the link, and
  *   deliberately not in Settings → Travel — no other page's jumps use holes.
+ *   And Use jump bridges (issue #2478), with the Ansiblex list behind it:
+ *   a device-local default, since the list itself never leaves the device.
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
@@ -24,6 +26,7 @@ import {
   StatChip,
   StatChips,
   TextInput,
+  textActionClassName,
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
@@ -32,10 +35,11 @@ import {
   MIN_ROUTE_HOLE_MIN_LIFE,
   parseRouteHoleMinLife,
   ROUTE_HOLE_HUBS,
-  type RouteHoleOverrides,
+  type RouteHoleChange,
   type RouteHoleQuery,
 } from '@/features/route/routeHoleSettings';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
+import type { RouteBridgeQuery } from '@/features/route/routeBridgeSettings';
 import {
   ROUTE_PREFERENCE_LABEL_KEYS,
   ROUTE_PREFERENCE_SHORT_LABEL_KEYS,
@@ -66,25 +70,63 @@ function GroupLabel({ children }: { children: string }) {
   );
 }
 
-/** A change to one wormhole setting: the field and its new value. */
-export type RouteHoleChange = {
-  [K in keyof RouteHoleOverrides]: { field: K; value: NonNullable<RouteHoleOverrides[K]> };
-}[keyof RouteHoleOverrides];
+/** What the Route Safety group needs for Use jump bridges and the Ansiblex list. */
+export interface RouteBridgeFieldsProps {
+  /** Whether this route may cross bridges: the link's say, else the page's default. */
+  bridgeQuery: RouteBridgeQuery;
+  /** Saves the page's default, and drops the link's override of it. */
+  onBridgesChange: (enabled: boolean) => void;
+  /** How many Ansiblex are known on this device. */
+  bridgeCount: number;
+  /** Opens the Ansiblex list. */
+  onManageBridges: () => void;
+}
 
-/** Route Safety's own group: whether, and through which holes, routes may go. */
-function RouteHoleFields({
+export function RouteBridgeFields({
+  bridgeQuery,
+  onBridgesChange,
+  bridgeCount,
+  onManageBridges,
+}: RouteBridgeFieldsProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-2 font-semibold">
+        <Checkbox
+          checked={bridgeQuery.enabled}
+          onChange={() => onBridgesChange(!bridgeQuery.enabled)}
+        />
+        {t('travel.bridges.enabled')}
+      </label>
+      <button type="button" className={textActionClassName()} onClick={onManageBridges}>
+        {t('travel.bridges.manage', { count: bridgeCount })}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Route Safety's own group: whether, and through which holes and bridges,
+ * routes may go. Shared with Settings → Travel (`bare`: the panel there
+ * supplies the heading and rule), so the two pages edit one set of controls.
+ */
+export function RouteHoleFields({
   query,
   onChange,
+  bridges,
+  bare = false,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
+  bridges: RouteBridgeFieldsProps;
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
   const { enabled, settings } = query;
   return (
-    <section className="space-y-3 border-t border-line pt-4">
-      <GroupLabel>{t('travel.holes.group')}</GroupLabel>
+    <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
+      {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
       <label className="flex items-center gap-2 font-semibold">
         <Checkbox
           checked={enabled}
@@ -141,6 +183,7 @@ function RouteHoleFields({
           uppercase={false}
         />
       </div>
+      <RouteBridgeFields {...bridges} />
     </section>
   );
 }
@@ -149,9 +192,11 @@ function RouteHoleFields({
 function ActiveRuleChips({
   preference,
   holeQuery,
+  bridges,
 }: {
   preference: RoutePreferenceKind;
   holeQuery: RouteHoleQuery;
+  bridges: RouteBridgeFieldsProps;
 }) {
   const { t } = useTranslation();
   const penalty = useSecurityPenalty((state) => state.value);
@@ -195,6 +240,12 @@ function ActiveRuleChips({
             value={t(`travel.thera.hub.${holeQuery.settings.hubs}`)}
           />
         )}
+        {bridges.bridgeQuery.enabled && (
+          <StatChip
+            label={t('travel.bridges.chip')}
+            value={t('travel.bridges.chipValue', { count: bridges.bridgeCount })}
+          />
+        )}
       </StatChips>
     </div>
   );
@@ -205,6 +256,7 @@ export function RouteRulesPanel({
   onPreferenceChange,
   holeQuery,
   onHoleChange,
+  bridges,
 }: {
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
@@ -214,6 +266,7 @@ export function RouteRulesPanel({
   holeQuery: RouteHoleQuery;
   /** Saves the page's default, and drops the link's override of it. */
   onHoleChange: (change: RouteHoleChange) => void;
+  bridges: RouteBridgeFieldsProps;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -232,10 +285,13 @@ export function RouteRulesPanel({
       labels={{ show: t('travel.rules.show'), hide: t('travel.rules.hide') }}
       collapsedSummary={
         settingsHydrated &&
-        holeQuery.hydrated && <ActiveRuleChips preference={preference} holeQuery={holeQuery} />
+        holeQuery.hydrated &&
+        bridges.bridgeQuery.hydrated && (
+          <ActiveRuleChips preference={preference} holeQuery={holeQuery} bridges={bridges} />
+        )
       }
     >
-      {settingsHydrated && holeQuery.hydrated ? (
+      {settingsHydrated && holeQuery.hydrated && bridges.bridgeQuery.hydrated ? (
         <div className="space-y-5 text-xs">
           <section className="space-y-2">
             <GroupLabel>{t('travel.rules.thisRoute')}</GroupLabel>
@@ -274,7 +330,7 @@ export function RouteRulesPanel({
             />
           </section>
 
-          <RouteHoleFields query={holeQuery} onChange={onHoleChange} />
+          <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} />
         </div>
       ) : (
         <Spinner />

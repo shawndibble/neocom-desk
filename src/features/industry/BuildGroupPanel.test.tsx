@@ -396,6 +396,37 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     expect(onOwnedStockChange).toHaveBeenCalledWith({ 35: 7, 34: 50 });
   });
+
+  // Same confirmation a plan's own "Use all" / "Use none" gives (issue #2541):
+  // a count, and an Undo that puts the ledger back.
+  it('confirms "Use none" with a toast whose Undo restores the ledger', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    const onOwnedStockChange = vi.fn();
+    renderPanel([plan('a', 'jita')], {
+      group: { ...GROUP, ownedStock: { 34: 40 } },
+      onOwnedStockChange,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Use none' }));
+    expect(onOwnedStockChange).toHaveBeenLastCalledWith({});
+    expect(screen.getByRole('status').textContent).toContain('Cleared Have on 1 material');
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onOwnedStockChange).toHaveBeenLastCalledWith({ 34: 40 });
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('says so when "Use all" has nothing to fill', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    const onOwnedStockChange = vi.fn();
+    renderPanel([plan('a', 'jita')], { onOwnedStockChange });
+
+    await user.click(screen.getByRole('button', { name: 'Use all' }));
+    expect(onOwnedStockChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toContain('Nothing to fill');
+  });
 });
 
 describe('BuildGroupPanel — built materials in the group needs list (issue #802)', () => {

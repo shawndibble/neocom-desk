@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CandidateRack } from '@/engine/fittings/candidates';
 import type { HullFitRequest } from './hullFit.worker';
+import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
 
 const loadDogmaEngine = vi.fn();
-const hullRacks = vi.fn();
+const hullRacks = vi.fn<(shipTypeId: number, skills: Map<number, number>) => Set<CandidateRack>>();
 const checkHullCandidate = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
   loadDogmaEngine: () => loadDogmaEngine(),
-  hullRacks: (...args: unknown[]) => hullRacks(...args),
-  checkHullCandidate: (...args: unknown[]) => checkHullCandidate(...args),
 }));
 
 import { runHullFit } from './hullFit.worker';
@@ -26,7 +26,7 @@ const request = (overrides: Partial<HullFitRequest> = {}): HullFitRequest => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  loadDogmaEngine.mockResolvedValue(undefined);
+  loadDogmaEngine.mockResolvedValue(fakeDogmaEngine({ hullRacks, checkHullCandidate }));
   hullRacks.mockReturnValue(new Set(['low', 'drone']));
   checkHullCandidate.mockImplementation((_ship: number, _rack: string, typeId: number) =>
     typeId === 11

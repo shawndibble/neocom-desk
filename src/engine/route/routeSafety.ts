@@ -174,8 +174,8 @@ export function summarizeRouteSafety(rows: readonly RouteSafetyRow[]): RouteSafe
 }
 
 /** A trip's legs as one route, and where along it each leg ends. */
-export interface JoinedLegs {
-  rows: RouteSafetyRow[];
+export interface JoinedLegs<R extends RouteSafetyRow = RouteSafetyRow> {
+  rows: R[];
   /** Index in `rows` of each leg's last system: the stops, in flying order. */
   stopIndexes: number[];
 }
@@ -184,8 +184,8 @@ export interface JoinedLegs {
  * A trip's legs end to end, for the whole-trip strip and facts (issue #2475).
  * Each leg starts where the last one ended, so that joining stop is kept once.
  */
-export function joinLegs(legs: readonly (readonly RouteSafetyRow[])[]): JoinedLegs {
-  const rows: RouteSafetyRow[] = [];
+export function joinLegs<R extends RouteSafetyRow>(legs: readonly (readonly R[])[]): JoinedLegs<R> {
+  const rows: R[] = [];
   const stopIndexes: number[] = [];
   legs.forEach((leg, index) => {
     rows.push(...(index === 0 ? leg : leg.slice(1)));

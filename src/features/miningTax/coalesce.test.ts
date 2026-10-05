@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
+import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import { coalesceAssignments } from './coalesce';
 
-const syncMock = vi.hoisted(() => ({
-  scheduleSync: vi.fn(),
-  markMiningTaxAssignmentDeleted: vi.fn(async (_characterId: number, assignmentId: string) => {
-    await db.miningTaxAssignments.delete(assignmentId);
-  }),
-}));
+const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 
 const CHAR_A = 1;
@@ -34,6 +31,7 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
+  await db.settings.clear();
 });
 
 describe('coalesceAssignments', () => {
@@ -227,7 +225,8 @@ describe('coalesceAssignments — exact duplicates', () => {
     expect(stored.map((a) => a.id)).toEqual(['a1']);
     expect(stored[0].oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
     expect(stored[0].taxOwed).toBe(50);
-    expect(syncMock.markMiningTaxAssignmentDeleted).toHaveBeenCalledWith(CHAR_A, 'a2');
+    const tombstones = await readTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, CHAR_A));
+    expect(tombstones.map((t) => t.id)).toEqual(['a2']);
   });
 
   it('leaves identical Assignments untouched when the entry is not in the ledger read', async () => {

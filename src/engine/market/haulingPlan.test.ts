@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { multibuyText, planTrip, type TripCandidate } from './haulingPlan';
+import type { CargoHold } from './cargoHolds';
+import { lotEconomics } from './haulingMarket';
+import { maxBuyPrice, multibuyText, planTrip, type TripCandidate } from './haulingPlan';
 
 const FEES = {
   accountingLevel: 5,
@@ -20,11 +22,14 @@ function candidate(over: Partial<TripCandidate> & { typeId: number }): TripCandi
 
 const NO_OVERRIDES = new Map();
 
+/** One hold of the given size that takes anything. */
+const anyHold = (capacityM3: number): CargoHold[] => [{ kind: 'general', capacityM3 }];
+
 describe('planTrip', () => {
   it('caps a load at a week of sales when nothing else binds', () => {
     const plan = planTrip({
       candidates: [candidate({ typeId: 1, demandCapUnits: 40 })],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -44,7 +49,7 @@ describe('planTrip', () => {
           ],
         }),
       ],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -55,7 +60,7 @@ describe('planTrip', () => {
   it('stops at the hold and says space was the limit', () => {
     const plan = planTrip({
       candidates: [candidate({ typeId: 1, unitVolumeM3: 10 })],
-      cargoM3: 250,
+      holds: anyHold(250),
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -67,7 +72,7 @@ describe('planTrip', () => {
   it('stops at the budget and says budget was the limit', () => {
     const plan = planTrip({
       candidates: [candidate({ typeId: 1 })],
-      cargoM3: 10_000,
+      holds: anyHold(10_000),
       budgetIsk: 1_050,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -83,7 +88,7 @@ describe('planTrip', () => {
         candidate({ typeId: 1, unitVolumeM3: 10, expectedPrice: 150 }), // ~+50 per 10 m³
         candidate({ typeId: 2, unitVolumeM3: 1, expectedPrice: 150 }), // ~+50 per 1 m³
       ],
-      cargoM3: 100,
+      holds: anyHold(100),
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -99,7 +104,7 @@ describe('planTrip', () => {
         candidate({ typeId: 1, unitVolumeM3: 1 }),
         candidate({ typeId: 2, unitVolumeM3: 1 }),
       ],
-      cargoM3: 60,
+      holds: anyHold(60),
       budgetIsk: null,
       fees: FEES,
       overrides: new Map([[1, { selected: false }]]),
@@ -115,7 +120,7 @@ describe('planTrip', () => {
         candidate({ typeId: 1, unitVolumeM3: 1 }),
         candidate({ typeId: 2, unitVolumeM3: 1 }),
       ],
-      cargoM3: 100,
+      holds: anyHold(100),
       budgetIsk: null,
       fees: FEES,
       overrides: new Map([[1, { quantity: 30 }]]),
@@ -131,7 +136,7 @@ describe('planTrip', () => {
         candidate({ typeId: 1, demandCapUnits: 10 }),
         candidate({ typeId: 2, demandCapUnits: 20 }),
       ],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
@@ -145,11 +150,11 @@ describe('planTrip', () => {
 
 describe('planTrip, a lane chosen per item', () => {
   it("prices a candidate at its own destination's fees when it carries them", () => {
-    // Break-even at 150 x (1 - fees): with poor standing the broker fee eats the
-    // 141-ISK level, with good standing it stays profitable.
+    // Break-even less the unit margin, at 150 x (1 - fees): with poor standing the
+    // broker fee eats the 136-ISK level, with good standing it stays profitable.
     const ladder = [
       { price: 100, units: 10, orders: 1 },
-      { price: 141, units: 10, orders: 1 },
+      { price: 136, units: 10, orders: 1 },
     ];
     const good = { ...FEES, standing: { factionStanding: 10, corpStanding: 10 } };
     const plan = planTrip({
@@ -157,7 +162,7 @@ describe('planTrip, a lane chosen per item', () => {
         candidate({ typeId: 1, expectedPrice: 150, buyLadder: ladder }),
         candidate({ typeId: 2, expectedPrice: 150, buyLadder: ladder, fees: good }),
       ],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: { ...FEES, brokerRelationsLevel: 0 },
       overrides: NO_OVERRIDES,
@@ -187,25 +192,28 @@ describe('planTrip, selling into buy orders', () => {
   it('sizes to the profitable depth of both books, not to a week of sales', () => {
     const plan = planTrip({
       candidates: [instant({ typeId: 1 })],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
     });
-    expect(plan.lines[0]).toMatchObject({ quantity: 17, cost: 1735, limitedBy: 'supply' });
-    expect(plan.lines[0]!.profit).toBeCloseTo(1895 - 1895 * 0.03375 - 1735);
+    expect(plan.lines[0]).toMatchObject({ quantity: 10, cost: 1000, limitedBy: 'supply' });
+    // 5 @ 115 and 5 @ 110; the 105 level would earn under the 5% unit margin.
+    expect(plan.lines[0]!.profit).toBeCloseTo(1125 - 1125 * 0.03375 - 1000);
+    // The weakest bid used is 110: it nets 106.29 after 3.375% tax, less 5% is 101.23.
+    expect(plan.lines[0]!.maxBuyPrice).toBe(101.2);
     expect(plan.binding).toBeNull();
   });
 
   it('still stops at the hold', () => {
     const plan = planTrip({
       candidates: [instant({ typeId: 1, unitVolumeM3: 2 })],
-      cargoM3: 20,
+      holds: anyHold(10),
       budgetIsk: null,
       fees: FEES,
       overrides: NO_OVERRIDES,
     });
-    expect(plan.lines[0]).toMatchObject({ quantity: 10, limitedBy: 'space' });
+    expect(plan.lines[0]).toMatchObject({ quantity: 5, limitedBy: 'space' });
     expect(plan.binding).toBe('space');
   });
 
@@ -220,12 +228,58 @@ describe('planTrip, selling into buy orders', () => {
           ],
         }),
       ],
-      cargoM3: null,
+      holds: null,
       budgetIsk: null,
       fees: FEES,
       overrides: new Map([[1, { quantity: 500 }]]),
     });
     expect(plan.lines[0]).toMatchObject({ quantity: 8, cost: 800, limitedBy: 'edited' });
+  });
+});
+
+describe('maxBuyPrice', () => {
+  it('is the break-even price less the unit margin, after sales tax and broker fee', () => {
+    const c = candidate({ typeId: 1, expectedPrice: 150 });
+    const limit = maxBuyPrice(c, FEES)!;
+    // 150 less ~5% in fees leaves ~142; a further 5% margin leaves ~135.
+    expect(limit).toBeLessThan(142);
+    expect(limit).toBeGreaterThan(130);
+    // Every unit at the limit still clears the margin once fees are paid.
+    const atLimit = lotEconomics({
+      buyLadder: [{ price: limit, units: 1000, orders: 1 }],
+      expectedPrice: 150,
+      quantity: 1000,
+      fees: FEES,
+    });
+    expect(atLimit.marginPct).toBeGreaterThanOrEqual(5);
+  });
+
+  it('rises with the weakest bid a lot sells into, not the origin price it was bought at', () => {
+    const c = candidate({
+      typeId: 1,
+      buyLadder: [{ price: 100, units: 10, orders: 1 }],
+      destBuyLadder: [{ price: 200, units: 10, orders: 1 }],
+    });
+    // 200 nets 193.25 after tax; less the 5% margin leaves about 184.
+    expect(maxBuyPrice(c, FEES)).toBeCloseTo(184, 0);
+  });
+
+  it('is null when not even the cheapest listing clears the margin', () => {
+    const c = candidate({
+      typeId: 1,
+      expectedPrice: 100,
+      buyLadder: [{ price: 99, units: 10, orders: 1 }],
+    });
+    expect(maxBuyPrice(c, FEES)).toBeNull();
+    expect(
+      planTrip({
+        candidates: [c],
+        holds: null,
+        budgetIsk: null,
+        fees: FEES,
+        overrides: NO_OVERRIDES,
+      }).lines[0]
+    ).toMatchObject({ quantity: 0, maxBuyPrice: null });
   });
 });
 
@@ -241,5 +295,191 @@ describe('multibuyText', () => {
 
   it('is empty when nothing ships', () => {
     expect(multibuyText([{ name: 'Alpha', quantity: 0 }])).toBe('');
+  });
+});
+
+describe('planTrip with specialised holds', () => {
+  const AMMO = { groupId: 85, categoryId: 8 };
+  const MODULE = { groupId: 55, categoryId: 7 };
+  const P0 = { groupId: 1032, categoryId: 42 };
+  const P1 = { groupId: 1042, categoryId: 43 };
+  const FUEL_BLOCK = { groupId: 1136, categoryId: 4 };
+  const ICE_PRODUCT = { groupId: 423, categoryId: 4 };
+
+  function plan(
+    candidates: TripCandidate[],
+    holds: CargoHold[] | null,
+    overrides: Map<number, { quantity?: number; selected?: boolean }> = NO_OVERRIDES
+  ) {
+    return planTrip({ candidates, holds, budgetIsk: null, fees: FEES, overrides });
+  }
+
+  it('fills an ammo hold with ammo before the cargo hold', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...AMMO, unitVolumeM3: 0.01, demandCapUnits: 1_000_000 })],
+      [
+        { kind: 'general', capacityM3: 300 },
+        { kind: 'ammo', capacityM3: 41_000 },
+      ]
+    );
+    // 100,000 units on the ladder at 0.01 m³ = 1,000 m³: all in the ammo hold.
+    expect(result.lines[0]).toMatchObject({ quantity: 100_000, placements: [{ kind: 'ammo' }] });
+    expect(result.holds).toEqual([
+      { kind: 'general', capacityM3: 300, usedM3: 0 },
+      { kind: 'ammo', capacityM3: 41_000, usedM3: 1_000 },
+    ]);
+  });
+
+  it('spills ammo into the general hold once the ammo hold is full', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...AMMO, unitVolumeM3: 1, demandCapUnits: 1_000 })],
+      [
+        { kind: 'general', capacityM3: 300 },
+        { kind: 'ammo', capacityM3: 500 },
+      ]
+    );
+    expect(result.lines[0]).toMatchObject({
+      quantity: 800,
+      limitedBy: 'space',
+      placements: [
+        { kind: 'ammo', quantity: 500, volumeM3: 500 },
+        { kind: 'general', quantity: 300, volumeM3: 300 },
+      ],
+    });
+    expect(result.holds.map((h) => h.usedM3)).toEqual([300, 500]);
+  });
+
+  it('never puts an item a specialised hold does not accept into it', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...MODULE, demandCapUnits: 1_000 })],
+      [
+        { kind: 'general', capacityM3: 300 },
+        { kind: 'ammo', capacityM3: 41_000 },
+      ]
+    );
+    expect(result.lines[0]).toMatchObject({
+      quantity: 300,
+      limitedBy: 'space',
+      placements: [{ kind: 'general', quantity: 300 }],
+    });
+    expect(result.holds[1]!.usedM3).toBe(0);
+  });
+
+  it('treats an item of unknown group as general-hold only', () => {
+    const result = plan(
+      [candidate({ typeId: 1, demandCapUnits: 1_000 })],
+      [{ kind: 'ammo', capacityM3: 41_000 }]
+    );
+    expect(result.lines[0]).toMatchObject({ quantity: 0, limitedBy: 'space', placements: [] });
+  });
+
+  it('reserves specialised space first for a typed quantity', () => {
+    const result = plan(
+      [
+        candidate({ typeId: 1, ...AMMO, demandCapUnits: 1_000 }),
+        candidate({ typeId: 2, ...AMMO, demandCapUnits: 1_000 }),
+      ],
+      [
+        { kind: 'general', capacityM3: 300 },
+        { kind: 'ammo', capacityM3: 500 },
+      ],
+      new Map([[1, { quantity: 400 }]])
+    );
+    expect(result.lines[0]).toMatchObject({
+      quantity: 400,
+      limitedBy: 'edited',
+      placements: [{ kind: 'ammo', quantity: 400 }],
+    });
+    expect(result.lines[1]).toMatchObject({
+      quantity: 400,
+      placements: [
+        { kind: 'ammo', quantity: 100 },
+        { kind: 'general', quantity: 300 },
+      ],
+    });
+  });
+
+  it('keeps a typed quantity that overflows every hold, over-filling the last one it may use', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...AMMO })],
+      [
+        { kind: 'general', capacityM3: 300 },
+        { kind: 'ammo', capacityM3: 500 },
+      ],
+      new Map([[1, { quantity: 1_000 }]])
+    );
+    expect(result.lines[0]!.quantity).toBe(1_000);
+    expect(result.holds.map((h) => h.usedM3)).toEqual([500, 500]);
+  });
+
+  it('still means no space limit with null or no holds', () => {
+    for (const holds of [null, []]) {
+      const result = plan([candidate({ typeId: 1, ...AMMO, demandCapUnits: 40 })], holds);
+      expect(result.lines[0]).toMatchObject({ quantity: 40, limitedBy: 'sales', placements: [] });
+      expect(result.holds).toEqual([]);
+    }
+  });
+
+  it('sizes a Hoarder on an ammunition scan against its ammo hold plus its cargo hold', () => {
+    const hoarder: CargoHold[] = [
+      { kind: 'general', capacityM3: 300 },
+      { kind: 'gas', capacityM3: 5_000 },
+      { kind: 'ammo', capacityM3: 41_000 },
+    ];
+    const result = plan(
+      [candidate({ typeId: 1, ...AMMO, unitVolumeM3: 1, demandCapUnits: 100_000 })],
+      hoarder
+    );
+    expect(result.lines[0]).toMatchObject({ quantity: 41_300, limitedBy: 'space' });
+    // The gas hold takes no ammo: it shows empty, not as spare room.
+    expect(result.holds.find((h) => h.kind === 'gas')!.usedM3).toBe(0);
+  });
+
+  it('loads planetary commodities into an Epithal-style PI hold', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...P1, unitVolumeM3: 0.38, demandCapUnits: 10_000 })],
+      [
+        { kind: 'general', capacityM3: 400 },
+        { kind: 'commandCenter', capacityM3: 1_000 },
+        { kind: 'planetary', capacityM3: 22_000 },
+      ]
+    );
+    expect(result.lines[0]!.placements).toEqual([
+      { kind: 'planetary', quantity: 10_000, volumeM3: 3_800 },
+    ]);
+  });
+
+  it('uses a Squall-style infrastructure hold for fuel blocks and P1, but not raw P0', () => {
+    const squall: CargoHold[] = [
+      { kind: 'general', capacityM3: 100 },
+      { kind: 'infrastructure', capacityM3: 10_000 },
+    ];
+    const result = plan(
+      [
+        candidate({ typeId: 1, ...FUEL_BLOCK, unitVolumeM3: 5, demandCapUnits: 100 }),
+        candidate({ typeId: 2, ...P1, unitVolumeM3: 0.38, demandCapUnits: 100 }),
+        candidate({ typeId: 3, ...P0, unitVolumeM3: 0.01, demandCapUnits: 100 }),
+      ],
+      squall
+    );
+    expect(result.lines.map((l) => l.placements.map((p) => p.kind))).toEqual([
+      ['infrastructure'],
+      ['infrastructure'],
+      ['general'],
+    ]);
+  });
+
+  it('fills the narrowest of two accepting holds first: a fuel bay before an infrastructure hold', () => {
+    const result = plan(
+      [candidate({ typeId: 1, ...ICE_PRODUCT, unitVolumeM3: 1, demandCapUnits: 100 })],
+      [
+        { kind: 'infrastructure', capacityM3: 10_000 },
+        { kind: 'fuel', capacityM3: 60 },
+      ]
+    );
+    expect(result.lines[0]!.placements).toEqual([
+      { kind: 'fuel', quantity: 60, volumeM3: 60 },
+      { kind: 'infrastructure', quantity: 40, volumeM3: 40 },
+    ]);
   });
 });

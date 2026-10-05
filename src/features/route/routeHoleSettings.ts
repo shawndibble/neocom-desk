@@ -75,6 +75,14 @@ const ROUTE_HOLE_STORES = [
   useRouteHoleHubs,
 ] as const;
 
+/** "No link override": the saved defaults, for a caller with no link to read. */
+export const NO_HOLE_OVERRIDES = {
+  enabled: null,
+  shipSize: null,
+  minLifeHours: null,
+  hubs: null,
+} as const;
+
 /** What a link may override; `null` is "the saved default". */
 export interface RouteHoleOverrides {
   enabled: boolean | null;
@@ -114,4 +122,26 @@ export function useRouteHoleQuery(overrides: RouteHoleOverrides): RouteHoleQuery
     },
     hydrated,
   };
+}
+
+/** A change to one wormhole setting: the field and its new value. */
+export type RouteHoleChange = {
+  [K in keyof RouteHoleOverrides]: { field: K; value: NonNullable<RouteHoleOverrides[K]> };
+}[keyof RouteHoleOverrides];
+
+/** Saves a wormhole setting as the saved default every jump count follows. */
+export function saveRouteHoleDefault(change: RouteHoleChange): void {
+  switch (change.field) {
+    case 'enabled':
+      void useRouteHolesEnabled.getState().setValue(change.value);
+      return;
+    case 'shipSize':
+      void useRouteHoleShipSize.getState().setValue(change.value);
+      return;
+    case 'minLifeHours':
+      void useRouteHoleMinLife.getState().setValue(change.value);
+      return;
+    case 'hubs':
+      void useRouteHoleHubs.getState().setValue(change.value);
+  }
 }
