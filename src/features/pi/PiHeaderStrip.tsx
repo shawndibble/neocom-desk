@@ -13,6 +13,7 @@ import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/contractSearch/routeExposure';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
 import { homeSystemId, routeFigures, type RouteFigures } from './sellRoute';
@@ -39,6 +40,7 @@ interface Home {
 export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
   const { t } = useTranslation();
   const { hub, setHub } = useSellHub();
+  const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const homeId = homeSystemId(colonySystemIds);
   const [home, setHome] = useState<Home | null>(null);
@@ -107,7 +109,11 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           {t('piPlan.strip.sellAt')}
         </span>
         <Select value={hub.id} onValueChange={(id) => setHub(id as TradeHub['id'])}>
-          <SelectTrigger className="w-40" aria-label={t('piPlan.strip.sellAt')}>
+          <SelectTrigger
+            size={mdUp ? 'sm' : 'md'}
+            className="w-40"
+            aria-label={t('piPlan.strip.sellAt')}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

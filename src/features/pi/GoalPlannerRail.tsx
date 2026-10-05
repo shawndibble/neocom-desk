@@ -39,6 +39,7 @@ import type { ProductOption } from './products';
 import { SectionLabel, TierChip } from './DirectiveRow';
 import { CadenceRow, PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
+import { piAdvisorHref } from './piPlanLink';
 
 /** How long typing pauses before a units box re-plans. */
 const COMMIT_DEBOUNCE_MS = 300;
@@ -365,7 +366,7 @@ export function ColoniesSection({
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">
           {t('piPlan.coloniesNone')}{' '}
-          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
+          <Link className={inlineLinkClassName} to={piAdvisorHref(undefined)}>
             {t('piPlan.openAdvisor')}
           </Link>
         </p>

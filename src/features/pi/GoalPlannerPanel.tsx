@@ -37,6 +37,7 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useCadence } from './cadencePref';
 import { useMarketSourcing } from './marketSourcingPref';
+import { piAdvisorHref } from './piPlanLink';
 import { useSellHub } from './sellHub';
 import {
   SYNCED_PI_CUSTOMS_KEY,
@@ -358,7 +359,7 @@ function GoalPlanner({
             : t('piPlan.noColoniesHint')
         }
         action={
-          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
+          <Link className={inlineLinkClassName} to={piAdvisorHref(undefined)}>
             {t('piPlan.openAdvisor')}
           </Link>
         }
