@@ -1818,7 +1818,6 @@ export function Assets() {
                         <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                           <SecurityValue
                             security={securityForStation(resolved.station.locationId)}
-                            t={t}
                           />
                           <JumpsAwayText
                             result={jumpsAwayByKey.get(

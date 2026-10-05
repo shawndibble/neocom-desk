@@ -153,7 +153,7 @@ export function EntryEditDialog({
             date: formatDateRange(current.map((m) => m.assignment.date)),
             system: systemName,
           })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
         </span>
       }
     >

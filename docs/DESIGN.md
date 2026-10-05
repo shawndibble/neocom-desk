@@ -812,6 +812,7 @@ row.
 | Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                      |
 | ⋮                                                    | The row's or table's action menu (⋯ is only the phone nav's More)                                                                                                                                        |
 | Accent 2px left border                               | Selected                                                                                                                                                                                                 |
+| `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                        |
 | A box sized like a field                             | A control (§6)                                                                                                                                                                                           |
 
 Retired meanings, each with its replacement:

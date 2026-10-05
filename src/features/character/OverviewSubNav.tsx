@@ -27,12 +27,7 @@ const TAB_PATHS = [
   '/employment-history',
 ] as const satisfies readonly AppRoutePath[];
 
-/**
- * Sub-navigation across the three Character-overview views. Real navigation
- * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
- * paths stay top-level rather than nesting under `/overview`, so each view
- * keeps its own `ScopeGate` and every existing bookmark still resolves.
- */
+/** The Clones tab; wears the re-auth marker and tooltip when its scope is missing. */
 function ClonesTab({ locked }: { locked: boolean }) {
   const { t } = useTranslation();
   const tab = (
@@ -52,6 +47,12 @@ function ClonesTab({ locked }: { locked: boolean }) {
   );
 }
 
+/**
+ * Sub-navigation across the three Character-overview views. Real navigation
+ * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
+ * paths stay top-level rather than nesting under `/overview`, so each view
+ * keeps its own `ScopeGate` and every existing bookmark still resolves.
+ */
 export function OverviewSubNav() {
   const { t } = useTranslation();
   const locked = useLockedRoutes(TAB_PATHS);
@@ -65,8 +66,8 @@ export function OverviewSubNav() {
         {/*
           The rail used to carry this marker for /clones; the tab has to keep it
           now that the rail no longer lists the route. Informational only, and it
-          rides on `title` rather than extra text so the link stays named
-          "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
+          is a dot inside the link with a tooltip on a wrapper, so the link stays
+          named "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
         */}
         <ClonesTab locked={locked.has('/clones')} />
         <NavLink to="/employment-history" className={subNavClass}>

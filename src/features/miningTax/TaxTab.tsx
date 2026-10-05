@@ -1297,7 +1297,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       render: (dr) => (
         <DataTableDenseCell>
           {systemName(dr)}
-          <SecurityValue security={systemSecurityOf(dr)} t={t} />
+          <SecurityValue security={systemSecurityOf(dr)} />
         </DataTableDenseCell>
       ),
       sortValue: (dr) => systemName(dr),

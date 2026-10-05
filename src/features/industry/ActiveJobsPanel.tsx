@@ -742,7 +742,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               </span>
             )}
             {showCharacterColumn && job.characterName !== '' && (
-              <CharacterBadge characterName={job.characterName} t={t} />
+              <CharacterBadge characterName={job.characterName} />
             )}
           </span>
         ),

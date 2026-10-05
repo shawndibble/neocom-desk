@@ -351,6 +351,9 @@ export function Wallet() {
           <Link
             to={`/market/lp-store/${entry.corporation_id}`}
             className={entityLinkClassName('inline-flex items-center gap-1')}
+            aria-label={t('loyalty.openStoreFor', {
+              corporation: corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+            })}
           >
             {t('loyalty.openStore')}
             <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />

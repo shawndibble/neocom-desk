@@ -19,6 +19,7 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
@@ -42,8 +43,6 @@ const rowCaretClassName =
 interface SecurityValueProps {
   /** Undefined while still resolving, null when unresolvable — renders nothing either way. */
   security: number | null | undefined;
-  /** Unused now (the number is its own label); callers still pass it. */
-  t?: Translate;
 }
 
 /**
@@ -97,8 +96,6 @@ export function JumpsAwayText({ result, t, locationId, preference }: JumpsAwayTe
 
 interface CharacterBadgeProps {
   characterName: string;
-  /** Unused now (the name is its own label); callers still pass it. */
-  t?: Translate;
 }
 
 /** Marks a row as belonging to a Character other than the active one. */
@@ -216,7 +213,7 @@ export function LocationRow({
           {unresolvedParent ? (
             <Icon.Container size={Icon.ICON_SIZE.md} className="text-text-faint" />
           ) : (
-            <SecurityValue security={security} t={t} />
+            <SecurityValue security={security} />
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -312,7 +309,7 @@ export function ContainerRow({
           ) : (
             <span className="truncate text-sm text-text-dim">{label}</span>
           )}
-          {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+          {characterBadge && <CharacterBadge characterName={characterBadge} />}
         </span>
         <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
           {formatBadge({ itemCount, estimatedValue }, t)}
@@ -416,6 +413,9 @@ export function ItemRow({
   onToggleSelection,
   t,
 }: ItemRowProps) {
+  // A touch long-press opens the row menu; the lift that ends it must not
+  // also follow the name link.
+  const guard = useLiftAfterHoldGuard();
   const volumeText =
     unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
   return (
@@ -444,12 +444,16 @@ export function ItemRow({
                     entityLinkClassName('flex min-w-0 items-center text-sm'),
                     tappableRowClassName
                   )}
+                  {...guard.handlers}
+                  onClick={(e) => {
+                    if (guard.swallowClick(e)) e.preventDefault();
+                  }}
                 >
                   <span className="truncate">{name}</span>
                 </MarketItemLink>
               )}
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
-              {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+              {characterBadge && <CharacterBadge characterName={characterBadge} />}
             </span>
             <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
               <span className={ITEM_QUANTITY_CELL}>×{quantity.toLocaleString()}</span>
@@ -523,13 +527,13 @@ export function SearchResultRow({
             <span className="flex min-w-0 flex-1 items-center">
               <span className="truncate text-sm font-medium">{name}</span>
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
-              {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+              {characterBadge && <CharacterBadge characterName={characterBadge} />}
             </span>
             <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
           </span>
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-              <SecurityValue security={security} t={t} />
+              <SecurityValue security={security} />
               <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
             </span>
             <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">

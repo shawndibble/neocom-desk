@@ -131,7 +131,7 @@ describe('Wallet', () => {
     );
     // A real link, not just a row click — a screen reader or keyboard user
     // reaches the LP Store without the row.
-    expect(screen.getByRole('link', { name: 'Open LP Store' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open LP Store for Caldari Navy' })).toHaveAttribute(
       'href',
       '/market/lp-store/1000167'
     );

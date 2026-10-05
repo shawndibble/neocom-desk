@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ItemRow, SearchResultRow } from './assetBrowserRows';
 
 function renderRow(unitVolume: number | undefined) {
@@ -38,6 +38,10 @@ describe('ItemRow volume', () => {
   });
 });
 
+function LocationProbe() {
+  return <output data-testid="loc">{useLocation().pathname}</output>;
+}
+
 function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
   return render(
     <MemoryRouter>
@@ -54,6 +58,7 @@ function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
         t={(key) => key}
         {...overrides}
       />
+      <LocationProbe />
     </MemoryRouter>
   );
 }
@@ -66,11 +71,42 @@ describe('ItemRow name', () => {
     expect(link).not.toHaveAttribute('title');
   });
 
-  it('stays live in select mode, where only the checkbox selects', async () => {
+  // §6c: the name stays a real link in select mode; only the checkbox selects.
+  it('still navigates in select mode, where only the checkbox selects', async () => {
     const onToggleSelection = vi.fn();
     renderItemRow({ typeId: 11, onToggleSelection, selectMode: true });
     await userEvent.click(screen.getByRole('link', { name: 'Rifter Blueprint' }));
+    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
     expect(onToggleSelection).not.toHaveBeenCalled();
+  });
+
+  it('does not follow the name from the click that ends a press which opened the row menu', () => {
+    renderItemRow({ typeId: 11 });
+    const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+    fireEvent.pointerDown(link, { pointerType: 'touch' });
+    fireEvent.contextMenu(link);
+    fireEvent.click(link, { detail: 1 });
+    expect(screen.getByTestId('loc')).toHaveTextContent('/');
+    expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
+
+    // The next ordinary tap still follows it.
+    fireEvent.pointerDown(link, { pointerType: 'touch' });
+    fireEvent.click(link, { detail: 1 });
+    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
+  });
+
+  it('does not follow the name when a touch is held past the long-press delay', () => {
+    vi.useFakeTimers();
+    try {
+      renderItemRow({ typeId: 11 });
+      const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+      fireEvent.pointerDown(link, { pointerType: 'touch' });
+      vi.advanceTimersByTime(800);
+      fireEvent.click(link, { detail: 1 });
+      expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('gives the name a 44px touch target, back to its pointer size at md+', () => {
