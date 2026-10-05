@@ -32,7 +32,7 @@ import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import type { PiCadence } from './cadencePref';
-import { customsRatePercent, type CustomsRateSource } from './customsRate';
+import { customsRatePercent, customsSourceText } from './customsRate';
 import { ASSUMED_UNKNOWN_CUSTOMS, type PlannerColonyRow } from './goalPlannerModel';
 import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 import type { ProductOption } from './products';
@@ -118,19 +118,6 @@ function UnitsBox({
       )}
     </span>
   );
-}
-
-function customsSourceText(source: CustomsRateSource, t: TFunction): string {
-  switch (source.kind) {
-    case 'highsec-skill':
-      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
-    case 'highsec-unknown-skill':
-      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
-    case 'player-poco':
-      return t('piAdvisor.customsRateSource.player-poco', {
-        space: t(`common.spaceOption.${source.space}`),
-      });
-  }
 }
 
 function excludedText(row: PlannerColonyRow, t: TFunction): string | null {

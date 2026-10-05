@@ -22,6 +22,7 @@
  * exactly the confident-wrong-number the colony `unknown` state avoids.
  */
 
+import type { TFunction } from 'i18next';
 import { securityBand } from '@/engine/securityStatus';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 
@@ -77,6 +78,25 @@ export function customsRateSource(space: ColonySpace, level: number | null): Cus
     kind: 'highsec-skill',
     level: Math.min(Math.max(Math.trunc(level), 0), MAX_SKILL_LEVEL),
   };
+}
+
+/**
+ * Where the customs rate came from, in words — the Advisor's and the Goal
+ * Planner's tooltip. One branch per source, each passing only the values its
+ * own sentence uses — feeding every key every placeholder means shipping a
+ * `level: 0` to a sentence with no level in it.
+ */
+export function customsSourceText(source: CustomsRateSource, t: TFunction): string {
+  switch (source.kind) {
+    case 'highsec-skill':
+      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
+    case 'highsec-unknown-skill':
+      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
+    case 'player-poco':
+      return t('piAdvisor.customsRateSource.player-poco', {
+        space: t(`common.spaceOption.${source.space}`),
+      });
+  }
 }
 
 /**

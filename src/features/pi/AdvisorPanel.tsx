@@ -35,7 +35,6 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { EmptyState, Panel, Modal, Spinner } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
 import { formatIsk } from '@/lib/isk';
@@ -98,6 +97,7 @@ import {
   customsRateSource,
   defaultCustomsRate,
   loadCustomsCodeExpertise,
+  customsSourceText,
   type CustomsRateSource,
 } from './customsRate';
 import { loadAccountingLevel } from './salesTaxRate';
@@ -128,24 +128,6 @@ interface SystemGroup {
    */
   customsRate: number;
   customsSource: CustomsRateSource;
-}
-
-/**
- * Where the customs rate came from, in words. One branch per source, each
- * passing only the values its own sentence uses — feeding every key every
- * placeholder means shipping a `level: 0` to a sentence with no level in it.
- */
-function customsTooltip(source: CustomsRateSource, t: TFunction): string {
-  switch (source.kind) {
-    case 'highsec-skill':
-      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
-    case 'highsec-unknown-skill':
-      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
-    case 'player-poco':
-      return t('piAdvisor.customsRateSource.player-poco', {
-        space: t(`common.spaceOption.${source.space}`),
-      });
-  }
 }
 
 interface Snapshot {
@@ -1294,7 +1276,7 @@ export function AdvisorPanel({
             customsTooltip={
               customsEdited
                 ? t('piAdvisor.customsRateEdited')
-                : customsTooltip(activeSystem.customsSource, t)
+                : customsSourceText(activeSystem.customsSource, t)
             }
             onCustomsChange={(percent) =>
               writeCustoms(

@@ -25,7 +25,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import * as Icon from '@/components/ui/icons';
-import type { PiData, PiFactoryKind } from '@/sde/types';
+import type { PiData } from '@/sde/types';
 import type {
   ColonyAssignment,
   DemandLine,
@@ -119,17 +119,6 @@ function signedCompact(perDay: number): string {
   return `${rounded > 0 ? '+' : ''}${formatIskCompact(rounded)}`;
 }
 
-function facilityName(kind: PiFactoryKind, t: TFunction): string {
-  switch (kind) {
-    case 'basic':
-      return t('piAdvisor.pinKind.basic');
-    case 'advanced':
-      return t('piAdvisor.pinKind.advanced');
-    case 'highTech':
-      return t('piAdvisor.pinKind.highTech');
-  }
-}
-
 /** Planet types as alternatives: "Gas or Ice". */
 function planetTypesText(types: readonly PlanetType[], t: TFunction): string {
   return types.map((type) => t(`pi.planetType.${type}`)).join(t('piPlan.or'));
@@ -141,8 +130,9 @@ function limitsText(limits: readonly FitLimit[], t: TFunction): string {
     .join(', ');
 }
 
-function destinationName(to: FlowEnd, names: PlanNames): string {
-  return to === 'hub' ? names.hub.systemName : names.planet(to);
+/** Either end of a haul, by name: the hub's system or the colony. */
+function endName(end: FlowEnd, names: PlanNames): string {
+  return end === 'hub' ? names.hub.systemName : names.planet(end);
 }
 
 // --- Headline ------------------------------------------------------------
@@ -454,7 +444,7 @@ function shortfallText(
         </>
       );
     case 'no-factory-host':
-      return t('piPlan.shortNoHost', { facility: facilityName(shortfall.facility, t) });
+      return t('piPlan.shortNoHost', { facility: t(`piAdvisor.pinKind.${shortfall.facility}`) });
     case 'host-over-budget':
       return (
         <>
@@ -569,7 +559,7 @@ function StepDetail({
     if (step.kind === 'as-is' && !ship.isNew) continue;
     const text = t('piPlan.stepShip', {
       item: commodityName(ship.typeId, pi),
-      to: destinationName(ship.to, names),
+      to: endName(ship.to, names),
     });
     push(ship.isNew ? t('piPlan.stepNew', { step: text }) : text);
   }
@@ -786,7 +776,7 @@ export function ColonyFit({
                     .map((kind) =>
                       t('piPlan.pinCount', {
                         count: assignment.factories[kind],
-                        pin: facilityName(kind, t),
+                        pin: t(`piAdvisor.pinKind.${kind}`),
                       })
                     )
                     .join(', ')}
@@ -821,10 +811,6 @@ interface LegRow {
   m3PerTrip: number;
   /** Undefined without distances yet; null when there is no route. */
   jumps: number | null | undefined;
-}
-
-function endName(end: FlowEnd, names: PlanNames): string {
-  return end === 'hub' ? names.hub.systemName : names.planet(end);
 }
 
 function EndLink({ end, names }: { end: FlowEnd; names: PlanNames }) {
