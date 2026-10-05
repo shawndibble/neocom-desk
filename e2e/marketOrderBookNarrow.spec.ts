@@ -156,7 +156,12 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
       });
       return {
         display: style.display,
-        contentWidth: box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        contentWidth:
+          box.width -
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight) -
+          parseFloat(style.borderLeftWidth) -
+          parseFloat(style.borderRightWidth),
         cells,
       };
     },

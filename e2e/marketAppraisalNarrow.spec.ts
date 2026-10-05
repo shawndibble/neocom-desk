@@ -145,7 +145,12 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
     });
     return {
       display: style.display,
-      contentWidth: box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+      contentWidth:
+        box.width -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight) -
+        parseFloat(style.borderLeftWidth) -
+        parseFloat(style.borderRightWidth),
       rowHeight: box.height,
       cells,
     };
