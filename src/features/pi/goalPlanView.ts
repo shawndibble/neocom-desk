@@ -5,12 +5,22 @@
  *
  * Pure: the plan, the change list and the planner rows are parameters.
  */
-import type { ColonyAssignment, FlowEnd, GoalPlan, Shortfall } from '@/engine/pi/goalTypes';
+import type { ColonyBaseline } from '@/engine/pi/baseline';
+import type {
+  ColonyAssignment,
+  ExtractionSlot,
+  FlowEnd,
+  GoalPlan,
+  PlanetType,
+  RateSource,
+  Shortfall,
+} from '@/engine/pi/goalTypes';
 import type { ColonyChange } from '@/engine/pi/planDiff';
 import type { PlannerColonyRow } from './goalPlannerModel';
 
 /** Below this short of one, a goal's fraction is float dust, not a miss. */
 const MET = 0.999;
+const HOURS_PER_DAY = 24;
 
 export interface GoalAttainment {
   met: number;
@@ -26,19 +36,42 @@ export function goalAttainment(achieved: GoalPlan['achieved']): GoalAttainment {
 }
 
 export interface PlanCaveats {
-  /** Colonies the plan extracts on at a rate that is not this colony's own measured one. */
+  /** Colonies with a slot whose rate is an estimate — see `slotEstimate`. */
   estimatedRates: number[];
   /** Enabled colonies costed at an assumed customs rate (nobody set theirs). */
   assumedCustoms: number[];
+}
+
+/**
+ * Why a slot's rate is an estimate, or null when it is this colony's own
+ * measured program as it runs today. A measured rate on a different ECU count
+ * is an estimate too: the planner scales a second ECU by its extra-ECU yield
+ * factor, so the per-ECU figure measured today no longer holds as measured.
+ * `ecusToday` is what the colony runs on that P0 now; unknown leaves a
+ * measured rate standing.
+ */
+export type SlotEstimate = Exclude<RateSource, 'measured'> | 'ecus-changed';
+
+export function slotEstimate(
+  slot: ExtractionSlot,
+  ecusToday: number | undefined
+): SlotEstimate | null {
+  if (slot.rateSource !== 'measured') return slot.rateSource;
+  return ecusToday !== undefined && ecusToday !== slot.ecus ? 'ecus-changed' : null;
 }
 
 export function planCaveats(
   assignments: readonly ColonyAssignment[],
   rows: readonly PlannerColonyRow[]
 ): PlanCaveats {
+  const ecusToday = new Map(rows.map((row) => [row.planetId, row.colony?.current.ecusByP0]));
   return {
     estimatedRates: assignments
-      .filter((a) => a.slots.some((slot) => slot.rateSource !== 'measured'))
+      .filter((a) =>
+        a.slots.some(
+          (slot) => slotEstimate(slot, ecusToday.get(a.planetId)?.get(slot.p0TypeId)) !== null
+        )
+      )
       .map((a) => a.planetId)
       .sort((a, b) => a - b),
     assumedCustoms: rows
@@ -191,4 +224,30 @@ export function shortfallHint(
     default:
       return null;
   }
+}
+
+/**
+ * What switching a colony to its best P1 alone would gain over what it earns
+ * now, ISK/day. Null when either side is unknown: no priced Baseline, or no
+ * measured extraction to price today's earnings from.
+ */
+export function switchGainPerDay(
+  planetId: number,
+  baseline: ReadonlyMap<number, ColonyBaseline>,
+  earningsByPlanet: ReadonlyMap<number, number | null>
+): number | null {
+  const own = baseline.get(planetId);
+  const now = earningsByPlanet.get(planetId);
+  return own?.status === 'ok' && now != null ? (own.iskPerHour - now) * HOURS_PER_DAY : null;
+}
+
+/** Each type gap's P0, to the planet types that would yield it. */
+export function typeGapPlanetTypes(
+  shortfalls: readonly Shortfall[]
+): Map<number, readonly PlanetType[]> {
+  return new Map(
+    shortfalls.flatMap((gap) =>
+      gap.kind === 'type-gap' ? [[gap.p0TypeId, gap.fixPlanetTypes] as const] : []
+    )
+  );
 }

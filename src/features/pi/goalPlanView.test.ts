@@ -10,7 +10,15 @@ import type {
 } from '@/engine/pi/goalTypes';
 import type { ColonyChange } from '@/engine/pi/planDiff';
 import type { PlannerColonyRow } from './goalPlannerModel';
-import { changeSteps, goalAttainment, planCaveats, shortfallHint } from './goalPlanView';
+import {
+  changeSteps,
+  goalAttainment,
+  planCaveats,
+  shortfallHint,
+  slotEstimate,
+  switchGainPerDay,
+  typeGapPlanetTypes,
+} from './goalPlanView';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -131,6 +139,76 @@ describe('planCaveats', () => {
       rows
     );
     expect(caveats).toEqual({ estimatedRates: [1], assumedCustoms: [2] });
+  });
+
+  it('counts a measured rate on a changed ECU count as an estimate', () => {
+    const today = row(1, 'barren', {}, [BASE_METALS]);
+    today.colony!.current.ecusByP0 = new Map([[BASE_METALS, 1]]);
+    const same = row(2, 'barren', {}, [BASE_METALS]);
+    same.colony!.current.ecusByP0 = new Map([[BASE_METALS, 1]]);
+    const caveats = planCaveats(
+      [
+        assignment(1, 'extract', [{ ...slot(BASE_METALS, REACTIVE_METALS), ecus: 2 }]),
+        assignment(2, 'extract', [slot(BASE_METALS, REACTIVE_METALS)]),
+      ],
+      [today, same]
+    );
+    expect(caveats.estimatedRates).toEqual([1]);
+  });
+});
+
+describe('slotEstimate', () => {
+  it("is null for this colony's own measured program at today's ECU count", () => {
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), 1)).toBeNull();
+    // Nothing known about today: the measured rate stands.
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), undefined)).toBeNull();
+  });
+
+  it('names a borrowed rate by its source', () => {
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS, 'own-mean'), undefined)).toBe(
+      'own-mean'
+    );
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS, 'assumed'), 2)).toBe('assumed');
+  });
+
+  it('flags a measured rate the plan runs on a different ECU count', () => {
+    const doubled = { ...slot(BASE_METALS, REACTIVE_METALS), ecus: 2 };
+    expect(slotEstimate(doubled, 1)).toBe('ecus-changed');
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), 2)).toBe('ecus-changed');
+  });
+});
+
+describe('switchGainPerDay', () => {
+  const perColony = new Map([
+    [1, { status: 'ok' as const, slots: [], iskPerHour: 1500 }],
+    [2, { status: 'needs-price' as const, missing: [WATER] }],
+  ]);
+
+  it("is the colony's best-P1 Baseline over what it earns now, per day", () => {
+    expect(switchGainPerDay(1, perColony, new Map([[1, 1000]]))).toBe(500 * 24);
+  });
+
+  it('is null without a priced Baseline or a measured earning', () => {
+    expect(switchGainPerDay(2, perColony, new Map([[2, 1000]]))).toBeNull();
+    expect(switchGainPerDay(1, perColony, new Map([[1, null]]))).toBeNull();
+    expect(switchGainPerDay(3, perColony, new Map())).toBeNull();
+  });
+});
+
+describe('typeGapPlanetTypes', () => {
+  it('maps each type gap P0 to the planet types that would fix it', () => {
+    const gaps = typeGapPlanetTypes([
+      {
+        kind: 'type-gap',
+        p0TypeId: NOBLE_GAS,
+        p1TypeId: 2390,
+        unitsPerHour: 1,
+        p1UnitsPerHour: 1,
+        fixPlanetTypes: ['gas', 'ice'],
+      },
+      { kind: 'no-factory-host', facility: 'advanced' },
+    ]);
+    expect([...gaps]).toEqual([[NOBLE_GAS, ['gas', 'ice']]]);
   });
 });
 

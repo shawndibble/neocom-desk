@@ -60,7 +60,14 @@ import {
   type GoalPlannerSnapshot,
 } from './goalPlannerSnapshot';
 import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
-import { changeSteps, goalAttainment, planCaveats, shortfallHint } from './goalPlanView';
+import {
+  changeSteps,
+  goalAttainment,
+  planCaveats,
+  shortfallHint,
+  switchGainPerDay,
+  typeGapPlanetTypes,
+} from './goalPlanView';
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
@@ -418,13 +425,9 @@ function GoalPlanner({
             <Changes
               steps={steps}
               names={names}
-              switchGainPerDay={(planetId) => {
-                const own = best.baseline.perColony.get(planetId);
-                const now = earnings.byPlanet.get(planetId);
-                return own?.status === 'ok' && now != null
-                  ? (own.iskPerHour - now) * HOURS_PER_DAY
-                  : null;
-              }}
+              switchGainPerDay={(planetId) =>
+                switchGainPerDay(planetId, best.baseline.perColony, earnings.byPlanet)
+              }
             />
             <ColonyFit
               assignments={best.plan.assignments}
@@ -443,20 +446,7 @@ function GoalPlanner({
             />
             <Flow
               demand={best.plan.demand}
-              typeGaps={
-                new Map(
-                  best.plan.shortfalls.flatMap((gap) =>
-                    gap.kind === 'type-gap'
-                      ? [
-                          [
-                            gap.p0TypeId,
-                            gap.fixPlanetTypes.map((type) => t(`pi.planetType.${type}`)),
-                          ] as const,
-                        ]
-                      : []
-                  )
-                )
-              }
+              typeGaps={typeGapPlanetTypes(best.plan.shortfalls)}
               names={names}
             />
           </>

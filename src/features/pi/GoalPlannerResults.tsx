@@ -34,7 +34,7 @@ import type {
   FitLimit,
   FlowEnd,
   GoalPlan,
-  RateSource,
+  PlanetType,
   Shortfall,
 } from '@/engine/pi/goalTypes';
 import type { BestPlan } from '@/engine/pi/planBest';
@@ -58,12 +58,14 @@ import type { PlanHauling, PlanVerdict, PlannerColonyRow } from './goalPlannerMo
 import type { TotalColonyEarnings } from './colonyEarningsModel';
 import { commodityName, formatUnits } from './goalPlannerFormat';
 import { piAdvisorHref, piColonyHref } from './piPlanLink';
-import type {
-  ColonyStep,
-  GoalAttainment,
-  PlanCaveats,
-  ShortfallHint,
-  StepKind,
+import {
+  slotEstimate,
+  type ColonyStep,
+  type GoalAttainment,
+  type PlanCaveats,
+  type ShortfallHint,
+  type SlotEstimate,
+  type StepKind,
 } from './goalPlanView';
 
 const HOURS_PER_DAY = 24;
@@ -120,6 +122,11 @@ function facilityName(kind: PiFactoryKind, t: TFunction): string {
     case 'highTech':
       return t('piAdvisor.pinKind.highTech');
   }
+}
+
+/** Planet types as alternatives: "Gas or Ice". */
+function planetTypesText(types: readonly PlanetType[], t: TFunction): string {
+  return types.map((type) => t(`pi.planetType.${type}`)).join(t('piPlan.or'));
 }
 
 function limitsText(limits: readonly FitLimit[], t: TFunction): string {
@@ -400,9 +407,7 @@ function shortfallText(
       return (
         <>
           {t(hint?.kind === 'switched-off' ? 'piPlan.shortTypeGapEnabled' : 'piPlan.shortTypeGap', {
-            types: shortfall.fixPlanetTypes
-              .map((type) => t(`pi.planetType.${type}`))
-              .join(t('piPlan.or')),
+            types: planetTypesText(shortfall.fixPlanetTypes, t),
             p0: commodityName(shortfall.p0TypeId, pi),
             p1: commodityName(shortfall.p1TypeId, pi),
             p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
@@ -620,10 +625,10 @@ export function Changes({
 
 // --- Colony fit ----------------------------------------------------------
 
-function rateSourceText(source: RateSource, t: TFunction): string {
-  switch (source) {
-    case 'measured':
-      return t('piPlan.rateMeasured');
+function estimateText(estimate: SlotEstimate, ecusToday: number | undefined, t: TFunction): string {
+  switch (estimate) {
+    case 'ecus-changed':
+      return t('piPlan.rateEcusChanged', { count: ecusToday ?? 0 });
     case 'own-mean':
       return t('piPlan.rateOwnMean');
     case 'assumed':
@@ -644,9 +649,19 @@ function roleText(role: ColonyAssignment['role'], t: TFunction): string {
   }
 }
 
-function SlotLine({ slot, pi }: { slot: ExtractionSlot; pi: PiData }) {
+function SlotLine({
+  slot,
+  ecusToday,
+  pi,
+}: {
+  slot: ExtractionSlot;
+  /** ECUs the colony runs on this P0 today, when known. */
+  ecusToday: number | undefined;
+  pi: PiData;
+}) {
   const { t } = useTranslation();
   const p1 = commodityName(slot.p1TypeId, pi);
+  const estimate = slotEstimate(slot, ecusToday);
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text">
       <span>
@@ -657,12 +672,12 @@ function SlotLine({ slot, pi }: { slot: ExtractionSlot; pi: PiData }) {
           rate: formatUnits(Math.round(slot.p1PerHour)),
         })}
       </span>
-      {slot.rateSource !== 'measured' && (
+      {estimate !== null && (
         <span className="inline-flex items-center gap-1">
           <EstimateBadge />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('piAdvisor.estimateBadge') })}
-            content={rateSourceText(slot.rateSource, t)}
+            content={estimateText(estimate, ecusToday, t)}
           />
         </span>
       )}
@@ -745,7 +760,12 @@ export function ColonyFit({
               {assignment.slots.length > 0 && (
                 <ul className="space-y-1">
                   {assignment.slots.map((slot) => (
-                    <SlotLine key={slot.p0TypeId} slot={slot} pi={names.pi} />
+                    <SlotLine
+                      key={slot.p0TypeId}
+                      slot={slot}
+                      ecusToday={row?.colony?.current.ecusByP0?.get(slot.p0TypeId)}
+                      pi={names.pi}
+                    />
                   ))}
                 </ul>
               )}
@@ -1083,7 +1103,7 @@ export function Flow({
 }: {
   demand: readonly DemandLine[];
   /** The plan's type gaps by P0, for naming what blocks the blocked goals. */
-  typeGaps: ReadonlyMap<number, readonly string[]>;
+  typeGaps: ReadonlyMap<number, readonly PlanetType[]>;
   names: PlanNames;
 }) {
   const { t } = useTranslation();
@@ -1194,7 +1214,7 @@ export function Flow({
               .filter((p0) => typeGaps.has(p0))
               .map((p0) =>
                 t('piPlan.blockedNeed', {
-                  types: (typeGaps.get(p0) ?? []).join(t('piPlan.or')),
+                  types: planetTypesText(typeGaps.get(p0) ?? [], t),
                   p0: commodityName(p0, pi),
                 })
               );
