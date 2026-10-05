@@ -35,6 +35,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterLink } from '@/features/entities';
 import { Panel, StatChip, StatChips, buttonClassName } from '@/components/ui';
 import {
   label,
@@ -166,9 +167,9 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
                     key={member.characterId}
                     className="flex items-baseline justify-between gap-3 border-b border-line py-1.5 text-xs last:border-b-0"
                   >
-                    <span className="min-w-0 truncate">
+                    <CharacterLink id={member.characterId} className="min-w-0 truncate">
                       {label(names.get(member.characterId) ?? null, member.characterId)}
-                    </span>
+                    </CharacterLink>
                     <span className="shrink-0 text-text-dim tabular-nums">
                       {standing.neverSeen
                         ? t('corp.members.never')
@@ -192,9 +193,10 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
                   className="border-b border-line py-1.5 text-xs text-success last:border-b-0"
                 >
                   <span className="truncate">
-                    {t('corp.people.joinedName', {
-                      name: label(names.get(characterId) ?? null, characterId),
-                    })}
+                    {t('corp.people.joinedName')}{' '}
+                    <CharacterLink id={characterId}>
+                      {label(names.get(characterId) ?? null, characterId)}
+                    </CharacterLink>
                   </span>
                 </p>
               ))}
@@ -204,9 +206,10 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
                   className="border-b border-line py-1.5 text-xs text-warning last:border-b-0"
                 >
                   <span className="truncate">
-                    {t('corp.people.leftName', {
-                      name: label(names.get(characterId) ?? null, characterId),
-                    })}
+                    {t('corp.people.leftName')}{' '}
+                    <CharacterLink id={characterId}>
+                      {label(names.get(characterId) ?? null, characterId)}
+                    </CharacterLink>
                   </span>
                 </p>
               ))}

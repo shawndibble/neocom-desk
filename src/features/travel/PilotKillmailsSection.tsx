@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -15,7 +16,7 @@ import { resolveNames } from '@/features/character/names';
 import { FittingModuleList } from '@/features/fittings/FittingModuleList';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
 import {
@@ -212,7 +213,11 @@ function KillmailRow({
         aria-expanded={isOpen}
         aria-controls={isOpen ? panelId : undefined}
         onClick={onToggle}
-        className="flex min-h-11 w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+        className={cx(
+          'flex min-h-11 w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left text-sm md:min-h-0',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
       >
         <Caret expanded={isOpen} />
         <span
@@ -246,7 +251,7 @@ function KillmailRow({
           <span className="text-text">{partyName(other)}</span>
         </span>
         <span className="text-text tabular-nums">
-          {entry.value === null ? dash : formatIskCompact(entry.value)}
+          {entry.value === null ? dash : formatIsk(entry.value, 0)}
         </span>
       </button>
       {isOpen && (

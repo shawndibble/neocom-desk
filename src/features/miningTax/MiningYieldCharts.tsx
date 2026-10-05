@@ -137,8 +137,8 @@ function CompareTooltip({
         <ul className="mt-1 border-t border-line pt-1 text-text-dim">
           {point.folded.map((type) => (
             <li key={type.typeId}>
-              {type.typeName}: {formatIskCompact(type.rawValue)}
-              {showRefining && ` / ${formatIskCompact(type.refineValue)}`}
+              {type.typeName}: {formatIsk(type.rawValue, 0)}
+              {showRefining && ` / ${formatIsk(type.refineValue, 0)}`}
             </li>
           ))}
         </ul>
@@ -332,6 +332,7 @@ function IskCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                 width={COMPACT_ISK_Y_AXIS_WIDTH}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
@@ -392,6 +393,7 @@ function IskCharts({
                 type="number"
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <YAxis

@@ -116,7 +116,7 @@ describe('RowDetailModal split', () => {
       onSplit
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Split between Payees' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Split between Payees…' }));
     expect(onSplit).toHaveBeenCalledTimes(1);
   });
 });
@@ -227,7 +227,7 @@ describe('RowDetailModal payment', () => {
       onLinkTransaction: onLink,
     });
     await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction…' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
@@ -260,7 +260,7 @@ describe('RowDetailModal edit', () => {
       onEdit
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit…' }));
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: /unlock/i })).not.toBeInTheDocument();
   });
@@ -285,7 +285,7 @@ describe('RowDetailModal owed entry', () => {
     const onSettleUp = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onSettleUp });
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up…' }));
     expect(onSettleUp).toHaveBeenCalledTimes(1);
   });
 
@@ -303,7 +303,7 @@ describe('RowDetailModal owed entry', () => {
     const onLinkWalletPayment = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment…' }));
     expect(onLinkWalletPayment).toHaveBeenCalledTimes(1);
   });
 });

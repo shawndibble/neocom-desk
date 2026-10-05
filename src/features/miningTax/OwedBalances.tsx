@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
@@ -67,7 +68,9 @@ export function OwedBalances({
       className={cx(
         // -my-3 cancels min-h-11's height so the card doesn't grow: the 44px
         // is invisible hit area on a phone (issue #1055); md: reverts both.
-        '-my-3 flex min-h-11 min-w-0 flex-1 items-center text-left text-base font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent md:my-0 md:min-h-0'
+        '-my-3 flex min-h-11 min-w-0 flex-1 items-center rounded-xs text-left text-base font-semibold hover:text-accent active:text-accent/75 aria-pressed:text-accent md:my-0 md:min-h-0',
+        interactiveClassName,
+        focusRingClassName
       )}
     >
       {/* Two lines before an ellipsis: "Bureau of Unified Harvesting" is a

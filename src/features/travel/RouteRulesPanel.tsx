@@ -19,6 +19,7 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   Checkbox,
   CollapsiblePanel,
   SegmentedControl,
@@ -26,7 +27,6 @@ import {
   StatChip,
   StatChips,
   TextInput,
-  textActionClassName,
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
@@ -98,9 +98,9 @@ export function RouteBridgeFields({
         />
         {t('travel.bridges.enabled')}
       </label>
-      <button type="button" className={textActionClassName()} onClick={onManageBridges}>
+      <Button size="sm" variant="ghost" onClick={onManageBridges}>
         {t('travel.bridges.manage', { count: bridgeCount })}
-      </button>
+      </Button>
     </div>
   );
 }

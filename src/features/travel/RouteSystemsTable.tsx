@@ -172,12 +172,11 @@ function useColumns(
       header: t('travel.col.region'),
       className: 'text-text-dim',
       render: (row) => (
-        <span
-          className="inline-block max-w-[12rem] truncate align-bottom"
-          title={row.regionName ?? undefined}
-        >
-          {row.regionName ?? DASH}
-        </span>
+        <Tooltip content={row.regionName ?? ''}>
+          <span className="inline-block max-w-[12rem] truncate align-bottom">
+            {row.regionName ?? DASH}
+          </span>
+        </Tooltip>
       ),
     },
     {

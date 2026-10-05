@@ -19,14 +19,18 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, textActionClassName } from '@/components/ui';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { RouteHolesState } from './useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
 
-const badgeClassName =
-  'rounded-xs border border-accent-dim px-1 text-[0.625rem] tracking-widest text-accent uppercase';
+const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-accent uppercase';
 
 function Dot() {
   return (
@@ -194,7 +198,7 @@ function BridgeSetupBox({ onSetUpBridges }: Pick<LegWaysProps, 'onSetUpBridges'>
       <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim">
         <button
           type="button"
-          className={textActionClassName()}
+          className={inlineLinkClassName}
           onClick={() => onSetUpBridges('search')}
         >
           {t('travel.ways.findBridges')}
@@ -202,7 +206,7 @@ function BridgeSetupBox({ onSetUpBridges }: Pick<LegWaysProps, 'onSetUpBridges'>
         <span>{t('travel.ways.or')}</span>
         <button
           type="button"
-          className={textActionClassName()}
+          className={inlineLinkClassName}
           onClick={() => onSetUpBridges('paste')}
         >
           {t('travel.ways.pasteBridges')}
@@ -273,8 +277,13 @@ function PhoneLine({
       aria-expanded={open}
       aria-label={t('travel.ways.phoneToggle', { number })}
       onClick={onToggle}
-      className="flex min-h-11 w-full items-center gap-1.5 text-left text-sm text-text-dim"
+      className={cx(
+        'flex min-h-11 w-full items-center gap-1.5 rounded-xs text-left text-sm text-text-dim',
+        rowInteractiveClassName,
+        focusRingInsetClassName
+      )}
     >
+      <Caret expanded={open} />
       <span className="font-semibold text-text">{label(way)}</span>
       <Dot />
       <span className="tabular-nums">
@@ -283,9 +292,8 @@ function PhoneLine({
           : t('travel.ways.noRoute', { to: nameOf(leg.to) })}
       </span>
       {/* The button is the whole line; this only looks like the page's other text actions. */}
-      <span className={textActionClassName('ml-auto min-h-0 gap-1')}>
+      <span className={textActionClassName('ml-auto min-h-0')}>
         {open ? t('travel.ways.hide') : t('travel.ways.compare')}
-        <Caret expanded={open} />
       </span>
     </button>
   );

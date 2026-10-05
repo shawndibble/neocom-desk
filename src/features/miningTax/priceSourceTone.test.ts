@@ -15,7 +15,7 @@ describe('price-source tones (issue #2225)', () => {
   it.each(SOURCES)("paints the %s bar in a token that source's tag already uses", (source) => {
     const token = fillToken(SOURCE_FILL[source]);
     const tagClasses = SOURCE_TAG_CLASS[source].split(' ');
-    expect(tagClasses.some((c) => c === `text-${token}` || c === `border-${token}`)).toBe(true);
+    expect(tagClasses.includes(`text-${token}`)).toBe(true);
   });
 
   it('keeps Saved neutral and gives accent only to Live', () => {
