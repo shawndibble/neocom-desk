@@ -38,7 +38,7 @@ export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /** A navigating row's trailing caret (§6c): faint at rest, accent while the row's link is hovered or focused. */
 const rowCaretClassName =
-  'shrink-0 text-text-faint transition-colors group-hover:text-accent group-focus-visible:text-accent';
+  'shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent';
 
 interface SecurityValueProps {
   /** Undefined while still resolving, null when unresolvable — renders nothing either way. */
