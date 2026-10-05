@@ -23,7 +23,18 @@ interface Colony {
   /** P0 typeIds, one ECU each. */
   extracts: number[];
   heads: number;
+  /** Hours until the programs expire; negative is already stopped. Default 52. */
+  expiresInHours?: number;
+  /** Hours since the programs were installed. Default 20. */
+  installedHoursAgo?: number;
+  /** Basic factories set to a schematic nothing feeds, so they sit idle. */
+  idleBasics?: number;
+  /** P0 per cycle per ECU. Default 6,000 (+500 per extra ECU); a big one fills storage fast. */
+  qtyPerCycle?: number;
 }
+
+/** Per-planet overrides a spec layers over `COLONIES`; the defaults stay what the planner specs rely on. */
+export type ColonyVariants = Record<number, Partial<Colony>>;
 
 const COLONIES: Colony[] = [
   {
@@ -70,13 +81,15 @@ const HOUR = 3_600_000;
 const BASIC_SCHEMATIC: Record<number, number> = { 2267: 126, 2268: 121, 2309: 123, 2310: 124 };
 
 function detailFor(colony: Colony, now: number) {
+  const installedHoursAgo = colony.installedHoursAgo ?? 20;
+  const expiresInHours = colony.expiresInHours ?? 52;
   const pins: unknown[] = colony.extracts.map((product, i) => ({
     pin_id: 100 + i,
     type_id: 2848,
     latitude: 0.3 + i * 0.05,
     longitude: 1.1 + i * 0.07,
-    install_time: new Date(now - 20 * HOUR).toISOString(),
-    expiry_time: new Date(now + 52 * HOUR).toISOString(),
+    install_time: new Date(now - installedHoursAgo * HOUR).toISOString(),
+    expiry_time: new Date(now + expiresInHours * HOUR).toISOString(),
     extractor_details: {
       heads: Array.from({ length: colony.heads }, (_, h) => ({
         head_id: h,
@@ -84,7 +97,7 @@ function detailFor(colony: Colony, now: number) {
         longitude: 1.1,
       })),
       product_type_id: product,
-      qty_per_cycle: 6_000 + i * 500,
+      qty_per_cycle: (colony.qtyPerCycle ?? 6_000) + i * 500,
       cycle_time: 1800,
     },
   }));
@@ -101,6 +114,17 @@ function detailFor(colony: Colony, now: number) {
     }))
   );
   pins.push(...basics);
+  for (let k = 0; k < (colony.idleBasics ?? 0); k += 1) {
+    basics.push({
+      pin_id: 300 + k,
+      type_id: 2469,
+      latitude: 0.5 + k * 0.03,
+      longitude: 1.5,
+      // Electrolytes needs Ionic Solutions, which no colony here extracts.
+      schematic_id: 123,
+    });
+    pins.push(basics[basics.length - 1]);
+  }
   // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
   const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
     (pinId) => ({ source_pin_id: 1, destination_pin_id: pinId, link_level: 0 })
@@ -113,8 +137,12 @@ function detailFor(colony: Colony, now: number) {
 }
 
 /** Routes the active Character's colony reads, and the public lookups they pull. */
-export async function mockPlannerColonies(page: Page): Promise<void> {
+export async function mockPlannerColonies(
+  page: Page,
+  variants: ColonyVariants = {}
+): Promise<void> {
   const now = Date.now();
+  const colonies = COLONIES.map((colony) => ({ ...colony, ...variants[colony.planetId] }));
   const json = (body: unknown) => ({
     status: 200,
     contentType: 'application/json',
@@ -124,12 +152,12 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
     const path = new URL(route.request().url()).pathname;
     const match = path.match(/\/planets\/(\d+)\/?$/);
     if (match) {
-      const colony = COLONIES.find((c) => c.planetId === Number(match[1]));
+      const colony = colonies.find((c) => c.planetId === Number(match[1]));
       return route.fulfill(colony ? json(detailFor(colony, now)) : { status: 404, body: '{}' });
     }
     return route.fulfill(
       json(
-        COLONIES.map((c) => ({
+        colonies.map((c) => ({
           solar_system_id: c.systemId,
           planet_id: c.planetId,
           planet_type: c.type,
@@ -158,7 +186,7 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
   });
   await page.route('https://esi.evetech.net/universe/planets/**', (route) => {
     const id = Number(new URL(route.request().url()).pathname.match(/planets\/(\d+)/)?.[1]);
-    const colony = COLONIES.find((c) => c.planetId === id);
+    const colony = colonies.find((c) => c.planetId === id);
     return route.fulfill(
       json({
         planet_id: id,
