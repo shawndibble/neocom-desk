@@ -7,6 +7,9 @@ export const SWIPE_DISMISS_VELOCITY = 0.5;
 /** Movement before a press counts as a drag, so a tap on the ✕ still clicks. */
 const DRAG_SLOP = 4;
 
+/** A release this long after the last move ignores velocity. */
+const VELOCITY_WINDOW_MS = 100;
+
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 function applyOffset(el: HTMLElement | null, px: number, animate: boolean) {
@@ -72,10 +75,9 @@ export function useSheetSwipe(
       gesture.current = null;
       if (!g?.dragging) return;
       const dy = Math.max(0, event.clientY - g.startY);
-      if (
-        dy >= SWIPE_DISMISS_DISTANCE ||
-        (dy > DRAG_SLOP && g.velocity >= SWIPE_DISMISS_VELOCITY)
-      ) {
+      // A flick that was then held still is not a flick: only a recent sample counts.
+      const velocity = performance.now() - g.lastT > VELOCITY_WINDOW_MS ? 0 : g.velocity;
+      if (dy >= SWIPE_DISMISS_DISTANCE || (dy > DRAG_SLOP && velocity >= SWIPE_DISMISS_VELOCITY)) {
         // The parent unmounts the dialog; clear the offset so the next open
         // starts in place.
         setOffset(0, false);

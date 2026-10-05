@@ -90,6 +90,21 @@ describe('Modal bottom sheet', () => {
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
   });
 
+  it('ignores velocity from a flick that was then held still', async () => {
+    const user = userEvent.setup();
+    render(<SheetHarness />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const zone = dragZone();
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    fireEvent.pointerDown(zone, { clientY: 100, pointerId: 1 });
+    now += 20;
+    fireEvent.pointerMove(zone, { clientY: 140, pointerId: 1 });
+    now += 500;
+    fireEvent.pointerUp(zone, { clientY: 140, pointerId: 1 });
+    expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
+  });
+
   it('snaps back on a short, slow swipe', async () => {
     const user = userEvent.setup();
     render(<SheetHarness />);

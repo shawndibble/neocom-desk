@@ -23,12 +23,15 @@ function Harness() {
         <button type="button" onClick={() => void navigate('/overview?info=x')}>
           Param inside
         </button>
+        <button type="button" onClick={() => void navigate('/market')}>
+          Leave page
+        </button>
       </Modal>
     </>
   );
 }
 
-describe('useOverlayHistory same-page pushes', () => {
+describe('useOverlayHistory', () => {
   it('keeps a search-param push real: Back removes it and the overlay stays open', async () => {
     window.history.replaceState(null, '', '/overview');
     const user = userEvent.setup();
@@ -45,5 +48,38 @@ describe('useOverlayHistory same-page pushes', () => {
     window.history.back();
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/overview$/));
     expect(screen.getByRole('dialog', { name: 'Layer' })).toBeInTheDocument();
+  });
+
+  it('replaces its entry on a pathname change, keeping the router idx', async () => {
+    window.history.replaceState({ idx: 4, key: 'k', usr: null }, '', '/overview');
+    const user = userEvent.setup();
+    render(
+      <BrowserRouter>
+        <Harness />
+      </BrowserRouter>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const entries = window.history.length;
+    await user.click(screen.getByRole('button', { name: 'Leave page' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/market');
+    // Replaced, not stacked.
+    expect(window.history.length).toBe(entries);
+    const state = window.history.state as Record<string, unknown>;
+    expect(state).not.toHaveProperty('__neocomOverlay');
+    expect(state.idx).toBe(4);
+  });
+
+  it('restores history.pushState once the last overlay is gone', async () => {
+    const original = window.history.pushState;
+    const user = userEvent.setup();
+    const view = render(
+      <BrowserRouter>
+        <Harness />
+      </BrowserRouter>
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(window.history.pushState).not.toBe(original);
+    view.unmount();
+    expect(window.history.pushState).toBe(original);
   });
 });

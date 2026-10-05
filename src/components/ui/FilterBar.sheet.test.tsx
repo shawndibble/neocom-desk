@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -85,15 +85,29 @@ describe('FilterBar sheet dismissal', () => {
     expect(screen.getByText('unread:false')).toBeInTheDocument();
   });
 
-  it('asks on the close button too, and Escape on the prompt keeps editing', async () => {
+  it('asks on the close button too, focuses Keep editing, and Escape keeps editing', async () => {
     const { user } = await openSheet();
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     await user.click(screen.getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
-    // The platform's Escape, dispatched directly: the close button still has
-    // focus and its tooltip would swallow a real first Escape.
-    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+    const keep = screen.getByRole('button', { name: 'Keep editing' });
+    expect(keep).toHaveFocus();
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleName('Discard filter changes?');
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+      'The filters you changed have not been applied.'
+    );
+    await user.keyboard('{Escape}');
     expect(await screen.findByRole('button', { name: 'Unread only' })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('puts focus back where it was after Keep editing', async () => {
+    const { user } = await openSheet();
+    const chip = screen.getByRole('button', { name: 'Unread only' });
+    await user.click(chip);
+    chip.focus();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
   });
 
   it('keeps the sheet and puts its history entry back when Back is pressed over a changed draft', async () => {

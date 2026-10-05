@@ -46,6 +46,11 @@ function pushOwnEntry(id: string): void {
  * converted. A search-param or hash push (an entity link's `?info=`, a modal
  * writing its own param) stays a real push, so Back closes just that layer and
  * the overlay's entry survives beneath it.
+ *
+ * Known limits, both leaving one extra same-URL Back step: stacked overlays
+ * (only the top one's entry is replaced when the page changes), and closing an
+ * overlay and navigating in the same breath (the entry is no longer on top, so
+ * it is never removed).
  */
 function trackOverlay(): () => void {
   activeOverlays += 1;
@@ -53,7 +58,15 @@ function trackOverlay(): () => void {
     const original = window.history.pushState;
     window.history.pushState = function (this: History, ...args: Parameters<History['pushState']>) {
       if (!pushingOwnEntry && ownerOf(window.history.state) !== undefined && leavesPage(args[2])) {
-        return window.history.replaceState(...args);
+        // The overlay's entry carries the router's `idx`; keep it, so the
+        // router's own index still matches the real stack after the swap.
+        const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+        const next: unknown = args[0];
+        const state =
+          typeof idx === 'number' && typeof next === 'object' && next !== null
+            ? { ...next, idx }
+            : next;
+        return window.history.replaceState(state, args[1], args[2]);
       }
       return original.apply(this, args);
     };
@@ -93,6 +106,9 @@ function trackOverlay(): () => void {
  * result) replaces its entry rather than pushing past it (`trackOverlay`), so
  * the page change adds no history step and Back returns to the page the
  * overlay was opened over.
+ *
+ * Known limits (see `trackOverlay`): stacked overlays and close-then-navigate
+ * can leave one extra same-URL Back step.
  *
  * `enabled: false` opts out, for an overlay that is already backed by a URL
  * (`PublicInfoModal` and `SkillDetailModal` use the `info` search param), so

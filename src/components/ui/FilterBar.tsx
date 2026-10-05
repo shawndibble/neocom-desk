@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -373,17 +373,11 @@ function FilterPopover({
   );
 }
 
-/**
- * The narrow half of `FilterBar`, as its own component so that widening the
- * window unmounts it and takes the open sheet and its draft with it. The
- * alternative — an effect closing the sheet when the viewport grows — would
- * leave a modal sitting over controls that are now in the row behind it, and
- * would cascade a render to do it.
- */
-/** Structural equality for a filter value: plain data, arrays, Sets, Maps. */
+/** Structural equality for a filter value: plain data, arrays, Dates, Sets, Maps. */
 function sameFilters(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
   if (a instanceof Set && b instanceof Set) {
     return a.size === b.size && [...a].every((item) => b.has(item));
   }
@@ -401,6 +395,13 @@ function sameFilters(a: unknown, b: unknown): boolean {
   );
 }
 
+/**
+ * The narrow half of `FilterBar`, as its own component so that widening the
+ * window unmounts it and takes the open sheet and its draft with it. The
+ * alternative — an effect closing the sheet when the viewport grows — would
+ * leave a modal sitting over controls that are now in the row behind it, and
+ * would cascade a render to do it.
+ */
 function FilterSheet<T>({
   value,
   onChange,
@@ -419,6 +420,23 @@ function FilterSheet<T>({
   // "Discard filter changes?", asked inside the sheet itself rather than in a
   // second dialog: one overlay means one history entry for Back to own.
   const [confirming, setConfirming] = useState(false);
+
+  const promptId = useId();
+  const keepEditingRef = useRef<HTMLButtonElement>(null);
+  const focusBeforePrompt = useRef<Element | null>(null);
+  // Focus follows the prompt in and back out: onto "Keep editing" (the safe
+  // choice) when it appears, and to whatever held focus before it when
+  // dismissed. The draft stays mounted (hidden) under the prompt so that
+  // element still exists.
+  useEffect(() => {
+    if (confirming) {
+      focusBeforePrompt.current = document.activeElement;
+      keepEditingRef.current?.focus();
+    } else if (focusBeforePrompt.current instanceof HTMLElement) {
+      if (focusBeforePrompt.current.isConnected) focusBeforePrompt.current.focus();
+      focusBeforePrompt.current = null;
+    }
+  }, [confirming]);
 
   const closeSheet = () => {
     setConfirming(false);
@@ -470,12 +488,21 @@ function FilterSheet<T>({
         title={title ?? t('filters.title')}
         placement="sheet"
       >
-        {confirming ? (
-          <div role="alertdialog" aria-label={t('filters.discardTitle')} className="space-y-3">
-            <p className="text-sm font-semibold">{t('filters.discardTitle')}</p>
-            <p className="text-sm text-text-dim">{t('filters.discardBody')}</p>
+        {confirming && (
+          <div
+            role="alertdialog"
+            aria-labelledby={`${promptId}-title`}
+            aria-describedby={`${promptId}-body`}
+            className="space-y-3"
+          >
+            <p id={`${promptId}-title`} className="text-sm font-semibold">
+              {t('filters.discardTitle')}
+            </p>
+            <p id={`${promptId}-body`} className="text-sm text-text-dim">
+              {t('filters.discardBody')}
+            </p>
             <div className="flex gap-2">
-              <Button className="flex-1" onClick={() => setConfirming(false)}>
+              <Button ref={keepEditingRef} className="flex-1" onClick={() => setConfirming(false)}>
                 {t('filters.keepEditing')}
               </Button>
               <Button variant="primary" className="flex-1" onClick={closeSheet}>
@@ -483,38 +510,37 @@ function FilterSheet<T>({
               </Button>
             </div>
           </div>
-        ) : (
-          <>
-            <FilterSurfaceContext.Provider value="sheet">
-              {/*
+        )}
+        <div hidden={confirming}>
+          <FilterSurfaceContext.Provider value="sheet">
+            {/*
             `items-start` so a chip keeps its own width in the column — only a
             `FilterField` marked `stretch` fills the sheet, and a full-width
             uppercase pill reads as a field it is not.
           */}
-              <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
-            </FilterSurfaceContext.Provider>
-            {/*
+            <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
+          </FilterSurfaceContext.Provider>
+          {/*
           Sticky rather than a `Modal` footer prop: the sheet's body is the
           scroller, and five filters on a phone push a static Apply below the
           fold. The negative margins let the bar span the body's own padding.
         */}
-            <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-              <Button className="flex-1" onClick={closeSheet}>
-                {t('filters.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                className="flex-1"
-                onClick={() => {
-                  onChange(draft);
-                  closeSheet();
-                }}
-              >
-                {t('filters.apply')}
-              </Button>
-            </div>
-          </>
-        )}
+          <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+            <Button className="flex-1" onClick={closeSheet}>
+              {t('filters.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={() => {
+                onChange(draft);
+                closeSheet();
+              }}
+            >
+              {t('filters.apply')}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );
