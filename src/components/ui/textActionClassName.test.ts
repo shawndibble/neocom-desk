@@ -14,6 +14,8 @@ describe('textActionClassName', () => {
       'text-accent',
       'uppercase',
       'hover:underline',
+      'active:text-accent/75',
+      'disabled:opacity-40',
       'focus-visible:outline-accent',
     ]) {
       expect(tokens).toContain(token);

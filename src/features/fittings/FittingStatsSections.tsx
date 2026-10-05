@@ -321,7 +321,7 @@ function StatSection({
   return (
     <section className="border-b border-line last:border-b-0">
       {/* Every section's row is shaded alike, open or shut: its small-caps title, the headline figure beside. */}
-      <div className="flex items-center gap-2 bg-panel-2 pr-3 transition-colors hover:bg-line">
+      <div className="flex items-center gap-2 bg-panel-2 pr-3 transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:bg-line">
         <h3 className="min-w-0 flex-1">
           <button
             type="button"

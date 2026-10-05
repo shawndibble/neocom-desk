@@ -210,7 +210,6 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
                   <Button
                     size="sm"
                     variant="primary"
-                    className="transition-transform active:scale-95"
                     onClick={() =>
                       void add(
                         unplanned.map((row) => ({
