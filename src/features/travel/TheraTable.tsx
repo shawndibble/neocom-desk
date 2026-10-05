@@ -33,7 +33,7 @@ const DASH = '—';
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 
 const hubBadgeClassName =
-  'rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest text-text-dim uppercase';
+  'shrink-0 rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
 
 /** Route Safety through a row's hole, or `null` for a row it is not offered on. */
 type RouteViaHref = (row: TheraConnectionRow) => string | null;
@@ -80,7 +80,7 @@ function useColumns(routeVia?: RouteViaHref): DataTableColumn<TheraConnectionRow
       primary: true,
       sortValue: (row) => row.exitSystemName ?? undefined,
       render: (row) => (
-        <span className="inline-flex min-w-0 items-center gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate font-semibold">{row.exitSystemName ?? DASH}</span>
           <span className={hubBadgeClassName}>{t(`travel.thera.hub.${row.hub}`)}</span>
         </span>

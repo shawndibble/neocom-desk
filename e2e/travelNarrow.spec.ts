@@ -148,6 +148,48 @@ test.describe('Travel at 390px', () => {
     await expect(page).toHaveURL(new RegExp(`origin=${AMARR}`));
   });
 
+  test('the hub badge stays one line beside a long exit name (#2609)', async ({ page }) => {
+    const longName = 'Tash-Murkon Prime Long Name That Keeps Going On Forever';
+    const hole = (id: string, outSystemId: number, name: string) => ({
+      id,
+      signature_type: 'wormhole',
+      out_system_id: outSystemId,
+      out_signature: 'ABC-123',
+      in_system_id: JITA,
+      in_system_name: name,
+      in_system_class: 'hs',
+      in_region_name: 'The Forge',
+      in_signature: 'XYZ-789',
+      wh_type: 'Q063',
+      max_ship_size: 'large',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    });
+    await page.route('https://api.eve-scout.com/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify([
+          hole('9101', THERA, 'Jita'),
+          hole('9102', THERA, longName),
+          hole('9103', 30002086, longName),
+        ]),
+      })
+    );
+    await signInAndGoto(page, './travel/thera');
+
+    const badges = page.getByRole('main').getByText(/^(thera|turnur)$/i);
+    await expect(badges).toHaveCount(3, COLD_LOAD);
+    const heights = await badges.evaluateAll((els) =>
+      els.map((el) => Math.round(el.getBoundingClientRect().height))
+    );
+    expect(new Set(heights).size).toBe(1);
+
+    const name = page.getByRole('main').locator('span.truncate', { hasText: longName }).first();
+    expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+    await expectNoPageOverflow(page);
+  });
+
   test('a two-stop trip sets its leg headers at 14px, without widening the page', async ({
     page,
   }) => {
