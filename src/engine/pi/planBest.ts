@@ -36,7 +36,9 @@
  * close are the same plan to a pilot, and the one 28 jumps out costs real
  * hauling time the ISK figure never sees — with a floor of 100 ISK/h so two
  * near-zero nets are not called different over rounding. Without a `JumpsFn`
- * every haul effort is 0 and step 3 falls through to net.
+ * (distances still resolving) every leg that moves goods counts as unknown,
+ * so step 4 prefers the plan with fewer moving legs and never compares
+ * effort — the right fallback: fewer hauls is better whatever the distance.
  *
  * Its own module so neither of `goalPlan` and `planEconomics` has to import
  * the other: the solver stays price-free and the ledger stays plan-agnostic.
