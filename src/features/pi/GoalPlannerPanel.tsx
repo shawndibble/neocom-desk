@@ -27,7 +27,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
-import type { Goal } from '@/engine/pi/goalTypes';
+import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
@@ -235,25 +235,10 @@ function GoalPlanner({
   const goalsKey = useDeferredValue(serializeGoals(plannableGoals(goals, plannable)) ?? '');
   const plannedGoals = useMemo(() => parseGoals(goalsKey), [goalsKey]);
 
-  const result = useMemo((): { best: BestPlan } | { error: true } | null => {
-    if (!pi || !prices || !snapshot) return null;
-    try {
-      const best = planBest(
-        {
-          goals: plannedGoals,
-          colonies: goalPlannerInput(rows),
-          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyP1 }),
-          books: priceBooks(prices, snapshot.accountingLevel),
-        },
-        pi
-      );
-      return { best };
-    } catch {
-      return { error: true };
-    }
-  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyP1]);
-
-  // --- Jumps from each colony's system to the hub, on the pilot's route basis ---
+  // --- Jumps on the pilot's route basis: each colony's system to the hub, and
+  // between colony systems for the host choice. The plan does not wait for
+  // them: until they resolve every leg is unknown (no host is penalised) and
+  // the plan is re-made when they land.
   const basis = useJumpBasis();
   const systemKey = useMemo(
     () => [...new Set(rows.map((row) => row.systemId))].sort((a, b) => a - b).join(','),
@@ -262,21 +247,29 @@ function GoalPlanner({
   const [jumps, setJumps] = useState<{
     key: string;
     bySystem: Map<number, number | null>;
+    /** Colony system to colony system, keyed `low-high`, for the host choice. */
+    pairs: Map<string, number | null>;
   } | null>(null);
   const jumpsKey = `${basis.key}|${hub.systemId}|${systemKey}`;
   useEffect(() => {
     if (!basis.hydrated || systemKey === '') return;
     let cancelled = false;
     const ids = systemKey.split(',').map(Number);
-    void Promise.all(
-      ids.map((id) =>
-        jumpsBetween(id, hub.systemId, basis)
-          .then((r) => (r.kind === 'known' ? r.jumps : null))
-          .catch(() => null)
-      )
-    ).then((counts) => {
+    const count = (from: number, to: number) =>
+      jumpsBetween(from, to, basis)
+        .then((r) => (r.kind === 'known' ? r.jumps : null))
+        .catch(() => null);
+    const pairIds = ids.flatMap((a, i) => ids.slice(i + 1).map((b) => [a, b] as const));
+    void Promise.all([
+      Promise.all(ids.map((id) => count(id, hub.systemId))),
+      Promise.all(pairIds.map(([a, b]) => count(a, b))),
+    ]).then(([toHub, between]) => {
       if (cancelled) return;
-      setJumps({ key: jumpsKey, bySystem: new Map(ids.map((id, i) => [id, counts[i]])) });
+      setJumps({
+        key: jumpsKey,
+        bySystem: new Map(ids.map((id, i) => [id, toHub[i]])),
+        pairs: new Map(pairIds.map(([a, b], i) => [`${a}-${b}`, between[i]])),
+      });
     });
     return () => {
       cancelled = true;
@@ -291,6 +284,38 @@ function GoalPlanner({
     }
     return out;
   }, [jumps, jumpsKey, rows]);
+  const jumpsFn = useMemo((): JumpsFn | undefined => {
+    if (jumps?.key !== jumpsKey) return undefined;
+    const systemOf = new Map(rows.map((row) => [row.planetId, row.systemId]));
+    return (from, to) => {
+      const a = systemOf.get(from);
+      if (a === undefined) return null;
+      if (to === 'hub') return jumps.bySystem.get(a) ?? null;
+      const b = systemOf.get(to);
+      if (b === undefined) return null;
+      if (a === b) return 0;
+      return jumps.pairs.get(a < b ? `${a}-${b}` : `${b}-${a}`) ?? null;
+    };
+  }, [jumps, jumpsKey, rows]);
+
+  const result = useMemo((): { best: BestPlan } | { error: true } | null => {
+    if (!pi || !prices || !snapshot) return null;
+    try {
+      const best = planBest(
+        {
+          goals: plannedGoals,
+          colonies: goalPlannerInput(rows),
+          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyP1 }),
+          books: priceBooks(prices, snapshot.accountingLevel),
+          jumps: jumpsFn,
+        },
+        pi
+      );
+      return { best };
+    } catch {
+      return { error: true };
+    }
+  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyP1, jumpsFn]);
 
   const names = useMemo((): PlanNames | null => {
     if (!snapshot || !pi) return null;
