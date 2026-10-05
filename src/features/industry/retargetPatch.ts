@@ -36,8 +36,8 @@ export function retargetPatch(snapshot: BuildGroupSnapshot): RetargetPatch {
 /**
  * Whether a plan already carries a snapshot's four values — what decides
  * whether the per-plan quick-fill link has anything left to do. Mirrors
- * `OwnedStockHint`'s own `canApply`: nothing to offer once applying it would
- * be a no-op.
+ * the owned-stock offer (`ownedStockOffer`): nothing to offer once applying
+ * it would be a no-op.
  */
 export function planMatchesSnapshot(
   plan: Pick<

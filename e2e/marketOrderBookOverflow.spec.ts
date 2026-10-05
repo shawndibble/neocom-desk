@@ -11,7 +11,9 @@
  * the wider table — this asserts on the page opened with mocked orders for
  * both, all columns visible (the default), a long NPC station name, and
  * checks the page-level scrollWidth bound `expectNoPageOverflow` already
- * uses for this exact failure mode (#1708) at three pointer-input widths.
+ * uses for this exact failure mode (#1708) at three pointer-input widths —
+ * and, since the order book rework, that neither table scrolls sideways
+ * inside its own wrapper either.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -86,15 +88,18 @@ for (const viewport of WIDTHS) {
     await openMarketOrders(page);
     await expectNoPageOverflow(page);
 
-    // Buy is the wider table (it carries `range`/`minVolume` on top of
-    // Sell's columns) — its own wrapper still needs to scroll horizontally
-    // rather than the fix having simply shrunk it to fit, so this table
-    // stays fully readable and sortable at its natural width (AC bullet 3).
-    const buyScroller = page.getByRole('table', { name: 'Buy Orders' }).locator('xpath=..');
-    const { scrollWidth, clientWidth } = await buyScroller.evaluate((el) => ({
-      scrollWidth: el.scrollWidth,
-      clientWidth: el.clientWidth,
-    }));
-    expect(scrollWidth).toBeGreaterThan(clientWidth);
+    // Buy is the wider table (it carries `range` on top of Sell's columns).
+    // Since the order book rework it no longer scrolls sideways at all: its
+    // widest columns drop out below ~1680px and, once the book's own column
+    // is too narrow for the rest, the rows become two-line cards — so the
+    // station and every figure stay in view without a horizontal scroller.
+    for (const name of ['Sell Orders', 'Buy Orders']) {
+      const scroller = page.getByRole('table', { name }).locator('xpath=..');
+      const { scrollWidth, clientWidth } = await scroller.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }));
+      expect(scrollWidth, name).toBeLessThanOrEqual(clientWidth);
+    }
   });
 }

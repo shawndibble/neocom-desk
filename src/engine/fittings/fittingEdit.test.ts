@@ -668,6 +668,15 @@ describe('setCargoQuantity', () => {
     expect(setCargoQuantity(withCargo, 3001, -4).cargo).toEqual([{ typeId: 209, quantity: 1500 }]);
   });
 
+  it('puts a type the cargo doesn’t hold yet on a new last stack', () => {
+    expect(setCargoQuantity(withCargo, 24495, 2000).cargo).toEqual([
+      { typeId: 209, quantity: 1500 },
+      { typeId: 3001, quantity: 1 },
+      { typeId: 24495, quantity: 2000 },
+    ]);
+    expect(setCargoQuantity(withCargo, 24495, 0)).toEqual(withCargo);
+  });
+
   it('folds several stacks of one type into its first', () => {
     const split: Fitting = {
       ...base,

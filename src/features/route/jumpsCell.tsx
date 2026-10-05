@@ -7,6 +7,7 @@
  */
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
+import { JumpsLink } from '@/features/travel/JumpsLink';
 import type { JumpsCellValue } from './currentSystem';
 
 /**
@@ -15,11 +16,14 @@ import type { JumpsCellValue } from './currentSystem';
  * which each table explains with its own `unavailableHintKey` (a market
  * order's system is always known; an offer's or a blueprint's location can
  * be a player structure the graph doesn't reach either).
+ *
+ * With `systemId`, a settled count links to the route it counts (`JumpsLink`).
  */
 export function renderJumpsCell(
   cell: JumpsCellValue,
   t: TFunction,
-  unavailableHintKey: string
+  unavailableHintKey: string,
+  systemId?: number | null
 ): ReactNode {
   if (cell.kind === 'loading') return <span className="text-text-dim">…</span>;
   if (cell.kind === 'no-origin') {
@@ -43,5 +47,9 @@ export function renderJumpsCell(
       </span>
     );
   }
-  return String(cell.count);
+  return systemId == null ? (
+    String(cell.count)
+  ) : (
+    <JumpsLink systemId={systemId}>{cell.count}</JumpsLink>
+  );
 }

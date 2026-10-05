@@ -43,7 +43,7 @@ import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -64,6 +64,7 @@ import { HaulingCargoControl } from './HaulingCargoControl';
 import { haulingCsvColumns } from './haulingCsv';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
+import { HaulingHoldMeters } from './HaulingHoldMeters';
 import {
   DEFAULT_HAULING_FILTER,
   useHaulingFilterPref,
@@ -266,6 +267,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const cards = isPhone || tableCards;
   const isk = (value: number, digits: number) =>
     isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
+  /** A per-unit price: the Market page's cents-below-10,000 rule. */
+  const price = (value: number) =>
+    isPhone || tableNarrow ? formatIskCompact(value) : formatMarketIsk(value);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -348,7 +352,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     () =>
       planTrip({
         candidates: shown.map((r) => r.candidate),
-        cargoM3: cargo?.m3 ?? null,
+        holds: cargo?.holds ?? null,
         budgetIsk: budget,
         // Every candidate carries its own destination's fees; this is only the fallback.
         fees: fees.at(TRADE_HUBS[0]!),
@@ -407,7 +411,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     const line = lineOf.get(row.typeId);
     if (!line) return undefined;
     const unit = line.volumeM3 > 0 ? `${Math.round(line.volumeM3).toLocaleString()} m³ · ` : '';
-    return `${unit}${t(`market.hauling.limit.${line.limitedBy}`)}`;
+    // Unless the Cargo Space is one plain hold, say which the line rides in ("in Ammo hold, Cargo hold").
+    const plainHold = plan.holds.length === 1 && plan.holds[0]!.kind === 'general';
+    const holds =
+      !plainHold && line.placements.length > 0
+        ? `${t('market.hauling.plan.inHolds', {
+            holds: line.placements.map((p) => t(`market.hauling.holds.${p.kind}`)).join(', '),
+          })} · `
+        : '';
+    return `${unit}${holds}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
   const flagLabel = useMemo<Record<HaulingFlag, { text: string; tip: string }>>(
@@ -536,7 +548,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
       sortValue: (row) => row.buyLadder[0]?.price,
-      render: (row) => isk(row.buyLadder[0]?.price ?? 0, 2),
+      render: (row) => price(row.buyLadder[0]?.price ?? 0),
     },
     {
       id: 'expected',
@@ -551,7 +563,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         before: `${t(instant ? 'market.hauling.columns.buyOrder' : 'market.hauling.columns.expected')} `,
       },
       sortValue: (row) => row.price,
-      render: (row) => isk(row.price, 2),
+      render: (row) => price(row.price),
     },
     {
       id: 'margin',
@@ -667,9 +679,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       !isHaulingColumnId(column.id) ||
       (availableColumnIds.includes(column.id) && columnVisibility.isVisible(column.id))
   );
-
-  const heldPct =
-    cargo !== null && cargo.m3 > 0 ? Math.min(100, (plan.totals.volumeM3 / cargo.m3) * 100) : null;
 
   const bindingText =
     plan.binding === 'budget'
@@ -989,36 +998,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   </span>
                 </div>
                 <div className="flex min-w-0 flex-1 basis-full items-center gap-3 @min-[40rem]:basis-auto">
-                  {cargo !== null && heldPct !== null ? (
-                    <>
-                      <div
-                        role="img"
-                        aria-label={t('market.hauling.plan.holdAria', {
-                          used: Math.round(plan.totals.volumeM3).toLocaleString(),
-                          total: Math.round(cargo.m3).toLocaleString(),
-                        })}
-                        className="h-1 min-w-8 flex-1 bg-line @max-[26rem]:hidden @min-[40rem]:max-w-xs"
-                      >
-                        <div className="h-full bg-accent" style={{ width: `${heldPct}%` }} />
-                      </div>
-                      {/* The meter's bar goes first in a phone-narrow bar
-                          (the words beside it say the same), so the ship
-                          button keeps its name.
-                          What binds the load prints in a bar 40rem wide and up
-                          (the bar's own width, not the viewport's: a tablet
-                          with the rail open is as cramped as a phone); below
-                          that there is no room, and each row's detail says
-                          what capped that row. */}
-                      <span className="min-w-0 shrink-0 text-[0.6875rem] text-text-dim">
-                        {t('market.hauling.plan.holdUsed', {
-                          used: Math.round(plan.totals.volumeM3).toLocaleString(),
-                          total: Math.round(cargo.m3).toLocaleString(),
-                        })}
-                        {bindingText && (
-                          <span className="@max-[40rem]:hidden"> · {bindingText}</span>
-                        )}
-                      </span>
-                    </>
+                  {cargo !== null && plan.holds.length > 0 ? (
+                    <HaulingHoldMeters holds={plan.holds} bindingText={bindingText} />
                   ) : (
                     // The ship button beside it says the same on a phone.
                     <span className="min-w-0 flex-1 text-[0.6875rem] text-text-dim @max-[40rem]:hidden">

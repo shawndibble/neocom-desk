@@ -1,4 +1,19 @@
-import type { FittingStats } from '../types';
+import type { FittingStats, HoldStats } from '../types';
+
+/** Every hold empty: spread into a test's `holds` so a new hold lands here once. */
+export const NO_HOLDS: HoldStats = {
+  cargo: 0,
+  fleetHangar: 0,
+  miningHold: 0,
+  ammoHold: 0,
+  planetaryHold: 0,
+  commandCenterHold: 0,
+  mineralHold: 0,
+  gasHold: 0,
+  iceHold: 0,
+  fuelBay: 0,
+  infrastructureHold: 0,
+};
 
 /**
  * The FittingStats fields a test about something else doesn't care about,
@@ -39,7 +54,7 @@ export function neutralExtendedStats(): Pick<
       nosferatu: 0,
     },
     sensor: { strength: 0, type: null },
-    holds: { cargo: 0, fleetHangar: 0, miningHold: 0 },
+    holds: NO_HOLDS,
     jumpDrive: null,
     lockedTargets: { ship: 0, pilot: 2, effective: 0 },
     allOverheated: false,

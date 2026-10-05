@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillStatsSection } from './ZkillStatsSection';
@@ -52,6 +53,15 @@ export function PilotProfileView(props: PilotProfileViewProps) {
 
 export default PilotProfileView;
 
+/**
+ * The Corporation and Alliance links are this page's only way into those orgs,
+ * two rows 2px apart: a 44px hit area on a phone, no overhang to overlap (#2520).
+ */
+const identityLinkClassName = cx(
+  inlineLinkClassName,
+  'inline-flex min-h-11 items-center md:min-h-0'
+);
+
 function PilotIdentity({
   profile,
   onOpenCorporation,
@@ -73,7 +83,7 @@ function PilotIdentity({
           <dd>
             <button
               type="button"
-              className={inlineLinkClassName}
+              className={identityLinkClassName}
               onClick={() => onOpenCorporation(profile.corporationId)}
             >
               {profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId })}
@@ -86,7 +96,7 @@ function PilotIdentity({
             ) : (
               <button
                 type="button"
-                className={inlineLinkClassName}
+                className={identityLinkClassName}
                 onClick={() => onOpenAlliance(allianceId)}
               >
                 {profile.allianceName ?? t('travel.pilot.unnamed', { id: allianceId })}

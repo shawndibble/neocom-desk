@@ -17,6 +17,9 @@ interface SelectionToolbarProps {
   /** Still-unassigned rows the selection would dismiss. */
   dismissCount: number;
   onDismiss: () => void;
+  /** "Link payment": the ticked owed entries, when they all belong to one Payee — `null` says why not. */
+  linkPaymentBlockedReason?: string | null;
+  onLinkPayment?: () => void;
 }
 
 /**
@@ -61,6 +64,8 @@ export function SelectionToolbar({
   onCombine,
   dismissCount,
   onDismiss,
+  linkPaymentBlockedReason = null,
+  onLinkPayment,
 }: SelectionToolbarProps) {
   const { t } = useTranslation();
   if (selectedCount === 0) return null;
@@ -80,6 +85,16 @@ export function SelectionToolbar({
       blockedReason: settleUpCount === 0 ? t('miningTax.settleUpBlockedHint') : null,
       onRun: onSettleUp,
     },
+    ...(onLinkPayment
+      ? [
+          {
+            id: 'link-payment',
+            label: t('miningTax.linkPaymentSelectedAction'),
+            blockedReason: linkPaymentBlockedReason,
+            onRun: onLinkPayment,
+          },
+        ]
+      : []),
     {
       id: 'combine',
       label: t('miningTax.combineSelectedAction', { count: selectedCount }),

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
@@ -23,6 +31,11 @@ interface ModalProps {
    */
   titleActions?: ReactNode;
   children: ReactNode;
+  /**
+   * Where focus lands on open instead of the dialog body — the one field a
+   * dialog exists to fill (a quantity), so the user can type straight away.
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
 }
@@ -64,6 +77,7 @@ export function Modal({
   titleActions,
   children,
   placement = 'center',
+  initialFocusRef,
 }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -95,12 +109,16 @@ export function Modal({
     // unmount-while-open too.
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
+    // After showModal(), whose own focusing steps land on the body: a child's
+    // mount-time focus() would run first (child effects fire before this one)
+    // and be overridden.
+    initialFocusRef?.current?.focus();
 
     return () => {
       if (dialog.open) dialog.close();
       if (trigger instanceof HTMLElement) trigger.focus();
     };
-  }, [open]);
+  }, [open, initialFocusRef]);
 
   const { dialogClass, heightClass } = PLACEMENT_CLASSES[placement];
 

@@ -92,6 +92,7 @@ import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
 import { useOrderDetail } from './useOrderDetail';
+import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
 import {
   OPEN_ORDER_COLUMN_IDS,
@@ -595,11 +596,17 @@ export function OpenOrdersPanel() {
       <ItemContextMenu
         typeId={row.typeId}
         extraItems={
-          relistPrice !== null && (
-            <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(relistPrice))}>
-              {t('market.orders.copyNewPrice')}
-            </MenuItem>
-          )
+          <>
+            {relistPrice !== null && (
+              <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(relistPrice))}>
+                {t('market.orders.copyNewPrice')}
+              </MenuItem>
+            )}
+            {/* Only where the Location column names it: an unnamed structure has nothing to show. */}
+            {row.stationName !== null && (
+              <SetWaypointMenuItem locationId={row.locationId} placeName={row.stationName} />
+            )}
+          </>
         }
         itemName={row.typeName}
       >

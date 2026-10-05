@@ -829,7 +829,13 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
         },
         stackAffix: { before: t('contractSearch.mobile.jumpsAffix') },
-        render: (row) => renderJumpsCell(offerJumps(row), t, 'contractSearch.jumpsUnavailableHint'),
+        render: (row) =>
+          renderJumpsCell(
+            offerJumps(row),
+            t,
+            'contractSearch.jumpsUnavailableHint',
+            offerLocations.get(row.locationId)?.systemId
+          ),
       },
       region: {
         id: 'region',

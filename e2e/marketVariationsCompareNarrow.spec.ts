@@ -87,7 +87,7 @@ async function scrollerCount(drawer: Locator) {
   });
 }
 
-/** Market Browser → search the fixture item → Variations panel → "Compare". */
+/** Market Browser → search the fixture item → Variations tab → "Compare". */
 async function openCompareDrawer(page: Page) {
   await signInAndGoto(page);
   await stubEveryType(page);
@@ -98,6 +98,8 @@ async function openCompareDrawer(page: Page) {
   await expect(leaf).toBeVisible();
   await leaf.click();
 
+  // Variations is the selected item's own tab, beside Order Book and Price History.
+  await page.getByRole('tab', { name: /^Variations/ }).click();
   await page.getByRole('button', { name: 'Compare', exact: true }).click();
   const drawer = page.getByRole('region', { name: 'Compare' });
   await expect(drawer.getByText('Fitting')).toBeVisible();

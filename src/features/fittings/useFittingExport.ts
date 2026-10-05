@@ -12,14 +12,14 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
-
-const NOTICE_MS = 2500;
+import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 /**
  * What Export does — copy a format, open Appraisal — and the brief notice
  * a copy leaves. Shared by the Export menu and the phone header's one menu.
+ * `cloneImplants` (the pilot's active clone) stay off the multibuy list.
  */
-export function useFittingExport(fitting: Fitting) {
+export function useFittingExport(fitting: Fitting, cloneImplants: readonly number[] = []) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -39,15 +39,11 @@ export function useFittingExport(fitting: Fitting) {
     };
   }, [fitting]);
 
-  useEffect(() => {
-    if (notice === null) return;
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [notice]);
+  useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
   async function copy(kind: FittingExportKind) {
     try {
-      const text = await exportFitting(kind, fitting);
+      const text = await exportFitting(kind, fitting, cloneImplants);
       if (text === null) {
         setNotice(t('fittings.export.tooLarge'));
         return;
@@ -114,7 +110,7 @@ export function useFittingExport(fitting: Fitting) {
   }
 
   async function openInAppraisal() {
-    const text = await exportFitting('multibuy', fitting);
+    const text = await exportFitting('multibuy', fitting, cloneImplants);
     if (text === null) return;
     navigate(tabPath(MARKET_TABS, 'appraisal'), {
       state: { appraiseText: text } satisfies MarketAppraiseState,

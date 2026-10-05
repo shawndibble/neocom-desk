@@ -38,7 +38,6 @@ import {
   type FittingModuleResult,
   type FittingSlotKind,
   type FittingStats,
-  type PilotProfile,
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
@@ -59,6 +58,7 @@ import {
   useFittingItemActions,
 } from './fittingItemActions';
 import type { AddTarget } from './addTarget';
+import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
@@ -121,8 +121,8 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
 export interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** The engine, pilot and catalogue for fit checks; null while any of them loads. */
+  context: FittingContext | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
 }
 
@@ -166,8 +166,7 @@ export function ModuleRow({
   cantUse,
   fitting,
   catalogue,
-  engineReady,
-  profile,
+  context,
   edit,
   onOpenVariations,
   inRack = false,
@@ -256,8 +255,7 @@ export function ModuleRow({
           result={result ?? undefined}
           fitting={fitting}
           catalogue={catalogue}
-          engineReady={engineReady}
-          profile={profile}
+          context={context}
           edit={edit}
           className="flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
         />
@@ -790,8 +788,7 @@ export function FittingRackList({
   stats,
   moduleResults,
   catalogue,
-  engineReady,
-  profile,
+  context,
   edit,
   target,
   onSelectTarget,
@@ -800,7 +797,7 @@ export function FittingRackList({
   actions,
 }: FittingRackListProps) {
   const { t } = useTranslation();
-  const context = { fitting, catalogue, engineReady, profile, edit };
+  const editContext = { fitting, catalogue, context, edit };
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
@@ -840,14 +837,14 @@ export function FittingRackList({
           )}
         </div>
 
-        {!engineReady && (
+        {context === null && (
           <p className="text-xs text-text-dim">{t('fittings.edit.slotsWaitForShipData')}</p>
         )}
 
         {FITTING_SLOT_KINDS.map((rack) => (
           <RackSlots
             key={rack}
-            {...context}
+            {...editContext}
             rack={rack}
             stats={stats}
             moduleResults={moduleResults}

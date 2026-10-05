@@ -15,9 +15,9 @@ interface BpoBadgeProps {
 }
 
 /**
- * "A BPO is for sale too" on a BPC Sourcing row (issue #1241). Price and
- * where are in the visible text so a phone reader gets them without a
- * gesture; the tooltip adds source, exact price, region and ME/TE. Its tap
+ * "A BPO is for sale too" on a BPC Sourcing row (issue #1241). The visible
+ * text stays short so it never widens the Item column; price and location
+ * live in the tooltip, one per line, and in the accessible name. Its tap
  * only explains (`openOnTap`), so it is stopped from reaching the row, whose
  * own tap opens the contract.
  */
@@ -28,14 +28,14 @@ export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBad
     bpo.kind === 'market' ? 'bpcContracts.bpoOnMarket' : 'bpcContracts.bpoOnContract',
     { price: formatIskCompact(bpo.price), where }
   );
+  const text = t(mayBeCheaper ? 'bpcContracts.bpoMayBeCheaper' : 'bpcContracts.bpoForSale');
   const details = [
-    bpo.kind === 'market' ? t('bpcContracts.bpoSourceMarket') : t('bpcContracts.bpoSourceContract'),
-    t('common.iskExact', { amount: formatIsk(bpo.price, 2) }),
+    t('bpcContracts.bpoPrice', {
+      price: t('common.iskExact', { amount: formatIsk(bpo.price, 2) }),
+    }),
     bpo.kind === 'market' && bpo.atHub
       ? t('bpcContracts.bpoLocationAtHub', { location: where, region: regionName })
       : t('bpcContracts.bpoLocation', { location: where, region: regionName }),
-    t('bpcContracts.bpoMeTe', { me: bpo.me, te: bpo.te }),
-    ...(mayBeCheaper ? [t('bpcContracts.bpoMayBeCheaperHint')] : []),
   ].join('\n');
 
   function stop(event: MouseEvent | KeyboardEvent) {
@@ -47,6 +47,7 @@ export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBad
     <Tooltip content={details} openOnTap>
       <button
         type="button"
+        aria-label={`${text} · ${label}`}
         onClick={stop}
         onKeyDown={stop}
         className={cx(
@@ -56,10 +57,7 @@ export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBad
             : 'border-line bg-panel-2 text-text-dim'
         )}
       >
-        {mayBeCheaper && (
-          <span className="shrink-0 font-semibold">{t('bpcContracts.bpoMayBeCheaper')}</span>
-        )}
-        <span className="min-w-0 truncate">{label}</span>
+        <span className={cx('min-w-0 truncate', mayBeCheaper && 'font-semibold')}>{text}</span>
       </button>
     </Tooltip>
   );

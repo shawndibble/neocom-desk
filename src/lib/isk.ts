@@ -55,6 +55,24 @@ export function formatIskAuto(value: number, centsBelow = 100): string {
 export const CONTRACT_ISK_CENTS_BELOW = 1000;
 
 /**
+ * Anything that would print as 10,000.00 or more. EVE limits an order price to
+ * four significant figures, so from 10,000 up an order's own cents are always
+ * `.00`; an average, total or margin does lose real cents there, which the
+ * Market page accepts as noise at that size.
+ */
+const MARKET_ISK_CENTS_BELOW = 9_999.995;
+
+/** The precision `formatMarketIsk` picks, for a caller that builds the text itself (a signed delta). */
+export function marketIskDecimals(value: number): 0 | 2 {
+  return Math.abs(value) >= MARKET_ISK_CENTS_BELOW ? 0 : 2;
+}
+
+/** Market page ISK: cents below 10,000, whole ISK from there up. */
+export function formatMarketIsk(value: number): string {
+  return formatIsk(value, marketIskDecimals(value));
+}
+
+/**
  * Grouped digits for an editable ISK field at rest — commas, and up to 2
  * decimal places only if the value actually has them (`1,234` vs `1,234.56`,
  * never a padded `1,234.00`). Distinct from `numberMask.ts`'s `maskNumber`,

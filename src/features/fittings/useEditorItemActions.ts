@@ -41,10 +41,10 @@ import {
   type DroneBay,
   type DroneLaunchLimits,
 } from '@/engine/fittings/fittingEdit';
-import type { Fitting, FittingSlotKind, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import type { AddTarget } from './addTarget';
-import { chargeGroupIdsFor, checkCharges } from './dogmaFittingEngine';
+import type { FittingContext } from './fittingContext';
 import {
   chargeSlotDropOnly,
   ringDropFor,
@@ -59,9 +59,11 @@ import type { FittingChange } from './useFittingWorkspace';
 interface EditorItemActionsInput {
   fitting: Fitting | null;
   stats: FittingStats | null;
+  /** The stats for exactly this Fitting; null while a calculation is pending. `stats` lags an edit by one. */
+  currentStats: FittingStats | null;
   edit: (change: FittingChange, coalesceKey?: string) => void;
-  engineReady: boolean;
-  profile: PilotProfile | null;
+  /** Null while the engine, pilot or catalogue loads. */
+  context: FittingContext | null;
   catalogue: FittingCatalogue | null;
   charges: ChargeLoading;
   /** The Add panel's chosen slot — an Add panel item always has room there. */
@@ -104,9 +106,9 @@ const RECENT_PER_RACK = 5;
 export function useEditorItemActions({
   fitting,
   stats,
+  currentStats,
   edit,
-  engineReady,
-  profile,
+  context,
   catalogue,
   charges,
   target,
@@ -142,7 +144,10 @@ export function useEditorItemActions({
         : { capacity: droneCapacity, volumeOf: (typeId) => catalogueVolume(catalogue, typeId) },
     [droneCapacity, catalogue]
   );
-  const launchLimits = useMemo<DroneLaunchLimits | null>(() => launchLimitsFrom(stats), [stats]);
+  const launchLimits = useMemo<DroneLaunchLimits | null>(
+    () => launchLimitsFrom(currentStats),
+    [currentStats]
+  );
 
   /**
    * The charges a not-yet-fitted `typeId` could default to at `rack` — its
@@ -152,20 +157,21 @@ export function useEditorItemActions({
    */
   const defaultCharges = useCallback(
     (shipTypeId: number, rack: FittingSlotKind, typeId: number): number[] => {
-      if (!engineReady || profile === null || catalogue === null) return [];
-      const groupIds = chargeGroupIdsFor(shipTypeId, rack, typeId);
+      if (context === null) return [];
+      const { engine, profile, catalogue } = context;
+      const groupIds = engine.chargeGroupIdsFor(shipTypeId, rack, typeId);
       if (groupIds.length === 0) return [];
       const candidates = [
         ...new Set(groupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? [])),
       ];
-      const accepted = checkCharges(shipTypeId, { slot: rack, typeId }, candidates, profile);
+      const accepted = engine.checkCharges(shipTypeId, { slot: rack, typeId }, candidates, profile);
       return candidates
         .filter((id) => accepted.has(id))
         .sort((a, b) =>
           catalogueTypeName(catalogue, a).localeCompare(catalogueTypeName(catalogue, b))
         );
     },
-    [engineReady, profile, catalogue]
+    [context]
   );
 
   const fitAt = useCallback(
@@ -278,13 +284,13 @@ export function useEditorItemActions({
   const shipTypeId = fitting?.shipTypeId ?? null;
   // Read by "Change charge ▸" only when it opens: a ref, so each edit doesn't rebuild the actions.
   const chargePickerRef = useRef<ChargePickerInput | null>(null);
-  const statModules = stats?.modules ?? null;
+  const statModules = currentStats?.modules ?? null;
   useLayoutEffect(() => {
     chargePickerRef.current =
       fitting === null || catalogue === null
         ? null
-        : { fitting, catalogue, engineReady, profile, moduleResults: statModules };
-  }, [fitting, catalogue, engineReady, profile, statModules]);
+        : { fitting, context, moduleResults: statModules };
+  }, [fitting, catalogue, context, statModules]);
 
   const itemActions = useMemo<FittingItemActions | null>(
     () =>

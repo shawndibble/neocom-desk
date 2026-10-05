@@ -66,6 +66,31 @@ describe('fittingItemCounts', () => {
       7: 100,
     });
   });
+
+  it("counts the Fitting's own implants and boosters, one of each", () => {
+    const counts = fittingItemCounts({
+      ...FITTING,
+      implantSet: { implants: [8, 9], boosters: [10], boosterSideEffects: [2737] },
+    });
+    expect(counts.get(8)).toBe(1);
+    expect(counts.get(9)).toBe(1);
+    expect(counts.get(10)).toBe(1);
+    expect(counts.has(2737)).toBe(false);
+  });
+
+  it('leaves out implants already in the clone, never a booster', () => {
+    // A set seeded from the clone (8, 9) with one implant and a booster added.
+    const seeded: Fitting = { ...FITTING, implantSet: { implants: [8, 9, 11], boosters: [10] } };
+    const counts = fittingItemCounts(seeded, [8, 9, 10]);
+    expect(counts.has(8)).toBe(false);
+    expect(counts.has(9)).toBe(false);
+    expect(counts.get(11)).toBe(1);
+    expect(counts.get(10)).toBe(1);
+  });
+
+  it('never leaves out a module, charge, drone or cargo item that matches a clone implant', () => {
+    expect(fittingItemCounts(FITTING, [1, 5, 6, 7])).toEqual(fittingItemCounts(FITTING));
+  });
 });
 
 describe('fittingToEft', () => {
@@ -153,6 +178,28 @@ describe('fittingToMultibuy', () => {
     expect(lines).toContain('Hobgoblin II\t5');
     expect(lines).toContain('Nanite Repair Paste\t100');
     expect(lines).toHaveLength(8);
+  });
+
+  it("includes the Fitting's own implants and boosters", () => {
+    const names: Record<number, string> = {
+      8: "Zor's Custom Navigation Hyper-Link",
+      9: 'Snake Alpha',
+      10: 'Synth Blue Pill Booster',
+    };
+    const withSet: Fitting = { ...FITTING, implantSet: { implants: [8, 9], boosters: [10] } };
+    const lines = fittingToMultibuy(withSet, (id) => names[id] ?? nameFor(id)).split('\n');
+    expect(lines).toContain("Zor's Custom Navigation Hyper-Link\t1");
+    expect(lines).toContain('Snake Alpha\t1');
+    expect(lines).toContain('Synth Blue Pill Booster\t1');
+    expect(lines).toHaveLength(11);
+  });
+
+  it('leaves out implants the clone already has', () => {
+    const withSet: Fitting = { ...FITTING, implantSet: { implants: [8, 9], boosters: [10] } };
+    const lines = fittingToMultibuy(withSet, nameFor, [8]).split('\n');
+    expect(lines).not.toContain('Type 8\t1');
+    expect(lines).toContain('Type 9\t1');
+    expect(lines).toContain('Type 10\t1');
   });
 
   it('reads back through the Appraisal paste parser', () => {

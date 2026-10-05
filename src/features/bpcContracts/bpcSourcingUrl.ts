@@ -7,6 +7,9 @@
  *
  * The Space filter and visible columns are *not* here: both are persisted
  * local settings already (`bpcSpaceFilterPref.ts`, `bpcSearchColumns.ts`).
+ * `sourcing.src` is here, with a remembered default behind it
+ * (`bpcSourcesPref.ts`) that a bare visit reads instead of
+ * `DEFAULT_SOURCE_TOGGLES`.
  */
 import { tabPath } from '@/lib/pageTabs';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
@@ -25,7 +28,7 @@ export const SOURCE_TOGGLES: readonly SourceToggle[] = [
   'market',
   'owned',
 ];
-/** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
+/** Both on by default (until the pilot picks their own, `bpcSourcesPref.ts`): an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
 export const DEFAULT_SOURCE_TOGGLES: readonly SourceToggle[] = ['contract', 'owned'];
 
 export const BPC_SOURCING_PARAMS = {

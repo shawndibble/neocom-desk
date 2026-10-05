@@ -4,7 +4,7 @@
  * Silent page state, not a Settings control: the chips are on screen whenever
  * they apply, and a second copy under Settings would be a place that could
  * drift from what the row itself shows — the same call `miningTaxStatusFilter`
- * made.
+ * made before the Open/History split retired it.
  *
  * It earns persistence because it *hides mail*, and because that is the whole
  * point of the feature: a pilot who never reads Sent asked to stop seeing it,

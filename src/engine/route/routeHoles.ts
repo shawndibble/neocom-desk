@@ -8,7 +8,6 @@
  * Thera and Turnur): the hole jumps and the hub itself carry no security
  * cost; the entrance and exit systems are charged as any other system.
  */
-import type { JumpGraph } from './jumpRoute';
 import {
   HUB_SYSTEM_IDS,
   shipSizeRank,
@@ -73,25 +72,6 @@ export function holeNetwork(holes: readonly HoleEnds[]): HoleNetwork {
 export type HoleEnds = Pick<TheraConnection, 'exitSystemId' | 'hub'>;
 
 /**
- * A stable name for the network a hole list makes — sorted, each exit/hub
- * pair once. The list itself is rebuilt as life ticks down; a route only
- * needs planning again when this changes.
- */
-export function holeNetworkKey(holes: readonly HoleEnds[]): string {
-  return [...new Set(holes.map((hole) => `${hole.exitSystemId}:${hole.hub}`))].sort().join(',');
-}
-
-/** The network `holeNetworkKey` named, rebuilt from the name alone. */
-export function holeNetworkFromKey(key: string): HoleNetwork {
-  if (key === '') return holeNetwork([]);
-  const ends = key.split(',').flatMap((pair): HoleEnds[] => {
-    const [exit, hub] = pair.split(':');
-    return hub === 'thera' || hub === 'turnur' ? [{ exitSystemId: Number(exit), hub }] : [];
-  });
-  return holeNetwork(ends);
-}
-
-/**
  * The hole a step between two systems crosses, either way round, or `null`
  * for a step no hole joins. Several holes can join the same exit to the same
  * hub; the longest-lived one is the one worth flying.
@@ -109,35 +89,4 @@ export function holeBetween<T extends TheraConnection>(
     if (joins && (best === null || hole.expiresAt > best.expiresAt)) best = hole;
   }
   return best;
-}
-
-/** The hole a step between two systems crosses, or `null` for a stargate jump. */
-export type HoleAt<T extends TheraConnection = TheraConnection> = (
-  from: number,
-  to: number
-) => T | null;
-
-/**
- * One answer to "was this step a hole?" for everything that draws a route: a
- * hole joins the two systems and no stargate does. Where both join them (an
- * exit next door to Turnur) the gate is the jump shown, as Set waypoints
- * reads it too: the pilot can always fly the gate. The search may have
- * priced that step as the free hole, a difference of at most one system's
- * security cost on a pairing EVE-Scout rarely lists.
- */
-export function holeStepFinder<T extends TheraConnection>(
-  graph: JumpGraph,
-  holes: readonly T[]
-): HoleAt<T> {
-  if (holes.length === 0) return () => null;
-  return (from, to) => (graph.get(from)?.includes(to) ? null : holeBetween(holes, from, to));
-}
-
-/** The positions along a route entered through a hole: index `i` is the step from `i - 1`. */
-export function holeStepIndexes(systemIds: readonly number[], holeAt: HoleAt): number[] {
-  const indexes: number[] = [];
-  for (let index = 1; index < systemIds.length; index += 1) {
-    if (holeAt(systemIds[index - 1], systemIds[index])) indexes.push(index);
-  }
-  return indexes;
 }
