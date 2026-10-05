@@ -4,6 +4,7 @@
  * lazily loaded graphs. Raw DPS never moves with the profile; applied does.
  */
 import { lazy, Suspense, useMemo } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
   Select,
@@ -34,7 +35,7 @@ import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
-const AppliedDpsChart = lazy(() => import('./AppliedDpsChart'));
+const AppliedDpsChart = lazy(() => guarded(() => import('./AppliedDpsChart')));
 
 const NO_OVERLAY = 'none';
 

@@ -40,10 +40,16 @@ export function named<K extends string>(
   importer: () => Promise<Record<K, ComponentType>>,
   key: K
 ): () => Promise<RouteModule> {
-  return () =>
-    importer().then((m: Record<K, ComponentType> | undefined) =>
-      m ? { default: m[key] } : new Promise<never>(() => {})
-    );
+  return () => guarded(importer).then((m) => ({ default: m[key] }));
+}
+
+/**
+ * For a raw `lazy(() => import(...))` outside the route table: the same
+ * undefined-module guard `named` has. Without it, `lazy()` reads `.default` off
+ * `undefined` and throws a TypeError into the nearest boundary.
+ */
+export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
+  return importer().then((m) => (m ? m : new Promise<never>(() => {})));
 }
 
 /** A loader that also hands back its component synchronously once loaded. */

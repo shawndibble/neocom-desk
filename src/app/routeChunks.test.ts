@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ComponentType } from 'react';
-import { named, remembered } from './routeChunks';
+import { guarded, named, remembered } from './routeChunks';
 
 const Page: ComponentType = () => null;
 
@@ -20,6 +20,25 @@ describe('named', () => {
     );
     const outcome = await Promise.race([
       load().then(
+        () => 'settled',
+        () => 'settled'
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+    ]);
+    expect(outcome).toBe('pending');
+  });
+});
+
+describe('guarded', () => {
+  it('passes a loaded module through', async () => {
+    await expect(guarded(() => Promise.resolve({ default: Page }))).resolves.toEqual({
+      default: Page,
+    });
+  });
+
+  it('waits instead of resolving when a cancelled chunk failure gives undefined', async () => {
+    const outcome = await Promise.race([
+      guarded(() => Promise.resolve(undefined)).then(
         () => 'settled',
         () => 'settled'
       ),
