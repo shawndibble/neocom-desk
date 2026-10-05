@@ -235,11 +235,11 @@ export function useMarketOrderColumns({
         id: 'minVolume',
         header: t('market.minVolume'),
         align: 'right',
-        // Almost always 1: a column only a very wide screen spends on it,
-        // never a card. The expanded row states it for every buy order.
-        className: 'tabular-nums max-[120rem]:hidden',
-        headerCellClassName: 'max-[120rem]:hidden',
-        render: (o) => <span data-dense-omit="">{formatVolume(o.min_volume)}</span>,
+        // Off by default (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`), then
+        // shown or hidden by the column picker alone, as Expires is.
+        className: 'tabular-nums',
+        stackAffix: { before: t('market.minVolumeAffix') },
+        render: (o) => formatVolume(o.min_volume),
         sortValue: (o) => o.min_volume,
       },
     }),

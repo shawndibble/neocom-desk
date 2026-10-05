@@ -20,7 +20,13 @@ describe('orderBookWidthsRem', () => {
     expect(widths.roomy).toBe(widths.cards);
   });
 
-  it('does not budget Min. Volume, which only renders on a screen far wider than any budget', () => {
-    expect(orderBookWidthsRem(['price', 'minVolume'])).toEqual(orderBookWidthsRem(['price']));
+  it('budgets Min. Volume once a pilot ticks it', () => {
+    expect(orderBookWidthsRem(['price', 'minVolume']).cards).toBe(
+      orderBookWidthsRem(['price']).cards + 8
+    );
+  });
+
+  it('leaves Min. Volume off by default', () => {
+    expect(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS).not.toContain('minVolume');
   });
 });

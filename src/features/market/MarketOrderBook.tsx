@@ -299,18 +299,16 @@ export function OrderSideCard({
           </span>
         </div>
         <span className="flex items-center gap-1">
-          {/* A two-line card has no columns to pick. */}
-          {!cards && (
-            <ColumnPickerMenu
-              available={availableColumns}
-              visible={visibleColumns}
-              columnsById={columnsById}
-              onToggle={onToggleColumn}
-              buttonLabel={t('market.columnsButton')}
-              menuTitle={t('market.columnsMenuTitle')}
-              size="sm"
-            />
-          )}
+          {/* As a card, the same picks choose what the card carries. */}
+          <ColumnPickerMenu
+            available={availableColumns}
+            visible={visibleColumns}
+            columnsById={columnsById}
+            onToggle={onToggleColumn}
+            buttonLabel={t('market.columnsButton')}
+            menuTitle={t('market.columnsMenuTitle')}
+            size="sm"
+          />
           <TableActionsMenu name={name} tableExport={tableExport} />
         </span>
       </div>

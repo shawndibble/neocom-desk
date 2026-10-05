@@ -10,8 +10,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
  * In table column order. Sell only ever renders the `baseColumns` prefix
  * (`price` through `expiry`); Buy adds `range` and `minVolume` after `expiry`.
  * Neither table can lose its columns entirely — there is no identity column
- * here to hold back, but every id defaults visible below, so a picker fresh
- * off this release changes nothing until a pilot actually opens it.
+ * here to hold back. Every id but `minVolume` defaults visible below.
  */
 export const MARKET_ORDER_COLUMN_IDS = [
   'price',
@@ -37,9 +36,13 @@ export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
 ];
 export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
 
-/** Every column shown today, so shipping the picker changes nothing on its own. */
+/**
+ * Every column but Min. Volume, which is almost always 1 (the expanded row
+ * states it for every buy order) and would cost the book 8rem of width
+ * before its rows become cards. A pilot who wants it ticks it.
+ */
 export const DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS: readonly MarketOrderColumnId[] =
-  MARKET_ORDER_COLUMN_IDS;
+  MARKET_ORDER_COLUMN_IDS.filter((id) => id !== 'minVolume');
 
 function isMarketOrderColumnId(raw: unknown): raw is MarketOrderColumnId {
   return typeof raw === 'string' && (MARKET_ORDER_COLUMN_IDS as readonly string[]).includes(raw);
@@ -70,8 +73,6 @@ export const ORDER_BOOK_LOCATION_REM = { roomy: 16, squeezed: 9 } as const;
  * What each column needs in a table row, in rem, measured in Chrome: mostly
  * the header (its `px-3` and sort icon) rather than the value, except Price,
  * sized for a twelve-digit ISK figure. Location is `ORDER_BOOK_LOCATION_REM`.
- * Min. Volume is not budgeted: it only renders from a 120rem viewport
- * (`useMarketOrderColumns`), where the book is far wider than any total here.
  */
 const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, number> = {
   price: 6.5,
@@ -80,7 +81,7 @@ const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, nu
   security: 6.25,
   expiry: 5.75,
   range: 5.25,
-  minVolume: 0,
+  minVolume: 8,
 };
 
 /** The row's expand toggle (`expandableRow`), plus the card's border. */

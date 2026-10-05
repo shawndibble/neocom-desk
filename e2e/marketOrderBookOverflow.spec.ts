@@ -3,7 +3,7 @@
  * horizontally (#2093): both `DataTable` call sites in `Market.tsx` were
  * missing the `overflow-x-auto` wrapper some other `DataTable` callers use
  * (`MaterialsTable.tsx`, `Characters.tsx`) — with the default all-columns
- * column set (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`, all 8 ids) and a long
+ * column set (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`) and a long
  * station name, the bare `<table>` forced `<html>` itself to scroll sideways
  * instead of just the table.
  *
