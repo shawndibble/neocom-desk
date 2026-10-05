@@ -28,6 +28,16 @@ interface EntityLinkProps extends AnchorProps {
   className?: string;
 }
 
+function isPlainPrimaryClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  const target = event.currentTarget.target;
+  return (
+    !event.defaultPrevented &&
+    event.button === 0 &&
+    (!target || target === '_self') &&
+    !(event.metaKey || event.altKey || event.ctrlKey || event.shiftKey)
+  );
+}
+
 const InfoLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { entity: EntityInfoTarget }>(
   function InfoLink({ entity, className, children, ...rest }, ref) {
     const location = useLocation();
@@ -82,7 +92,9 @@ export const SkillLink = forwardRef<
       entity={{ kind: 'skill', id: typeId }}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        stage(typeId, planEntries);
+        // Only the click react-router handles in-app opens the modal here; a
+        // Ctrl/middle click opens a new tab and must not leave entries staged.
+        if (isPlainPrimaryClick(event)) stage(typeId, planEntries);
       }}
     />
   );

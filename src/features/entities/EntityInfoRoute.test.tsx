@@ -160,4 +160,44 @@ describe('EntityInfoRoute', () => {
       expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3315, planEntries })
     );
   });
+  it('a Ctrl+click does not stage plan entries, and an open then close leaves none staged', async () => {
+    const planEntries = [{ skillTypeID: 3300, targetLevel: 3 }];
+    render(
+      <MemoryRouter initialEntries={['/skills']}>
+        <EntityInfoRoute />
+        <SkillLink typeId={3315} planEntries={planEntries}>
+          Surgical Strike
+        </SkillLink>
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: 'Surgical Strike' });
+    fireEvent.click(link, { ctrlKey: true });
+    expect(useSkillDetailModalStore.getState().staged).toBeNull();
+
+    fireEvent.click(link);
+    await waitFor(() => expect(useSkillDetailModalStore.getState().request).not.toBeNull());
+    expect(useSkillDetailModalStore.getState().staged).toBeNull();
+    act(() => useSkillDetailModalStore.getState().close());
+    await waitFor(() => expect(useSkillDetailModalStore.getState().request).toBeNull());
+    expect(useSkillDetailModalStore.getState().staged).toBeNull();
+  });
+
+  it('strips info when the page changes under it', async () => {
+    renderAt('/contacts?tab=a&info=character-1');
+    await screen.findByRole('dialog');
+    act(() => void probe.navigate('/mail?tab=a&info=character-1'));
+    await waitFor(() => expect(probe.search).toBe('?tab=a'));
+    expect(probe.pathname).toBe('/mail');
+  });
+
+  it('returns focus to the link that opened the modal', async () => {
+    renderAt('/contacts');
+    const link = screen.getByRole('link', { name: 'Pilot One' });
+    link.focus();
+    fireEvent.click(link);
+    await screen.findByRole('dialog');
+    usePublicInfoModalStore.getState().close();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(link).toHaveFocus();
+  });
 });

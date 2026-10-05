@@ -62,6 +62,18 @@ export function EntityInfoRoute() {
     [navigate]
   );
 
+  // A tab switch keeps the search, so `info` would outlive the page the modal
+  // was opened on (the modals close on a page change): strip it.
+  const shownPathname = useRef(location.pathname);
+  useEffect(() => {
+    if (shownPathname.current === location.pathname) return;
+    shownPathname.current = location.pathname;
+    if (parseEntityInfo(location.search) === null) return;
+    navigate(`${location.pathname}${withoutEntityInfo(location.search)}${location.hash}`, {
+      replace: true,
+    });
+  }, [location.pathname, location.search, location.hash, navigate]);
+
   const info = parseEntityInfo(location.search);
   const kind = info?.kind ?? null;
   const id = info?.id ?? null;
@@ -75,6 +87,8 @@ export function EntityInfoRoute() {
       publicInfo.clear();
       const staged = skill.staged?.typeID === id ? skill.staged.planEntries : undefined;
       skill.show({ typeID: id, planEntries: staged });
+      // Consumed: a later open must not inherit them.
+      skill.stage(id, undefined);
     } else {
       skill.clear();
       publicInfo.show({ kind, id });
