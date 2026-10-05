@@ -31,6 +31,8 @@ import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
+import { PiMapTab } from '@/features/pi/map/PiMapTab';
+import { cx } from '@/lib/cx';
 import { builtAdvice } from '@/features/pi/advisorModel';
 import { colonyHoursToFull } from '@/features/pi/colonyThroughput';
 import { colonyFillTimeDisplay, span as fillTimeSpan } from '@/features/pi/colonyStripModel';
@@ -1257,7 +1259,7 @@ export function PlanetaryIndustry() {
   const hasAnyColoniesSurface = sortedPlanets.length > 0 || hasOtherCharacters;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
       <PageHeader
         title={t('pi.title')}
         meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
@@ -1289,11 +1291,11 @@ export function PlanetaryIndustry() {
 
       <PiHeaderStrip
         colonySystemIds={planets.map((planet) => planet.solar_system_id)}
-        estimate={tab === 'plan'}
+        estimate={tab === 'plan' || tab === 'map'}
       />
 
       {tab === 'map' ? (
-        <EmptyState title={t('piPlan.mapEmptyTitle')} hint={t('piPlan.mapEmptyHint')} />
+        <PiMapTab characterId={activeCharacterId} />
       ) : tab === 'plan' ? (
         <GoalPlannerPanel
           characterId={activeCharacterId}

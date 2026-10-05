@@ -4588,13 +4588,206 @@
       "summaryNext": "next {{duration}}"
     }
   },
+  "piMap": {
+    "title": "Planet map",
+    "helpButton": "How to use the map",
+    "hint": "Click a planet type to filter, or a product to trace it.",
+    "hintDismiss": "Got it",
+    "boardLabel": "Planet map: planet types, then raw, processed, refined, specialized and advanced products",
+    "planetsTitle": "Planets",
+    "planetsSub": "Tick yours",
+    "planetsInfo": "A colony sits on one planet, and each planet type has its own raw resources. Ticked means you have one (read from your colonies). Click a type you have to hide or show it; click one you don't have to see what it would unlock and where to find one.",
+    "infoLabel": "What is {{name}}?",
+    "tier": {
+      "0": {
+        "name": "Raw",
+        "sub": "Pulled from the planet",
+        "info": "Raw resources come out of the ground through extractors. Extractors run for a time you choose and must be restarted when they stop. Other tools call these P0."
+      },
+      "1": {
+        "name": "Processed",
+        "sub": "Made from 1 raw",
+        "info": "A basic factory turns one raw resource into a processed product. Other tools call these P1."
+      },
+      "2": {
+        "name": "Refined",
+        "sub": "Made from 2 processed",
+        "info": "An advanced factory combines processed products. If one planet type yields both raws, it is a one-planet setup with no hauling between planets. Other tools call these P2."
+      },
+      "3": {
+        "name": "Specialized",
+        "sub": "Made from 2–3 refined",
+        "info": "Specialized products are made from refined ones and usually need goods from several planets. Other tools call these P3."
+      },
+      "4": {
+        "name": "Advanced",
+        "sub": "Top tier, Barren/Temperate only",
+        "info": "Advanced products need a High-Tech Production Plant, which fits only on Barren or Temperate planets, and long chains over many planets. Other tools call these P4."
+      }
+    },
+    "tierWithCode": "{{name}} (P{{tier}})",
+    "tierCount": "{{shown}} of {{total}} shown",
+    "picksLabel": "Your picks",
+    "picksTitle": "Your picks",
+    "picksRecipes": "Best one-planet recipes",
+    "picksNone": "Your planets already make their best product. The Plan tab lists quick wins.",
+    "picksNoteRebuild": "vs today · same as the Plan tab",
+    "picksNoteRecipes": "a day from one planet · same as the Plan tab",
+    "perDaySuffix": "/day",
+    "clearTrace": "Clear trace",
+    "whatIfBlank": "What if I add a ___ planet?",
+    "whatIfNoColonies": "No colonies yet, so every planet type is ticked. Untick the types you can't reach.",
+    "whatIfHint": "Hover or focus a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark. Click it to see where to find one.",
+    "whatIfAll": "You have every planet type.",
+    "whatIfTitle": "What if I add a {{type}} planet?",
+    "whatIfNothing": "Nothing new: every raw it yields already comes from your planets.",
+    "whatIfUnlocks_one": "Unlocks {{count}} product on the map.",
+    "whatIfUnlocks_other": "Unlocks {{count}} products on the map.",
+    "whatIfBest": "Best one-planet recipe: {{name}}.",
+    "planetHave_one": "{{name}} planet. You have a colony on it: {{names}}. Toggle it to show or hide it on the map.",
+    "planetHave_other": "{{name}} planet. You have {{count}} colonies on it: {{names}}. Toggle it to show or hide it on the map.",
+    "planetHaveShort": "{{name}} planet, one of yours. Toggle it to show or hide it on the map.",
+    "planetMissing": "{{name}} planet, you don't have one. Opens what adding one would unlock and where to find it.",
+    "planetTipOn": "{{name}}: shown on the map. Click to hide.",
+    "planetTipOff": "{{name}}: hidden. Click to show.",
+    "planetTipMissing": "{{name}}: you don't have one. Click to see what it would unlock.",
+    "tagHave": "have",
+    "tagNeed": "need",
+    "tagWhatIf": "what if",
+    "rawYields": "Raw resource, found on {{types}} planets",
+    "pickMark": "Your pick number {{rank}}",
+    "unlockedMark": "Unlocked by adding a {{type}} planet",
+    "tracedMark": "Traced",
+    "announceTrace": "Tracing {{name}}. Needs {{planets}}. The chain is written out in the details.",
+    "figure": "About {{isk}} ISK a day from one {{type}} planet",
+    "cmp": {
+      "better": "Better than {{name}}, the simplest product on {{type}} planets",
+      "same": "About the same as {{name}}, the simplest product on {{type}} planets",
+      "worse": "Worse than {{name}}, the simplest product on {{type}} planets",
+      "reference": "The simplest product on {{type}} planets",
+      "none": "No simpler product to compare with"
+    },
+    "unranked": {
+      "raw": "A raw resource: sold as is, or refined on the way up",
+      "tier": "Needs goods from several planets, so there is no per-planet figure",
+      "unpriced": "The market has no price for it, so there is no figure",
+      "not-one-planet": "No single planet type makes it, so there is no per-planet figure"
+    },
+    "estimateNote": "An estimate: ISK a day for one planet, after customs and sales tax, at your sell market. The same figures as the Plan tab.",
+    "detail": {
+      "panelTitle": "How to make it",
+      "panelTitleEmpty": "Details",
+      "empty": "Click a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
+      "perPlanet": "ISK/day per {{type}} planet",
+      "needHeading": "You need",
+      "needOne_one": "One planet is enough: {{types}}.",
+      "needOne_other": "One planet is enough, any of {{types}}.",
+      "needMany_one": "{{count}} planet: {{types}}.",
+      "needMany_other": "{{count}} planets: {{types}}.",
+      "youHave": "You have {{types}}.",
+      "youHaveNone": "You have none of these.",
+      "chainHeading": "How it is made",
+      "chainLabel": "Steps to make {{name}}, by planet",
+      "have": "you have one{{colonies}}",
+      "findOne": "find one",
+      "shipTo": "Bring the goods to one factory planet, then make:",
+      "samePlanet": "On the same planet, then make:",
+      "chainText": "In words: {{planets}} → {{steps}}.",
+      "pickRebuild": "This is your #{{rank}} pick in Plan.",
+      "pickRecipe": "This is one of the best one-planet recipes in Plan (#{{rank}})."
+    },
+    "add": {
+      "panelTitle": "Where to put a new colony",
+      "title": "Add a {{type}} planet",
+      "unlocks_one": "Unlocks {{count}} product (pink on the map)",
+      "unlocks_other": "Unlocks {{count}} products (pink on the map)",
+      "asOnePlanet_one": "{{count}} as a one-planet recipe",
+      "asOnePlanet_other": "{{count}} as one-planet recipes",
+      "bestRecipe": "Best one-planet recipe:",
+      "perDaySuffix": " ISK a day",
+      "nothingAlone": "Nothing new to build alone on it: the raws it yields already come from your planets.",
+      "slotsHeading": "Planet slots",
+      "close": "Close"
+    },
+    "slots": {
+      "unknown": "Your Interplanetary Consolidation skill hasn't loaded, so how many planets you can run is unknown. The game allows up to 6.",
+      "room_one": "You're using {{used}} of {{allowed}} planets: room for {{count}} more.",
+      "room_other": "You're using {{used}} of {{allowed}} planets: room for {{count}} more.",
+      "trainOrReplace": "You're using {{used}} of {{allowed}} planets: train Interplanetary Consolidation or replace one.",
+      "replace": "You're using {{used}} of {{allowed}} planets, the most there are: replace one.",
+      "weakest": "Your weakest colony today is {{name}}, at about"
+    },
+    "finder": {
+      "title": "Find {{types}} planet near {{home}}",
+      "or": "or",
+      "homeFallback": "home",
+      "noHome": "Nearby planets are measured from where your colonies are. With no colony yet there is no starting point.",
+      "highsecOnly": "Highsec only",
+      "loading": "Looking for nearby systems…",
+      "failed": "The map data didn't load. Try again later.",
+      "none": "No system within {{jumps}} jumps has one.",
+      "noneHighsec": "No highsec system within {{jumps}} jumps has one. Untick \"Highsec only\" to look further.",
+      "here": "here",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "system": "System {{id}}",
+      "band": {
+        "highsec": "Highsec",
+        "lowsec": "Lowsec",
+        "nullsec": "Nullsec"
+      }
+    },
+    "phone": {
+      "tierSwitcher": "Product tier",
+      "tierHeading": "{{name}} (P{{tier}}) · {{sub}}",
+      "hidden_one": "{{count}} more needs a planet type that is hidden.",
+      "hidden_other": "{{count}} more need planet types that are hidden.",
+      "newSr": "unlocked by the planet you are trying",
+      "showFull": "Show full map",
+      "hideFull": "Hide full map"
+    },
+    "help": {
+      "title": "How to use the map",
+      "stepsHeading": "Steps",
+      "steps": {
+        "tick": {
+          "title": "Tick your planets.",
+          "body": "The planet column starts with your colonies' types. Click a type to hide or show it; what the ticked planets can't make leaves an empty slot."
+        },
+        "read": {
+          "title": "Read each product.",
+          "body": "The number is ISK a day for one planet; the symbol compares it with the simplest product you could sell from that planet."
+        },
+        "trace": {
+          "title": "Click a product",
+          "body": "to light its chain back to the planets it needs, with the steps in words and nearby planets to find."
+        },
+        "try": {
+          "title": "Try a planet.",
+          "body": "Hover or focus a planet type you don't have: pink and a + mark show what it would unlock. Click it to see where to find one."
+        }
+      },
+      "legendHeading": "Legend",
+      "legend": {
+        "better": "Better than selling the simplest product from that planet",
+        "same": "About the same, or it is the simplest product",
+        "worse": "Worse: you earn less than just selling the simpler product",
+        "pick": "#1 to #3: the Plan tab's picks for your planets",
+        "chain": "The chain of the traced product",
+        "whatIf": "Unlocked by a planet type you don't have (the + mark)",
+        "ghost": "Empty slot: your ticked planets can't make it"
+      },
+      "numbers": "Numbers are ISK a day for one planet, after customs and sales tax, at your sell market. Only products one planet can make have one: specialized and advanced products need several planets.",
+      "learnHeading": "New to PI?",
+      "eveUniPi": "EVE University: Planetary Industry",
+      "eveUniCommodities": "EVE University: PI commodities"
+    }
+  },
   "piPlan": {
     "tabsLabel": "Planetary Industry views",
     "coloniesTab": "Colonies",
     "planTab": "Plan",
     "mapTab": "Map",
-    "mapEmptyTitle": "The PI map is coming",
-    "mapEmptyHint": "A map of planet types against product tiers is on its way. Plan already ranks what to make.",
     "advisorSection": "Advisor",
     "strip": {
       "home": "Home",
