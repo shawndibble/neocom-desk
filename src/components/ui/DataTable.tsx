@@ -590,14 +590,17 @@ function DataTableRowImpl<T>({
       aria-current={selected ? 'true' : undefined}
       className={cx(
         'hover:bg-panel-2',
-        clickable && 'active:bg-panel',
+        // A selected row keeps its `panel-2` fill while pressed.
+        clickable && !selected && 'active:bg-panel',
         interactiveClassName,
         member && 'dt-group-member',
         clickable && 'cursor-pointer',
         focusable &&
           'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         highlighted && 'row-pulse',
-        selected && selectedRowClassName,
+        // The 2px edge is on every row (transparent when not selected), so
+        // selecting never shifts a cell, in the table or the phone card.
+        selected ? selectedRowClassName : 'border-l-2 border-l-transparent',
         rowClassName?.(row)
       )}
       tabIndex={focusable ? 0 : undefined}
