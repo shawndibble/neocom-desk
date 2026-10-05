@@ -36,7 +36,7 @@ function eachCell(value: number | null): string {
 /** A line total as scannable shorthand, exact value one gesture away. */
 function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
-  return <IskAmount value={value} revealOn="tap" decimals={0} />;
+  return <IskAmount value={value} decimals={0} />;
 }
 
 export type AppraisalShareState =

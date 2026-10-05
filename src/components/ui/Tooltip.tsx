@@ -14,12 +14,8 @@ import {
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
-import { TooltipHoldContext } from './tooltipHold';
+import { HOLD_MS, HOLD_SLOP_PX, TooltipHoldContext } from './tooltipHold';
 
-/** Matches Material UI's `enterTouchDelay` — long enough to not fire on an incidental brush, short enough to feel responsive. */
-const TOUCH_LONG_PRESS_MS = 500;
-/** Finger roll during a tap: iOS fires `touchmove` for sub-pixel drift, so only real dragging should cancel. */
-const TOUCH_MOVE_TOLERANCE_PX = 10;
 /** Generous bound on a device's touchend→click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
 const TOUCH_CLICK_ECHO_MS = 700;
 
@@ -73,19 +69,6 @@ interface TooltipProps {
    * action, and touch-and-hold stays the way to read the tooltip.
    */
   openOnTap?: boolean;
-  /**
-   * Off for a trigger whose touch-and-hold belongs to something else — a
-   * context menu, which Radix opens on a long-press: both would open at once.
-   * Touch then has no way to the bubble, so what it says must be reachable
-   * another way (the menu itself, a label). Hover and focus still show it.
-   *
-   * Unset, it follows `TooltipHoldContext`: off inside a row menu
-   * (`RowActionsMenu`), on everywhere else. Set true inside a row menu for a
-   * trigger whose bubble touch has no other way to (`IskAmount`'s exact
-   * figure): the trigger then keeps its touch-and-hold, and the row's menu
-   * never starts from it — a right-click still opens the menu.
-   */
-  holdToReveal?: boolean;
   /** Extra classes merged onto the trigger element, e.g. `w-full` so a full-width trigger stays full-width. */
   className?: string;
 }
@@ -112,20 +95,9 @@ interface TooltipProps {
  * something dismisses it: a tap outside, a scroll, Escape, or another tap on
  * an `openOnTap` trigger.
  */
-export function Tooltip({
-  content,
-  children,
-  openOnTap = false,
-  holdToReveal: holdProp,
-  className = '',
-}: TooltipProps) {
-  // Off by default inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
-  const holdDefault = useContext(TooltipHoldContext);
-  const holdToReveal = holdProp ?? holdDefault;
-  // Asked for inside a row menu: this trigger's touch-and-hold is its own, not the menu's.
-  const claimsHold = holdProp === true && !holdDefault;
-  /** The last press was a finger (or pen), so a `contextmenu` now is its long-press, not a right-click. */
-  const pressedByTouch = useRef(false);
+export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
+  // Off inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
+  const holdOpens = useContext(TooltipHoldContext);
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
@@ -164,18 +136,7 @@ export function Tooltip({
   }
 
   function handlePointerDown(event: PointerEvent) {
-    pressedByTouch.current = event.pointerType !== 'mouse';
-    if (!pressedByTouch.current) return;
-    captureOpenState();
-    // The row menu's own long-press timer starts on this pointerdown, on the row.
-    if (claimsHold) event.stopPropagation();
-  }
-
-  /** A touch long-press's own `contextmenu` (Android fires one) stays here; a right-click reaches the row menu. */
-  function handleContextMenu(event: MouseEvent) {
-    if (!claimsHold || !pressedByTouch.current) return;
-    event.stopPropagation();
-    event.preventDefault();
+    if (event.pointerType !== 'mouse') captureOpenState();
   }
 
   function handleTouchStart(event: TouchEvent) {
@@ -184,8 +145,8 @@ export function Tooltip({
     touchDragged.current = event.touches.length > 1;
     const touch = event.touches.length === 1 ? event.touches[0] : undefined;
     touchOrigin.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    if (!openOnTap && holdToReveal && !touchDragged.current) {
-      longPressTimer.current = setTimeout(() => setTouchOpen(true), TOUCH_LONG_PRESS_MS);
+    if (!openOnTap && holdOpens && !touchDragged.current) {
+      longPressTimer.current = setTimeout(() => setTouchOpen(true), HOLD_MS);
     }
   }
 
@@ -197,8 +158,8 @@ export function Tooltip({
       event.touches.length > 1 ||
       (!!touch &&
         !!origin &&
-        (Math.abs(touch.clientX - origin.x) > TOUCH_MOVE_TOLERANCE_PX ||
-          Math.abs(touch.clientY - origin.y) > TOUCH_MOVE_TOLERANCE_PX));
+        (Math.abs(touch.clientX - origin.x) > HOLD_SLOP_PX ||
+          Math.abs(touch.clientY - origin.y) > HOLD_SLOP_PX));
     if (dragged) {
       touchDragged.current = true;
       cancelLongPress();
@@ -288,7 +249,6 @@ export function Tooltip({
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchCancel}
           onClick={suppressEchoedClose}
-          onContextMenu={handleContextMenu}
           // A tap opens this bubble, so a clickable table row must leave the
           // tap to it rather than open the row too (see DataTable).
           data-row-control={openOnTap ? '' : undefined}
@@ -315,14 +275,13 @@ interface InfoTooltipProps {
   /** One-line plain-language tooltip content; a node only to bold a caveat (see `Tooltip`). */
   content: ReactNode;
   /**
-   * Makes the trigger do something as well as explain: the tooltip stays the
-   * one-line answer on hover/focus, the click opens the longer one. Say so in
-   * `content` when this is set — a control that acts on click has to look
-   * like one. On touch it also takes the tap back, leaving touch-and-hold as
-   * the way to read the tooltip.
+   * @deprecated Tooltip-only now (DESIGN.md §6c): a trigger that acts on click
+   * is an `IconButton` with its own tooltip. Kept only until `ResultsSummary`
+   * migrates (package B, #2659); delete once nothing passes it.
+   * TODO(#2659): remove `onClick` and `aria-haspopup` with that migration.
    */
   onClick?: () => void;
-  /** Set when the click opens a dialog, so the trigger announces what it opens. */
+  /** @deprecated See `onClick`. */
   'aria-haspopup'?: 'dialog';
   /** `accent` tints the trigger like the value it annotates; default is the dim glyph. */
   tone?: 'dim' | 'accent';

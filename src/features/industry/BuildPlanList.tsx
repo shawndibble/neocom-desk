@@ -37,6 +37,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { gripHitAreaClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -234,7 +235,7 @@ function ProfitCell({ profit }: { profit: number | null }) {
       {profit > 0 ? '+' : ''}
       {/* Tap: this cell is inert — the row's tap belongs to the plan-name
           button and its context menu beside it. */}
-      <IskAmount value={profit} revealOn="tap" decimals={0} />
+      <IskAmount value={profit} decimals={0} />
     </span>
   );
 }
@@ -444,7 +445,7 @@ function PlanRow({
           aria-hidden="true"
           {...listeners}
           title={t('industry.dragToGroup')}
-          className="inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7"
+          className={`inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7 ${gripHitAreaClassName}`}
         >
           <Icon.DragHandle />
         </button>
@@ -500,11 +501,7 @@ function PlanRow({
         <ProfitCell profit={stats?.profit ?? null} />
       </span>
       <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
-        {stats?.iskPerHour == null ? (
-          '—'
-        ) : (
-          <IskAmount value={stats.iskPerHour} revealOn="tap" decimals={0} />
-        )}
+        {stats?.iskPerHour == null ? '—' : <IskAmount value={stats.iskPerHour} decimals={0} />}
       </span>
       <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
         {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}

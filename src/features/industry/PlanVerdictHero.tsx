@@ -232,7 +232,7 @@ export function PlanVerdictHero({
                   // `formatIsk` — their amounts are i18next interpolation
                   // values, which take a string, not a node.
                   <>
-                    <IskAmount value={profit} revealOn="tap" decimals={0} /> ISK
+                    <IskAmount value={profit} decimals={0} /> ISK
                   </>
                 )}
               </p>

@@ -2,6 +2,7 @@ import { Popover as PopoverPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
+import { RowTappableContext } from './tooltipHold';
 import { menuContentClassName } from './menuStyles';
 
 /**
@@ -26,11 +27,13 @@ export function PopoverContent({
   const container = usePortalContainer();
   return (
     <PopoverPrimitive.Portal container={container}>
-      <PopoverPrimitive.Content
-        sideOffset={sideOffset}
-        className={cx(menuContentClassName, className)}
-        {...props}
-      />
+      <RowTappableContext.Provider value={false}>
+        <PopoverPrimitive.Content
+          sideOffset={sideOffset}
+          className={cx(menuContentClassName, className)}
+          {...props}
+        />
+      </RowTappableContext.Provider>
     </PopoverPrimitive.Portal>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { SelectionState } from './assetSelection';
 import { Checkbox } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 
 interface SelectionCheckboxProps {
   state: SelectionState;
@@ -23,14 +24,17 @@ export function SelectionCheckbox({
   }, [state]);
 
   return (
-    <Checkbox
-      ref={ref}
-      checked={state === 'checked'}
-      disabled={disabled}
-      onChange={onToggle}
-      onClick={(e) => e.stopPropagation()}
-      aria-label={label}
-      className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    />
+    // The label is the 44px touch target on a coarse pointer (it grows its cell, never overlays a neighbour).
+    <label className={touchCheckboxLabelClassName}>
+      <Checkbox
+        ref={ref}
+        checked={state === 'checked'}
+        disabled={disabled}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={label}
+        className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      />
+    </label>
   );
 }

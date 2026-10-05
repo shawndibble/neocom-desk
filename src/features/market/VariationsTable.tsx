@@ -66,8 +66,7 @@ function priceCell(
 ): ReactNode {
   if (summary === undefined) return t('common.loading');
   const own = side === 'sell' ? summary.bestSell : summary.bestBuy;
-  if (own !== null)
-    return <IskAmount value={own} revealOn="longPress" decimals={marketIskDecimals(own)} />;
+  if (own !== null) return <IskAmount value={own} decimals={marketIskDecimals(own)} />;
   const other = side === 'sell' ? summary.bestBuy : summary.bestSell;
   if (other !== null) return t(side === 'sell' ? 'market.emptySellTitle' : 'market.emptyBuyTitle');
   return t('market.variations.noOrders');

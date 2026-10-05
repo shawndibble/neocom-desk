@@ -1,7 +1,14 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { iconButtonClassName } from './iconButtonClassName';
+import { menuItemClassName } from './menuStyles';
 import {
+  controlHeightClassName,
+  gripHitAreaClassName,
+  tappableRowClassName,
+  resizeHandleTouchClassName,
+  touchCheckboxLabelClassName,
   disabledClassName,
   focusRingClassName,
   focusRingInsetClassName,
@@ -90,5 +97,63 @@ describe('primitives compose the shared recipe', () => {
     expect(readFileSync('src/components/ui/buttonClassName.ts', 'utf8')).not.toContain(
       'pointer-events-none'
     );
+  });
+});
+
+describe('touch tier', () => {
+  it('keeps the touch height on a coarse pointer above md, and the pointer height otherwise', () => {
+    expect(controlHeightClassName.sm).toBe('h-9 md:h-7 touch:h-9');
+    expect(controlHeightClassName.md).toBe('h-11 md:h-9 touch:h-11');
+    expect(tappableRowClassName).toBe('min-h-11 md:min-h-7 touch:min-h-11');
+  });
+
+  it('puts `touch:` after `md:` in every sized class, so it wins above md', () => {
+    for (const size of ['md', 'sm', 'row'] as const) {
+      const classes = iconButtonClassName({ size }).split(' ');
+      const md = classes.findIndex((c) => c.startsWith('md:size-'));
+      const touch = classes.findIndex((c) => c.startsWith('touch:size-'));
+      expect(md).toBeGreaterThan(-1);
+      expect(touch).toBeGreaterThan(md);
+    }
+    expect(iconButtonClassName({ size: 'md' })).toContain('touch:size-11');
+    expect(iconButtonClassName({ size: 'row' })).toContain('touch:size-11');
+    expect(iconButtonClassName({ size: 'sm' })).toContain('touch:size-9');
+  });
+
+  it('gives menu items a 44px target on touch', () => {
+    expect(menuItemClassName).toContain('touch:min-h-11');
+  });
+
+  it('gives a bare checkbox its 44px target through its label, never a pseudo-element', () => {
+    expect(touchCheckboxLabelClassName).toContain('touch:size-11');
+    for (const file of ['Checkbox', 'Radio']) {
+      expect(readFileSync(`src/components/ui/${file}.tsx`, 'utf8')).not.toMatch(/before:/);
+    }
+  });
+
+  it('grows a grip hit area along the vertical axis only, so it cannot cover a neighbour', () => {
+    expect(gripHitAreaClassName).toContain('touch:before:inset-x-0');
+    expect(gripHitAreaClassName).toContain('touch:before:h-11');
+    expect(gripHitAreaClassName).not.toMatch(/before:(size|w|-inset-x|-left|-right)/);
+  });
+
+  it('makes the resize separator itself 44px tall on touch, with its hairline centred', () => {
+    expect(resizeHandleTouchClassName).toContain('touch:h-11');
+    expect(resizeHandleTouchClassName).toContain('touch:after:top-1/2');
+    expect(resizeHandleTouchClassName).not.toContain('before:');
+  });
+
+  it('declares the touch variant against a coarse pointer', () => {
+    const css = readFileSync('src/styles/index.css', 'utf8');
+    expect(css).toContain('@custom-variant touch (@media (pointer: coarse));');
+  });
+
+  it('has no long-press tooltip override left in app source', () => {
+    const offenders = ['src']
+      .flatMap((dir) => sourceFiles(dir))
+      .filter((file) =>
+        /holdToReveal|revealOn="longPress"|'longPress'/.test(readFileSync(file, 'utf8'))
+      );
+    expect(offenders).toEqual([]);
   });
 });

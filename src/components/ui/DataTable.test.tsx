@@ -19,6 +19,7 @@ import {
   ContextMenuTrigger,
 } from './ContextMenu';
 import { Tooltip } from './Tooltip';
+import { IskAmount } from './IskAmount';
 
 interface Row {
   id: number;
@@ -1637,5 +1638,63 @@ describe('DataTable row memoization', () => {
 
     expect([...rendered].sort()).toEqual([1, 2]);
     expect(document.querySelector('[data-row-key="2"]')?.getAttribute('aria-current')).toBe('true');
+  });
+});
+
+describe('DataTable tappable-row scope for IskAmount', () => {
+  const iskColumns: DataTableColumn<Row>[] = [
+    { id: 'item', header: 'Item', render: (row) => row.item },
+    { id: 'amount', header: 'Amount', render: (row) => <IskAmount value={row.amount * 1e6} /> },
+  ];
+  const exactOf = (row: Row) => `${(row.amount * 1e6).toLocaleString('en-US')}.00 ISK`;
+  function tapFigure(row: Row) {
+    const figure = screen.getByText(exactOf(row), { selector: '.sr-only' }).parentElement!;
+    fireEvent.touchStart(figure, { touches: [{ clientX: 0, clientY: 0 }] });
+    fireEvent.touchEnd(figure, { touches: [] });
+    return figure;
+  }
+
+  it('leaves the tap to a row with onRowClick', () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={iskColumns}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        onRowClick={() => {}}
+      />
+    );
+    tapFigure(rows[0]);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('still tap-reveals in an expand-only row, whose detail may not show the figure', async () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={iskColumns}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        expandableRow={{ renderDetail: () => <p>Detail</p> }}
+      />
+    );
+    tapFigure(rows[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('ISK');
+  });
+
+  it('still tap-reveals in expansion content, even when the row itself is clickable', async () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={[{ id: 'item', header: 'Item', render: (row) => row.item }]}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        onRowClick={() => {}}
+        expandableRow={{ renderDetail: (row) => <IskAmount value={row.amount * 1e6} /> }}
+      />
+    );
+    fireEvent.click(screen.getByText('Tritanium'));
+    tapFigure(rows[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('ISK');
   });
 });

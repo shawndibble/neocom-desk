@@ -10,7 +10,7 @@ import {
   Tooltip,
   TypeIcon,
 } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { gripHitAreaClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -331,7 +331,7 @@ function SlotCard({
               title={grip.label}
               onDragStart={(event) => startFittingDrag(event, grip.payload)}
               onDragEnd={endFittingDrag}
-              className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing"
+              className={`flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing ${gripHitAreaClassName}`}
             >
               <DragHandle aria-hidden />
             </span>

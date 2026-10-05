@@ -32,6 +32,15 @@
  * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
  * name emits real utility rules into the shipped stylesheet.
  */
+/*
+ * `touch:` — the input is a finger (`(pointer: coarse)`), whatever the width.
+ * The 44px touch tier is "below `md` or `touch:`", so a touch tablet or laptop
+ * is treated as touch (DESIGN.md §3, §6c). Declared here, after Tailwind's own
+ * variants, so `md:h-7 touch:h-9` lets `touch:` win above `md` on a coarse
+ * pointer while a fine pointer never matches it.
+ */
+@custom-variant touch (@media (pointer: coarse));
+
 @source '../../index.html';
 @source '../../src';
 
@@ -146,6 +155,28 @@
  * very cells they need to re-lay-out. Inside `utilities` ordinary specificity
  * applies again and `.dt-stacked td` (0,1,1) wins over a bare utility (0,1,0).
  */
+/*
+ * Tap feedback and zoom delay (DESIGN.md §6c). The browser's grey tap flash is
+ * off — the `active:` colour step from the shared recipe is the feedback — and
+ * `manipulation` drops the double-tap-zoom delay on everything tappable while
+ * keeping pan and pinch. In the `base` layer so a `touch-none` grip still wins.
+ */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+}
+
 @layer utilities {
   /*
    * The tab bar's scroll frame (`components/ui/tabStyles.ts`).

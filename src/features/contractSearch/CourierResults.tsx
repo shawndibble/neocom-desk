@@ -1168,7 +1168,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         sortValue: (row) => row.reward,
         stackAffix: { after: t('contractSearch.courierMobile.rewardAffix') },
         // Long press, not tap: the row's own tap opens the haul's detail modal.
-        render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
+        render: (row) => <IskAmount value={row.reward} />,
       },
       collateral: {
         id: 'collateral',
@@ -1183,11 +1183,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // dash says "none asked", where "0.00 ISK" reads as a figure the issuer
         // actually typed.
         render: (row) =>
-          courierCollateral(row) === 0 ? (
-            '—'
-          ) : (
-            <IskAmount value={courierCollateral(row)} revealOn="longPress" />
-          ),
+          courierCollateral(row) === 0 ? '—' : <IskAmount value={courierCollateral(row)} />,
       },
       jumps: {
         id: 'jumps',
@@ -1248,7 +1244,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 // tap opens the modal). The " /J" only shows on the phone
                 // card, which has no column header to name the figure.
                 <span className="whitespace-nowrap">
-                  <IskAmount value={rate} revealOn="longPress" />
+                  <IskAmount value={rate} />
                   <span className="text-[0.625rem] font-semibold text-text-dim sm:hidden">
                     {t('contractSearch.courierMobile.perJumpSuffix')}
                   </span>

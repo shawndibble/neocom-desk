@@ -416,11 +416,7 @@ export function Contracts() {
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
           const amount = contractAmount(contract);
-          return amount !== undefined ? (
-            <IskAmount value={amount} revealOn="longPress" />
-          ) : (
-            t('common.unknown')
-          );
+          return amount !== undefined ? <IskAmount value={amount} /> : t('common.unknown');
         },
       },
       issued: {

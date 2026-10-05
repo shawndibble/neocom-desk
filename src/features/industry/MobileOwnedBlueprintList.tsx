@@ -187,7 +187,7 @@ export function MobileOwnedBlueprintList({
                 <span className="flex flex-col items-end leading-tight tabular-nums">
                   {row.iskPerHour !== null ? (
                     <span className={cx('text-base font-bold', iskToneClass(row.iskPerHour))}>
-                      <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+                      <IskAmount value={row.iskPerHour} decimals={0} />
                     </span>
                   ) : (
                     <span className="text-sm text-text-dim" aria-label={unknown}>

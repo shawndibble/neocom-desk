@@ -756,7 +756,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               plexAskLabel(row)
             ) : (
               // Long press, not tap: the row's own tap opens the offer's detail modal.
-              <IskAmount value={offerAskingPrice(row, plexPrice)} revealOn="longPress" />
+              <IskAmount value={offerAskingPrice(row, plexPrice)} />
             )}
             {row.isAuction && (
               // An auction's number is a starting bid unless the seller set a
@@ -1110,22 +1110,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       <StatChip
                         label={t('contractSearch.cheapestLabel')}
                         value={
-                          summary.cheapest === null ? (
-                            '—'
-                          ) : (
-                            <IskAmount value={summary.cheapest} revealOn="tap" />
-                          )
+                          summary.cheapest === null ? '—' : <IskAmount value={summary.cheapest} />
                         }
                       />
                       <StatChip
                         label={t('contractSearch.medianLabel')}
-                        value={
-                          summary.median === null ? (
-                            '—'
-                          ) : (
-                            <IskAmount value={summary.median} revealOn="tap" />
-                          )
-                        }
+                        value={summary.median === null ? '—' : <IskAmount value={summary.median} />}
                       />
                     </StatChips>
                     <Button size="sm" onClick={clearType}>

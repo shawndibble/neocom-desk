@@ -5,6 +5,7 @@ import { cx } from '@/lib/cx';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { IconButton } from './IconButton';
 import { Close } from './icons';
+import { RowTappableContext } from './tooltipHold';
 
 interface SlideOverProps {
   open: boolean;
@@ -69,7 +70,9 @@ export function SlideOver({
             <DialogPrimitive.Title className="text-sm font-semibold">{title}</DialogPrimitive.Title>
             <IconButton icon={<Close />} label={t('common.close')} onClick={onClose} />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

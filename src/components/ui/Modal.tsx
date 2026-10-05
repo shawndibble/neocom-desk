@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
+import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { useSheetSwipe } from './useSheetSwipe';
 
@@ -205,7 +206,7 @@ export function Modal({
               tabIndex={-1}
               className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${isSheet ? ' scroll-pb-20 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]' : ''}`}
             >
-              {children}
+              <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
             </div>
           </div>
         </PortalContainerProvider>
