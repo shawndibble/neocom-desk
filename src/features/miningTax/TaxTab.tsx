@@ -3,19 +3,24 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Caret,
   DataAgeBadge,
   DataTable,
+  DataTableDenseCell,
+  DataTableSortPicker,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
-  FilterChip,
   IconButton,
   PageHeader,
   Panel,
   Spinner,
+  Toast,
   Tooltip,
+  TypeIcon,
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
@@ -28,15 +33,17 @@ import { characterFilterParam } from '@/features/character/characterFilterUrlPar
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, type UrlParamCodec } from '@/lib/urlState';
+import { type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -64,20 +71,22 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
+  acceptNewTotal,
+  assignmentsMovedWithPayee,
   assignmentsSharingPayment,
-  deleteAssignment,
-  dismissEntry,
-  linkPaymentTransaction,
+  continueSession as continueSessionAction,
+  dismiss,
   linkRecordedPayment,
-  markAssignmentsPaid,
-  resolveNeedsReview,
-  unlinkPaymentTransaction,
-  unlockPaidAssignment,
-} from '@/features/miningTax/assignments';
+  linkTransaction,
+  settle,
+  unassign,
+  uncombine,
+  undoContinue,
+  unlinkTransaction,
+  type LedgerActionResult,
+} from '@/features/miningTax/ledgerActions';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
-import { useStatusFilter } from '@/features/miningTax/statusFilterPref';
-import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import {
   combineEligibility,
@@ -98,7 +107,7 @@ import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
-import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
+import { PayeeManagerDialog, type PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { type LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
 import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
@@ -106,6 +115,26 @@ import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
+import { StatusPill } from '@/features/miningTax/StatusPill';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { useMediaQuery } from '@/lib/useMediaQuery';
+import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
+import { OwedBalances } from '@/features/miningTax/OwedBalances';
+import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
+import { EntryEditDialog } from '@/features/miningTax/EntryEditDialog';
+import { LinkWalletPaymentDialog } from '@/features/miningTax/LinkWalletPaymentDialog';
+import {
+  useAutoContinueSessions,
+  useDismissedContinuations,
+} from '@/features/miningTax/continueSessionPref';
+import {
+  findSessionContinuations,
+  type SessionContinuation,
+} from '@/features/miningTax/sessionContinuation';
+import { useLedgerAction } from '@/features/miningTax/useLedgerAction';
+import { splitLedger } from '@/features/miningTax/ledgerSections';
+import { suggestPayeeForSystem, systemsByPayee } from '@/features/miningTax/suggestPayee';
+import { useTimedToast } from '@/components/ui/useTimedToast';
 
 /**
  * A `MadePayment`'s own timestamp as a local calendar date, falling back to
@@ -174,14 +203,6 @@ function assignmentsForLinkTarget(
   if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
   return dr.assignment ? assignmentsSharingPayment(dr.assignment, everyAssignment) : [];
 }
-
-const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
-  'unassigned',
-  'needs-review',
-  'outstanding',
-  'paid',
-  'dismissed',
-];
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -278,7 +299,6 @@ function payeeFilterParam(): UrlParamCodec<ReadonlySet<string> | 'all'> {
 const TAX_URL_PARAMS = {
   'tax.character': characterFilterParam('all'),
   'tax.payee': payeeFilterParam(),
-  'tax.showSettled': boolParam(),
 };
 
 const TAX_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
@@ -297,16 +317,23 @@ interface TaxTabProps {
 
 export function TaxTab({ tabBar }: TaxTabProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  // The Ore column only where the table has room for it beside a full Payee
+  // name: the Payee is what a row is read by, the ore is one click away in
+  // the entry itself (and at 1024px it pushed Status off-screen, #2147).
+  const showOreColumn = useMediaQuery('(min-width: 87.5rem)');
+  // Est. value is out between the phone card and `lg`: there the other
+  // columns' fixed widths would leave the Payee column no room at all. The
+  // card still shows it, and so does every wider screen (and the export).
+  const showValueColumn = useMediaQuery('(min-width: 64rem)') || isPhone;
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
     { cacheKey: 'moonMiningTax' }
   );
 
-  const [
-    { 'tax.character': characterFilter, 'tax.payee': payeeFilter, 'tax.showSettled': showSettled },
-    setTaxUrlParams,
-  ] = useUrlParams(TAX_URL_PARAMS);
+  const [{ 'tax.character': characterFilter, 'tax.payee': payeeFilter }, setTaxUrlParams] =
+    useUrlParams(TAX_URL_PARAMS);
   const setCharacterFilter = useCallback(
     (next: CharacterFilterValue) => setTaxUrlParams({ 'tax.character': next }),
     [setTaxUrlParams]
@@ -315,23 +342,17 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     (next: ReadonlySet<string> | 'all') => setTaxUrlParams({ 'tax.payee': next }),
     [setTaxUrlParams]
   );
-  const setShowSettled = useCallback(
-    (next: boolean) => setTaxUrlParams({ 'tax.showSettled': next }),
-    [setTaxUrlParams]
-  );
-  // Remembered across visits (`statusFilterPref.ts`): this filter hides rows,
-  // so forgetting it silently drops whatever the pilot was working from.
-  const storedStatuses = useStatusFilter((state) => state.value);
-  const setStoredStatuses = useStatusFilter((state) => state.setValue);
-  const hydrateStatuses = useStatusFilter((state) => state.hydrate);
+  const autoContinue = useAutoContinueSessions((state) => state.value);
+  const setAutoContinue = useAutoContinueSessions((state) => state.setValue);
+  const hydrateAutoContinue = useAutoContinueSessions((state) => state.hydrate);
+  const dismissedContinuations = useDismissedContinuations((state) => state.value);
+  const setDismissedContinuations = useDismissedContinuations((state) => state.setValue);
+  const hydrateDismissedContinuations = useDismissedContinuations((state) => state.hydrate);
   useEffect(() => {
-    void hydrateStatuses();
-  }, [hydrateStatuses]);
-  const statusFilter = useMemo(() => new Set(storedStatuses), [storedStatuses]);
-  const setStatusFilter = useCallback(
-    (next: ReadonlySet<MiningTaxRowStatus>) => void setStoredStatuses([...next]),
-    [setStoredStatuses]
-  );
+    void hydrateAutoContinue();
+    void hydrateDismissedContinuations();
+  }, [hydrateAutoContinue, hydrateDismissedContinuations]);
+
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   // Unconditional, deliberately. Hiding this behind "the pilot has at least
   // one tag" reads tidier and reintroduces the shape of the bug it exists to
@@ -341,7 +362,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // already taken the banner away, stranding the pilot exactly as before. The
   // dialog says so itself when there is nothing to show.
   const [oreTagsOpen, setOreTagsOpen] = useState(false);
-  // Row keys checked in the table's select column. Feeds all three bulk
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Row keys checked in the Open table's select column. Feeds all three bulk
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkDismissOpen, setBulkDismissOpen] = useState(false);
@@ -349,7 +371,18 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
+  // Whose owed entries "Link a wallet payment" is choosing a payment for: a
+  // Payee's whole balance, or just the entries ticked or settling.
+  const [linkWalletTarget, setLinkWalletTarget] = useState<{
+    payeeId: string;
+    members?: readonly GroupMember[];
+  } | null>(null);
+  // Offers on screen when automatic mode was switched on — "next time" means
+  // they stay offers rather than being continued the moment the box is ticked.
+  const [autoSkip, setAutoSkip] = useState<ReadonlySet<string>>(new Set());
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
+  // The entry whose edit form is open — single or combined, owed or paid (mockup F1).
+  const [editTarget, setEditTarget] = useState<DisplayRow | null>(null);
   // Which row's "Link transaction" picker is open — kept separate from
   // `detailTarget` so the manual picker can sit on top of the row detail
   // rather than replacing it (issue #540 follow-up: linking a transaction to
@@ -360,9 +393,34 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // Set only by the selection toolbar's Combine — pins `JoinAssignDialog`'s
   // candidate list to exactly the rows picked via checkbox (and pre-ticks
   // them), instead of the full same-system candidate list `RowDetailModal`'s
-  // "Join with another entry" button offers.
+  // "Combine with another day" button offers.
   const [joinCandidateOverride, setJoinCandidateOverride] = useState<DisplayRow[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  // Combined rows the pilot has expanded in place (desktop), to show each day.
+  const [expandedCombined, setExpandedCombined] = useState<ReadonlySet<string>>(new Set());
+  const [toast, setToast] = useState<{ message: string; onUndo?: () => void } | null>(null);
+  const [continuing, setContinuing] = useState(false);
+  // Every row action and the Link-transaction confirm run through this, so a
+  // failure reads the same as in every dialog: the modal stays open saying
+  // nothing was changed (each action is one transaction, so that is true).
+  const {
+    pending: acting,
+    error: actionError,
+    setError: setActionError,
+    run: runRowAction,
+  } = useLedgerAction();
+  const busy = continuing || acting;
+  // Reset whenever the target changes, not keyed on it: after a failure
+  // nothing reloads, so reopening the same row hands back the very same object.
+  const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
+  if (
+    errorTargets.detailTarget !== detailTarget ||
+    errorTargets.linkTransactionTarget !== linkTransactionTarget
+  ) {
+    setErrorTargets({ detailTarget, linkTransactionTarget });
+    setActionError(null);
+  }
+
+  useTimedToast(toast, () => setToast(null));
 
   // Every tracked character, not just those with a Mining Ledger Entry this
   // refresh (CONTEXT.md: the point of the feature is not missing an alt's
@@ -419,7 +477,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // Filtering "by Payee" only makes sense for rows that already have one —
   // an unassigned or dismissed row has no Payee to match, so it drops out as
   // soon as a specific Payee is selected.
-  const payeeFiltered = useMemo(
+  const visibleRows = useMemo(
     () =>
       resolvedPayeeFilter === 'all'
         ? characterFiltered
@@ -430,23 +488,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     [characterFiltered, resolvedPayeeFilter]
   );
 
-  const statusCounts = useMemo(() => {
-    const counts = new Map<MiningTaxRowStatus, number>();
-    for (const dr of payeeFiltered) counts.set(dr.status, (counts.get(dr.status) ?? 0) + 1);
-    return counts;
-  }, [payeeFiltered]);
-
-  // The Balances strip: per Payee, what is owed *now*. Follows the Character
-  // filter (an alt's debts are still debts) but deliberately not the Payee or
-  // Status filters — hiding Paid rows from the table must not change a balance.
+  // The owed cards: per Payee, what is owed *now*. Follows the Character
+  // filter (an alt's debts are still debts) but deliberately not the Payee
+  // filter — narrowing the ledger to one Payee must not change a balance.
   const balances = useMemo(
     () => computePayeeBalances(characterFiltered, allPayees),
     [characterFiltered, allPayees]
   );
-  const owedBalances = balances.filter((b) => b.owed > 0);
-  const visibleBalances = showSettled ? balances : owedBalances;
-  const settledCount = balances.length - owedBalances.length;
-  const owedTotal = owedBalances.reduce((sum, b) => sum + b.owed, 0);
   const unassigned = useMemo(
     () => summarizeUnassigned(characterFiltered, estimatedValueOf),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -541,21 +589,135 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     );
   }, [everyAssignment, madePayments, balances, recordedMatches]);
 
-  const visibleRows = useMemo(
-    () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),
-    [payeeFiltered, statusFilter]
+  // Every Payee's systems and owed entries, for the Payee manager's rows.
+  const payeeSystems = useMemo(
+    () => systemsByPayee(everyAssignment, allPayees),
+    [everyAssignment, allPayees]
+  );
+  const owedByPayee = useMemo(() => {
+    const out = new Map<string, PayeeOwed>();
+    for (const a of everyAssignment) {
+      // Owed means Outstanding, as on the balance cards: a needs-review entry
+      // was already paid (or dismissed) before it grew.
+      if (!a.payeeId || a.status !== 'outstanding') continue;
+      const entry = out.get(a.payeeId) ?? { amount: 0, count: 0, moving: 0 };
+      entry.amount += a.taxOwed;
+      entry.count += 1;
+      out.set(a.payeeId, entry);
+    }
+    for (const [payeeId, entry] of out) {
+      entry.moving = assignmentsMovedWithPayee(everyAssignment, payeeId).length;
+    }
+    return out;
+  }, [everyAssignment]);
+
+  /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
+  function suggestionFor(row: MoonMiningTaxRow) {
+    return suggestPayeeForSystem(
+      everyAssignment.filter((a) => a.characterId === row.characterId),
+      allPayees,
+      row.entry.solarSystemId
+    );
+  }
+
+  const continuations = useMemo(
+    () =>
+      findSessionContinuations(characterFiltered).filter(
+        (c) => !dismissedContinuations.includes(c.next.key)
+      ),
+    [characterFiltered, dismissedContinuations]
   );
 
-  function toggleStatus(status: MiningTaxRowStatus) {
-    const next = new Set(statusFilter);
-    if (next.has(status)) next.delete(status);
-    else next.add(status);
-    // Not an updater callback: the value now lives in a store rather than
-    // component state, and `statusFilter` is already the current one.
-    // Unselecting the last status is refused — an empty filter renders an
-    // empty table with nothing explaining it, and a stored empty array is
-    // rejected on read for the same reason.
-    if (next.size > 0) setStatusFilter(next);
+  /**
+   * The seam every value-computing dialog reads: prices at whichever hub a
+   * Payee bills at, on the date the ore was actually mined (issue #523
+   * follow-up decision doc) — not "now". A lookup rather than one map,
+   * because the dialogs are where the Payee (and so the hub) is chosen —
+   * assigning to a different Payee, or splitting ore over to a second one,
+   * re-values the same ore against a different order book, and this is what
+   * lets that happen without another fetch.
+   */
+  function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
+    return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
+  }
+
+  /**
+   * Continues one session, offering Undo in a toast. `false` when nothing was
+   * written: its Payee is gone, the day was claimed meanwhile (the refresh
+   * shows what exists), or the write failed (the toast says so).
+   */
+  async function continueSession(continuation: SessionContinuation): Promise<boolean> {
+    const payee = allPayees.find((p) => p.id === continuation.payeeId);
+    if (!payee) return false;
+    const result = await continueSessionAction(continuation, (date) =>
+      pricesFor(payee.hubId, date)
+    );
+    refresh();
+    if (!result.ok) {
+      if (result.reason === 'save-failed') setToast({ message: t('miningTax.saveFailed') });
+      return false;
+    }
+    setToast({
+      message: t('miningTax.continue.done', {
+        date: continuation.next.row.entry.date,
+        payee: payee.name,
+      }),
+      onUndo: () => {
+        setToast(null);
+        void undoContinue(result.value).then((undone) => {
+          if (!undone.ok) setToast({ message: t('miningTax.saveFailed') });
+          refresh();
+        });
+      },
+    });
+    return true;
+  }
+
+  async function handleContinue(continuation: SessionContinuation) {
+    setContinuing(true);
+    try {
+      await continueSession(continuation);
+    } finally {
+      setContinuing(false);
+    }
+  }
+
+  // Automatic mode: continue each new offer once, without asking. The ref
+  // keeps a rerender from re-firing a continuation before the refresh lands.
+  const autoContinuedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!autoContinue || !data) return;
+    const fresh = continuations.filter(
+      (c) => !autoContinuedRef.current.has(c.next.key) && !autoSkip.has(c.next.key)
+    );
+    if (fresh.length === 0) return;
+    for (const c of fresh) autoContinuedRef.current.add(c.next.key);
+    void (async () => {
+      for (const c of fresh) {
+        const continued = await continueSession(c);
+        // Not continued: bring the offer back as a card so the pilot can retry
+        // or choose, rather than it vanishing until the next page load.
+        if (!continued) setAutoSkip((previous) => new Set(previous).add(c.next.key));
+      }
+    })();
+    // `continueSession` closes over `allPayees`/`pricesFor`/`t`/`refresh`,
+    // all derived from `data` (or stable) — re-running on those would retry
+    // the same offers for nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoContinue, autoSkip, continuations, data]);
+
+  function setAutoContinueFromCard(next: boolean) {
+    if (next) setAutoSkip(new Set(continuations.map((c) => c.next.key)));
+    void setAutoContinue(next);
+  }
+
+  /** "Keep separate", remembered — pruned to entries still in the ledger so the list can't grow forever. */
+  function keepSeparate(continuation: SessionContinuation) {
+    const present = new Set(allDisplayRows.map((dr) => dr.key));
+    void setDismissedContinuations([
+      ...dismissedContinuations.filter((key) => present.has(key)),
+      continuation.next.key,
+    ]);
   }
 
   function togglePayee(payeeId: string) {
@@ -573,20 +735,30 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     resolvedPayeeFilter.size === 1 &&
     resolvedPayeeFilter.has(payeeId);
 
-  /** A balance card's name doubles as "show me just this Payee's entries" — the filter the card's own figure came from. */
+  /** A balance's Payee name doubles as "show me just this Payee's entries" — the filter its own figure came from. */
   function filterToPayee(payeeId: string) {
     setPayeeFilter(isSolePayeeFilter(payeeId) ? 'all' : new Set([payeeId]));
   }
 
-  /** "Pay them in one lump sum": every Outstanding Assignment behind one balance card, straight into Settle up. */
+  function settleUpRowsFor(members: readonly GroupMember[]): SettleUpRow[] {
+    return members.map((m) => ({
+      assignment: m.assignment,
+      characterName: m.row.characterName,
+      payeeName: payeeName(m.assignment.payeeId),
+    }));
+  }
+
+  /** "Pay them in one lump sum": every Outstanding Assignment behind one balance, straight into Settle up. */
   function settleUpBalance(members: readonly GroupMember[]) {
-    setSettleUpRows(
-      members.map((m) => ({
-        assignment: m.assignment,
-        characterName: m.row.characterName,
-        payeeName: payeeName(m.assignment.payeeId),
-      }))
-    );
+    setSettleUpRows(settleUpRowsFor(members));
+  }
+
+  /** Settle up from a row: that row's whole Payee balance, since that's what one transfer pays. */
+  function settleUpPayeeOf(dr: DisplayRow) {
+    const payeeId = dr.assignment?.payeeId;
+    const balance = balances.find((b) => b.payee.id === payeeId);
+    setDetailTarget(null);
+    if (balance && balance.members.length > 0) settleUpBalance(balance.members);
   }
 
   /** The "Assign next" shortcut: the newest still-unassigned entry, opened straight into its Assign form. */
@@ -608,33 +780,21 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
-  async function handleDismiss(row: MoonMiningTaxRow) {
+  function dismissRow(row: MoonMiningTaxRow) {
     const { estimatedValue } = computeAssignmentValue(
       row.unassignedOreLines,
       pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, row.entry.date),
       0
     );
-    await dismissEntry({
-      characterId: row.characterId,
-      date: row.entry.date,
-      solarSystemId: row.entry.solarSystemId,
-      oreLines: row.unassignedOreLines,
-      estimatedValue,
-    });
-    refresh();
-  }
-
-  /**
-   * The seam every value-computing dialog reads: prices at whichever hub a
-   * Payee bills at, on the date the ore was actually mined (issue #523
-   * follow-up decision doc) — not "now". A lookup rather than one map,
-   * because the dialogs are where the Payee (and so the hub) is chosen —
-   * assigning to a different Payee, or splitting ore over to a second one,
-   * re-values the same ore against a different order book, and this is what
-   * lets that happen without another fetch.
-   */
-  function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
-    return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
+    return dismiss([
+      {
+        characterId: row.characterId,
+        date: row.entry.date,
+        solarSystemId: row.entry.solarSystemId,
+        oreLines: row.unassignedOreLines,
+        estimatedValue,
+      },
+    ]);
   }
 
   function payeeName(payeeId: string | undefined): string {
@@ -652,7 +812,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   function renderGapLinks(gaps: readonly PricingGap[], pick: (gap: PricingGap) => number[]) {
     return (
       <div className="space-y-0.5">
-        <p className="text-text-dim">{t('miningTax.pricingGapEntries')}</p>
+        <p>{t('miningTax.pricingGapEntries')}</p>
         <ul className="space-y-0.5">
           {gaps.map((gap) => (
             <li key={gap.row.key}>
@@ -684,7 +844,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return data?.systemSecurity.get(dr.row.entry.solarSystemId);
   }
 
-  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A joined row sums every member's own value — never a blended re-price across dates. */
+  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A combined row sums every member's own value — never a blended re-price across dates. */
   function estimatedValueOf(dr: DisplayRow): number {
     return dr.assignment
       ? allMembers(dr).reduce((sum, m) => sum + m.assignment.estimatedValue, 0)
@@ -699,7 +859,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return allMembers(dr).reduce((sum, m) => sum + m.assignment.taxOwed, 0);
   }
 
-  /** Every date this row covers, earliest first — one entry for an ordinary row, 2+ for a joined one. */
+  /** Every date this row covers, earliest first — one entry for an ordinary row, 2+ for a combined one. */
   function dateRangeOf(dr: DisplayRow): string[] {
     const members = allMembers(dr);
     return (members.length > 0 ? members.map((m) => m.row.entry.date) : [dr.row.entry.date]).sort();
@@ -709,17 +869,36 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return formatDateRange(dateRangeOf(dr));
   }
 
+  /** The table's own date: a combined range within one year drops the repeated year ("2026-10-03 – 10-04"), the width a long Payee name needs. */
+  function shortDateLabel(dr: DisplayRow): string {
+    const dates = dateRangeOf(dr);
+    const first = dates[0];
+    const last = dates.at(-1);
+    if (!first || !last || first === last) return first ?? dr.row.entry.date;
+    return first.slice(0, 4) === last.slice(0, 4)
+      ? `${first} – ${last.slice(5)}`
+      : formatDateRange(dates);
+  }
+
+  /** The ore types a row covers, for the Ore column's icons. */
+  function oreTypeIdsOf(dr: DisplayRow): number[] {
+    const lines = dr.assignment
+      ? allMembers(dr).flatMap((m) => m.assignment.oreLines)
+      : dr.row.unassignedOreLines;
+    return [...new Set(lines.map((line) => line.typeId))];
+  }
+
   /**
-   * Other rows `joinTarget` may fold in (issue #523's "join entries") when the
-   * dialog is opened from a row's detail view: same character, same solar
-   * system, not already part of a group, and either Unassigned or Outstanding.
-   * Adding to an *existing* group goes through the selection toolbar's Combine
-   * instead (issue #539), which checks the same rules plus the
-   * at-most-one-`groupId` constraint in `selection.ts`. When
-   * `joinTarget` already has an Assignment, a candidate Assignment must
-   * share its Payee and tax % (the decision doc's merge rule) — a candidate
-   * still unassigned always qualifies, since it simply adopts whichever
-   * side is already assigned.
+   * Other rows `joinTarget` may combine with (issue #523's "join entries")
+   * when the dialog is opened from a row's detail view: same character, same
+   * solar system, not already part of a combined entry, and either Unassigned
+   * or Outstanding. Adding to an *existing* combined entry goes through the
+   * selection toolbar's Combine instead (issue #539), which checks the same
+   * rules plus the at-most-one-`groupId` constraint in `selection.ts`. When
+   * `joinTarget` already has an Assignment, a candidate Assignment must share
+   * its Payee and tax % (the decision doc's merge rule) — a candidate still
+   * unassigned always qualifies, since it simply adopts whichever side is
+   * already assigned.
    */
   function joinCandidatesFor(primary: DisplayRow) {
     return allDisplayRows
@@ -749,37 +928,36 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     refresh();
   }
 
-  async function handleMarkGroupPaidFromDetail() {
+  /**
+   * Every row action ends the same way: busy while it writes, then close and
+   * reload — or, when it wrote nothing, stay open and say so.
+   */
+  async function runAndClose(action: () => Promise<LedgerActionResult<unknown>>) {
+    await runRowAction(action, () => {
+      setDetailTarget(null);
+      refresh();
+    });
+  }
+
+  function handleMarkGroupPaidFromDetail() {
     if (!detailTarget) return;
     const outstanding = allMembers(detailTarget)
       .filter((m) => m.assignment.status === 'outstanding')
       .map((m) => m.assignment);
     if (outstanding.length === 0) return;
-    setBusy(true);
-    try {
-      await markAssignmentsPaid(outstanding);
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+    void runAndClose(() => settle(outstanding));
   }
 
-  /** The Assign form's create-or-edit submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
+  /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
   function handleAssignedFromDetail() {
     setDetailTarget(null);
     refresh();
   }
 
-  async function handleDismissFromDetail() {
+  function handleDismissFromDetail() {
     if (!detailTarget) return;
-    setBusy(true);
-    try {
-      await handleDismiss(detailTarget.row);
-      setDetailTarget(null);
-    } finally {
-      setBusy(false);
-    }
+    const { row } = detailTarget;
+    void runAndClose(() => dismissRow(row));
   }
 
   const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
@@ -796,21 +974,17 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     );
   }, [detailTarget, madePayments, t]);
 
-  async function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
+  function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
     if (!detailTarget) return;
-    setBusy(true);
-    try {
-      await unlinkPaymentTransaction(
-        assignmentsForLinkTarget(detailTarget, everyAssignment),
+    const targets = assignmentsForLinkTarget(detailTarget, everyAssignment);
+    void runAndClose(() =>
+      unlinkTransaction(
+        targets,
         transaction.kind === 'journal'
           ? { journalRefId: transaction.refId }
           : { contractId: transaction.refId }
-      );
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+      )
+    );
   }
 
   const linkTransactionCandidates = useMemo(() => {
@@ -832,102 +1006,88 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!linkTransactionTarget) return;
     const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
     if (targets.length === 0) return;
-    setBusy(true);
-    try {
-      await linkPaymentTransaction(
-        targets,
-        payment.kind === 'journal'
-          ? { journalRefId: payment.refId }
-          : { contractId: payment.refId },
-        source,
-        {
-          paidOn: paidOnFromMadePaymentDate(payment.date),
-          method: payment.method,
-          amount: payment.amount === null ? 0 : Math.round(payment.amount),
-        }
-      );
-      setLinkTransactionTarget(null);
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+    await runRowAction(
+      () =>
+        linkTransaction(
+          targets,
+          payment.kind === 'journal'
+            ? { journalRefId: payment.refId }
+            : { contractId: payment.refId },
+          source,
+          {
+            paidOn: paidOnFromMadePaymentDate(payment.date),
+            method: payment.method,
+            amount: payment.amount === null ? 0 : Math.round(payment.amount),
+          }
+        ),
+      () => {
+        setLinkTransactionTarget(null);
+        setDetailTarget(null);
+        refresh();
+      }
+    );
   }
 
-  async function handleMarkPaidFromDetail() {
-    if (!detailTarget?.assignment) return;
-    setBusy(true);
-    try {
-      await markAssignmentsPaid([detailTarget.assignment]);
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+  function handleMarkPaidFromDetail() {
+    const assignment = detailTarget?.assignment;
+    if (!assignment) return;
+    void runAndClose(() => settle([assignment]));
   }
 
-  async function handleResolveFromDetail() {
-    if (!detailTarget?.assignment) return;
-    setBusy(true);
-    try {
-      await resolveNeedsReview(
-        detailTarget.assignment,
-        detailTarget.row.entry,
-        detailTarget.row.assignments
-      );
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+  function handleResolveFromDetail() {
+    const target = detailTarget;
+    if (!target?.assignment) return;
+    const assignment = target.assignment;
+    void runAndClose(() => acceptNewTotal([{ assignment, row: target.row }]));
   }
 
-  async function handleUndoFromDetail() {
-    if (!detailTarget?.assignment) return;
-    setBusy(true);
-    try {
-      await deleteAssignment(detailTarget.assignment);
-      setDetailTarget(null);
-      refresh();
-    } finally {
-      setBusy(false);
-    }
+  function handleUndoFromDetail() {
+    const assignment = detailTarget?.assignment;
+    if (!assignment) return;
+    void runAndClose(() => unassign([assignment]));
   }
 
-  /**
-   * "Unlock to edit" (AssignDialog's paid-lock banner). Deliberately does not
-   * close the modal or call `refresh()` the way every other row action does
-   * — the whole point is to reopen the *same* record for editing right away,
-   * so it swaps `detailTarget`'s assignment in place (the same pattern
-   * `GroupSummaryModal`'s `onEditMember` already uses) rather than round-
-   * tripping through the full snapshot reload.
-   */
-  async function handleUnlockFromDetail() {
-    if (!detailTarget?.assignment) return;
-    setBusy(true);
-    try {
-      const unlocked = await unlockPaidAssignment(detailTarget.assignment);
-      setDetailTarget({ ...detailTarget, assignment: unlocked, status: unlocked.status });
-    } finally {
-      setBusy(false);
-    }
+  /** Taking one day out of a combined entry keeps its Assignment; only the combination goes. */
+  function handleTakeOut(member: GroupMember) {
+    void runAndClose(() => uncombine([member.assignment]));
   }
+
+  /** "Accept new total" on a combined entry: every day that grew since it was paid. */
+  function handleResolveGroup() {
+    if (!detailTarget) return;
+    const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
+    void runAndClose(() => acceptNewTotal(grown));
+  }
+
+  function handleUnassignGroup() {
+    if (!detailTarget) return;
+    const members = allMembers(detailTarget).map((m) => m.assignment);
+    void runAndClose(() => unassign(members));
+  }
+
+  function handleUncombineAll() {
+    if (!detailTarget) return;
+    const members = allMembers(detailTarget).map((m) => m.assignment);
+    void runAndClose(() => uncombine(members));
+  }
+
+  const { open: openRows, history } = useMemo(
+    () => splitLedger(visibleRows, (dr) => dateRangeOf(dr).at(-1) ?? dr.row.entry.date),
+    [visibleRows]
+  );
+  const historyRows = useMemo(() => history.flatMap((month) => month.rows), [history]);
 
   // Every bulk action reads the selection narrowed to what is *on screen*:
   // selection state survives a filter change, so acting on the full set would
   // let Dismiss reach entries the pilot cannot see.
   const selectedRows = useMemo(
-    () => visibleRows.filter((dr) => selection.has(dr.key)),
-    [visibleRows, selection]
+    () => openRows.filter((dr) => selection.has(dr.key)),
+    [openRows, selection]
   );
 
   const selectedSettleUpRows: SettleUpRow[] = useMemo(
-    () =>
-      settleUpMembers(selectedRows).map((m) => ({
-        assignment: m.assignment,
-        characterName: m.row.characterName,
-        payeeName: payeeName(m.assignment.payeeId),
-      })),
+    () => settleUpRowsFor(settleUpMembers(selectedRows)),
+    // `settleUpRowsFor` reads only `allPayees`, which follows `data`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedRows, data]
   );
@@ -951,43 +1111,124 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     });
   }
 
-  // The Character column only earns its place when more than one character
-  // is actually in view — with a single tracked character (or a filter
-  // narrowed to one) it says the same thing on every row.
-  const showCharacterColumn = characters.length > 1;
-  // Same reasoning for the select column: with nothing selectable on screen
-  // (nothing Outstanding to bulk-pay, nothing Unassigned to join) an
-  // always-blank leading column just reads as unexplained whitespace before
-  // Date. A row qualifies if either action could apply to it — bulk-pay
-  // (Outstanding, already assigned) or join (Unassigned) — the two share one
-  // checkbox column rather than each getting its own.
+  function toggleCombinedExpanded(key: string) {
+    setExpandedCombined((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  // Only when the rows in view actually come from more than one pilot: a
+  // single-miner ledger repeating the same name on every line is width the
+  // Payee column needs (decision 20261004, "room for long Payee names").
+  const showCharacterColumn = new Set(visibleRows.map((dr) => dr.row.characterId)).size > 1;
+  // The select column only shows with something selectable on screen
+  // (nothing Outstanding to bulk-pay, nothing Unassigned to combine or
+  // dismiss) — an always-blank leading column reads as unexplained
+  // whitespace before Date. Both actions share one checkbox column.
   const isSelectableRow = (dr: DisplayRow) =>
     (dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned';
-  const selectableVisible = visibleRows.filter(isSelectableRow);
+  const selectableVisible = openRows.filter(isSelectableRow);
   const showSelectColumn = selectableVisible.length > 0;
 
-  const columns: DataTableColumn<DisplayRow>[] = [
-    ...(showSelectColumn
-      ? [
-          {
-            id: 'select',
-            header: '',
-            className: 'w-8 px-2',
-            render: (dr: DisplayRow) =>
-              isSelectableRow(dr) ? (
-                <Checkbox
-                  aria-label={t('miningTax.selectForBulkAction')}
-                  checked={selection.has(dr.key)}
-                  onChange={() => toggleRowSelected(dr.key)}
-                />
-              ) : null,
-          } satisfies DataTableColumn<DisplayRow>,
-        ]
-      : []),
+  /**
+   * A cell's figure, with a combined row's per-day lines under it once
+   * expanded. Plain text otherwise: the dense phone card prints cells inline
+   * on its meta line, where a block would break the line apart.
+   */
+  function withDayLines(
+    dr: DisplayRow,
+    main: ReactNode,
+    render: (member: GroupMember) => ReactNode
+  ) {
+    const days = dayLines(dr, render);
+    if (!days) return main;
+    return (
+      <span className="block">
+        <span className="block h-5 leading-5">{main}</span>
+        {days}
+      </span>
+    );
+  }
+
+  /** A combined row's per-day lines, shown under its total when expanded (desktop only — the phone card keeps its two lines). */
+  function dayLines(dr: DisplayRow, render: (member: GroupMember) => ReactNode) {
+    if (!dr.groupMembers || !expandedCombined.has(dr.key)) return null;
+    return allMembers(dr)
+      .sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date))
+      .map((member) => (
+        <span
+          key={member.assignment.id}
+          className="hidden text-[0.6875rem] leading-5 text-text-dim sm:block"
+        >
+          {render(member)}
+        </span>
+      ));
+  }
+
+  const oreColumn: DataTableColumn<DisplayRow> = {
+    id: 'ore',
+    headerCellClassName: 'sm:w-40',
+    header: t('miningTax.oreColumn'),
+    render: (dr) =>
+      withDayLines(
+        dr,
+        dr.groupMembers ? (
+          <span className="inline-flex rounded-xs border border-accent-dim px-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+            {t('miningTax.combined.days', { count: allMembers(dr).length })}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-0.5">
+            {oreTypeIdsOf(dr)
+              .slice(0, 5)
+              .map((typeId) => (
+                <Tooltip key={typeId} content={data?.typeNames.get(typeId) ?? `#${typeId}`}>
+                  <span tabIndex={0}>
+                    <TypeIcon typeId={typeId} size={32} className="h-4 w-4" />
+                  </span>
+                </Tooltip>
+              ))}
+          </span>
+        ),
+        (m) => (
+          <span className="block max-w-[12rem] truncate">
+            {m.assignment.oreLines
+              .map(
+                (line) =>
+                  `${data?.typeNames.get(line.typeId) ?? `#${line.typeId}`} ${line.quantity.toLocaleString()}`
+              )
+              .join(' · ')}
+          </span>
+        )
+      ),
+  };
+
+  const valueColumn: DataTableColumn<DisplayRow> = {
+    id: 'value',
+    headerCellClassName: 'sm:w-32',
+    header: t('miningTax.estimatedValueColumn'),
+    align: 'right',
+    className: 'whitespace-nowrap',
+    stackAffix: { after: ` ${t('miningTax.valueAffix')}` },
+    // Compact on a phone card, where it shares one meta line with the
+    // system, the Payee and the status.
+    render: (dr) =>
+      withDayLines(
+        dr,
+        isPhone ? formatIskCompact(estimatedValueOf(dr)) : `${formatIsk(estimatedValueOf(dr))} ISK`,
+        (m) => `${formatIsk(m.assignment.estimatedValue)} ISK`
+      ),
+    sortValue: (dr) => estimatedValueOf(dr),
+  };
+
+  const baseColumns: DataTableColumn<DisplayRow>[] = [
     ...(showCharacterColumn
       ? [
           {
             id: 'character',
+            headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
             render: (dr: DisplayRow) => dr.row.characterName,
             sortValue: (dr: DisplayRow) => dr.row.characterName,
@@ -996,31 +1237,59 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       : []),
     {
       id: 'date',
+      headerCellClassName: 'sm:w-36',
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
-      render: (dr) => dateLabel(dr),
+      className: 'whitespace-nowrap',
+      render: (dr) =>
+        withDayLines(
+          dr,
+          <span className="relative inline-flex items-center">
+            {dr.groupMembers && (
+              <button
+                type="button"
+                aria-expanded={expandedCombined.has(dr.key)}
+                aria-label={t('miningTax.combined.showDays', { date: dateLabel(dr) })}
+                onClick={() => toggleCombinedExpanded(dr.key)}
+                // In the gutter left of the date, so a combined row's date
+                // keeps the same left edge as every other row's.
+                className="absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex"
+              >
+                <Caret expanded={expandedCombined.has(dr.key)} />
+              </button>
+            )}
+            {shortDateLabel(dr)}
+            {isPhone && dr.groupMembers && (
+              <span className="ml-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+                {t('miningTax.combined.days', { count: allMembers(dr).length })}
+              </span>
+            )}
+          </span>,
+          (m) => <span className="pl-3">{m.row.entry.date}</span>
+        ),
       sortValue: (dr) => dateRangeOf(dr)[0],
       primary: true,
     },
     {
       id: 'system',
+      headerCellClassName: 'sm:w-24',
       header: t('miningTax.systemColumn'),
       render: (dr) => (
-        <span className="flex items-center gap-1.5">
+        <DataTableDenseCell>
           {systemName(dr)}
           <SecurityValue security={systemSecurityOf(dr)} t={t} />
-        </span>
+        </DataTableDenseCell>
       ),
       sortValue: (dr) => systemName(dr),
     },
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      // Table mode only — a long Payee name was pushing Status and the edit
-      // affordance off-screen at 1024px. Same shape as Market's
-      // `location` column/`LocationCell`: `sm:`-scoped so the stacked-card
-      // layout below `sm` still shows the full, untruncated name.
-      className: 'sm:max-w-[8rem] truncate',
+      // The one column without a fixed width (both tables are `table-fixed`),
+      // so it takes whatever the others leave — room for "Bureau of Unified
+      // Harvesting" — and truncates rather than pushing Status off-screen at
+      // 1024px. `sm:`-scoped so the phone card shows the whole name.
+      className: 'sm:truncate',
       render: (dr) => {
         const name = payeeDisplayName(dr);
         return (
@@ -1036,48 +1305,95 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       },
       sortValue: (dr) => payeeDisplayName(dr),
     },
-    {
-      id: 'value',
-      header: t('miningTax.estimatedValueColumn'),
-      align: 'right',
-      className: 'whitespace-nowrap',
-      render: (dr) => `${formatIsk(estimatedValueOf(dr))} ISK`,
-      sortValue: (dr) => estimatedValueOf(dr),
-    },
+    ...(showOreColumn ? [oreColumn] : []),
+    ...(showValueColumn ? [valueColumn] : []),
     {
       id: 'taxOwed',
+      headerCellClassName: 'sm:w-28',
       header: t('miningTax.taxOwedColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (dr) => (dr.assignment ? `${formatIsk(taxOwedOf(dr))} ISK` : '—'),
+      cardCorner: true,
+      // Owed is the figure the page is about; settled history recedes.
+      cellClassName: (dr) =>
+        dr.status === 'outstanding'
+          ? 'text-isk-neg'
+          : dr.status === 'paid' || dr.status === 'dismissed'
+            ? 'text-text-dim font-normal'
+            : undefined,
+      render: (dr) =>
+        dr.assignment
+          ? withDayLines(
+              dr,
+              `${formatIsk(taxOwedOf(dr))} ISK`,
+              (m) => `${formatIsk(m.assignment.taxOwed)} ISK`
+            )
+          : '—',
       sortValue: (dr) => (dr.assignment ? taxOwedOf(dr) : undefined),
     },
     {
       id: 'status',
+      headerCellClassName: 'sm:w-32',
       header: t('miningTax.statusColumn'),
-      className: 'font-medium',
-      cellClassName: (dr) => STATUS_TEXT_CLASS[dr.status],
-      render: (dr) => statusLabel(t, dr.status),
+      // Closes the phone card's second line at its right edge, so every
+      // status sits in one column under the tax figure above it.
+      stackEdge: 'end',
+      render: (dr) => <StatusPill status={dr.status} label={statusLabel(t, dr.status)} />,
       sortValue: (dr) => statusLabel(t, dr.status),
     },
-    {
-      id: 'edit',
-      header: '',
-      className: 'w-6 px-2',
-      cardCorner: true,
-      // Decorative only — the whole row is the click target (onRowClick
-      // below); this just signals that clicking opens something editable,
-      // now that the table carries no per-row action buttons of its own.
-      render: () => (
-        <Icon.Rename aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-faint" />
-      ),
-    },
+  ];
+
+  const openColumns: DataTableColumn<DisplayRow>[] = [
+    ...(showSelectColumn
+      ? [
+          {
+            id: 'select',
+            header: '',
+            className: 'w-8 px-2',
+            headerCellClassName: 'sm:w-8',
+            stackEdge: 'start',
+            render: (dr: DisplayRow) =>
+              isSelectableRow(dr) ? (
+                <Checkbox
+                  aria-label={t('miningTax.selectForBulkAction')}
+                  checked={selection.has(dr.key)}
+                  onChange={() => toggleRowSelected(dr.key)}
+                />
+              ) : null,
+          } satisfies DataTableColumn<DisplayRow>,
+        ]
+      : []),
+    ...baseColumns,
+  ];
+
+  // History has no checkboxes, but keeps an empty column the same width so
+  // its columns sit exactly under Open's (both tables are fixed-layout). Not
+  // on a phone: there it would be one more (empty) value on the card's meta
+  // line, opening it with a stray "·".
+  const historyColumns: DataTableColumn<DisplayRow>[] = [
+    ...(showSelectColumn && !isPhone
+      ? [
+          {
+            id: 'spacer',
+            header: '',
+            className: 'w-8 px-2',
+            headerCellClassName: 'sm:w-8',
+            render: () => null,
+          } satisfies DataTableColumn<DisplayRow>,
+        ]
+      : []),
+    ...baseColumns,
   ];
 
   const taxSort = useUrlSort(
     'tax.sort',
     TAX_DEFAULT_SORT,
-    columns.map((c) => c.id)
+    openColumns.map((c) => c.id)
+  );
+  const historySort = useUrlSort(
+    'tax.historySort',
+    TAX_DEFAULT_SORT,
+    baseColumns.map((c) => c.id)
   );
 
   // The table's own cell helpers, so the export reads each row exactly as it
@@ -1092,6 +1408,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         estimatedValue: estimatedValueOf,
         taxOwed: (dr) => (dr.assignment ? taxOwedOf(dr) : null),
       }),
+    // Every helper above reads only `data`/`allPayees`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, showCharacterColumn, data, allPayees]
   );
@@ -1112,15 +1429,160 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const duplicateRows =
     data?.entries.filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) ?? [];
 
+  const attentionItems: AttentionItem[] = [];
+  if (data) {
+    // Per-character re-login, never one flag hiding every other character's
+    // data behind a full-page banner — a lapsed alt must stay visible as
+    // needing attention, not disappear.
+    for (const c of data.reauthCharacters) {
+      attentionItems.push({
+        id: `reauth:${c.characterId}`,
+        tone: 'warning',
+        title: t('miningTax.reauthCharacterHint', { character: c.characterName }),
+        action: (
+          <Button size="sm" onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}>
+            {t('miningTax.reauthAction')}
+          </Button>
+        ),
+      });
+    }
+    // An ore type the hub quoted no buy order for is valued at 0, which
+    // renders exactly like a cheap ore and silently understates the bill.
+    // Named per hub rather than pooled: "no buy orders" is a fact about one
+    // order book, and once two Payees bill at two hubs, blaming both for one
+    // thin book would be wrong.
+    if (data.unpricedTypeIds.size > 0) {
+      attentionItems.push({
+        id: 'unpriced',
+        tone: 'warning',
+        title: t('miningTax.unpricedTitle'),
+        detail: (
+          <>
+            <ul className="space-y-0.5">
+              {[...data.unpricedByHub]
+                .filter(([, typeIds]) => typeIds.size > 0)
+                .map(([hubId, typeIds]) => (
+                  <li key={hubId}>
+                    {t('miningTax.unpricedAtHub', {
+                      hub: hubForPayee(hubId).systemName,
+                      types: [...typeIds]
+                        .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
+                        .join(', '),
+                    })}
+                  </li>
+                ))}
+            </ul>
+            <p>{t('miningTax.unpricedHint')}</p>
+            {renderGapLinks(
+              pricingGaps.filter((g) => g.unpriced.length > 0),
+              (g) => g.unpriced
+            )}
+          </>
+        ),
+      });
+    }
+    if (pricingGaps.some((g) => g.sellFallback.length > 0)) {
+      attentionItems.push({
+        id: 'sell-fallback',
+        tone: 'info',
+        title: t('miningTax.sellFallbackTitle'),
+        detail: (
+          <>
+            <p>{t('miningTax.sellFallbackHint')}</p>
+            {renderGapLinks(
+              pricingGaps.filter((g) => g.sellFallback.length > 0),
+              (g) => g.sellFallback
+            )}
+          </>
+        ),
+      });
+    }
+    if (duplicateRows.length > 0) {
+      attentionItems.push({
+        id: 'duplicates',
+        tone: 'warning',
+        title: t('miningTax.duplicateTitle'),
+        detail: (
+          <>
+            <p>{t('miningTax.duplicateHint')}</p>
+            <ul className="space-y-0.5">
+              {duplicateRows.map((row) => (
+                <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
+                  {row.characterName} — {row.entry.date} —{' '}
+                  {data.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`}
+                </li>
+              ))}
+            </ul>
+          </>
+        ),
+      });
+    }
+    for (const u of data.unclassified) {
+      for (const typeId of u.typeIds) {
+        attentionItems.push({
+          id: `unclassified:${u.characterId}:${typeId}`,
+          tone: 'warning',
+          title: t('miningTax.attention.unclassifiedOre', {
+            character: u.characterName,
+            ore: data.typeNames.get(typeId) ?? `#${typeId}`,
+          }),
+          detail: <p>{t('miningTax.unclassifiedHint')}</p>,
+          action: (
+            <>
+              <Button size="sm" onClick={() => void handleTagAsMoonOre(typeId)}>
+                {t('miningTax.tagAsMoonOre')}
+              </Button>
+              <Button size="sm" onClick={() => void handleTagAsIgnored(typeId)}>
+                {t('miningTax.ignoreOreAction')}
+              </Button>
+            </>
+          ),
+        });
+      }
+    }
+  }
+
+  const linkWalletPayee = allPayees.find((p) => p.id === linkWalletTarget?.payeeId) ?? null;
+  const linkWalletOwed = useMemo(
+    () =>
+      linkWalletTarget?.members ??
+      balances.find((b) => b.payee.id === linkWalletTarget?.payeeId)?.members ??
+      [],
+    [linkWalletTarget, balances]
+  );
+  // Only payments from a pilot who mined one of the owed entries — the ISK
+  // has to have left a wallet that owes this bill.
+  const linkWalletCandidates = useMemo(() => {
+    const miners = new Set(linkWalletOwed.map((m) => m.row.characterId));
+    return unlinkedPayments(
+      madePayments.filter((p) => miners.has(p.characterId)),
+      everyAssignment
+    );
+  }, [linkWalletOwed, madePayments, everyAssignment]);
+
+  // The selection bar's "Link payment": one transfer pays one Payee.
+  const selectedPayeeIds = [...new Set(selectedSettleUpRows.map((r) => r.assignment.payeeId))];
+  const linkSelectedBlocked =
+    selectedSettleUpRows.length === 0
+      ? t('miningTax.settleUpBlockedHint')
+      : selectedPayeeIds.length > 1
+        ? t('miningTax.linkPaymentOnePayeeHint')
+        : null;
+
+  const rowClassName = (dr: DisplayRow) =>
+    cx(
+      dr.status === 'paid' && 'text-text-dim',
+      expandedCombined.has(dr.key) && 'sm:[&>td]:align-top'
+    );
+
   return (
     <div className="space-y-4">
       {/*
         The tab's controls ride the page title's own line rather than a strip
         of their own below the tab bar: they act on this tab's whole snapshot,
-        which is what `PageHeader.actions` is for, and the strip they replace
-        held nothing else. Rendering the header here rather than in the route
-        shell is what lets the `DataAgeBadge` read `fetchedAt` directly — see
-        the note on `MoonMiningTax`.
+        which is what `PageHeader.actions` is for. Rendering the header here
+        rather than in the route shell is what lets the `DataAgeBadge` read
+        `fetchedAt` directly — see the note on `MoonMiningTax`.
       */}
       <PageHeader
         title={t('miningTax.title')}
@@ -1135,7 +1597,19 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
-            <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton icon={<Icon.More />} label={t('miningTax.moreActions')} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
+                  {t('miningTax.oreTagsAction')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                  {t('pageSettings.menuItem')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
@@ -1159,145 +1633,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
 
-          {/* Per-character re-login, never one flag hiding every other
-              character's data behind a full-page banner — a lapsed alt must
-              stay visible as needing attention, not disappear. */}
-          {data && data.reauthCharacters.length > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
-              <ul className="space-y-1">
-                {data.reauthCharacters.map((c) => (
-                  <li key={c.characterId} className="flex items-center justify-between gap-2">
-                    <span>
-                      {t('miningTax.reauthCharacterHint', { character: c.characterName })}
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
-                    >
-                      {t('miningTax.reauthAction')}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/*
-            An ore type the hub quoted no buy order for is valued at 0, which
-            renders exactly like a cheap ore and silently understates the bill.
-            Jita has orders for effectively every compressed ore, so this is
-            usually dead copy — it stops being dead the moment a Payee is
-            priced somewhere thinner. Named per hub rather than pooled: "no buy
-            orders" is a fact about one order book, and once two Payees bill at
-            two hubs, blaming both for one thin book would be wrong.
-          */}
-          {data && data.unpricedTypeIds.size > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">{t('miningTax.unpricedTitle')}</p>
-              <ul className="space-y-0.5 text-text-dim">
-                {[...data.unpricedByHub]
-                  .filter(([, typeIds]) => typeIds.size > 0)
-                  .map(([hubId, typeIds]) => (
-                    <li key={hubId}>
-                      {t('miningTax.unpricedAtHub', {
-                        hub: hubForPayee(hubId).systemName,
-                        types: [...typeIds]
-                          .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
-                          .join(', '),
-                      })}
-                    </li>
-                  ))}
-              </ul>
-              <p className="text-text-dim">{t('miningTax.unpricedHint')}</p>
-              {renderGapLinks(
-                pricingGaps.filter((g) => g.unpriced.length > 0),
-                (g) => g.unpriced
-              )}
-            </div>
-          )}
-
-          {pricingGaps.some((g) => g.sellFallback.length > 0) && (
-            <div
-              role="status"
-              className="space-y-1 rounded-xs border border-line bg-panel-2 p-2 text-xs"
-            >
-              <p className="font-semibold text-text uppercase">
-                {t('miningTax.sellFallbackTitle')}
-              </p>
-              <p className="text-text-dim">{t('miningTax.sellFallbackHint')}</p>
-              {renderGapLinks(
-                pricingGaps.filter((g) => g.sellFallback.length > 0),
-                (g) => g.sellFallback
-              )}
-            </div>
-          )}
-
-          {duplicateRows.length > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">
-                {t('miningTax.duplicateTitle')}
-              </p>
-              <p className="text-text-dim">{t('miningTax.duplicateHint')}</p>
-              <ul className="space-y-1">
-                {duplicateRows.map((row) => (
-                  <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
-                    {row.characterName} — {row.entry.date} —{' '}
-                    {data?.systemNames.get(row.entry.solarSystemId) ??
-                      `#${row.entry.solarSystemId}`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {data && data.unclassified.length > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">
-                {t('miningTax.unclassifiedTitle')}
-              </p>
-              <p className="text-text-dim">{t('miningTax.unclassifiedHint')}</p>
-              <ul className="space-y-1">
-                {data.unclassified.flatMap((u) =>
-                  u.typeIds.map((typeId) => (
-                    <li
-                      key={`${u.characterId}:${typeId}`}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span>
-                        {u.characterName} — {data.typeNames.get(typeId) ?? `#${typeId}`}
-                      </span>
-                      <div className="flex shrink-0 gap-1.5">
-                        <Button size="sm" onClick={() => void handleTagAsMoonOre(typeId)}>
-                          {t('miningTax.tagAsMoonOre')}
-                        </Button>
-                        <Button size="sm" onClick={() => void handleTagAsIgnored(typeId)}>
-                          {t('miningTax.ignoreOreAction')}
-                        </Button>
-                      </div>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          )}
+          <AttentionStrip items={attentionItems} />
 
           {/* Until a Payee exists there is nothing to assign an entry to, so
-              the balances, filters and table would all read as blank. Point
-              at the Payees button (outlined in accent while this shows)
-              instead. */}
+              the balances and ledger would all read as blank. Point at the
+              Payees button (outlined in accent while this shows) instead. */}
           {needsFirstPayee ? (
             <EmptyState
               title={t('miningTax.firstPayeeTitle')}
@@ -1305,254 +1645,230 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             />
           ) : (
             <>
-              {/* Balances strip (decision doc): who is owed what right now, and
-                the lump-sum "Settle up" on each card. Settled Payees hide
-                behind the toggle; unassigned ore gets its own card so a
-                balance is never silently short of it. */}
-              <div className="space-y-1.5">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.balancesLabel')} ·{' '}
-                  {owedBalances.length > 0
-                    ? t('miningTax.balancesAcross', {
-                        amount: formatIsk(owedTotal),
-                        count: owedBalances.length,
-                      })
-                    : t('miningTax.balancesNothing')}
-                </p>
-                {(visibleBalances.length > 0 ||
-                  unassigned.entryCount > 0 ||
-                  linkSuggestions.length > 0) && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {visibleBalances.map((balance) => (
-                      <Panel key={balance.payee.id}>
-                        <div className="flex items-center justify-between gap-2">
-                          {/* -my-3 cancels min-h-11's added height so the row (and card) doesn't grow — the 44px only exists as invisible hit area bleeding into Panel's own p-3 padding above and the tight gap below; md: reverts both so desktop is unchanged. */}
-                          <button
-                            type="button"
-                            onClick={() => filterToPayee(balance.payee.id)}
-                            aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
-                            aria-pressed={isSolePayeeFilter(balance.payee.id)}
-                            className="-my-3 flex min-h-11 min-w-0 items-center text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent md:my-0 md:min-h-0"
-                          >
-                            <span className="min-w-0 truncate">{balance.payee.name}</span>
-                          </button>
-                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                            {t('miningTax.balanceEntries', { count: balance.members.length })}
-                          </span>
-                        </div>
-                        {characters.length > 1 && (
-                          <p className="truncate text-[0.6875rem] text-text-dim">
-                            {characters.find((c) => c.characterId === balance.payee.characterId)
-                              ?.characterName ?? ''}
-                          </p>
-                        )}
-                        <p className="mt-1 flex items-baseline gap-1.5">
-                          <span
-                            className={cx(
-                              'text-xl font-semibold tabular-nums',
-                              balance.owed > 0 ? 'text-isk-neg' : 'text-isk-pos'
-                            )}
-                          >
-                            {formatIsk(balance.owed, 0)}
-                          </span>
-                          <span className="text-[0.6875rem] text-text-dim">ISK</span>
-                        </p>
-                        <div className="mt-2">
-                          {balance.owed > 0 ? (
-                            <Button
-                              size="sm"
-                              className="w-full"
-                              onClick={() => settleUpBalance(balance.members)}
-                            >
-                              {t('miningTax.settleUpAction')}
-                            </Button>
-                          ) : (
-                            <Button size="sm" className="w-full" disabled>
-                              {t('miningTax.nothingToSettle')}
-                            </Button>
-                          )}
-                        </div>
-                      </Panel>
-                    ))}
-                    {unassigned.entryCount > 0 && (
-                      <Panel className="border-dashed">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-warning">
-                            {t('miningTax.unassignedCardTitle')}
-                          </span>
-                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                            {t('miningTax.balanceEntries', { count: unassigned.entryCount })}
-                          </span>
-                        </div>
-                        <p className="mt-1 flex items-baseline gap-1.5">
-                          <span className="text-xl font-semibold tabular-nums">
-                            {formatIsk(unassigned.estimatedValue, 0)}
-                          </span>
-                          <span className="text-[0.6875rem] text-text-dim">
-                            {t('miningTax.unassignedMined')}
-                          </span>
-                        </p>
-                        <div className="mt-2">
-                          <Button size="sm" className="w-full" onClick={assignNext}>
-                            {t('miningTax.assignNextAction')}
-                          </Button>
-                        </div>
-                      </Panel>
-                    )}
-                    {/* Paying backwards (issue #540): ISK that left the wallet and
-                      isn't accounted for. A card beside Unassigned, never an
-                      alert — it is an observation about balances, and only
-                      payments with a plausible target reach here at all. */}
-                    {linkSuggestions.length > 0 && (
-                      <Panel className="border-dashed">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold">
-                            {t('miningTax.unlinkedPaymentsCardTitle')}
-                          </span>
-                          <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                            {t('miningTax.unlinkedPaymentsCount', {
-                              count: linkSuggestions.length,
-                            })}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-[0.6875rem] text-text-dim">
-                          {t('miningTax.unlinkedPaymentsHint')}
-                        </p>
-                        <div className="mt-2">
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={() => setLinkPaymentOpen(true)}
-                          >
-                            {t('miningTax.linkPaymentAction')}
-                          </Button>
-                        </div>
-                      </Panel>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <CharacterFilterControl
-                  activeCharacterId={activeCharacterId}
-                  value={characterFilter}
-                  onChange={setCharacterFilter}
-                />
-
-                {allPayees.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm">
-                        {resolvedPayeeFilter === 'all'
-                          ? t('miningTax.allPayees')
-                          : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {allPayees.map((p) => (
-                        <DropdownMenuCheckboxItem
-                          key={p.id}
-                          checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
-                          onSelect={(e) => e.preventDefault()}
-                          onCheckedChange={() => togglePayee(p.id)}
-                        >
-                          {characters.length > 1
-                            ? t('miningTax.payeeOptionWithCharacter', {
-                                payee: p.name,
-                                character:
-                                  characters.find((c) => c.characterId === p.characterId)
-                                    ?.characterName ?? '',
-                              })
-                            : p.name}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm">
-                      {t('miningTax.statusFilterLabel', { count: statusFilter.size })}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {ALL_STATUSES.map((status) => (
-                      <DropdownMenuCheckboxItem
-                        key={status}
-                        checked={statusFilter.has(status)}
-                        onSelect={(e) => e.preventDefault()}
-                        onCheckedChange={() => toggleStatus(status)}
-                      >
-                        {statusLabel(t, status)} ({statusCounts.get(status) ?? 0})
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/*
-                Settled Payees are hidden from the Balances strip by default —
-                a balance of zero is not a thing to act on. The control belongs
-                with the other three filters rather than on the strip's own
-                label, and is a `FilterChip` rather than a checkbox: a pressed
-                view toggle, drawn the way every other one in the app is. At
-                `sm` it shares the small `Button` dropdown triggers' height and
-                uppercase 11px type, so the row still reads as one control row —
-                and it stays off the accent fill, which here belongs to the
-                selection toolbar's Settle Up just below. Only offered when
-                hiding is actually doing something: with nothing settled the
-                toggle would change nothing on screen.
-              */}
-                <span className="ml-auto flex items-center gap-2">
-                  {settledCount > 0 && (
-                    <FilterChip
-                      size="sm"
-                      label={t('miningTax.settledPayeesFilter')}
-                      selected={showSettled}
-                      onToggle={() => setShowSettled(!showSettled)}
-                    />
-                  )}
-                  {visibleRows.length > 0 && (
-                    <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
-                  )}
-                </span>
-              </div>
-
-              <SelectionToolbar
-                selectedCount={selectedRows.length}
-                canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
-                onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
-                onClear={() => setSelection(new Set())}
-                settleUpCount={selectedSettleUpRows.length}
-                onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
-                combine={combine}
-                onCombine={handleCombineSelected}
-                dismissCount={dismissTargets.length}
-                onDismiss={() => setBulkDismissOpen(true)}
+              <OwedBalances
+                balances={balances}
+                unassigned={unassigned}
+                unlinkedPaymentCount={linkSuggestions.length}
+                characterNameOf={
+                  characters.length > 1
+                    ? (balance) =>
+                        characters.find((c) => c.characterId === balance.payee.characterId)
+                          ?.characterName
+                    : undefined
+                }
+                isSoleFilter={isSolePayeeFilter}
+                onFilterPayee={filterToPayee}
+                onSettleUp={(balance) => settleUpBalance(balance.members)}
+                onLinkPayment={(balance) => setLinkWalletTarget({ payeeId: balance.payee.id })}
+                onAssignNext={assignNext}
+                onReviewPayments={() => setLinkPaymentOpen(true)}
               />
 
-              {visibleRows.length === 0 ? (
-                <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
-              ) : (
-                <Panel padded={false}>
-                  <div className="overflow-x-auto">
-                    <DataTable
-                      {...taxExport.tableProps}
-                      columns={columns}
-                      rows={visibleRows}
-                      rowKey={(dr) => dr.key}
-                      label={t('miningTax.title')}
-                      {...taxSort}
-                      mobileSort
-                      onRowClick={(dr) => setDetailTarget(dr)}
+              {data && continuations.some((c) => !autoContinue || autoSkip.has(c.next.key)) && (
+                <div className="space-y-2">
+                  {continuations
+                    .filter((c) => !autoContinue || autoSkip.has(c.next.key))
+                    .map((c) => (
+                      <ContinueSessionCard
+                        key={c.next.key}
+                        continuation={c}
+                        systemName={systemName(c.next)}
+                        payeeName={payeeName(c.previous.payeeId)}
+                        typeNames={data.typeNames}
+                        busy={busy}
+                        autoContinue={autoContinue}
+                        onContinue={() => void handleContinue(c)}
+                        onChooseOther={() => setDetailTarget(c.next)}
+                        onKeepSeparate={() => keepSeparate(c)}
+                        onAutoContinueChange={setAutoContinueFromCard}
+                      />
+                    ))}
+                </div>
+              )}
+
+              {/* The filters sit right on top of the Open list they filter
+                  first: no "Open" heading between them, since every row in
+                  it already carries its status. */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CharacterFilterControl
+                    activeCharacterId={activeCharacterId}
+                    value={characterFilter}
+                    onChange={setCharacterFilter}
+                  />
+
+                  {allPayees.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm">
+                          {resolvedPayeeFilter === 'all'
+                            ? t('miningTax.allPayees')
+                            : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {allPayees.map((p) => (
+                          <DropdownMenuCheckboxItem
+                            key={p.id}
+                            checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
+                            onSelect={(e) => e.preventDefault()}
+                            onCheckedChange={() => togglePayee(p.id)}
+                          >
+                            {characters.length > 1
+                              ? t('miningTax.payeeOptionWithCharacter', {
+                                  payee: p.name,
+                                  character:
+                                    characters.find((c) => c.characterId === p.characterId)
+                                      ?.characterName ?? '',
+                                })
+                              : p.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                  {/* On a phone the stacked cards have no header row to sort
+                    from; the picker lives here rather than above the list. */}
+                  {isPhone && openRows.length > 1 && (
+                    <DataTableSortPicker
+                      columns={openColumns}
+                      sort={taxSort.sort}
+                      onSortChange={taxSort.onSortChange}
+                      size="sm"
                     />
-                  </div>
-                </Panel>
+                  )}
+
+                  {visibleRows.length > 0 && (
+                    <span className="ml-auto">
+                      <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
+                    </span>
+                  )}
+                </div>
+
+                {/* An empty ledger is EmptyState's to explain below; "nothing
+                  open — every entry is paid" would contradict it. */}
+                {visibleRows.length > 0 && (
+                  <section aria-labelledby="mining-tax-open">
+                    <h2 id="mining-tax-open" className="sr-only">
+                      {t('miningTax.sections.open', { count: openRows.length })}
+                    </h2>
+                    {openRows.length === 0 ? (
+                      <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
+                        {t('miningTax.sections.openEmpty')}
+                      </p>
+                    ) : (
+                      <Panel padded={false}>
+                        <div className="overflow-x-auto">
+                          <DataTable
+                            {...taxExport.tableProps}
+                            columns={openColumns}
+                            rows={openRows}
+                            className="sm:table-fixed"
+                            rowKey={(dr) => dr.key}
+                            label={t('miningTax.sections.openLabel')}
+                            {...taxSort}
+                            stackLayout="dense"
+                            rowClassName={rowClassName}
+                            onRowClick={(dr) => setDetailTarget(dr)}
+                          />
+                        </div>
+                      </Panel>
+                    )}
+                  </section>
+                )}
+              </div>
+
+              {historyRows.length > 0 && (
+                <section aria-labelledby="mining-tax-history" className="space-y-2">
+                  <h2
+                    id="mining-tax-history"
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  >
+                    {t('miningTax.sections.history')}
+                  </h2>
+                  <Panel padded={false}>
+                    <div className="overflow-x-auto">
+                      <DataTable
+                        columns={historyColumns}
+                        rows={historyRows}
+                        // Months are sections here, not folded duplicates:
+                        // their entries line up with Open's, unindented.
+                        className="dt-flat-groups sm:table-fixed"
+                        rowKey={(dr) => dr.key}
+                        label={t('miningTax.sections.history')}
+                        {...historySort}
+                        stackLayout="dense"
+                        rowClassName={rowClassName}
+                        onRowClick={(dr) => setDetailTarget(dr)}
+                        groupBy={{
+                          key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
+                          allWidths: true,
+                          minSize: 1,
+                          // The newest month opens; older ones stay folded.
+                          defaultExpanded: (rows) =>
+                            (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
+                          renderHeader: (rows) => (
+                            <HistoryMonthHeader
+                              month={(dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7)}
+                              count={rows.length}
+                              taxTotal={rows.reduce(
+                                (sum, dr) => sum + (dr.assignment ? taxOwedOf(dr) : 0),
+                                0
+                              )}
+                            />
+                          ),
+                        }}
+                      />
+                    </div>
+                  </Panel>
+                </section>
+              )}
+
+              {visibleRows.length === 0 && (
+                <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
+              )}
+
+              {/* Pinned above the phone tab bar (and to the bottom of the
+                  viewport on desktop), so the bulk actions stay in reach
+                  wherever the ticked row sits in a long ledger. */}
+              {selectedRows.length > 0 && (
+                <div className="sticky bottom-[var(--bottom-nav-clearance)] z-30 md:bottom-3">
+                  <SelectionToolbar
+                    selectedCount={selectedRows.length}
+                    canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
+                    onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
+                    onClear={() => setSelection(new Set())}
+                    settleUpCount={selectedSettleUpRows.length}
+                    onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
+                    combine={combine}
+                    onCombine={handleCombineSelected}
+                    dismissCount={dismissTargets.length}
+                    onDismiss={() => setBulkDismissOpen(true)}
+                    linkPaymentBlockedReason={linkSelectedBlocked}
+                    onLinkPayment={() => {
+                      const payeeId = selectedPayeeIds[0];
+                      if (!payeeId) return;
+                      setLinkWalletTarget({
+                        payeeId,
+                        members: settleUpMembers(selectedRows),
+                      });
+                    }}
+                  />
+                </div>
               )}
             </>
           )}
         </>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          undo={
+            toast.onUndo ? { label: t('miningTax.continue.undo'), onUndo: toast.onUndo } : undefined
+          }
+        />
       )}
 
       {oreTagsOpen && (
@@ -1563,6 +1879,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         />
       )}
 
+      <PageSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        pageName={t('miningTax.title')}
+        section="miningTax"
+      >
+        <MiningTaxSettingsForm onAutoContinueChange={setAutoContinueFromCard} />
+      </PageSettingsModal>
+
       {payeeManagerCharacterId !== null && (
         <PayeeManagerDialog
           open={payeeManagerCharacterId !== null}
@@ -1571,6 +1896,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           payeesByCharacter={data?.payeesByCharacter ?? new Map()}
           initialCharacterId={payeeManagerCharacterId}
           onChanged={refresh}
+          owedByPayee={owedByPayee}
+          systemsByPayee={payeeSystems}
+          systemNames={data?.systemNames}
         />
       )}
 
@@ -1579,30 +1907,60 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           open={detailTarget !== null}
           onClose={() => setDetailTarget(null)}
           members={allMembers(detailTarget)}
-          systemName={
-            data.systemNames.get(detailTarget.row.entry.solarSystemId) ??
-            `#${detailTarget.row.entry.solarSystemId}`
-          }
-          systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
+          systemName={systemName(detailTarget)}
+          systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           busy={busy}
-          onEditMember={(member) =>
-            setDetailTarget({
-              key: member.assignment.id,
-              row: member.row,
-              assignment: member.assignment,
-              status: member.assignment.status,
-            })
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
+          onEdit={() => {
+            setEditTarget(detailTarget);
+            setDetailTarget(null);
+          }}
+          onSettleUp={
+            detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
           }
-          onMarkAllPaid={() => void handleMarkGroupPaidFromDetail()}
+          onMarkAllPaid={handleMarkGroupPaidFromDetail}
+          onTakeOut={handleTakeOut}
+          onUncombine={handleUncombineAll}
+          onResolve={handleResolveGroup}
+          onUnassignAll={handleUnassignGroup}
+          onLinkWalletPayment={() => {
+            const payeeId = detailTarget.assignment?.payeeId;
+            if (!payeeId) return;
+            setLinkWalletTarget({
+              payeeId,
+              members: allMembers(detailTarget).filter(
+                (m) => m.assignment.status === 'outstanding'
+              ),
+            });
+            setDetailTarget(null);
+          }}
           linkedTransactions={groupLinkedTransactions}
           onLinkTransaction={
             allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
               ? () => setLinkTransactionTarget(detailTarget)
               : undefined
           }
-          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
+          onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+        />
+      )}
+
+      {editTarget && data && (
+        <EntryEditDialog
+          open
+          onClose={() => setEditTarget(null)}
+          members={allMembers(editTarget)}
+          systemName={systemName(editTarget)}
+          systemSecurity={systemSecurityOf(editTarget)}
+          payees={allPayees}
+          typeNames={data.typeNames}
+          pricesFor={pricesFor}
+          onSaved={() => {
+            setEditTarget(null);
+            refresh();
+          }}
         />
       )}
 
@@ -1613,21 +1971,36 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           row={detailTarget.row}
           assignment={detailTarget.assignment}
           status={detailTarget.status}
-          systemName={
-            data.systemNames.get(detailTarget.row.entry.solarSystemId) ??
-            `#${detailTarget.row.entry.solarSystemId}`
-          }
-          systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
+          systemName={systemName(detailTarget)}
+          systemSecurity={systemSecurityOf(detailTarget)}
           typeNames={data.typeNames}
           payees={allPayees}
+          suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
           pricesFor={pricesFor}
           busy={busy}
+          // A failed link shows in its own dialog, open on top of this one.
+          saveError={linkTransactionTarget ? null : actionError}
           onAssigned={handleAssignedFromDetail}
-          onDismiss={() => void handleDismissFromDetail()}
-          onMarkPaid={() => void handleMarkPaidFromDetail()}
-          onResolve={() => void handleResolveFromDetail()}
-          onUndo={() => void handleUndoFromDetail()}
-          onUnlock={handleUnlockFromDetail}
+          onDismiss={handleDismissFromDetail}
+          onMarkPaid={handleMarkPaidFromDetail}
+          onResolve={handleResolveFromDetail}
+          onUndo={handleUndoFromDetail}
+          onEdit={() => {
+            setEditTarget(detailTarget);
+            setDetailTarget(null);
+          }}
+          onSettleUp={
+            detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
+          }
+          onLinkWalletPayment={
+            detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
+              ? () => {
+                  const payeeId = detailTarget.assignment?.payeeId;
+                  if (payeeId) setLinkWalletTarget({ payeeId });
+                  setDetailTarget(null);
+                }
+              : undefined
+          }
           onAddPayee={
             payeeManagerDefaultCharacterId !== null
               ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
@@ -1651,7 +2024,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               ? () => setLinkTransactionTarget(detailTarget)
               : undefined
           }
-          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
+          onUnlinkTransaction={handleUnlinkTransactionFromDetail}
         />
       )}
 
@@ -1663,6 +2036,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             candidates={linkTransactionCandidates}
             targetAmount={linkTransactionTargetAmount}
             busy={busy}
+            saveError={actionError}
             onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
           />
         )}
@@ -1730,6 +2104,35 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             setSelection(new Set());
             refresh();
           }}
+          onPickFromWallet={(() => {
+            const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
+            const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
+            if (!only) return undefined;
+            // The entries being settled, not the Payee's whole balance.
+            const members = settleUpRows.flatMap((r) =>
+              allDisplayRows.flatMap(allMembers).filter((m) => m.assignment.id === r.assignment.id)
+            );
+            return () => {
+              setSettleUpRows(null);
+              setLinkWalletTarget({ payeeId: only, members });
+            };
+          })()}
+        />
+      )}
+
+      {linkWalletPayee && data && (
+        <LinkWalletPaymentDialog
+          key={linkWalletPayee.id}
+          open
+          onClose={() => setLinkWalletTarget(null)}
+          payee={linkWalletPayee}
+          owed={linkWalletOwed}
+          candidates={linkWalletCandidates}
+          systemNames={data.systemNames}
+          onLinked={() => {
+            setSelection(new Set());
+            refresh();
+          }}
         />
       )}
 
@@ -1739,7 +2142,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onClose={() => setLinkPaymentOpen(false)}
           suggestions={linkSuggestions}
           systemNames={data.systemNames}
-          showCharacter={showCharacterColumn}
+          showCharacter={characters.length > 1}
           onLinked={refresh}
         />
       )}
@@ -1759,5 +2162,31 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         />
       )}
     </div>
+  );
+}
+
+/** A History month's fold row: which month, how many entries, what was paid in it. */
+function HistoryMonthHeader({
+  month,
+  count,
+  taxTotal,
+}: {
+  month: string;
+  count: number;
+  taxTotal: number;
+}) {
+  const { t, i18n } = useTranslation();
+  const label = new Date(`${month}-01T00:00:00Z`).toLocaleDateString(i18n.language, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return (
+    <span className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3">
+      <span className="font-semibold">{label}</span>
+      <span className="text-[0.6875rem] text-text-dim tabular-nums">
+        {t('miningTax.sections.monthSummary', { count, amount: formatIsk(taxTotal, 0) })}
+      </span>
+    </span>
   );
 }

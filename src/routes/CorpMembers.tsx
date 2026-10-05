@@ -212,7 +212,15 @@ async function loadMembersSnapshot(
  */
 function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
   return (
-    <MemberContextMenu characterId={row.characterId} name={label(row.name, row.characterId)}>
+    <MemberContextMenu
+      characterId={row.characterId}
+      name={label(row.name, row.characterId)}
+      location={
+        row.locationId !== null && row.locationName !== null
+          ? { id: row.locationId, name: row.locationName }
+          : undefined
+      }
+    >
       {tr}
     </MemberContextMenu>
   );

@@ -43,7 +43,10 @@ const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
   serialize: (value) => (value === '' ? null : value),
 };
 
-const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
+/** The selected item's own views: its Order Book, its Variations, its Price History. */
+export type MarketItemTab = 'orders' | 'variations' | 'history';
+
+const ITEM_TAB_PARAM = enumParam<MarketItemTab>(['orders', 'variations', 'history'], 'orders');
 
 /**
  * The URL's `hub`/`region`, read exactly as `parseMarketParams` reads them,
@@ -94,8 +97,8 @@ export interface MarketBrowserController {
   handleToggle: (groupId: number) => void;
 
   /** Order Book / Price History — Order Book by default. */
-  itemTab: 'orders' | 'history';
-  setItemTab: (next: 'orders' | 'history') => void;
+  itemTab: MarketItemTab;
+  setItemTab: (next: MarketItemTab) => void;
 }
 
 export function useMarketBrowser({

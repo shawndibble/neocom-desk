@@ -25,6 +25,19 @@ import { roundPriceDown, undercutPrice } from './priceTick';
 export interface HaulingThresholds {
   /** Days of demand a load may lean on: the horizon a quantity and a "clearing price" are read over. */
   horizonDays: number;
+  /**
+   * The share of the horizon's unmet demand one hauler can realistically
+   * capture: other sellers undercut, and region volume includes trades a
+   * listing never sees. Bounds a lot on fast sellers, where a week of sales is
+   * more units than anyone moves in one trip.
+   */
+  ownShareOfDemand: number;
+  /**
+   * The least a unit must earn, as a percent of what it costs to buy, to be
+   * worth buying at all. A unit that only breaks even on today's books loses
+   * money the moment a price slips between planning and buying or selling.
+   */
+  minUnitMarginPct: number;
   /** The history window demand is read over. */
   historyDays: number;
   /** The recent-sale-price window. Falls back to the whole history window when nothing traded inside it. */
@@ -51,6 +64,8 @@ export interface HaulingThresholds {
  */
 export const HAULING_THRESHOLDS: HaulingThresholds = {
   horizonDays: 7,
+  ownShareOfDemand: 0.25,
+  minUnitMarginPct: 5,
   historyDays: 30,
   recentPriceDays: 7,
   minOrdersPerTradingDay: 2,
@@ -218,7 +233,7 @@ export interface SaleEstimate {
   dailyVolume: number;
   /** Days until those units plus a reference lot (one day's sales) have sold. */
   daysToSell: number;
-  /** Most units worth bringing: a week of sales less those ahead, never under 1. */
+  /** Most units worth bringing: `ownShareOfDemand` of a week's sales less those ahead, never under 1. */
   demandCapUnits: number;
 }
 
@@ -262,7 +277,10 @@ export function estimateSale(input: {
     unitsAhead,
     dailyVolume,
     daysToSell: (unitsAhead + referenceLot) / dailyVolume,
-    demandCapUnits: Math.max(1, Math.floor(horizonDemand - unitsAhead)),
+    demandCapUnits: Math.max(
+      1,
+      Math.floor(Math.max(0, horizonDemand - unitsAhead) * thresholds.ownShareOfDemand)
+    ),
   };
 }
 
@@ -334,8 +352,11 @@ export function walkInstant(input: {
   destBuyLadder: readonly LadderLevel[];
   accountingLevel: number;
   maxUnits?: number;
+  /** Stop at the first unit earning less than this percent of its buy price; 0 (the default) stops at break-even. */
+  minMarginPct?: number;
 }): InstantWalk {
   const { originLadder, destBuyLadder, accountingLevel } = input;
+  const minMargin = 1 + Math.max(0, input.minMarginPct ?? 0) / 100;
   let remaining = input.maxUnits === undefined ? Infinity : Math.max(0, Math.floor(input.maxUnits));
   let units = 0;
   let cost = 0;
@@ -347,7 +368,7 @@ export function walkInstant(input: {
   while (remaining > 0 && i < originLadder.length && j < destBuyLadder.length) {
     const buyAt = originLadder[i]!.price;
     const sellAt = destBuyLadder[j]!.price;
-    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt) break;
+    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt * minMargin) break;
     const take = Math.min(leftAtOrigin, leftAtDest, remaining);
     units += take;
     cost += take * buyAt;

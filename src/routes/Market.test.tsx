@@ -370,6 +370,19 @@ beforeEach(async () => {
 // The Market Group, not the nav rail's "Ships" link: the group is a button.
 const SHIPS_GROUP = { name: 'Ships' } as const;
 
+/** Variations live behind their own item tab, next to Order Book and Price History. */
+async function openVariationsTab(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('tab', { name: /^Variations/ }));
+  return screen.findByRole('table', { name: 'Variations' });
+}
+
+/** The finder column: item search, its filter funnel, the Market Group tree. */
+function finder(): HTMLElement {
+  const panel = screen.getByRole('searchbox').closest('section');
+  if (!panel) throw new Error('expected the finder panel');
+  return panel;
+}
+
 describe('Market Browser', () => {
   it('filters the Market Group tree in place, hiding branches with no match', async () => {
     const user = userEvent.setup();
@@ -472,7 +485,7 @@ describe('Market Browser', () => {
     await user.click(await screen.findByText('Rifter'));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
     expect(
       within(sellTable).getByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
         exact: false,
@@ -480,7 +493,7 @@ describe('Market Browser', () => {
     ).toBeInTheDocument();
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
-    expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
+    expect(within(buyTable).getByText('500,000')).toBeInTheDocument();
   });
 
   it('focuses the item panel heading on selection, and the tree row on Back (issue #1485)', async () => {
@@ -595,7 +608,7 @@ describe('Market Browser', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('450,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('450,000')).toBeInTheDocument();
     expect(screen.queryByText("Couldn't load the order book")).not.toBeInTheDocument();
   });
 
@@ -726,11 +739,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
     expect(await within(table).findByText('Kestrel')).toBeInTheDocument();
-    expect(
-      within(table).getByText('1,500,000.00 ISK', { selector: '.sr-only' })
-    ).toBeInTheDocument();
+    expect(within(table).getByText('1,500,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
 
     // Corax has a buy order but no sell order — the Sell cell says so
     // plainly rather than showing a fabricated zero, and the Buy cell still
@@ -738,9 +749,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const coraxRow = within(table).getByText('Corax').closest('tr');
     if (!coraxRow) throw new Error('expected a Corax row');
     expect(within(coraxRow).getByText('No sell orders')).toBeInTheDocument();
-    expect(
-      within(coraxRow).getByText('700,000.00 ISK', { selector: '.sr-only' })
-    ).toBeInTheDocument();
+    expect(within(coraxRow).getByText('700,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
 
     // Cormorant has no orders on either side — each cell independently says
     // so, never conflated with Corax's buy-only state.
@@ -765,7 +774,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
     // Kestrel is Merlin's Tech II variant, not a Market Group sibling here —
     // Corax and Cormorant (Market Group siblings, no variation entry) are
     // excluded once the variation group resolves.
@@ -802,7 +811,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    await screen.findByRole('table', { name: 'Variations' });
+    await openVariationsTab(user);
 
     await user.click(screen.getByRole('button', { name: 'Compare' }));
 
@@ -829,7 +838,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    await screen.findByRole('table', { name: 'Variations' });
+    await openVariationsTab(user);
 
     await user.click(screen.getByRole('button', { name: 'Compare' }));
     const toast = await screen.findByRole('status');
@@ -848,7 +857,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
 
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
@@ -888,7 +897,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
 
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
@@ -907,7 +916,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
 
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
@@ -932,10 +941,10 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     // The order book — unrelated to variations.json — still renders fine.
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('900,000')).toBeInTheDocument();
     // The Variations table degrades to the sibling fallback rather than
     // going empty or taking the whole route down with it.
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
     expect(within(table).getByText('Kestrel')).toBeInTheDocument();
   });
 
@@ -946,16 +955,17 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    await screen.findByText('Variations');
+    const before = await openVariationsTab(user);
 
-    await user.click(await screen.findByText('Kestrel'));
+    await user.click(await within(before).findByText('Kestrel'));
 
-    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
-    // Re-anchored: Merlin, the previously-selected item, is now a row
-    // (the tree still shows its own "Merlin" match for the lingering search).
+    // Re-anchored: Merlin, the previously-selected item, is now a row. The
+    // Variations tab stays open across the selection, like Price History.
     const table = await screen.findByRole('table', { name: 'Variations' });
-    expect(within(table).getByText('Merlin')).toBeInTheDocument();
+    expect(await within(table).findByText('Merlin')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Order Book' }));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,500,000')).toBeInTheDocument();
   });
 
   it('re-anchors on a click anywhere in the row, not just the item name — identical to the old card click', async () => {
@@ -965,15 +975,16 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
 
     // Click the row itself, not the Name cell.
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
     await user.click(kestrelRow);
 
+    await user.click(await screen.findByRole('tab', { name: 'Order Book' }));
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
+    expect(await within(sellTable).findByText('1,500,000')).toBeInTheDocument();
   });
 
   it('a manual Refresh also refetches row prices, not just the on-screen order book', async () => {
@@ -985,7 +996,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    await screen.findByRole('table', { name: 'Variations' });
+    await openVariationsTab(user);
     await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
@@ -1003,25 +1014,30 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Merlin'));
     await user.click(screen.getByRole('button', { name: 'Region' })); // reveal Merlin's second, out-of-hub order
 
-    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
-    const table = await screen.findByRole('table', { name: 'Variations' });
     expect(
-      within(table).getByText('1,500,000.00 ISK', { selector: '.sr-only' })
+      within(await screen.findByRole('table', { name: 'Sell Orders' })).getByText('850,000')
+    ).toBeInTheDocument();
+    const unfiltered = await openVariationsTab(user);
+    expect(
+      await within(unfiltered).findByText('1,500,000 ISK', { selector: '.sr-only' })
     ).toBeInTheDocument(); // Kestrel, unfiltered
 
+    await user.click(screen.getByRole('tab', { name: 'Order Book' }));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     const rows = within(sellTable).getAllByRole('row');
-    const targetRow = rows.find((row) => within(row).queryByText('850,000.00'));
+    const targetRow = rows.find((row) => within(row).queryByText('850,000'));
     if (!targetRow) throw new Error('expected a row with the out-of-hub Merlin order');
     targetRow.focus();
     fireEvent.contextMenu(targetRow);
     await user.click(await screen.findByRole('menuitem', { name: 'Filter to this station' }));
+    await screen.findByText(/^Filtered to/);
 
     // Kestrel and Corax have no orders at all at that location — the table
     // degrades exactly as the on-screen tables do under the same filter.
+    const table = await openVariationsTab(user);
     await waitFor(() => {
       expect(
-        within(table).queryByText('1,500,000.00 ISK', { selector: '.sr-only' })
+        within(table).queryByText('1,500,000 ISK', { selector: '.sr-only' })
       ).not.toBeInTheDocument();
     });
     expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
@@ -1036,7 +1052,11 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    expect(screen.queryByText('Variations')).not.toBeInTheDocument();
+    // The tab stays (a tab that comes and goes per item moves the others),
+    // but it carries no count and opens on a plain empty state.
+    await user.click(screen.getByRole('tab', { name: 'Variations' }));
+    expect(await screen.findByText('No variations for this item')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Variations' })).not.toBeInTheDocument();
   });
 
   it('renders every sibling of a large Market Group, uncapped', async () => {
@@ -1070,8 +1090,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
 
-    expect(await screen.findByText('Variations')).toBeInTheDocument();
-    const table = await screen.findByRole('table', { name: 'Variations' });
+    const table = await openVariationsTab(user);
     expect(within(table).getAllByRole('row')).toHaveLength(26); // header + all 25 siblings, uncapped
   });
 
@@ -1377,7 +1396,7 @@ describe('Quickbar (issue #7)', () => {
 describe('Market Browser order row context menu (issue #6)', () => {
   afterEach(() => configureClipboard(null));
 
-  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+  it("copies an order's price from the expanded row's Copy price button", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
     server.use(ordersHandler({ count: 0 }));
@@ -1387,12 +1406,12 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    await user.click(
-      within(sellTable).getByRole('button', { name: /^More actions for 1,000,000.00 ISK, Jita IV/ })
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+    await user.click(sellRow);
+    await user.click(await screen.findByRole('button', { name: 'Copy price 1,000,000' }));
 
     expect(writeText).toHaveBeenCalledWith('1000000');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 
   it('copies the location and price to the clipboard', async () => {
@@ -1423,7 +1442,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
   });
 
   // Plain digits, never `formatIsk`'s grouped text (#2294): EVE's own order
-  // price field rejects "12.34 ISK" and "1,000,000.00" alike.
+  // price field rejects "12.34 ISK" and "1,000,000" alike.
   it('copies a price with cents as plain digits (#2294)', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
@@ -1453,10 +1472,9 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    await user.click(
-      within(sellTable).getByRole('button', { name: /^More actions for 12.34 ISK, Jita IV/ })
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+    await user.click(sellRow);
+    await user.click(await screen.findByRole('button', { name: 'Copy price 12.34' }));
 
     expect(writeText).toHaveBeenCalledWith('12.34');
   });
@@ -1491,7 +1509,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
   });
 
-  it('Add to Skill Plan from the order row expand creates the plan and shows it was added', async () => {
+  it("Add to Skill Plan from the item's Required skills creates the plan and shows it was added", async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     server.use(
       ordersHandler({ count: 0 }),
@@ -1517,10 +1535,9 @@ describe('Market Browser order row context menu (issue #6)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    const [, sellRow] = within(sellTable).getAllByRole('row');
+    await screen.findByRole('table', { name: 'Sell Orders' });
 
-    await user.click(sellRow);
+    await user.click(await screen.findByRole('button', { name: /^Required skills/i }));
     // No plan yet -> "Create Skill Plan and add", not "Add to Skill Plan" (matches
     // FitCheck/Mastery's shared Target Plan contract).
     const addButton = await screen.findByRole('button', { name: 'Create Skill Plan and add' });
@@ -1550,7 +1567,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('2,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('2,000,000')).toBeInTheDocument();
     const [, sellRow] = within(sellTable).getAllByRole('row');
     sellRow.focus();
     fireEvent.contextMenu(sellRow);
@@ -1562,16 +1579,16 @@ describe('Market Browser order row context menu (issue #6)', () => {
     ).toBeInTheDocument();
     // The other sell order sits at a different (player-structure) location, so it drops out of view.
     expect(
-      within(await screen.findByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000.00')
+      within(await screen.findByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000')
     ).not.toBeInTheDocument();
     // The buy order shares the filtered-to station, so it stays visible.
     expect(
-      within(await screen.findByRole('table', { name: 'Buy Orders' })).getByText('500,000.00')
+      within(await screen.findByRole('table', { name: 'Buy Orders' })).getByText('500,000')
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Clear filter' }));
     expect(
-      within(await screen.findByRole('table', { name: 'Sell Orders' })).getByText('2,000,000.00')
+      within(await screen.findByRole('table', { name: 'Sell Orders' })).getByText('2,000,000')
     ).toBeInTheDocument();
   });
 });
@@ -1587,8 +1604,8 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.click(await screen.findByText('Rifter'));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
-    expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('2,000,000')).not.toBeInTheDocument();
   });
 
   it('shows Distance and Min quantity in both modes; Security and NPC-only only once the book spans stations', async () => {
@@ -1602,17 +1619,17 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await screen.findByRole('table', { name: 'Sell Orders' });
     // Behind the funnel, like the other search pages.
     expect(screen.queryByRole('spinbutton', { name: 'Min quantity' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    expect(screen.getByRole('spinbutton', { name: 'Min quantity' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
+    await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
+    expect(within(finder()).getByRole('spinbutton', { name: 'Min quantity' })).toBeInTheDocument();
+    expect(within(finder()).getByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'NPC stations only' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
-    expect(await screen.findByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Security' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'NPC stations only' })).toBeInTheDocument();
+    expect(await within(finder()).findByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
+    expect(within(finder()).getByRole('group', { name: 'Security' })).toBeInTheDocument();
+    expect(within(finder()).getByRole('button', { name: 'NPC stations only' })).toBeInTheDocument();
   });
 
   it('Min quantity and NPC stations only narrow the book, counted on the funnel', async () => {
@@ -1622,25 +1639,29 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     render(<App />);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('2,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('2,000,000')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.click(screen.getByRole('button', { name: 'NPC stations only' }));
+    await user.click(within(finder()).getByRole('button', { name: 'Filters' }));
+    await user.click(within(finder()).getByRole('button', { name: 'NPC stations only' }));
 
     // The player-structure sell order drops out; the Jita 4-4 one stays.
     await waitFor(() =>
       expect(
-        within(screen.getByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000.00')
+        within(screen.getByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000')
       ).not.toBeInTheDocument()
     );
-    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+    expect(
+      within(finder()).getByRole('button', { name: 'Filters (1 active)' })
+    ).toBeInTheDocument();
 
-    await user.type(screen.getByRole('spinbutton', { name: 'Min quantity' }), '6');
+    await user.type(within(finder()).getByRole('spinbutton', { name: 'Min quantity' }), '6');
     // Jita's orders have 5 (sell) and 3 (buy) left, so both sides empty — and the hint says why.
     expect(
       await screen.findAllByText('No orders match the filters. Loosen them to see more.')
     ).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
+    expect(
+      within(finder()).getByRole('button', { name: 'Filters (2 active)' })
+    ).toBeInTheDocument();
   });
 
   it('Region mode shows every station in the region, including ones Trade Hub mode hides', async () => {
@@ -1656,7 +1677,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('2,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('2,000,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('Unknown Structure', { exact: false })).toBeInTheDocument();
     // Same region as Trade Hub mode was already fetched, so this is the cached result, not a refetch.
     expect(hits.count).toBe(1);
@@ -1696,7 +1717,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(await screen.findByText(/GPMR-01/)).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     // PLEX orders still carry ordinary station ids, so Trade Hub mode's Jita filter still applies.
-    expect(within(sellTable).getByText('3,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('3,000,000')).toBeInTheDocument();
     expect(hits.count).toBe(1);
   });
 });
@@ -1726,7 +1747,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
   });
 
   it('an unknown item id in the URL degrades to the default view instead of erroring', async () => {
@@ -1744,7 +1765,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     // Falls back to the persisted default (Trade Hub mode, Jita) rather than erroring.
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
+    expect(within(sellTable).queryByText('2,000,000')).not.toBeInTheDocument();
   });
 
   it('does not touch the URL while the user is still typing a search', async () => {

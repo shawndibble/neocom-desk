@@ -42,8 +42,8 @@ here — they go one per file in `docs/context/decisions/`.
   not just prefilled, and invoice semantics thereafter: neither a later Jita
   price move nor an edited Payee default retroactively changes what it shows
   as owed. Re-diffed on every ledger refresh: if ESI reports _more_ ore for
-  the same entry afterward, an Outstanding, ungrouped one absorbs the growth
-  at once (re-snapshotted, re-priced), while a Paid, dismissed or joined one
+  the same entry afterward, an Outstanding one — combined or not — absorbs
+  the growth at once (re-snapshotted, re-priced), while a Paid or dismissed one
   flips to `needs-review` with an explicit before/after diff — and can be
   split from there. A `dismissed`
   Assignment ("I don't pay tax on this entry") carries no Payee at all, but
@@ -208,6 +208,14 @@ here — they go one per file in `docs/context/decisions/`.
   it look empty for a reason that is not about the pilot's data. Map, ticker
   and rail all read the same board, so a day cannot show a dot for something
   the rail declines to list.
+- **Combined Entry**: Two or more Mining Ledger Entries the pilot billed as
+  one obligation — almost always a mining session that ran past midnight UTC,
+  which ESI's per-day ledger splits in two. Stored as ordinary Assignments
+  sharing a `groupId`, all on one Payee and one tax %; each day keeps its own
+  ore and value. The UI word is "Combine" (never "Join") for making one, "Take
+  out of combined" for removing a day without unassigning it, and "Continue
+  the <date> session" for the one-tap offer that combines a new day into the
+  previous day's owed entry (see `docs/context/decisions/20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit.md`).
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab
   — it opens beside the order book rather than covering it, since comparing
   happens _while_ browsing. Two views: Prices (best sell, best buy, spread
@@ -337,7 +345,7 @@ here — they go one per file in `docs/context/decisions/`.
   `NetworkColony.exportablePerHour`, computed by `colonyExportablePerHour`.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands, and from **Appraisal**, which reads it for what the loadout costs to buy; all three share `parseEftFit` and nothing else.
-- **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. The thing the Ships section's Fittings tab opens, edits, shares and compares (**Fitting Compare**). Its numbers (CPU, powergrid, damage, tank, capacitor…) are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are either that Character's own clone or the set the Fitting itself carries, whichever the pilot has chosen; a Fitting that carries a set opens on it. The one exception to the active Character is a **Fitting Share Code** or **Share Link** opened with nobody logged in, which is stated at every skill level V and says so. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
+- **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. The thing the Ships section's Fittings tab opens, edits, shares and compares (**Fitting Compare**). Its numbers (CPU, powergrid, damage, tank, capacitor…) are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are the set the Fitting itself carries when it carries one, and that Character's own clone otherwise; dropping the set goes back to the clone (`docs/context/decisions/20261004-135042-fittings-implants-one-control-the-set-decides-the.md`). The one exception to the active Character is a **Fitting Share Code** or **Share Link** opened with nobody logged in, which is stated at every skill level V and says so. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
 - **Fleet boosts**: The Fittings stats section for what a command ship gives its fleet — each running command or mining foreman burst (with its charge; strength, range, length, reload) and an industrial core's compression (compressor range, fuel per activation), read off the engine's final module attributes (`src/engine/fittings/fleetSupport.ts`). Only there on a fit that has one. **What to train** ranks on these figures too. Distinct from **Support out**, which is what a fit's modules do to another ship (remote repair, webs, ewar), and from **Projected effects**, which is what other ships do to this one.
 - **Fitting Compare**: The Ships section's `/ships/fittings/compare` page (issue #1547; `/fittings/compare` before the section became Ships, which still redirects) — up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as `?f=` **Fitting Share Code**s, so copying the address bar reproduces it. The UI says only "Compare" (button), "Compare Fittings" (page title) and "Compare with…" (picker); the Fittings context tells it apart. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares no state or code path with them and never touches the Compare Set.
 - **Fitting Share Code**: A **Fitting** compressed into its URL: hull,
@@ -487,7 +495,7 @@ here — they go one per file in `docs/context/decisions/`.
   link in the order typed. Optimize stop order may fly them in a cheaper
   order under the active route rules; the typed order stays as written.
 - **Leg**: one route of a trip, by stargate (and, with **Hole jumps** on,
-  through Thera / Turnur holes), from its start or a **Stop** to the
+  through Thera / Turnur holes; with Use jump bridges on, over **Ansiblex**), from its start or a **Stop** to the
   next stop (and, with Return to start, the last stop home). Route Safety
   lists a trip leg by leg, each with its own jumps, lowest security and
   **Gank Chokepoints**; the facts line and **Route strip** cover the whole
@@ -497,6 +505,23 @@ here — they go one per file in `docs/context/decisions/`.
   Shown as its own row between those two systems and as a hatched **Route
   strip** cell. How it is costed and where it applies: decision
   `20261003-181618`.
+- **Ansiblex**: an alliance-built jump gate between two nullsec systems,
+  named "SYS1 » SYS2 - …" in game. Route Safety may route over the ones in
+  this device's list — found by a character's structure search or pasted —
+  each as one jump, shown as its own row and as a dashed-edged **Route
+  strip** cell. Decision `20261003-204009`.
+- **Way to fly**: one way a **Leg** can be flown, listed beside its rows:
+  Gates only (always), Via Thera / Via Turnur (when that hub has a
+  qualifying hole), Via Ansiblex (with Use jump bridges on, when a known
+  gate is on the way), the planner's pick when it differs, and a **Pinned way**.
+  Each states jumps, lowest security, lowsec / nullsec counts and the
+  **Gank Chokepoints** it passes — facts side by side, never ranked.
+- **Pinned way**: the **Way to fly** a pilot chose for one **Leg** with
+  "Use for this leg", kept in the link (`pin`, by leg position): `gates`,
+  `thera`, `turnur`, `ansiblex` or an EVE-Scout hole id. A pin that cannot be flown (its
+  hole closed, its hub has no qualifying hole) is reported on the leg, and
+  the planner's pick flies it. Route via on a Thera / Turnur row opens Route
+  Safety with that hole pinned for the first leg.
 - **Pilot Lookup**: Travel's view of one pilot, found by name — portrait,
   corporation, alliance and character age from public ESI, and the all-time
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
@@ -526,7 +551,8 @@ here — they go one per file in `docs/context/decisions/`.
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax. Labelled "Total job cost" in the UI,
   matching the in-game Industry window.
-- **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5, 10, 15 or 20 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. Contract Search and BPC Sourcing narrow what was already fetched. On Market Browser a set range replaces the header's Trade Hub or region: the book is fetched from every region holding an in-range system, at every station. Its "Any" option is labelled with the header's scope.
+- **Jump Basis**: The one set of rules every jump count in the app is worked out under — the Travel Settings (preference, security penalty, **Avoided Systems** and their pod-kill / EDENCOM / Triglavian rules) plus Route Safety's saved Thera / Turnur hole and Ansiblex jump-bridge settings. It is how Assets, Market, BPC Sourcing, Contract Search and Courier agree with the route Route Safety draws. Set in Settings → Travel or Route Safety's rules panel.
+- **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5, 10, 15 or 20 stargate jumps of it. Counted on the local stargate graph, never ESI, under the **Jump Basis**. A row the app cannot place (a player structure) drops out once a range is set. Contract Search and BPC Sourcing narrow what was already fetched. On Market Browser a set range replaces the header's Trade Hub or region: the book is fetched from every region holding an in-range system, at every station. Its "Any" option is labelled with the header's scope.
 - **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
@@ -709,6 +735,14 @@ here — they go one per file in `docs/context/decisions/`.
   this ceiling, so it is derived from trained skills
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
+- **Owned-Stock Offer**: A materials row's "Use assets" offer — the
+  owned quantity it would write (detected stock in the owned-stock scope,
+  capped at what the row needs), or none: a Blueprint Acquisition row, no
+  scoped stock, or the row already holding that number. "Use all" is every
+  row's offer at once; "Use none" clears every row's owned quantity, wider
+  than the offer on purpose. One rule for a Build Plan and a Build Group alike
+  (`src/engine/industry/ownedStockOffer.ts`), with plan sourcing and the
+  **Group Owned Overlay** as its two stores.
 - **Payee**: Who the Moon Mining Tax ledger owes — user-managed `{name,
 default tax %, optional moon/system tag, optional Trade Hub}`. The
   moon/system tag lets the UI
@@ -752,21 +786,24 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   seen and roughly what it cost, and **Load**s the group's most recent loss.
 - **EVE Workbench fit**: A fit a pilot published on EVE Workbench, listed for its
   hull in the Popular fits panel's EVE Workbench tab (beside the zKillboard tab
-  of **Popular fit**s) with its name, author and date added, linked to its page
+  of **Popular fit**s) with its name, price and date created, linked to its page
   there.
   **Load**s from its EFT. Comes from our own copy of Workbench's public list,
   synced by a Cloud Function, since Workbench can't list fits by hull.
 - **Out-of-date fit**: An **EVE Workbench fit** that no longer works in today's
-  game. It names an item or hull the app's current game data doesn't have, or
-  it has more modules in a rack than the hull now has slots. CPU, powergrid and
-  calibration never make a fit out of date. The tab lists it below the current
-  fits, only on request, with the reason.
+  game. It names a hull the app's current game data doesn't have, or an item
+  the game's full list of type names doesn't have, or it has more modules in a rack than the hull now has slots. CPU, powergrid and
+  calibration never make a fit out of date. The tab never lists it; when
+  every fit for the hull is out of date, it says so instead.
 - **Seen on zKillboard**: A sighting badge on an **EVE Workbench fit** whose
   fitted modules exactly match one of its hull's **Popular fit**s (the same
   grouping, so charges, drones and cargo don't count). Shows how many of the
   hull's recent losses flew that group and when it was last seen. A fit that
   matches nothing, has any line that doesn't load cleanly, or whose hull's losses
-  can't be fetched shows nothing — never a warning.
+  can't be fetched shows nothing — never a warning. The one exception is a line
+  written with a count (`x1`) naming an item the game still has but the app
+  can't read, such as a filament in cargo: it can't be a fitted module, so the
+  fit is still matched.
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
@@ -1072,8 +1109,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing, and never the cheapest listing that every other user of a price-gap tool sees too. `estimateSale` in `src/engine/market/haulingMarket.ts`.
 - **Days to Sell**: How long the units listed within 1% of the **Expected Sell Price** (they will relist below the hauler), plus about one day's worth of the hauler's own, take to sell at the region's recent sales rate. Not **Traded Volume** (units sold), and not a promise for the whole load.
 - **Any hub**: A **Hauling Opportunities** From or To choice (`from=any` / `to=any`, `ANY_HUB` in code) that scans every other **Trade Hub** for that end and keeps each item on its single best lane; a Hub column names the hub each row uses. Allowed at one end only. A **Trip Plan** made with From on Any can buy at several hubs.
-- **Cargo Space**: The m³ a hauler can carry, chosen once per device as a ship's base hold, a saved **Fitting**'s exact hold or a typed number. A ship's hold here is its cargo hold plus its fleet hangar (a Deep Space Transport carries most of its load in the hangar), never an ore-only mining hold. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
-- **Trip Plan**: The suggested load for one hold on one route (with **Any hub** at one end, each item on its own lane): a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
+- **Cargo Space**: The holds a hauler can fill, each with its own m³, chosen once per device as a ship's base holds, a saved **Fitting**'s exact holds or a typed number. A ship's general hold is its cargo hold plus its fleet hangar (a Deep Space Transport carries most of its load in the hangar), which take anything; beside it sit any **Specialised Holds** the ship has. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
+- **Specialised Hold**: A ship hold that takes only certain contents, such as an ammo, planetary commodities, command center, mineral, gas, mining, ice, fuel or infrastructure hold, as opposed to the general hold (cargo hold plus fleet hangar). Which holds count and what each accepts: `docs/context/decisions/20261004-101406-cargo-space-counts-specialised-holds-whose-contents-fit.md`.
+- **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route (with **Any hub** at one end, each item on its own lane): a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
 - **Training Progress**: How much SP a Character has already banked toward
   the level it is training _right now_. Distinct from **Trained Skills**,
   which is levels finished. ESI reports it in two places that disagree:
@@ -1103,9 +1141,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
   stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
-  variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
-  it for price comparison; falls back to its Market Group siblings when it
-  has no variation data.
+  variation group, shown on its own item tab (beside Order Book and Price
+  History) as a sortable table grouped by tier — Name, Tier, Sell, Buy and a
+  signed "vs <item>" sell delta, the item's own prices above it — for price
+  comparison; falls back to its Market Group siblings when it has no
+  variation data.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is

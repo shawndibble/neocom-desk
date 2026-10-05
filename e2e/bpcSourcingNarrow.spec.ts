@@ -82,9 +82,13 @@ function cheapestPerRunOffers() {
 }
 
 /** Same shape `syncedContracts.ts` writes into `esi/cache.ts`'s `esiCache` store. */
-async function seedBpcSnapshot(page: Page, rows: unknown[]): Promise<void> {
+async function seedBpcSnapshot(
+  page: Page,
+  rows: unknown[],
+  regions: readonly (readonly [number, string])[] = [[THE_FORGE, 'The Forge']]
+): Promise<void> {
   await page.evaluate(
-    async ({ seeded, regionId, regionName }) => {
+    async ({ seeded, regionNames }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
         request.onsuccess = () => resolve(request.result);
@@ -102,18 +106,20 @@ async function seedBpcSnapshot(page: Page, rows: unknown[]): Promise<void> {
         // `regionNames.ts`'s own cache row — pre-seeded so the "Location"
         // column's region name resolves from Dexie rather than a real,
         // unmocked GET to ESI's public /universe/regions/{id}.
-        tx.objectStore('esiCache').put({
-          characterId: 0,
-          key: `bpc-region:${regionId}`,
-          value: { name: regionName },
-          fetchedAt: now,
-        });
+        for (const [regionId, regionName] of regionNames) {
+          tx.objectStore('esiCache').put({
+            characterId: 0,
+            key: `bpc-region:${regionId}`,
+            value: { name: regionName },
+            fetchedAt: now,
+          });
+        }
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
       database.close();
     },
-    { seeded: rows, regionId: THE_FORGE, regionName: 'The Forge' }
+    { seeded: rows, regionNames: regions }
   );
 }
 
@@ -245,5 +251,47 @@ test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
       expect(box).not.toBeNull();
       expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
     }
+  });
+});
+
+test.describe('BPC Sourcing — cheapest by region on a phone', () => {
+  test('scrolls inside its own row, never the page', async ({ page }) => {
+    await stubSyncConfigured(page);
+    await refuseSyncBackend(page);
+    await page.route(/\/markets\/\d+\/orders/, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
+    await page.setViewportSize(PHONE);
+
+    // Five regions: five cells are wider than a 390px screen, so the row
+    // must scroll — the bug was the whole page scrolling with it.
+    const regions = [
+      [THE_FORGE, 'The Forge'],
+      [10000043, 'Domain'],
+      [10000032, 'Sinq Laison'],
+      [10000030, 'Heimatar'],
+      [10000042, 'Metropolis'],
+    ] as const;
+    const base = singleTypeContractRow();
+    const offers = regions.map(([regionId], index) => ({
+      ...base,
+      contractId: 8_000_000 + index,
+      regionId,
+      price: 1_000_000 * (index + 1),
+    }));
+
+    await signInAndGoto(page);
+    await seedBpcSnapshot(page, offers, regions);
+    await page.goto(`./industry/sourcing?sourcing.type=${BLUEPRINT_TYPE_ID}`);
+
+    const row = page.getByRole('list', { name: 'Cheapest by region' });
+    await expect(row).toContainText('Metropolis', COLD_LOAD);
+
+    const { pageWidth, rowScrolls } = await row.evaluate((ul) => ({
+      pageWidth: document.documentElement.scrollWidth,
+      rowScrolls: ul.scrollWidth > ul.clientWidth,
+    }));
+    expect(rowScrolls, 'the region row should overflow and scroll on its own').toBe(true);
+    expect(pageWidth).toBeLessThanOrEqual(PHONE.width);
   });
 });

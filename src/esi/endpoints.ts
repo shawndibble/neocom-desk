@@ -1870,7 +1870,7 @@ export function getCharacterLocation(
 export interface RouteOptions extends EndpointOptions {
   /**
    * ESI's route preference, in its own words — the app's names map onto
-   * these in one place (`features/route/esiRoute.ts`'s `esiRoutePreference`).
+   * these in one place (it is no longer called for jump counts).
    */
   preference?: 'Shorter' | 'Safer' | 'LessSecure';
   /**
@@ -1882,7 +1882,7 @@ export interface RouteOptions extends EndpointOptions {
   /**
    * Systems the route must not enter (ESI caps it at 1000). Verified live: a
    * hard filter — 404 "No route found" when the only way runs through one;
-   * an avoided destination is fine. `features/route/esiRoute.ts` softens that.
+   * an avoided destination is fine. the app no longer routes through it.
    */
   avoid?: readonly number[];
 }

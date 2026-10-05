@@ -22,7 +22,15 @@ export type RouteHolesState =
   | { kind: 'off' }
   | { kind: 'loading' }
   | { kind: 'unavailable' }
-  | { kind: 'ready'; holes: TheraConnection[]; fetchedAt: Date; now: number };
+  | {
+      kind: 'ready';
+      /** The holes a route may cross: the hubs, ship size and life asked for. */
+      holes: TheraConnection[];
+      /** Every hole EVE-Scout lists open, filters aside: where a pinned hole is looked up. */
+      listed: TheraConnection[];
+      fetchedAt: Date;
+      now: number;
+    };
 
 /** Remaining life counts down in minutes, so the clock ticks once a minute. */
 const TICK_MS = 60_000;
@@ -53,6 +61,7 @@ export function useRouteHoles(query: RouteHoleQuery): RouteHolesState {
     return {
       kind: 'ready',
       holes: routeHoles(result.connections, { shipSize, minLifeHours, hubs }, now),
+      listed: result.connections.filter((connection) => connection.expiresAt > now),
       fetchedAt: result.fetchedAt,
       now,
     };

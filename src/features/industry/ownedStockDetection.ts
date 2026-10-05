@@ -8,11 +8,7 @@
  * of truth, so nothing here can change a saved plan's cost.
  */
 
-import type {
-  DetectedOwnedStock,
-  OwnedStockPlacement,
-  OwnedStockSource,
-} from '@/engine/industry/ownedStock';
+import type { OwnedStockPlacement, OwnedStockSource } from '@/engine/industry/ownedStock';
 import { loadAllCharactersAssets } from '@/features/character/assets';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
@@ -154,13 +150,10 @@ export function stockLocationLabel(
 
 /** Everything `MaterialsTable` needs to render detection, bundled so the table takes one optional prop. */
 export interface OwnedStockDetection {
-  /** Every placement, galaxy-wide — never filtered by the plan's owned-stock scope. Feeds the breakdown popover, which always shows the full picture. */
-  stockFor: (typeID: number) => DetectedOwnedStock | undefined;
   /**
-   * The total "use detected" offers for this material: `stockFor`'s quantity
-   * narrowed to the plan's `ownedStockScope` (issue #454). Equal to
-   * `stockFor(typeID)?.quantity ?? 0` when the scope is absent or
-   * `everywhere` — today's only behavior before this existed.
+   * The total "use detected" offers for this material: detected stock
+   * narrowed to the plan's `ownedStockScope` (issue #454) — the galaxy-wide
+   * total when the scope is absent or `everywhere`.
    */
   scopedQuantityFor: (typeID: number) => number;
   /** True when any Character's list was incomplete: every total renders as a lower bound. */

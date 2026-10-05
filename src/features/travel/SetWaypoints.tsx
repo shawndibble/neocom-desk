@@ -6,8 +6,10 @@
  * The client routes between waypoints by stargate with its own autopilot
  * settings, and cannot fly a wormhole or a bridge, so the waypoints stop at
  * the first such hop's entrance and the result says where to pick up
- * (`engine/route/waypoints.ts`). A Character whose grant predates the scope
- * sees the button disabled, the reason, and a Grant for that Character.
+ * (`engine/route/waypoints.ts`). How each hop was flown is the trip's own
+ * row tag (issue #2546): this never loads the stargate graph. A Character
+ * whose grant predates the scope sees the button disabled, the reason, and a
+ * Grant for that Character.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +26,7 @@ import {
 } from '@/components/ui';
 import { db } from '@/db';
 import type { EsiEndpointId } from '@/esi/registry';
-import type { TripLeg } from '@/engine/route/tripPlan';
-import { stargateHopKind, waypointSequence, type WaypointSequence } from '@/engine/route/waypoints';
-import { loadJumpGraph } from '@/sde/jumpGraph';
+import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { setWaypointsInGame } from './sendWaypoints';
 import type { RouteSafetyLeg } from './useRouteSafety';
@@ -35,28 +35,12 @@ const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
 
 type Outcome = { tone: 'status' | 'alert'; text: string } | null;
 
-/** A leg's rows are its systems, one each, in flying order. */
-function tripLegsOf(legs: readonly RouteSafetyLeg[]): TripLeg[] {
-  return legs.map((leg) => ({
-    from: leg.from,
-    to: leg.to,
-    route: leg.rows
-      ? { kind: 'route', systems: leg.rows.map((row) => row.systemId) }
-      : { kind: 'no-route' },
-  }));
-}
-
-/** The waypoints to send, read off the plain stargate graph; `null` when it can't be read. */
-async function sequenceOf(legs: readonly RouteSafetyLeg[]): Promise<WaypointSequence | null> {
-  const gates = await loadJumpGraph().catch(() => undefined);
-  return gates ? waypointSequence(tripLegsOf(legs), stargateHopKind(gates)) : null;
-}
-
 export function SetWaypoints({
   legs,
   nameOf,
   children,
 }: {
+  /** The trip's legs: a hole or bridge hop in their rows cuts the waypoints, named as such. */
   legs: readonly RouteSafetyLeg[];
   nameOf: (systemId: number) => string;
   /** The facts line the button closes. */
@@ -84,12 +68,7 @@ export function SetWaypoints({
     setSending(true);
     setOutcome(null);
     try {
-      const sequence = await sequenceOf(legs);
-      if (sequence === null) {
-        setOutcome({ tone: 'alert', text: t('travel.waypoints.noMap') });
-        return;
-      }
-      const { waypoints, cutOff } = sequence;
+      const { waypoints, cutOff } = waypointSequence(legs);
       /** The cut-off's copy under `group`, naming where it is taken and where to pick up. */
       const cutOffText = (group: 'nothing' | 'cutOff') =>
         cutOff &&
@@ -135,7 +114,8 @@ export function SetWaypoints({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {children}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Full width under the facts on a phone, so it reads as the panel's action rather than one more fact. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {characters.length > 1 && characterId !== null && (
             <Select
               value={String(characterId)}
@@ -162,6 +142,7 @@ export function SetWaypoints({
           )}
           <Button
             size="sm"
+            className="max-sm:flex-1"
             disabled={blockedReason !== null || sending}
             title={blockedReason ?? undefined}
             onClick={() => {
@@ -173,7 +154,7 @@ export function SetWaypoints({
         </div>
       </div>
       {characterId === null && blockedReason !== null && (
-        <p className="text-right text-text-dim">{blockedReason}</p>
+        <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
       {lacksScope && characterId !== null && (
         <GrantBanner

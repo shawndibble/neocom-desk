@@ -147,7 +147,7 @@ async function resolvePricesForHubAcrossDates(
 
 /**
  * Per-unit buy price for `typeIds` at `hub` on one specific date — the shape
- * `resolveNeedsReview` needs to re-price a single Assignment at its own
+ * `planNeedsReviewResolution` needs to re-price a single Assignment at its own
  * mined date, without the whole ledger's bulk fetch `loadDatedUnitPricesByHub`
  * does for `TaxTab`.
  */

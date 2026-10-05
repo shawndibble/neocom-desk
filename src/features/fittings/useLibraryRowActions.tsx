@@ -8,7 +8,7 @@
  * Link code, an In-game one ESI's own shape. Each action that needs the
  * Fitting itself works it out when chosen, never while the list renders.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { MenuItem, MenuSeparator } from '@/components/ui';
@@ -23,8 +23,7 @@ import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
 import { SaveToEveDialog } from './SaveToEveDialog';
 import type { LibraryRow } from './useLibraryFittings';
-
-const NOTICE_MS = 2500;
+import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
 /** The row's Fitting and its Fitting Share Code (null when too large for one); null when a saved code no longer decodes. */
 async function rowFitting(
@@ -68,11 +67,7 @@ export function useLibraryRowActions({
   const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState<{ fitting: Fitting; description: string } | null>(null);
-  useEffect(() => {
-    if (notice === null) return;
-    const timer = setTimeout(() => setNotice(null), NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [notice]);
+  useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
   async function withFitting(
     row: LibraryRow,

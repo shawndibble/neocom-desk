@@ -40,7 +40,7 @@ describe('CopyablePrice', () => {
     });
     render(<CopyablePrice price={1_233_000} />);
 
-    await userEvent.setup().click(screen.getByText('1,233,000.00'));
+    await userEvent.setup().click(screen.getByText('1,233,000'));
 
     expect(written).toEqual(['1233000']);
     expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
