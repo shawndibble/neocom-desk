@@ -200,7 +200,8 @@ describe('planTrip, selling into buy orders', () => {
     expect(plan.lines[0]).toMatchObject({ quantity: 10, cost: 1000, limitedBy: 'supply' });
     // 5 @ 115 and 5 @ 110; the 105 level would earn under the 5% unit margin.
     expect(plan.lines[0]!.profit).toBeCloseTo(1125 - 1125 * 0.03375 - 1000);
-    expect(plan.lines[0]!.maxBuyPrice).toBe(100);
+    // The weakest bid used is 110: it nets 106.29 after 3.375% tax, less 5% is 101.23.
+    expect(plan.lines[0]!.maxBuyPrice).toBe(101.2);
     expect(plan.binding).toBeNull();
   });
 
@@ -251,6 +252,16 @@ describe('maxBuyPrice', () => {
       fees: FEES,
     });
     expect(atLimit.marginPct).toBeGreaterThanOrEqual(5);
+  });
+
+  it('rises with the weakest bid a lot sells into, not the origin price it was bought at', () => {
+    const c = candidate({
+      typeId: 1,
+      buyLadder: [{ price: 100, units: 10, orders: 1 }],
+      destBuyLadder: [{ price: 200, units: 10, orders: 1 }],
+    });
+    // 200 nets 193.25 after tax; less the 5% margin leaves about 184.
+    expect(maxBuyPrice(c, FEES)).toBeCloseTo(184, 0);
   });
 
   it('is null when not even the cheapest listing clears the margin', () => {

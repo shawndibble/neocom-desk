@@ -28,7 +28,7 @@
  *
  * Pure: no fetch/DOM/Dexie.
  */
-import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
+import { brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalNetFees } from './appraisal';
 import {
   HOLD_KINDS,
@@ -162,8 +162,9 @@ export function profitableDepth(
  * for. Null when no unit on today's books clears the margin.
  *
  * Listed, it is the break-even price less the margin, rounded down to a price
- * the market can hold. Sold into buy orders it is the origin price of the last
- * unit the walk takes, since each further buy would pair with a worse bid.
+ * the market can hold. Sold into buy orders it is what the weakest bid the lot
+ * sells into nets after sales tax, less the margin: the origin price of any
+ * unit in the lot can rise to there before that unit stops clearing it.
  */
 export function maxBuyPrice(
   candidate: TripCandidate,
@@ -178,10 +179,17 @@ export function maxBuyPrice(
       accountingLevel,
       minMarginPct,
     });
-    let reached = 0;
-    for (const level of candidate.buyLadder) {
-      reached += level.units;
-      if (reached >= units) return units > 0 ? level.price : null;
+    if (units <= 0) return null;
+    // The weakest bid the lot sells into sets the ceiling: any unit bought
+    // dearer than what that bid nets, less the margin, loses its margin.
+    let sold = 0;
+    for (const level of candidate.destBuyLadder) {
+      sold += level.units;
+      if (sold >= units) {
+        const net = level.price - salesTax(level.price, accountingLevel);
+        const limit = net / (1 + minMarginPct / 100);
+        return roundPriceDown(limit) ?? limit;
+      }
     }
     return null;
   }
