@@ -1283,8 +1283,8 @@ describe('FittingStatsSections price', () => {
 
     const dialog = within(screen.getByRole('dialog', { name: 'Price breakdown' }));
     const priced = within(dialog.getByText('Priced Thing').closest('tr')!);
-    expect(priced.getByText('1,500.00 ISK')).toBeInTheDocument();
-    expect(priced.getByText('3,000.00 ISK')).toBeInTheDocument();
+    expect(priced.getByText('1,500 ISK')).toBeInTheDocument();
+    expect(priced.getByText('3,000 ISK')).toBeInTheDocument();
     const rare = within(dialog.getByText('Rare Thing').closest('tr')!);
     expect(rare.getAllByText('—')).toHaveLength(2);
 

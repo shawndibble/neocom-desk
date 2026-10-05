@@ -36,7 +36,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
   useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
   const isk = (value: number | null) =>
-    value === null ? '—' : t('fittings.stats.unit.isk', { value: formatIsk(value, 2) });
+    value === null ? '—' : t('fittings.stats.unit.isk', { value: formatIsk(value) });
 
   const columns: DataTableColumn<AppraisalRow>[] = [
     {
