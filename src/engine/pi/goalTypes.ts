@@ -165,6 +165,12 @@ export interface ColonyAssignment {
   budget: PinLoad;
   /** The axes the host's factories overrun. Always empty for an extractor, which is only ever planned to fit. */
   limitedBy: FitLimit[];
+  /**
+   * The extraction is the colony's own layout today (`colonyExtraction`'s
+   * `runningToday`): accepted as fitting, so `used` — the model's estimate —
+   * may exceed `budget` without that being an overrun.
+   */
+  runningToday?: true;
 }
 
 export type Shortfall =

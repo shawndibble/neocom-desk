@@ -389,6 +389,8 @@ function shortfallText(
               .join(t('piPlan.or')),
             p0: commodityName(shortfall.p0TypeId, pi),
             p1: commodityName(shortfall.p1TypeId, pi),
+            p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
+            p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
           })}{' '}
           {hint?.kind === 'switched-off' ? (
             <>
@@ -407,7 +409,8 @@ function shortfallText(
           {t('piPlan.shortBudgetGap', {
             p0: commodityName(shortfall.p0TypeId, pi),
             p1: commodityName(shortfall.p1TypeId, pi),
-            rate: formatUnits(shortfall.unitsPerHour * HOURS_PER_DAY),
+            p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
+            p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
           })}{' '}
           {hint?.kind === 'retarget' ? (
             <>
@@ -644,16 +647,30 @@ export function ColonyFit({
                   {roleText(assignment.role, t)}
                 </span>
               </div>
-              <LoadMeter
-                label={t('piPlan.cpu')}
-                used={assignment.used.cpu}
-                budget={assignment.budget.cpu}
-              />
-              <LoadMeter
-                label={t('piPlan.powergrid')}
-                used={assignment.used.powergrid}
-                budget={assignment.budget.powergrid}
-              />
+              {assignment.runningToday &&
+              (assignment.used.cpu > assignment.budget.cpu ||
+                assignment.used.powergrid > assignment.budget.powergrid) ? (
+                <p className="flex items-center gap-1.5 text-xs text-text">
+                  {t('piPlan.fitAsBuilt')}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('piPlan.fitAsBuilt') })}
+                    content={t('piPlan.fitAsBuiltTooltip')}
+                  />
+                </p>
+              ) : (
+                <>
+                  <LoadMeter
+                    label={t('piPlan.cpu')}
+                    used={assignment.used.cpu}
+                    budget={assignment.budget.cpu}
+                  />
+                  <LoadMeter
+                    label={t('piPlan.powergrid')}
+                    used={assignment.used.powergrid}
+                    budget={assignment.budget.powergrid}
+                  />
+                </>
+              )}
               {assignment.limitedBy.length > 0 && (
                 <p className="flex items-center gap-1 text-[0.6875rem] text-warning">
                   <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
@@ -852,6 +869,21 @@ export function Hauling({
 
 // --- Flow ----------------------------------------------------------------
 
+/** Under this short of one, a made fraction is float dust. */
+const WHOLE = 0.995;
+
+/** The source, with how much is made where the line is partial. */
+function sourceLabel(line: DemandLine, t: TFunction): string {
+  const percent = PERCENT_FORMAT.format(line.madeFraction * 100);
+  if (line.source === 'short' && line.madeFraction > 1 - WHOLE) {
+    return t('piPlan.sourceShortPartial', { percent });
+  }
+  if ((line.source === 'made' || line.source === 'extracted') && line.madeFraction < WHOLE) {
+    return t('piPlan.sourceHeldBack', { percent });
+  }
+  return sourceText(line.source, t);
+}
+
 function sourceText(source: DemandSource, t: TFunction): string {
   switch (source) {
     case 'made':
@@ -922,9 +954,18 @@ export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: 
         id: 'source',
         header: t('piPlan.flowSource'),
         sortValue: (line) => line.source,
-        render: (line) => (
-          <span className={SOURCE_TONE[line.source]}>{sourceText(line.source, t)}</span>
-        ),
+        render: (line) => {
+          const heldBack =
+            (line.source === 'made' || line.source === 'extracted') && line.madeFraction < WHOLE;
+          return (
+            <span
+              className={heldBack ? 'text-warning' : SOURCE_TONE[line.source]}
+              title={heldBack ? t('piPlan.sourceHeldBackTooltip') : undefined}
+            >
+              {sourceLabel(line, t)}
+            </span>
+          );
+        },
       },
     ],
     [t, pi, hub]
@@ -938,7 +979,7 @@ export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: 
       { header: t('piPlan.flowPerDay'), value: (line) => line.unitsPerHour * HOURS_PER_DAY },
       { header: t('piPlan.flowPerHour'), value: (line) => line.unitsPerHour },
       { header: t('piPlan.flowFactories'), value: (line) => line.factories ?? '' },
-      { header: t('piPlan.flowSource'), value: (line) => sourceText(line.source, t) },
+      { header: t('piPlan.flowSource'), value: (line) => sourceLabel(line, t) },
     ],
   });
   if (demand.length === 0) return null;

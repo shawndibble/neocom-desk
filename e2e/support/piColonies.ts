@@ -66,6 +66,9 @@ const COLONIES: Colony[] = [
 
 const HOUR = 3_600_000;
 
+/** P0 typeId to the basic schematic that refines it on the spot. */
+const BASIC_SCHEMATIC: Record<number, number> = { 2267: 126, 2268: 121, 2309: 123, 2310: 124 };
+
 function detailFor(colony: Colony, now: number) {
   const pins: unknown[] = colony.extracts.map((product, i) => ({
     pin_id: 100 + i,
@@ -86,12 +89,22 @@ function detailFor(colony: Colony, now: number) {
     },
   }));
   pins.push({ pin_id: 1, type_id: 2256, latitude: 0.4, longitude: 1.4 });
-  const links = colony.extracts.map((_, i) => ({
-    source_pin_id: 1,
-    destination_pin_id: 100 + i,
-    link_level: 0,
-  }));
-  // A pad-only colony still has one link: to a storage pin, so its hop is measurable.
+  // Each ECU's P0 refined on the spot, as a real colony runs it: two Basic
+  // Industry Facilities per program (~12,000 P0/h against 6,000 each).
+  const basics = colony.extracts.flatMap((product, i) =>
+    [0, 1].map((j) => ({
+      pin_id: 200 + i * 2 + j,
+      type_id: 2469,
+      latitude: 0.42 + i * 0.03,
+      longitude: 1.45 + j * 0.03,
+      schematic_id: BASIC_SCHEMATIC[product],
+    }))
+  );
+  pins.push(...basics);
+  // A tree rooted at the Launchpad: every ECU and every basic one hop from it.
+  const links = [...colony.extracts.map((_, i) => 100 + i), ...basics.map((b) => b.pin_id)].map(
+    (pinId) => ({ source_pin_id: 1, destination_pin_id: pinId, link_level: 0 })
+  );
   if (links.length === 0) {
     pins.push({ pin_id: 2, type_id: 2257, latitude: 0.45, longitude: 1.6 });
     links.push({ source_pin_id: 1, destination_pin_id: 2, link_level: 0 });
@@ -127,6 +140,21 @@ export async function mockPlannerColonies(page: Page): Promise<void> {
         }))
       )
     );
+  });
+  // The Colonies tab names each basic's schematic.
+  await page.route('https://esi.evetech.net/universe/schematics/**', (route) => {
+    const id = Number(new URL(route.request().url()).pathname.match(/schematics\/(\d+)/)?.[1]);
+    const names: Record<number, string> = {
+      126: 'Reactive Metals',
+      121: 'Water',
+      123: 'Electrolytes',
+      124: 'Oxygen',
+    };
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ cycle_time: 1800, schematic_name: names[id] ?? `Schematic ${id}` }),
+    });
   });
   await page.route('https://esi.evetech.net/universe/planets/**', (route) => {
     const id = Number(new URL(route.request().url()).pathname.match(/planets\/(\d+)/)?.[1]);

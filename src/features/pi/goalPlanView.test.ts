@@ -217,6 +217,7 @@ describe('shortfallHint', () => {
           p0TypeId: 2306,
           p1TypeId: 2401,
           unitsPerHour: 1,
+          p1UnitsPerHour: 1 / 150,
           fixPlanetTypes: ['lava', 'plasma'],
         },
         rows,
@@ -234,6 +235,7 @@ describe('shortfallHint', () => {
           p0TypeId: BASE_METALS,
           p1TypeId: REACTIVE_METALS,
           unitsPerHour: 5000,
+          p1UnitsPerHour: 5000 / 150,
         },
         rows,
         false
@@ -246,6 +248,7 @@ describe('shortfallHint', () => {
           p0TypeId: BASE_METALS,
           p1TypeId: REACTIVE_METALS,
           unitsPerHour: 5000,
+          p1UnitsPerHour: 5000 / 150,
         },
         rows,
         true

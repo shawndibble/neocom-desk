@@ -526,3 +526,29 @@ describe('planGoals — the plan describes itself consistently', () => {
     });
   });
 });
+
+describe('planGoals — the layout a colony runs today', () => {
+  it("marks an assignment on today's extraction as runningToday, even where the model puts it over budget", () => {
+    // colonyCapacity's case: CC4, two 8-head ECUs on Base Metals, which the
+    // model puts over Powergrid although the colony runs it.
+    const jita: PlannerColony = {
+      ...colony(1, 'barren', 4, 12_133),
+      headsPerExtractor: 8,
+      newLinkCost: { cpu: 74, powergrid: 54 },
+      current: {
+        p0TypeIds: [BASE_METALS],
+        productTypeIds: [],
+        ecusByP0: new Map([[BASE_METALS, 2]]),
+      },
+    };
+    const result = plan([goal(REACTIVE_METALS, 140)], [jita]);
+    const [assignment] = result.assignments;
+    expect(assignment).toMatchObject({ role: 'extract', runningToday: true });
+    expect(assignment.used.powergrid).toBeGreaterThan(assignment.budget.powergrid);
+  });
+
+  it('leaves runningToday off a layout the colony does not run', () => {
+    const result = plan([goal(REACTIVE_METALS, 40)], [colony(1, 'barren')]);
+    expect(result.assignments[0].runningToday).toBeUndefined();
+  });
+});

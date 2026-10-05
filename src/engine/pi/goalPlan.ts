@@ -715,6 +715,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
         used: pinFit.used,
         budget: pinFit.budget,
         limitedBy: [],
+        ...(fit?.runningToday ? { runningToday: true as const } : {}),
       };
     }
     if (fit) {
@@ -727,6 +728,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
         used: fit.used,
         budget: fit.budget,
         limitedBy: [],
+        ...(fit.runningToday ? { runningToday: true as const } : {}),
       };
     }
     const own = ctx.baselines.get(c.planetId);
@@ -747,6 +749,7 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
         used: keep.used,
         budget: keep.budget,
         limitedBy: [],
+        ...(keep.runningToday ? { runningToday: true as const } : {}),
       };
     }
     return {
