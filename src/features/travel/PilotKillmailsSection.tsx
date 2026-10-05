@@ -3,11 +3,11 @@
  * `PILOT_KILLMAIL_LIMIT` from zKillboard, each row expanding to the victim's
  * fit with Open in Fittings. A killmail is read only when its row expands.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -131,14 +131,9 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
         >
           {title}
         </h3>
-        <a
-          href={characterZkillUrl(characterId)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cx(inlineLinkClassName, 'text-xs')}
-        >
+        <ExternalLink href={characterZkillUrl(characterId)} className="text-xs">
           {t('travel.pilot.recent.more')}
-        </a>
+        </ExternalLink>
       </div>
       {result === null ? (
         <p role="status" className="text-xs text-text-dim">

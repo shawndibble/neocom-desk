@@ -12,9 +12,10 @@
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
  * its own beyond formatting.
  */
+import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MenuItem, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
+import { MenuItem, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 import { marketItemUrl } from '@/engine/market/urlState';
@@ -105,18 +106,12 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   }
   if (item.withinStaleWindow) {
     return (
-      // A real `<button>` rather than a styled span: `Tooltip` reveals on hover
-      // *or focus*, and the caveat is the part of this row a keyboard user most
-      // needs to reach.
-      <Tooltip content={t('corp.board.underCacheWindowHint')} openOnTap>
-        <button
-          type="button"
-          className={`${base} ${tone} cursor-help text-left underline decoration-dotted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
-        >
-          {icon}
-          {t('corp.board.underCacheWindow')}
-        </button>
-      </Tooltip>
+      // `HintText` is focusable, not just hoverable: the caveat is the part of
+      // this row a keyboard user most needs to reach.
+      <HintText content={t('corp.board.underCacheWindowHint')} className={`${base} ${tone}`}>
+        {icon}
+        {t('corp.board.underCacheWindow')}
+      </HintText>
     );
   }
   const remainingMs = item.remainingMs ?? 0;

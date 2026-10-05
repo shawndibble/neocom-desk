@@ -54,6 +54,17 @@ export const disabledClassName =
   'disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
 
 /**
+ * The selected row (DESIGN.md §6c): a 2px accent left border, a `panel-2`
+ * fill and an accent label on the row's primary cell (`dt-primary` in a
+ * `DataTable`). A real border, not a background or a shadow, so it survives
+ * forced-colours mode; hover only fills, so a hovered row never reads as the
+ * selected one. `DataTable` applies it itself for `selectedRowKey`; a hand-built
+ * list of rows uses it directly, with `aria-current="true"` on the row.
+ */
+export const selectedRowClassName =
+  'border-l-2 border-l-accent bg-panel-2 [&_.dt-primary]:text-accent';
+
+/**
  * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
  * step up on a touch viewport so a thumb gets a 44px target. Touch means below
  * `md` *or* a coarse primary pointer (`touch:`, see `index.css`), so a touch

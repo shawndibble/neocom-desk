@@ -179,7 +179,7 @@ export function FaqPanel() {
         <Trans
           i18nKey="settings.faq.store.privacyLink"
           components={{
-            privacy: <a href="/privacy.html" target="_blank" rel="noopener" className={LINK} />,
+            privacy: <a href="/privacy.html" className={LINK} />,
           }}
         />{' '}
         <Trans

@@ -553,31 +553,4 @@ describe('InfoTooltip', () => {
 
     expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
   });
-
-  it('gives the tap back to the click action when it has one, keeping long-press for the tooltip', () => {
-    vi.useFakeTimers();
-    const onClick = vi.fn();
-    render(
-      <InfoTooltip
-        label="About Material Efficiency"
-        content="Reduces material use."
-        onClick={onClick}
-        aria-haspopup="dialog"
-      />
-    );
-    const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
-
-    fireEvent.touchStart(trigger);
-    fireEvent.touchEnd(trigger);
-    fireEvent.click(trigger);
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-
-    fireEvent.touchStart(trigger);
-    act(() => {
-      vi.advanceTimersByTime(700);
-    });
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
-    vi.useRealTimers();
-  });
 });

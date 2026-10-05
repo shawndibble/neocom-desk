@@ -55,7 +55,7 @@ beforeEach(() => {
 describe('PermissionsPanel — revoking', () => {
   it("links the revoke hint to CCP's authorized-apps page", () => {
     render(<PermissionsPanel />);
-    const link = screen.getByRole('link', { name: "EVE's own site" });
+    const link = screen.getByRole('link', { name: /^EVE's own site/ });
     expect(link).toHaveAttribute('href', AUTHORIZED_APPS_URL);
     expect(link).toHaveAttribute('target', '_blank');
   });

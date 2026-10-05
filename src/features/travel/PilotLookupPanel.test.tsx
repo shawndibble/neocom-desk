@@ -166,7 +166,7 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
     expect(screen.getByText('-2.3')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'zKillboard' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: /^zKillboard/ }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
     );
     // The profile is already on the page; the modal would only repeat it.
@@ -268,7 +268,7 @@ describe('PilotLookupPanel', () => {
       expect(within(list).getByText('Loss')).toBeTruthy();
       expect(within(list).getByText('12.5M')).toBeTruthy();
       expect(mocks.loadKillmailFit).not.toHaveBeenCalled();
-      expect(screen.getByRole('link', { name: 'More on zKillboard' }).getAttribute('href')).toBe(
+      expect(screen.getByRole('link', { name: /^More on zKillboard/ }).getAttribute('href')).toBe(
         'https://zkillboard.com/character/42/'
       );
     });

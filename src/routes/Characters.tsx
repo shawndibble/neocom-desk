@@ -1,3 +1,5 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
+import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -312,8 +314,8 @@ function CharacterCard({
   return (
     <li
       aria-current={isActive ? 'true' : undefined}
-      className={`flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-line-bright hover:bg-panel-2 ${
-        isActive ? 'border-l-2 border-l-accent' : ''
+      className={`flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-line-bright hover:bg-panel-2 ${
+        isActive ? selectedRowClassName : 'bg-panel/85'
       }`}
     >
       <div className="flex flex-wrap items-start gap-2">
@@ -590,14 +592,12 @@ function openJobsColumn(
       // urgent, not less.
       const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
-        <Tooltip openOnTap content={t('characters.openJobsTooltip', { used: running, max })}>
-          <span
-            tabIndex={0}
-            className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-          >
-            {open}
-          </span>
-        </Tooltip>
+        <HintText
+          content={t('characters.openJobsTooltip', { used: running, max })}
+          className={tone}
+        >
+          {open}
+        </HintText>
       );
     },
   };
@@ -728,17 +728,12 @@ function buildColumns(
           return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
         }
         return (
-          <Tooltip
-            openOnTap
+          <HintText
             content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}
+            className={tone}
           >
-            <span
-              tabIndex={0}
-              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-            >
-              {formatCountdown((row.queue.trainingFinishMs - Date.now()) / 1000)}
-            </span>
-          </Tooltip>
+            {formatCountdown((row.queue.trainingFinishMs - Date.now()) / 1000)}
+          </HintText>
         );
       },
     },
@@ -759,14 +754,12 @@ function buildColumns(
         if (expiryMs != null && isPiExpired(expiryMs, Date.now())) {
           const stoppedTone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE.idle];
           return (
-            <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
-              <span
-                tabIndex={0}
-                className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${stoppedTone}`}
-              >
-                {t('pi.attention.idle')}
-              </span>
-            </Tooltip>
+            <HintText
+              content={formatTimestamp(new Date(expiryMs), timeZone)}
+              className={stoppedTone}
+            >
+              {t('pi.attention.idle')}
+            </HintText>
           );
         }
         const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
@@ -779,18 +772,13 @@ function buildColumns(
         }
         const label = formatDuration((expiryMs - Date.now()) / 1000);
         return (
-          <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
-            <span
-              tabIndex={0}
-              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-            >
-              {/* The countdown alone is a colour-only tell of the underlying
+          <HintText content={formatTimestamp(new Date(expiryMs), timeZone)} className={tone}>
+            {/* The countdown alone is a colour-only tell of the underlying
                   attention state (DESIGN.md §7) — colour-blind sighted readers
                   need the word too, not just screen readers, so it prints
                   rather than hiding in an sr-only span. */}
-              {t(`pi.attention.${attention}`)} · {label}
-            </span>
-          </Tooltip>
+            {t(`pi.attention.${attention}`)} · {label}
+          </HintText>
         );
       },
     },

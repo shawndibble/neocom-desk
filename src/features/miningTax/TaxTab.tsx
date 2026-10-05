@@ -1,3 +1,4 @@
+import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -1312,14 +1313,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       render: (dr) => {
         const name = payeeDisplayName(dr);
         return (
-          <Tooltip content={name}>
-            <span
-              tabIndex={0}
-              className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
-            >
-              {name}
-            </span>
-          </Tooltip>
+          <HintText content={name} desktopOnly>
+            {name}
+          </HintText>
         );
       },
       sortValue: (dr) => payeeDisplayName(dr),

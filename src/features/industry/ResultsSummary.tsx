@@ -7,10 +7,12 @@ import {
   Disclosure,
   EmptyState,
   FilterChip,
+  IconButton,
   InfoTooltip,
   IskAmount,
   Spinner,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
@@ -67,14 +69,21 @@ function CostRow({
     >
       <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
         {label}
-        {tooltip && (
-          <InfoTooltip
-            label={t('common.aboutLabel', { label })}
-            content={tooltip}
-            onClick={onTooltipClick}
-            {...(onTooltipClick ? { 'aria-haspopup': 'dialog' as const } : {})}
-          />
-        )}
+        {tooltip &&
+          (onTooltipClick ? (
+            // An ⓘ button, not a "?" tooltip: it opens the calculation (§6c).
+            <IconButton
+              size="sm"
+              variant="plain"
+              icon={<Icon.Info size={Icon.ICON_SIZE.sm} />}
+              label={t('common.aboutLabel', { label })}
+              tooltip={tooltip}
+              onClick={onTooltipClick}
+              aria-haspopup="dialog"
+            />
+          ) : (
+            <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
+          ))}
       </span>
       <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}

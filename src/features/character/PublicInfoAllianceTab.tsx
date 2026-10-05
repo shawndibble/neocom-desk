@@ -12,6 +12,7 @@
  * zKillboard's own (`memberCount`): ESI states no alliance-wide headcount,
  * and summing every member corp's record would cost a request per corp.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { allianceLogoUrl } from '@/lib/eveImages';
@@ -31,13 +32,7 @@ import {
   type PublicAllianceInfo,
 } from './publicInfoData';
 import { CorporationEntry, PersonLink } from './PublicInfoParts';
-import {
-  FACT_COLUMNS,
-  externalLinkClassName,
-  fullDate,
-  sectionHeading,
-  termClassName,
-} from './publicInfoStyles';
+import { FACT_COLUMNS, fullDate, sectionHeading, termClassName } from './publicInfoStyles';
 
 export interface PublicInfoAllianceTabProps {
   data: PublicAllianceInfo;
@@ -129,14 +124,9 @@ export default function PublicInfoAllianceTab({ data }: PublicInfoAllianceTabPro
           )}
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
-          <a
-            href={allianceZkillUrl(allianceId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={externalLinkClassName}
-          >
-            {t('publicInfo.zkillboard')} <span aria-hidden>↗</span>
-          </a>
+          <ExternalLink href={allianceZkillUrl(allianceId)}>
+            {t('publicInfo.zkillboard')}
+          </ExternalLink>
         </div>
       </div>
 

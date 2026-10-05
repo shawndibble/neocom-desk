@@ -512,13 +512,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     },
     [catalog]
   );
-  // Tint and `selectedRowKey` both key on the selected id rather than
-  // `selectedRow`: a selected offer filtered out of `filteredRows` has no row
-  // to mark either way, and one source keeps the two from disagreeing.
-  const offerRowClassName = useCallback(
-    (row: LoyaltyOfferRow) => (row.offer.offer_id === selectedOfferId ? 'bg-panel-2' : undefined),
-    [selectedOfferId]
-  );
+  // `DataTable` draws the selected row itself from `selectedRowKey`; it keys on the
+  // selected id rather than `selectedRow`, so a selected offer filtered out of
+  // `filteredRows` simply has no row to mark.
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
@@ -660,7 +656,6 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
             selectedRowKey={selectedOfferId}
-            rowClassName={offerRowClassName}
           />
         </>
       )}

@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -703,11 +704,12 @@ export function Mail() {
                               it now, with the fill as the second, non-colour signal;
                               both sit on the wrapper so they span the twin too. */}
                           <div
+                            aria-current={isSelected ? 'true' : undefined}
                             className={cx(
-                              'flex items-center border-l-2 transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none',
+                              'flex items-center transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none',
                               isSelected
-                                ? 'border-l-accent bg-panel-2'
-                                : 'border-l-transparent hover:bg-panel-2/60'
+                                ? selectedRowClassName
+                                : 'border-l-2 border-l-transparent hover:bg-panel-2/60'
                             )}
                           >
                             <button

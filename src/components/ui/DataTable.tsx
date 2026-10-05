@@ -24,8 +24,10 @@ import {
   focusRingInsetClassName,
   interactiveClassName,
   rowInteractiveClassName,
+  selectedRowClassName,
   type ControlSize,
 } from './controlStyles';
+import { useLiftAfterHoldGuard } from './liftAfterHold';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
@@ -291,8 +293,9 @@ interface DataTableProps<T> {
   /**
    * Marks one row as the persistent current selection — e.g. the offer the
    * LP Store's detail panel is showing. `aria-current="true"` on that row's
-   * `<tr>`, so the selection reads in text/AT rather than only through
-   * `rowClassName`'s background tint (DESIGN.md §7). Distinct from
+   * `<tr>`, so the selection reads in text/AT, and the row wears
+   * `selectedRowClassName` (accent left border, `panel-2` fill, accent
+   * primary cell) itself — a caller no longer tints it (DESIGN.md §6c, §7). Distinct from
    * `highlightRowKey`'s one-shot `"location"`: that one is a deep link the
    * reader arrives on and moves past, this one persists as long as the row
    * stays selected.
@@ -570,6 +573,7 @@ function DataTableRowImpl<T>({
     observer.observe(detail);
     return () => observer.disconnect();
   }, [expanded, remeasure]);
+  const guard = useLiftAfterHoldGuard();
   const tr = (
     <tr
       role="row"
@@ -593,12 +597,17 @@ function DataTableRowImpl<T>({
         focusable &&
           'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         highlighted && 'row-pulse',
+        selected && selectedRowClassName,
         rowClassName?.(row)
       )}
       tabIndex={focusable ? 0 : undefined}
+      // A touch held for the row menu's long-press lifts into a click on some
+      // browsers; that click is the menu's, not the row's (`liftAfterHold.ts`).
+      {...(clickable ? guard.handlers : undefined)}
       onClick={
         clickable
           ? (event) => {
+              if (guard.swallowClick(event)) return;
               if (isRowOwnEvent(event)) onActivate(row, key);
             }
           : undefined

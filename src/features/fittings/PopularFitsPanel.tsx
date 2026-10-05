@@ -1,7 +1,7 @@
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Spinner, Tabs } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
@@ -179,14 +179,7 @@ function WorkbenchFits({
       {/* One line for the whole tab, not one per row: a hull can list hundreds. */}
       <p className="text-xs text-text-dim">
         {t('fittings.popular.workbench.source')}{' '}
-        <a
-          href="https://eveworkbench.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={inlineLinkClassName}
-        >
-          eveworkbench.com
-        </a>
+        <ExternalLink href="https://eveworkbench.com">eveworkbench.com</ExternalLink>
         {listed && tab.pricing ? (
           <>
             {' · '}
@@ -220,14 +213,9 @@ function WorkbenchFits({
             <>
               <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <a
-                    href={workbenchFitUrl(fit.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="truncate hover:underline"
-                  >
+                  <ExternalLink href={workbenchFitUrl(fit.id)} className="truncate">
                     {fit.name || t('fittings.popular.workbench.unnamed')}
-                  </a>
+                  </ExternalLink>
                   <WorkbenchFitPrice price={price} />
                 </p>
                 <p className="text-xs text-text-dim">

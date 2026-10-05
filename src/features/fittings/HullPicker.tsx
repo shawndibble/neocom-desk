@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
@@ -74,7 +75,7 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                           title={hull.group}
                           onClick={() => setSelected(hull)}
                           onDoubleClick={() => onStart(hull)}
-                          className={`flex min-h-11 w-full md:min-h-9 items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                          className={`flex min-h-11 w-full md:min-h-9 items-center px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? `${selectedRowClassName} text-accent` : 'border-l-2 border-l-transparent'}`}
                         >
                           {hull.name}
                         </button>

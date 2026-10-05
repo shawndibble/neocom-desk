@@ -4,9 +4,6 @@
  * them live in `PublicInfoParts.tsx`.
  */
 
-/** zKillboard and Website: links, so they wear a control's edge (DESIGN.md §6). */
-export const externalLinkClassName =
-  'inline-flex h-11 flex-1 items-center justify-center rounded-xs border border-line-bright px-3 text-xs text-text hover:bg-panel-2 sm:h-8 sm:flex-none';
 /** Status words: type and colour, never a box — a box would read as a button (DESIGN.md §6). */
 export const statusWordClassName = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 /** One line from `md` up however many facts there are (tax, a pilot count and the killboard are optional). */

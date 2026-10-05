@@ -17,7 +17,7 @@
  * knowable by asking ESI per Character, so a section per stored Character
  * would mean a read per stored Character on every visit to Settings.
  */
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -74,14 +74,7 @@ export function PermissionsPanel() {
           <Trans
             i18nKey="settings.permissions.hint"
             components={{
-              ccp: (
-                <a
-                  href={AUTHORIZED_APPS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={inlineLinkClassName}
-                />
-              ),
+              ccp: <ExternalLink href={AUTHORIZED_APPS_URL} />,
             }}
           />
         </p>

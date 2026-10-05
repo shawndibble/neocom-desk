@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -84,7 +85,7 @@ function PlanRow({
 
   return (
     <li
-      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? 'bg-accent/15' : ''}`}
+      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? selectedRowClassName : ''}`}
     >
       {renaming ? (
         <TextInput

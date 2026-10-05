@@ -8,9 +8,9 @@
  * Stargate (Nourvukaiken), last one 32 min ago", "Smartbombs involved" —
  * never a word about what that means for the pilot.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { KillTags, RecentKillLocation } from '@/engine/route/recentKills';
 import { systemZkillUrl } from '@/lib/zkillboard';
 import type { RouteKillsCell } from './useRouteKills';
@@ -80,14 +80,9 @@ export function RecentKillsCell({ systemId, cell }: { systemId: number; cell: Ro
       // Nothing to say on a phone card's meta line; the table column keeps it.
       data-dense-omit={summary.count === 0 ? '' : undefined}
     >
-      <a
-        href={systemZkillUrl(systemId)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={inlineLinkClassName}
-      >
+      <ExternalLink href={systemZkillUrl(systemId)}>
         {t('travel.kills.count', { count: summary.count })}
-      </a>
+      </ExternalLink>
       {summary.locations
         .filter((location) => location.onPath)
         .map((location) => (

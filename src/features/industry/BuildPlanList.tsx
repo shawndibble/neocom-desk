@@ -1,3 +1,4 @@
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -406,9 +407,10 @@ function PlanRow({
         setDropRef(node);
         setDragRef(node);
       }}
+      aria-current={active ? 'true' : undefined}
       className={`flex items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${
         indented ? 'pl-6' : 'pl-2'
-      } ${active ? 'bg-panel-2' : ''} ${isDragging ? 'opacity-40' : ''} ${
+      } ${active ? selectedRowClassName : ''} ${isDragging ? 'opacity-40' : ''} ${
         dropKind === 'into' ? DROP_INTO_CLASS : dropKind === 'out' ? DROP_OUT_CLASS : ''
       }`}
     >
@@ -566,8 +568,9 @@ function GroupHeader({
   return (
     <li
       ref={setNodeRef}
+      aria-current={active ? 'true' : undefined}
       className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${
-        active ? 'bg-panel-2' : ''
+        active ? selectedRowClassName : ''
       } ${dropActive ? DROP_INTO_CLASS : ''}`}
     >
       {/* Compare's checkbox only ever renders on a *visible* row, so a
