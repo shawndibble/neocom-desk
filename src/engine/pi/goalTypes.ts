@@ -120,11 +120,18 @@ export type FitLimit = 'cpu' | 'powergrid';
 // --- The solver's answer (goalPlan.ts), read by planEconomics.ts and planDiff.ts ---
 
 /**
- * How a demanded type is covered. A line partly covered takes the worst of
- * its parts — any shortfall makes it `'short'`, else any purchase makes it
- * `'bought'` — and `GoalPlan.buys` / `GoalPlan.shortfalls` carry the amounts.
+ * How a demanded type is covered, with `DemandLine.madeFraction` saying how
+ * much of it the plan makes:
+ *
+ * - `'short'` — this line has a gap of its own (a budget gap on its P1, or a
+ *   P2+ that does not reach its rate);
+ * - `'bought'` — a P1 whose uncovered part is bought (the made part is
+ *   `madeFraction`);
+ * - `'made'` / `'extracted'` — no gap of its own. `madeFraction` under 1 then
+ *   means it is rationed by a scarcer input elsewhere, not short itself;
+ * - `'not-extracted'` — a P0 whose P1 is bought in full: nothing is extracted.
  */
-export type DemandSource = 'made' | 'bought' | 'short' | 'extracted';
+export type DemandSource = 'made' | 'bought' | 'short' | 'extracted' | 'not-extracted';
 
 /** One type the goals need, summed across every goal that needs it. */
 export interface DemandLine {
@@ -134,6 +141,8 @@ export interface DemandLine {
   /** Factories of this schematic, re-ceiled on the summed rate. Null on P0, which no factory makes. */
   factories: number | null;
   source: DemandSource;
+  /** 0..1: the share of `unitsPerHour` the plan makes (extracts, for a P0). */
+  madeFraction: number;
 }
 
 /**
@@ -165,10 +174,18 @@ export type Shortfall =
       p0TypeId: number;
       p1TypeId: number;
       unitsPerHour: number;
+      /** The same gap in P1 units/h — the figure a pilot buys or plans in. */
+      p1UnitsPerHour: number;
       fixPlanetTypes: PlanetType[];
     }
-  /** Colonies that could yield it are full. P0 units. */
-  | { kind: 'budget-gap'; p0TypeId: number; p1TypeId: number; unitsPerHour: number }
+  /** No colony that yields it can take more. `unitsPerHour` is P0 units; `p1UnitsPerHour` P1. */
+  | {
+      kind: 'budget-gap';
+      p0TypeId: number;
+      p1TypeId: number;
+      unitsPerHour: number;
+      p1UnitsPerHour: number;
+    }
   /** P2+ is demanded but no enabled colony's planet type carries every factory the chain needs. */
   | { kind: 'no-factory-host'; facility: PiFactoryKind }
   /** The host was chosen but its factories overrun its CPU/Powergrid. */

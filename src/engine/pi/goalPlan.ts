@@ -4,17 +4,25 @@
  *
  * ## Greedy, and says so
  *
- * The scope decision fixes this as a greedy pass, not an optimiser. It is not
- * optimal; what makes it checkable is that every gap it leaves is named as a
- * `Shortfall` and every colony's role is a visible change against today. One
- * pass (`solve`), in order:
+ * The scope decision fixes this as a greedy solver, not an optimiser. It is
+ * not optimal; what makes it checkable is that every gap it leaves is named
+ * as a `Shortfall` and every colony's role is a visible change against today.
+ * Every output — demand lines, flows, shortfalls, assignments — describes the
+ * one final plan. In order:
  *
- * 1. **Demand.** Each goal is expanded with `expandChain` at
+ * 1. **Type gaps first.** A P1 whose P0 no enabled colony's planet type
+ *    yields (and that the pilot will not buy) blocks every goal that needs
+ *    it. Those goals are dropped before anything is assigned and reported as
+ *    `type-gap`s: nothing is extracted for a product that cannot be finished,
+ *    and no budget gap is reported for a blocked goal's other inputs — they
+ *    reappear once the type gap is fixed.
+ *
+ * 2. **Demand.** Each remaining goal is expanded with `expandChain` at
  *    `unitsPerDay / 24`, the per-type rates are summed across goals, and the
  *    factory counts re-ceiled on the sums — two goals each wanting half a
  *    Water factory share one.
  *
- * 2. **Factory host.** Needed only when a P2+ is made. It must be a colony
+ * 3. **Factory host.** Needed only when a P2+ is made. It must be a colony
  *    whose planet type carries every made schematic's factory, which for a P4
  *    means Barren or Temperate (the High-Tech Production Plant exists nowhere
  *    else). Among the eligible, the host is the one whose extraction the plan
@@ -22,51 +30,48 @@
  *    1 / (colonies able to yield that P0), and take the lowest — then the
  *    smaller Baseline forfeited, then the larger Powergrid, then CPU, then the
  *    lower planet id. That is the price-free default; `planBest` instead
- *    solves once per eligible host (`hostPlanetId`) and keeps the best net. Its P2+ factories are fitted first (`fitPlannedPins`);
- *    an overrun is a `host-over-budget` shortfall, and a host that cannot be
- *    built makes nothing. With no eligible colony, P2+ goals are not expanded
- *    at all — each is one `'short'` (or, if its tier is buyable, `'bought'`)
- *    line — and only P1 goals are planned.
+ *    solves once per eligible host (`hostPlanetId`) and keeps the best plan.
+ *    Its P2+ factories are fitted first (`fitPlannedPins`); an overrun is a
+ *    `host-over-budget` shortfall, and a host that cannot be built makes
+ *    nothing. With no eligible colony, P2+ goals are not planned at all —
+ *    each is one `'short'` (or, if its tier is buyable, `'bought'`) line.
  *
- * 3. **Extraction.** Each demanded P1 is made from its P0 on the spot. The
+ * 4. **Extraction.** Each demanded P1 is made from its P0 on the spot. The
  *    host is an ordinary extractor too, fitted against what its factories
  *    leave (`colonyExtraction`'s `fixed` pins) — so P0 → P2 on one planet, the
  *    classic setup, is expressible and its P1 never crosses a customs office.
  *    P0s are taken scarcest first (fewest eligible colonies, then typeId), and
  *    each fills colonies in the order: the host first when the P1 feeds it,
- *    then fewest ECUs already planned, then fewest *other* still-unassigned
- *    demanded P0s the colony could yield (leave contested colonies for later),
- *    then the higher per-ECU rate, then the lower planet id. On each colony it
- *    adds the fewest ECUs that cover what is left, else the most that fit
- *    beside what the colony already runs — so a colony's second slot takes a
- *    different P0 before anything is called a budget gap. Whole ECUs
- *    overshoot; the overshoot is `surplusP1`, sold.
+ *    then fewest ECUs already planned, then fewest *other* demanded P0s the
+ *    colony could yield (leave contested colonies for later), then the higher
+ *    per-ECU rate, then the lower planet id. On each colony it adds the fewest
+ *    ECUs that cover what is left, else the most that fit beside what the
+ *    colony already runs — so a colony's second slot takes a different P0
+ *    before anything is called a budget gap. Whole ECUs overshoot; the
+ *    overshoot is `surplusP1`, sold.
  *
- * 4. **Gaps.** P1 left uncovered is bought at the hub when the pilot allows
- *    buying P1. Otherwise it is a `Shortfall`, in P0 units: a **type gap**
- *    when no enabled colony's planet type yields that P0 at all (the fix is a
- *    planet of a listed type), else a **budget gap** (the fix is re-targeting
- *    or buying). Buying stops at P1 in milestone 1 — a short P1 under a pilot
- *    who allows buying P2 but not P1 is still a shortfall, because working
- *    out how many P2s a short P1 strands is its own pass.
+ * 5. **Release and refill.** A goal whose inputs are short runs at the
+ *    fraction its scarcest P1 is supplied at (`achieved`; a shared short P1
+ *    is rationed proportionally), so some extraction feeds production that
+ *    never happens. Each round releases every slot (or ECU) beyond what the
+ *    achieved rates consume — those colonies fall back to their Baseline —
+ *    then tries to add extraction for whatever P1 binds, on any colony with
+ *    room, the released ones included. A round is kept only if some goal got
+ *    further; it converges in a few. A goal that reaches zero retargets
+ *    nothing.
  *
- * 5. **Spare capacity sells.** A colony the plan uses but does not fill takes
+ * 6. **Gaps.** P1 still uncovered is bought at the hub when the pilot allows
+ *    buying P1. Otherwise it is a **budget gap** only if no colony that
+ *    yields it can take more — never while a colony able to yield it sits on
+ *    its Baseline with room. A P1 merely rationed by a scarcer input is not a
+ *    gap; its demand line says how much is made (`madeFraction`). Shortfalls
+ *    carry both P0 and P1 units. Buying stops at P1 in milestone 1.
+ *
+ * 7. **Spare capacity sells.** A colony the plan uses but does not fill takes
  *    one more slot on its best-selling P1 if one fits; a colony the plan does
- *    not need at all keeps its **Baseline** (role `'baseline'`). Either way
- *    nothing the plan leaves alone is credited at zero, so a plan is never
- *    penalised for colonies it simply does not touch. Only a colony with no
- *    priced Baseline is `'idle'`.
- *
- * ## Two passes: release what nothing consumes
- *
- * A goal whose inputs are short runs at the fraction its scarcest P1 is
- * supplied at (`achieved`, a shared short P1 rationed proportionally). The
- * first pass's extraction was sized for the full goals, so some of it feeds
- * production that never happens. `planGoals` therefore solves again at the
- * achieved rates: extraction nothing consumes is released, and those colonies
- * fall back to their Baseline. A goal that reaches zero retargets nothing. The
- * shortfalls and the demand lines are the first pass's — they describe what
- * the goals as asked for lack; everything else is the second pass's.
+ *    not need at all keeps its **Baseline** (role `'baseline'`). Nothing the
+ *    plan leaves alone is credited at zero. Only a colony with no Baseline
+ *    worth selling is `'idle'`.
  *
  * ## Flows are the ledger
  *
@@ -198,12 +203,74 @@ function madeHighOf(goals: readonly Goal[], pi: PiData): number[] {
   return [...made].sort(byId);
 }
 
+interface GoalTriage {
+  /** Goals nothing rules out up front. */
+  live: Goal[];
+  /** Goals a type gap blocks: they make nothing, so nothing is extracted for them. */
+  blocked: Goal[];
+  typeGaps: Shortfall[];
+}
+
+/**
+ * Which goals can be planned at all. A P1 whose P0 no enabled colony's planet
+ * type yields, and that the pilot will not buy, blocks every goal whose chain
+ * needs it — a **type gap**. Those goals are dropped before anything is
+ * assigned: nothing extracts for a product that cannot be finished, and no
+ * budget gap is reported for its other inputs (fix the type gap first; they
+ * reappear in the plan once it is fixed).
+ */
+function triageGoals(
+  goals: readonly Goal[],
+  colonies: readonly PlannerColony[],
+  policy: PlannerPolicy,
+  pi: PiData
+): GoalTriage {
+  const buyP1 = policy.buyTiers.includes(1);
+  const yieldable = (p0: number) => colonies.some((c) => c.ratePerEcu.has(p0));
+  const gapUnits = new Map<number, number>(); // p1 → P1 units/h the blocked goals wanted
+  const live: Goal[] = [];
+  const blocked: Goal[] = [];
+  for (const g of goals) {
+    const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
+    const gaps = buyP1
+      ? []
+      : chain.nodes.filter(
+          (n) => n.tier === 1 && !yieldable(pi.schematics[String(n.typeId)].inputs[0].typeID)
+        );
+    if (gaps.length === 0) {
+      live.push(g);
+      continue;
+    }
+    blocked.push(g);
+    for (const n of gaps) gapUnits.set(n.typeId, (gapUnits.get(n.typeId) ?? 0) + n.unitsPerHour);
+  }
+  const typeGaps: Shortfall[] = [...gapUnits]
+    .sort(([a], [b]) => a - b)
+    .map(([p1TypeId, p1UnitsPerHour]) => {
+      const schematic = pi.schematics[String(p1TypeId)];
+      const input = schematic.inputs[0];
+      const raw = pi.raw.find((r) => r.typeID === input.typeID)!;
+      return {
+        kind: 'type-gap',
+        p0TypeId: input.typeID,
+        p1TypeId,
+        unitsPerHour: (p1UnitsPerHour * input.quantity) / schematic.quantity,
+        p1UnitsPerHour,
+        fixPlanetTypes: [...raw.planetTypes],
+      };
+    });
+  return { live, blocked, typeGaps };
+}
+
 /**
  * Planet ids that could host these goals' factories, sorted — empty when no
- * P2+ is made or no colony can carry it. What `planBest` iterates.
+ * P2+ is made or no colony can carry it. Goals a type gap blocks are left
+ * out, as `planGoals` leaves them out. What `planBest` iterates.
  */
 export function hostCandidates(input: PlanGoalsInput, pi: PiData): number[] {
-  const madeHigh = madeHighOf(normaliseGoals(input.goals, pi), pi);
+  const goals = normaliseGoals(input.goals, pi);
+  const { live } = triageGoals(goals, input.colonies, input.policy, pi);
+  const madeHigh = madeHighOf(live, pi);
   if (madeHigh.length === 0) return [];
   return eligibleHosts(madeHigh, input.colonies, pi)
     .map((c) => c.planetId)
@@ -285,173 +352,350 @@ function spareSlot(
   return best?.fit ?? null;
 }
 
-interface Solved {
-  achieved: GoalPlan['achieved'];
-  demand: DemandLine[];
-  assignments: ColonyAssignment[];
-  factoryHost: GoalPlan['factoryHost'];
-  shortfalls: Shortfall[];
-  flows: Flow[];
-  surplusP1: GoalPlan['surplusP1'];
-}
+/** Most release/refill rounds; it converges in two or three on real colonies. */
+const MAX_ROUNDS = 8;
 
-function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
-  const { policy, pi } = ctx;
+export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
+  const { colonies, policy, books } = input;
+  const goals = normaliseGoals(input.goals, pi);
+  const baselines = new Map(
+    colonies.map((c) => [c.planetId, colonyBaseline(c, pi, policy, books)] as const)
+  );
+  const ctx: SolveContext = {
+    colonies,
+    policy,
+    books,
+    baselines,
+    pi,
+    hostPlanetId: input.hostPlanetId,
+  };
   const tierOf = (id: number) => piTier(id, pi);
-  const sortedColonies = [...ctx.colonies].sort((a, b) => a.planetId - b.planetId);
-
-  // --- 1. Demand -----------------------------------------------------------
+  const perHour = (g: Goal) => g.unitsPerDay / HOURS_PER_DAY;
+  const sortedColonies = [...colonies].sort((a, b) => a.planetId - b.planetId);
+  const buyP1 = policy.buyTiers.includes(1);
   const expandInto = (into: Map<number, number>, list: readonly Goal[]) => {
     for (const g of list) {
-      const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
+      const chain = expandChain(g.typeId, pi, { unitsPerHour: perHour(g) });
       for (const node of chain.nodes) {
         into.set(node.typeId, (into.get(node.typeId) ?? 0) + node.unitsPerHour);
       }
     }
   };
-  const fullDemand = new Map<number, number>();
-  expandInto(fullDemand, goals);
+
+  // --- 1. Type gaps --------------------------------------------------------
+  const triage = triageGoals(goals, colonies, policy, pi);
+  const shortfalls: Shortfall[] = [...triage.typeGaps];
+  const dead = new Set<Goal>(triage.blocked);
 
   // --- 2. Factory host -----------------------------------------------------
-  const madeHigh = [...fullDemand.keys()].filter((id) => tierOf(id) >= 2).sort(byId);
-  const demandedP0 = [...fullDemand.keys()].filter((id) => tierOf(id) === 0).sort(byId);
-  const shortfalls: Shortfall[] = [];
   let host: PlannerColony | null = null;
-  let factoryHost: GoalPlan['factoryHost'] = null;
-  const unhostedGoals: Goal[] = [];
-  if (madeHigh.length > 0) {
-    const choice = chooseHost(madeHigh, demandedP0, ctx);
-    if (choice.host) {
-      host = choice.host;
-      factoryHost = { planetId: choice.host.planetId, reason: choice.reason };
-    } else {
-      shortfalls.push({ kind: 'no-factory-host', facility: choice.facility });
-      unhostedGoals.push(...goals.filter((g) => tierOf(g.typeId) >= 2));
+  let hostReason: FactoryHostReason | null = null;
+  const liveHigh = triage.live.filter((g) => tierOf(g.typeId) >= 2);
+  // A missing host is its own fix, whatever else blocks a goal: check every
+  // P2+ goal, not only the ones a type gap leaves standing.
+  const allHigh = goals.filter((g) => tierOf(g.typeId) >= 2);
+  if (allHigh.length > 0 && liveHigh.length < allHigh.length) {
+    const madeAll = madeHighOf(allHigh, pi);
+    if (eligibleHosts(madeAll, colonies, pi).length === 0) {
+      const probe = chooseHost(madeAll, [], { ...ctx, hostPlanetId: undefined });
+      if (!probe.host) shortfalls.push({ kind: 'no-factory-host', facility: probe.facility });
     }
   }
-  const plannedGoals = goals.filter((g) => !unhostedGoals.includes(g));
+  const factoriesOf = (rates: ReadonlyMap<number, number>) => {
+    const out: Partial<Record<PiFactoryKind, number>> = {};
+    for (const [id, units] of rates) {
+      if (tierOf(id) < 2 || units <= EPSILON) continue;
+      const facility = pi.schematics[String(id)].facility;
+      out[facility] = (out[facility] ?? 0) + factoriesFor(id, units, pi)!;
+    }
+    return out;
+  };
+  let hostFactories: PinCounts = {};
+  if (liveHigh.length > 0) {
+    const liveDemand = new Map<number, number>();
+    expandInto(liveDemand, triage.live);
+    const demandedP0 = [...liveDemand.keys()].filter((id) => tierOf(id) === 0).sort(byId);
+    const choice = chooseHost(madeHighOf(liveHigh, pi), demandedP0, ctx);
+    if (choice.host) {
+      const highDemand = new Map<number, number>();
+      expandInto(highDemand, liveHigh);
+      const factories = factoriesOf(highDemand);
+      const fit = fitPlannedPins(choice.host, factories, 0, pi);
+      if (fit.fits) {
+        host = choice.host;
+        hostReason = choice.reason;
+        hostFactories = factories;
+      } else {
+        // A host that cannot carry its factories makes nothing at all.
+        shortfalls.push({
+          kind: 'host-over-budget',
+          planetId: choice.host.planetId,
+          limitedBy: fit.limitedBy,
+        });
+        liveHigh.forEach((g) => dead.add(g));
+      }
+    } else {
+      if (!shortfalls.some((sf) => sf.kind === 'no-factory-host')) {
+        shortfalls.push({ kind: 'no-factory-host', facility: choice.facility });
+      }
+      liveHigh.forEach((g) => dead.add(g));
+    }
+  }
+  // A goal that cannot be made is bought outright when its own tier is buyable.
+  const boughtOutright = new Set(
+    [...dead].filter((g) => policy.buyTiers.includes(tierOf(g.typeId)))
+  );
+  const planned = goals.filter((g) => !dead.has(g));
+  const plannedHigh = planned.filter((g) => tierOf(g.typeId) >= 2);
   const demand = new Map<number, number>();
-  expandInto(demand, plannedGoals);
-
-  const hostFactories: Partial<Record<PiFactoryKind, number>> = {};
-  for (const [id, units] of demand) {
-    if (tierOf(id) < 2) continue;
-    const facility = pi.schematics[String(id)].facility;
-    hostFactories[facility] = (hostFactories[facility] ?? 0) + factoriesFor(id, units, pi)!;
-  }
-  const hostFit = host ? fitPlannedPins(host, hostFactories, 0, pi) : null;
-  const hostBuilds = hostFit?.fits ?? false;
-  if (host && hostFit && !hostFit.fits) {
-    shortfalls.push({
-      kind: 'host-over-budget',
-      planetId: host.planetId,
-      limitedBy: hostFit.limitedBy,
-    });
-  }
+  expandInto(demand, planned);
   const fixedOn = (c: PlannerColony): PinCounts => (c === host ? hostFactories : {});
 
-  // P1 wanted as a goal of its own, as against fed to the host.
   const p1GoalNeed = new Map<number, number>();
-  for (const g of plannedGoals) {
-    if (tierOf(g.typeId) === 1) p1GoalNeed.set(g.typeId, g.unitsPerDay / HOURS_PER_DAY);
-  }
-  const p1Demand = [...demand].filter(([id]) => tierOf(id) === 1);
+  for (const g of planned) if (tierOf(g.typeId) === 1) p1GoalNeed.set(g.typeId, perHour(g));
   const feedsHost = (p1: number) => (demand.get(p1) ?? 0) - (p1GoalNeed.get(p1) ?? 0) > EPSILON;
 
   // --- 3. Extraction -------------------------------------------------------
-  // A host whose factories already overrun has nothing left to extract with.
-  const extractors = sortedColonies.filter((c) => c !== host || hostBuilds);
-  const p1Rows = p1Demand
+  const p1Rows = [...demand]
+    .filter(([id]) => tierOf(id) === 1)
     .map(([p1, units]) => {
       const schematic = pi.schematics[String(p1)];
       const input = schematic.inputs[0];
-      const eligible = extractors.filter((c) => c.ratePerEcu.has(input.typeID));
-      const p1PerP0 = schematic.quantity / input.quantity;
-      return { p1, p0: input.typeID, units, p1PerP0, eligible };
+      const eligible = sortedColonies.filter((c) => c.ratePerEcu.has(input.typeID));
+      return {
+        p1,
+        p0: input.typeID,
+        units,
+        p1PerP0: schematic.quantity / input.quantity,
+        eligible,
+      };
     })
     .sort((a, b) => a.eligible.length - b.eligible.length || a.p0 - b.p0);
+  const rowByP0 = new Map(p1Rows.map((r) => [r.p0, r]));
 
-  const wants = new Map<number, ExtractionWant[]>();
-  const fitted = new Map<number, FittedExtraction>();
-  const extracted = new Map<number, number>(); // p1 → units/h planned
-  const unmet = new Map<number, number>(); // p1 → units/h uncovered
-  const pending = new Set(p1Rows.map((r) => r.p0));
-  const ecusOn = (c: PlannerColony) =>
-    (wants.get(c.planetId) ?? []).reduce((s, w) => s + w.ecus, 0);
+  type Wants = Map<number, ExtractionWant[]>;
+  let wants: Wants = new Map();
+  const ecusOn = (state: Wants, c: PlannerColony) =>
+    (state.get(c.planetId) ?? []).reduce((s, w) => s + w.ecus, 0);
+  const slotP1 = (c: PlannerColony, p0: number, ecus: number) =>
+    c.ratePerEcu.get(p0)!.unitsPerHour *
+    (1 + policy.extraEcuFactor * (ecus - 1)) *
+    rowByP0.get(p0)!.p1PerP0;
 
-  for (const row of p1Rows) {
-    pending.delete(row.p0);
+  /**
+   * Greedy: add `row`'s P0 to colonies in the documented order until
+   * `remaining` P1/h is covered or nothing more fits. Mutates `state`;
+   * returns the P1/h added.
+   */
+  const fill = (state: Wants, row: (typeof p1Rows)[number], remaining: number): number => {
+    const pending = new Set(p1Rows.map((r) => r.p0).filter((p0) => p0 !== row.p0));
     const contention = (c: PlannerColony) =>
       [...pending].filter((p0) => c.ratePerEcu.has(p0)).length;
     const hostFirst = (c: PlannerColony) => (c === host && feedsHost(row.p1) ? 0 : 1);
     const order = [...row.eligible].sort(
       (a, b) =>
         hostFirst(a) - hostFirst(b) ||
-        ecusOn(a) - ecusOn(b) ||
+        ecusOn(state, a) - ecusOn(state, b) ||
         contention(a) - contention(b) ||
         b.ratePerEcu.get(row.p0)!.unitsPerHour - a.ratePerEcu.get(row.p0)!.unitsPerHour ||
         a.planetId - b.planetId
     );
-    let remaining = row.units;
+    let added = 0;
     for (const c of order) {
-      if (remaining <= EPSILON) break;
-      const current = wants.get(c.planetId) ?? [];
-      if (current.length >= policy.maxP0TypesPerColony) continue;
-      let best: { want: ExtractionWant[]; result: FittedExtraction; p1: number } | null = null;
-      for (let ecus = 1; ecus <= policy.maxEcusPerColony - ecusOn(c); ecus++) {
-        const want = [...current, { p0TypeId: row.p0, ecus }];
+      if (remaining - added <= EPSILON) break;
+      const current = state.get(c.planetId) ?? [];
+      const existing = current.find((w) => w.p0TypeId === row.p0);
+      if (!existing && current.length >= policy.maxP0TypesPerColony) continue;
+      const others = current.filter((w) => w.p0TypeId !== row.p0);
+      const had = existing ? slotP1(c, row.p0, existing.ecus) : 0;
+      let best: { want: ExtractionWant[]; gain: number } | null = null;
+      const first = (existing?.ecus ?? 0) + 1;
+      for (
+        let ecus = first;
+        ecus <= policy.maxEcusPerColony - ecusOn(state, c) + (existing?.ecus ?? 0);
+        ecus++
+      ) {
+        const want = [...others, { p0TypeId: row.p0, ecus }];
         const result = colonyExtraction(c, want, pi, policy, fixedOn(c));
         if (result.status !== 'fits') break;
-        const p1 = result.slots.find((s) => s.p0TypeId === row.p0)!.p1PerHour;
-        best = { want, result, p1 };
-        if (p1 >= remaining - EPSILON) break;
+        const gain = slotP1(c, row.p0, ecus) - had;
+        best = { want, gain };
+        if (gain >= remaining - added - EPSILON) break;
       }
       if (!best) continue;
-      wants.set(c.planetId, best.want);
-      fitted.set(c.planetId, best.result);
-      extracted.set(row.p1, (extracted.get(row.p1) ?? 0) + best.p1);
-      remaining -= best.p1;
+      state.set(c.planetId, best.want);
+      added += best.gain;
     }
-    if (remaining > EPSILON) unmet.set(row.p1, remaining);
+    return added;
+  };
+
+  const extractedFrom = (state: Wants) => {
+    const out = new Map<number, number>();
+    for (const c of sortedColonies) {
+      for (const w of state.get(c.planetId) ?? []) {
+        const p1 = rowByP0.get(w.p0TypeId)!.p1;
+        out.set(p1, (out.get(p1) ?? 0) + slotP1(c, w.p0TypeId, w.ecus));
+      }
+    }
+    return out;
+  };
+
+  /**
+   * What the goals reach on `state`'s extraction: each P2+ goal at its
+   * scarcest P1's supply fraction (a shared short P1 rationed proportionally),
+   * the host consuming exactly what those rates need, and each P1 goal taking
+   * what is left of its type.
+   */
+  const evaluate = (state: Wants) => {
+    const extracted = extractedFrom(state);
+    const supplied = (p1: number) =>
+      buyP1 ? Math.max(extracted.get(p1) ?? 0, demand.get(p1) ?? 0) : (extracted.get(p1) ?? 0);
+    const supplyFraction = (p1: number) => {
+      const need = demand.get(p1) ?? 0;
+      return need <= EPSILON ? 1 : Math.min(1, supplied(p1) / need);
+    };
+    const highFraction = new Map<number, number>();
+    const binding = new Set<number>();
+    for (const g of plannedHigh) {
+      const p1s = expandChain(g.typeId, pi, { unitsPerHour: perHour(g) })
+        .nodes.filter((n) => n.tier === 1)
+        .map((n) => n.typeId);
+      const fraction = Math.min(1, ...p1s.map(supplyFraction));
+      highFraction.set(g.typeId, fraction);
+      if (fraction < 1 - EPSILON) {
+        p1s
+          .filter((p1) => supplyFraction(p1) <= fraction + EPSILON)
+          .forEach((p1) => binding.add(p1));
+      }
+    }
+    const hostUse = new Map<number, number>();
+    expandInto(
+      hostUse,
+      plannedHigh
+        .map((g) => ({
+          typeId: g.typeId,
+          unitsPerDay: g.unitsPerDay * highFraction.get(g.typeId)!,
+        }))
+        .filter((g) => g.unitsPerDay > EPSILON)
+    );
+    const p1GoalReach = new Map<number, number>();
+    for (const [p1, need] of p1GoalNeed) {
+      const reach = Math.max(0, Math.min(need, supplied(p1) - (hostUse.get(p1) ?? 0)));
+      p1GoalReach.set(p1, reach);
+      if (reach < need - EPSILON) binding.add(p1);
+    }
+    const consumption = new Map<number, number>();
+    for (const row of p1Rows) {
+      consumption.set(row.p1, (hostUse.get(row.p1) ?? 0) + (p1GoalReach.get(row.p1) ?? 0));
+    }
+    const score =
+      [...highFraction.values()].reduce((s, f) => s + f, 0) +
+      [...p1GoalReach].reduce((s, [p1, reach]) => s + reach / p1GoalNeed.get(p1)!, 0);
+    return { extracted, supplied, highFraction, hostUse, p1GoalReach, consumption, binding, score };
+  };
+
+  /** Drop or shrink every slot beyond what `consumption` needs; the host's own slots are kept first. */
+  const release = (state: Wants, consumption: ReadonlyMap<number, number>) => {
+    const needed = new Map(consumption);
+    const feedOrder = [...sortedColonies].sort((a, b) => Number(b === host) - Number(a === host));
+    for (const c of feedOrder) {
+      const current = state.get(c.planetId);
+      if (!current) continue;
+      const kept: ExtractionWant[] = [];
+      for (const w of [...current].sort((a, b) => a.p0TypeId - b.p0TypeId)) {
+        const p1 = rowByP0.get(w.p0TypeId)!.p1;
+        const need = needed.get(p1) ?? 0;
+        if (need <= EPSILON) continue;
+        let ecus = w.ecus;
+        for (let k = 1; k <= w.ecus; k++) {
+          if (slotP1(c, w.p0TypeId, k) >= need - EPSILON) {
+            ecus = k;
+            break;
+          }
+        }
+        kept.push({ p0TypeId: w.p0TypeId, ecus });
+        needed.set(p1, need - slotP1(c, w.p0TypeId, ecus));
+      }
+      if (kept.length > 0) state.set(c.planetId, kept);
+      else state.delete(c.planetId);
+    }
+  };
+  const copy = (state: Wants): Wants => new Map([...state].map(([k, v]) => [k, [...v]]));
+
+  for (const row of p1Rows) fill(wants, row, row.units);
+  // Release extraction nothing consumes, then try to raise whatever binds;
+  // keep a round only if some goal actually got further.
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const before = evaluate(wants);
+    release(wants, before.consumption);
+    if (buyP1) break;
+    const trial = copy(wants);
+    const after = evaluate(trial);
+    let added = 0;
+    for (const row of p1Rows) {
+      if (!after.binding.has(row.p1)) continue;
+      added += fill(trial, row, row.units - (extractedFrom(trial).get(row.p1) ?? 0));
+    }
+    if (added <= EPSILON || evaluate(trial).score <= before.score + EPSILON) break;
+    wants = trial;
   }
+  const final = evaluate(wants);
+  release(wants, final.consumption);
+  const { extracted, hostUse, highFraction, p1GoalReach, consumption } = evaluate(wants);
 
   // --- 4. Gaps -------------------------------------------------------------
-  const buyP1 = policy.buyTiers.includes(1);
+  // A P1 is a budget gap only if no colony can take more of it. One that is
+  // merely rationed by a scarcer input (colonies with room exist) is not.
   const bought = new Map<number, number>();
+  const budgetGapP1 = new Set<number>();
   for (const row of p1Rows) {
-    const short = unmet.get(row.p1);
-    if (short === undefined) continue;
+    const unmet = row.units - (extracted.get(row.p1) ?? 0);
+    if (unmet <= EPSILON) continue;
     if (buyP1) {
-      bought.set(row.p1, short);
+      bought.set(row.p1, unmet);
       continue;
     }
-    const p0Units = short / row.p1PerP0;
-    if (!ctx.colonies.some((c) => c.ratePerEcu.has(row.p0))) {
-      const raw = pi.raw.find((r) => r.typeID === row.p0)!;
-      shortfalls.push({
-        kind: 'type-gap',
-        p0TypeId: row.p0,
-        p1TypeId: row.p1,
-        unitsPerHour: p0Units,
-        fixPlanetTypes: [...raw.planetTypes],
-      });
-    } else {
-      shortfalls.push({
-        kind: 'budget-gap',
-        p0TypeId: row.p0,
-        p1TypeId: row.p1,
-        unitsPerHour: p0Units,
-      });
-    }
+    if (fill(copy(wants), row, unmet) > EPSILON) continue;
+    budgetGapP1.add(row.p1);
+    shortfalls.push({
+      kind: 'budget-gap',
+      p0TypeId: row.p0,
+      p1TypeId: row.p1,
+      unitsPerHour: unmet / row.p1PerP0,
+      p1UnitsPerHour: unmet,
+    });
   }
-  const p1Short = new Set(buyP1 ? [] : unmet.keys());
 
-  // --- 5. Spare capacity and assignments -----------------------------------
+  // --- 5. Host, at what it actually makes ------------------------------------
+  const highAchieved = plannedHigh.map((g) => ({
+    typeId: g.typeId,
+    unitsPerDay: g.unitsPerDay * (highFraction.get(g.typeId) ?? 0),
+  }));
+  const madeHighRates = new Map<number, number>();
+  expandInto(
+    madeHighRates,
+    highAchieved.filter((a) => a.unitsPerDay > EPSILON)
+  );
+  if (host && ![...madeHighRates.values()].some((u) => u > EPSILON)) {
+    // Nothing gets made: no host, and its colony is an ordinary one again.
+    host = null;
+    hostReason = null;
+  }
+  hostFactories = host ? factoriesOf(madeHighRates) : {};
+
+  // --- 6. Spare capacity and assignments -----------------------------------
+  const fitted = new Map<number, FittedExtraction>();
+  for (const c of sortedColonies) {
+    const want = wants.get(c.planetId);
+    if (!want) continue;
+    const fit = colonyExtraction(c, want, pi, policy, fixedOn(c));
+    if (fit.status === 'fits') fitted.set(c.planetId, fit);
+  }
   const spare = new Map<number, ExtractionSlot>();
   const assignments: ColonyAssignment[] = sortedColonies.map((c): ColonyAssignment => {
-    const isHost = c === host && hostFit !== null;
+    const isHost = c === host;
     let fit = fitted.get(c.planetId) ?? null;
-    if (fit || (isHost && hostBuilds)) {
+    if (fit || isHost) {
       const current = wants.get(c.planetId) ?? [];
       const extra = spareSlot(c, current, fixedOn(c), ctx);
       if (extra) {
@@ -461,7 +705,7 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
       }
     }
     if (isHost) {
-      const pinFit = fit ?? hostFit!;
+      const pinFit = fit ?? fitPlannedPins(c, hostFactories, 0, pi);
       return {
         planetId: c.planetId,
         role: 'factory',
@@ -470,7 +714,7 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
         pins: pinFit.pins,
         used: pinFit.used,
         budget: pinFit.budget,
-        limitedBy: hostFit!.limitedBy,
+        limitedBy: [],
       };
     }
     if (fit) {
@@ -518,101 +762,83 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
   });
 
   // --- Demand lines --------------------------------------------------------
-  const shortP0 = new Set(p1Rows.filter((r) => p1Short.has(r.p1)).map((r) => r.p0));
-  const boughtP0 = new Set(p1Rows.filter((r) => bought.has(r.p1)).map((r) => r.p0));
-  const isShort = (id: number, seen: ReadonlySet<number> = new Set()): boolean => {
-    const tier = tierOf(id);
-    if (tier === 0) return shortP0.has(id);
-    if (tier === 1) return p1Short.has(id);
-    if (!hostBuilds) return true;
-    if (seen.has(id)) return false;
-    const next = new Set(seen).add(id);
-    return pi.schematics[String(id)].inputs.some((input) => isShort(input.typeID, next));
-  };
+  // The goals as asked, each line saying how much of it the final plan makes.
+  const p1Of = (p0: number) => rowByP0.get(p0)!.p1;
+  // Made means extracted *and used*: overshoot from a whole ECU is surplus, not made.
+  const p1Made = (p1: number) => Math.min(extracted.get(p1) ?? 0, consumption.get(p1) ?? 0);
   const lines: DemandLine[] = [...demand].map(([typeId, unitsPerHour]) => {
     const tier = tierOf(typeId);
+    let made: number;
     let source: DemandSource;
-    if (isShort(typeId)) source = 'short';
-    else if (tier === 0) source = boughtP0.has(typeId) ? 'bought' : 'extracted';
-    else if (tier === 1 && bought.has(typeId)) source = 'bought';
-    else source = 'made';
+    if (tier === 0) {
+      const p1 = p1Of(typeId);
+      made = (p1Made(p1) / (demand.get(p1) ?? 1)) * unitsPerHour;
+      source = budgetGapP1.has(p1)
+        ? 'short'
+        : (extracted.get(p1) ?? 0) <= EPSILON && bought.has(p1)
+          ? 'not-extracted'
+          : 'extracted';
+    } else if (tier === 1) {
+      made = p1Made(typeId);
+      source = budgetGapP1.has(typeId) ? 'short' : bought.has(typeId) ? 'bought' : 'made';
+    } else {
+      made = madeHighRates.get(typeId) ?? 0;
+      source = made >= unitsPerHour - EPSILON ? 'made' : 'short';
+    }
     return {
       typeId,
       tier,
       unitsPerHour,
       factories: factoriesFor(typeId, unitsPerHour, pi),
       source,
+      madeFraction: unitsPerHour <= EPSILON ? 1 : Math.min(1, made / unitsPerHour),
     };
   });
-  for (const g of unhostedGoals) {
+  for (const g of dead) {
     const tier = tierOf(g.typeId);
-    const unitsPerHour = g.unitsPerDay / HOURS_PER_DAY;
+    const unitsPerHour = perHour(g);
     lines.push({
       typeId: g.typeId,
       tier,
       unitsPerHour,
       factories: factoriesFor(g.typeId, unitsPerHour, pi),
-      source: policy.buyTiers.includes(tier) ? 'bought' : 'short',
+      source: boughtOutright.has(g) ? 'bought' : 'short',
+      madeFraction: 0,
     });
   }
   lines.sort((a, b) => b.tier - a.tier || a.typeId - b.typeId);
 
-  // --- Achieved rates ------------------------------------------------------
-  const supplied = (p1: number) => (extracted.get(p1) ?? 0) + (bought.get(p1) ?? 0);
-  const supplyFraction = (p1: number) => {
-    const need = demand.get(p1) ?? 0;
-    return need <= EPSILON ? 1 : Math.min(1, supplied(p1) / need);
-  };
-  const highGoals = host ? plannedGoals.filter((g) => tierOf(g.typeId) >= 2) : [];
-  const highAchieved = highGoals.map((g) => {
-    const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
-    // A host that cannot carry its factories makes nothing at all.
-    const fraction = hostBuilds
-      ? Math.min(1, ...chain.nodes.filter((n) => n.tier === 1).map((n) => supplyFraction(n.typeId)))
-      : 0;
-    return { typeId: g.typeId, unitsPerDay: g.unitsPerDay * fraction, fraction };
-  });
-  const hostUse = new Map<number, number>();
-  expandInto(
-    hostUse,
-    highAchieved.filter((a) => a.unitsPerDay > 0)
-  );
-
+  // --- Achieved ------------------------------------------------------------
   const achieved: GoalPlan['achieved'] = goals.map((g) => {
-    const target = g.unitsPerDay / HOURS_PER_DAY;
-    const high = highAchieved.find((a) => a.typeId === g.typeId);
-    if (high) {
-      return { typeId: g.typeId, unitsPerHour: target * high.fraction, fraction: high.fraction };
-    }
-    if (unhostedGoals.includes(g)) {
-      const fraction = policy.buyTiers.includes(tierOf(g.typeId)) ? 1 : 0;
-      return { typeId: g.typeId, unitsPerHour: target * fraction, fraction };
-    }
-    // A P1 goal takes what is left of its type once the host is fed.
-    const left = supplied(g.typeId) - (hostUse.get(g.typeId) ?? 0);
-    const unitsPerHour = Math.max(0, Math.min(target, left));
+    const target = perHour(g);
+    const unitsPerHour = boughtOutright.has(g)
+      ? target
+      : dead.has(g)
+        ? 0
+        : tierOf(g.typeId) >= 2
+          ? target * (highFraction.get(g.typeId) ?? 0)
+          : (p1GoalReach.get(g.typeId) ?? 0);
     return { typeId: g.typeId, unitsPerHour, fraction: unitsPerHour / target };
   });
 
   // --- Flows ---------------------------------------------------------------
   const flows: Flow[] = [];
   const push = (from: FlowEnd, to: FlowEnd, typeId: number, unitsPerHour: number) => {
-    if (unitsPerHour > EPSILON) {
+    if (unitsPerHour > EPSILON)
       flows.push({ from, to, typeId, tier: tierOf(typeId), unitsPerHour });
-    }
   };
   const hostLeft = new Map([...hostUse].filter(([id]) => tierOf(id) === 1));
   // The host feeds itself before anyone ships it anything. Spare slots are
-  // not in `fitted`'s planned share: they go straight to the hub below.
+  // not the plan's own extraction: they go straight to the hub below.
   const feedOrder = [...sortedColonies].sort((a, b) => Number(b === host) - Number(a === host));
   for (const c of feedOrder) {
-    const fit = fitted.get(c.planetId);
-    if (!fit) continue;
-    for (const slot of fit.slots) {
-      const toHost = Math.min(slot.p1PerHour, hostLeft.get(slot.p1TypeId) ?? 0);
-      if (host) push(c.planetId, host.planetId, slot.p1TypeId, toHost);
-      hostLeft.set(slot.p1TypeId, (hostLeft.get(slot.p1TypeId) ?? 0) - toHost);
-      push(c.planetId, 'hub', slot.p1TypeId, slot.p1PerHour - toHost);
+    for (const w of wants.get(c.planetId) ?? []) {
+      const p1 = p1Of(w.p0TypeId);
+      const units = slotP1(c, w.p0TypeId, w.ecus);
+      const toHost = host ? Math.min(units, hostLeft.get(p1) ?? 0) : 0;
+      if (host) push(c.planetId, host.planetId, p1, toHost);
+      hostLeft.set(p1, (hostLeft.get(p1) ?? 0) - toHost);
+      push(c.planetId, 'hub', p1, units - toHost);
     }
   }
   for (const [p1, units] of [...bought].sort(([a], [b]) => a - b)) {
@@ -620,14 +846,10 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
     if (host) push('hub', host.planetId, p1, toHost);
     push('hub', 'hub', p1, units - toHost);
   }
-  for (const a of highAchieved) {
-    if (host) push(host.planetId, 'hub', a.typeId, a.unitsPerDay / HOURS_PER_DAY);
-  }
-  for (const g of unhostedGoals) {
-    if (policy.buyTiers.includes(tierOf(g.typeId))) {
-      push('hub', 'hub', g.typeId, g.unitsPerDay / HOURS_PER_DAY);
-    }
-  }
+  if (host)
+    for (const a of highAchieved)
+      push(host.planetId, 'hub', a.typeId, a.unitsPerDay / HOURS_PER_DAY);
+  for (const g of boughtOutright) push('hub', 'hub', g.typeId, perHour(g));
   // What the plan leaves alone sells: spare slots and whole Baseline colonies.
   for (const [planetId, slot] of spare) push(planetId, 'hub', slot.p1TypeId, slot.p1PerHour);
   for (const a of assignments) {
@@ -637,60 +859,23 @@ function solve(goals: readonly Goal[], ctx: SolveContext): Solved {
 
   const surplusP1: GoalPlan['surplusP1'] = [];
   for (const [p1, units] of [...extracted].sort(([a], [b]) => a - b)) {
-    const surplus = units - (hostUse.get(p1) ?? 0) - (p1GoalNeed.get(p1) ?? 0);
+    const surplus = units - (hostUse.get(p1) ?? 0) - (p1GoalReach.get(p1) ?? 0);
     if (surplus > EPSILON) surplusP1.push({ typeId: p1, unitsPerHour: surplus });
   }
 
-  shortfalls.sort(compareShortfalls);
-  return { achieved, demand: lines, assignments, factoryHost, shortfalls, flows, surplusP1 };
-}
-
-export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
-  const { colonies, policy, books } = input;
-  const goals = normaliseGoals(input.goals, pi);
-  const baselines = new Map(
-    colonies.map((c) => [c.planetId, colonyBaseline(c, pi, policy, books)] as const)
-  );
-  const ctx: SolveContext = {
-    colonies,
-    policy,
-    books,
-    baselines,
-    pi,
-    hostPlanetId: input.hostPlanetId,
-  };
-
-  const first = solve(goals, ctx);
-  const allMet = first.achieved.every((a) => a.fraction >= 1 - EPSILON);
-  // Second pass at the achieved rates: what no achieved production consumes is released.
-  const final = allMet
-    ? first
-    : solve(
-        first.achieved
-          .filter((a) => a.unitsPerHour > EPSILON)
-          .map((a) => ({ typeId: a.typeId, unitsPerDay: a.unitsPerHour * HOURS_PER_DAY })),
-        ctx
-      );
-  const achieved: GoalPlan['achieved'] = goals.map((g) => {
-    const target = g.unitsPerDay / HOURS_PER_DAY;
-    const reached = final.achieved.find((a) => a.typeId === g.typeId)?.unitsPerHour ?? 0;
-    return { typeId: g.typeId, unitsPerHour: reached, fraction: reached / target };
-  });
-
   const buysByType = new Map<number, number>();
-  for (const f of final.flows) {
-    if (f.from === 'hub') {
+  for (const f of flows) {
+    if (f.from === 'hub')
       buysByType.set(f.typeId, (buysByType.get(f.typeId) ?? 0) + f.unitsPerHour);
-    }
   }
   const buys = [...buysByType]
     .sort(([a], [b]) => a - b)
-    .map(([typeId, unitsPerHour]) => ({ typeId, tier: piTier(typeId, pi), unitsPerHour }));
+    .map(([typeId, unitsPerHour]) => ({ typeId, tier: tierOf(typeId), unitsPerHour }));
 
   // Hub-to-hub (bought and kept) and host-to-itself legs move nothing between places.
   let m3PerWeek = 0;
   const perColony = new Map<number, number>();
-  for (const f of final.flows) {
+  for (const f of flows) {
     if (f.from === f.to) continue;
     const m3 = f.unitsPerHour * volumeOf(f.typeId, pi) * HOURS_PER_WEEK;
     m3PerWeek += m3;
@@ -699,16 +884,17 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     }
   }
 
+  shortfalls.sort(compareShortfalls);
   return {
     goals,
     achieved,
-    demand: first.demand,
-    assignments: final.assignments,
-    factoryHost: final.factoryHost,
-    shortfalls: first.shortfalls,
+    demand: lines,
+    assignments,
+    factoryHost: host && hostReason ? { planetId: host.planetId, reason: hostReason } : null,
+    shortfalls,
     buys,
-    surplusP1: final.surplusP1,
-    flows: final.flows,
+    surplusP1,
+    flows,
     hauling: { m3PerWeek, perColony },
   };
 }

@@ -665,12 +665,15 @@ function sourceText(source: DemandSource, t: TFunction): string {
       return t('piPlan.sourceShort');
     case 'extracted':
       return t('piPlan.sourceExtracted');
+    case 'not-extracted':
+      return t('piPlan.sourceNotExtracted');
   }
 }
 
 const SOURCE_TONE: Record<DemandSource, string> = {
   made: 'text-text',
   extracted: 'text-text',
+  'not-extracted': 'text-text-dim',
   bought: 'text-warning',
   short: 'text-danger',
 };
