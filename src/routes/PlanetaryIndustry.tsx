@@ -30,6 +30,7 @@ import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
+import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { builtAdvice } from '@/features/pi/advisorModel';
 import { colonyHoursToFull } from '@/features/pi/colonyThroughput';
 import { colonyFillTimeDisplay, span as fillTimeSpan } from '@/features/pi/colonyStripModel';
@@ -1280,20 +1281,19 @@ export function PlanetaryIndustry() {
         value={tab}
         onChange={(id) => setTab(id as typeof tab)}
         tabs={[
-          { id: 'colonies', label: t('piPlan.coloniesTab') },
           { id: 'plan', label: t('piPlan.planTab') },
-          { id: 'advisor', label: t('piPlan.advisorTab') },
+          { id: 'map', label: t('piPlan.mapTab') },
+          { id: 'colonies', label: t('piPlan.coloniesTab') },
         ]}
       />
 
-      {tab === 'advisor' ? (
-        <AdvisorPanel
-          characterId={activeCharacterId}
-          systemId={advisorSystemId}
-          onSystemIdChange={setAdvisorSystemId}
-          includeRebuilds={includeRebuilds}
-          onIncludeRebuildsChange={setIncludeRebuilds}
-        />
+      <PiHeaderStrip
+        colonySystemIds={planets.map((planet) => planet.solar_system_id)}
+        estimate={tab === 'plan'}
+      />
+
+      {tab === 'map' ? (
+        <EmptyState title={t('piPlan.mapEmptyTitle')} hint={t('piPlan.mapEmptyHint')} />
       ) : tab === 'plan' ? (
         <GoalPlannerPanel
           characterId={activeCharacterId}
@@ -1486,6 +1486,26 @@ export function PlanetaryIndustry() {
             </>
           )}
         </>
+      )}
+
+      {/*
+        Temporary: the Advisor's own tab is gone, but its worklist stays
+        reachable until it retires, below the colonies it advises on. Old
+        `/advisor` links and `?system=` land here.
+      */}
+      {tab === 'colonies' && (
+        <section aria-label={t('piPlan.advisorSection')} className="space-y-4">
+          <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('piPlan.advisorSection')}
+          </h2>
+          <AdvisorPanel
+            characterId={activeCharacterId}
+            systemId={advisorSystemId}
+            onSystemIdChange={setAdvisorSystemId}
+            includeRebuilds={includeRebuilds}
+            onIncludeRebuildsChange={setIncludeRebuilds}
+          />
+        </section>
       )}
     </div>
   );

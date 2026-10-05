@@ -21,7 +21,7 @@ describe('piColonyHref', () => {
 
 describe('piAdvisorHref', () => {
   it('opens the Advisor on a system, or on its own default without one', () => {
-    expect(piAdvisorHref(30000142)).toBe('/planetary-industry/advisor?system=30000142');
-    expect(piAdvisorHref(undefined)).toBe('/planetary-industry/advisor');
+    expect(piAdvisorHref(30000142)).toBe('/planetary-industry/colonies?system=30000142');
+    expect(piAdvisorHref(undefined)).toBe('/planetary-industry/colonies');
   });
 });
