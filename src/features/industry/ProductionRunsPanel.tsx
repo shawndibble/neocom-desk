@@ -152,7 +152,7 @@ export function ProductionRunsPanel({
   const rollup = rollupProductionRuns(rows);
   const runsSummary = t('industry.runsSummary', {
     count: rollup.count,
-    profit: formatIsk(rollup.realizedProfit, 2),
+    profit: formatIsk(rollup.realizedProfit),
     open: rollup.openCount,
   });
 
@@ -228,7 +228,7 @@ export function ProductionRunsPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (r) => r.profit.grossRevenue,
-      render: (r) => formatIsk(r.profit.grossRevenue, 2),
+      render: (r) => formatIsk(r.profit.grossRevenue),
     },
     realizedProfitColumn(t, skills, () => standing),
     quantitySoldColumn(t),
@@ -322,7 +322,7 @@ export function ProductionRunsPanel({
                       <span>
                         {t('industry.linkedSaleRow', {
                           quantity: link.quantity,
-                          price: formatIsk(link.unitPrice, 2),
+                          price: formatIsk(link.unitPrice),
                         })}
                         {link.transactionId === undefined && ` (${t('industry.manualSale')})`}
                       </span>
@@ -344,7 +344,7 @@ export function ProductionRunsPanel({
                         {t('industry.watchedOrderRow', {
                           filled: watch.filled,
                           total: watch.initialVolumeRemain,
-                          price: formatIsk(watch.unitPrice, 2),
+                          price: formatIsk(watch.unitPrice),
                           status: watch.closed
                             ? t('industry.watchedOrderClosed')
                             : t('industry.watchedOrderOpen'),
@@ -446,7 +446,7 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
           {t('industry.totalCost')}
         </span>
         <span className="font-medium tabular-nums text-text">
-          {formatIsk(materialCost + jobFee, 2)}
+          {formatIsk(materialCost + jobFee)}
         </span>
       </div>
       <Button variant="primary" onClick={() => onSubmit(form)} className="w-full justify-center">

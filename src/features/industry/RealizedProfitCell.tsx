@@ -24,7 +24,7 @@ interface RealizedProfitCellProps {
  */
 export function RealizedProfitCell({ row, label, skills, standing }: RealizedProfitCellProps) {
   const [open, setOpen] = useState(false);
-  const value = formatIsk(row.profit.profit, 2);
+  const value = formatIsk(row.profit.profit);
 
   if (row.quantitySold === 0) return value;
 

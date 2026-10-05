@@ -428,7 +428,7 @@ export function ProductionLogPanel({
         className: 'tabular-nums font-semibold',
         cellClassName: (r) => iskToneClass(r.realizedProfit),
         sortValue: (r) => r.realizedProfit,
-        render: (r) => formatIsk(r.realizedProfit, 2),
+        render: (r) => formatIsk(r.realizedProfit),
       },
       {
         id: 'avgMargin',
@@ -445,7 +445,7 @@ export function ProductionLogPanel({
         className: 'tabular-nums',
         cellClassName: (r) => (r.unitsSold > 0 ? iskToneClass(r.soldUnitsMargin) : 'text-text-dim'),
         sortValue: (r) => (r.unitsSold > 0 ? r.soldUnitsMargin : undefined),
-        render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin, 2) : '—'),
+        render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : '—'),
       },
       {
         id: 'unsoldCost',
@@ -453,7 +453,7 @@ export function ProductionLogPanel({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (r) => r.unsoldCost,
-        render: (r) => formatIsk(r.unsoldCost, 2),
+        render: (r) => formatIsk(r.unsoldCost),
       },
     ],
     [t]
@@ -555,7 +555,7 @@ export function ProductionLogPanel({
             <span
               className={`text-3xl leading-tight font-semibold tabular-nums ${iskToneClass(totalRealizedProfit)}`}
             >
-              {formatIsk(totalRealizedProfit, 2)} ISK
+              {formatIsk(totalRealizedProfit)} ISK
             </span>
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.productionLogSubtitle')}
@@ -574,14 +574,14 @@ export function ProductionLogPanel({
             />
           )}
           <div className="divide-y divide-line rounded-xs border border-line">
-            <TotalRow label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged, 2)} />
+            <TotalRow label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
             <TotalRow
               label={t('industry.totalRevenueLinked')}
-              value={formatIsk(totalRevenueLinked, 2)}
+              value={formatIsk(totalRevenueLinked)}
             />
             <TotalRow
               label={t('industry.openInventoryValue')}
-              value={formatIsk(openInventoryValue, 2)}
+              value={formatIsk(openInventoryValue)}
             />
             <TotalRow
               label={t('industry.avgMargin')}

@@ -65,7 +65,7 @@ export function totalCostColumn<Row extends ProductionRunSummary>(t: T): DataTab
     align: 'right',
     className: 'tabular-nums',
     sortValue: (r) => r.run.totalCost,
-    render: (r) => formatIsk(r.run.totalCost, 2),
+    render: (r) => formatIsk(r.run.totalCost),
   };
 }
 

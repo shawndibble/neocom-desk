@@ -139,7 +139,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    const row = (await screen.findByRole('cell', { name: /^320,000\.00$/ })).closest('tr');
+    const row = (await screen.findByRole('cell', { name: /^320,000$/ })).closest('tr');
     expect(row).not.toBeNull();
   });
 
@@ -149,7 +149,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('cell', { name: /^320,000\.00$/ }));
+    await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
     const jobFeeInput = within(dialog).getByLabelText('Total job cost');
     await user.clear(jobFeeInput);
@@ -181,7 +181,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('cell', { name: /^320,000\.00$/ }));
+    await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
@@ -278,7 +278,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('cell', { name: /^320,000\.00$/ });
+    await screen.findByRole('cell', { name: /^320,000$/ });
 
     expect(screen.queryByRole('button', { name: 'Calculations?' })).not.toBeInTheDocument();
   });

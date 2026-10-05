@@ -114,10 +114,10 @@ function SalePicker({
           <span>
             {t('industry.linkedSaleRow', {
               quantity: txn.quantity,
-              price: formatIsk(txn.unit_price, 2),
+              price: formatIsk(txn.unit_price),
             })}
             {' — '}
-            {formatIsk(txn.quantity * txn.unit_price, 2)}
+            {formatIsk(txn.quantity * txn.unit_price)}
             {' — '}
             {new Date(txn.date).toLocaleDateString()}
           </span>
@@ -152,7 +152,7 @@ function WatchPicker({
             {t('industry.watchedOrderRow', {
               filled: 0,
               total: order.volume_remain,
-              price: formatIsk(order.price, 2),
+              price: formatIsk(order.price),
               status: t('industry.watchedOrderOpen'),
             })}
           </span>
