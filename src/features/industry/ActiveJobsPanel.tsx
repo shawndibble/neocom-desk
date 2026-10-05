@@ -1,3 +1,4 @@
+import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +21,6 @@ import {
   MenuItem,
   Panel,
   Spinner,
-  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -880,7 +880,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * whole: one idle pool is worth flagging even when the other two are busy.
    */
   const jobSlotSummaryElement = (
-    <Tooltip
+    <HintText
       content={JOB_SLOT_CATEGORIES.map((category) => {
         const entry = jobSlotSummary[category];
         const label = t(`characters.jobSlotCategory.${category}`);
@@ -892,32 +892,28 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             })
           : t('industry.jobSlotBreakdownUnknown', { category: label });
       }).join(' · ')}
+      className="flex items-center gap-1 text-xs tabular-nums"
     >
-      <span
-        tabIndex={0}
-        className="flex cursor-help items-center gap-1 text-xs tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2"
-      >
-        <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
-          {t('industry.jobSlotSummaryLabel')}
-        </span>
-        {JOB_SLOT_CATEGORIES.map((category, index) => {
-          const entry = jobSlotSummary[category];
-          const tone = !entry
-            ? 'text-text-dim'
-            : entry.open === entry.max
-              ? 'text-danger'
-              : entry.open / entry.max >= 0.5
-                ? 'text-warning'
-                : 'text-text';
-          return (
-            <span key={category} className="flex items-center gap-1">
-              {index > 0 && <span className="text-text-dim">/</span>}
-              <span className={tone}>{entry ? entry.open : '—'}</span>
-            </span>
-          );
-        })}
+      <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+        {t('industry.jobSlotSummaryLabel')}
       </span>
-    </Tooltip>
+      {JOB_SLOT_CATEGORIES.map((category, index) => {
+        const entry = jobSlotSummary[category];
+        const tone = !entry
+          ? 'text-text-dim'
+          : entry.open === entry.max
+            ? 'text-danger'
+            : entry.open / entry.max >= 0.5
+              ? 'text-warning'
+              : 'text-text';
+        return (
+          <span key={category} className="flex items-center gap-1">
+            {index > 0 && <span className="text-text-dim">/</span>}
+            <span className={tone}>{entry ? entry.open : '—'}</span>
+          </span>
+        );
+      })}
+    </HintText>
   );
 
   /**

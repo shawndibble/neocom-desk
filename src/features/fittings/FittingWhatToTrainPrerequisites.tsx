@@ -1,3 +1,10 @@
+import { cx } from '@/lib/cx';
+import {
+  fieldBaseClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
@@ -35,10 +42,16 @@ export function WhatToTrainPrerequisites({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="text-[0.6875rem] text-warning underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          className={cx(
+            fieldBaseClassName,
+            'inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.6875rem] text-warning',
+            interactiveClassName,
+            focusRingClassName
+          )}
           aria-label={t('fittings.whatToTrain.prerequisitesOpen', { skill })}
         >
           {t('fittings.whatToTrain.withPrerequisites')}
+          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">

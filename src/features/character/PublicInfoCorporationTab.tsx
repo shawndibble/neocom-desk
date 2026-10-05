@@ -15,6 +15,7 @@
  * and skips the killboard and the alliance history: neither means anything
  * for a corporation no player runs.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -44,7 +45,6 @@ import { useEntityName } from './useEntityName';
 import { PersonLink } from './PublicInfoParts';
 import {
   FACT_COLUMNS,
-  externalLinkClassName,
   fullDate,
   monthYear,
   sectionHeading,
@@ -184,25 +184,11 @@ export default function PublicInfoCorporationTab({
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
           {!npc && (
-            <a
-              href={corporationZkillUrl(corporationId)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={externalLinkClassName}
-            >
-              {t('publicInfo.zkillboard')} <span aria-hidden>↗</span>
-            </a>
+            <ExternalLink href={corporationZkillUrl(corporationId)}>
+              {t('publicInfo.zkillboard')}
+            </ExternalLink>
           )}
-          {website && (
-            <a
-              href={website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={externalLinkClassName}
-            >
-              {t('publicInfo.website')} <span aria-hidden>↗</span>
-            </a>
-          )}
+          {website && <ExternalLink href={website}>{t('publicInfo.website')}</ExternalLink>}
         </div>
       </div>
 

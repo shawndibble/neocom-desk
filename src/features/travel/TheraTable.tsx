@@ -15,11 +15,11 @@
  *
  * Conditions, never verdicts (decision `20260912-172628`).
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { DataTable, textActionClassName, type DataTableColumn } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import {
   jumpsSortValue,
   shipSizeRank,
@@ -227,16 +227,13 @@ function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: Rou
         exitSignature: row.exitSignature ?? DASH,
       })}
     </span>,
-    <a
+    <ExternalLink
       key="zkill"
       href={systemZkillUrl(row.exitSystemId)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={inlineLinkClassName}
       aria-label={t('travel.thera.detail.zkillboardLabel', { system: row.exitSystemName ?? DASH })}
     >
       {t('travel.thera.detail.zkillboard')}
-    </a>,
+    </ExternalLink>,
     routeViaTarget(row, routeVia) === null ? null : (
       <RouteVia key="route-via" row={row} href={routeVia} />
     ),

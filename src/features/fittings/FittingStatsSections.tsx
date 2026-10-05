@@ -1,6 +1,7 @@
+import { HintText } from '@/components/ui/HintText';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, RowMoreActions, Tooltip } from '@/components/ui';
+import { Button, Caret, RowMoreActions } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import { formatSeconds } from '@/lib/duration';
 import {
@@ -1136,17 +1137,9 @@ export function FittingStatsSections({
             {stats.unknownItemTypeIds.length > 0 && (
               <StatNote tone="warning">
                 {/* Which items, one per line — on hover, focus or a tap. */}
-                <Tooltip
-                  openOnTap
-                  content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}
-                >
-                  <button
-                    type="button"
-                    className="cursor-help underline decoration-dotted underline-offset-2"
-                  >
-                    {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
-                  </button>
-                </Tooltip>
+                <HintText content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}>
+                  {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                </HintText>
               </StatNote>
             )}
           </>

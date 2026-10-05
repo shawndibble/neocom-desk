@@ -4,6 +4,7 @@
  * for Fast Refresh to find) since these are plain render functions, not
  * components — same precedent as `route/jumpsCell.tsx`.
  */
+import { HintText } from '@/components/ui/HintText';
 import type { TFunction } from 'i18next';
 import { Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -46,14 +47,9 @@ export function LocationCell({
   // would mislead there. No `openOnTap` — it reveals nothing new, and
   // `DataTable` treats an `openOnTap` trigger as the row's own click.
   return (
-    <Tooltip content={location.stationName}>
-      <span
-        tabIndex={0}
-        className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
-      >
-        {location.stationName}
-      </span>
-    </Tooltip>
+    <HintText content={location.stationName} desktopOnly>
+      {location.stationName}
+    </HintText>
   );
 }
 

@@ -17,6 +17,13 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  */
+import { cx } from '@/lib/cx';
+import {
+  fieldBaseClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
@@ -407,9 +414,15 @@ function AttributeModifierTrigger({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className={cx(
+            fieldBaseClassName,
+            'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs',
+            interactiveClassName,
+            focusRingClassName
+          )}
         >
           {children}
+          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-2">

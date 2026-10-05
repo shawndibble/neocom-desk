@@ -1,3 +1,4 @@
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
@@ -567,28 +568,18 @@ export function Login() {
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
         <span>{t('login.footerOffline')}</span>
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-text hover:underline"
-        >
+        <ExternalLink href={REPO_URL} variant="quiet">
           {t('login.footerOpenSource')}
-        </a>
+        </ExternalLink>
         <a href="/privacy.html" className="hover:text-text hover:underline">
           {t('login.footerPrivacy')}
         </a>
         <a href="/data-credit.html" className="hover:text-text hover:underline">
           {t('login.footerDataCredit')}
         </a>
-        <a
-          href={DISCORD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-text hover:underline"
-        >
+        <ExternalLink href={DISCORD_URL} variant="quiet">
           {t('login.footerDiscord')}
-        </a>
+        </ExternalLink>
       </footer>
     </main>
   );

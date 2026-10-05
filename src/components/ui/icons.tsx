@@ -33,6 +33,7 @@ import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRigh
 import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
 import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
@@ -155,6 +156,8 @@ function withWeight(Glyph: PhosphorIcon): ComponentType<IconProps> {
   return Wrapped;
 }
 
+/** Leaves Neocom Desk: the trailing glyph on `ExternalLink` and on a `Button` that opens another site. */
+export const External = withWeight(ArrowSquareOut);
 /** Steps back up one level in the Assets drill-down; also the generic "go back". */
 export const Back = withWeight(CaretLeft);
 /** A row you can descend into. */

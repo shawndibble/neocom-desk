@@ -1,3 +1,4 @@
+import { HintText } from '@/components/ui/HintText';
 import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  Tooltip,
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
@@ -433,14 +433,9 @@ export function OpenOrdersPanel() {
                     {row.stationName === null ? (
                       t('market.unknownStructure')
                     ) : (
-                      <Tooltip content={row.stationName} openOnTap>
-                        <span
-                          tabIndex={0}
-                          className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                        >
-                          {stationShortName(row.stationName)}
-                        </span>
-                      </Tooltip>
+                      <HintText content={row.stationName}>
+                        {stationShortName(row.stationName)}
+                      </HintText>
                     )}
                   </span>
                   {isOffHubStation(row.stationName, row.locationId) && (

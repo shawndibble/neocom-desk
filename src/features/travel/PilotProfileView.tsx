@@ -9,6 +9,7 @@
  * caller's too: Pilot Lookup opens the modal, the modal switches tabs.
  * Neither links to the modal's Character tab, which would only repeat this view.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
@@ -120,14 +121,9 @@ function PilotIdentity({
           </dd>
         </dl>
         <div className="flex flex-wrap gap-3 pt-1 text-sm">
-          <a
-            href={characterZkillUrl(profile.characterId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={inlineLinkClassName}
-          >
+          <ExternalLink href={characterZkillUrl(profile.characterId)}>
             {t('travel.pilot.zkillboard')}
-          </a>
+          </ExternalLink>
         </div>
       </div>
     </div>

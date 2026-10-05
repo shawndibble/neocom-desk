@@ -10,6 +10,7 @@
  * this modal's backdrop, so recovery (Try again, or Log in again for an auth
  * failure) has to live in the body — `SkillDetailModal`'s pattern.
  */
+import { ExternalMark } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
@@ -256,6 +257,7 @@ export function EventDetailModal({
               >
                 <Icon.CalendarEvent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                 {t('calendar.addToGoogleCalendar')}
+                <ExternalMark />
               </Button>
             </div>
           </div>
