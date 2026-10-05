@@ -165,7 +165,7 @@ export function PublicInfoModal() {
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
 
   return (
-    <Modal open onClose={close} title={title} placement="wide">
+    <Modal open onClose={close} title={title} placement="wide" closeOnBack={false}>
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs

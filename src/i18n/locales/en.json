@@ -2196,6 +2196,8 @@
     "groupBlueprint": "Blueprint",
     "groupLocationMarket": "Location & market",
     "runs": "Runs",
+    "breakEvenRuns": "Break Even",
+    "breakEvenRunsNone": "No break even found up to {{max}} runs.",
     "facility": "Facility",
     "rigFitLabel": "Rigs",
     "rigSlotLabel": "Rig {{slot}}",
@@ -7442,7 +7444,11 @@
     "open": "Filters",
     "openWithCount": "Filters ({{count}} active)",
     "apply": "Apply",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "discardTitle": "Discard filter changes?",
+    "discardBody": "The filters you changed have not been applied.",
+    "discard": "Discard",
+    "keepEditing": "Keep editing"
   },
   "contractSearch": {
     "title": "Contract Search",

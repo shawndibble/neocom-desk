@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SlideOver } from './SlideOver';
@@ -42,5 +42,29 @@ describe('SlideOver', () => {
     const afterEscape = onClose.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(afterEscape + 1);
+  });
+});
+
+describe('SlideOver edge and history', () => {
+  it('pads its edge by the safe-area inset', () => {
+    render(
+      <SlideOver open onClose={() => {}} title="Add">
+        <p>Panel body</p>
+      </SlideOver>
+    );
+    expect(screen.getByRole('dialog', { name: 'Add' }).className).toContain(
+      'pb-[env(safe-area-inset-bottom)]'
+    );
+  });
+
+  it('closes on Back', async () => {
+    const onClose = vi.fn();
+    render(
+      <SlideOver open onClose={onClose} title="Add">
+        <p>Panel body</p>
+      </SlideOver>
+    );
+    act(() => window.history.back());
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
+import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { IconButton } from './IconButton';
 import { Close } from './icons';
 import { RowTappableContext } from './tooltipHold';
@@ -32,6 +33,9 @@ const SIDE_CLASS = {
  * no backdrop, and a click outside is not a dismissal — so the page can keep
  * steering what the panel shows (the Fitting editor retargets its Add panel
  * from the Ring behind it) and take drops dragged out of it.
+ *
+ * Escape, the close button and Back all close it; `env(safe-area-inset-bottom)`
+ * keeps its last row clear of a phone's home indicator.
  */
 export function SlideOver({
   open,
@@ -42,6 +46,8 @@ export function SlideOver({
   className,
 }: SlideOverProps) {
   const { t } = useTranslation();
+  // Back closes it, like every other overlay (§6c).
+  useOverlayHistory(open, onClose);
   return (
     <DialogPrimitive.Root
       open={open}
@@ -55,7 +61,7 @@ export function SlideOver({
           onInteractOutside={(event) => event.preventDefault()}
           aria-describedby={undefined}
           className={cx(
-            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col border-line-bright bg-panel shadow-lg shadow-black/50',
+            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
             SIDE_CLASS[side],
             className
           )}
