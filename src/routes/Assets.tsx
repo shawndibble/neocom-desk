@@ -1818,7 +1818,6 @@ export function Assets() {
                         <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                           <SecurityValue
                             security={securityForStation(resolved.station.locationId)}
-                            t={t}
                           />
                           <JumpsAwayText
                             result={jumpsAwayByKey.get(
@@ -2168,7 +2167,7 @@ function NodeRowView({
       estimatedValue={estimatedValue}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      onShowInfo={() => pageActions.showInfo(asset.type_id, label)}
+      typeId={asset.type_id}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}

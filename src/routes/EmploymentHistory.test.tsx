@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -131,7 +131,7 @@ describe('EmploymentHistory', () => {
     const rows = screen.getAllByRole('row');
     expect(rows[1]).toHaveTextContent('Current Corp');
     expect(rows[1]).toHaveTextContent('Current');
-    expect(screen.queryByRole('link', { name: 'Current Corp' })).toBeNull();
+    expect(within(rows[1]).queryByRole('link', { name: 'Current Corp' })).toBeNull();
     // The past corp's row gets no badge either.
     expect(rows[2]).not.toHaveTextContent('Current');
   });
@@ -176,7 +176,7 @@ describe('EmploymentHistory', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
-    expect(await screen.findByText('Current Corp', { selector: 'p' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
     // Data age and Refresh belong to this tab's panel, below the tabs.

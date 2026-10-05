@@ -358,7 +358,7 @@ export function Calendar() {
       {!isNarrow && (
         <IconButton
           size="sm"
-          icon={<Icon.Expanded />}
+          icon={<Icon.CalendarEvent />}
           label={
             density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
           }

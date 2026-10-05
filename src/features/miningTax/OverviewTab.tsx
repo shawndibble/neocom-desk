@@ -383,7 +383,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       render: (row) => (
         <DataTableDenseCell>
           <SystemLink systemId={row.entry.solarSystemId}>{systemName(row)}</SystemLink>
-          <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} t={t} />
+          <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),
       sortValue: (row) => systemName(row),

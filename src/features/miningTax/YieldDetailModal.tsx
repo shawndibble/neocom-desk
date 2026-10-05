@@ -292,7 +292,7 @@ export function YieldDetailModal({
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.overview.detail.title', { date: entry.date, system: systemName })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
             content={t('miningTax.dateEveHint')}

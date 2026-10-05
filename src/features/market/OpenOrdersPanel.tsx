@@ -428,7 +428,7 @@ export function OpenOrdersPanel() {
               render: (row) => (
                 <span className="flex flex-wrap items-center gap-1">
                   <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
+                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} />}
                 </span>
               ),
             },

@@ -76,7 +76,7 @@ export function OpenOrdersList({
               <span className="flex items-start justify-between gap-2">
                 <span className="flex min-w-0 flex-wrap items-center gap-1">
                   <span className="truncate text-sm text-accent">{row.typeName}</span>
-                  {showCharacter && <CharacterBadge characterName={row.characterName} t={t} />}
+                  {showCharacter && <CharacterBadge characterName={row.characterName} />}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-text tabular-nums">
                   {formatIskAuto(row.price)}

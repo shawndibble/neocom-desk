@@ -742,10 +742,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               </span>
             )}
             {showCharacterColumn && job.characterName !== '' && (
-              <span
-                className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem]"
-                title={t('assets.crossCharacterBadge', { character: job.characterName })}
-              >
+              <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
                 <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
               </span>
             )}

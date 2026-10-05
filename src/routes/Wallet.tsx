@@ -18,6 +18,10 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { CorporationLink } from '@/features/entities';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import {
@@ -319,14 +323,12 @@ export function Wallet() {
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        // A real link as well as the row click: the row alone has no link
-        // role or name, so keyboard and screen-reader users could not tell
-        // it leads to the LP Store. DataTable ignores row clicks that land on
-        // a link, so the two never double-navigate.
+        // The name is the corporation's Show Info link (§6c); the row's own
+        // destination, the LP Store, is the trailing link column below.
         render: (entry) => (
-          <Link to={`/market/lp-store/${entry.corporation_id}`} className="hover:text-accent">
+          <CorporationLink id={entry.corporation_id}>
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-          </Link>
+          </CorporationLink>
         ),
         sortValue: (entry) =>
           corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
@@ -338,6 +340,25 @@ export function Wallet() {
         className: 'tabular-nums font-semibold',
         render: (entry) => entry.loyalty_points.toLocaleString(),
         sortValue: (entry) => entry.loyalty_points,
+      },
+      {
+        // A real link as well as the row click: the row alone has no link role
+        // or name. DataTable ignores row clicks that land on a link, so the two
+        // never double-navigate.
+        id: 'store',
+        header: t('loyalty.storeColumn'),
+        render: (entry) => (
+          <Link
+            to={`/market/lp-store/${entry.corporation_id}`}
+            className={entityLinkClassName('inline-flex items-center gap-1')}
+            aria-label={t('loyalty.openStoreFor', {
+              corporation: corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+            })}
+          >
+            {t('loyalty.openStore')}
+            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          </Link>
+        ),
       },
     ],
     [t, corporationNames]
@@ -740,7 +761,10 @@ export function Wallet() {
             <span className="flex items-center gap-2">
               <Link
                 to="/market/history/transactions"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
+                className={cx(
+                  'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
+                  inlineLinkClassName
+                )}
               >
                 {t('wallet.transactionsLink')}
               </Link>

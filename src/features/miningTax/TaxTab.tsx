@@ -1316,7 +1316,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       render: (dr) => (
         <DataTableDenseCell>
           <SystemLink systemId={dr.row.entry.solarSystemId}>{systemName(dr)}</SystemLink>
-          <SecurityValue security={systemSecurityOf(dr)} t={t} />
+          <SecurityValue security={systemSecurityOf(dr)} />
         </DataTableDenseCell>
       ),
       sortValue: (dr) => systemName(dr),

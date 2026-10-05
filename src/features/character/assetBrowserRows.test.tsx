@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ItemRow, SearchResultRow } from './assetBrowserRows';
 
 function renderRow(unitVolume: number | undefined) {
@@ -38,6 +38,10 @@ describe('ItemRow volume', () => {
   });
 });
 
+function LocationProbe() {
+  return <output data-testid="loc">{useLocation().pathname}</output>;
+}
+
 function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
   return render(
     <MemoryRouter>
@@ -54,90 +58,82 @@ function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
         t={(key) => key}
         {...overrides}
       />
+      <LocationProbe />
     </MemoryRouter>
   );
 }
 
-describe('ItemRow Show info', () => {
-  it('opens Show info from a name button', async () => {
-    const onShowInfo = vi.fn();
-    renderItemRow({ onShowInfo });
-    const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
-    expect(button).toHaveAttribute('title', 'Rifter Blueprint');
-    await userEvent.click(button);
-    expect(onShowInfo).toHaveBeenCalledTimes(1);
+describe('ItemRow name', () => {
+  it('links the name to the item in Market', () => {
+    renderItemRow({ typeId: 11 });
+    const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+    expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*11/);
+    expect(link).not.toHaveAttribute('title');
   });
 
-  it('opens Show info from the keyboard', async () => {
-    const onShowInfo = vi.fn();
-    renderItemRow({ onShowInfo });
-    screen.getByRole('button', { name: 'Rifter Blueprint' }).focus();
-    await userEvent.keyboard('{Enter}');
-    expect(onShowInfo).toHaveBeenCalledTimes(1);
-  });
-
-  it('stays live in select mode, where only the checkbox selects', async () => {
-    const onShowInfo = vi.fn();
+  // §6c: the name stays a real link in select mode; only the checkbox selects.
+  it('still navigates in select mode, where only the checkbox selects', async () => {
     const onToggleSelection = vi.fn();
-    renderItemRow({ onShowInfo, onToggleSelection, selectMode: true });
-    await userEvent.click(screen.getByRole('button', { name: 'Rifter Blueprint' }));
-    expect(onShowInfo).toHaveBeenCalledTimes(1);
+    renderItemRow({ typeId: 11, onToggleSelection, selectMode: true });
+    await userEvent.click(screen.getByRole('link', { name: 'Rifter Blueprint' }));
+    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
     expect(onToggleSelection).not.toHaveBeenCalled();
   });
 
-  it('gives the name a 44px touch target, back to its pointer size at md+', () => {
-    renderItemRow({ onShowInfo: vi.fn() });
-    const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
-    expect(button).toHaveClass('min-h-11', 'md:min-h-7', 'truncate');
+  it('does not follow the name from the click that ends a press which opened the row menu', () => {
+    renderItemRow({ typeId: 11 });
+    const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+    fireEvent.pointerDown(link, { pointerType: 'touch' });
+    fireEvent.contextMenu(link);
+    fireEvent.click(link, { detail: 1 });
+    expect(screen.getByTestId('loc')).toHaveTextContent('/');
+    expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
+
+    // The next ordinary tap still follows it.
+    fireEvent.pointerDown(link, { pointerType: 'touch' });
+    fireEvent.click(link, { detail: 1 });
+    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
   });
 
-  it('does not open Show info from the click that ends a press which opened the row menu', () => {
-    const onShowInfo = vi.fn();
-    renderItemRow({ onShowInfo });
-    const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
-    fireEvent.pointerDown(button, { pointerType: 'touch' });
-    fireEvent.contextMenu(button);
-    fireEvent.click(button, { detail: 1 });
-    expect(onShowInfo).not.toHaveBeenCalled();
-
-    // The next ordinary tap still opens it.
-    fireEvent.pointerDown(button, { pointerType: 'touch' });
-    fireEvent.click(button, { detail: 1 });
-    expect(onShowInfo).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not open Show info when a touch is held past the long-press delay', () => {
+  it('does not follow the name when a touch is held past the long-press delay', () => {
     vi.useFakeTimers();
     try {
-      const onShowInfo = vi.fn();
-      renderItemRow({ onShowInfo });
-      const button = screen.getByRole('button', { name: 'Rifter Blueprint' });
-      fireEvent.pointerDown(button, { pointerType: 'touch' });
+      renderItemRow({ typeId: 11 });
+      const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
+      fireEvent.pointerDown(link, { pointerType: 'touch' });
       vi.advanceTimersByTime(800);
-      fireEvent.click(button, { detail: 1 });
-      expect(onShowInfo).not.toHaveBeenCalled();
+      fireEvent.click(link, { detail: 1 });
+      expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('keeps the name plain text without a Show info handler', () => {
+  it('gives the name a 44px touch target, back to its pointer size at md+', () => {
+    renderItemRow({ typeId: 11 });
+    expect(screen.getByRole('link', { name: 'Rifter Blueprint' })).toHaveClass(
+      'min-h-11',
+      'md:min-h-7'
+    );
+  });
+
+  it('keeps the name plain text without a type id', () => {
     renderItemRow();
-    expect(screen.queryByRole('button', { name: 'Rifter Blueprint' })).toBeNull();
-    expect(screen.getByText('Rifter Blueprint')).toHaveAttribute('title', 'Rifter Blueprint');
+    expect(screen.queryByRole('link', { name: 'Rifter Blueprint' })).toBeNull();
+    expect(screen.getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });
 
 describe('blueprint badge', () => {
   it('marks an original as BPO', () => {
-    renderItemRow({ blueprintKind: 'original', onShowInfo: vi.fn() });
+    renderItemRow({ blueprintKind: 'original', typeId: 11 });
     expect(screen.getByText('assets.blueprintBadge.original.label')).toHaveAttribute(
       'aria-hidden',
       'true'
     );
     expect(screen.getByText('assets.blueprintBadge.original.name')).toHaveClass('sr-only');
-    // The badge sits beside the button, so the button's name stays the item's.
-    expect(screen.getByRole('button', { name: 'Rifter Blueprint' })).toBeInTheDocument();
+    // The badge sits beside the link, so the link's name stays the item's.
+    expect(screen.getByRole('link', { name: 'Rifter Blueprint' })).toBeInTheDocument();
   });
 
   it('marks a copy as BPC', () => {

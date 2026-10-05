@@ -53,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
 export interface CharacterFilterControlProps {
@@ -100,8 +101,8 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
  */
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
-  `tracking-widest uppercase transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 ` +
-  `focus-visible:outline-accent md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
+  `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
+  `md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
   `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
   `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 
@@ -137,6 +138,7 @@ export function CharacterFilterControl({
             )}
           </span>
           <span className="hidden md:inline">{label}</span>
+          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-40">
