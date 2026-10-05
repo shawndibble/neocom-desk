@@ -42,9 +42,11 @@
  *    classic setup, is expressible and its P1 never crosses a customs office.
  *    P0s are taken scarcest first (fewest eligible colonies, then typeId), and
  *    each fills colonies in the order: the host first when the P1 feeds it,
- *    then fewest ECUs already planned, then fewest *other* demanded P0s the
- *    colony could yield (leave contested colonies for later), then the higher
- *    per-ECU rate, then the lower planet id. On each colony it adds the fewest
+ *    then a colony that extracts that P0 today (a working colony is not
+ *    churned for nothing), then fewest ECUs already planned, then a measured
+ *    rate before an estimated one, then fewest *other* demanded P0s the colony
+ *    could yield (leave contested colonies for later), then the higher per-ECU
+ *    rate, then the lower planet id. On each colony it adds the fewest
  *    ECUs that cover what is left, else the most that fit beside what the
  *    colony already runs — so a colony's second slot takes a different P0
  *    before anything is called a budget gap. Whole ECUs overshoot; the
@@ -112,6 +114,7 @@ import type {
   PlannerPolicy,
   JumpsFn,
   PriceBooks,
+  RateSource,
   Shortfall,
 } from './goalTypes';
 import { haulEffortOf, legJumps, volumeOf } from './haulEffort';
@@ -352,6 +355,13 @@ function spareSlot(
   return best?.fit ?? null;
 }
 
+/** Strongest rate source first. */
+const RATE_SOURCE_RANK: Readonly<Record<RateSource, number>> = {
+  measured: 0,
+  'own-mean': 1,
+  assumed: 2,
+};
+
 /** Most release/refill rounds; it converges in two or three on real colonies. */
 const MAX_ROUNDS = 8;
 
@@ -492,10 +502,17 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
     const contention = (c: PlannerColony) =>
       [...pending].filter((p0) => c.ratePerEcu.has(p0)).length;
     const hostFirst = (c: PlannerColony) => (c === host && feedsHost(row.p1) ? 0 : 1);
+    // Leave a working colony where it is: one that runs this P0 today keeps
+    // it before anyone else starts it, and a measured rate beats an estimate.
+    const runsToday = (c: PlannerColony) =>
+      (c.current.ecusByP0?.get(row.p0) ?? 0) > 0 || c.current.p0TypeIds.includes(row.p0) ? 0 : 1;
+    const estimated = (c: PlannerColony) => RATE_SOURCE_RANK[c.ratePerEcu.get(row.p0)!.source];
     const order = [...row.eligible].sort(
       (a, b) =>
         hostFirst(a) - hostFirst(b) ||
+        runsToday(a) - runsToday(b) ||
         ecusOn(state, a) - ecusOn(state, b) ||
+        estimated(a) - estimated(b) ||
         contention(a) - contention(b) ||
         b.ratePerEcu.get(row.p0)!.unitsPerHour - a.ratePerEcu.get(row.p0)!.unitsPerHour ||
         a.planetId - b.planetId

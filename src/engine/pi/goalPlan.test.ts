@@ -569,3 +569,31 @@ describe('planGoals — the layout a colony runs today', () => {
     expect(result.assignments[0].runningToday).toBeUndefined();
   });
 });
+
+describe('planGoals — stability against what colonies run today', () => {
+  it('keeps Water on the colony that extracts it today rather than starting it elsewhere', () => {
+    // e2e fixture: Jita IV runs one measured ECU on Aqueous Liquids; X-7OMU III
+    // runs nothing. A Water goal must not move it to the unbuilt colony.
+    const result = plan([goal(WATER, 40)], fixtureColonies(), POLICY, fixtureBooks());
+    const role = (id: number) => result.assignments.find((a) => a.planetId === id)!;
+    expect(role(40009080)).toMatchObject({
+      role: 'extract',
+      slots: [expect.objectContaining({ p0TypeId: AQUEOUS_LIQUIDS, rateSource: 'measured' })],
+    });
+    expect(role(40000005).role).not.toBe('extract');
+  });
+
+  it('prefers a measured rate over an estimate when neither colony runs the P0', () => {
+    const base = colony(1, 'barren');
+    const measured: PlannerColony = {
+      ...base,
+      ratePerEcu: new Map([
+        ...base.ratePerEcu,
+        [BASE_METALS, { unitsPerHour: 5_000, source: 'measured' as const }],
+      ]),
+    };
+    const estimated = colony(2, 'barren');
+    const result = plan([goal(REACTIVE_METALS, 30)], [estimated, measured].reverse());
+    expect(result.assignments.find((a) => a.role === 'extract')?.planetId).toBe(1);
+  });
+});
