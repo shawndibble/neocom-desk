@@ -26,6 +26,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
+import { HintText } from '@/components/ui/HintText';
 import {
   Button,
   DataTable,
@@ -145,16 +146,12 @@ function useColumns(
         <DataTableDenseCell>
           <span className="font-semibold whitespace-nowrap">{row.name ?? DASH}</span>
           {row.chokepoint && (
-            <Tooltip content={t('travel.chokepointHint')} openOnTap>
-              <span
-                tabIndex={0}
-                // A tap explains the badge; it never opens the row.
-                data-row-control
-                className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] whitespace-nowrap text-warning"
-              >
-                {t('travel.chokepoint')}
-              </span>
-            </Tooltip>
+            <HintText
+              content={t('travel.chokepointHint')}
+              className="text-[0.6875rem] whitespace-nowrap text-warning"
+            >
+              {t('travel.chokepoint')}
+            </HintText>
           )}
         </DataTableDenseCell>
       ),

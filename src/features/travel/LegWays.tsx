@@ -30,7 +30,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import type { RouteHolesState } from './useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
 
-const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-accent uppercase';
+const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-text-dim uppercase';
 
 function Dot() {
   return (

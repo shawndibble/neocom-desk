@@ -12,17 +12,23 @@ function fillToken(fill: string): string {
 }
 
 describe('price-source tones (issue #2225)', () => {
-  it.each(SOURCES)("paints the %s bar in a token that source's tag already uses", (source) => {
-    const token = fillToken(SOURCE_FILL[source]);
-    const tagClasses = SOURCE_TAG_CLASS[source].split(' ');
-    expect(tagClasses.includes(`text-${token}`)).toBe(true);
+  it.each(SOURCES.filter((s) => s !== 'none'))(
+    "paints the %s bar in a token that source's tag already uses",
+    (source) => {
+      const token = fillToken(SOURCE_FILL[source]);
+      const tagClasses = SOURCE_TAG_CLASS[source].split(' ');
+      expect(tagClasses.includes(`text-${token}`)).toBe(true);
+    }
+  );
+
+  it('keeps Saved neutral and never uses accent (clickable only)', () => {
+    expect(SOURCE_FILL.saved).toBe('var(--color-text-dim)');
+    expect(SOURCES.filter((s) => SOURCE_FILL[s].includes('accent'))).toEqual([]);
+    expect(SOURCES.filter((s) => SOURCE_TAG_CLASS[s].includes('accent'))).toEqual([]);
   });
 
-  it('keeps Saved neutral and gives accent only to Live', () => {
-    expect(SOURCE_FILL.saved).toBe('var(--color-text-dim)');
-    expect(SOURCE_FILL.live).toBe('var(--color-accent)');
-    const accented = SOURCES.filter((s) => SOURCE_FILL[s].includes('accent'));
-    expect(accented).toEqual(['live']);
+  it('keeps the No price tag text dim, not faint', () => {
+    expect(SOURCE_TAG_CLASS.none).toBe('text-text-dim');
   });
 
   it('never gives No price the same fill as Saved', () => {

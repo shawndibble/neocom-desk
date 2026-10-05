@@ -1203,7 +1203,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       withDayLines(
         dr,
         dr.groupMembers ? (
-          <span className="inline-flex text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+          <span className="inline-flex text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
             {t('miningTax.combined.days', { count: allMembers(dr).length })}
           </span>
         ) : (

@@ -418,6 +418,7 @@ function IskCharts({
                   <LabelList
                     dataKey="rawValue"
                     position="right"
+                    // SVG label text: IskAmount can't render inside the chart (documented exception).
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
                     style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                   />

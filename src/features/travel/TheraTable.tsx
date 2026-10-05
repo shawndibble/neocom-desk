@@ -61,7 +61,10 @@ function RouteVia({
       to={to}
       data-row-control
       className={entityLinkClassName(
-        cx('inline-flex min-h-11 items-center gap-0.5 whitespace-nowrap md:min-h-0', className)
+        cx(
+          'group inline-flex min-h-11 items-center gap-0.5 whitespace-nowrap md:min-h-0',
+          className
+        )
       )}
       aria-label={t('travel.thera.routeViaLabel', {
         hub: t(`travel.thera.hub.${row.hub}`),
@@ -69,7 +72,11 @@ function RouteVia({
       })}
     >
       {t('travel.thera.routeVia')}
-      <Icon.Descend aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-faint" />
+      <Icon.Descend
+        aria-hidden="true"
+        size={Icon.ICON_SIZE.sm}
+        className="text-text-faint group-hover:text-accent"
+      />
     </Link>
   );
 }

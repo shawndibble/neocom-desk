@@ -50,11 +50,9 @@ function LocationLine({ location }: { location: RecentKillLocation }) {
         });
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className={location.onPath ? 'font-semibold text-accent' : 'text-text-dim'}>
-        {text}
-      </span>
+      <span className={location.onPath ? 'font-semibold text-text' : 'text-text-dim'}>{text}</span>
       {location.onPath && (
-        <span className={`${BADGE} bg-accent/10 text-accent`}>{t('travel.kills.onPath')}</span>
+        <span className={`${BADGE} bg-panel-2 text-text`}>{t('travel.kills.onPath')}</span>
       )}
       <Tags tags={location} />
     </span>
