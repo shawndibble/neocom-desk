@@ -353,16 +353,39 @@ describe('planHauling', () => {
 });
 
 describe('planVerdict', () => {
-  it('reads a positive Lift as earning more', () => {
-    expect(planVerdict(1_000, 50, 100)).toEqual({ lift: 'more', haulChange: -0.5 });
+  const effort = (m3JumpsPerHour: number, unknownLegs = 0) => ({ m3JumpsPerHour, unknownLegs });
+
+  it('reads a positive Lift as earning more, with hauling effort (m3 x jumps) against the Baseline', () => {
+    expect(planVerdict(1_000, effort(50), effort(100))).toEqual({
+      lift: 'more',
+      haulChange: -0.5,
+      distances: 'known',
+    });
   });
 
-  it('reads a negative Lift as earning less, with the haul change beside it', () => {
-    expect(planVerdict(-240_000, 40, 100)).toEqual({ lift: 'less', haulChange: -0.6 });
+  it('reads a negative Lift as earning less', () => {
+    expect(planVerdict(-240_000, effort(40), effort(100))).toEqual({
+      lift: 'less',
+      haulChange: -0.6,
+      distances: 'known',
+    });
   });
 
-  it('calls a Lift within a rounding of zero the same, and has no haul change without a Baseline', () => {
-    expect(planVerdict(0.4, 10, 0)).toEqual({ lift: 'same', haulChange: null });
+  it('claims no hauling change while any leg on either side has no distance', () => {
+    expect(planVerdict(1_000, effort(50, 2), effort(100))).toEqual({
+      lift: 'more',
+      haulChange: null,
+      distances: 'unknown',
+    });
+    expect(planVerdict(1_000, effort(50), effort(100, 1)).distances).toBe('unknown');
+  });
+
+  it('calls a Lift within a rounding of zero the same, and has no change with no Baseline effort', () => {
+    expect(planVerdict(0.4, effort(10), effort(0))).toEqual({
+      lift: 'same',
+      haulChange: null,
+      distances: 'known',
+    });
   });
 });
 

@@ -33,10 +33,13 @@ import type {
   ExtractionSlot,
   FitLimit,
   FlowEnd,
+  GoalPlan,
   RateSource,
   Shortfall,
 } from '@/engine/pi/goalTypes';
 import type { BestPlan } from '@/engine/pi/planBest';
+import type { BaselineTotal } from '@/engine/pi/baseline';
+import { volumeOf } from '@/engine/pi/haulEffort';
 import type { TradeHub } from '@/market/hubs';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -147,25 +150,38 @@ export interface HeadlineProps {
   caveats: PlanCaveats;
   hasGoals: boolean;
   pricesFetchedAt: Date;
+  /** Jumps between colonies and to the hub are still being counted. */
+  distancesPending: boolean;
   names: PlanNames;
 }
 
-function verdictText(verdict: PlanVerdict, lift: string, t: TFunction): string {
-  const haul = verdict.haulChange;
-  const percent = haul === null ? '' : PERCENT_FORMAT.format(Math.abs(haul) * 100);
-  const lessHaul = haul !== null && Math.round(haul * 100) < 0;
+function liftSentence(verdict: PlanVerdict, lift: string, t: TFunction): string {
   switch (verdict.lift) {
     case 'more':
-      return lessHaul
-        ? t('piPlan.verdictMoreHaulsLess', { isk: lift, percent })
-        : t('piPlan.verdictMore', { isk: lift });
+      return t('piPlan.verdictMore', { isk: lift });
     case 'less':
-      return lessHaul
-        ? t('piPlan.verdictLessHaulsLess', { isk: lift, percent })
-        : t('piPlan.verdictLess', { isk: lift });
+      return t('piPlan.verdictLess', { isk: lift });
     case 'same':
       return t('piPlan.verdictSame');
   }
+}
+
+/** The hauling half of the verdict: effort (m3 x jumps) against the Baseline. */
+function haulSentence(verdict: PlanVerdict, pending: boolean, t: TFunction): string | null {
+  if (pending) return t('piPlan.verdictHaulPending');
+  if (verdict.distances === 'unknown') return t('piPlan.verdictHaulUnknown');
+  const change = verdict.haulChange;
+  if (change === null) return null;
+  const percent = Math.round(change * 100);
+  if (percent < 0) return t('piPlan.verdictHaulLower', { percent: -percent });
+  if (percent > 0) return t('piPlan.verdictHaulHigher', { percent });
+  return t('piPlan.verdictHaulSame');
+}
+
+function verdictText(verdict: PlanVerdict, lift: string, pending: boolean, t: TFunction): string {
+  return [liftSentence(verdict, lift, t), haulSentence(verdict, pending, t)]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function attainmentText(attainment: GoalAttainment, pi: PiData, t: TFunction): string {
@@ -208,6 +224,7 @@ export function Headline({
   caveats,
   hasGoals,
   pricesFetchedAt,
+  distancesPending,
   names,
 }: HeadlineProps) {
   const { t } = useTranslation();
@@ -232,7 +249,12 @@ export function Headline({
   const short = hasGoals && attainment.unmet.length > 0;
   const liftPerDay = economics.liftPerHour * HOURS_PER_DAY;
   const verdictLine = verdict
-    ? verdictText(verdict, formatIskCompact(Math.abs(clampIskZero(liftPerDay, 0))), t)
+    ? verdictText(
+        verdict,
+        formatIskCompact(Math.abs(clampIskZero(liftPerDay, 0))),
+        distancesPending,
+        t
+      )
     : null;
   const customsPerHour =
     economics.customs.exportFromExtractors +
@@ -280,7 +302,7 @@ export function Headline({
 
   return (
     <Panel title={t('piPlan.headlineTitle')} actions={badge}>
-      <LiveVerdict text={announcement} />
+      <LiveVerdict text={distancesPending ? '' : announcement} />
       <div className="space-y-3" data-testid="goal-plan-headline">
         {hasGoals ? (
           <>
@@ -717,77 +739,120 @@ export function ColonyFit({
 
 // --- Hauling -------------------------------------------------------------
 
-interface HaulRow {
-  planetId: number;
+interface LegRow {
+  key: string;
+  from: FlowEnd;
+  to: FlowEnd;
+  typeId: number;
   name: string;
-  outM3: number;
-  inM3: number;
-  /** Undefined while counting; null when no route. */
+  m3PerTrip: number;
+  /** Undefined without distances yet; null when there is no route. */
   jumps: number | null | undefined;
+}
+
+function endName(end: FlowEnd, names: PlanNames): string {
+  return end === 'hub' ? names.hub.systemName : names.planet(end);
+}
+
+function EndLink({ end, names }: { end: FlowEnd; names: PlanNames }) {
+  return end === 'hub' ? <>{names.hub.systemName}</> : <ColonyLink planetId={end} names={names} />;
+}
+
+function endSystem(end: FlowEnd, names: PlanNames): number | undefined {
+  return end === 'hub' ? names.hub.systemId : names.systemOf(end);
+}
+
+function effortText(m3Jumps: number): string {
+  return formatUnits(Math.round(m3Jumps));
 }
 
 export function Hauling({
   hauling,
-  jumpsByPlanet,
+  plan,
+  baseline,
+  haulHours,
   haulDays,
+  distancesPending,
   names,
 }: {
   hauling: PlanHauling;
-  jumpsByPlanet: ReadonlyMap<number, number | null>;
+  plan: Pick<GoalPlan, 'flows' | 'haulEffort'>;
+  baseline: Pick<BaselineTotal, 'haulEffort'>;
+  haulHours: number;
   haulDays: number;
+  distancesPending: boolean;
   names: PlanNames;
 }) {
   const { t } = useTranslation();
-  const { hub } = names;
-  const rows: HaulRow[] = useMemo(
+  const { pi } = names;
+  const rows: LegRow[] = useMemo(
     () =>
-      [...hauling.perColony]
-        .map(([planetId, m3]) => ({
-          planetId,
-          name: names.planet(planetId),
-          ...m3,
-          jumps: jumpsByPlanet.get(planetId),
+      plan.flows
+        .filter((flow) => flow.from !== flow.to)
+        .map((flow) => ({
+          key: `${flow.from}>${flow.to}:${flow.typeId}`,
+          from: flow.from,
+          to: flow.to,
+          typeId: flow.typeId,
+          name: commodityName(flow.typeId, pi),
+          m3PerTrip: flow.unitsPerHour * volumeOf(flow.typeId, pi) * haulHours,
+          jumps: flow.jumps,
         }))
-        .sort((a, b) => b.outM3 + b.inM3 - (a.outM3 + a.inM3)),
-    [hauling, jumpsByPlanet, names]
+        .filter((row) => row.m3PerTrip > 0)
+        .sort((x, y) => y.m3PerTrip - x.m3PerTrip),
+    [plan.flows, pi, haulHours]
   );
-  const change =
-    hauling.baselineM3PerTrip > 0 ? hauling.planM3PerTrip / hauling.baselineM3PerTrip - 1 : null;
-  const changePercent = change === null ? 0 : Math.round(change * 100);
-  const jumpsHeader = t('piPlan.haulJumps', { hub: hub.systemName });
-  const columns = useMemo<DataTableColumn<HaulRow>[]>(
+  const unknown = plan.haulEffort.unknownLegs + baseline.haulEffort.unknownLegs;
+  const planEffort = plan.haulEffort.m3JumpsPerHour * haulHours;
+  const baselineEffort = baseline.haulEffort.m3JumpsPerHour * haulHours;
+  const changePercent =
+    unknown === 0 && baselineEffort > 0
+      ? Math.round((planEffort / baselineEffort - 1) * 100)
+      : null;
+
+  const columns = useMemo<DataTableColumn<LegRow>[]>(
     () => [
       {
-        id: 'colony',
-        header: t('piPlan.haulColony'),
+        id: 'from',
+        header: t('piPlan.legFrom'),
         primary: true,
+        sortValue: (row) => endName(row.from, names),
+        render: (row) => (
+          <span>
+            <EndLink end={row.from} names={names} />
+            {' → '}
+            <EndLink end={row.to} names={names} />
+          </span>
+        ),
+      },
+      {
+        id: 'item',
+        header: t('piPlan.legItem'),
         sortValue: (row) => row.name,
-        render: (row) => <ColonyLink planetId={row.planetId} names={names} />,
+        render: (row) => row.name,
       },
       {
-        id: 'out',
-        header: t('piPlan.haulOut'),
+        id: 'm3',
+        header: t('piPlan.legM3'),
         align: 'right',
         className: 'tabular-nums',
-        sortValue: (row) => row.outM3,
-        render: (row) => formatVolume(row.outM3),
-      },
-      {
-        id: 'in',
-        header: t('piPlan.haulIn'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (row) => row.inM3,
-        render: (row) => formatVolume(row.inM3),
+        sortValue: (row) => row.m3PerTrip,
+        render: (row) => formatVolume(row.m3PerTrip),
       },
       {
         id: 'jumps',
-        header: jumpsHeader,
+        header: t('piPlan.legJumps'),
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.jumps ?? undefined,
         render: (row) => {
-          if (row.jumps === undefined) return <span className="text-text-dim">…</span>;
+          if (row.jumps === undefined) {
+            return (
+              <span className="text-text-dim" title={t('piPlan.legJumpsPending')}>
+                …
+              </span>
+            );
+          }
           if (row.jumps === null) {
             return (
               <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
@@ -795,26 +860,37 @@ export function Hauling({
               </span>
             );
           }
-          return (
-            <JumpsLink systemId={hub.systemId} fromId={names.systemOf(row.planetId)}>
+          const to = endSystem(row.to, names);
+          const from = endSystem(row.from, names);
+          if (row.jumps === 0)
+            return <span className="text-text-dim">{t('piPlan.legSameSystem')}</span>;
+          return to === undefined ? (
+            String(row.jumps)
+          ) : (
+            <JumpsLink systemId={to} fromId={from}>
               {row.jumps}
             </JumpsLink>
           );
         },
       },
     ],
-    [t, names, hub, jumpsHeader]
+    [t, names]
   );
   const tableExport = useTableExport({
     surface: 'pi-plan-hauling',
     rows,
     columns: [
-      { header: t('piPlan.haulColony'), value: (row) => row.name },
-      { header: t('piPlan.haulOutM3'), value: (row) => Math.round(row.outM3 * 10) / 10 },
-      { header: t('piPlan.haulInM3'), value: (row) => Math.round(row.inM3 * 10) / 10 },
-      { header: jumpsHeader, value: (row) => row.jumps ?? '' },
+      { header: t('piPlan.legFromCsv'), value: (row) => endName(row.from, names) },
+      { header: t('piPlan.legToCsv'), value: (row) => endName(row.to, names) },
+      { header: t('piPlan.legItem'), value: (row) => row.name },
+      { header: t('piPlan.legM3'), value: (row) => Math.round(row.m3PerTrip * 10) / 10 },
+      { header: t('piPlan.legJumps'), value: (row) => row.jumps ?? '' },
     ],
   });
+  const perColony = [...hauling.perColony]
+    .map(([planetId, m3]) => ({ planetId, ...m3 }))
+    .sort((x, y) => y.outM3 + y.inM3 - (x.outM3 + x.inM3));
+
   return (
     <Panel
       title={t('piPlan.haulTitle')}
@@ -830,14 +906,18 @@ export function Hauling({
       }
       padded={false}
     >
-      <div className="p-3">
+      <div className="space-y-2 p-3">
         <StatChips>
-          <StatChip label={t('piPlan.haulPlanTotal')} value={formatVolume(hauling.planM3PerTrip)} />
           <StatChip
-            label={t('piPlan.haulBaselineTotal')}
-            value={formatVolume(hauling.baselineM3PerTrip)}
+            label={t('piPlan.haulEffortPlan')}
+            tooltip={t('piPlan.haulEffortTooltip')}
+            value={unknown > 0 ? '—' : effortText(planEffort)}
           />
-          {change !== null && (
+          <StatChip
+            label={t('piPlan.haulEffortBaseline')}
+            value={unknown > 0 ? '—' : effortText(baselineEffort)}
+          />
+          {changePercent !== null && (
             <StatChip
               label={t('piPlan.haulChange')}
               tone={changePercent < 0 ? 'success' : 'default'}
@@ -850,7 +930,32 @@ export function Hauling({
               }
             />
           )}
+          <StatChip label={t('piPlan.haulPlanTotal')} value={formatVolume(hauling.planM3PerTrip)} />
+          <StatChip
+            label={t('piPlan.haulBaselineTotal')}
+            value={formatVolume(hauling.baselineM3PerTrip)}
+          />
         </StatChips>
+        {unknown > 0 && (
+          <p className="text-[0.6875rem] text-text-dim">
+            {distancesPending
+              ? t('piPlan.haulDistancesPending')
+              : t('piPlan.haulDistancesUnknown', { count: unknown })}
+          </p>
+        )}
+        {perColony.length > 0 && (
+          <p className="text-[0.6875rem] text-text-dim">
+            {perColony
+              .map((c) =>
+                t('piPlan.haulColonyTotal', {
+                  name: names.planet(c.planetId),
+                  out: formatVolume(c.outM3),
+                  in: formatVolume(c.inM3),
+                })
+              )
+              .join(' · ')}
+          </p>
+        )}
       </div>
       {rows.length > 0 && (
         <DataTable
@@ -858,7 +963,7 @@ export function Hauling({
           label={t('piPlan.haulTableLabel')}
           columns={columns}
           rows={rows}
-          rowKey={(row) => row.planetId}
+          rowKey={(row) => row.key}
           density="compact"
           stackColumns={2}
         />
@@ -910,9 +1015,27 @@ const SOURCE_TONE: Record<DemandSource, string> = {
   blocked: 'text-text-dim',
 };
 
-export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: PlanNames }) {
+export function Flow({
+  demand,
+  blockedBy,
+  names,
+}: {
+  demand: readonly DemandLine[];
+  /** Planet types the type gaps need, for the blocked group's header. */
+  blockedBy: readonly string[];
+  names: PlanNames;
+}) {
   const { t } = useTranslation();
   const { pi, hub } = names;
+  // The live chain first, the blocked goals' chain folded below it: a type
+  // both need then reads as two lines in two places, not a duplicate.
+  const rows = useMemo(
+    () => [
+      ...demand.filter((line) => line.source !== 'blocked'),
+      ...demand.filter((line) => line.source === 'blocked'),
+    ],
+    [demand]
+  );
   const columns = useMemo<DataTableColumn<DemandLine>[]>(
     () => [
       {
@@ -975,7 +1098,7 @@ export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: 
   );
   const tableExport = useTableExport({
     surface: 'pi-plan-flow',
-    rows: demand,
+    rows,
     columns: [
       { header: t('piPlan.flowTier'), value: (line) => `P${line.tier}` },
       { header: t('piPlan.flowItem'), value: (line) => commodityName(line.typeId, pi) },
@@ -996,8 +1119,22 @@ export function Flow({ demand, names }: { demand: readonly DemandLine[]; names: 
         {...tableExport.tableProps}
         label={t('piPlan.flowTableLabel')}
         columns={columns}
-        rows={demand}
+        rows={rows}
         rowKey={(line) => `${line.typeId}:${line.source}`}
+        rowClassName={(line) => (line.source === 'blocked' ? 'text-text-dim' : undefined)}
+        groupBy={{
+          key: (line) => (line.source === 'blocked' ? 'blocked' : null),
+          renderHeader: (lines) =>
+            blockedBy.length > 0
+              ? t('piPlan.flowBlockedGroup', {
+                  count: lines.length,
+                  types: blockedBy.join(t('piPlan.or')),
+                })
+              : t('piPlan.flowBlockedGroupPlain', { count: lines.length }),
+          defaultExpanded: () => true,
+          allWidths: true,
+          minSize: 1,
+        }}
         density="compact"
         stackColumns={2}
         rowContextMenu={(line, tr) => (

@@ -45,6 +45,7 @@ import type { PiData } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type {
   EcuRate,
+  HaulEffort,
   GoalPlan,
   PlannerColony,
   PlannerPolicy,
@@ -354,17 +355,32 @@ export function planHauling(
 
 export interface PlanVerdict {
   lift: 'more' | 'less' | 'same';
-  /** Plan volume over the Baseline's, minus one: -0.6 hauls 60% less. Null with no Baseline volume. */
+  /**
+   * Hauling effort (m3 x jumps) over the Baseline's, minus one: -0.6 is 60%
+   * less. Null without a Baseline effort, or while any leg's distance is unknown.
+   */
   haulChange: number | null;
+  /** 'unknown' while any leg on either side has no distance yet: no claim either way. */
+  distances: 'known' | 'unknown';
 }
 
 /** Below this an ISK/day Lift is rounding, not a difference worth a sentence. */
 const SAME_LIFT_ISK_PER_DAY = 1;
 
-export function planVerdict(liftPerDay: number, planM3: number, baselineM3: number): PlanVerdict {
+export function planVerdict(
+  liftPerDay: number,
+  planEffort: HaulEffort,
+  baselineEffort: HaulEffort
+): PlanVerdict {
   const lift =
     Math.abs(liftPerDay) < SAME_LIFT_ISK_PER_DAY ? 'same' : liftPerDay > 0 ? 'more' : 'less';
-  return { lift, haulChange: baselineM3 > 0 ? planM3 / baselineM3 - 1 : null };
+  const distances =
+    planEffort.unknownLegs > 0 || baselineEffort.unknownLegs > 0 ? 'unknown' : 'known';
+  const haulChange =
+    distances === 'known' && baselineEffort.m3JumpsPerHour > 0
+      ? planEffort.m3JumpsPerHour / baselineEffort.m3JumpsPerHour - 1
+      : null;
+  return { lift, haulChange, distances };
 }
 
 /**

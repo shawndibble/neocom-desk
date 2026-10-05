@@ -275,15 +275,6 @@ function GoalPlanner({
       cancelled = true;
     };
   }, [basis, hub.systemId, systemKey, jumpsKey]);
-  const jumpsByPlanet = useMemo(() => {
-    const out = new Map<number, number | null>();
-    if (jumps?.key !== jumpsKey) return out;
-    for (const row of rows) {
-      const count = jumps.bySystem.get(row.systemId);
-      if (count !== undefined) out.set(row.planetId, count);
-    }
-    return out;
-  }, [jumps, jumpsKey, rows]);
   const jumpsFn = useMemo((): JumpsFn | undefined => {
     if (jumps?.key !== jumpsKey) return undefined;
     const systemOf = new Map(rows.map((row) => [row.planetId, row.systemId]));
@@ -385,10 +376,13 @@ function GoalPlanner({
       best.economics.status === 'costed'
         ? planVerdict(
             best.economics.liftPerHour * HOURS_PER_DAY,
-            hauling.planM3PerTrip,
-            hauling.baselineM3PerTrip
+            best.plan.haulEffort,
+            best.baseline.haulEffort
           )
         : null;
+    // Until distances land the plan is made without them and re-made after,
+    // which can move the host: say so rather than announce a verdict twice.
+    const distancesPending = jumpsFn === undefined && rows.length > 0;
     const hasGoals = plannedGoals.some((goal) => goal.unitsPerDay > 0);
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
     results = (
@@ -402,6 +396,7 @@ function GoalPlanner({
           caveats={planCaveats(best.plan.assignments, rows)}
           hasGoals={hasGoals}
           pricesFetchedAt={prices.fetchedAt}
+          distancesPending={distancesPending}
           names={names}
         />
         {hasGoals && (
@@ -416,11 +411,26 @@ function GoalPlanner({
             <ColonyFit assignments={best.plan.assignments} rows={rows} names={names} />
             <Hauling
               hauling={hauling}
-              jumpsByPlanet={jumpsByPlanet}
+              plan={best.plan}
+              baseline={best.baseline}
+              haulHours={haulHours}
               haulDays={cadence.haulDays}
+              distancesPending={distancesPending}
               names={names}
             />
-            <Flow demand={best.plan.demand} names={names} />
+            <Flow
+              demand={best.plan.demand}
+              blockedBy={[
+                ...new Set(
+                  best.plan.shortfalls.flatMap((gap) =>
+                    gap.kind === 'type-gap'
+                      ? gap.fixPlanetTypes.map((type) => t(`pi.planetType.${type}`))
+                      : []
+                  )
+                ),
+              ]}
+              names={names}
+            />
           </>
         )}
       </div>
