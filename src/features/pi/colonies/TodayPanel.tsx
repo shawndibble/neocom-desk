@@ -124,7 +124,7 @@ function Hero({
                   : 'piColonies.today.bringsBackLead'
               )}{' '}
               <span className="text-isk-pos">
-                +{formatIskCompact(gain)} ISK{t('piColonies.perDay')}
+                +{formatIskCompact(gain)} {t('piColonies.iskPerDay')}
               </span>
             </>
           )}

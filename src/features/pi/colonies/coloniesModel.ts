@@ -545,7 +545,10 @@ export function todayCheck(rows: readonly ColonyCheckRow[], nowMs: number): Toda
 
   const next = due[0] ?? null;
   const loginAtMs = next ? next.atMs : null;
-  const trip = next ? due.filter((item) => item.atMs <= next.atMs + DAY_HOURS * HOUR_MS) : [];
+  // Anything already stopped is part of this login whatever its age, so the
+  // window starts at now, not at the oldest stop.
+  const tripEnd = next ? Math.max(next.atMs, nowMs) + DAY_HOURS * HOUR_MS : 0;
+  const trip = next ? due.filter((item) => item.atMs <= tripEnd) : [];
   const tripCharacterIds: number[] = [];
   for (const item of trip) {
     if (!tripCharacterIds.includes(item.characterId)) tripCharacterIds.push(item.characterId);

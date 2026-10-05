@@ -388,7 +388,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               aria-expanded={expanded}
               aria-controls={regionId}
               aria-label={toggleLabel}
-              className="-m-1 inline-flex min-h-11 min-w-6 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
+              className="-m-1 inline-flex min-h-11 min-w-11 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
             >
               <Caret expanded={expanded} />
             </button>
@@ -490,14 +490,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
           </div>
 
           <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
-            <Button
-              size="md"
-              variant={variant}
-              className="w-full"
-              aria-expanded={expanded}
-              aria-controls={regionId}
-              onClick={props.onExpand}
-            >
+            <Button size="md" variant={variant} className="w-full" onClick={props.onExpand}>
               {label}
             </Button>
             <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>

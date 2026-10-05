@@ -350,6 +350,11 @@ describe('todayCheck', () => {
     expect(check.tripMinutes).toBeGreaterThan(0);
   });
 
+  it('keeps colonies stopped long ago in the same trip as ones stopped just now', () => {
+    const check = todayCheck([expiring(1, -30), expiring(2, -3), expiring(3, 6)], NOW);
+    expect(check.trip.map((item) => item.planetId)).toEqual([1, 2, 3]);
+  });
+
   it('lists each character the trip needs, in visiting order', () => {
     const check = todayCheck([expiring(1, 6, 1), expiring(2, 7, 2), expiring(3, 8, 1)], NOW);
     expect(check.tripCharacterIds).toEqual([1, 2]);

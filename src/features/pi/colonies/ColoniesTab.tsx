@@ -131,11 +131,19 @@ function NoColonies({ planHref }: { planHref: string }) {
             {(['barren', 'lava', 'temperate'] as const).map((type) => (
               <PlanetImage key={type} type={type} size={40} />
             ))}
+            {[0, 1, 2].map((slot) => (
+              <span
+                key={slot}
+                aria-hidden="true"
+                className="size-10 rounded-full border border-dashed border-line-bright"
+              />
+            ))}
           </span>
         }
         action={
           <Link to={planHref} className={buttonClassName({ variant: 'primary' })}>
             {t('piColonies.emptyAction')}
+            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           </Link>
         }
       />
@@ -295,7 +303,7 @@ export function ColoniesTab({
   // The shared recommendation model: quick wins and today's figure come from
   // the same `buildPlanAdvice` Plan reads. It carries its own clock, so status
   // and fixes agree about whether a program has expired.
-  const planAdvice = usePlanAdvice(characterId, data?.loadedAt ?? 0);
+  const planAdvice = usePlanAdvice(data ? characterId : null, data?.loadedAt ?? 0);
   const advice = planAdvice.advice;
   const nowMs = planAdvice.snapshot?.nowMs ?? data?.loadedAt ?? 0;
 

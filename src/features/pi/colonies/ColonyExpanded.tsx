@@ -404,7 +404,10 @@ export function ColonyExpanded({
         )}
         <StatChip
           label={t('pi.lastUpdate')}
-          value={`${formatTimestamp(new Date(planet.last_update), timeZone)} · ${eveClock(Date.parse(planet.last_update))} EVE`}
+          value={t('piColonies.expanded.lastUpdateValue', {
+            local: formatTimestamp(new Date(planet.last_update), timeZone),
+            eve: eveClock(Date.parse(planet.last_update)),
+          })}
           tooltip={t('pi.lastUpdateTooltip')}
           className="ml-auto"
         />
