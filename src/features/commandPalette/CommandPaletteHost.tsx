@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { isApplePlatform, isCommandPaletteShortcut } from '@/lib/shortcuts';
 import { CommandPalette } from './CommandPalette';
 import type { ShownMarketItem } from './marketItems';
@@ -9,7 +10,7 @@ const APPLE = isApplePlatform();
 // Lazy: the shell mounts this host on every page, and Item Detail brings ESI,
 // SDE and skills code the shell chunk should not carry until an item is picked.
 const ItemDetailModal = lazy(() =>
-  import('@/features/market/ItemDetailModal').then((module) => ({
+  guarded(() => import('@/features/market/ItemDetailModal')).then((module) => ({
     default: module.ItemDetailModal,
   }))
 );

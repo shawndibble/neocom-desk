@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
@@ -42,7 +43,7 @@ function movingAverageWindowDays(range: PriceHistoryRange): number {
  * the initial page bundle — it only loads once the Price History tab is
  * actually opened.
  */
-const LazyPriceHistoryChart = lazy(() => import('./PriceHistoryChart'));
+const LazyPriceHistoryChart = lazy(() => guarded(() => import('./PriceHistoryChart')));
 
 interface PriceHistoryPanelProps {
   regionId: number;

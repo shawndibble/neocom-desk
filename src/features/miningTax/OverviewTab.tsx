@@ -11,6 +11,7 @@
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -84,7 +85,7 @@ import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
-const LazyMiningYieldCharts = lazy(() => import('./MiningYieldCharts'));
+const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };

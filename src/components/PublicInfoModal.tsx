@@ -25,6 +25,7 @@
  */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { CharacterAvatar, EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
@@ -39,11 +40,19 @@ import {
 import { loadPilotProfile, type PilotProfile } from '@/features/travel/pilotLookup';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
-const LazyEmploymentTab = lazy(() => import('@/features/character/PublicInfoEmploymentTab'));
-const LazyCorporationTab = lazy(() => import('@/features/character/PublicInfoCorporationTab'));
-const LazyAllianceTab = lazy(() => import('@/features/character/PublicInfoAllianceTab'));
+const LazyEmploymentTab = lazy(() =>
+  guarded(() => import('@/features/character/PublicInfoEmploymentTab'))
+);
+const LazyCorporationTab = lazy(() =>
+  guarded(() => import('@/features/character/PublicInfoCorporationTab'))
+);
+const LazyAllianceTab = lazy(() =>
+  guarded(() => import('@/features/character/PublicInfoAllianceTab'))
+);
 // Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
-const LazyPilotProfileView = lazy(() => import('@/features/travel/PilotProfileView'));
+const LazyPilotProfileView = lazy(() =>
+  guarded(() => import('@/features/travel/PilotProfileView'))
+);
 
 type TabState<T> =
   { status: 'idle' } | { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };

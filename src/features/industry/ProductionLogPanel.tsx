@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState, type ReactElement } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -64,7 +65,7 @@ import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
  * renders a chart (see `character/WalletBalanceChart.tsx`'s bundle-size
  * precedent).
  */
-const LazyProductionProfitChart = lazy(() => import('./ProductionProfitChart'));
+const LazyProductionProfitChart = lazy(() => guarded(() => import('./ProductionProfitChart')));
 
 interface ProductionLogPanelProps {
   characterId: number;

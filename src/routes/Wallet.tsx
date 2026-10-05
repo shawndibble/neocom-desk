@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { guarded } from '@/app/routeChunks';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -84,7 +85,9 @@ import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanc
  * renders a chart (see `market/PriceHistoryChart.tsx`'s bundle-size
  * precedent).
  */
-const LazyWalletBalanceChart = lazy(() => import('@/features/character/WalletBalanceChart'));
+const LazyWalletBalanceChart = lazy(() =>
+  guarded(() => import('@/features/character/WalletBalanceChart'))
+);
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
