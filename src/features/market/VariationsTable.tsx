@@ -10,12 +10,14 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { IskAmount, TypeIcon } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { priceComparison } from '@/engine/market/orderBookDepth';
 import { formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
+import { MarketItemLink } from './MarketItemLink';
 import type { VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
 
@@ -47,7 +49,7 @@ export interface VariationsTableProps {
   scopeName: string;
 }
 
-/** "+1.44M" / "−350.1K": compact, and signed so the colour never carries it alone. */
+/** "+1.44M" / "−350.1K": compact, and signed so the colour never carries it alone. A signed delta string, not an IskAmount figure (exception). */
 function signedCompactIsk(value: number): string {
   const text = formatIskCompact(Math.abs(value));
   return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
@@ -106,14 +108,27 @@ export function VariationsTable({
       id: 'name',
       header: t('market.variations.name'),
       sortValue: (row) => row.name,
-      // The whole row is the click target (onRowClick below) — identical to
-      // the old card strip, where clicking anywhere on a card re-anchored
-      // the page, not just its name.
+      // The row navigates (re-anchors the page): a real link on the name,
+      // a plain click is handled in place, plus the trailing GoTo caret.
+      // The whole row stays a pointer shortcut (onRowClick below).
       render: (row) => (
-        <span className="flex items-center gap-1.5 font-medium text-accent">
+        <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
-          {row.name}
-          <span aria-hidden="true"> ›</span>
+          <MarketItemLink
+            typeId={row.typeId}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+              event.preventDefault();
+              onSelect(row.typeId);
+            }}
+          >
+            {row.name}
+          </MarketItemLink>
+          <Icon.GoTo
+            aria-hidden="true"
+            size={Icon.ICON_SIZE.sm}
+            className="shrink-0 text-text-faint [tr:hover_&]:text-accent"
+          />
         </span>
       ),
     },

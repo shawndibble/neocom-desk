@@ -88,6 +88,9 @@ import {
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { cx } from '@/lib/cx';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { SystemLink } from '@/features/entities';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -808,7 +811,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           if (location.systemName === null) return <span className="text-text-dim">—</span>;
           return (
             <>
-              {location.systemName}
+              {location.systemId === null ? (
+                location.systemName
+              ) : (
+                <SystemLink systemId={location.systemId}>{location.systemName}</SystemLink>
+              )}
               {location.security !== null && (
                 <>
                   {' '}
@@ -1078,7 +1085,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                           <button
                             type="button"
                             onClick={() => selectType(suggestion)}
-                            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent md:min-h-9"
+                            className={cx(
+                              'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left md:min-h-9',
+                              rowInteractiveClassName,
+                              focusRingInsetClassName
+                            )}
                           >
                             <span className="truncate">{suggestion.name}</span>
                             <span className="shrink-0 text-[0.6875rem] text-text-dim">

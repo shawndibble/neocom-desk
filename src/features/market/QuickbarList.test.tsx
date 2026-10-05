@@ -58,3 +58,18 @@ describe('QuickbarList item context menu', () => {
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 });
+
+describe('QuickbarList selection', () => {
+  it('marks only the selected row aria-current and gives it the selected treatment', () => {
+    renderList({
+      items: [...items, { typeId: 35, name: 'Pyerite', characterId: 1, position: 1 }],
+      selectedTypeId: 34,
+    });
+    const selected = screen.getByRole('button', { name: 'Tritanium' });
+    expect(selected).toHaveAttribute('aria-current', 'true');
+    expect(selected.closest('li')).toHaveClass('border-l-accent');
+    const other = screen.getByRole('button', { name: 'Pyerite' });
+    expect(other).not.toHaveAttribute('aria-current');
+    expect(other.closest('li')).not.toHaveClass('border-l-accent');
+  });
+});

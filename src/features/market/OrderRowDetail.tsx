@@ -9,8 +9,8 @@
  * same on every row, so they sit once in the item header instead.
  */
 import { useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
   orderExpiry,
@@ -19,10 +19,11 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
+import { SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIskCompact, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
+import { formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { formatVolume } from './format';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { priceClipboardText } from './priceClipboardText';
@@ -115,13 +116,18 @@ export function OrderRowDetail({
       <p className="text-text">
         <span className="font-semibold">{placeName}</span>
         {location.systemName !== '' && (
-          <span className="text-text-dim"> · {location.systemName}</span>
+          <span className="text-text-dim">
+            {' · '}
+            <SystemLink systemId={npcStations.get(order.location_id)?.systemId ?? order.system_id}>
+              {location.systemName}
+            </SystemLink>
+          </span>
         )}
       </p>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
         <Fact label={t('market.orderDetail.orderValue')}>
-          {formatIskCompact(order.price * order.volume_remain)}
+          <IskAmount value={order.price * order.volume_remain} />
         </Fact>
         <Fact label={t('market.orderDetail.versusBest')}>
           {versusBest === null || versusBest.delta === 0
@@ -158,10 +164,11 @@ export function OrderRowDetail({
             {t(buy ? 'market.orderDetail.sellDownTo' : 'market.orderDetail.buyDownTo')}
           </span>{' '}
           <span className="font-semibold tabular-nums">
-            {t('market.orderDetail.depthUnits', {
-              units: formatVolume(depth.units),
-              isk: formatIskCompact(depth.isk),
-            })}
+            <Trans
+              i18nKey="market.orderDetail.depthUnits"
+              values={{ units: formatVolume(depth.units) }}
+              components={{ isk: <IskAmount value={depth.isk} /> }}
+            />
           </span>{' '}
           <span className="text-text-dim tabular-nums">
             ·{' '}

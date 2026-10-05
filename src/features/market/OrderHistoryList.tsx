@@ -2,12 +2,18 @@ import { Fragment, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonClassName,
+  Caret,
   nextDataTableSort,
   RowMoreActions,
   sortRows,
   type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import {
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIskCompact, formatMarketIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
@@ -92,7 +98,9 @@ export function OrderHistoryList({
             : t('orders.sortBy', { column: text })
         }
         className={cx(
-          'flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+          'flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest uppercase',
+          interactiveClassName,
+          focusRingInsetClassName,
           align === 'right' && 'justify-end',
           active ? 'text-text' : 'text-text-dim'
         )}
@@ -135,19 +143,27 @@ export function OrderHistoryList({
                   onClick={() => setOpenId(open ? null : order.order_id)}
                   className={cx(
                     columns,
-                    'min-h-13 min-w-0 flex-1 items-center px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
+                    'min-h-13 min-w-0 flex-1 items-center px-3 py-2 text-left',
+                    rowInteractiveClassName,
+                    focusRingInsetClassName
                   )}
                 >
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-sm text-text">{name}</span>
-                    <span className="truncate text-xs text-text-dim">
-                      {sideLabel(order)} · {stateLabel(order)} · {issued}
+                  <span className="flex min-w-0 items-start gap-1.5">
+                    <span className="mt-1">
+                      <Caret expanded={open} />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-sm text-text">{name}</span>
+                      <span className="truncate text-xs text-text-dim">
+                        {sideLabel(order)} · {stateLabel(order)} · {issued}
+                      </span>
                     </span>
                   </span>
                   <span className="text-right text-sm text-text-dim tabular-nums">
                     {filledOf(order).toLocaleString()}/{order.volume_total.toLocaleString()}
                   </span>
                   <span className="text-right text-sm font-semibold text-text tabular-nums">
+                    {/* Compact figure stays plain text: IskAmount's focusable trigger can't nest in this row button. The exact price is in the expanded detail. */}
                     {formatIskCompact(order.price)}
                   </span>
                 </button>

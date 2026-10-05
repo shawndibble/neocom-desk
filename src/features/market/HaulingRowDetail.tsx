@@ -24,6 +24,8 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { maxBuyPrice } from '@/engine/market/haulingPlan';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
@@ -89,6 +91,7 @@ function OrdersDisclosure({
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
+        <Caret expanded={open} />
         {open ? hideLabel : showLabel}
       </Button>
       <div className={open ? undefined : 'max-lg:hidden'}>{children}</div>
@@ -144,11 +147,7 @@ export function HaulingRowDetail({ row, loadNote }: HaulingRowDetailProps) {
 function MarketLink({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   return (
-    <MarketItemLink
-      typeId={row.typeId}
-      hubId={row.toHub.id}
-      className="self-start text-xs text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
+    <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
       {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
     </MarketItemLink>
   );
