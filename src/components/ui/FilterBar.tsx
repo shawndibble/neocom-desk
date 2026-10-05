@@ -380,6 +380,27 @@ function FilterPopover({
  * leave a modal sitting over controls that are now in the row behind it, and
  * would cascade a render to do it.
  */
+/** Structural equality for a filter value: plain data, arrays, Sets, Maps. */
+function sameFilters(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (a instanceof Set && b instanceof Set) {
+    return a.size === b.size && [...a].every((item) => b.has(item));
+  }
+  if (a instanceof Map && b instanceof Map) {
+    return a.size === b.size && [...a].every(([k, v]) => b.has(k) && sameFilters(v, b.get(k)));
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every(
+    (key) =>
+      Object.hasOwn(b, key) &&
+      sameFilters((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+  );
+}
+
 function FilterSheet<T>({
   value,
   onChange,
@@ -395,6 +416,21 @@ function FilterSheet<T>({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  // "Discard filter changes?", asked inside the sheet itself rather than in a
+  // second dialog: one overlay means one history entry for Back to own.
+  const [confirming, setConfirming] = useState(false);
+
+  const closeSheet = () => {
+    setConfirming(false);
+    setOpen(false);
+  };
+  // Scrim, Escape, ✕ and Back all land here (§6c "Tap outside"): with edits
+  // pending they ask first; Cancel and Apply skip it.
+  const requestClose = () => {
+    if (confirming) setConfirming(false);
+    else if (sameFilters(draft, value)) closeSheet();
+    else setConfirming(true);
+  };
 
   return (
     <>
@@ -430,38 +466,55 @@ function FilterSheet<T>({
       </div>
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={requestClose}
         title={title ?? t('filters.title')}
         placement="sheet"
       >
-        <FilterSurfaceContext.Provider value="sheet">
-          {/*
+        {confirming ? (
+          <div role="alertdialog" aria-label={t('filters.discardTitle')} className="space-y-3">
+            <p className="text-sm font-semibold">{t('filters.discardTitle')}</p>
+            <p className="text-sm text-text-dim">{t('filters.discardBody')}</p>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => setConfirming(false)}>
+                {t('filters.keepEditing')}
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={closeSheet}>
+                {t('filters.discard')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <FilterSurfaceContext.Provider value="sheet">
+              {/*
             `items-start` so a chip keeps its own width in the column — only a
             `FilterField` marked `stretch` fills the sheet, and a full-width
             uppercase pill reads as a field it is not.
           */}
-          <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
-        </FilterSurfaceContext.Provider>
-        {/*
+              <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
+            </FilterSurfaceContext.Provider>
+            {/*
           Sticky rather than a `Modal` footer prop: the sheet's body is the
           scroller, and five filters on a phone push a static Apply below the
           fold. The negative margins let the bar span the body's own padding.
         */}
-        <div className="sticky bottom-0 -mx-3 -mb-3 mt-3 flex gap-2 border-t border-line bg-panel px-3 py-2">
-          <Button className="flex-1" onClick={() => setOpen(false)}>
-            {t('filters.cancel')}
-          </Button>
-          <Button
-            variant="primary"
-            className="flex-1"
-            onClick={() => {
-              onChange(draft);
-              setOpen(false);
-            }}
-          >
-            {t('filters.apply')}
-          </Button>
-        </div>
+            <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+              <Button className="flex-1" onClick={closeSheet}>
+                {t('filters.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={() => {
+                  onChange(draft);
+                  closeSheet();
+                }}
+              >
+                {t('filters.apply')}
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </>
   );

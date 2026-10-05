@@ -102,6 +102,12 @@ function InfoSurface({
   phone: boolean;
   children: ReactNode;
 }) {
+  // One dismissal contract on both surfaces: Escape, the ✕ and Back close it.
+  // Below `sm` it is a bottom sheet (grabber, swipe down, scrim). From `sm` up
+  // — touch tablets included — it stays the non-modal `SlideOver`, because the
+  // tree behind it must stay live to pick the next ship; `SlideOver` carries a
+  // visible close button, Escape, and the shared Back hook, so a tablet needs
+  // no sheet to get the same ways out.
   if (phone) {
     return open ? (
       <Modal open onClose={onClose} title={title} placement="sheet">
