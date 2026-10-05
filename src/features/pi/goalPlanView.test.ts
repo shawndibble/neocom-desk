@@ -236,6 +236,7 @@ describe('shortfallHint', () => {
           p1TypeId: REACTIVE_METALS,
           unitsPerHour: 5000,
           p1UnitsPerHour: 5000 / 150,
+          retargetCandidates: [1, 2],
         },
         rows,
         false
@@ -249,6 +250,7 @@ describe('shortfallHint', () => {
           p1TypeId: REACTIVE_METALS,
           unitsPerHour: 5000,
           p1UnitsPerHour: 5000 / 150,
+          retargetCandidates: [1, 2],
         },
         rows,
         true

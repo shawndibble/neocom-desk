@@ -680,6 +680,16 @@ export function planGoals(input: PlanGoalsInput, pi: PiData): GoalPlan {
       p1TypeId: row.p1,
       unitsPerHour: unmet / row.p1PerP0,
       p1UnitsPerHour: unmet,
+      // Every colony that yields it and is not already at the ECU cap on it:
+      // freeing room on one of these (dropping its other P0) closes the gap.
+      retargetCandidates: sortedColonies
+        .filter(
+          (c) =>
+            c.ratePerEcu.has(row.p0) &&
+            (wants.get(c.planetId)?.find((w) => w.p0TypeId === row.p0)?.ecus ?? 0) <
+              policy.maxEcusPerColony
+        )
+        .map((c) => c.planetId),
     });
   }
 

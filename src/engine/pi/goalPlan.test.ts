@@ -229,6 +229,7 @@ describe('planGoals — extraction and shortfalls', () => {
         p1TypeId: REACTIVE_METALS,
         unitsPerHour: expect.closeTo(48 * 150, 6),
         p1UnitsPerHour: expect.closeTo(48, 6),
+        retargetCandidates: [],
       },
     ]);
     expect(result.buys).toEqual([]);
@@ -509,6 +510,7 @@ describe('planGoals — the plan describes itself consistently', () => {
         p1TypeId: 2390,
         unitsPerHour: expect.closeTo(8 * 150, 6),
         p1UnitsPerHour: expect.closeTo(8, 6),
+        retargetCandidates: [],
       },
     ]);
     const line = (id: number) => result.demand.find((l) => l.typeId === id)!;
@@ -595,5 +597,23 @@ describe('planGoals — stability against what colonies run today', () => {
     const estimated = colony(2, 'barren');
     const result = plan([goal(REACTIVE_METALS, 30)], [estimated, measured].reverse());
     expect(result.assignments.find((a) => a.role === 'extract')?.planetId).toBe(1);
+  });
+});
+
+describe('planGoals — what a gap can be fixed with', () => {
+  it('names the colonies a budget gap could retarget, leaving out ones already maxed on that P0', () => {
+    // Noble Metals only comes off the Barren, which it fills; the gas colony
+    // runs two ECUs on Base Metals and still falls 72/h short.
+    const result = plan(
+      [goal(PRECIOUS_METALS, 72), goal(REACTIVE_METALS, 144)],
+      [colony(1, 'barren'), colony(2, 'gas')]
+    );
+    expect(result.shortfalls).toEqual([
+      expect.objectContaining({
+        kind: 'budget-gap',
+        p0TypeId: BASE_METALS,
+        retargetCandidates: [1],
+      }),
+    ]);
   });
 });

@@ -194,6 +194,12 @@ export type Shortfall =
       p1TypeId: number;
       unitsPerHour: number;
       p1UnitsPerHour: number;
+      /**
+       * Planet ids, ascending, of colonies that yield this P0 and are not
+       * already at the ECU cap on it — the ones a re-target (dropping their
+       * other P0) could turn to it. Empty when every such colony is maxed.
+       */
+      retargetCandidates: number[];
     }
   /** P2+ is demanded but no enabled colony's planet type carries every factory the chain needs. */
   | { kind: 'no-factory-host'; facility: PiFactoryKind }
