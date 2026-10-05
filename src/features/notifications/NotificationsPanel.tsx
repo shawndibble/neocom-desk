@@ -33,7 +33,9 @@
  * Characters actually on screen mount, and `CharacterNotificationSection` is
  * memoized so an edit to one Character's preferences doesn't force React to
  * re-diff every other Character's rows.
- */ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+ */ import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
@@ -902,9 +904,9 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                         screen, and now that it says
                                         something, the cut-off half
                                         is worth recovering. */}
-                          <span className="truncate text-text-dim" title={typeLabel}>
-                            {typeLabel}
-                          </span>
+                          <Tooltip content={typeLabel}>
+                            <span className="truncate text-text-dim">{typeLabel}</span>
+                          </Tooltip>
                           <div className={CHANNEL_COLUMNS}>
                             {NOTIFICATION_CHANNELS.map((channel) => (
                               <ChannelCheckbox
@@ -962,7 +964,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           type="button"
           aria-expanded={expanded}
           onClick={() => onToggleExpanded(character.characterId)}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+          className={cx(
+            'flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0',
+            interactiveClassName,
+            focusRingInsetClassName
+          )}
         >
           <Caret expanded={expanded} />
           <span className="min-w-0 truncate normal-case">{character.name}</span>
@@ -1136,7 +1142,7 @@ function ChannelCheckbox({
       }}
       aria-disabled={enabled ? undefined : true}
       aria-label={label}
-      className={enabled ? undefined : 'cursor-not-allowed! opacity-50'}
+      className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
     />
   );
   if (enabled) return checkbox;

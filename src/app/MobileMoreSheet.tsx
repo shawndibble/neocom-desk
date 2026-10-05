@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -212,6 +213,7 @@ export function MobileMoreSheet({
                 focusRingClassName
               )}
             >
+              <Caret expanded={showHidden} />
               <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
               <span className="min-w-0 flex-1 truncate">
                 {t('nav.hiddenPages', {

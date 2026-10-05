@@ -115,7 +115,7 @@ export function CustomizePermissionsDialog({
                 checked
                 disabled
                 tag={
-                  <span className="rounded-xs border border-line bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                  <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
                     {t('permissions.customize.requiredTag')}
                   </span>
                 }
@@ -158,7 +158,7 @@ export function CustomizePermissionsDialog({
                   onChange={() => toggle(group)}
                   tag={
                     !meta.defaultOn && (
-                      <span className="rounded-xs border border-line bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                      <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
                         {t('permissions.customize.optInTag')}
                       </span>
                     )
