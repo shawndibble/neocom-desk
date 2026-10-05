@@ -904,6 +904,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Traded Volume**: Units of an item that changed hands in a Region on one
   day (ESI's `volume`). Not the item's cargo volume in m³ — the collision is
   EVE's, and this glossary keeps both words only because ESI does.
+- **Quick win**: An in-place fix to a PI colony the pilot already runs, such as
+  restarting a slowing extractor, adding a missing head, hauling before a
+  launchpad fills, or repointing an idle factory. It adds to today's income
+  without changing what the colony makes. The PI Plan tab lists every Quick
+  win before any rebuild and quotes a rebuild's gain on top of them, keeping
+  ADR 0012's split between tuning today's extraction and re-planning it.
+  Ranked by ISK/day per minute of in-game work.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
   column. Replaces the pin-to-compare grid; comparing lives in the **Compare**
   drawer over the separate **Compare Set**.

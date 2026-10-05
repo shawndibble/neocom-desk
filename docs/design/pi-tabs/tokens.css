@@ -1,0 +1,18 @@
+/* Neocom Desk tokens (docs/DESIGN.md / src/styles/index.css). App is dark-only. */
+:root{--bg:#0a0e14;--panel:#11161d;--panel-2:#161d27;--line:#2a3442;--line-bright:#586c86;--text:#dee7ee;--text-dim:#95a3b4;--text-faint:#5c6b7a;--accent:#57c7f4;--accent-dim:#2e7da3;--accent-contrast:#04181f;--success:#5fd584;--warning:#f5b94a;--danger:#ff7369;--isk-pos:#4fd98a;--isk-neg:#ff8177;
+--t0:#9aa7b5;--t1:#6fc3a0;--t2:#57c7f4;--t3:#b48cf2;--t4:#f5b94a;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.micro{text-transform:uppercase;font-size:.6875rem;font-weight:600;letter-spacing:.12em;color:var(--text-dim)}
+.panel{background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:2px;padding:12px}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.pos{color:var(--isk-pos)}.neg{color:var(--isk-neg)}.dim{color:var(--text-dim)}.faint{color:var(--text-faint)}
+button,select,input{font:inherit;color:var(--text);background:var(--panel-2);border:1px solid var(--line-bright);border-radius:2px;height:28px;padding:0 8px}
+button{cursor:pointer}button.primary{background:var(--accent);color:var(--accent-contrast);border-color:var(--accent);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border:1px solid var(--line);background:var(--panel-2);border-radius:2px;font-size:12px;cursor:pointer;white-space:nowrap}
+.chip.on{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+.tier{display:inline-block;min-width:22px;text-align:center;font-size:10px;font-weight:700;border-radius:2px;padding:1px 4px;color:var(--bg)}
+.tier.t0{background:var(--t0)}.tier.t1{background:var(--t1)}.tier.t2{background:var(--t2)}.tier.t3{background:var(--t3)}.tier.t4{background:var(--t4)}
+table{border-collapse:collapse;width:100%}th{background:var(--panel-2);text-align:left;font-weight:600;font-size:12px;color:var(--text-dim)}th,td{padding:6px 12px;border-bottom:1px solid var(--line)}
+.sample{font-size:11px;color:var(--warning)}
+@media (pointer:coarse){button,select,input{height:44px}.chip{height:36px}}

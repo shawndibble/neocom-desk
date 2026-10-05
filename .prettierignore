@@ -7,3 +7,5 @@ playwright-report
 test-results
 firestore.rules
 functions/lib
+# Design mockups and reference specs: kept byte-for-byte as reviewed
+docs/design/**
