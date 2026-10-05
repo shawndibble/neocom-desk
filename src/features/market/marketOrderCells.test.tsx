@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import i18n from '@/i18n';
-import { LocationCell } from './marketOrderCells';
+import { BaitFlag, LocationCell } from './marketOrderCells';
 import type { RegionOrder } from '@/esi/endpoints';
 
 const STATION_ORDER: RegionOrder = {
@@ -48,5 +48,18 @@ describe('LocationCell', () => {
     renderCell({ ...STATION_ORDER, location_id: 999999999999 });
     const text = screen.getByText(i18n.t('market.unknownStructure'));
     expect(text).not.toHaveAttribute('tabindex');
+  });
+});
+
+describe('BaitFlag', () => {
+  it('is a focusable warning named in words, not a colour alone', () => {
+    render(<BaitFlag multiple={65.2} t={i18n.t} />);
+    const flag = screen.getByRole('img', { name: 'Likely bait price' });
+    expect(flag).toHaveAttribute('tabindex', '0');
+  });
+
+  it('renders nothing for an ordinary price', () => {
+    const { container } = render(<BaitFlag multiple={null} t={i18n.t} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

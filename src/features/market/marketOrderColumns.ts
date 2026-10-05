@@ -93,7 +93,8 @@ const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, nu
   security: 4,
   expiry: 5.625,
   range: 5.25,
-  // Its header's 92px, with room for a ten-character minimum.
+  // Its header is 92px (5.75rem); a ten-character minimum needs
+  // 10 × charRem + paddingRem (`ORDER_BOOK_FIGURE`), about 6.1rem.
   minVolume: 6.25,
 };
 

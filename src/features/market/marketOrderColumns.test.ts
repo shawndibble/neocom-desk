@@ -26,9 +26,8 @@ describe('orderBookWidthsRem', () => {
       quantityChars: 10,
       baitFlag: false,
     });
-    expect(long.cards - short.cards).toBeCloseTo(
-      13 * 0.36 + 2.5 - 4.75 + (10 * 0.36 + 2.5 - 4.125)
-    );
+    // Price 4.75 -> 7.18rem, Quantity 4.125 -> 6.1rem.
+    expect(long.cards - short.cards).toBeCloseTo(4.405);
   });
 
   it("adds the bait flag's icon beside a price that already fills its column", () => {

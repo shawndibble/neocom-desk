@@ -87,7 +87,8 @@ export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunctio
       <span
         tabIndex={0}
         role="img"
-        aria-label={t('market.baitHint', { times })}
+        // Short: the tooltip's full sentence becomes its description.
+        aria-label={t('market.baitLabel')}
         className="mr-1 inline-flex align-text-bottom text-warning"
       >
         <Icon.Warn aria-hidden size={Icon.ICON_SIZE.sm} />

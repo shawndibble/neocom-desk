@@ -601,13 +601,9 @@ export function Market() {
   // card. Short of that, Location narrows first, so fewer widths need cards.
   const isPhone = useIsPhone();
   const bookBestSell = loadedView?.summary.bestSell ?? null;
-  const figureChars = useMemo(
-    () => orderBookFigureChars([...sellRows, ...buyRows], bookBestSell),
-    [sellRows, buyRows, bookBestSell]
-  );
   const orderBookWidths = orderBookWidthsRem(
     useVisibleMarketOrderColumns((state) => state.value),
-    figureChars
+    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
