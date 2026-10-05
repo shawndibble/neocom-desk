@@ -4,7 +4,7 @@ import { syncDisplayState, type SyncDisplayState } from './syncStatus';
 
 const DOT_CLASS: Record<SyncDisplayState, string> = {
   idle: 'bg-success',
-  syncing: 'bg-accent animate-pulse',
+  syncing: 'bg-accent motion-safe:animate-pulse',
   error: 'bg-danger',
   offline: 'bg-text-faint',
 };

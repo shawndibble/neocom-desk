@@ -131,12 +131,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
               )}
               <TargetPlanPicker target={target} />
               {unplanned.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="transition-transform active:scale-95"
-                  onClick={() => void add()}
-                >
+                <Button size="sm" variant="primary" onClick={() => void add()}>
                   {target.plans.length === 0
                     ? t('skills.fitCheck.createPlanAndAdd')
                     : t('skills.fitCheck.addAllToPlan')}

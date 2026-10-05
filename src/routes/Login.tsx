@@ -650,7 +650,7 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
           height={shot.size.height}
           loading="lazy"
           decoding="async"
-          className="h-auto w-full rounded-xs border border-line transition-colors hover:border-accent"
+          className="h-auto w-full rounded-xs border border-line transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-accent"
         />
       </button>
       <figcaption className="mt-2 text-sm text-text-dim">{caption}</figcaption>
@@ -687,7 +687,7 @@ function SsoButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40"
+      className="inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40"
     >
       {pending ? (
         <Spinner size="sm" label={t('common.loading')} />

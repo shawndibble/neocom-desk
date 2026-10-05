@@ -1,10 +1,18 @@
 import { cx } from '@/lib/cx';
-import { controlHeightClassName, type ControlSize } from './controlStyles';
+import {
+  controlHeightClassName,
+  disabledClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  type ControlSize,
+} from './controlStyles';
 
 interface SegmentedControlOption<T extends string> {
   value: T;
   /** Already-translated label. */
   label: string;
+  /** Inert and muted. The group's other segments stay live. */
+  disabled?: boolean;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -62,14 +70,20 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={selected}
+            disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={cx(
-              'inline-flex items-center justify-center px-3 whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+              'inline-flex items-center justify-center px-3 whitespace-nowrap',
+              interactiveClassName,
+              focusRingInsetClassName,
+              disabledClassName,
               controlHeightClassName[size],
               uppercase ? 'text-[0.6875rem] font-semibold tracking-widest uppercase' : 'text-xs',
               fill && 'flex-1 basis-0',
               index > 0 && 'border-l border-line',
-              selected ? 'bg-accent/15 text-accent' : 'text-text-dim hover:text-text'
+              selected
+                ? 'bg-accent/15 text-accent enabled:hover:bg-accent/22 enabled:active:bg-accent/28'
+                : 'text-text-dim enabled:hover:bg-panel-2 enabled:hover:text-text enabled:active:bg-panel'
             )}
           >
             {option.label}

@@ -1,5 +1,5 @@
 /**
- * The Advisor tab, rendered against a colony that has something wrong with it.
+ * The Advisor (on the Colonies tab), rendered against a colony that has something wrong with it.
  *
  * The shared ESI fixture answers `/characters/{id}/planets` with an empty list
  * — it is warmed at boot for every scope and no spec needed rows until now —
@@ -242,7 +242,7 @@ test.beforeEach(async ({ page }) => {
   // colony below is what the tab actually reads.
   await clearEsiCache(page);
 
-  await page.goto('/planetary-industry/advisor');
+  await page.goto('/planetary-industry/colonies');
 });
 
 test('leads with one ranked list of what to do, across planets', async ({ page }) => {

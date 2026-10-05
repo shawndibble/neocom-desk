@@ -271,6 +271,8 @@ export const ROUTE_REQUIREMENTS = {
   '/market/lp-store/:corporationId': LP_STORE_REQUIREMENT,
   // Its old home under Wallet: a redirect, so it needs nothing.
   '/wallet/loyalty': UNGATED,
+  // The retired PI Advisor tab: a redirect, so it needs nothing.
+  '/planetary-industry/advisor': UNGATED,
   '/wallet/loyalty/:corporationId': UNGATED,
   '/contacts': {
     endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],

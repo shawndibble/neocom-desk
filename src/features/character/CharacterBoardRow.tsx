@@ -119,7 +119,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
     return (
       <Link
         to={contractHref}
-        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {body}
       </Link>
@@ -135,7 +135,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
       <button
         type="button"
         onClick={() => onSelectEvent(Number(item.sourceId))}
-        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {body}
       </button>

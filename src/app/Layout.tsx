@@ -80,7 +80,7 @@ function PrefetchIndicator() {
       role="status"
       title={label}
       aria-label={label}
-      className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-accent"
+      className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
     />
   );
 }

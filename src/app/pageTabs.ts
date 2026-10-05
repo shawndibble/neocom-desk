@@ -70,9 +70,9 @@ export const HELP_TABS = definePageTabs('/help', [
 ]);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [
-  { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
   { id: 'plan', labelKey: 'piPlan.planTab' },
-  { id: 'advisor', labelKey: 'piPlan.advisorTab' },
+  { id: 'map', labelKey: 'piPlan.mapTab' },
+  { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
 ]);
 
 export const MINING_TABS = definePageTabs('/mining', [
