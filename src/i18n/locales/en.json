@@ -5158,6 +5158,8 @@
     "goalsHint": "Units per day you want of each. The plan below updates as you type.",
     "colonyCustomsAssumed": "Unknown — assuming {{percent}}% until you set it.",
     "colonyCustomsSetIt": "Set it",
+    "customsAssumedNote": "ISK figures assume {{percent}}% customs on {{names}}: nothing reports what a player-owned office charges.",
+    "customsSetOnPlan": "Set the rate on Plan",
     "coloniesShow": "Show colonies",
     "coloniesHide": "Hide colonies",
     "coloniesListLabel": "Colonies in the plan",

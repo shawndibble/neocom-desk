@@ -8,7 +8,8 @@ import { rankRecipes } from '@/engine/pi/planRecipes';
 import { builtColonyEarnings } from './colonyEarningsModel';
 import { builtAdvice } from './advisorModel';
 import type { PiCadence } from './cadencePref';
-import type { PlannerSnapshot } from './goalPlannerModel';
+import { plannerColonies, type PlannerSnapshot } from './goalPlannerModel';
+import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import {
   buildPlanAdvice,
   hubBooks,
@@ -613,5 +614,44 @@ describe('planColonyAnchor', () => {
   it('falls back to the planet id when there is no name', () => {
     expect(planColonyAnchor(null, 40000001)).toBe('plan-planet-40000001');
     expect(planColonyAnchor('***', 7)).toBe('plan-planet-7');
+  });
+});
+
+describe('customs parity across Plan, Colonies and Map', () => {
+  const planPrefs = { restartHours: 72, fallbackRatePerHour: 12_000 };
+  const disabled = new Set<number>();
+
+  it.each([
+    ['no overrides', {}],
+    ['an override on the nullsec system', { [NULLSEC_SYSTEM]: 0.17 }],
+    ['a zero override on the nullsec system', { [NULLSEC_SYSTEM]: 0 }],
+  ])('costs every colony at the rate Plan does: %s', (_label, customsOverrides) => {
+    const snap = snapshot();
+    const plan = plannerColonies(snap, { ...planPrefs, customsOverrides, disabled });
+    const advice = buildPlanAdvice(
+      input({ snapshot: snap, prefs: { ...planPrefs, customsOverrides } })
+    );
+    for (const row of plan) {
+      const colony = advice.colonies.find((c) => c.planetId === row.planetId);
+      if (!colony) continue;
+      expect(colony.taxRate).toBe(row.taxRate);
+      expect(colony.taxAssumed).toBe(row.taxAssumed);
+    }
+    expect(advice.colonies.length).toBeGreaterThan(0);
+  });
+
+  it('assumes the shared rate for an unset nullsec colony and flags it', () => {
+    const advice = buildPlanAdvice(input());
+    const nullsec = advice.colonies.find((c) => c.planetId === OCEANIC_ID)!;
+    expect(nullsec.taxRate).toBe(ASSUMED_UNKNOWN_CUSTOMS);
+    expect(nullsec.taxAssumed).toBe(true);
+    expect(temperate(advice).taxAssumed).toBe(false);
+  });
+
+  it("flags Map's ranking when the rate it costs recipes at is the assumed one", () => {
+    const nullsecOnly = snapshot({ colonies: [planet(OCEANIC_ID, NULLSEC_SYSTEM, 'oceanic')] });
+    expect(buildPlanAdvice(input({ snapshot: nullsecOnly })).rankingBasis.taxAssumed).toBe(true);
+    const highsecOnly = snapshot({ colonies: [planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate')] });
+    expect(buildPlanAdvice(input({ snapshot: highsecOnly })).rankingBasis.taxAssumed).toBe(false);
   });
 });

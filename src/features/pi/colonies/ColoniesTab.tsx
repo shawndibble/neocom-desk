@@ -27,6 +27,8 @@ import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { useColoniesAdvice } from './useColoniesAdvice';
+import { AssumedCustomsNote } from '../AssumedCustomsNote';
+import { assumedCustomsNames } from '../colonyCustoms';
 import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
 import {
   colonyCheckRow,
@@ -472,6 +474,10 @@ export function ColoniesTab({
               planHref={PLAN_HREF}
             />
           ) : null}
+
+          <AssumedCustomsNote
+            names={assumedCustomsNames(advice?.colonies ?? [], (id) => t('pi.planetLabel', { id }))}
+          />
 
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-dim">
             <span>

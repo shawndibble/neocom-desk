@@ -6,11 +6,11 @@ import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/en
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { extractorProgramsFromPins } from './adapters';
 import { colonyBudget } from './colonyBudget';
+import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import { planBest } from '@/engine/pi/planBest';
 import { builtColonyEarnings } from './colonyEarningsModel';
 import type { GoalPlan } from '@/engine/pi/goalTypes';
 import {
-  ASSUMED_UNKNOWN_CUSTOMS,
   DEFAULT_PLANNER_HEADS,
   earningsNow,
   goalPlannerInput,

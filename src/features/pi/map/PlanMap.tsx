@@ -14,6 +14,8 @@
  * phone. The observed box is the same width docked or not, so docking never
  * changes the number it was decided on.
  */
+import { AssumedCustomsNote } from '../AssumedCustomsNote';
+import { assumedCustomsNames } from '../colonyCustoms';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, TypeIcon } from '@/components/ui';
@@ -462,6 +464,10 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           }
         >
           {hint}
+          <AssumedCustomsNote
+            className="border-b border-line px-3 py-1.5"
+            names={assumedCustomsNames(advice.colonies, (id) => t('pi.planetLabel', { id }))}
+          />
           {picksStrip}
           {phone ? null : whatIfLine}
           {phone ? (
