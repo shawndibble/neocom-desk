@@ -50,6 +50,14 @@ const resolveSolarSystem = vi.hoisted(() =>
 );
 vi.mock('@/features/character/systemLookup', () => ({ resolveSolarSystem }));
 
+// The search's own maths is tested in `breakEvenRuns.test.ts`; here only the
+// button's wiring is under test, so its answer is set per test.
+const breakEvenRuns = vi.hoisted(() => vi.fn<(...args: unknown[]) => number | null>());
+vi.mock('@/engine/industry/breakEvenRuns', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/engine/industry/breakEvenRuns')>()),
+  breakEvenRuns,
+}));
+
 // The band is reconciled on load against `/universe/systems/{id}`.
 const loadSystemSecurity = vi.hoisted(() =>
   // Badivefi 0.6587 (highsec), Tama 0.2825 (lowsec); anything else unresolvable.
@@ -1575,5 +1583,86 @@ describe('BuildPlanDetail Use all / Use none', () => {
 
     expect(onSourcing).not.toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent(/^Nothing to fill/);
+  });
+});
+
+describe('BuildPlanDetail Break Even button', () => {
+  // Rifter at 100 ISK is a loss; the plan also carries the fixture's 150M blueprint cost.
+  function priceRifter(rifterPrice: number) {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: rifterPrice },
+      hubBuyPrices: { 34: 4, 587: rifterPrice },
+      adjustedPrices: { 34: 4.5, 587: rifterPrice },
+      systemCostIndex: 0.05,
+    });
+  }
+  const breakEvenButton = () => screen.findByRole('button', { name: 'Break Even' });
+
+  afterEach(() => {
+    breakEvenRuns.mockReset();
+    loadMarketSnapshot.mockReset();
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+    });
+  });
+
+  it('sets runs to the break-even count when the plan loses ISK', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    priceRifter(100);
+    breakEvenRuns.mockReturnValue(250);
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.click(await breakEvenButton());
+
+    expect(onUpdate).toHaveBeenCalledWith({ runs: 250 });
+    expect(valueOf(runsInput())).toBe('250');
+  });
+
+  it('is absent when the plan already makes a profit', async () => {
+    const user = userEvent.setup();
+    priceRifter(100_000_000); // clears the fixture's 150M blueprint cost over 10 runs
+    render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
+
+    await screen.findByLabelText('Price for Tritanium');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Break Even' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('says so, and leaves runs alone, when no break-even count exists', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    priceRifter(100);
+    breakEvenRuns.mockReturnValue(null);
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.click(await breakEvenButton());
+
+    expect(await screen.findByText(/No break even found up to/)).toBeInTheDocument();
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(valueOf(runsInput())).toBe('10');
+  });
+
+  it('drops the "none found" note once the plan changes', async () => {
+    const user = userEvent.setup();
+    priceRifter(100);
+    breakEvenRuns.mockReturnValue(null);
+    render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
+    await user.click(await breakEvenButton());
+    expect(await screen.findByText(/No break even found up to/)).toBeInTheDocument();
+
+    await user.clear(runsInput());
+    await user.type(runsInput(), '20');
+    await user.tab();
+
+    expect(screen.queryByText(/No break even found up to/)).not.toBeInTheDocument();
   });
 });
