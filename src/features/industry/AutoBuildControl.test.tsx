@@ -24,9 +24,9 @@ describe('AutoBuildControl', () => {
       />
     );
 
-    expect(strategySelect().closest('div')).toBe(
-      screen.getByRole('button', { name: 'Extra tool' }).closest('div')?.parentElement
-    );
+    const row = strategySelect().closest('.flex-wrap');
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(screen.getByRole('button', { name: 'Extra tool' }));
   });
 
   it('has no depth control (issue #798)', () => {
