@@ -36,7 +36,6 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useCadence } from './cadencePref';
-import { useMarketSourcing } from './marketSourcingPref';
 import { piAdvisorHref } from './piPlanLink';
 import { useSellHub } from './sellHub';
 import {
@@ -158,23 +157,18 @@ function GoalPlanner({
   const prefs = useGoalPlannerPrefs((state) => state.value);
   const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
   const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
-  const sourcing = useMarketSourcing((state) => state.value);
-  const hydrateSourcing = useMarketSourcing((state) => state.hydrate);
-  const setSourcing = useMarketSourcing((state) => state.setValue);
   const cadence = useCadence((state) => state.value);
   const hydrateCadence = useCadence((state) => state.hydrate);
-  const setCadence = useCadence((state) => state.setValue);
   useEffect(() => {
     void hydratePrefs();
-    void hydrateSourcing();
     void hydrateCadence();
-  }, [hydratePrefs, hydrateSourcing, hydrateCadence]);
+  }, [hydratePrefs, hydrateCadence]);
 
-  // Buying is the shared sourcing pref: when it names a hub, that hub prices
-  // the plan too, so the Advisor and the planner never disagree on a market.
-  const buyP1 = sourcing !== 'none';
-  const { hub, setHub } = useSellHub();
-  const setBuyP1 = (buy: boolean) => void setSourcing(buy ? hub.id : 'none');
+  // Where the plan sells, and what it may buy there, are the shared PI
+  // settings: the page strip and the settings form edit the same record.
+  const { hub, buybackPct, buyTiers } = useSellHub();
+  const buysAnything = buyTiers.length > 0;
+  const buysP1 = buyTiers.includes(1);
 
   // --- Prices, keyed on the hub so a hub switch never refetches colonies ---
   const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices } | null>(null);
@@ -301,8 +295,8 @@ function GoalPlanner({
         {
           goals: plannedGoals,
           colonies: goalPlannerInput(rows),
-          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyP1 }),
-          books: priceBooks(prices, snapshot.accountingLevel),
+          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyTiers }),
+          books: priceBooks(prices, snapshot.accountingLevel, buybackPct),
           jumps: jumpsFn,
         },
         pi
@@ -311,7 +305,7 @@ function GoalPlanner({
     } catch {
       return { error: true };
     }
-  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyP1, jumpsFn]);
+  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyTiers, buybackPct, jumpsFn]);
 
   const names = useMemo((): PlanNames | null => {
     if (!snapshot || !pi) return null;
@@ -347,7 +341,7 @@ function GoalPlanner({
   const advisorSystem = rows.find((row) => row.enabled)?.systemId;
 
   let results: React.ReactNode;
-  if (noColonies && !buyP1) {
+  if (noColonies && !buysAnything) {
     results = (
       <EmptyState
         title={t('piPlan.noColoniesTitle')}
@@ -377,8 +371,8 @@ function GoalPlanner({
     const { best } = result;
     const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
-    const books = priceBooks(prices, snapshot.accountingLevel);
-    const earnings = earningsNow(rows, pi, prices, books.salesTaxPct);
+    const books = priceBooks(prices, snapshot.accountingLevel, buybackPct);
+    const earnings = earningsNow(rows, pi, prices, books.salesTaxPct, buybackPct);
     const verdict =
       best.economics.status === 'costed'
         ? planVerdict(
@@ -414,7 +408,7 @@ function GoalPlanner({
           <>
             <Shortfalls
               shortfalls={best.plan.shortfalls}
-              hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buyP1))}
+              hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buysP1))}
               names={names}
               advisorSystem={advisorSystem}
             />
@@ -480,10 +474,9 @@ function GoalPlanner({
       </div>
       <div className="md:col-start-1 md:row-start-3">
         <AssumptionsSection
-          hubId={hub.id}
-          onHubChange={setHub}
-          buyP1={buyP1}
-          onBuyP1Change={setBuyP1}
+          hubName={hub.systemName}
+          buybackPct={buybackPct}
+          buyTiers={buyTiers}
           fallbackRate={prefs.fallbackRatePerHour}
           onFallbackRateChange={(rate) => void setPrefs({ ...prefs, fallbackRatePerHour: rate })}
           fallbackInUse={liveRows.some((row) =>
@@ -492,7 +485,6 @@ function GoalPlanner({
           maxP0Types={prefs.maxP0Types}
           onMaxP0TypesChange={(value) => void setPrefs({ ...prefs, maxP0Types: value })}
           cadence={cadence}
-          onCadenceChange={(next) => void setCadence(next)}
           size={size}
           expanded={assumptionsOpen ?? mdUp}
           onToggleExpanded={() => setAssumptionsOpen(!(assumptionsOpen ?? mdUp))}

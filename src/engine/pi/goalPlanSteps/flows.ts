@@ -17,7 +17,7 @@ import type {
 } from '../goalTypes';
 import { legJumps, volumeOf } from '../haulEffort';
 import { hostFirstOrder, slotP1, type ExtractionProblem, type Wants } from './extraction';
-import { EPSILON, HOURS_PER_DAY, HOURS_PER_WEEK, perHour } from './shared';
+import { EPSILON, HOURS_PER_DAY, HOURS_PER_WEEK, chainRates, perHour } from './shared';
 
 export function planFlows(args: {
   problem: ExtractionProblem;
@@ -62,8 +62,24 @@ export function planFlows(args: {
     push('hub', 'hub', p1, units - toHost);
   }
   if (host)
-    for (const a of highAchieved)
-      push(host.planetId, 'hub', a.typeId, a.unitsPerDay / HOURS_PER_DAY);
+    for (const a of highAchieved) {
+      // A goal's own type may be partly bought (`Goal.buyShare`): only the
+      // made part leaves the host.
+      push(
+        host.planetId,
+        'hub',
+        a.typeId,
+        (a.unitsPerDay / HOURS_PER_DAY) * (1 - (a.buyShare?.get(a.typeId) ?? 0))
+      );
+      // P2/P3 bought for the chain land on the host, in proportion to what it makes.
+      for (const [typeId, units] of [...chainRates(a, pi).bought].sort(([x], [y]) => x - y)) {
+        if (typeId !== a.typeId) push('hub', host.planetId, typeId, units);
+      }
+    }
+  for (const g of problem.plannedHigh) {
+    const share = g.buyShare?.get(g.typeId) ?? 0;
+    if (share > 0) push('hub', 'hub', g.typeId, perHour(g) * share);
+  }
   for (const g of boughtOutright) push('hub', 'hub', g.typeId, perHour(g));
   // What the plan leaves alone sells: spare slots and whole Baseline colonies.
   for (const [planetId, slot] of args.spare) push(planetId, 'hub', slot.p1TypeId, slot.p1PerHour);

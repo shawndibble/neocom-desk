@@ -1,30 +1,36 @@
 import { useEffect } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useGoalPlannerPrefs } from './goalPlannerPrefs';
-import { useMarketSourcing } from './marketSourcingPref';
+import { usePiSettings, type PiBuyTier } from './piSettings';
+
+export interface SellHub {
+  /** The hub PI is priced at: sold to, or the basis of the corp buyback, and bought from. */
+  hub: TradeHub;
+  /** The corp buyback's percent of the hub's price, or null when selling on the hub's market. */
+  buybackPct: number | null;
+  buyTiers: readonly PiBuyTier[];
+  /** Sell on this hub's market. */
+  setHub: (id: TradeHub['id']) => void;
+  /** Sell to a corp buyback at this percent of the hub's price; null returns to the market. */
+  setBuyback: (pct: number | null) => void;
+}
 
 /**
- * The hub PI is priced and sold at: the Goal Planner's price hub, or, when
- * buying inputs is on, the hub the shared sourcing pref names, so no two PI
- * surfaces ever price one pilot's operation at two markets. Setting it moves
- * both, same as the Plan rail's Hub field.
+ * Where PI sells and what it may buy there: the shared PI settings
+ * (`piSettings.ts`) in the shape the PI surfaces read. The page strip, the
+ * Plan rail, the Advisor and the settings form all edit the same record.
  */
-export function useSellHub(): { hub: TradeHub; setHub: (id: TradeHub['id']) => void } {
-  const prefs = useGoalPlannerPrefs((state) => state.value);
-  const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
-  const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
-  const sourcing = useMarketSourcing((state) => state.value);
-  const hydrateSourcing = useMarketSourcing((state) => state.hydrate);
-  const setSourcing = useMarketSourcing((state) => state.setValue);
+export function useSellHub(): SellHub {
+  const settings = usePiSettings((state) => state.value);
+  const hydrate = usePiSettings((state) => state.hydrate);
+  const setSettings = usePiSettings((state) => state.setValue);
   useEffect(() => {
-    void hydratePrefs();
-    void hydrateSourcing();
-  }, [hydratePrefs, hydrateSourcing]);
-  const buyP1 = sourcing !== 'none';
-  const hub = (buyP1 ? getTradeHub(sourcing) : getTradeHub(prefs.priceHub)) ?? DEFAULT_TRADE_HUB;
-  const setHub = (id: TradeHub['id']) => {
-    void setPrefs({ ...prefs, priceHub: id });
-    if (buyP1) void setSourcing(id);
+    void hydrate();
+  }, [hydrate]);
+  return {
+    hub: getTradeHub(settings.hub) ?? DEFAULT_TRADE_HUB,
+    buybackPct: settings.buybackPct,
+    buyTiers: settings.buyTiers,
+    setHub: (id) => void setSettings({ ...settings, hub: id, buybackPct: null }),
+    setBuyback: (pct) => void setSettings({ ...settings, buybackPct: pct === null ? null : pct }),
   };
-  return { hub, setHub };
 }

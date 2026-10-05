@@ -8,11 +8,11 @@
  * the settled host (`settleHost`), which may differ.
  */
 import type { PiData } from '@/sde/types';
-import { expandChain, piTier } from '../chain';
+import { piTier } from '../chain';
 import { colonyExtraction, type ExtractionWant } from '../colonyCapacity';
 import type { Goal, PlannerColony, PlannerPolicy, RateSource } from '../goalTypes';
 import type { PinCounts } from '../types';
-import { EPSILON, expandInto, perHour, schematicOf } from './shared';
+import { EPSILON, expandInto, madeNodes, perHour, schematicOf } from './shared';
 
 /** One demanded P1 and the colonies that could extract its P0. */
 export interface P1Row {
@@ -235,8 +235,8 @@ export function evaluate(problem: ExtractionProblem, state: Wants): Evaluation {
   const highFraction = new Map<number, number>();
   const binding = new Set<number>();
   for (const g of problem.plannedHigh) {
-    const p1s = expandChain(g.typeId, pi, { unitsPerHour: perHour(g) })
-      .nodes.filter((n) => n.tier === 1)
+    const p1s = madeNodes(g, pi)
+      .filter((n) => n.tier === 1)
       .map((n) => n.typeId);
     const fraction = Math.min(1, ...p1s.map(supplyFraction));
     highFraction.set(g.typeId, fraction);
@@ -248,10 +248,7 @@ export function evaluate(problem: ExtractionProblem, state: Wants): Evaluation {
   expandInto(
     hostUse,
     problem.plannedHigh
-      .map((g) => ({
-        typeId: g.typeId,
-        unitsPerDay: g.unitsPerDay * highFraction.get(g.typeId)!,
-      }))
+      .map((g) => ({ ...g, unitsPerDay: g.unitsPerDay * highFraction.get(g.typeId)! }))
       .filter((g) => g.unitsPerDay > EPSILON),
     pi
   );
