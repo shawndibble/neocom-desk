@@ -185,7 +185,7 @@ test.describe('Travel at 390px', () => {
     );
     expect(new Set(heights).size).toBe(1);
 
-    const name = page.getByRole('main').getByText(longName).first();
+    const name = page.getByRole('main').locator('span.truncate', { hasText: longName }).first();
     expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     await expectNoPageOverflow(page);
   });
