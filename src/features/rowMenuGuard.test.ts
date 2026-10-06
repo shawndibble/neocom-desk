@@ -11,9 +11,6 @@ const ALLOWED = new Set([
   'src/features/character/EventContextMenu.tsx',
   // Table-only shortcuts to pages the nav already reaches.
   'src/features/character/CharacterRowContextMenu.tsx',
-  // Build Plan menus carry their own visible twins.
-  'src/features/industry/BuildPlanList.tsx',
-  'src/features/industry/BuildPlanRowContextMenu.tsx',
   // Component gallery demonstrating the primitive.
   'src/routes/Styleguide.tsx',
 ]);

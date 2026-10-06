@@ -39,11 +39,9 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
-import { ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { CharacterLink } from '@/features/entities';
@@ -326,16 +324,11 @@ export function MobileOpportunityList({
                     {t('industry.marketOpportunitiesStartPlan')}
                   </DropdownMenuItem>
                   {productTypeID !== null && (
-                    <>
-                      <DropdownMenuItem
-                        onSelect={() => onViewHistory(productTypeID, productName, row.hub.regionId)}
-                      >
-                        {t('industry.opportunitiesPriceHistory')}
-                      </DropdownMenuItem>
-                      <MenuKindContext.Provider value="dropdown">
-                        <ViewInMarketMenuItem typeId={productTypeID} />
-                      </MenuKindContext.Provider>
-                    </>
+                    <DropdownMenuItem
+                      onSelect={() => onViewHistory(productTypeID, productName, row.hub.regionId)}
+                    >
+                      {t('industry.opportunitiesPriceHistory')}
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>

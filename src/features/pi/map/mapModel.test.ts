@@ -172,6 +172,28 @@ describe('productFigure: the same numbers as the recommendation model', () => {
   });
 });
 
+describe('productFigure: no colonies at Command Center Upgrades V', () => {
+  const base = adviceInput('lean');
+  const advice = buildPlanAdvice({
+    ...base,
+    snapshot: { ...base.snapshot, colonies: [], details: new Map() },
+    skills: { commandCenterUpgrades: 5, interplanetaryConsolidation: null },
+  });
+  const coolant = graph.tiers[2].find((p) => p.name === 'Coolant')!;
+
+  it('ranks Coolant, a P2 one planet can make', () => {
+    expect(productFigure(advice, coolant.typeId, graph)).toMatchObject({ kind: 'ranked' });
+  });
+
+  it('never calls a one-planet P2 that is unscored "not one planet"', () => {
+    const empty = { ...advice, recipes: { ...advice.recipes, recipes: [], unpriced: [] } };
+    expect(productFigure(empty, coolant.typeId, graph)).toEqual({
+      kind: 'unranked',
+      reason: 'no-fit',
+    });
+  });
+});
+
 describe('unlockedRecipe', () => {
   it('is the best recipe only the new planet type can host, priced for that type', () => {
     const base = buildPlanAdvice(adviceInput('lean'));

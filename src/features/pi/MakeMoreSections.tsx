@@ -43,6 +43,7 @@ import type {
   RebuildCardView,
 } from './planView';
 
+const SM_UP = '(min-width: 40rem)';
 const MD_UP = '(min-width: 48rem)';
 
 /** The shared tick state: ids of ticked rows and a toggle. */
@@ -117,7 +118,27 @@ export function YourPlanetsPanel({
 }) {
   const { t } = useTranslation();
   const mdUp = useMediaQuery(MD_UP);
+  const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
+  // Beside the title from `sm`; on its own row under it below, where the
+  // header has no room and the label printed over the "Your planets" title.
+  const mattersToggle = (
+    <span className="flex flex-wrap items-center justify-end gap-2">
+      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {t('piPlan.make.matters')}
+      </span>
+      <SegmentedControl<RebuildPreference>
+        label={t('piPlan.make.matters')}
+        size={mdUp ? 'sm' : 'md'}
+        value={preference}
+        onChange={onPreference}
+        options={[
+          { value: 'isk', label: t('piPlan.make.mostIsk') },
+          { value: 'haul', label: t('piPlan.make.leastHauling') },
+        ]}
+      />
+    </span>
+  );
   return (
     <Panel
       title={t('piPlan.make.planetsTitle')}
@@ -129,26 +150,11 @@ export function YourPlanetsPanel({
           })}
         </span>
       }
-      actions={
-        <span className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('piPlan.make.matters')}
-          </span>
-          <SegmentedControl<RebuildPreference>
-            label={t('piPlan.make.matters')}
-            size={mdUp ? 'sm' : 'md'}
-            value={preference}
-            onChange={onPreference}
-            options={[
-              { value: 'isk', label: t('piPlan.make.mostIsk') },
-              { value: 'haul', label: t('piPlan.make.leastHauling') },
-            ]}
-          />
-        </span>
-      }
+      actions={smUp ? mattersToggle : undefined}
       padded={false}
     >
       <div className="space-y-3 p-3">
+        {!smUp && <div data-testid="pi-matters-row">{mattersToggle}</div>}
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {headline.quickWinPerDay > 0 || view.quickWins.length > 0 ? (
             <Hero

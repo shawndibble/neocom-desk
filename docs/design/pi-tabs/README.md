@@ -24,6 +24,16 @@ Four AI agents role-played new players (new Omega, lowsec hauling-hater, nullsec
 
 Three of them re-tested Plan and scored it 8, 8 and 7 out of 10.
 
+## Deliberate differences (not built)
+
+Five places where the app intentionally departs from these mockups, so a review should not flag them. Recorded in [decision 20261005-210436](../../context/decisions/20261005-210436-pi-design-refs-deliberate-differences-not-built.md):
+
+- phone Map shows a tier list, not "Your best moves" / the trace (`map-phone*`);
+- no "What matters more" on Find best (it lives on Make more only);
+- no popover linking to the 60-second explainer; "New to PI?" opens the drawer directly;
+- no planet diagram in "Show me how" (`plan-q2-show-me-how-*`);
+- the Map "have" tag stays boxed.
+
 ## Reading the mockups
 
 The sample pilots, nearby systems ("Sample system A") and alt characters are illustrative. Every number comes from a toy model: a flat 6,000 raw/h per planet, 10% customs and a Jita price snapshot. The app uses the real engine. **Verify against these mockups for structure, order, wording, icons and states, not numbers.**

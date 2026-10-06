@@ -11,6 +11,7 @@ import { PiExplainer } from '@/features/pi/PiExplainer';
 import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
+import { GrantBanner } from '@/app/GrantNote';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
@@ -144,6 +145,16 @@ export function PlanetaryIndustry() {
       />
 
       <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
+
+      {data?.planetsNeedsReauth && (
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterPlanets']}
+          title={t('pi.reauthTitle')}
+          hint={t('pi.reauthHint')}
+          actionLabel={t('pi.reauthAction')}
+        />
+      )}
 
       <Tabs
         label={t('piPlan.tabsLabel')}
