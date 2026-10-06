@@ -17,11 +17,16 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import {
+  DisabledMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  MenuItem,
+  MenuSeparator,
+  RowActionsMenu,
+  RowMoreActions,
   Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
@@ -53,9 +58,11 @@ export type BandInfo =
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /**
- * A row's icon-only buttons. `iconButtonClassName` on a bare `<button>`
- * rather than `IconButton`, which wraps each one in a Tooltip — a Radix
- * provider on every row of a long queue. It also never shrinks its glyph: a
+ * A row's icon-only buttons (grip, prereq promote). `iconButtonClassName` on a
+ * bare `<button>` rather than `IconButton`, which wraps each one in a Tooltip —
+ * a Radix provider on every row of a long queue. (The ⋮ is `RowMoreActions`;
+ * its menu content mounts only when opened, so a long queue pays for the
+ * trigger button only.) It also never shrinks its glyph: a
  * text `Button` narrowed to `w-7` kept its `px-2.5` padding and squeezed a
  * 1rem icon into what was left, down to a dot.
  */
@@ -331,7 +338,7 @@ function milestoneStateKey(state: MilestoneState): string {
  * Plan Milestone (CONTEXT.md): a named goal ("Fly Loki") pinned to this row's
  * skill level. Decorative only — sits beside the name so a flagged row reads
  * as one at a glance; the Add/Rename/Remove actions live in the row's own
- * `MilestoneRowMenu` instead, so this never has to fight the name's own
+ * the row's ⋮ menu instead, so this never has to fight the name's own
  * `truncate` for click area.
  */
 function MilestoneMark({ status }: { status: MilestoneStatus }) {
@@ -354,55 +361,6 @@ function MilestoneMark({ status }: { status: MilestoneStatus }) {
         <span className="tabular-nums">{dateText}</span>
       </span>
     </Tooltip>
-  );
-}
-
-interface MilestoneRowMenuProps {
-  /** For the menu trigger's accessible name — the row's own label ("Loki IV"). */
-  rowLabel: string;
-  /** Present when this row already carries a milestone — swaps Add for Rename/Remove. */
-  status: MilestoneStatus | undefined;
-  onAdd: () => void;
-  onRename: () => void;
-  onRemove: () => void;
-}
-
-/**
- * The row's second control (the first is `PriorityPill`): a bare "Add
- * milestone" button when the row has none — one action needs no menu to sit
- * behind — or a Rename/Remove menu once it does, where a single fixed-width
- * slot has to offer two.
- */
-function MilestoneRowMenu({ rowLabel, status, onAdd, onRename, onRemove }: MilestoneRowMenuProps) {
-  const { t } = useTranslation();
-  if (!status) {
-    return (
-      <button
-        type="button"
-        className={ICON_BUTTON}
-        onClick={onAdd}
-        aria-label={t('plans.milestone.addLabel', { name: rowLabel })}
-      >
-        <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      </button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={ICON_BUTTON}
-          aria-label={t('plans.milestone.menuLabel', { name: rowLabel })}
-        >
-          <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onRename}>{t('plans.milestone.rename')}</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onRemove}>{t('plans.milestone.remove')}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -540,52 +498,41 @@ const EntryRow = memo(function EntryRow({
     />
   ) : null;
 
-  const milestoneMenu = (
-    <MilestoneRowMenu
-      rowLabel={rowLabel}
-      status={milestoneStatus}
-      onAdd={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}
-      onRename={() => milestoneStatus && onRenameMilestone(milestoneStatus.milestone.id)}
-      onRemove={() => milestoneStatus && onRemoveMilestone(milestoneStatus.milestone.id)}
-    />
-  );
-
   const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
-  // `aria-disabled`, not the native attribute (DESIGN.md's `FilterChip` rule,
-  // same reasoning as `Characters.tsx`'s refresh-all button): a natively
-  // disabled button takes no hover and no focus, so the Tooltip explaining
-  // why it's inert could never be read by either route — only a stray mouse
-  // hover would work, and unreliably even then. The click still does
-  // nothing; the guard just moved from the DOM into the handler.
-  const removeButtonEl = (
-    <button
-      type="button"
-      className={
-        blockedReason
-          ? `${ICON_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40`
-          : DANGER_ICON_BUTTON
-      }
-      onClick={() => {
-        if (blockedReason) return;
-        onRemove(entry.skillTypeID, entry.targetLevel);
-      }}
-      aria-label={t('plans.removeEntry', { name: rowLabel })}
-      aria-disabled={blockedReason ? true : undefined}
-    >
-      <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-    </button>
-  );
-  // Tooltip only when blocked (rare relative to a long queue's row count) —
-  // every row wrapping in a Radix provider is exactly what ICON_BUTTON's own
-  // comment above says to avoid. `openOnTap`: the tap does nothing while
-  // blocked (same as `ItemPriceAlertBell`'s disabled case), so a plain tap
-  // reveals the reason instead of needing a touch-and-hold.
-  const removeButton = blockedReason ? (
-    <Tooltip content={blockedReason} openOnTap>
-      {removeButtonEl}
-    </Tooltip>
-  ) : (
-    removeButtonEl
+  // One ⋮ ends the row (right-click and touch-and-hold open the same menu):
+  // the milestone's actions, then Remove as the danger item. A blocked removal
+  // is an `aria-disabled` item with a tap-reachable reason (`DisabledMenuItem`)
+  // rather than a click that silently undoes itself.
+  const rowMenuItems = (
+    <>
+      {milestoneStatus ? (
+        <>
+          <MenuItem onSelect={() => onRenameMilestone(milestoneStatus.milestone.id)}>
+            {t('plans.milestone.rename')}
+          </MenuItem>
+          <MenuItem onSelect={() => onRemoveMilestone(milestoneStatus.milestone.id)}>
+            {t('plans.milestone.remove')}
+          </MenuItem>
+        </>
+      ) : (
+        <MenuItem onSelect={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}>
+          {t('plans.milestone.add')}
+        </MenuItem>
+      )}
+      <MenuSeparator />
+      {blockedReason ? (
+        <DisabledMenuItem reason={blockedReason}>
+          {t('plans.removeEntry', { name: rowLabel })}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem
+          className="text-danger"
+          onSelect={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+        >
+          {t('plans.removeEntry', { name: rowLabel })}
+        </MenuItem>
+      )}
+    </>
   );
 
   /**
@@ -626,35 +573,41 @@ const EntryRow = memo(function EntryRow({
         isDragging ? 'bg-panel-2' : ''
       }`}
     >
-      {isDesktop ? (
-        <div className="flex items-center justify-between gap-2">
-          {dragHandle}
-          {nameSpan}
-          {attributeBadge}
-          {priorityControl}
-          {columns.perLevelTime && (
-            <TimeCell value={formatCountdown(takesSeconds)} dim label={t('plans.columnTakes')} />
+      <RowActionsMenu name={rowLabel} items={rowMenuItems}>
+        <div>
+          {isDesktop ? (
+            <div className="flex items-center justify-between gap-2">
+              {dragHandle}
+              {nameSpan}
+              {attributeBadge}
+              {priorityControl}
+              {columns.perLevelTime && (
+                <TimeCell
+                  value={formatCountdown(takesSeconds)}
+                  dim
+                  label={t('plans.columnTakes')}
+                />
+              )}
+              {columns.cumulativeTime && (
+                <TimeCell
+                  value={doneByText(row.cumulativeSeconds, startDate)}
+                  label={t('plans.columnDoneBy')}
+                />
+              )}
+              <RowMoreActions />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                {dragHandle}
+                {nameSpan}
+                <RowMoreActions />
+              </div>
+              {metaLine}
+            </>
           )}
-          {columns.cumulativeTime && (
-            <TimeCell
-              value={doneByText(row.cumulativeSeconds, startDate)}
-              label={t('plans.columnDoneBy')}
-            />
-          )}
-          {milestoneMenu}
-          {removeButton}
         </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            {dragHandle}
-            {nameSpan}
-            {milestoneMenu}
-            {removeButton}
-          </div>
-          {metaLine}
-        </>
-      )}
+      </RowActionsMenu>
     </li>
   );
 });
@@ -710,7 +663,7 @@ const PrereqRow = memo(function PrereqRow({
     </button>
   );
 
-  // Icon-only with an aria-label, exactly like EntryRow's remove button —
+  // Icon-only with an aria-label, like the grip —
   // and deliberately not wrapped in a Tooltip, which would put a Radix
   // provider on every row of a long queue to restate the label.
   const promoteButton = (

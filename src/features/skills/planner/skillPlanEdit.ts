@@ -2,7 +2,7 @@
  * Every Skill Plan edit, each a pure `(plan, ...args) => patch`: the Plan
  * Editor (issue #2044) only dispatches — the same shape as the Fitting
  * editor's `engine/fittings/fittingEdit.ts` — and the writes from outside it
- * (`useTargetPlan`'s Add/Undo, `SkillRowContextMenu`'s Add) come through here
+ * (`useTargetPlan`'s Add/Undo, `SkillPlanAdd`'s Add) come through here
  * too. Never mutates its input.
  *
  * A Skill Plan holds three index-aligned lists: `entries`, `markers` (Remap

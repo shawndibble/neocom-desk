@@ -41,6 +41,8 @@ import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink } from '@/features/entities';
 import { StandingTag } from './StandingTag';
+import { ContractReceiverLink } from './ContractReceiverLink';
+import type { ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -54,6 +56,10 @@ export interface ContractDetailModalProps {
   issuerName: string;
   /** Omitted (not just null) by a caller that hasn't computed one — same as null, no tag renders. */
   issuerStanding?: EffectiveStanding | null;
+  /** Who received it (see `contractReceiver`); omitted or null hides the row. */
+  receiver?: ContractReceiver | null;
+  receiverName?: string;
+  receiverStanding?: EffectiveStanding | null;
   onClose: () => void;
 }
 
@@ -79,6 +85,9 @@ export function ContractDetailModal({
   contract,
   issuerName,
   issuerStanding = null,
+  receiver = null,
+  receiverName = '',
+  receiverStanding = null,
   onClose,
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
@@ -207,6 +216,19 @@ export function ContractDetailModal({
               <CharacterLink id={contract.issuer_id}>{issuerName}</CharacterLink>
               <StandingTag standing={issuerStanding} />
             </dd>
+
+            {receiver && (
+              <>
+                <dt className="text-text-dim uppercase">{t('contracts.detailReceivedBy')}</dt>
+                <dd>
+                  <ContractReceiverLink
+                    receiver={receiver}
+                    name={receiverName}
+                    standing={receiverStanding}
+                  />
+                </dd>
+              </>
+            )}
 
             <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>
             <dd>{t(CONTRACT_AVAILABILITY_KEY[contract.availability])}</dd>

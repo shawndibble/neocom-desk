@@ -352,6 +352,7 @@ export function SkillCompare() {
       {
         id: 'skill',
         header: t('skillCompare.skillColumn'),
+        stickyStart: true,
         sortValue: (row) => row.name,
         // Skill -> its modal (DESIGN.md §6c).
         render: (row) => <SkillLink typeId={row.skillTypeID}>{row.name}</SkillLink>,
@@ -362,6 +363,7 @@ export function SkillCompare() {
               id: 'group',
               header: t('skillCompare.groupColumn'),
               className: 'text-text-dim',
+              phoneHidden: true,
               sortValue: (row) => row.groupName,
               render: (row) => row.groupName,
             } satisfies DataTableColumn<ComparisonRow>,
@@ -508,12 +510,9 @@ export function SkillCompare() {
               hint={t('skillCompare.differingOnlyEmptyHint')}
             />
           ) : (
-            // Below `sm`, DataTable's default 'stack' layout turns each skill
-            // into its own card with a character/level line per row — real
-            // reading beats the horizontal scroll a matrix would otherwise
-            // force on a phone. `overflow-x-auto` still covers wider widths,
-            // where several compared characters can outgrow the viewport as
-            // real columns.
+            // A matrix reads across its columns, so it stays a table on a phone:
+            // it scrolls sideways with the skill column pinned, the group
+            // column dropped below `sm`.
             <div className="overflow-x-auto">
               <DataTable
                 {...compareExport.tableProps}
@@ -522,6 +521,7 @@ export function SkillCompare() {
                 rowKey={(row) => row.skillTypeID}
                 label={t('skillCompare.tableLabel')}
                 defaultSort={{ columnId: 'skill', direction: 'asc' }}
+                responsive="table"
               />
             </div>
           )}

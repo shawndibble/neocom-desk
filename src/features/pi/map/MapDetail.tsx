@@ -233,6 +233,13 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
             {props.oneHostCount > 0 &&
               `, ${t('piMap.add.asOnePlanet', { count: props.oneHostCount })}`}
           </p>
+          {props.unlockedIds.length > 0 && (
+            <p className="sr-only">
+              {t('piMap.add.unlockList', {
+                names: names(props.graph, props.unlockedIds).join(', '),
+              })}
+            </p>
+          )}
         </div>
       </div>
 

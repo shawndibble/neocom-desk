@@ -183,7 +183,7 @@ export function setDeviceNotificationPrefs(next: NotificationPreferencesValue): 
  * would otherwise be able to clobber a genuine, still-unsynced feed edit
  * made concurrently on another device.
  *
- * Shared by `NotificationsPanel` (Settings) and `NotificationContextMenu`
+ * Shared by `NotificationsPanel` (Settings) and the feed's mute
  * (issue #364) so the sync-vs-local branching lives in one place.
  */
 export function updateNotificationPrefs(

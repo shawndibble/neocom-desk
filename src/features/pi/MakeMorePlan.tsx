@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
+import { IskTabStopContext } from '@/components/ui/tooltipHold';
 import { formatIskCompact } from '@/lib/isk';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
@@ -133,21 +134,23 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div role="status" aria-live="polite" className="sr-only">
-        {headlineText(view, t)}
+    <IskTabStopContext.Provider value={false}>
+      <div className="space-y-4">
+        <div role="status" aria-live="polite" className="sr-only">
+          {headlineText(view, t)}
+        </div>
+        <YourPlanetsPanel
+          view={view}
+          preference={preference}
+          onPreference={(value) => void setPreference(value)}
+          onFindBest={onFindBest}
+          priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+        />
+        {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
+        <RebuildPanel view={view} />
+        <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
+        <ChecklistPanel view={view} ticks={ticks} />
       </div>
-      <YourPlanetsPanel
-        view={view}
-        preference={preference}
-        onPreference={(value) => void setPreference(value)}
-        onFindBest={onFindBest}
-        priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
-      />
-      {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
-      <RebuildPanel view={view} />
-      <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
-      <ChecklistPanel view={view} ticks={ticks} />
-    </div>
+    </IskTabStopContext.Provider>
   );
 }

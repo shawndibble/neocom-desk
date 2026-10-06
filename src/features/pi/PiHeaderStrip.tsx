@@ -13,6 +13,10 @@ import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/contractSearch/routeExposure';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
+import { HintText } from '@/components/ui/HintText';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
@@ -45,6 +49,7 @@ interface Home {
 export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, setHub, setBuyback } = useSellHub();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const homeId = homeSystemId(colonySystemIds);
@@ -182,7 +187,29 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
           />
         </StatChips>
       )}
-      {estimate && <EstimateBadge />}
+      <button
+        type="button"
+        className={`${inlineLinkClassName} ${tappableRowClassName} text-xs`}
+        onClick={() => setSettingsOpen(true)}
+      >
+        {t('piPlan.strip.settings')}
+      </button>
+      {estimate && (
+        <span className="inline-flex items-center gap-2 text-xs text-text-dim">
+          <EstimateBadge />
+          <HintText content={t('piPlan.strip.priceNoteHint')}>
+            {t('piPlan.strip.priceNote')}
+          </HintText>
+        </span>
+      )}
+      <PageSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        pageName={t('pi.title')}
+        section="industry"
+      >
+        <PiSettingsForm />
+      </PageSettingsModal>
     </div>
   );
 }
