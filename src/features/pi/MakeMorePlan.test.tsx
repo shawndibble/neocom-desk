@@ -206,6 +206,17 @@ describe('MakeMorePlan', () => {
     expect(screen.getByRole('img', { name: '0 of 1 planet slot used' })).toBeInTheDocument();
   });
 
+  it('says "1 planet" without a gain figure too', () => {
+    mockState = ready({
+      ...fixtureAdvice,
+      slots: { ...fixtureAdvice.slots, used: 0, allowed: 1, free: 1, gainPerPlanetPerDay: null },
+    });
+    renderPlan();
+    expect(
+      screen.getByText(/You can run up to 1 planet and you're using 0\. Each level/)
+    ).toBeInTheDocument();
+  });
+
   it('has no nudge when every slot is in use', () => {
     mockState = ready({
       ...fixtureAdvice,
