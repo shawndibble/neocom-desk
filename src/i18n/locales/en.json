@@ -5022,7 +5022,7 @@
       "allNew": "new",
       "allBestSimple": "Best simple product on {{type}}",
       "allUnreachable": "Needs a planet type you don't have.",
-      "allFoot": "Each line names what it compares with: the simplest (processed) product on the same planet type. Faded = needs a planet type you don't have. Specialized and advanced products take several planets: their figure is a multi-planet estimate for the whole chain, hauled to one factory planet, and is never compared with one-planet figures.",
+      "allFoot": "Each line names what it compares with: the simplest (processed) product on the same planet type. Faded = needs a planet type you don't have. Specialized and advanced products take several planets: where they have a figure, it is a multi-planet estimate for the whole chain, hauled to one factory planet, never compared with one-planet figures.",
       "rawLabel": "Raw: huge volume, thin market",
       "rawHint": "Raw resources take about 16 times the hauling of a one-planet factory and have thin markets, so they are never recommended.",
       "failedTitle": "Couldn't build the ranking",

@@ -27,30 +27,38 @@ const SLICE_MS = 30;
 const CACHE_SIZE = 4;
 
 const cache = new Map<string, Map<number, ChainEstimateView | null>>();
-const fingerprints = new WeakMap<object, string>();
+const contents = new WeakMap<object, string>();
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
 
-/** Cheap content key for a price book: a buyback builds a new object each time with the same values. */
-function fingerprint(book: Readonly<Record<number, number>>): string {
-  const known = fingerprints.get(book);
-  if (known) return known;
-  let count = 0;
-  let sum = 0;
-  for (const [id, price] of Object.entries(book)) {
-    count += 1;
-    sum += price * ((Number(id) % 997) + 1);
+/** A price book by content, once per object: a buyback builds a new object with the same values each time. */
+function contentKey(book: Readonly<Record<number, number>>): string {
+  let key = contents.get(book);
+  if (key === undefined) {
+    key = JSON.stringify(book);
+    contents.set(book, key);
   }
-  const key = `${count}:${sum}`;
-  fingerprints.set(book, key);
   return key;
 }
 
-export function chainBasisKey(basis: ChainBasis): string {
+/** The SDE payload by identity: a new bake is new work. */
+function objectId(value: object): number {
+  let id = objectIds.get(value);
+  if (id === undefined) {
+    id = nextObjectId++;
+    objectIds.set(value, id);
+  }
+  return id;
+}
+
+export function chainBasisKey(basis: ChainBasis, pi: PiData): string {
   const { books, ...rest } = basis;
   return JSON.stringify([
+    objectId(pi),
     rest,
     books.salesTaxPct,
-    fingerprint(books.prices),
-    fingerprint(books.revenuePrices),
+    contentKey(books.prices),
+    contentKey(books.revenuePrices),
   ]);
 }
 
@@ -70,7 +78,7 @@ export function resetChainEstimates(): void {
 }
 
 export function useChainEstimates(basis: ChainBasis | null, pi: PiData | null): ChainEstimateOf {
-  const key = basis ? chainBasisKey(basis) : null;
+  const key = basis && pi ? chainBasisKey(basis, pi) : null;
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -85,6 +93,8 @@ export function useChainEstimates(basis: ChainBasis | null, pi: PiData | null): 
         const typeId = todo.shift()!;
         results.set(typeId, buildChainEstimate(typeId, basis, pi));
       }
+      // Another assumption set may have evicted this one mid-run: put it back before rendering from it.
+      if (cache.get(key) !== results) cache.set(key, results);
       setVersion((v) => v + 1);
       if (todo.length > 0) timer = setTimeout(slice, 0);
     };

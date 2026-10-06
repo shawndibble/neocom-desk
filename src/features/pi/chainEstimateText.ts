@@ -31,7 +31,7 @@ export function chainAssumptions(t: TFunction, view: ChainEstimateView): string 
     t('piShared.chain.assumesPlanets', {
       count: view.planets.length,
       types,
-      host: view.hostType ? typeName(t, view.hostType) : '',
+      host: typeName(t, view.hostType),
     }),
     t(view.ccAssumed ? 'piShared.chain.assumesCcGuess' : 'piShared.chain.assumesCc', {
       level: view.ccLevel,

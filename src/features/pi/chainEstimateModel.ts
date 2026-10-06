@@ -79,7 +79,7 @@ export interface ChainEstimateView {
   /** One entry per planet the estimate adds, factory planet included. */
   planets: PlanetType[];
   /** The planet type the factories sit on. */
-  hostType: PlanetType | null;
+  hostType: PlanetType;
   m3PerWeek: number;
   /** m³ a trip at the pilot's haul cadence. */
   m3PerHaul: number;
@@ -198,7 +198,10 @@ export function buildChainEstimate(
     salesTaxPct: basis.books.salesTaxPct,
   };
   const policy = plannerPolicy({ maxP0Types: 2, buyTiers: [] });
-  const layouts = [covered, [...covered, { type: hostTypes[0], raws: [] }]];
+  // A dedicated factory planet, unless the cover already ends in one.
+  const layouts = covered.some((planet) => planet.raws.length === 0)
+    ? [covered]
+    : [covered, [...covered, { type: hostTypes[0], raws: [] }]];
   const heads: number[] = [];
   for (let h = basis.headsPerExtractor; h >= 1; h -= 2) heads.push(h);
 
@@ -209,13 +212,15 @@ export function buildChainEstimate(
       // Prices do not change with the layout: no point trying another.
       if (result.status === 'needs-price') return null;
       if (result.status === 'no-plan') continue;
-      const hostId = result.best.plan.factoryHost?.planetId ?? null;
+      const hostId = result.best.plan.factoryHost?.planetId;
+      // A P3 made in full always has a factory planet; without one there is nothing to describe.
+      if (hostId === undefined) continue;
       return {
         typeId,
         iskPerDay: result.iskPerDay,
         unitsPerDay: result.unitsPerDay,
         planets: planets.map((planet) => planet.type),
-        hostType: hostId === null ? null : planets[hostId - 1].type,
+        hostType: planets[hostId - 1].type,
         m3PerWeek: result.m3PerWeek,
         m3PerHaul: (result.m3PerWeek * basis.haulDays) / 7,
         haulDays: basis.haulDays,

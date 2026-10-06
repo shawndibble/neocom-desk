@@ -44,6 +44,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from '../PlanetImage';
 import { ChainTileFigure } from './ChainTileFigure';
+import { chainAssumptions } from '../chainEstimateText';
 import {
   comparisonSentence,
   figureSentence,
@@ -383,6 +384,9 @@ export function MapBoard(props: MapBoardProps) {
                       })
                     : comparisonSentence(t, figure),
                   figureSentence(t, figure),
+                  figure.kind === 'unranked' && figure.chain
+                    ? chainAssumptions(t, figure.chain)
+                    : null,
                 ]
                   .filter(Boolean)
                   .join('\n');

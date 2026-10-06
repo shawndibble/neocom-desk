@@ -183,10 +183,15 @@ export function ProductDetail(props: ProductDetailProps) {
       )}
       {view.money.kind === 'multi-planet' && view.money.estimate ? (
         <div className="mt-3">
-          <div className="text-[1.875rem] leading-[1.1] font-semibold text-isk-pos tabular-nums">
+          <div
+            className={cx(
+              'text-[1.875rem] leading-[1.1] font-semibold tabular-nums',
+              view.money.estimate.iskPerDay < 0 ? 'text-isk-neg' : 'text-isk-pos'
+            )}
+          >
             ≈ <IskAmount value={view.money.estimate.iskPerDay} decimals={0} />
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+          <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piShared.chain.perDayAcross', { count: view.money.estimate.planets.length })}
             <EstimateBadge />
           </div>

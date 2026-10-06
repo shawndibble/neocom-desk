@@ -23,8 +23,8 @@ export function ChainTileFigure({
     <span
       aria-hidden="true"
       className={cx(
-        'flex text-[11px] text-text-dim tabular-nums',
-        stacked ? 'flex-col items-end gap-px leading-[11px]' : 'items-center gap-1',
+        'flex text-[0.6875rem] text-text-dim tabular-nums',
+        stacked ? 'flex-col items-end gap-px leading-[0.6875rem]' : 'items-center gap-1',
         className
       )}
     >
@@ -32,7 +32,7 @@ export function ChainTileFigure({
       <span
         className={cx(
           'rounded-xs border border-warning/60 px-1 font-semibold text-warning',
-          stacked ? 'text-[9px] leading-[11px]' : 'text-[10px] leading-[14px]'
+          stacked ? 'text-[0.625rem] leading-[0.6875rem]' : 'text-[0.625rem] leading-[0.875rem]'
         )}
       >
         {t('piShared.estimateBadge')}
