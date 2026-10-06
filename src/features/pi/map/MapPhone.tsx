@@ -144,6 +144,7 @@ export function MapPhone(props: MapPhoneProps) {
               <li key={product.typeId}>
                 <Link
                   to={props.productHref(product.typeId)}
+                  data-map-key={`p:${product.typeId}`}
                   aria-current={traced ? 'true' : undefined}
                   onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                   className={cx(

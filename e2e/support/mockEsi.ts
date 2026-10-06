@@ -133,6 +133,16 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === `/characters/${CHARACTER_ID}/wallet`) return json(WALLET_BALANCE);
     // Jump Range's Current System (Market, Item Offers, BPC Sourcing): Jita.
     if (path === `/characters/${CHARACTER_ID}/location`) return json({ solar_system_id: 30000142 });
+    // The PI strip names that system for a pilot with no colonies.
+    if (path === '/universe/systems/30000142') {
+      return json({
+        system_id: 30000142,
+        name: 'Jita',
+        security_status: 0.9459,
+        constellation_id: 20000020,
+        star_id: 40009076,
+      });
+    }
     if (path === `/corporations/${CORPORATION_ID}`) return json(CORPORATION_INFO);
     if (path === `/alliances/${ALLIANCE_ID}`) return json(ALLIANCE_INFO);
     if (path === '/markets/prices') return json(MARKET_PRICES);

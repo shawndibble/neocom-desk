@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { hrefWithoutPiProduct, parsePiProduct } from '@/features/pi/piPlanLink';
+import { hrefWithout, MAP_ONLY_PARAMS } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
@@ -24,6 +24,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
+import { usePopScrollRestore } from '@/lib/usePopScrollRestore';
 import { useUrlParams } from '@/lib/useUrlState';
 import { type UrlParamCodec } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
@@ -95,14 +96,15 @@ export function PlanetaryIndustry() {
   // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
-  // A tab switch keeps the search, so the Map's `?product=` would reopen its
-  // drawer on the way back: it belongs to the Map alone.
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
-    if (tab === 'map' || parsePiProduct(location.search) === null) return;
-    navigate(hrefWithoutPiProduct(location), { replace: true, state: location.state });
+    if (tab === 'map') return;
+    const params = new URLSearchParams(location.search);
+    if (!MAP_ONLY_PARAMS.some((key) => params.has(key))) return;
+    navigate(hrefWithout(location, MAP_ONLY_PARAMS), { replace: true, state: location.state });
   }, [tab, location, navigate]);
+  usePopScrollRestore();
 
   // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
   // Plan tab only, and only for a type the planner can plan.
@@ -130,6 +132,10 @@ export function PlanetaryIndustry() {
   const clearLinkedColony = useCallback(() => setPiParams({ colony: null }), [setPiParams]);
 
   const planetsResult = data?.planetsResult ?? null;
+  const countUnknown = colonyCountUnknown({
+    needsReauth: data?.planetsNeedsReauth,
+    fetchFailed: data?.planetsFetchFailed,
+  });
   // Another reader (a poll, a prefetch) can be refused after this snapshot loaded; the shell
   // notice stays quiet on this page for that refusal, so the page banner must show it.
   const failure = useAuthFailure((state) => state.failure);
@@ -196,10 +202,12 @@ export function PlanetaryIndustry() {
 
         <PiHeaderStrip
           colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-          colonyCountUnknown={colonyCountUnknown({
-            needsReauth: data?.planetsNeedsReauth,
-            fetchFailed: data?.planetsFetchFailed,
-          })}
+          colonyCountUnknown={countUnknown}
+          locationCharacterId={
+            planetsResult !== null && !countUnknown && planetsResult.data.length === 0
+              ? activeCharacterId
+              : null
+          }
           estimate={tab === 'plan' || tab === 'map'}
           eveTime={tab === 'colonies'}
         />

@@ -56,7 +56,10 @@ export interface PlanetStrip {
   planetType: PlanetType;
   /** Null when the colony has no quick win that adds. */
   quickWinGainPerDay: number | null;
-  rebuild: { kind: 'change'; gainPerDay: number } | { kind: 'keep' } | { kind: 'unknown' };
+  rebuild:
+    | { kind: 'change'; gainPerDay: number }
+    | { kind: 'keep' }
+    | { kind: 'unknown'; reason: RebuildRefusal };
 }
 
 export interface NamedItem {
@@ -72,6 +75,17 @@ export interface AlternativeView {
   iskPerDayDelta: number;
   /** How many times less (>1) or more (<1) it hauls than the recommendation; null when either is zero. */
   haulRatio: number | null;
+}
+
+/**
+ * Why a colony gets no rebuild advice. `link-cost`: the planet's size is not
+ * on file, so a new layout's links cannot be costed, while what it earns today
+ * is still real (and counted). `other`: the colony itself could not be measured.
+ */
+export type RebuildRefusal = 'link-cost' | 'other';
+
+function refusalOf(reason: string): RebuildRefusal {
+  return reason === 'needs-link-cost' ? 'link-cost' : 'other';
 }
 
 export interface RebuildCardView {
@@ -97,6 +111,8 @@ export interface RebuildCardView {
   minutes: number | null;
   hasQuickWin: boolean;
   keepReason: 'already-best' | 'gain-too-small' | 'no-candidates' | 'no-haul-saving' | null;
+  /** Set only when `status` is 'unknown'. */
+  refusal: RebuildRefusal | null;
   alternative: AlternativeView | null;
 }
 
@@ -255,6 +271,7 @@ function stepView(step: BuildStep, id: string, pi: PiData, carries: string | nul
         pin: step.pin,
         typeId: step.typeId,
         subject: piItemName(step.typeId, pi),
+        count: step.count,
       };
     case 'route':
       return {
@@ -314,7 +331,7 @@ export function buildPlanView(
         ? { kind: 'change', gainPerDay: colony.rebuild.gainPerDay }
         : colony.rebuild.status === 'keep'
           ? { kind: 'keep' }
-          : { kind: 'unknown' },
+          : { kind: 'unknown', reason: refusalOf(colony.rebuild.reason) },
   }));
 
   const rebuilds: RebuildCardView[] = advice.colonies.map((colony) => {
@@ -341,6 +358,7 @@ export function buildPlanView(
         gainPerDay: rebuild.gainPerDay,
         minutes: rebuild.minutes,
         keepReason: null,
+        refusal: null,
         alternative: rebuild.alternative ? alternativeOf(rebuild.pick, rebuild.alternative) : null,
       };
     }
@@ -354,21 +372,25 @@ export function buildPlanView(
         gainPerDay: null,
         minutes: null,
         keepReason: rebuild.reason,
+        refusal: null,
         alternative:
           rebuild.best && rebuild.alternative
             ? alternativeOf(rebuild.best, rebuild.alternative)
             : null,
       };
     }
+    const refusal = refusalOf(rebuild.reason);
     return {
       ...base,
       status: 'unknown',
       target: null,
       fromPerDay: colony.afterQuickWinsPerDay,
-      toPerDay: null,
+      // Only the rebuild is unknown: the colony runs as it is, at today's figure.
+      toPerDay: refusal === 'link-cost' ? colony.afterQuickWinsPerDay : null,
       gainPerDay: null,
       minutes: null,
       keepReason: null,
+      refusal,
       alternative: null,
     };
   });

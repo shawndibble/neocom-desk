@@ -43,6 +43,35 @@ describe('Tooltip', () => {
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
+  // PI settings gear: its modal returned and retook focus in one tick (dev remount).
+  it('ends closed when focus arrives and leaves in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.focus(trigger);
+      fireEvent.blur(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('closes on the click that opens a dialog, even if hover opened it in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.pointerMove(trigger);
+      fireEvent.click(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('reveals the tooltip on keyboard focus too, with no hover delay', () => {
     render(
       <Tooltip content="One-line explanation.">

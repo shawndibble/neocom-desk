@@ -234,12 +234,27 @@ export interface PlanAdvice {
    * what-if planets, so the figures stay this model's.
    */
   recipeRows: RecipeRow[];
+  /**
+   * What one planet earns extracting and selling each raw P0, per planet type,
+   * at the same prices and assumptions. Shown in All products only: P0 is
+   * never ranked or recommended.
+   */
+  rawRows: RawRow[];
+  /** Raw P0 the sell market quotes no price for. */
+  rawUnpriced: number[];
   rankingBasis: RankingBasis;
   /**
    * The same assumptions, resolved for a multi-planet chain estimate
    * (`chainEstimateModel.ts`): priced lazily, never part of the ranking.
    */
   chainBasis: ChainBasis;
+}
+
+/** One raw P0 on one planet type: ISK a day from one planet selling it as extracted. */
+export interface RawRow {
+  typeId: number;
+  planetType: PlanetType;
+  iskPerDay: number;
 }
 
 /** `plan-hek-vi`: the stable fragment a card carries and a deep link targets. */
@@ -476,6 +491,8 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
     recipes: ranking.ranking,
     recipesWithTagged: ranking.withTagged,
     recipeRows: ranking.rows,
+    rawRows: ranking.rawRows,
+    rawUnpriced: ranking.rawUnpriced,
     rankingBasis: ranking.basis,
     chainBasis: ranking.chain,
   };
@@ -972,6 +989,8 @@ function rankingFor(args: {
   ranking: RecipeRanking;
   withTagged: RecipeRanking;
   rows: RecipeRow[];
+  rawRows: RawRow[];
+  rawUnpriced: number[];
   basis: RankingBasis;
   chain: ChainBasis;
 } {
@@ -1015,6 +1034,8 @@ function rankingFor(args: {
   const planetTypes = [...new Set(pi.raw.flatMap((resource) => resource.planetTypes))].sort();
   const recipeRows: RecipeRow[] = [];
   const unpriced = new Set<number>();
+  const rawRows: RawRow[] = [];
+  const rawUnpriced = new Set<number>();
   const maxLevel = Math.max(pi.infrastructure.commandCenterUpgrades.length - 1, 0);
   // The lowest level whose budget carries `used`: what Show me how and its meter
   // name for a layout that fits the pilot's own Command Center.
@@ -1107,6 +1128,15 @@ function rankingFor(args: {
 
     const fitted = adviceFor(ceiling.budget);
     for (const { entry } of fitted) {
+      if (entry.tier === 0) {
+        // Kept apart from the recipe rows: a raw is shown, never ranked.
+        if (entry.status === 'needs-price') rawUnpriced.add(entry.typeId);
+        const isk = entry.status === 'scored' ? iskPerHourOf(entry, books, taxRate) : null;
+        if (isk !== null) {
+          rawRows.push({ typeId: entry.typeId, planetType, iskPerDay: isk * HOURS_PER_DAY });
+        }
+        continue;
+      }
       if (entry.tier !== 1 && entry.tier !== 2) continue;
       if (entry.status === 'needs-price') unpriced.add(entry.typeId);
     }
@@ -1141,8 +1171,12 @@ function rankingFor(args: {
     ccAssumed: skill === null,
     linkCost: borrowed ? 'borrowed' : 'assumed',
   };
+  const rawPriced = new Set(rawRows.map((row) => row.typeId));
   return {
     rows: recipeRows,
+    rawRows,
+    // Priced on any planet type = priced: the market prices the item, not the planet.
+    rawUnpriced: [...rawUnpriced].filter((id) => !rawPriced.has(id)),
     // With no colony every planet type is one the pilot could go and find, as in Find best.
     withTagged: rankRecipes({
       rows: recipeRows,

@@ -184,7 +184,19 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
       Date.now() - touchOpenedAt.current < TOUCH_CLICK_ECHO_MS
     ) {
       event.preventDefault();
+      return;
     }
+    forceClose();
+  }
+
+  /**
+   * Radix's controllable state drops a close matching the `open` it last rendered: open+close
+   * in one tick (a modal returning then retaking focus) left the bubble up, eating the modal's
+   * first Escape. Clearing our own state closes it regardless.
+   */
+  function forceClose() {
+    setHoverOpen(false);
+    setTouchOpen(false);
   }
 
   /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
@@ -249,6 +261,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchCancel}
           onClick={suppressEchoedClose}
+          onBlur={forceClose}
           // A tap opens this bubble, so a clickable table row must leave the
           // tap to it rather than open the row too (see DataTable).
           data-row-control={openOnTap ? '' : undefined}

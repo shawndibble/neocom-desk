@@ -67,6 +67,7 @@ describe('buildPlanView', () => {
     expect(column.index).toBe(1);
     expect(column.steps.map((s) => s.verb)).toEqual(['remove', 'set', 'route']);
     expect(column.steps[1].id).toBe(`1:${P2_A}:1:set`);
+    expect(column.steps[1].count).toBe(1);
     expect(column.steps[2].carries).toBe(piItemName(P2_A, pi));
     expect(column.fit).toMatchObject({ level: 4, cpuPercent: 25, powerPercent: 55 });
   });
@@ -87,5 +88,38 @@ describe('buildPlanView', () => {
       (id) => `Planet ${id}`
     );
     expect(empty.empty).toBe(true);
+  });
+
+  it('names a missing planet size apart from "can\'t measure", and keeps today\'s figure', () => {
+    const linkCost = buildPlanView(
+      {
+        ...advice,
+        colonies: [
+          colony({
+            planetId: 5,
+            afterQuickWinsPerDay: 1200,
+            rebuild: { status: 'refused', planetId: 5, reason: 'needs-link-cost' },
+          }),
+          colony({ planetId: 6 }),
+        ],
+      },
+      pi,
+      (id) => `Planet ${id}`
+    );
+    expect(linkCost.strips.map((s) => s.rebuild)).toEqual([
+      { kind: 'unknown', reason: 'link-cost' },
+      { kind: 'unknown', reason: 'other' },
+    ]);
+    expect(linkCost.rebuilds[0]).toMatchObject({
+      status: 'unknown',
+      refusal: 'link-cost',
+      fromPerDay: 1200,
+      toPerDay: 1200,
+    });
+    expect(linkCost.rebuilds[1]).toMatchObject({
+      status: 'unknown',
+      refusal: 'other',
+      toPerDay: null,
+    });
   });
 });

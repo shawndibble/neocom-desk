@@ -22,8 +22,23 @@ vi.mock('@/features/contractSearch/routeExposure', () => ({
   }),
 }));
 
+const located = vi.hoisted(() => ({ systemId: null as number | null, calls: [] as number[] }));
+vi.mock('@/features/character/location', () => ({
+  loadCharacterSolarSystemId: vi.fn(async (characterId: number) => {
+    located.calls.push(characterId);
+    return located.systemId;
+  }),
+}));
+vi.mock('@/features/character/systemSecurity', () => ({
+  loadSystemNameAndSecurity: vi.fn(async (id: number) =>
+    id === 30004759 ? { name: '1DQ1-A', security: -0.4 } : { name: 'Jita', security: 0.9 }
+  ),
+}));
+
 beforeEach(async () => {
   routes.jumps = {};
+  located.systemId = null;
+  located.calls = [];
   await db.settings.clear();
   usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: false });
 });
@@ -133,6 +148,48 @@ describe('PiHeaderStrip', () => {
       usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: true });
       render(strip());
       await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('home for a pilot with no colonies', () => {
+    const NULLSEC = 30004759;
+    const HEK = 30002053;
+    const JITA = 30000142;
+
+    it("stands in the pilot's location, labelled as such, and finds the nearest hub from it", async () => {
+      located.systemId = NULLSEC;
+      routes.jumps = { [JITA]: 40, [HEK]: 22 };
+      renderStrip({ colonySystemIds: [], locationCharacterId: 91, estimate: false });
+      const strip = await screen.findByTestId('pi-header-strip');
+      expect(await within(strip).findByText('1DQ1-A')).toBeInTheDocument();
+      expect(within(strip).getByText('Location')).toBeInTheDocument();
+      expect(within(strip).queryByText('Home')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('pi-nearest-hub')).toHaveTextContent(
+        'Nearest hub: Hek, 22 jumps'
+      );
+      expect(within(strip).getByText('Route from here')).toBeInTheDocument();
+      expect(located.calls).toEqual([91]);
+    });
+
+    it('asks for no location while the colonies are unknown or the pilot has some', async () => {
+      located.systemId = NULLSEC;
+      const { unmount } = renderStrip({ colonySystemIds: [], estimate: false });
+      await screen.findByTestId('pi-header-strip');
+      unmount();
+      renderStrip({ colonySystemIds: [JITA], locationCharacterId: 91, estimate: false });
+      const strip = await screen.findByTestId('pi-header-strip');
+      expect(await within(strip).findByText('Home')).toBeInTheDocument();
+      expect(located.calls).toEqual([]);
+    });
+
+    it('shows no home, and never assumes a hub, when the location is unknown', async () => {
+      renderStrip({ colonySystemIds: [], locationCharacterId: 91, estimate: false });
+      const strip = await screen.findByTestId('pi-header-strip');
+      await waitFor(() => expect(located.calls).toEqual([91]));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(within(strip).queryByText('Location')).not.toBeInTheDocument();
+      expect(within(strip).queryByText('Home')).not.toBeInTheDocument();
       expect(screen.queryByTestId('pi-nearest-hub')).not.toBeInTheDocument();
     });
   });

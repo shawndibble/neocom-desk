@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -203,6 +203,44 @@ describe('PlanMap: what if I add a planet', () => {
     renderMap();
     act(() => planet('Plasma').focus());
     expect(screen.getByText('What if I add a Plasma planet?')).toBeInTheDocument();
+  });
+});
+
+// A product link on Plan or Colonies opens the drawer by URL: the link is gone
+// with its tab, so focus goes to the product on the map, never the page body.
+describe('PlanMap: focus after a drawer another tab opened', () => {
+  const COOLANT = 9832;
+
+  it('lands on the product tile on Escape', async () => {
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`)
+    );
+  });
+
+  it('lands on the product tile on Close', async () => {
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    const dialog = await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`)
+    );
+  });
+
+  it("lands on the product's row in a phone's sheet", async () => {
+    stubPhone(true);
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`);
   });
 });
 
@@ -686,6 +724,25 @@ describe('PlanMap richness drawer', () => {
     ).toBeVisible();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(within(aside).getByRole('button', { name: 'Back to the map' })).toBeVisible();
+  });
+
+  it('keeps only the drawer it shows when the URL names a planet and a product', async () => {
+    stubPhone(true);
+    function Search() {
+      return <output data-testid="search">{useLocation().search}</output>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/planetary-industry/map?planet=40000001&product=9832']}>
+        <PlanMap {...props()} />
+        <Search />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByTestId('search')).toHaveTextContent(/^\?planet=40000001$/)
+    );
   });
 
   it('ignores a planet the pilot has no colony on', async () => {

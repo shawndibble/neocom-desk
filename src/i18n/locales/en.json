@@ -4860,9 +4860,11 @@
     "mapTab": "Map",
     "strip": {
       "home": "Home",
+      "location": "Location",
       "colonies": "Colonies",
       "eveTime": "EVE time",
       "route": "Home route",
+      "routeFromHere": "Route from here",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
@@ -4878,6 +4880,7 @@
       "buybackRate": "Buyback rate",
       "buybackPct": "{{pct}}% of {{hub}}",
       "dropOff": "Drop off in your home system",
+      "dropOffHere": "Drop off where you are",
       "settings": "PI settings",
       "priceNote": "Estimated prices",
       "priceNoteHint": "Every ISK figure here is a projection from current market prices at your sell market, after customs and sales tax. What a sale actually fetches will differ."
@@ -5039,6 +5042,7 @@
       "allUnreachable": "Needs a planet type you don't have.",
       "allFoot": "Each line names what it compares with: the simplest (processed) product on the same planet type. Faded = needs a planet type you don't have. Specialized and advanced products take several planets: where they have a figure, it is a multi-planet estimate for the whole chain, hauled to one factory planet, never compared with one-planet figures.",
       "rawLabel": "Raw: huge volume, thin market",
+      "rawNoPrice": "No market price",
       "rawHint": "Raw resources take about 16 times the hauling of a one-planet factory and have thin markets, so they are never recommended.",
       "failedTitle": "Couldn't build the ranking",
       "failedHint": "Refresh the page, or pick a specific product instead."
@@ -5071,6 +5075,7 @@
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
       "stripUnknown": "Not measured",
+      "stripNoLinkCost": "Size unknown",
       "excluded_one": "Left out: {{names}}. Its details have not loaded. Refresh to try again.",
       "excluded_other": "Left out: {{names}}. Their details have not loaded. Refresh to try again.",
       "slotsLabel_one": "{{used}} of {{count}} planet slot used",
@@ -5127,7 +5132,8 @@
           "no-candidates": "No other setup fits there.",
           "no-haul-saving": "A rebuild would not cut your hauling."
         },
-        "unknown": "{{planet}} {{type}}: we can't measure this colony yet, so there is nothing to recommend."
+        "unknown": "{{planet}} {{type}}: we can't measure this colony yet, so there is nothing to recommend.",
+        "needsLinkCost": "{{planet}} {{type}}: we don't have this planet's size, so a rebuild's links can't be costed and there is nothing to recommend. What it earns today still counts."
       },
       "to": "to",
       "tagRebuild": "Rebuild",
@@ -5203,7 +5209,7 @@
         "remove": "{{count}} × {{pin}}",
         "place": "{{count}} × {{pin}}",
         "placeExtractor": "{{count}} × {{pin}} (scan for a bright spot)",
-        "set": "{{pin}} → {{item}}",
+        "set": "{{count}} × {{pin}} → {{item}}",
         "route": "Send {{item}} to the launchpad"
       },
       "fitsCc": "Fits your Command Center (upgrade level {{level}})",

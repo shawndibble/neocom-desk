@@ -332,7 +332,8 @@ export interface RebuildFacts {
 export type BuildStep =
   | { verb: 'upgrade'; fromLevel: number; toLevel: number; minutes: number }
   | { verb: 'remove' | 'place'; pin: PiPinKind; count: number; minutes: number }
-  | { verb: 'set'; pin: PiPinKind; typeId: number; minutes: number }
+  /** `count` pins of that kind set to `typeId` (split: `setCount`). */
+  | { verb: 'set'; pin: PiPinKind; typeId: number; count: number; minutes: number }
   | { verb: 'route'; count: number; minutes: number };
 
 /** In-game minutes per step. Estimates. */
@@ -386,11 +387,16 @@ export function buildSteps(
     if (count > 0)
       steps.push({ verb: 'place', pin: kind, count, minutes: count * STEP_MINUTES.placePin });
   }
-  for (const typeId of candidate.recipe.extracts) {
-    steps.push({ verb: 'set', pin: 'extractorControlUnit', typeId, minutes: STEP_MINUTES.set });
-  }
-  for (const make of candidate.recipe.makes) {
-    steps.push({ verb: 'set', pin: make.facility, typeId: make.typeId, minutes: STEP_MINUTES.set });
+  const sets: { pin: PiPinKind; typeId: number }[] = [
+    ...candidate.recipe.extracts.map((typeId) => ({
+      pin: 'extractorControlUnit' as const,
+      typeId,
+    })),
+    ...candidate.recipe.makes.map((make) => ({ pin: make.facility, typeId: make.typeId })),
+  ];
+  for (const [index, set] of sets.entries()) {
+    const count = setCount(set.pin, index, sets, want(set.pin));
+    steps.push({ verb: 'set', ...set, count, minutes: count * STEP_MINUTES.set });
   }
   const routes = PRODUCTION_PINS.reduce((sum, kind) => sum + want(kind), 0);
   if (routes > 0) {
@@ -398,6 +404,23 @@ export function buildSteps(
   }
 
   return { steps, minutes: Math.ceil(steps.reduce((sum, step) => sum + step.minutes, 0)) };
+}
+
+/**
+ * How many of `pins` pins of one kind the set at `index` covers. The layout
+ * does not say which factory makes which input, so a kind's pins split evenly
+ * across its sets, the remainder to the earliest; at least one each.
+ */
+function setCount(
+  pin: PiPinKind,
+  index: number,
+  sets: readonly { pin: PiPinKind }[],
+  pins: number
+): number {
+  const ofKind = sets.filter((set) => set.pin === pin).length;
+  const position = sets.slice(0, index).filter((set) => set.pin === pin).length;
+  const share = Math.floor(pins / ofKind) + (position < pins % ofKind ? 1 : 0);
+  return Math.max(1, share);
 }
 
 export interface RebuildOption extends RebuildCandidate {

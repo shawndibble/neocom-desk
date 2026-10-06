@@ -88,7 +88,7 @@ const changing = colony({
     gainPerDay: 3700,
     steps: [
       { verb: 'remove', pin: 'extractorControlUnit', count: 1, minutes: 1 },
-      { verb: 'set', pin: 'advanced', typeId: P2_A, minutes: 1 },
+      { verb: 'set', pin: 'advanced', typeId: P2_A, count: 1, minutes: 1 },
       { verb: 'route', count: 1, minutes: 2 },
     ],
     minutes: 4,

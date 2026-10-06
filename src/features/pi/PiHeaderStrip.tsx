@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/contractSearch/routeExposure';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { HintText } from '@/components/ui/HintText';
@@ -40,6 +41,12 @@ interface Props {
   colonySystemIds: readonly number[];
   /** The colony list could not be read: the count is unknown, not 0. */
   colonyCountUnknown?: boolean;
+  /**
+   * The Character whose current system stands in for home: set only once the
+   * colony list is read and empty, so a list still loading (or unreadable) is
+   * never taken for none. Never a hub default: no location, no home.
+   */
+  locationCharacterId?: number | null;
   /** Plan's prices and figures are projections; the other tabs show no such number. */
   estimate: boolean;
   /** Show the EVE clock (Colonies, where timers read in EVE time). */
@@ -61,13 +68,14 @@ interface Home {
 
 /**
  * The strip under the PI tabs, shared by all three: where the pilot's colonies
- * are, how many, the way to the sell market, which market that is, and (on
- * Colonies) EVE time. Only
- * what there is data for today: a field with no source is left out.
+ * are (with none, where the pilot is), how many, the way to the sell market,
+ * which market that is, and (on Colonies) EVE time. Only what there is data
+ * for today: a field with no source is left out.
  */
 export function PiHeaderStrip({
   colonySystemIds,
   colonyCountUnknown,
+  locationCharacterId = null,
   estimate,
   eveTime = false,
 }: Props) {
@@ -76,7 +84,34 @@ export function PiHeaderStrip({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
-  const homeId = homeSystemId(colonySystemIds);
+  const colonyHome = homeSystemId(colonySystemIds);
+  const [located, setLocated] = useState<{
+    characterId: number;
+    systemId: number | null;
+  } | null>(null);
+  useEffect(() => {
+    if (colonyHome !== null || locationCharacterId === null) return;
+    let cancelled = false;
+    void loadCharacterSolarSystemId(locationCharacterId)
+      .catch(() => null)
+      .then((systemId) => {
+        if (!cancelled) setLocated({ characterId: locationCharacterId, systemId });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [colonyHome, locationCharacterId]);
+  const locationId =
+    colonyHome === null && located !== null && located.characterId === locationCharacterId
+      ? located.systemId
+      : null;
+  // Where the route and the nearest-hub nudge start: the colonies, else the pilot.
+  const homeId = colonyHome ?? locationId;
+  // With no colony, the chips say where the figures start: here, not home.
+  const label =
+    colonyHome === null && homeId !== null
+      ? { home: 'location', route: 'routeFromHere', dropOff: 'dropOffHere' }
+      : { home: 'home', route: 'route', dropOff: 'dropOff' };
   const [home, setHome] = useState<Home | null>(null);
   const [route, setRoute] = useState<{ key: string; figures: RouteFigures | null } | null>(null);
 
@@ -133,7 +168,7 @@ export function PiHeaderStrip({
       <StatChips>
         {homeId !== null && shownHome?.name && (
           <StatChip
-            label={t('piPlan.strip.home')}
+            label={t(`piPlan.strip.${label.home}`)}
             value={
               <>
                 {shownHome.name}
@@ -224,13 +259,16 @@ export function PiHeaderStrip({
       )}
       {buybackPct !== null && homeId !== null && (
         <StatChips>
-          <StatChip label={t('piPlan.strip.route')} value={t('piPlan.strip.dropOff')} />
+          <StatChip
+            label={t(`piPlan.strip.${label.route}`)}
+            value={t(`piPlan.strip.${label.dropOff}`)}
+          />
         </StatChips>
       )}
       {figures && (
         <StatChips>
           <StatChip
-            label={t('piPlan.strip.route')}
+            label={t(`piPlan.strip.${label.route}`)}
             value={
               <>
                 {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}

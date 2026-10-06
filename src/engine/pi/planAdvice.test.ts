@@ -12,6 +12,7 @@ import {
   slotNudge,
   spendRoomOnce,
   totalQuickWins,
+  type BuildStep,
   type RebuildCandidate,
   type RebuildFacts,
 } from './planAdvice';
@@ -427,6 +428,59 @@ describe('buildSteps', () => {
           ['upgrade', 'remove', 'place', 'set', 'route'].indexOf(b)
       )
     );
+  });
+});
+
+describe('buildSteps set counts', () => {
+  const setsOf = (steps: readonly BuildStep[], pin: string) =>
+    steps.filter(
+      (s): s is Extract<BuildStep, { verb: 'set' }> => s.verb === 'set' && s.pin === pin
+    );
+
+  it('says how many factories each set covers, so every factory placed gets set', () => {
+    const candidate = cand(10, 1, 1, 1, {
+      pins: { extractorControlUnit: 2, basic: 2 },
+      recipe: { extracts: [900], makes: [{ typeId: 10, facility: 'basic' }] },
+    });
+    const { steps } = buildSteps(candidate, { currentPins: {}, fromLevel: 4 });
+    expect(setsOf(steps, 'basic')).toEqual([expect.objectContaining({ typeId: 10, count: 2 })]);
+    expect(setsOf(steps, 'extractorControlUnit')).toEqual([
+      expect.objectContaining({ typeId: 900, count: 2 }),
+    ]);
+  });
+
+  it('splits an uneven count, so the sets still add up to the factories', () => {
+    const candidate = cand(10, 2, 1, 1, {
+      pins: { extractorControlUnit: 2, basic: 3, advanced: 1 },
+      recipe: {
+        extracts: [900, 901],
+        makes: [
+          { typeId: 11, facility: 'basic' },
+          { typeId: 12, facility: 'basic' },
+          { typeId: 10, facility: 'advanced' },
+        ],
+      },
+    });
+    const { steps } = buildSteps(candidate, { currentPins: {}, fromLevel: 4 });
+    const basic = setsOf(steps, 'basic');
+    expect(basic.map((s) => s.count)).toEqual([2, 1]);
+    expect(setsOf(steps, 'advanced').map((s) => s.count)).toEqual([1]);
+    expect(setsOf(steps, 'extractorControlUnit').map((s) => s.count)).toEqual([1, 1]);
+  });
+
+  it('never sets fewer than one of a kind the layout uses', () => {
+    const candidate = cand(10, 2, 1, 1, {
+      pins: { basic: 1 },
+      recipe: {
+        extracts: [],
+        makes: [
+          { typeId: 11, facility: 'basic' },
+          { typeId: 12, facility: 'basic' },
+        ],
+      },
+    });
+    const { steps } = buildSteps(candidate, { currentPins: {}, fromLevel: 4 });
+    expect(setsOf(steps, 'basic').map((s) => s.count)).toEqual([1, 1]);
   });
 });
 

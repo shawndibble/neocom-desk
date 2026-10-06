@@ -45,6 +45,7 @@ import type { ChainEstimateOf } from '../useChainEstimates';
 import { CcLevelTag } from '../CcLevelTag';
 import { planPicks } from '../planPicks';
 import {
+  hrefWithout,
   hrefWithoutPiPlanet,
   hrefWithoutPiProduct,
   parsePiPlanet,
@@ -125,13 +126,6 @@ export function PlanMap({
   const linked = linkedRaw !== null && graph.byId.has(linkedRaw) ? linkedRaw : null;
   const hasProductParam =
     linkedRaw !== null || new URLSearchParams(location.search).has(PI_PRODUCT_PARAM);
-  useEffect(() => {
-    if (!hasProductParam || linked !== null) return;
-    navigate(hrefWithoutPiProduct(location), {
-      replace: true,
-      state: location.state,
-    });
-  }, [hasProductParam, linked, location, navigate]);
 
   const owned = useMemo(() => new Set(colonies.map((c) => c.type)), [colonies]);
   const colonyNames = useMemo(() => {
@@ -204,10 +198,18 @@ export function PlanMap({
   const planetRaw = parsePiPlanet(location.search);
   const richnessColony = colonies.find((c) => c.planetId === planetRaw) ?? null;
   const hasPlanetParam = new URLSearchParams(location.search).has(PI_PLANET_PARAM);
+  // The URL keeps only what the view uses, in one navigation (two would each
+  // start from the same stale search and undo each other): an id the map does
+  // not know goes, and with a colony's richness drawer open the product does too.
+  const dropProductParam = hasProductParam && (linked === null || richnessColony !== null);
+  const dropPlanetParam = hasPlanetParam && richnessColony === null;
   useEffect(() => {
-    if (!hasPlanetParam || richnessColony !== null) return;
-    navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
-  }, [hasPlanetParam, richnessColony, location, navigate]);
+    const keys: string[] = [];
+    if (dropProductParam) keys.push(PI_PRODUCT_PARAM);
+    if (dropPlanetParam) keys.push(PI_PLANET_PARAM);
+    if (keys.length === 0) return;
+    navigate(hrefWithout(location, keys), { replace: true, state: location.state });
+  }, [dropProductParam, dropPlanetParam, location, navigate]);
   const dropPlanet = () =>
     navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
 
@@ -241,10 +243,17 @@ export function PlanMap({
     const active = document.activeElement;
     returnFocus.current = active instanceof HTMLElement && active !== document.body ? active : null;
   }, []);
+  // Set until the frame that focuses it: the drawer's own close may run first or second.
+  const restoring = useRef<HTMLElement | null>(null);
   const restore = useCallback(() => {
     const el = returnFocus.current;
     returnFocus.current = null;
-    if (el && el.isConnected) requestAnimationFrame(() => el.focus());
+    if (!el || !el.isConnected) return;
+    restoring.current = el;
+    requestAnimationFrame(() => {
+      restoring.current = null;
+      el.focus();
+    });
   }, []);
   const closePlanet = useCallback(() => {
     setPlanetOpen(false);
@@ -267,6 +276,32 @@ export function PlanMap({
       });
     }
   }, [location, navigate]);
+  // A drawer a link on Plan or Colonies opened has no opener left on this
+  // tab: focus goes to that product on the map (a tile, or a phone row), else
+  // the page heading, never the page body.
+  const lastLinked = useRef<number | null>(null);
+  useEffect(() => {
+    if (linked !== null) lastLinked.current = linked;
+    else if (richnessColony !== null) lastLinked.current = null;
+  }, [linked, richnessColony]);
+  const productFocusFallback = useCallback((): HTMLElement | null => {
+    // An opener this page remembered wins, whether its frame has run yet or not.
+    if (restoring.current?.isConnected) return restoring.current;
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !active.closest('dialog, [role="dialog"]')
+    ) {
+      return active;
+    }
+    const id = lastLinked.current;
+    const item =
+      id === null
+        ? null
+        : (layoutRef.current?.querySelector<HTMLElement>(`[data-map-key="p:${id}"]`) ?? null);
+    return item ?? document.querySelector<HTMLElement>('main h1[tabindex]');
+  }, []);
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
     restore();
@@ -769,6 +804,7 @@ export function PlanMap({
         title={detailTitle}
         phone={phone}
         closeOnBack={!productShown && !richnessShown}
+        returnFocusFallback={productFocusFallback}
       >
         {detailBody}
       </PiDrawer>
