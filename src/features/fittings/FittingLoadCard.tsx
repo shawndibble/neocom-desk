@@ -137,6 +137,9 @@ export function FittingLoadCard({
           id="fitting-load-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onSubmitChord={() => {
+            if (!loading && text.trim() !== '') void handleLoad();
+          }}
           rows={10}
           placeholder={t('fittings.load.pastePlaceholder')}
           mono

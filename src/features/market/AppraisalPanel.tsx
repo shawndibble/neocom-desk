@@ -455,6 +455,9 @@ export function AppraisalPanel({
             id="market-appraisal-text"
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onSubmitChord={() => {
+              if (controller.canAppraise && !loading) controller.appraise();
+            }}
             rows={14}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
