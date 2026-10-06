@@ -32,12 +32,12 @@ leave out of any "differences from the mockup" list.
 
 ## Deliberate differences from the mockups (not §6c)
 
-Beyond the cues above, five departures are product decisions, recorded in
+Beyond the cues above, six departures are product decisions, recorded in
 [the 2717 decision](../../context/decisions/20261005-210436-pi-design-refs-deliberate-differences-not-built.md). Leave them out of any
 "differences from the mockup" list; do not build them.
 
 - **Plan / Find best:** no "What matters more" switch (Make more keeps it); "Show me how" has no planet diagram.
-- **Map:** phone shows a tier list, not "Your best moves" / the trace; the "have" tag stays boxed.
+- **Map:** phone shows a tier list, not "Your best moves" / the trace; the "have" tag stays boxed; no "I have planets / best thing to make" question toggle.
 - **All tabs:** "New to PI?" opens the explainer drawer directly, with no popover or link to it.
 
 Source of truth: `docs/DESIGN.md` §6c. If this file and §6c ever disagree, §6c wins.

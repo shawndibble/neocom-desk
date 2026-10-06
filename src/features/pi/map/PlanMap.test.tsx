@@ -222,6 +222,17 @@ describe('PlanMap: trace', () => {
     ).toHaveLength(1);
   });
 
+  it('says a P4 is made from its direct inputs side by side, a P1 beside its P3s', () => {
+    // Nano-Factory takes Reactive Metals (P1) next to two P3s.
+    renderMap({}, '/planetary-industry/map?product=2869');
+    const dialog = screen.getByRole('dialog', { name: 'How to make Nano-Factory' });
+    const words = within(dialog).getByText(
+      (_, el) => el?.tagName === 'P' && /^In words: /.test(el.textContent ?? '')
+    );
+    expect(words.textContent).toMatch(/: [^→]+ → [^→]+ → Nano-Factory\.$/);
+    expect(words.textContent).toMatch(/Reactive Metals/);
+  });
+
   it('traces a product: marks it current, announces it and writes the chain in words', async () => {
     const user = userEvent.setup();
     renderMap();

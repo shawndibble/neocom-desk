@@ -32,13 +32,15 @@ interface Props {
 function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t']): string {
   const { headline } = view;
   const parts: string[] = [];
-  // No quick wins: say nothing rather than "add 0 ISK a day in about 0 minutes".
+  // Never "add 0 ISK a day": no wins says nothing, wins with no gain (saves, unpriced) give time only.
   if (view.quickWins.length > 0) {
     parts.push(
-      t('piPlan.make.liveQuick', {
-        gain: formatIskCompact(headline.quickWinPerDay),
-        count: headline.quickWinMinutes,
-      })
+      headline.quickWinPerDay > 0
+        ? t('piPlan.make.liveQuick', {
+            gain: formatIskCompact(headline.quickWinPerDay),
+            count: headline.quickWinMinutes,
+          })
+        : t('piPlan.make.liveQuickNoGain', { count: headline.quickWinMinutes })
     );
   }
   if (headline.rebuildCount > 0) {

@@ -171,8 +171,11 @@ export interface Trace {
 export function groupByTier(graph: MapGraph, ids: Iterable<number>): number[][] {
   const byTier = new Map<MapTier, number[]>();
   for (const id of ids) {
-    const tier = graph.byId.get(id)!.tier;
-    byTier.set(tier, [...(byTier.get(tier) ?? []), id]);
+    const product = graph.byId.get(id);
+    if (!product) continue;
+    const group = byTier.get(product.tier);
+    if (group) group.push(id);
+    else byTier.set(product.tier, [id]);
   }
   return [...byTier.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
 }

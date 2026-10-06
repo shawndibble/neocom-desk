@@ -62,21 +62,21 @@ const names = (graph: MapGraph, ids: readonly number[]) =>
 
 /**
  * A chain of product names, each a link to its own PI detail but the one
- * already open. Names in one tier are parallel inputs, joined with commas;
- * an arrow only marks the step up a tier.
+ * already open. Names in a group are parallel, joined with commas; an arrow
+ * marks the step to the next group.
  */
 function NameChain({
   graph,
-  ids,
+  groups,
   open,
 }: {
   graph: MapGraph;
-  ids: readonly number[];
+  groups: readonly (readonly number[])[];
   open: number;
 }) {
   return (
     <>
-      {groupByTier(graph, ids).map((group, g) => (
+      {groups.map((group, g) => (
         <span key={group[0]}>
           {g > 0 && ' → '}
           {group.map((id, i) => {
@@ -275,7 +275,7 @@ export function ProductDetail(props: ProductDetailProps) {
                   )}
                 </div>
                 <div className="text-text-dim">
-                  <NameChain graph={graph} ids={planet.made} open={typeId} />
+                  <NameChain graph={graph} groups={groupByTier(graph, planet.made)} open={typeId} />
                 </div>
               </div>
             </li>
@@ -294,7 +294,7 @@ export function ProductDetail(props: ProductDetailProps) {
                 {trace.planets.length > 1 ? t('piMap.detail.shipTo') : t('piMap.detail.samePlanet')}
               </div>
               <div>
-                <NameChain graph={graph} ids={trace.rest} open={typeId} />
+                <NameChain graph={graph} groups={groupByTier(graph, trace.rest)} open={typeId} />
               </div>
             </div>
           </li>
@@ -310,7 +310,10 @@ export function ProductDetail(props: ProductDetailProps) {
             steps: (
               <NameChain
                 graph={graph}
-                ids={[...view.inputs.map((input) => input.typeId), typeId]}
+                // Direct inputs as one group: a P4 can take a P1 beside its P3s.
+                groups={[view.inputs.map((input) => input.typeId), [typeId]].filter(
+                  (group) => group.length > 0
+                )}
                 open={typeId}
               />
             ),
