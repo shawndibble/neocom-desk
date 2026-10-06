@@ -464,7 +464,8 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               <div className="min-w-0 space-y-1">
                 <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm leading-tight font-semibold">
                   <SystemLink systemId={row.systemId}>{planetName}</SystemLink>
-                  <span className="text-xs font-normal">
+                  {/* A stopped colony's red bar, time and Restart button say so; the word stays for screen readers only. */}
+                  <span className={stopped ? 'sr-only' : 'text-xs font-normal'}>
                     <span className="mr-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                       {t('piColonies.statusLabel')}
                     </span>
