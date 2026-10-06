@@ -25,6 +25,8 @@ const BUYBACK = 'buyback';
 interface Props {
   /** The solar system of each of the active Character's colonies. */
   colonySystemIds: readonly number[];
+  /** The colony list could not be read: the count is unknown, not 0. */
+  colonyCountUnknown?: boolean;
   /** Plan's prices and figures are projections; the other tabs show no such number. */
   estimate: boolean;
 }
@@ -40,7 +42,7 @@ interface Home {
  * are, how many, the way to the sell market, and which market that is. Only
  * what there is data for today: a field with no source is left out.
  */
-export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
+export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, setHub, setBuyback } = useSellHub();
   const mdUp = useMediaQuery('(min-width: 48rem)');
@@ -105,7 +107,10 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
             }
           />
         )}
-        <StatChip label={t('piPlan.strip.colonies')} value={colonySystemIds.length} />
+        <StatChip
+          label={t('piPlan.strip.colonies')}
+          value={colonyCountUnknown ? '—' : colonySystemIds.length}
+        />
       </StatChips>
       <label className="flex items-center gap-2">
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

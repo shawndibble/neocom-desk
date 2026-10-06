@@ -169,6 +169,7 @@ export function PlanetaryIndustry() {
 
       <PiHeaderStrip
         colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
+        colonyCountUnknown={data?.planetsFetchFailed}
         estimate={tab === 'plan' || tab === 'map'}
       />
 
