@@ -62,6 +62,8 @@ export interface MapBoardProps {
   noColonies: boolean;
   /** Planet types the map is filtered to: what it can make is lit, the rest leaves ghost slots. */
   ticked: ReadonlySet<PlanetType>;
+  /** Missing planet types the traced product needs: drawn lit, tagged NEED, though not ticked. */
+  needTypes: ReadonlySet<PlanetType>;
   /** Products the ticked planet types can make. */
   litIds: ReadonlySet<number>;
   /** Products a what-if planet (hovered, focused or open in the detail panel) would unlock. */
@@ -329,6 +331,7 @@ export function MapBoard(props: MapBoardProps) {
                   onKeyDown={(e) => move(planetKey(type), e)}
                   onClick={() => props.onPlanet(type)}
                   onPreview={props.onPreview}
+                  needed={props.needTypes.has(type)}
                   whatIf={props.whatIfType === type && !owned.has(type) && !props.noColonies}
                 />
               </li>
@@ -518,6 +521,7 @@ function PlanetToggle({
   ranks: number[];
   tracedNeed: { have: boolean } | null;
   whatIf: boolean;
+  needed: boolean;
   tabbable: boolean;
   registerNode: (el: HTMLElement | null) => void;
   boardRef: RefObject<HTMLElement | null>;
@@ -592,7 +596,7 @@ function PlanetToggle({
           size={40}
           className={cx(
             'outline-2 outline-offset-1',
-            !pressed && 'brightness-[.45] grayscale',
+            !pressed && !props.needed && 'brightness-[.45] grayscale',
             props.ranks.length > 0 && have ? 'outline-warning' : 'outline-transparent',
             props.whatIf && 'outline-map-whatif brightness-100 grayscale-0'
           )}

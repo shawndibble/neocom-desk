@@ -264,16 +264,6 @@ export function PlanMap({
   }, [restore]);
 
   // --- Derived view ----------------------------------------------------------
-  const activeWhatIf = preview ?? whatIf;
-  const litIds = useMemo(
-    () => new Set([...graph.byId.keys()].filter((id) => canMake(graph, id, ticked))),
-    [graph, ticked]
-  );
-  const unlock = useMemo(
-    () => (activeWhatIf ? unlockedBy(graph, activeWhatIf, ticked) : null),
-    [graph, activeWhatIf, ticked]
-  );
-  const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
   const trace = useMemo(
     () =>
       traced
@@ -285,6 +275,35 @@ export function PlanMap({
         : null,
     [graph, traced, owned, ticked, picks]
   );
+  /**
+   * Planet types a traced product needs that the pilot has no colony on. The
+   * chain is drawn as if they were there (lit, tagged NEED) so the trace runs
+   * end to end instead of stopping at a dimmed planet.
+   */
+  const needTypes = useMemo<ReadonlySet<PlanetType>>(
+    () =>
+      new Set(
+        traced?.explicit && trace && !noColonies
+          ? trace.planets.filter((p) => !p.have).map((p) => p.type)
+          : []
+      ),
+    [traced, trace, noColonies]
+  );
+  // A planet the trace already needs has nothing to preview: hovering it must not pile pink wires on the trace.
+  const activeWhatIf = (preview && !needTypes.has(preview) ? preview : null) ?? whatIf;
+  const litTicked = useMemo<ReadonlySet<PlanetType>>(
+    () => (needTypes.size > 0 ? new Set([...ticked, ...needTypes]) : ticked),
+    [ticked, needTypes]
+  );
+  const litIds = useMemo(
+    () => new Set([...graph.byId.keys()].filter((id) => canMake(graph, id, litTicked))),
+    [graph, litTicked]
+  );
+  const unlock = useMemo(
+    () => (activeWhatIf ? unlockedBy(graph, activeWhatIf, ticked) : null),
+    [graph, activeWhatIf, ticked]
+  );
+  const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
   const figures = useMemo(
     () =>
       new Map<number, ProductFigure>(
@@ -364,6 +383,20 @@ export function PlanMap({
         else next.add(type);
         return next;
       });
+      return;
+    }
+    if (needTypes.has(type)) {
+      // The traced product already shows what this planet is for and where to
+      // find one. A what-if here would swap the panel and pile pink unlock
+      // wires on top of the trace.
+      if (!docked && !drawerShown) remember();
+      setWhatIf(null);
+      setPlanetOpen(false);
+      setDetailKind('product');
+      // The product drawer is the URL's: bring it back if it was closed.
+      if (linked === null && traced) {
+        navigate(piProductHref(traced.id, location.search), productNavigation(location));
+      }
       return;
     }
     if (whatIf === type) {
@@ -626,6 +659,7 @@ export function PlanMap({
       owned={owned}
       noColonies={noColonies}
       ticked={ticked}
+      needTypes={needTypes}
       litIds={litIds}
       newIds={newIds}
       whatIfType={activeWhatIf && !isHave(activeWhatIf) ? activeWhatIf : null}
@@ -681,7 +715,7 @@ export function PlanMap({
               graph={graph}
               owned={owned}
               noColonies={noColonies}
-              ticked={ticked}
+              ticked={litTicked}
               whatIfType={whatIf}
               litIds={litIds}
               newIds={newIds}
