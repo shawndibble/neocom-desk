@@ -4709,6 +4709,7 @@
     "unranked": {
       "raw": "A raw resource: sold as is, or refined on the way up",
       "tier": "Needs goods from several planets, so there is no per-planet figure",
+      "tierChain": "Needs goods from several planets",
       "unpriced": "The market has no price for it, so there is no figure",
       "not-one-planet": "No single planet type makes it, so there is no per-planet figure",
       "no-fit": "One planet type can make it, but not at the Command Center level assumed here, so there is no figure"
@@ -5029,7 +5030,7 @@
       "allNew": "new",
       "allBestSimple": "Best simple product on {{type}}",
       "allUnreachable": "Needs a planet type you don't have.",
-      "allFoot": "Each line names what it compares with: the simplest (processed) product on the same planet type. Faded = needs a planet type you don't have. Products that take several planets have no one-planet figure; the Goal Planner lays out the chain.",
+      "allFoot": "Each line names what it compares with: the simplest (processed) product on the same planet type. Faded = needs a planet type you don't have. Specialized and advanced products take several planets: where they have a figure, it is a multi-planet estimate for the whole chain, hauled to one factory planet, never compared with one-planet figures.",
       "rawLabel": "Raw: huge volume, thin market",
       "rawHint": "Raw resources take about 16 times the hauling of a one-planet factory and have thin markets, so they are never recommended.",
       "failedTitle": "Couldn't build the ranking",
@@ -5667,6 +5668,24 @@
     "hoursShort": "{{count}} h",
     "daysShort": "{{count}} d",
     "estimateBadge": "Est.",
+    "chain": {
+      "tileLabel_one": "multi-planet estimate across {{count}} planet, needs hauling",
+      "tileLabel_other": "multi-planet estimate across {{count}} planets, needs hauling",
+      "figure_one": "Multi-planet estimate, needs hauling: about {{isk}} ISK a day across {{count}} planet",
+      "figure_other": "Multi-planet estimate, needs hauling: about {{isk}} ISK a day across {{count}} planets",
+      "perDayAcross_one": "ISK/day across {{count}} planet",
+      "perDayAcross_other": "ISK/day across {{count}} planets",
+      "label": "Multi-planet, needs hauling. An estimate from the Goal Planner's chain, never ranked against one-planet figures.",
+      "assumesPlanets_one": "Assumes {{count}} new planet ({{types}}), the factories on the {{host}} one.",
+      "assumesPlanets_other": "Assumes {{count}} new planets ({{types}}), the factories on the {{host}} one.",
+      "assumesCc": "Each with a level {{level}} Command Center.",
+      "assumesCcGuess": "Each with a level {{level}} Command Center (assumed: your skills haven't loaded).",
+      "assumesRateMeasured": "Extractors with {{heads}} heads pull about {{rate}} units an hour each, from your own extractors.",
+      "assumesRateAssumed": "Extractors with {{heads}} heads pull about {{rate}} units an hour each, your fallback rate.",
+      "assumesSale": "Sold at your sell market after customs and sales tax; nothing bought.",
+      "assumesHaul_one": "Hauling about {{m3}} m³ a week: {{perHaul}} m³ a trip at your haul every {{count}} day. Jumps between the planets are not counted.",
+      "assumesHaul_other": "Hauling about {{m3}} m³ a week: {{perHaul}} m³ a trip at your haul every {{count}} days. Jumps between the planets are not counted."
+    },
     "pinKind": {
       "extractorControlUnit": "Extractor Control Unit",
       "basic": "Basic Industry Facility",

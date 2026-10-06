@@ -1,14 +1,16 @@
 /**
  * The PI Map's own logic, pure over `PiData` and the recommendation model's
- * output. Nothing here prices anything: every ISK figure the Map shows is read
- * off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is the number
- * Plan shows for the same product. This module only decides what is
+ * output. Nothing here prices anything: every one-planet ISK figure the Map
+ * shows is read off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is
+ * the number Plan shows for the same product; a P3/P4's chain estimate comes
+ * from `useChainEstimates`, the same as All products. This module only decides what is
  * reachable, what a chain looks like, and how the panels sit.
  */
 import { piTier } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import type { PiData, PiFactoryKind } from '@/sde/types';
+import type { ChainEstimateView } from '../chainEstimateModel';
 import type { PlanAdvice } from '../planAdviceModel';
 
 export type MapTier = 0 | 1 | 2 | 3 | 4;
@@ -281,7 +283,15 @@ export type ProductFigure =
       /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
       needsCcLevel: number | null;
     }
-  | { kind: 'unranked'; reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit' };
+  | {
+      kind: 'unranked';
+      reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit';
+      /**
+       * A P3 or P4's multi-planet chain estimate, once priced: its own figure,
+       * never a ranked one-planet recipe (`chainEstimateModel.ts`).
+       */
+      chain?: ChainEstimateView;
+    };
 
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from

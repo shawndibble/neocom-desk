@@ -116,6 +116,7 @@ import {
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import { medianNewLinkLoad } from './unbuiltPlanModel';
 import { planetSlots } from './planetSlots';
+import type { ChainBasis } from './chainEstimateModel';
 
 /** Planet slots at Interplanetary Consolidation V: 1 + 5. */
 const MAX_PLANET_SLOTS = 6;
@@ -234,6 +235,11 @@ export interface PlanAdvice {
    */
   recipeRows: RecipeRow[];
   rankingBasis: RankingBasis;
+  /**
+   * The same assumptions, resolved for a multi-planet chain estimate
+   * (`chainEstimateModel.ts`): priced lazily, never part of the ranking.
+   */
+  chainBasis: ChainBasis;
 }
 
 /** `plan-hek-vi`: the stable fragment a card carries and a deep link targets. */
@@ -471,6 +477,7 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
     recipesWithTagged: ranking.withTagged,
     recipeRows: ranking.rows,
     rankingBasis: ranking.basis,
+    chainBasis: ranking.chain,
   };
 }
 
@@ -966,6 +973,7 @@ function rankingFor(args: {
   withTagged: RecipeRanking;
   rows: RecipeRow[];
   basis: RankingBasis;
+  chain: ChainBasis;
 } {
   const { input, rows, books, pi, haulHours } = args;
   const withAdvice = rows.flatMap((row) => (row.advice ? [row.advice] : []));
@@ -1127,6 +1135,12 @@ function rankingFor(args: {
   ] as PlanetType[];
 
   const unpricedIds = [...unpriced].sort((a, b) => a - b);
+  const basis: RankingBasis = {
+    rateSource: measured.length > 0 ? 'measured' : 'assumed',
+    ccLevel: ceiling.level,
+    ccAssumed: skill === null,
+    linkCost: borrowed ? 'borrowed' : 'assumed',
+  };
   return {
     rows: recipeRows,
     // With no colony every planet type is one the pilot could go and find, as in Find best.
@@ -1143,11 +1157,16 @@ function rankingFor(args: {
       filter: input.recipeFilter,
       unpriced: unpricedIds,
     }),
-    basis: {
-      rateSource: measured.length > 0 ? 'measured' : 'assumed',
-      ccLevel: ceiling.level,
-      ccAssumed: skill === null,
-      linkCost: borrowed ? 'borrowed' : 'assumed',
+    basis,
+    chain: {
+      ...basis,
+      budget: ceiling.budget,
+      newLinkCost: borrowed ?? ASSUMED_RANKING_LINK_COST,
+      headsPerExtractor: heads,
+      ratePerHour: rate,
+      taxRate,
+      books,
+      haulDays: input.cadence.haulDays,
     },
   };
 }

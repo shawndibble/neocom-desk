@@ -29,7 +29,8 @@ export function planetTypesOf(pi: PiData): PlanetType[] {
   return [...new Set(pi.raw.flatMap((raw) => raw.planetTypes))].sort();
 }
 
-function hostsOf(rawId: number, pi: PiData): readonly PlanetType[] {
+/** The planet types that yield a raw; empty for an unknown one. */
+export function hostsOf(rawId: number, pi: PiData): readonly PlanetType[] {
   return pi.raw.find((raw) => raw.typeID === rawId)?.planetTypes ?? [];
 }
 

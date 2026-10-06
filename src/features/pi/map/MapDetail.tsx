@@ -22,6 +22,8 @@ import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { CcLevelTag } from '../CcLevelTag';
+import { chainAssumptions } from '../chainEstimateText';
+import { EstimateBadge } from '../DirectiveRow';
 import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
@@ -179,13 +181,30 @@ export function ProductDetail(props: ProductDetailProps) {
             ` ${t('piMap.detail.ccAssumed', { level: view.money.ccLevel })}`}
         </p>
       )}
-      {view.money.kind === 'multi-planet' && (
+      {view.money.kind === 'multi-planet' && view.money.estimate ? (
+        <div className="mt-3">
+          <div
+            className={cx(
+              'text-[1.875rem] leading-[1.1] font-semibold tabular-nums',
+              view.money.estimate.iskPerDay < 0 ? 'text-isk-neg' : 'text-isk-pos'
+            )}
+          >
+            ≈ <IskAmount value={view.money.estimate.iskPerDay} decimals={0} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('piShared.chain.perDayAcross', { count: view.money.estimate.planets.length })}
+            <EstimateBadge />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-warning">{t('piShared.chain.label')}</p>
+          <p className="mt-1 text-xs text-text-dim">{chainAssumptions(t, view.money.estimate)}</p>
+        </div>
+      ) : view.money.kind === 'multi-planet' ? (
         <p className="mt-2 text-xs font-semibold text-warning">
           {view.money.planets > 1
             ? t('piMap.detail.multiPlanet', { count: view.money.planets })
             : t('piMap.detail.notRanked')}
         </p>
-      )}
+      ) : null}
 
       <Heading>{t('piMap.detail.needHeading')}</Heading>
       <p className="text-xs text-text-dim">
@@ -306,7 +325,10 @@ export function ProductDetail(props: ProductDetailProps) {
         </div>
       )}
 
-      <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+      {/* A chain estimate states its own basis above; this note is about one-planet figures. */}
+      {!(view.money.kind === 'multi-planet' && view.money.estimate) && (
+        <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+      )}
       <Button size="sm" className="mt-3" onClick={props.onClearTrace}>
         {t('piMap.clearTrace')}
       </Button>
