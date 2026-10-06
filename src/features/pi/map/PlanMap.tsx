@@ -4,8 +4,8 @@
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
  * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
- * estimates via `chainOf`. The only pricing it starts is a ticked what-if
- * planet's Bigger chains (`WhatIfChainsFeed`), for a pilot who hauls between planets. `useMapAdvice` builds the advice; tests hand one in.
+ * estimates via `chainOf`. It prices only a ticked what-if's Bigger chains
+ * (below). `useMapAdvice` builds the advice; tests hand one in.
  *
  * ## Where the detail panel goes
  *
@@ -73,7 +73,7 @@ import { clampIskZero, formatIsk, formatIskCompact, formatIskCompactSigned } fro
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import type { PiData } from '@/sde/types';
-import { whatIfChainsOf } from '../biggerChainsModel';
+import { cardPlanetCount, whatIfChainsOf } from '../biggerChainsModel';
 import { WhatIfChainCards } from '../BiggerChainsPanel';
 import { usePiSettings } from '../piSettings';
 import { NO_WHAT_IF_CHAINS, type WhatIfChainsState } from '../useBiggerChains';
@@ -395,12 +395,11 @@ export function PlanMap({
         .map((type) => ({ type, unlock: unlockedBy(graph, type, ticked) })),
     [graph, isHave, ticked]
   );
-  // What-if Bigger chains: the ticked what-if type, priced only while the pilot hauls between planets.
   const haulBetween = usePiSettings((state) => state.value.haulBetweenPlanets === true);
-  const whatIfChainType =
-    haulBetween && pi && !pricesFailed && whatIf && !isHave(whatIf) ? whatIf : null;
+  const chainsOn = haulBetween && pi !== null && !pricesFailed;
+  const whatIfChainType = chainsOn && whatIf && !isHave(whatIf) ? whatIf : null;
   const hasFreeSlot = advice.slots.free >= 1;
-  // Fed by `WhatIfChainsFeed`, mounted only while there is a type to price.
+  // Fed by `WhatIfChainsFeed`.
   const [fed, setFed] = useState<{ advice: PlanAdvice; state: WhatIfChainsState } | null>(null);
   const whatIfChains = fed?.advice === advice ? fed.state : NO_WHAT_IF_CHAINS;
   const chainsPending = whatIfChainType !== null && !whatIfChains.byType.has(whatIfChainType);
@@ -412,18 +411,17 @@ export function PlanMap({
         : [],
     [whatIfChainType, whatIfChains.byType, advice]
   );
-  // Only while the ticked what-if is the one shown: hovering another type previews that type alone.
   const chainCards = useMemo(
-    () =>
-      whatIfChainType && activeWhatIf === whatIfChainType
-        ? new Map(whatIfCards.map((card) => [card.typeId, card]))
-        : null,
-    [whatIfChainType, activeWhatIf, whatIfCards]
+    () => new Map(whatIfCards.map((card) => [card.typeId, card])),
+    [whatIfCards]
   );
+  // Lit only while the ticked what-if is the one shown: hovering another type previews that type alone.
   const newIds = useMemo(() => {
     const ids = unlock?.highlight ?? new Set<number>();
-    return chainCards ? new Set([...ids, ...chainCards.keys()]) : ids;
-  }, [unlock, chainCards]);
+    return activeWhatIf === whatIfChainType && chainCards.size > 0
+      ? new Set([...ids, ...chainCards.keys()])
+      : ids;
+  }, [unlock, chainCards, activeWhatIf, whatIfChainType]);
   const figures = useMemo(
     () =>
       new Map<number, ProductFigure>(
@@ -431,7 +429,7 @@ export function PlanMap({
           const figure = productFigure(advice, id, graph, pricesFailed);
           if (figure.kind !== 'unranked' || figure.reason !== 'tier') return [id, figure];
           const chain = chainOf(id);
-          const card = chainCards?.get(id);
+          const card = chainCards.get(id);
           return [
             id,
             {
@@ -442,10 +440,7 @@ export function PlanMap({
                     whatIf: {
                       type: whatIfChainType,
                       iskPerDay: card.iskPerDay,
-                      planets:
-                        card.kind === 'colonies'
-                          ? card.planetIds.length
-                          : card.estimate.planets.length,
+                      planets: cardPlanetCount(card),
                     },
                   }
                 : {}),
@@ -640,7 +635,7 @@ export function PlanMap({
             closePlanet();
           }}
           chains={
-            haulBetween && pi && !pricesFailed ? (
+            chainsOn && pi ? (
               !hasFreeSlot ? (
                 <p className="text-xs text-text-dim">{t('piMap.add.chainsNoSlot')}</p>
               ) : chainsPending ? (

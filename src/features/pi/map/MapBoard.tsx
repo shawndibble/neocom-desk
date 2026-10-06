@@ -402,6 +402,7 @@ export function MapBoard(props: MapBoardProps) {
                   .filter(Boolean)
                   .join('\n');
                 const unlockedBy = isNew ? props.whatIfType : null;
+                const chainIsk = tileChainIsk(figure);
                 return (
                   <li key={product.typeId} className="relative flex-none">
                     <Tooltip content={tip}>
@@ -467,8 +468,8 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
-                        ) : tileChainIsk(figure) !== null ? (
-                          <ChainTileFigure iskPerDay={tileChainIsk(figure)!} stacked />
+                        ) : chainIsk !== null ? (
+                          <ChainTileFigure iskPerDay={chainIsk} stacked />
                         ) : (
                           <span aria-hidden="true" />
                         )}

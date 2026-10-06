@@ -46,6 +46,7 @@ import {
 } from './chainEstimateModel';
 import type { PlanAdvice } from './planAdviceModel';
 import { rawInputsOf } from './productPlanets';
+import { localResourcesFor } from './systemPlanetModel';
 
 /** One haul between two of the chain's colonies. */
 export interface ChainLeg {
@@ -101,9 +102,7 @@ function candidatesFor(
 export const WHAT_IF_PLANET_ID = -1;
 
 const rawsOn = (type: PlanetType, pi: PiData) =>
-  pi.raw
-    .filter((raw) => (raw.planetTypes as readonly string[]).includes(type))
-    .map((raw) => raw.typeID);
+  localResourcesFor(type, pi).map((raw) => raw.typeID);
 
 /** The P3s and P4s a planet of `type` would add: buildable with it, not without. None for a type they run. */
 export function whatIfChainCandidates(
@@ -330,18 +329,18 @@ export function biggerChainsView(input: BiggerChainsInput): BiggerChainsView {
   };
 }
 
+/** The planets a card's chain uses, the new ones included. */
+export function cardPlanetCount(card: BiggerChainCard): number {
+  return card.kind === 'colonies' ? card.planetIds.length : card.estimate.planets.length;
+}
+
 export interface WhatIfChainsRow {
   /** The planet type added. */
   type: PlanetType;
-  /** Every chain it makes possible with a figure, best first. Never recommended. */
+  /** Every chain it makes possible with a figure, best first. */
   cards: BiggerChainCard[];
 }
 
-/**
- * One row a planet type that makes a chain possible, the type whose best
- * chain gains most first. The new planet is compared with a free slot at the
- * best one-planet recipe, as a chain on new planets is.
- */
 /** `whatIfChainsView` over Plan's own figures: the same comparison on Plan and the Map. */
 export function whatIfChainsOf(
   advice: Pick<PlanAdvice, 'colonies' | 'slots' | 'chainBasis'>,
@@ -357,6 +356,11 @@ export function whatIfChainsOf(
   });
 }
 
+/**
+ * One row per planet type that makes a chain possible, the type whose best
+ * chain gains most first. The new planet is compared with a free slot at the
+ * best one-planet recipe, as a chain on new planets is.
+ */
 export function whatIfChainsView(
   input: Omit<BiggerChainsInput, 'estimates'> & {
     byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>;

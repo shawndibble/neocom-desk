@@ -22,6 +22,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import { withArticle } from './article';
 import {
   biggerChainsView,
+  cardPlanetCount,
   whatIfChainsOf,
   WHAT_IF_PLANET_ID,
   type BiggerChainCard,
@@ -113,7 +114,7 @@ function Verdict({ card }: { card: BiggerChainCard }) {
       {t('piPlan.make.perDay')}
     </>
   );
-  const count = card.kind === 'colonies' ? card.planetIds.length : card.estimate.planets.length;
+  const count = cardPlanetCount(card);
   return (
     <Sentence
       text={t(`piPlan.chains.${card.verdict === 'beats' ? 'beats' : 'short'}${where}`, {

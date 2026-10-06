@@ -130,6 +130,7 @@ export function MapPhone(props: MapPhoneProps) {
         <ul className="mt-1.5 divide-y divide-line border-y border-line">
           {shown.map((product) => {
             const figure = props.figureOf(product.typeId);
+            const chainIsk = tileChainIsk(figure);
             const glyph = verdictGlyph(figure);
             const rank = props.pickRanks.get(product.typeId);
             const traced = props.tracedId === product.typeId;
@@ -174,11 +175,8 @@ export function MapPhone(props: MapPhoneProps) {
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
-                  {tileChainIsk(figure) !== null && (
-                    <ChainTileFigure
-                      iskPerDay={tileChainIsk(figure)!}
-                      className="shrink-0 text-xs"
-                    />
+                  {chainIsk !== null && (
+                    <ChainTileFigure iskPerDay={chainIsk} className="shrink-0 text-xs" />
                   )}
                   {glyph && figure.kind === 'ranked' && (
                     <span

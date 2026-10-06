@@ -1,7 +1,7 @@
 /**
- * Plan's Bigger chains, priced off the main render. Mounted only while the
- * pilot has opted in to hauling between planets, so nothing here runs (no
- * route counting, no solver) for anyone else.
+ * Bigger chains (Plan) and what-if chains (Plan, the Map), priced off the main
+ * render. Mounted only while the pilot hauls between planets, so nothing here
+ * runs (no route counting, no solver) for anyone else.
  *
  * Each candidate runs the Goal Planner's solver a few dozen times, so they
  * are worked through one layout at a time between frames (`runSliced`, as
@@ -10,8 +10,8 @@
  *
  * `useWhatIfChains` prices the same chains with one planet type added, for
  * the types asked for (Plan: every type the pilot does not run; the Map: the
- * ticked what-if planet). One cache, so both tabs show the same figures and
- * the second never prices again.
+ * ticked what-if planet). Cached by inputs: a tab with the same inputs as the
+ * other reuses its figures.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
@@ -211,7 +211,7 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
       },
       () => setVersion((v) => v + 1)
     );
-    // `key` stands for the colonies, the assumptions, the jumps, the types and the free slots.
+    // `key` stands for the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
