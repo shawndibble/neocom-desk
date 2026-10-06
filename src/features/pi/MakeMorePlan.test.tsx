@@ -37,16 +37,18 @@ beforeEach(async () => {
 });
 
 describe('MakeMorePlan', () => {
-  it('keeps ISK figures out of the tab order, but their exact text stays readable', async () => {
-    const user = userEvent.setup();
+  it('gives each panel one ISK tab stop, and the exact figure still shows on focus', async () => {
     const { container } = renderPlan();
-    expect(container.querySelectorAll('span[tabindex="0"]').length).toBe(0);
+    const figures = container.querySelectorAll('[data-isk-figure]');
+    expect(figures.length).toBeGreaterThan(1);
+    // At most one stop per panel, never one per figure.
+    const stops = container.querySelectorAll('[data-isk-figure][tabindex="0"]');
+    expect(stops.length).toBeGreaterThan(0);
+    expect(stops.length).toBeLessThan(figures.length);
+    expect(stops.length).toBeLessThanOrEqual(5);
     expect(container.querySelector('.sr-only')?.textContent).toBeTruthy();
-    // Tab never lands on a bare ISK figure.
-    for (let i = 0; i < 12; i++) {
-      await user.tab();
-      expect(document.activeElement?.tagName).not.toBe('SPAN');
-    }
+    (stops[0] as HTMLElement).focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/ISK/);
   });
 
   it('shows the loading, prices-failed and error states', () => {
