@@ -21,6 +21,7 @@
  * would send keyboard and screen-reader users through a different sequence
  * than the one on screen (WCAG 2.4.3).
  */
+import { PricesUnavailable } from './PricesUnavailable';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -361,9 +362,7 @@ function GoalPlanner({
   } else if (!prices || !result) {
     results = <Loading />;
   } else if (prices.failed) {
-    results = (
-      <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />
-    );
+    results = <PricesUnavailable />;
   } else if ('error' in result) {
     results = <EmptyState title={t('piPlan.planFailedTitle')} hint={t('piPlan.planFailedHint')} />;
   } else {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PricesUnavailable } from './PricesUnavailable';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import type { PlanetType } from '@/engine/pi/goalTypes';
@@ -89,7 +90,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   }, [advice, colonyTypes, allTypes, off, whatIf, filter, snapshot.pi]);
 
   if (state.status === 'prices-failed') {
-    return <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />;
+    return <PricesUnavailable />;
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.find.failedTitle')} hint={t('piPlan.find.failedHint')} />;
