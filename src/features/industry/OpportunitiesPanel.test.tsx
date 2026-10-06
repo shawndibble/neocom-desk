@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -198,41 +197,10 @@ describe('OpportunitiesPanel', () => {
       expect(within(row).getByText('Widget Alpha')).toBeInTheDocument();
     });
 
-    it('opens the shared item menu from a row and wires its actions', async () => {
-      const { row, actions } = await renderWithRow(1000);
-      fireEvent.contextMenu(row);
-      fireEvent.click(await screen.findByText('Add to Quickbar'));
-      expect(actions.addToQuickbar).toHaveBeenCalledWith(1000, 'Widget Alpha');
-
-      fireEvent.contextMenu(row);
-      fireEvent.click(await screen.findByText('Show info'));
-      expect(actions.showInfo).toHaveBeenCalledWith(1000, 'Widget Alpha');
-    });
-
-    it('renders a row with an unknown product type without a menu', async () => {
-      const { row } = await renderWithRow(null);
-      fireEvent.contextMenu(row);
-      expect(screen.queryByText('Add to Quickbar')).toBeNull();
-    });
-
-    it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
+    it('has no row menu or More-actions button: Plan is the row’s one control', async () => {
       const { row } = await renderWithRow(1000);
-      const user = userEvent.setup();
-
-      await user.click(within(row).getByRole('button', { name: 'More actions for Widget Alpha' }));
-      const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-      await user.keyboard('{Escape}');
-
       fireEvent.contextMenu(row);
-      const contextItems = await screen
-        .findAllByRole('menuitem')
-        .then((els) => els.map((el) => el.textContent));
-
-      expect(buttonItems).toEqual(contextItems);
-    });
-
-    it('renders no More-actions button for a row with an unknown product type', async () => {
-      const { row } = await renderWithRow(null);
+      expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
       expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     });
 

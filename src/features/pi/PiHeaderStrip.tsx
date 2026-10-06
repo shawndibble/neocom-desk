@@ -119,7 +119,7 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
         >
           <SelectTrigger
             size={mdUp ? 'sm' : 'md'}
-            className="w-40"
+            className="w-auto min-w-40"
             aria-label={t('piPlan.strip.sellAt')}
           >
             <SelectValue />
@@ -137,7 +137,7 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           <Select value={String(buybackPct)} onValueChange={(pct) => setBuyback(Number(pct))}>
             <SelectTrigger
               size={mdUp ? 'sm' : 'md'}
-              className="w-40"
+              className="w-auto min-w-40"
               aria-label={t('piPlan.strip.buybackRate')}
             >
               <SelectValue />

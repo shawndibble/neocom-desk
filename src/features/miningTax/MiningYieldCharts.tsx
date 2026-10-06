@@ -353,6 +353,7 @@ function IskCharts({
         <div className="sr-only">
           <DataTable
             columns={rateColumns}
+            responsive="table"
             rows={dailyRate}
             rowKey={(point) => point.date}
             label={t('miningTax.overview.rateChartTitle')}
@@ -439,6 +440,7 @@ function IskCharts({
         <div className="sr-only">
           <DataTable
             columns={compareColumns}
+            responsive="table"
             rows={typeComparison}
             rowKey={(point) => point.typeId}
             label={compareChartTitle}
@@ -577,6 +579,7 @@ function MetricCharts({
         <div className="sr-only">
           <DataTable
             columns={rateColumns}
+            responsive="table"
             rows={dailyPoints}
             rowKey={(point) => point.date}
             label={rateChartTitle}
@@ -635,6 +638,7 @@ function MetricCharts({
         <div className="sr-only">
           <DataTable
             columns={compareColumns}
+            responsive="table"
             rows={typeComparison}
             rowKey={(point) => point.typeId}
             label={compareChartTitle}

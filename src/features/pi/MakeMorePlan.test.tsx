@@ -60,6 +60,13 @@ describe('MakeMorePlan', () => {
     expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
   });
 
+  it('puts "What matters more?" on its own row in the body below sm, not in the header', () => {
+    renderPlan();
+    const row = screen.getByTestId('pi-matters-row');
+    expect(within(row).getByRole('group', { name: 'What matters more?' })).toBeInTheDocument();
+    expect(screen.getAllByRole('group', { name: 'What matters more?' })).toHaveLength(1);
+  });
+
   it('announces the headline in a live region', () => {
     renderPlan();
     const live = screen.getByRole('status');
