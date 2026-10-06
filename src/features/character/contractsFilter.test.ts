@@ -33,6 +33,16 @@ const issuerNames = new Map([
 ]);
 
 describe('filterContracts', () => {
+  it('matches the receiver name', () => {
+    const names = new Map([
+      [500001, 'Some Trader'],
+      [777, 'Buyer Bob'],
+    ]);
+    const rows = [contract({ contract_id: 1, acceptor_id: 777 }), contract({ contract_id: 2 })];
+    const f = { ...EMPTY_CONTRACTS_FILTER, text: 'bob' };
+    expect(filterContracts(rows, f, names, 42).map((r) => r.contract_id)).toEqual([1]);
+  });
+
   it('returns every row unchanged when the filter is empty', () => {
     const rows = [contract({ contract_id: 1 }), contract({ contract_id: 2 })];
     expect(filterContracts(rows, EMPTY_CONTRACTS_FILTER, issuerNames)).toEqual(rows);

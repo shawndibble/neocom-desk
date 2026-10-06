@@ -12,6 +12,8 @@
  * (issue #2321); `/market/lp-store` with no corporation is the picker's
  * landing state.
  */
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
 import {
   useCallback,
   useDeferredValue,
@@ -387,6 +389,19 @@ const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 /** The picker in the page header, sized so it wraps onto its own line on a phone. */
 const PICKER_CLASS = 'w-72 max-w-full';
 
+/** The header's picker plus the gear for the one setting this page's numbers lean on, LP Value. */
+function LpStoreActions({ corporationName }: { corporationName: string | null }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <LpStorePicker corporationName={corporationName} className={PICKER_CLASS} />
+      <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
+        <LpValueSettingsForm />
+      </PageSettingsButton>
+    </>
+  );
+}
+
 /** `/market/lp-store` with no corporation chosen yet: just the picker. */
 function LoyaltyStoreLanding() {
   const { t } = useTranslation();
@@ -394,7 +409,7 @@ function LoyaltyStoreLanding() {
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
       <PageHeader
         title={t('loyaltyStore.title')}
-        actions={<LpStorePicker corporationName={null} className={PICKER_CLASS} />}
+        actions={<LpStoreActions corporationName={null} />}
       />
       <Panel>
         <EmptyState title={t('loyaltyStore.landingTitle')} hint={t('loyaltyStore.landingHint')} />
@@ -718,7 +733,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </StatChips>
             </div>
           }
-          actions={<LpStorePicker corporationName={corpName} className={PICKER_CLASS} />}
+          actions={<LpStoreActions corporationName={corpName} />}
         />
 
         <FilterBar

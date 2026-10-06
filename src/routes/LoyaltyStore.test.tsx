@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -200,6 +200,22 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   requiredItems: [],
   requiredItemsCost: 0,
 };
+
+describe('LoyaltyStore LP Value cog', () => {
+  it('opens the LP Value setting in a modal', async () => {
+    const user = userEvent.setup();
+    renderStore();
+    await user.click(screen.getByRole('button', { name: /LP Store settings/i }));
+    const dialog = screen.getByRole('dialog');
+    expect(
+      await within(dialog).findByRole('textbox', { name: /Your LP value/ })
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'All settings' })).toHaveAttribute(
+      'href',
+      '/settings/market'
+    );
+  });
+});
 
 describe('LoyaltyStore filters', () => {
   it('shows the filters inline on a pointer viewport', () => {
