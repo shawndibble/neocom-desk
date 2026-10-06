@@ -407,7 +407,7 @@ export function RecipeListPanel({
   banner: ReactNode;
   unpricedCount: number;
   /** Why nothing ranks, when the pilot's own toggles are not the reason. */
-  emptyHint: string;
+  emptyHint: ReactNode;
 }) {
   const { t } = useTranslation();
   return (

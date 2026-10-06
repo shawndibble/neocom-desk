@@ -137,6 +137,25 @@ describe('FindBestPlan', () => {
     renderPlan();
     await user.click(screen.getByRole('button', { name: 'Factory goods (P2)' }));
     expect(screen.getByText(/No Factory goods \(P2\) setup fits one planet/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Command Center Upgrades' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=skill-2505')
+    );
+  });
+
+  it('links Command Center Upgrades when no setup fits at all', () => {
+    mockState = {
+      status: 'ready',
+      advice: advice({ recipeRows: [] }),
+      pricesFetchedAt: new Date(),
+      hubName: 'Jita',
+    };
+    renderPlan();
+    expect(screen.getByText(/No one-planet setup fits a Command Center/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Command Center Upgrades' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=skill-2505')
+    );
   });
 
   it('hides recipes only a switched-off planet type could host', async () => {

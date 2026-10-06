@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { SkillLink } from '@/features/entities';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { PricesUnavailable } from './PricesUnavailable';
 import { AllProductsPanel } from './AllProductsPanel';
 import { useCadence } from './cadencePref';
+import { COMMAND_CENTER_UPGRADES_SKILL_ID } from './colonyBudget';
 import {
   FindBestControls,
   PlanetTypesPanel,
@@ -17,6 +19,7 @@ import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { SlotNudge } from './PlanSlotNudge';
 import { usePlanPreference } from './planTicksPref';
 import { planetTypesOf } from './productPlanets';
+import { Sentence } from './sentence';
 import { ShowMeHow } from './ShowMeHow';
 import { useFinderOrigin } from './usePlanetFinder';
 import { usePlanAdvice } from './usePlanAdvice';
@@ -42,6 +45,24 @@ function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
  * (`usePlanAdvice`), shapes it (`buildFindBestView`) and draws it
  * (`FindBestSections`, `ShowMeHow`, `AllProductsPanel`).
  */
+/** An empty-state sentence whose `{skill}` slot is a link to Command Center Upgrades. */
+function CcHint({ text }: { text: string }) {
+  const { t } = useTranslation();
+  return (
+    <Sentence
+      text={text}
+      slots={{
+        skill: (
+          <SkillLink typeId={COMMAND_CENTER_UPGRADES_SKILL_ID}>
+            {t('piPlan.find.ccSkill')}
+          </SkillLink>
+        ),
+      }}
+    />
+  );
+}
+const ccHint = (text: string) => <CcHint text={text} />;
+
 export function FindBestPlan({ snapshot, characterId }: Props) {
   const { t } = useTranslation();
   const preference = usePlanPreference((state) => state.value);
@@ -164,12 +185,17 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           unpricedCount={best.unpricedCount}
           emptyHint={
             advice.recipeRows.length === 0
-              ? t('piPlan.find.noneFit', { level: advice.rankingBasis.ccLevel })
+              ? ccHint(
+                  t('piPlan.find.noneFit', { level: advice.rankingBasis.ccLevel, skill: '{skill}' })
+                )
               : filter !== 'any' && best.hasRecipesAtAll
-                ? t('piPlan.find.noneFitFilter', {
-                    tier: t(filter === 'p1' ? 'piPlan.find.makeP1' : 'piPlan.find.makeP2'),
-                    level: advice.rankingBasis.ccLevel,
-                  })
+                ? ccHint(
+                    t('piPlan.find.noneFitFilter', {
+                      tier: t(filter === 'p1' ? 'piPlan.find.makeP1' : 'piPlan.find.makeP2'),
+                      level: advice.rankingBasis.ccLevel,
+                      skill: '{skill}',
+                    })
+                  )
                 : t('piPlan.find.noRecipes')
           }
           banner={
