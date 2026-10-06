@@ -4918,7 +4918,7 @@
       "hideSteps": "Hide steps",
       "close": "Close",
       "howLabel": "How to make {{item}}",
-      "howTitle": "Show me how · {{item}} on a {{type}} planet",
+      "howTitle": "Show me how · {{item}} on {{aType}} planet",
       "stepFind": "Find a planet: {{types}}",
       "or": "or",
       "haveOne": "You already have one:",

@@ -800,10 +800,9 @@ function factoryRoom(
   );
   const byHost = new Map<number, NetworkOpportunity[]>();
   for (const opportunity of network.plan.opportunities) {
-    byHost.set(opportunity.hostPlanetId, [
-      ...(byHost.get(opportunity.hostPlanetId) ?? []),
-      opportunity,
-    ]);
+    const group = byHost.get(opportunity.hostPlanetId) ?? [];
+    group.push(opportunity);
+    byHost.set(opportunity.hostPlanetId, group);
   }
   const opportunities = [...byHost.values()].flatMap((group) => dropSharedSurplus(group));
   for (const opportunity of opportunities) {

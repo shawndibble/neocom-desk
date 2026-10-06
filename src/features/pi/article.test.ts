@@ -9,5 +9,6 @@ describe('withArticle', () => {
   it('uses "a" before a consonant', () => {
     expect(withArticle('Lava')).toBe('a Lava');
     expect(withArticle('Barren')).toBe('a Barren');
+    expect(withArticle('Gas')).toBe('a Gas');
   });
 });
