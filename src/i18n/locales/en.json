@@ -4867,6 +4867,8 @@
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
       "lowsecJumps_other": "{{count}} lowsec jumps",
+      "nullsecJumps_one": "{{count}} nullsec jump",
+      "nullsecJumps_other": "{{count}} nullsec jumps",
       "sellAt": "Where do you sell?",
       "nearestHub_one": "Nearest hub: {{hub}}, {{count}} jump",
       "nearestHub_other": "Nearest hub: {{hub}}, {{count}} jumps",

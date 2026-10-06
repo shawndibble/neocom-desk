@@ -239,6 +239,12 @@ export function PiHeaderStrip({
                     {t('piPlan.strip.lowsecJumps', { count: figures.lowsecJumps })}
                   </span>
                 )}
+                {figures.nullsecJumps > 0 && (
+                  <span className="text-danger">
+                    {' · '}
+                    {t('piPlan.strip.nullsecJumps', { count: figures.nullsecJumps })}
+                  </span>
+                )}
               </>
             }
           />
