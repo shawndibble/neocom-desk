@@ -188,6 +188,30 @@ describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () =
     expect(onFailure).toHaveBeenCalledWith(CHAR_ID);
   });
 
+  it('names the endpoint in the signal when the caller says which read it is', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'x',
+      refreshToken: 'y',
+      expiresAt: Date.now() + 100_000,
+      scopes: ['esi-clones.read_clones.v1'],
+    });
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new EsiError(403, 'missing scope', undefined, 'getCharacterClones');
+      },
+      { authFailureEndpoint: 'getCharacterClones' }
+    );
+    unsubscribe();
+
+    expect(onFailure).toHaveBeenCalledWith(CHAR_ID, 'getCharacterClones');
+  });
+
   it('still emits for a refresh failure (AuthError), which has no single endpoint to check', async () => {
     const onFailure = vi.fn();
     const unsubscribe = onEsiAuthFailure(onFailure);
