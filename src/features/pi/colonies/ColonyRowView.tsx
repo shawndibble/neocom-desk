@@ -158,7 +158,9 @@ function actionText(
       return {
         labelGain: action.savesPerDay,
         label:
-          g === null ? t('piColonies.action.haul') : t('piColonies.action.haulSaves', { gain: g }),
+          g === null
+            ? t('piColonies.action.haul')
+            : t('piColonies.action.haulSaves', { gain: g, perDay }),
         note: t('piColonies.action.haulNote', { minutes: action.minutes }),
       };
     }

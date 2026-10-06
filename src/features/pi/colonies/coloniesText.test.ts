@@ -13,6 +13,7 @@ describe('quickWinLine', () => {
       what: 'factories',
       productTypeId: 2389,
       factories: 1,
+      source: 'local',
       routedFrom: [],
       needsRemoval: false,
     },
