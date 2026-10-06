@@ -37,6 +37,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow } from './support/overflow';
 import type { RegionOrder } from '../src/esi/endpoints';
 
 const PHONE = { width: 390, height: 844 };
@@ -373,3 +374,76 @@ test.describe('Market Browser — order book stacked cards', () => {
     await expect(row.locator('td.dt-disclosure svg')).toHaveCount(0);
   });
 });
+
+/**
+ * The item panel header's icon cluster (Add to Quickbar, Add to Compare, price
+ * alert, Info) at phone widths: every button visible, a 44px touch target
+ * (§6c touch tier), none overlapping another, and the page not scrolling
+ * sideways.
+ */
+for (const width of [390, 360]) {
+  test(`item header buttons are visible, 44px and non-overlapping at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    // Empty books and a stub type: only the header is under test.
+    await page.route(/\/markets\/\d+\/orders/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'X-Pages': '1' },
+        body: '[]',
+      })
+    );
+    await page.route(/\/universe\/types\/\d+$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          type_id: TRITANIUM,
+          name: 'Tritanium',
+          description: '',
+          group_id: 18,
+          published: true,
+          dogma_attributes: [],
+        }),
+      })
+    );
+    await signInAndGoto(page, './market');
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
+    await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
+
+    const names = [
+      /^Add Tritanium to Quickbar$/,
+      /^Add Tritanium to Compare$/,
+      /^Set price alert for Tritanium$/,
+      /^Show info$/,
+    ];
+    // The cluster must not squeeze the item name out of the header.
+    await expect(page.getByRole('heading', { name: 'Tritanium' })).toBeVisible();
+    const boxes = [];
+    for (const name of names) {
+      const button = page.getByRole('button', { name });
+      await expect(button).toBeVisible();
+      const box = await button.boundingBox();
+      expect(box, String(name)).not.toBeNull();
+      expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(44);
+      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(44);
+      expect(box!.x + box!.width, `${name} inside viewport`).toBeLessThanOrEqual(width);
+      boxes.push(box!);
+    }
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const overlap =
+          a.x < b.x + b.width &&
+          b.x < a.x + a.width &&
+          a.y < b.y + b.height &&
+          b.y < a.y + a.height;
+        expect(overlap, `buttons ${i} and ${j} overlap`).toBe(false);
+      }
+    }
+    await expectNoPageOverflow(page);
+  });
+}

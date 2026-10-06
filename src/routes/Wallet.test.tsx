@@ -11,6 +11,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -83,10 +84,28 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one. A worker's first
+  // `App` render (compiling the lazy Layout and route chunks, warming jsdom
+  // and React) took seconds under parallel load and landed on whichever test
+  // ran first, tipping it past its findBy / test timeout. Done here under the
+  // hook's own budget, as IndustryPlanPage.test.tsx does.
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadWallet()]);
+  await seed();
+  const { unmount } = render(<App />);
+  await waitFor(
+    () => expect(document.querySelector('main')?.textContent?.length).toBeGreaterThan(0),
+    {
+      timeout: 25_000,
+    }
+  );
+  unmount();
+  server.resetHandlers();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+async function seed() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -105,7 +124,9 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/wallet');
-});
+}
+
+beforeEach(seed);
 
 describe('Wallet', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {

@@ -990,7 +990,7 @@ export function Market() {
                 selectedTypeId !== null && (
                   <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
                     <IconButton
-                      size="sm"
+                      size="md"
                       icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
                       label={t(
                         selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
@@ -1014,7 +1014,7 @@ export function Market() {
                       }}
                     />
                     <IconButton
-                      size="sm"
+                      size="md"
                       icon={<Icon.Compare />}
                       label={t(
                         selectedInCompare ? 'market.compare.removeItem' : 'market.compare.addItem',
@@ -1035,7 +1035,7 @@ export function Market() {
                       onPin={handlePinWithTarget}
                     />
                     <IconButton
-                      size="sm"
+                      size="md"
                       icon={<Icon.Info />}
                       label={t('market.contextMenu.showInfo')}
                       onClick={() =>
