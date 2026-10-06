@@ -1038,25 +1038,35 @@ function rankingFor(args: {
     // A head count must not decide whether a planet can host a P2: ten heads on
     // each of its two extractors overdraws even a level-5 Command Center's
     // powergrid, and the heads a pilot runs on a P0 colony are not the ones
-    // they would put on a P2 planet. Step the heads down until a P2 block fits.
-    // An assumed count steps the whole layout; a measured one steps only the
-    // P2s, at the measured rate scaled to the heads kept, so P1 still reads
-    // the colonies the pilot really runs.
+    // they would put on a P2 planet. An assumed count first steps the whole
+    // layout down until some P2 block fits; a measured one keeps P1 at the
+    // pilot's own count. Then each P2 that still does not fit gets the most
+    // heads that do, a measured rate scaled to the heads kept.
     const adviceFor = (budget: PinLoad): FittedEntry[] => {
-      const own = adviceAt(budget, heads, rate);
-      let stepped = own;
-      let steppedHeads = heads;
-      for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(stepped); tryHeads -= 2) {
-        stepped = adviceAt(budget, tryHeads, headsMeasured ? (rate * tryHeads) / heads : rate);
-        steppedHeads = tryHeads;
+      let base = adviceAt(budget, heads, rate);
+      let baseHeads = heads;
+      if (!headsMeasured) {
+        for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(base); tryHeads -= 2) {
+          base = adviceAt(budget, tryHeads, rate);
+          baseHeads = tryHeads;
+        }
       }
-      if (!headsMeasured) return stepped.entries.map((entry) => ({ entry, heads: steppedHeads }));
-      return [
-        ...own.entries.filter((entry) => entry.tier !== 2).map((entry) => ({ entry, heads })),
-        ...stepped.entries
-          .filter((entry) => entry.tier === 2)
-          .map((entry) => ({ entry, heads: steppedHeads })),
-      ];
+      const fitted = base.entries.map((entry) => ({ entry, heads: baseHeads }));
+      const unhosted = new Set(
+        base.entries
+          .filter((entry) => entry.tier === 2 && entry.status === 'does-not-fit')
+          .map((entry) => entry.typeId)
+      );
+      for (let tryHeads = baseHeads - 1; tryHeads >= 1 && unhosted.size > 0; tryHeads -= 1) {
+        const tryRate = headsMeasured ? (rate * tryHeads) / heads : rate;
+        for (const entry of adviceAt(budget, tryHeads, tryRate).entries) {
+          if (!unhosted.has(entry.typeId) || entry.status === 'does-not-fit') continue;
+          unhosted.delete(entry.typeId);
+          const at = fitted.findIndex((f) => f.entry.typeId === entry.typeId);
+          fitted[at] = { entry, heads: tryHeads };
+        }
+      }
+      return fitted;
     };
     const rowFor = (
       fitted: FittedEntry & { entry: ScoredStopTier },

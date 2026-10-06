@@ -43,7 +43,7 @@ function prices(): { prices: Record<number, number>; buyPrices: Record<number, n
   return { prices: sell, buyPrices: buy };
 }
 
-function ecu(pinId: number, product: number, heads: number): PlanetPin {
+function ecu(pinId: number, product: number, heads: number, qty: number): PlanetPin {
   return {
     pin_id: pinId,
     type_id: ECU,
@@ -54,7 +54,7 @@ function ecu(pinId: number, product: number, heads: number): PlanetPin {
     extractor_details: {
       heads: Array.from({ length: heads }, (_, i) => ({ head_id: i, latitude: 0, longitude: 0 })),
       product_type_id: product,
-      qty_per_cycle: 6_000,
+      qty_per_cycle: qty,
       cycle_time: 1800,
     },
   };
@@ -67,22 +67,25 @@ const pin = (pinId: number, typeId: number): PlanetPin => ({
   longitude: 0.5,
 });
 
-/** A nullsec extraction colony: two eight-head ECUs on one P0, a pad, a silo, a factory. */
-function extractionColony(product: number): CharacterPlanetDetail {
+/** A nullsec extraction colony: two ECUs on one P0, a pad, a factory and maybe a silo. */
+function extractionColony(
+  product: number,
+  heads: number,
+  storage: boolean,
+  qty: number
+): CharacterPlanetDetail {
+  const pins = [
+    ecu(1, product, heads, qty),
+    ecu(2, product, heads, qty),
+    pin(3, LAUNCHPAD),
+    pin(5, BASIC),
+  ];
+  if (storage) pins.push(pin(4, STORAGE));
   return {
-    pins: [
-      ecu(1, product, 8),
-      ecu(2, product, 8),
-      pin(3, LAUNCHPAD),
-      pin(4, STORAGE),
-      pin(5, BASIC),
-    ],
-    links: [
-      { source_pin_id: 3, destination_pin_id: 1, link_level: 0 },
-      { source_pin_id: 3, destination_pin_id: 2, link_level: 0 },
-      { source_pin_id: 3, destination_pin_id: 4, link_level: 0 },
-      { source_pin_id: 3, destination_pin_id: 5, link_level: 0 },
-    ],
+    pins,
+    links: pins
+      .filter((p) => p.pin_id !== 3)
+      .map((p) => ({ source_pin_id: 3, destination_pin_id: p.pin_id, link_level: 0 })),
     routes: [],
   };
 }
@@ -103,15 +106,23 @@ function advise(opts: {
   colonies: boolean;
   ccu: number | null;
   haulDays: PiCadence['haulDays'];
+  /** Heads per ECU on the pilot's colonies. */
+  heads?: number;
+  storage?: boolean;
+  /** P0 per cycle on each ECU: the measured yield. */
+  qty?: number;
 }): PlanAdvice {
+  const qty = opts.qty ?? 6_000;
+  const heads = opts.heads ?? 8;
+  const storage = opts.storage ?? true;
   const colonies = opts.colonies
     ? [planet(1, 'barren'), planet(2, 'gas'), planet(3, 'temperate')]
     : [];
   const details = opts.colonies
     ? new Map([
-        [1, extractionColony(2267)],
-        [2, extractionColony(2309)],
-        [3, extractionColony(2268)],
+        [1, extractionColony(2267, heads, storage, qty)],
+        [2, extractionColony(2309, heads, storage, qty)],
+        [3, extractionColony(2268, heads, storage, qty)],
       ])
     : new Map<number, CharacterPlanetDetail>();
   return buildPlanAdvice({
@@ -178,25 +189,38 @@ describe('one fit source: tag, Show me how and the meter agree', () => {
     expect(buildHowTo(plasmoids, pi)?.fit?.level).toBe(1);
   });
 
-  it.each([1, 7] as const)('nullsec colonies at CC 4, hauling every %i days', (haulDays) => {
-    const advice = advise({ colonies: true, ccu: 4, haulDays });
+  it.each([
+    [1, 6_000],
+    [7, 6_000],
+    [1, 3_000],
+  ] as const)('nullsec colonies at CC 4, hauling every %i days, %i P0 a cycle', (haulDays, qty) => {
+    const advice = advise({ colonies: true, ccu: 4, haulDays, qty });
     expect(advice.rankingBasis).toMatchObject({ ccLevel: 4, linkCost: 'borrowed' });
     expectOneFitSource(advice);
   });
 
-  it('nullsec colonies at CC 4: a P2 is not pushed to level 5 by the heads their P0 colonies run', () => {
-    const advice = advise({ colonies: true, ccu: 4, haulDays: 1 });
-    const p2 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 2);
-    expect(p2.length).toBeGreaterThan(0);
-    expect(p2.every((r) => r.needsCcLevel === undefined)).toBe(true);
-    // The heads the layout assumes are named, so the pilot can build what the meter reads.
-    for (const recipe of p2) {
-      const heads = recipe.layout?.headsPerExtractor ?? 0;
-      expect(heads).toBeGreaterThanOrEqual(1);
-      expect(heads).toBeLessThan(8);
+  it.each([
+    [8, true],
+    [8, false],
+    [7, true],
+    [6, false],
+  ])(
+    'nullsec colonies at CC 4 on %i heads (storage %s): a yield richer than a P2 block needs runs it on fewer heads, not at level 5',
+    (heads, storage) => {
+      const advice = advise({ colonies: true, ccu: 4, haulDays: 1, heads, storage });
+      expectOneFitSource(advice);
+      const p2 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 2);
+      expect(p2.length).toBeGreaterThan(0);
+      expect(p2.filter((r) => r.needsCcLevel !== undefined).map((r) => r.name)).toEqual([]);
+      // The heads the layout assumes are named, so the pilot can build what the meter reads.
+      for (const recipe of p2) {
+        const kept = recipe.layout?.headsPerExtractor ?? 0;
+        expect(kept, recipe.name).toBeGreaterThanOrEqual(1);
+        expect(kept, recipe.name).toBeLessThanOrEqual(heads);
+      }
+      // P1 keeps the pilot's own measured head count.
+      const p1 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 1);
+      expect(p1.every((r) => r.layout?.headsPerExtractor === heads)).toBe(true);
     }
-    // P1 keeps the pilot's own measured head count.
-    const p1 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 1);
-    expect(p1.every((r) => r.layout?.headsPerExtractor === 8)).toBe(true);
-  });
+  );
 });
