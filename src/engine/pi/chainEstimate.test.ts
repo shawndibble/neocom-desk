@@ -87,6 +87,28 @@ describe('estimateChain', () => {
     expect(result.best.plan.factoryHost?.planetId).toBe(1);
   });
 
+  it('hands a jumps function to the planner, so every leg between colonies carries its distance', () => {
+    // Condensates (P3) from two Gas colonies: one ships its P1 to the other.
+    const GAS_RAWS = [IONIC_SOLUTIONS, AQUEOUS_LIQUIDS, 2311, 2310];
+    const colonies = [colony(1, 'gas', GAS_RAWS), colony(2, 'gas', GAS_RAWS)];
+    const result = estimateChain(
+      {
+        typeId: 2344,
+        colonies,
+        policy: POLICY,
+        books: priced(),
+        jumps: (from, to) => (to === 'hub' ? 9 : from === to ? 0 : 3),
+      },
+      pi
+    );
+    if (result.status !== 'estimated') throw new Error(`expected estimated, got ${result.status}`);
+    const between = result.best.plan.flows.filter(
+      (f) => f.from !== 'hub' && f.to !== 'hub' && f.from !== f.to
+    );
+    expect(between.length).toBeGreaterThan(0);
+    expect(between.every((f) => f.jumps === 3)).toBe(true);
+  });
+
   it('refuses with the missing prices rather than pricing them at zero', () => {
     const books = priced();
     const bid = { ...books.bid };

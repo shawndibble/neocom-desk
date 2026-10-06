@@ -51,6 +51,20 @@ describe('parsePiSettings', () => {
     expect(parsePiSettings({ hub: 'jita', hubChosen: true })?.hubChosen).toBe(true);
   });
 
+  it('keeps the haul-between-planets opt-in only when it is on, and never counts it as a hub pick', () => {
+    expect(parsePiSettings({ hub: 'jita', haulBetweenPlanets: true })).toEqual({
+      ...DEFAULT_PI_SETTINGS,
+      haulBetweenPlanets: true,
+    });
+    expect(parsePiSettings({ hub: 'jita', haulBetweenPlanets: 'yes' })).toEqual(
+      DEFAULT_PI_SETTINGS
+    );
+    expect(parsePiSettings({ hub: 'jita', haulBetweenPlanets: false })).toEqual(
+      DEFAULT_PI_SETTINGS
+    );
+    expect(DEFAULT_PI_SETTINGS.haulBetweenPlanets).toBeUndefined();
+  });
+
   it('repairs each bad field and refuses a non-object', () => {
     expect(parsePiSettings({ hub: 'x', buybackPct: 'a', buyTiers: 'b' })).toEqual(
       DEFAULT_PI_SETTINGS

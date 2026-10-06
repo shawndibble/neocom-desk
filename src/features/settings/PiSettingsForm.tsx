@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  Checkbox,
   Field,
   Fields,
   FilterChip,
@@ -17,8 +18,11 @@ import {
   PI_BUYBACK_PCT_OPTIONS,
   PI_BUY_TIERS,
   usePiSettings,
+  withHaulBetweenPlanets,
   type PiBuyTier,
 } from '@/features/pi/piSettings';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ChipRow } from './settingsFields';
 import { useHydratedStore } from './useHydratedStore';
@@ -157,6 +161,21 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
           labelFor={cadenceDays}
           onChange={(haulDays) => void setCadence({ ...cadence, haulDays })}
         />
+      </Field>
+
+      <Field label={t('piPlan.chains.title')} note={t('piPlan.chains.optInHint')}>
+        <label
+          className={cx(
+            'flex w-fit cursor-pointer items-center gap-2 text-sm text-text',
+            tappableRowClassName
+          )}
+        >
+          <Checkbox
+            checked={settings.haulBetweenPlanets === true}
+            onChange={(e) => void setSettings(withHaulBetweenPlanets(settings, e.target.checked))}
+          />
+          {t('piPlan.chains.optIn')}
+        </label>
       </Field>
 
       <ChipRow

@@ -11,15 +11,16 @@
  * search is capped and keeps the best rate it saw reached, never a guess.
  *
  * The figure is the plan's absolute `netPerHour` a day (sales after sales tax,
- * less customs and anything bought), never a Lift over a Baseline: the
- * colonies are hypothetical, so what they "would earn anyway" means nothing.
+ * less customs and anything bought), never a Lift over a Baseline: for
+ * hypothetical colonies what they "would earn anyway" means nothing. A caller
+ * on real colonies reads the plan's `perColony` for the ones the chain uses.
  * Nothing is bought: the policy's `buyTiers` is cleared, since a chain that
  * buys its inputs is a trade spread, not a planet chain.
  *
  * Pure: colonies, policy, prices and `PiData` are parameters.
  */
 import type { PiData } from '@/sde/types';
-import type { GoalPlan, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
+import type { GoalPlan, JumpsFn, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
 import { planBest, type BestPlan } from './planBest';
 
 export interface ChainEstimateInput {
@@ -27,6 +28,12 @@ export interface ChainEstimateInput {
   colonies: readonly PlannerColony[];
   policy: PlannerPolicy;
   books: PriceBooks;
+  /**
+   * Jumps between real colonies, when the caller knows them: the planner then
+   * prefers the nearer host and every leg carries its distance. Hypothetical
+   * planets have none.
+   */
+  jumps?: JumpsFn;
 }
 
 export type ChainEstimate =
@@ -72,6 +79,7 @@ export function estimateChain(input: ChainEstimateInput, pi: PiData): ChainEstim
         colonies: input.colonies,
         policy,
         books: input.books,
+        ...(input.jumps ? { jumps: input.jumps } : {}),
       },
       pi
     );
