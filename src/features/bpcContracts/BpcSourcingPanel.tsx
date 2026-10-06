@@ -90,6 +90,7 @@ import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
+import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
@@ -1418,14 +1419,15 @@ export function BpcSourcingPanel() {
           if (row.source === 'market') return <IskAmount value={row.price} />;
           if (row.source === 'lp') {
             return (
-              <span
-                title={t('bpcContracts.lpOfferCost', {
+              <HintText
+                desktopOnly
+                content={t('bpcContracts.lpOfferCost', {
                   isk: row.iskCost.toLocaleString(),
                   lp: row.lpCost.toLocaleString(),
                 })}
               >
                 <IskAmount value={row.price} />
-              </span>
+              </HintText>
             );
           }
           const contract = asContract(row);
