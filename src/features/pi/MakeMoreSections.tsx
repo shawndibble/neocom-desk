@@ -305,7 +305,7 @@ function QuickWinSentence({ win, names }: { win: QuickWinRow; names: Map<number,
         <Sentence
           text={t('piPlan.make.win.storage', {
             hours: Math.max(1, Math.round(detail.hoursToFull)),
-            haulDays: Math.max(1, Math.round(detail.haulHours / 24)),
+            count: Math.max(1, Math.round(detail.haulHours / 24)),
             planet: '{planet}',
           })}
           slots={{ planet }}
@@ -416,6 +416,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
                 ) : win.gainKind === 'saves' ? (
                   <span className="tabular-nums text-warning">
                     {t('piPlan.make.saves')} <IskAmount value={win.gainPerDay} decimals={0} />
+                    {t('piPlan.make.perDay')}
                   </span>
                 ) : (
                   <Gain value={win.gainPerDay} />

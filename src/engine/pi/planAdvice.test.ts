@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildSteps,
   colonyAdvice,
+  isSaving,
   orderQuickWins,
   pickRebuild,
   planTotals,
@@ -9,6 +10,7 @@ import {
   quickWinMinutes,
   sellBooks,
   slotNudge,
+  spendRoomOnce,
   totalQuickWins,
   type RebuildCandidate,
   type RebuildFacts,
@@ -112,6 +114,97 @@ describe('quick wins', () => {
       minutes: 6,
       unpriced: 1,
     });
+  });
+
+  it('leaves out of the total what a storage win saves, but counts its minutes', () => {
+    const storage = quickWin(4, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, 80_000);
+    expect(isSaving(storage.detail)).toBe(true);
+    expect(isSaving(restart(1, 100).detail)).toBe(false);
+    expect(totalQuickWins([restart(1, 100), storage])).toEqual({
+      gainPerDay: 100,
+      minutes: 5,
+      unpriced: 0,
+    });
+    // A saving with no figure is not an unpriced addition either.
+    expect(
+      totalQuickWins([quickWin(4, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, null)])
+        .unpriced
+    ).toBe(0);
+  });
+});
+
+describe('spendRoomOnce', () => {
+  const PLANET = 7;
+  const heads = (gain: number | null, headsToAdd: number | null = 6) =>
+    quickWin(
+      PLANET,
+      {
+        kind: 'idle-factories',
+        pinCount: 3,
+        freed: { cpu: 600, powergrid: 2_400 },
+        wouldFeed: 3,
+        headsToAdd,
+        resourceTypeId: 1,
+      },
+      gain
+    );
+  const factory = (productTypeId: number, gain: number | null) =>
+    quickWin(
+      PLANET,
+      {
+        kind: 'spare-room',
+        what: 'factories',
+        productTypeId,
+        factories: 1,
+        routedFrom: [8],
+        needsRemoval: true,
+      },
+      gain
+    );
+  const extractors = (gain: number | null) =>
+    quickWin(
+      PLANET,
+      { kind: 'spare-room', what: 'extractors', extraEcus: 1, resourceTypeId: 1 },
+      gain
+    );
+  const restart = quickWin(
+    PLANET,
+    { kind: 'restart', reason: 'stopped', extractors: 1, resourceTypeIds: [1] },
+    50_000
+  );
+  const kinds = (wins: readonly { id: string }[]) => wins.map((win) => win.id);
+
+  it('keeps one claim on the freed room, the one that earns more (Uttindar V)', () => {
+    const kept = spendRoomOnce([heads(2_040_000), factory(2319, 935_000)]);
+    expect(kinds(kept)).toEqual([`${PLANET}:idle`]);
+    expect(totalQuickWins(kept).gainPerDay).toBe(2_040_000);
+    expect(kinds(spendRoomOnce([heads(500_000), factory(2319, 935_000)]))).toEqual([
+      `${PLANET}:room-factories:2319`,
+    ]);
+  });
+
+  it('counts the network plan’s factories on one host together, since it split the room between them', () => {
+    const kept = spendRoomOnce([heads(1_000_000), factory(2319, 600_000), factory(2312, 600_000)]);
+    expect(kinds(kept)).toEqual([`${PLANET}:room-factories:2319`, `${PLANET}:room-factories:2312`]);
+  });
+
+  it('spends plain headroom once too: more extractors or a new factory, not both', () => {
+    expect(kinds(spendRoomOnce([extractors(300_000), factory(2319, 200_000)]))).toEqual([
+      `${PLANET}:room-extractors`,
+    ]);
+  });
+
+  it('prefers a claim with a figure over one without', () => {
+    expect(kinds(spendRoomOnce([heads(null), factory(2319, 10)]))).toEqual([
+      `${PLANET}:room-factories:2319`,
+    ]);
+  });
+
+  it('leaves alone what spends no room: a restart, storage, factories removed without heads', () => {
+    const removeOnly = heads(null, null);
+    const storage = quickWin(PLANET, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, 1);
+    const wins = [restart, storage, removeOnly, factory(2319, 935_000)];
+    expect(spendRoomOnce(wins)).toEqual(wins);
   });
 });
 
@@ -308,7 +401,7 @@ describe('buildSteps', () => {
 
 describe('colonyAdvice', () => {
   const win = (gain: number | null) =>
-    quickWin(1, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, gain);
+    quickWin(1, { kind: 'restart', reason: 'stopped', extractors: 1, resourceTypeIds: [] }, gain);
 
   it('adds the priced quick wins to today and stacks the rebuild on top', () => {
     const advice = colonyAdvice({
@@ -322,6 +415,23 @@ describe('colonyAdvice', () => {
     expect(advice.afterQuickWinsPerDay).toBe(120_000);
     expect(advice.rebuild.status).toBe('change');
     expect(advice.afterRebuildPerDay).toBe(160_000);
+  });
+
+  it('shows what a storage win saves without adding it to the colony after its quick wins', () => {
+    const advice = colonyAdvice({
+      planetId: 1,
+      planetType: 'barren',
+      todayPerDay: 100_000,
+      quickWins: [
+        win(20_000),
+        quickWin(1, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, 30_000),
+      ],
+      rebuild: { refused: 'needs-link-cost' },
+      preference: 'isk',
+    });
+    expect(advice.quickWins).toHaveLength(2);
+    expect(advice.quickWinGainPerDay).toBe(20_000);
+    expect(advice.afterQuickWinsPerDay).toBe(120_000);
   });
 
   it('has no figures, rather than zeros, for a colony whose income is unknown', () => {
@@ -384,7 +494,13 @@ describe('planTotals', () => {
       planetType: 'barren',
       todayPerDay: today,
       quickWins: wins
-        ? [quickWin(1, { kind: 'storage', hoursToFull: 1, haulHours: 24 }, wins)]
+        ? [
+            quickWin(
+              1,
+              { kind: 'restart', reason: 'stopped', extractors: 1, resourceTypeIds: [] },
+              wins
+            ),
+          ]
         : [],
       rebuild: rebuildGain
         ? facts([cand(10, 2, (today ?? 0) + wins + rebuildGain, 1)], {

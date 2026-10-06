@@ -12,9 +12,9 @@ import {
 const view = buildPlanView(advice, pi, (id) => `Planet ${id}`);
 
 describe('buildPlanView', () => {
-  it('splits the headline into quick wins and the rebuild gain on top', () => {
+  it('splits the headline into quick wins and the rebuild gain on top, leaving out what storage saves', () => {
     expect(view.headline).toMatchObject({
-      quickWinPerDay: 420,
+      quickWinPerDay: 300,
       quickWinMinutes: 4,
       rebuildGainPerDay: 3700,
       rebuildCount: 1,
@@ -23,10 +23,10 @@ describe('buildPlanView', () => {
     expect(view.stats.m3PerWeek).toBe(700);
   });
 
-  it('draws one strip per colony: quick-win label only when it has one, change or keep', () => {
+  it('draws one strip per colony: quick-win label only when one adds, change or keep', () => {
     expect(view.strips.map((s) => [s.name, s.quickWinGainPerDay, s.rebuild.kind])).toEqual([
       ['Hek VI', 300, 'change'],
-      ['Uttindar II', 120, 'keep'],
+      ['Uttindar II', null, 'keep'],
     ]);
   });
 
@@ -52,8 +52,8 @@ describe('buildPlanView', () => {
     expect(card).toMatchObject({
       status: 'keep',
       gainPerDay: null,
-      fromPerDay: 1120,
-      toPerDay: 1120,
+      fromPerDay: 1000,
+      toPerDay: 1000,
       keepReason: 'already-best',
     });
     expect(card.sells.map((s) => s.typeId)).toEqual([P2_B]);

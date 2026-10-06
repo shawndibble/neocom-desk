@@ -10,7 +10,12 @@
  */
 
 import type { PlanetType } from '@/engine/pi/goalTypes';
-import type { BuildStep, QuickWinDetail, RebuildOption } from '@/engine/pi/planAdvice';
+import {
+  isSaving,
+  type BuildStep,
+  type QuickWinDetail,
+  type RebuildOption,
+} from '@/engine/pi/planAdvice';
 import type { ShipClass } from '@/engine/pi/planHaul';
 import type { PiData, PiPinKind } from '@/sde/types';
 import type { PlanAdvice, PlanColonyAdvice } from './planAdviceModel';
@@ -38,7 +43,7 @@ export interface QuickWinRow {
   iconTypeId: number | null;
   /** The raw or product the sentence names. */
   subject: string | null;
-  /** Storage wins give stalled income back ("saves"); the others add to today. */
+  /** Storage wins save stalled income ("saves", in no total); the others add to today. */
   gainKind: 'adds' | 'saves';
   gainPerDay: number | null;
   minutes: number;
@@ -48,7 +53,7 @@ export interface PlanetStrip {
   planetId: number;
   name: string;
   planetType: PlanetType;
-  /** Null when the colony has no quick win. */
+  /** Null when the colony has no quick win that adds. */
   quickWinGainPerDay: number | null;
   rebuild: { kind: 'change'; gainPerDay: number } | { kind: 'keep' } | { kind: 'unknown' };
 }
@@ -285,7 +290,7 @@ export function buildPlanView(
         detail: win.detail,
         iconTypeId: subjectId,
         subject: subjectId === null ? null : piItemName(subjectId, pi),
-        gainKind: win.detail.kind === 'storage' ? 'saves' : 'adds',
+        gainKind: isSaving(win.detail) ? 'saves' : 'adds',
         gainPerDay: win.gainPerDay,
         minutes: win.minutes,
       },
@@ -296,7 +301,9 @@ export function buildPlanView(
     planetId: colony.planetId,
     name: nameOf(colony),
     planetType: colony.planetType,
-    quickWinGainPerDay: colony.quickWins.length > 0 ? colony.quickWinGainPerDay : null,
+    quickWinGainPerDay: colony.quickWins.some((win) => !isSaving(win.detail))
+      ? colony.quickWinGainPerDay
+      : null,
     rebuild:
       colony.rebuild.status === 'change'
         ? { kind: 'change', gainPerDay: colony.rebuild.gainPerDay }

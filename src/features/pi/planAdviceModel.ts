@@ -27,7 +27,9 @@
  *   fills early, spare room. Each is priced by re-running the same earnings
  *   model with the fix applied and taking the difference, so a quick win's
  *   figure is the colony's own earnings model's answer rather than a second
- *   one. A win whose value cannot be priced keeps a `null` gain.
+ *   one. A win whose value cannot be priced keeps a `null` gain. A colony's
+ *   spare and freed room is spent by one win only (`spendRoomOnce`), and a
+ *   storage win's figure is a saving, shown but never added to a total.
  * - **Rebuild**: `colonyStopTierAdvice`, the one-planet scorer, not `planBest`:
  *   `planBest` hosts a multi-planet goal chain, while this question is "what is
  *   the best one planet can make from its own ground". Its candidate list is
@@ -54,6 +56,7 @@ import {
   quickWin,
   sellBooks,
   slotNudge,
+  spendRoomOnce,
   orderQuickWins,
   type ColonyAdvice,
   type PlanTotals,
@@ -631,7 +634,8 @@ function analyseColony(args: {
   const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
   // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
-  // headroom, so when the idle win already buys heads, this one would count it twice.
+  // headroom. The idle win goes first so its factories still get named for removal;
+  // `spendRoomOnce` below settles the rest.
   const headroomSpent = wins.some(
     (win) => win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null
   );
@@ -654,6 +658,7 @@ function analyseColony(args: {
   }
 
   wins.push(...args.factoryWins.map((win) => ({ ...win, planetId })));
+  const counted = spendRoomOnce(wins);
 
   // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;
@@ -688,7 +693,7 @@ function analyseColony(args: {
       planetType: row.planetType,
       todayPerDay,
       ...(unknownReason ? { unknownReason } : {}),
-      quickWins: wins,
+      quickWins: counted,
       rebuild,
       preference,
     }),

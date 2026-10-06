@@ -71,7 +71,10 @@ describe('MakeMorePlan', () => {
     const boxes = within(panel).getAllByRole('checkbox');
     expect(boxes).toHaveLength(2);
     expect(boxes[0]).toHaveAccessibleName(/Restart Hek VI/);
-    expect(boxes[1]).toHaveAccessibleName(/launchpad is full/);
+    expect(boxes[1]).toHaveAccessibleName(/launchpad is full in 16 h, before your daily haul/);
+    // A storage win's figure is a saving, a day's worth, and is not in the quick-win total.
+    const storageRow = boxes[1].closest('li')!;
+    expect(storageRow).toHaveTextContent(/saves ~\s*120.*\/day/);
     await user.click(boxes[0]);
     expect(boxes[0]).toBeChecked();
     await waitFor(() => expect(usePlanTicks.getState().value).toContain('1:restart'));

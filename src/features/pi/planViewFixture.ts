@@ -105,19 +105,20 @@ const keeping = colony({
   planetId: 2,
   name: 'Uttindar II',
   sells: [P2_B],
+  // A storage win saves; it adds nothing to the colony's figures.
   quickWins: [win(2, 'storage', 120)],
-  quickWinGainPerDay: 120,
-  afterQuickWinsPerDay: 1120,
+  quickWinGainPerDay: 0,
+  afterQuickWinsPerDay: 1000,
   rebuild: {
     status: 'keep',
     planetId: 2,
     planetType: 'barren',
-    todayPerDay: 1120,
-    best: option(P2_B, 1120, 50),
+    todayPerDay: 1000,
+    best: option(P2_B, 1000, 50),
     alternative: null,
     reason: 'already-best',
   },
-  afterRebuildPerDay: 1120,
+  afterRebuildPerDay: 1000,
 });
 
 export const fixtureAdvice = {
@@ -128,8 +129,8 @@ export const fixtureAdvice = {
   quickWins: [win(1, 'restart', 300), win(2, 'storage', 120)],
   totals: {
     todayPerDay: 2000,
-    afterQuickWinsPerDay: 2420,
-    afterRebuildPerDay: 6120,
+    afterQuickWinsPerDay: 2300,
+    afterRebuildPerDay: 6000,
     quickWinMinutes: 4,
     rebuildMinutes: 4,
     unknownColonies: 0,

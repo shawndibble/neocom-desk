@@ -208,16 +208,76 @@ export function orderQuickWins(wins: readonly QuickWin[]): QuickWin[] {
   });
 }
 
+/**
+ * A storage win saves income the colony loses to a full launchpad; it adds
+ * nothing to what the colony makes. Its figure is shown as a saving and left
+ * out of every quick-win total.
+ */
+export function isSaving(detail: QuickWinDetail): boolean {
+  return detail.kind === 'storage';
+}
+
+/** The totals count what a win adds; a saving keeps its minutes but not its figure. */
 export function totalQuickWins(wins: readonly QuickWin[]): {
   gainPerDay: number;
   minutes: number;
   unpriced: number;
 } {
+  const adds = wins.filter((win) => !isSaving(win.detail));
   return {
-    gainPerDay: wins.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0),
+    gainPerDay: adds.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0),
     minutes: wins.reduce((sum, win) => sum + win.minutes, 0),
-    unpriced: wins.filter((win) => win.gainPerDay === null).length,
+    unpriced: adds.filter((win) => win.gainPerDay === null).length,
   };
+}
+
+/**
+ * Which share of a colony's CPU and Powergrid a win spends, or null when it
+ * spends none. Heads in place of idle factories, more extractors and new
+ * factories all draw on the same spare and freed room. The network plan's
+ * factories on one host are one claim: it already split the room between them.
+ */
+function roomClaim(detail: QuickWinDetail): 'heads' | 'extractors' | 'factories' | null {
+  if (detail.kind === 'idle-factories') return detail.headsToAdd === null ? null : 'heads';
+  if (detail.kind === 'spare-room') return detail.what;
+  return null;
+}
+
+/**
+ * One colony's room is spent once. Of the wins that claim it, the claim that
+ * adds the most ISK a day stays and the rest are dropped: a claim with a figure
+ * beats one without, and a tie keeps the first. Wins that spend no room pass
+ * through untouched, in order.
+ */
+export function spendRoomOnce(wins: readonly QuickWin[]): QuickWin[] {
+  const claims = new Map<string, { priced: boolean; gain: number }>();
+  for (const win of wins) {
+    const claim = roomClaim(win.detail);
+    if (claim === null) continue;
+    const key = `${win.planetId}:${claim}`;
+    const sum = claims.get(key) ?? { priced: false, gain: 0 };
+    claims.set(key, {
+      priced: sum.priced || win.gainPerDay !== null,
+      gain: sum.gain + (win.gainPerDay ?? 0),
+    });
+  }
+  const kept = new Map<number, string>();
+  for (const [key, value] of claims) {
+    const planetId = Number.parseInt(key, 10);
+    const held = kept.get(planetId);
+    const best = held === undefined ? undefined : claims.get(held)!;
+    if (
+      best === undefined ||
+      (value.priced && !best.priced) ||
+      (value.priced === best.priced && value.gain > best.gain)
+    ) {
+      kept.set(planetId, key);
+    }
+  }
+  return wins.filter((win) => {
+    const claim = roomClaim(win.detail);
+    return claim === null || kept.get(win.planetId) === `${win.planetId}:${claim}`;
+  });
 }
 
 // --- Rebuild -----------------------------------------------------------------

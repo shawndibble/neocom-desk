@@ -6,6 +6,7 @@ import * as Icon from '@/components/ui/icons';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { extractorState } from '@/engine/pi/colonyStatus';
+import { isSaving } from '@/engine/pi/planAdvice';
 import {
   extractorCycleYields,
   fractionOfPeak,
@@ -371,9 +372,17 @@ export function ColonyExpanded({
                     {t(`piColonies.fixVerb.${line.verb}`)}
                   </span>
                   <span className="min-w-0 flex-1">{line.text}</span>
-                  <span className="shrink-0 text-isk-pos tabular-nums">
+                  <span
+                    className={`shrink-0 tabular-nums ${isSaving(win.detail) ? 'text-warning' : 'text-isk-pos'}`}
+                  >
                     {win.gainPerDay === null ? (
                       t('piColonies.noFigure')
+                    ) : isSaving(win.detail) ? (
+                      <>
+                        {t('piColonies.saves')}
+                        <IskAmount value={win.gainPerDay} decimals={0} />
+                        {t('piColonies.perDay')}
+                      </>
                     ) : (
                       <>
                         +<IskAmount value={win.gainPerDay} decimals={0} />
