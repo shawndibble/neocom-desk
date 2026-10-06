@@ -534,6 +534,13 @@ describe('InfoTooltip', () => {
     expect(trigger).not.toHaveClass('text-text-dim');
   });
 
+  it('is a real 24px target on a phone or a touch screen, not a pseudo-element hit area (WCAG 2.5.8, DESIGN.md §6c)', () => {
+    render(<InfoTooltip label="About X" content="X." />);
+    const trigger = screen.getByRole('button', { name: 'About X' });
+    expect(trigger).toHaveClass('size-4', 'max-md:size-6', 'touch:size-6');
+    expect(trigger.className).not.toMatch(/before:/);
+  });
+
   it('renders a labeled "?" button describing the tooltip content once revealed', () => {
     render(<InfoTooltip label="About Material Efficiency" content="Reduces material use." />);
     const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });

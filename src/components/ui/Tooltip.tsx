@@ -291,12 +291,20 @@ export function InfoTooltip({
 }: InfoTooltipProps) {
   return (
     <Tooltip content={content} openOnTap>
+      {/* The 16px circle sits in a box that is itself 24px on a phone or a
+          touch screen (WCAG 2.5.8), with negative block margins so the line
+          height doesn't grow. Never a pseudo-element hit area (§6c). */}
       <button
         type="button"
         aria-label={label}
-        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
+        className={`group inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent max-md:-my-1 max-md:size-6 touch:-my-1 touch:size-6 ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
-        {glyph === 'info' ? 'i' : '?'}
+        <span
+          aria-hidden="true"
+          className="inline-flex size-4 items-center justify-center rounded-full border border-line group-hover:border-line-bright"
+        >
+          {glyph === 'info' ? 'i' : '?'}
+        </span>
       </button>
     </Tooltip>
   );
