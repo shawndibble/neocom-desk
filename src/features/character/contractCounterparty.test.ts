@@ -40,6 +40,11 @@ describe('contractReceiver', () => {
       'alliance'
     );
   });
+  it('keeps the corp kind when the assigned corp accepted', () => {
+    expect(
+      contractReceiver(c({ acceptor_id: 7, assignee_id: 7, availability: 'corporation' }), 10)
+    ).toEqual({ id: 7, kind: 'corporation', role: 'acceptor' });
+  });
   it('is null for public/unassigned', () => {
     expect(contractReceiver(c(), 10)).toBeNull();
   });

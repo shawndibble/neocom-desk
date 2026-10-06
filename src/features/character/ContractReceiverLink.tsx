@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { AllianceLink, CharacterLink, CorporationLink } from '@/features/entities';
+import { HintText } from '@/components/ui/HintText';
 import { StandingTag } from './StandingTag';
 import type { EffectiveStanding } from './contactStandings';
 import type { ContractReceiver } from './contractCounterparty';
@@ -27,9 +28,9 @@ export function ContractReceiverLink({ receiver, name, standing = null }: Props)
       </Link>
       <StandingTag standing={standing} />
       {receiver.role === 'assignee' && (
-        <span className="text-text-dim" title={t('contracts.offeredToHint')}>
+        <HintText content={t('contracts.offeredToHint')} className="text-text-dim">
           {t('contracts.offeredTag')}
-        </span>
+        </HintText>
       )}
     </span>
   );

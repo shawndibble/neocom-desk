@@ -5667,7 +5667,7 @@
     "receiver": "Received by",
     "offeredTag": "(offered)",
     "offeredToHint": "Not accepted yet — offered to this party.",
-    "searchPlaceholder": "Search issuer or title…",
+    "searchPlaceholder": "Search issuer, receiver or title…",
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "noFilterMatchesResetHint": "No contract matches the current search and filters.",
