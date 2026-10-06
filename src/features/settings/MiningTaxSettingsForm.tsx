@@ -1,6 +1,6 @@
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
+import { Checkbox, Spinner } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
 import { DefaultsSyncHint } from './settingsFields';
@@ -32,41 +32,51 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
   return (
     <div className="space-y-4">
       <DefaultsSyncHint />
-      <Fields variant="form">
-        <Field
+      <div className="divide-y divide-line">
+        <CheckboxRow
+          id="settings-mining-tax-ore-value-mode"
           label={t('settings.miningTaxOreValueModeLabel')}
-          htmlFor="settings-mining-tax-ore-value-mode"
-          inline
-          note={t('settings.miningTaxOreValueModeHint')}
-        >
-          <label className={touchCheckboxLabelClassName}>
-            <Checkbox
-              id="settings-mining-tax-ore-value-mode"
-              checked={oreValueMode}
-              onChange={() => void setOreValueMode(!oreValueMode)}
-            />
-          </label>
-        </Field>
-        {/* Device-local (`continueSessionPref.ts`); its note says so. Same grid as
-            the row above so both checkboxes share one column. */}
-        <Field
+          hint={t('settings.miningTaxOreValueModeHint')}
+          checked={oreValueMode}
+          onChange={() => void setOreValueMode(!oreValueMode)}
+        />
+        {/* Device-local (`continueSessionPref.ts`): its hint says so. */}
+        <CheckboxRow
+          id="settings-mining-tax-auto-continue"
           label={t('settings.miningTaxAutoContinueLabel')}
-          htmlFor="settings-mining-tax-auto-continue"
-          inline
-          note={t('settings.miningTaxAutoContinueHint')}
-        >
-          <label className={touchCheckboxLabelClassName}>
-            <Checkbox
-              id="settings-mining-tax-auto-continue"
-              checked={autoContinue}
-              onChange={() => {
-                if (onAutoContinueChange) onAutoContinueChange(!autoContinue);
-                else void setAutoContinue(!autoContinue);
-              }}
-            />
-          </label>
-        </Field>
-      </Fields>
+          hint={t('settings.miningTaxAutoContinueHint')}
+          checked={autoContinue}
+          onChange={() => {
+            if (onAutoContinueChange) onAutoContinueChange(!autoContinue);
+            else void setAutoContinue(!autoContinue);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface CheckboxRowProps {
+  id: string;
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: () => void;
+}
+
+/** Checkbox at the left, label beside it, help text under the label. */
+function CheckboxRow({ id, label, hint, checked, onChange }: CheckboxRowProps) {
+  return (
+    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+      <label htmlFor={id} className={touchCheckboxLabelClassName}>
+        <Checkbox id={id} checked={checked} onChange={onChange} />
+      </label>
+      <div className="min-w-0">
+        <label htmlFor={id} className="block cursor-pointer font-semibold">
+          {label}
+        </label>
+        <p className="mt-1 text-sm text-dim">{hint}</p>
+      </div>
     </div>
   );
 }
