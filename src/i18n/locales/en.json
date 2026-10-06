@@ -4819,7 +4819,10 @@
       "corpBuyback": "My corp buyback",
       "buybackRate": "Buyback rate",
       "buybackPct": "{{pct}}% of {{hub}}",
-      "dropOff": "Drop off in your home system"
+      "dropOff": "Drop off in your home system",
+      "settings": "More market settings",
+      "priceNote": "Prices",
+      "priceNoteHint": "Every ISK figure here is a projection from current market prices at your sell market, after customs and sales tax. What a sale actually fetches will differ."
     },
     "newToPi": "New to PI?",
     "picker": {
@@ -7631,7 +7634,6 @@
     "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
     "includeBlueprintCostLabel": "Count blueprint cost toward Industry profit",
     "includeBlueprintCostHint": "When a plan needs a blueprint copy, what covering it costs is added to totalCost and subtracted from profit — on the plan's own page, the Industry index's Profit column, and every Build Group's rollup. Turn this off to price plans as if every blueprint were already owned.",
-    "piSellAtLabel": "Sell at",
     "piSellAtHint": "Where Planetary Industry prices and sells its output. A corp buyback pays a percentage of the chosen hub's price.",
     "piBuyTiersLabel": "Buy at the hub when short",
     "piBuyTiersHint": "Off by default, because buying assumes a hub within reach. With a tier on, the Goal Planner buys it to finish a chain your colonies cannot, at the lowest tier that closes the gap. Priced at the ask, with import customs at the colony.",

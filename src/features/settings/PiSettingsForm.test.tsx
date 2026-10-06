@@ -33,7 +33,7 @@ describe('PiSettingsForm', () => {
         'false'
       );
     }
-    expect(screen.getByRole('combobox', { name: 'Sell at' })).toHaveTextContent('Jita');
+    expect(screen.queryByRole('combobox', { name: 'Where do you sell?' })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Restart extractors every' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Haul every' })).toBeInTheDocument();
   });
@@ -54,35 +54,26 @@ describe('PiSettingsForm', () => {
     );
   });
 
-  it('keeps the form and the header strip on one setting, whichever edits it', async () => {
+  it('offers the sell market only where asked, under the strip label', async () => {
+    render(<PiSettingsForm sellAt />);
+    expect(await screen.findByRole('combobox', { name: 'Where do you sell?' })).toHaveTextContent(
+      'Jita'
+    );
+  });
+
+  it('leaves one sell control with the strip and the form side by side', async () => {
+    both();
+    await screen.findByRole('group', { name: 'Buy at the hub when short' });
+    expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
+  });
+
+  it('keeps the form and the header strip on one setting', async () => {
     const user = userEvent.setup();
     both();
     const strip = await screen.findByTestId('pi-header-strip');
     const stripSellAt = within(strip).getByRole('combobox', { name: 'Where do you sell?' });
-    const formSellAt = await screen.findByRole('combobox', { name: 'Sell at' });
-    expect(stripSellAt).toHaveTextContent('Jita');
-
-    // A change from the form shows in the strip...
     await act(() => usePiSettings.getState().setValue({ ...DEFAULT_PI_SETTINGS, hub: 'amarr' }));
     expect(stripSellAt).toHaveTextContent('Amarr');
-    expect(formSellAt).toHaveTextContent('Amarr');
-
-    // ...and a corp buyback set from the strip shows in the form, rate included.
-    await act(() =>
-      usePiSettings.getState().setValue({ ...usePiSettings.getState().value, buybackPct: 85 })
-    );
-    expect(stripSellAt).toHaveTextContent('My corp buyback');
-    expect(formSellAt).toHaveTextContent('My corp buyback');
-    expect(within(strip).getByRole('combobox', { name: 'Buyback rate' })).toHaveTextContent(
-      '85% of Amarr'
-    );
-    expect(
-      screen
-        .getAllByRole('combobox', { name: 'Buyback rate' })
-        .filter((box) => !strip.contains(box))[0]
-    ).toHaveTextContent('85% of Amarr');
-
-    // The tier chips and the strip read the same record too.
     await user.click(screen.getByRole('button', { name: 'P2' }));
     expect(usePiSettings.getState().value).toMatchObject({ hub: 'amarr', buyTiers: [2] });
   });
