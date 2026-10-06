@@ -15,6 +15,8 @@ interface AddToPlanBarProps {
   target: TargetPlan;
   /** Entries the target plan does not already cover; the button hides at zero. */
   unplannedCount: number;
+  /** The Add button's text when "Add all" doesn't fit (a single skill). */
+  addLabel?: string;
   added: AddedToPlan | null;
   onAdd: () => void;
   onUndo: () => void;
@@ -25,7 +27,14 @@ interface AddToPlanBarProps {
  * popover and the industry skill-gate popover share. Renders nothing until the
  * Character's plans have loaded.
  */
-export function AddToPlanBar({ target, unplannedCount, added, onAdd, onUndo }: AddToPlanBarProps) {
+export function AddToPlanBar({
+  target,
+  unplannedCount,
+  addLabel,
+  added,
+  onAdd,
+  onUndo,
+}: AddToPlanBarProps) {
   const { t } = useTranslation();
   if (target.plans === undefined) return null;
   return (
@@ -46,7 +55,7 @@ export function AddToPlanBar({ target, unplannedCount, added, onAdd, onUndo }: A
         <Button size="sm" variant="primary" onClick={onAdd}>
           {target.plans.length === 0
             ? t('skills.fitCheck.createPlanAndAdd')
-            : t('skills.fitCheck.addAllToPlan')}
+            : (addLabel ?? t('skills.fitCheck.addAllToPlan'))}
         </Button>
       )}
     </div>
