@@ -3,7 +3,8 @@
  * the ranked recipe cards, drawn from `FindBestView`. No figure is computed
  * here; components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item names are Market links; the planet-type
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`); the planet-type
  * chips toggle with `aria-pressed`; "Show me how" expands in place with a
  * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
  * colour alone.
@@ -18,8 +19,8 @@ import { HintText } from '@/components/ui/HintText';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { formatIsk } from '@/lib/isk';
+import { PiProductLink } from './PiProductLink';
 import { SkillLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
@@ -326,9 +327,9 @@ function RecipeCard({
         <div className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-text-dim tabular-nums md:hidden">{card.rank}.</span>
-            <MarketItemLink typeId={recipe.typeId}>
+            <PiProductLink typeId={recipe.typeId}>
               <b className="text-sm font-semibold">{recipe.name}</b>
-            </MarketItemLink>
+            </PiProductLink>
             <TierChip tier={recipe.tier} />
             {card.isNew && (
               <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">

@@ -14,7 +14,7 @@ import {
   yieldBankedBy,
 } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram } from '@/engine/pi/types';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from '../PiProductLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -165,9 +165,9 @@ export function ColonyExpanded({
                   )}
                   <span className="min-w-0 flex-1 truncate">
                     {productId !== undefined ? (
-                      <MarketItemLink typeId={productId}>
+                      <PiProductLink typeId={productId}>
                         {productNames.get(productId) ?? t('pi.unknownProduct')}
-                      </MarketItemLink>
+                      </PiProductLink>
                     ) : (
                       t('pi.unknownProduct')
                     )}
@@ -242,7 +242,7 @@ export function ColonyExpanded({
                 <span className="min-w-0 flex-1 truncate">
                   {t('piColonies.expanded.factoryLine', { count: group.count })}{' '}
                   {outputId !== null ? (
-                    <MarketItemLink typeId={outputId}>{name}</MarketItemLink>
+                    <PiProductLink typeId={outputId}>{name}</PiProductLink>
                   ) : (
                     name
                   )}

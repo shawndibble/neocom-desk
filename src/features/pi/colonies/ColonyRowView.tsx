@@ -16,7 +16,8 @@ import { IskAmount } from '@/components/ui';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from '../PiProductLink';
+import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -413,6 +414,13 @@ export function ColonyRowView(props: ColonyRowViewProps) {
           {t('pi.altColonies.switchTo', { name: props.switchTo.name })}
         </MenuItem>
       )}
+      {/* The product name opens its PI detail (§6c "Entities", Overrides): Market and Show info move here. */}
+      {shownProductId !== null && productName !== null && (
+        <>
+          <ViewInMarketMenuItem typeId={shownProductId} />
+          <ShowInfoMenuItem typeId={shownProductId} itemName={productName} />
+        </>
+      )}
     </>
   );
 
@@ -466,7 +474,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                   )}
                   <span className="min-w-0">
                     {shownProductId !== null && productName !== null ? (
-                      <MarketItemLink typeId={shownProductId}>{productName}</MarketItemLink>
+                      <PiProductLink typeId={shownProductId}>{productName}</PiProductLink>
                     ) : (
                       t('piColonies.nothingMade')
                     )}

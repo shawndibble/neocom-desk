@@ -17,6 +17,8 @@ interface SlideOverProps {
   side?: 'left' | 'right';
   /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
+  /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
+  closeOnBack?: boolean;
 }
 
 const SIDE_CLASS = {
@@ -44,10 +46,11 @@ export function SlideOver({
   children,
   side = 'right',
   className,
+  closeOnBack = true,
 }: SlideOverProps) {
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
-  useOverlayHistory(open, onClose);
+  useOverlayHistory(open, onClose, closeOnBack);
   // Radix has no Trigger here, so it cannot return focus on close: remember
   // what held focus as the panel opened and give it back.
   const opener = useRef<HTMLElement | null>(null);
