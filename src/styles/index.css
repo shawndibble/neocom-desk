@@ -583,10 +583,11 @@
   }
 
   /* With the expand chevron on line one too, the chevron is what clears the
-     pinned button: it ends 2rem before the row's padding edge, so the two
-     sit side by side, never one over the other. */
+     pinned button (the corner rule's 2.25rem, moved onto it): the button
+     spans 0.25-3rem from the edge, the row pads 0.75rem, so the two sit
+     side by side, never one over the other. */
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-disclosure {
-    margin-right: 2rem;
+    margin-right: 2.25rem;
     margin-left: 0.25rem;
   }
 

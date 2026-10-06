@@ -21,13 +21,14 @@ import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 import type { MarketOrder } from '../src/esi/endpoints';
 
-const WIDTHS = [
+const WIDTHS: { width: number; height: number; table?: boolean }[] = [
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
-  // This book's tightest table — just over its `cards` width
-  // (`orderBookWidthsRem`, sized by its ten-digit price) — and either side
-  // of where Location narrows before that.
-  { width: 1370, height: 900 },
+  // This book's tightest table (1368: cards below about 1365, measured) —
+  // just over its `cards` width (`orderBookWidthsRem`, which counts the ⋮
+  // column and is sized by the ten-digit price), where Buy's ⋮ used to
+  // scroll out of its card — and either side of where Location narrows.
+  { width: 1368, height: 900, table: true },
   { width: 1400, height: 900 },
   { width: 1440, height: 900 },
   { width: 1500, height: 900 },
@@ -100,6 +101,17 @@ for (const viewport of WIDTHS) {
     await page.setViewportSize(viewport);
     await openMarketOrders(page);
     await expectNoPageOverflow(page);
+
+    if (viewport.table) {
+      // Not cards: the case this width exists to cover.
+      const row = page.locator('table[aria-label="Buy Orders"] tbody tr').first();
+      expect(await row.evaluate((el) => getComputedStyle(el).display)).toBe('table-row');
+      // The ⋮ is on screen, inside the card.
+      const more = row.getByRole('button', { name: /^More actions/ });
+      const box = await more.boundingBox();
+      const card = await page.getByRole('region', { name: 'Buy Orders' }).boundingBox();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(card!.x + card!.width);
+    }
 
     // Buy is the wider table (it carries `range` on top of Sell's columns).
     // Since the order book rework it no longer scrolls sideways at all:
