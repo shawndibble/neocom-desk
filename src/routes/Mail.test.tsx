@@ -12,6 +12,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 
 /**
  * jsdom's `matchMedia` stub (`vitest.setup.dom.ts`) never matches, which
@@ -124,14 +125,29 @@ const server = setupServer(
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one. A worker's first
+  // `App` render (compiling the lazy Layout and route chunks, warming jsdom
+  // and React) took seconds under parallel load and landed on whichever test
+  // ran first, tipping it past its findBy / test timeout. Done here under the
+  // hook's own budget, as IndustryPlanPage.test.tsx does.
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadMail()]);
+  await seed();
+  const { unmount } = render(<App />);
+  // Wait for real content, not just the shell: the first data load (Dexie, MSW,
+  // the ESI cache) is part of the cold cost too.
+  await screen.findByText('Fleet up!', {}, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
   restoreMatchMedia?.();
   restoreMatchMedia = undefined;
 });
-beforeEach(async () => {
+async function seed() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -153,7 +169,9 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/mail');
-});
+}
+
+beforeEach(seed);
 
 describe('Mail', () => {
   it('lists headers newest first with resolved sender names', async () => {

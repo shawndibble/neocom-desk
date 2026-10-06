@@ -10,13 +10,15 @@
 import type { ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MenuItem, RowActionsMenu } from '@/components/ui';
+import { MenuItem, MenuSeparator, RowActionsMenu } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export interface CharacterRowContextMenuProps {
   characterId: number;
   /** The character's name, for the row's "More actions" button label. */
   name: string;
+  /** Opens the remove-confirm dialog: the menu's one danger item (decision 20261005-202754). */
+  onRemove: () => void;
   /** The `<tr>` `DataTable`'s `rowContextMenu` hands back — the menu's trigger. */
   children: ReactElement;
 }
@@ -32,6 +34,7 @@ const DESTINATIONS = [
 export function CharacterRowContextMenu({
   characterId,
   name,
+  onRemove,
   children,
 }: CharacterRowContextMenuProps) {
   const { t } = useTranslation();
@@ -46,11 +49,19 @@ export function CharacterRowContextMenu({
   return (
     <RowActionsMenu
       name={name}
-      items={DESTINATIONS.map((destination) => (
-        <MenuItem key={destination.path} onSelect={() => void go(destination.path)}>
-          {t(destination.labelKey)}
-        </MenuItem>
-      ))}
+      items={
+        <>
+          {DESTINATIONS.map((destination) => (
+            <MenuItem key={destination.path} onSelect={() => void go(destination.path)}>
+              {t(destination.labelKey)}
+            </MenuItem>
+          ))}
+          <MenuSeparator />
+          <MenuItem className="text-danger" onSelect={onRemove}>
+            {t('characters.removeButtonLabel', { name })}
+          </MenuItem>
+        </>
+      }
     >
       {children}
     </RowActionsMenu>

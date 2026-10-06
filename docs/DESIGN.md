@@ -467,11 +467,9 @@ exactly the markup above.
   line of its own for a value and its control (Thera's signature pair and
   Copy). An `expandableRow`'s chevron cell joins
   the actions on line one (none at all with `hideIcon`). A table with no
-  chevron and no `end` box can add `className="dt-actions-pinned"` to pin
-  the More actions button to the right edge across both lines instead, so
-  line one stays text-tall, with a short `cardCorner` figure (a standing
-  icon) centred beside it (Contacts). `dt-actions-pinned-only` pins the
-  button the same way but keeps the figure in flow on line one, hides the
+  chevron and no `end` box can add `className="dt-actions-pinned-only"` to
+  pin the More actions button to the right edge across both lines, so line
+  one stays text-tall, keeping the figure in flow on line one, hiding the
   expand chevron (line two runs the card's full width, so a chevron beside
   the button would sit off its axis or on the text; the whole card is the
   tap target), draws the ⋮ in the text colour, and gives it a 44px gutter of its own: the Range cell ellipsizes before text could meet the button (Market order book). A table with

@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { IskAmount, TypeIcon } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -109,7 +108,7 @@ export function VariationsTable({
       header: t('market.variations.name'),
       sortValue: (row) => row.name,
       // The row navigates (re-anchors the page): a real link on the name,
-      // a plain click is handled in place, plus the trailing GoTo caret.
+      // a plain click is handled in place.
       // The whole row stays a pointer shortcut (onRowClick below).
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
@@ -124,11 +123,6 @@ export function VariationsTable({
           >
             {row.name}
           </MarketItemLink>
-          <Icon.GoTo
-            aria-hidden="true"
-            size={Icon.ICON_SIZE.sm}
-            className="shrink-0 text-text-faint [tr:hover_&]:text-accent"
-          />
         </span>
       ),
     },

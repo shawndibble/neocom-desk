@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { Button, RowMoreActions, SearchInput, TypeIcon } from '@/components/ui';
 import {
   loadBlueprintCatalog,
@@ -20,6 +21,7 @@ import {
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
+import { MarketItemLink } from './MarketItemLink';
 import { useOptionalItemActions } from './itemActions';
 
 /** Rows per page — the whole list for anything but a mineral or common component. */
@@ -122,7 +124,12 @@ export function UsedInSection({
                     height={20}
                     className="shrink-0"
                   />
-                  <span className="truncate text-text">{use.productName}</span>
+                  <MarketItemLink
+                    typeId={use.productTypeID}
+                    className={entityLinkClassName('truncate')}
+                  >
+                    {use.productName}
+                  </MarketItemLink>
                   {use.activity === 'reaction' && (
                     <span className="shrink-0 text-text-dim">
                       {t('market.itemDetail.usedInReaction')}

@@ -131,6 +131,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
           rows={chartData}
           rowKey={(p) => p.date}
           label={t('wallet.balanceHistoryChartLabel')}
+          responsive="table"
         />
       </div>
     </div>

@@ -167,16 +167,10 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/fittings/FittingStartScreen.tsx',
       'src/features/fittings/FittingStatsSections.tsx',
       'src/features/industry/BuildPlanList.tsx',
-      'src/features/market/CompareDrawer.tsx',
       'src/features/market/ItemContextMenu.tsx',
       'src/features/market/OpenOrdersList.tsx',
-      'src/features/market/OrderHistoryList.tsx',
-      'src/features/market/QuickbarList.tsx',
-      'src/features/market/TransactionsDayList.tsx',
       'src/features/market/UsedInSection.tsx',
       'src/features/skills/planner/EntryList.tsx',
-      'src/routes/Mail.tsx',
-      'src/routes/Market.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
