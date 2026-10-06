@@ -6,8 +6,8 @@ decide by what is already there".
 - **Why.** The interaction-grammar rollout applied "a table with a row menu
   always shows the ⋮" everywhere. Result: ⋮ on rows whose click already did
   the action, a ⋮ mid-row, a ⋮ beside a › caret, two controls on one line, a
-  ⋮ on read-only data tables, and simple display tables turned into cards on
-  phones. Controls were added where the surroundings already carried the
+  ⋮ on read-only data tables, and display tables turned into cards on phones
+  where reading across columns was the point. Controls were added where the surroundings already carried the
   intent.
 - **Check what is already there.** Row click, a visible link or name, a
   header or bulk action and the detail view come first. If one gives the
@@ -18,9 +18,13 @@ decide by what is already there".
 - **One trailing control cluster**, right edge, never mid-row. Drop a › caret
   beside a ⋮. A destructive × beside a ⋮ goes into the menu as a danger item,
   or is separated.
-- **Read-only display tables** get no ⋮, caret, actions or row menu, and stay
-  plain compact tables on phones when the columns fit at 390px. Cards are for
-  interactive rows or tables that can't fit.
+- **Read-only display tables** get no ⋮, caret, actions or row menu, and skip
+  `exportable` when export means nothing.
+- **Cards vs table on a phone** is decided by how the table is read, not by
+  interactivity. Compare tables, matrices, rosters and wide numeric tables
+  stay tables (`responsive="table"`, horizontal scroll, key column pinned
+  with `stickyStart`). Cards are for records read as a unit (mail, order,
+  contract, offer) with text-heavy columns.
 - **Duplicates:** keep the visible control, drop the menu item.
 - **A removed control names its new home** in the PR.
 
