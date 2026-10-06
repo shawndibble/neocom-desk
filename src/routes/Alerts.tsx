@@ -163,7 +163,7 @@ export function Alerts() {
   /*
    * The raw feed minus dismissals — deliberately NOT `visibleFeedEntries`,
    * which also drops muted types. A muted type has to be reachable from
-   * somewhere: `NotificationContextMenu`'s "hide in feed" is one-way from a row
+   * somewhere: a feed row's "hide in feed" is one-way from a row
    * that vanishes the moment it applies, so until now the only way back was
    * Settings. Muted groups are hidden here by default and revealed by a chip.
    */

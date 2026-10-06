@@ -9,6 +9,7 @@ import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import type { PlanAdvice } from './planAdviceModel';
 import { FindBestPlan } from './FindBestPlan';
 import { fixturePi } from './planViewFixture';
+import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 import type { FinderOrigin, FinderState } from './usePlanetFinder';
 
 let mockState: PlanAdviceState = { status: 'loading' };
@@ -98,6 +99,7 @@ function renderPlan(snap = snapshot()) {
 const cardItems = () => Array.from(document.querySelectorAll('ol > li'));
 
 beforeEach(() => {
+  usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: true });
   mockState = { status: 'ready', advice: advice(), pricesFetchedAt: new Date(), hubName: 'Jita' };
   mockFinder = { status: 'loading' };
   finderArgs = null;
@@ -296,5 +298,24 @@ describe('FindBestPlan', () => {
       </MemoryRouter>
     );
     expect(screen.getByText("Couldn't build the ranking")).toBeInTheDocument();
+  });
+
+  it('names the chosen hub in the ranking basis, and the buyback once selected', () => {
+    mockState = {
+      status: 'ready',
+      advice: advice(),
+      pricesFetchedAt: new Date(),
+      hubName: 'Amarr',
+    };
+    const { unmount } = renderPlan();
+    expect(screen.getAllByText(/Amarr prices/).length).toBeGreaterThan(0);
+    expect(document.body).not.toHaveTextContent(/Jita/);
+    unmount();
+
+    usePiSettings.setState({ value: { ...DEFAULT_PI_SETTINGS, buybackPct: 85 }, hydrated: true });
+    mockState = { ...mockState, hubName: 'Jita' } as PlanAdviceState;
+    renderPlan();
+    expect(screen.getAllByText(/your corp buyback rate/).length).toBeGreaterThan(0);
+    expect(document.body).not.toHaveTextContent(/Jita/);
   });
 });

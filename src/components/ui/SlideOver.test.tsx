@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -66,5 +67,51 @@ describe('SlideOver edge and history', () => {
     );
     act(() => window.history.back());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe('SlideOver focus', () => {
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open panel
+        </button>
+        <SlideOver open={open} onClose={() => setOpen(false)} title="Panel">
+          <p>Body</p>
+        </SlideOver>
+      </>
+    );
+  }
+
+  it('returns focus to the opener on Escape and on the close button', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Open panel' });
+    opener.focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog', { name: 'Panel' });
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+
+  it('opens without focusing Close, so no tooltip eats the first Escape', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    screen.getByRole('button', { name: 'Open panel' }).focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog', { name: 'Panel' });
+    expect(screen.getByRole('button', { name: 'Close' })).not.toHaveFocus();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });

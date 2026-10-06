@@ -169,7 +169,13 @@ function Graph({
       </div>
       {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
       <div className="sr-only">
-        <DataTable columns={columns} rows={rows} rowKey={(row) => String(row.x)} label={label} />
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => String(row.x)}
+          label={label}
+          responsive="table"
+        />
       </div>
     </div>
   );

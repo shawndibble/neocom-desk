@@ -108,13 +108,13 @@ export function YourPlanetsPanel({
   preference,
   onPreference,
   onFindBest,
-  hubName,
+  priceSource,
 }: {
   view: PlanView;
   preference: RebuildPreference;
   onPreference: (value: RebuildPreference) => void;
   onFindBest: () => void;
-  hubName: string;
+  priceSource: string;
 }) {
   const { t } = useTranslation();
   const mdUp = useMediaQuery(MD_UP);
@@ -209,7 +209,9 @@ export function YourPlanetsPanel({
           />
           <EstimateBadge />
         </StatChips>
-        <p className="text-[0.6875rem] text-text-dim">{t('piPlan.make.basis', { hub: hubName })}</p>
+        <p className="text-[0.6875rem] text-text-dim">
+          {t('piPlan.make.basis', { source: priceSource })}
+        </p>
       </div>
       <ul className="grid grid-cols-2 border-t border-line md:grid-cols-3 xl:grid-cols-6">
         {view.strips.map((strip) => (

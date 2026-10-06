@@ -539,7 +539,7 @@ describe('ItemDetailModal', () => {
       const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
       expect(plans).toHaveLength(1);
       // Untrained -> "Add to Plan" trains one level, same convention as
-      // SkillRowContextMenu's `Math.min(currentLevel + 1, 5)`.
+      // SkillPlanAdd's `Math.min(currentLevel + 1, 5)`.
       expect(plans[0].entries).toEqual([{ skillTypeID: SHARPSHOOTER_TYPE_ID, targetLevel: 1 }]);
     });
   });
