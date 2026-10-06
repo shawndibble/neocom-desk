@@ -38,13 +38,6 @@ function toggled<T>(set: ReadonlySet<T>, value: T): Set<T> {
   return next;
 }
 
-/**
- * "Find the best thing to build": ranked one-planet recipes for the pilot's
- * planet types and what-if planets, a planet finder per recipe, and every
- * product by tier. Reads the same recommendation model as every Plan view
- * (`usePlanAdvice`), shapes it (`buildFindBestView`) and draws it
- * (`FindBestSections`, `ShowMeHow`, `AllProductsPanel`).
- */
 /** An empty-state sentence whose `{skill}` slot is a link to Command Center Upgrades. */
 function CcHint({ text }: { text: string }) {
   const { t } = useTranslation();
@@ -63,6 +56,13 @@ function CcHint({ text }: { text: string }) {
 }
 const ccHint = (text: string) => <CcHint text={text} />;
 
+/**
+ * "Find the best thing to build": ranked one-planet recipes for the pilot's
+ * planet types and what-if planets, a planet finder per recipe, and every
+ * product by tier. Reads the same recommendation model as every Plan view
+ * (`usePlanAdvice`), shapes it (`buildFindBestView`) and draws it
+ * (`FindBestSections`, `ShowMeHow`, `AllProductsPanel`).
+ */
 export function FindBestPlan({ snapshot, characterId }: Props) {
   const { t } = useTranslation();
   const preference = usePlanPreference((state) => state.value);
