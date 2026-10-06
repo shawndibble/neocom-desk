@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -810,7 +811,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           return (
             <>
               {/* Plain: the row opens the contract modal, which carries the system link. */}
-              {location.systemName}
+              <span className={entityLinkClassName()}>{location.systemName}</span>
               {location.security !== null && (
                 <>
                   {' '}
@@ -866,7 +867,9 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => (
           // Plain: the row opens the contract modal, whose item lines link to Market.
-          <>{typeNames.get(row.typeId) ?? `#${row.typeId}`}</>
+          <span className={entityLinkClassName()}>
+            {typeNames.get(row.typeId) ?? `#${row.typeId}`}
+          </span>
         ),
       },
     ];

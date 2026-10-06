@@ -154,6 +154,19 @@ describe('OwnedBlueprintsPanel', () => {
     expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves an uncatalogued row inert: no click action, no tab stop, no pointer cursor', async () => {
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(onStartPlan);
+    const merlin = screen.getByText('Merlin Blueprint').closest('tr')!;
+    expect(merlin).not.toHaveAttribute('tabindex');
+    expect(merlin.className).not.toContain('cursor-pointer');
+    await userEvent.click(screen.getByText('Merlin Blueprint'));
+    expect(onStartPlan).not.toHaveBeenCalled();
+    const rifter = screen.getByText('Rifter Blueprint').closest('tr')!;
+    expect(rifter).toHaveAttribute('tabindex', '0');
+    expect(rifter.className).toContain('cursor-pointer');
+  });
+
   it('filters by BPO/BPC and activity', async () => {
     const user = userEvent.setup();
     renderPanel();

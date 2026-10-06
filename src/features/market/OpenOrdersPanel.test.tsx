@@ -731,7 +731,7 @@ describe('OpenOrdersPanel', () => {
     expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
   });
 
-  it("opens the detail modal from a row's Details button", async () => {
+  it('opens the detail modal by clicking the row', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
       snapshot([
@@ -749,7 +749,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    await user.click(within(row).getByRole('button', { name: 'Details' }));
+    await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
     expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
@@ -812,7 +812,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    await user.click(within(row).getByRole('button', { name: 'Details' }));
+    await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     expect(loaders.priceHistory).toHaveBeenCalledWith(REGION, 34);
@@ -847,7 +847,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    await user.click(within(row).getByRole('button', { name: 'Details' }));
+    await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking…')).not.toBeInTheDocument());
@@ -1144,7 +1144,7 @@ describe('OpenOrdersPanel', () => {
 
       renderPanel();
       const row = await screen.findByRole('row', { name: /Tritanium/ });
-      await user.click(within(row).getByRole('button', { name: 'Details' }));
+      await user.click(within(row).getByText(/Tritanium|Pyerite|Mexallon/));
       await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
       await user.click(screen.getByRole('button', { name: 'Close' }));
       expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
@@ -1206,7 +1206,7 @@ describe('OpenOrdersPanel — phone', () => {
     expect(row).toHaveTextContent('Selling at this price loses');
   });
 
-  it("opens the detail modal by tapping the row, same order as the desktop table's Details button", async () => {
+  it('opens the detail modal by tapping the row, same order as clicking a desktop row', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
       snapshot([

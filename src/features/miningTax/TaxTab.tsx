@@ -1,4 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -1261,7 +1262,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
             // Plain: the row opens the detail modal, which links the pilot (§6c).
-            render: (dr: DisplayRow) => dr.row.characterName,
+            render: (dr: DisplayRow) => (
+              <span className={entityLinkClassName()}>{dr.row.characterName}</span>
+            ),
             sortValue: (dr: DisplayRow) => dr.row.characterName,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -1313,7 +1316,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.systemColumn'),
       render: (dr) => (
         <DataTableDenseCell>
-          {systemName(dr)}
+          <span className={entityLinkClassName()}>{systemName(dr)}</span>
           <SecurityValue security={systemSecurityOf(dr)} />
         </DataTableDenseCell>
       ),

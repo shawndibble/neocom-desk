@@ -10,6 +10,7 @@
  * The rows arrive already filtered, sorted and cut to the page the panel is
  * showing, so the rank is just a card's position.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, IskAmount, TypeIcon, type DataTableSort } from '@/components/ui';
@@ -169,7 +170,9 @@ export function MobileMarketWideList({
                   <span className="sr-only">
                     {t('industry.marketOpportunitiesRank', { rank: index + 1 })}
                   </span>
-                  <span className="text-sm font-semibold break-words">{row.productName}</span>
+                  <span className={entityLinkClassName('text-sm font-semibold break-words')}>
+                    {row.productName}
+                  </span>
                   {verdict?.gated && (
                     <SkillGateMarker
                       verdict={verdict}
@@ -236,6 +239,7 @@ export function MobileMarketWideList({
                 </span>
                 <StartPlanButton
                   onStart={() => onStartPlan(row)}
+                  planKey={row}
                   compact={{ name: row.productName }}
                 />
               </div>

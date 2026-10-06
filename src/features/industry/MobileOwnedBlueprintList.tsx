@@ -8,6 +8,7 @@
  * Identical copies (same owner, print, location, ME/TE and runs) fold into
  * one card whose quantity is their sum (`identicalBlueprints.ts`).
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -148,7 +149,15 @@ export function MobileOwnedBlueprintList({
               />
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-y-0.5">
-                  <span className="text-sm font-semibold break-words">{name}</span>
+                  <span
+                    className={
+                      entry
+                        ? entityLinkClassName('text-sm font-semibold break-words')
+                        : 'text-sm font-semibold break-words'
+                    }
+                  >
+                    {name}
+                  </span>
                   <BlueprintBadge kind={row.kind === 'bpo' ? 'original' : 'copy'} t={t} />
                   {row.activity === 'reaction' && (
                     <span className="ml-1.5 text-[0.6875rem] text-text-dim">
@@ -204,7 +213,13 @@ export function MobileOwnedBlueprintList({
                     {t('industry.iskPerHour')}
                   </span>
                 </span>
-                {entry && <StartPlanButton onStart={() => onStartPlan(entry)} compact={{ name }} />}
+                {entry && (
+                  <StartPlanButton
+                    onStart={() => onStartPlan(entry)}
+                    compact={{ name }}
+                    planKey={entry}
+                  />
+                )}
               </div>
             </li>
           );

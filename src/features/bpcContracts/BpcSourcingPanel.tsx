@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -1564,7 +1565,7 @@ export function BpcSourcingPanel() {
               // Plain text: the row opens the contract modal, which lists the
               // item with its Market link (DESIGN.md §6c, a row's primary
               // action beats name links inside it).
-              <span className="max-sm:block max-sm:truncate">{name}</span>
+              <span className={entityLinkClassName('max-sm:block max-sm:truncate')}>{name}</span>
             );
           if (!bpo && !owned) return title;
           return (

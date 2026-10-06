@@ -6,6 +6,7 @@
  * the blueprint load, the Character filter and the ranked rows this view
  * borrows ISK/hour from.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -241,7 +242,7 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          {row.name}
+          {row.catalogEntry ? <span className={entityLinkClassName()}>{row.name}</span> : row.name}
           {row.activity === 'reaction' && (
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.ownedBlueprintsActivity.reaction')}
@@ -321,7 +322,9 @@ export function OwnedBlueprintsPanel({
       header: '',
       render: (row) => {
         const entry = row.catalogEntry;
-        return entry ? <StartPlanButton onStart={() => onStartPlan(entry)} /> : null;
+        return entry ? (
+          <StartPlanButton onStart={() => onStartPlan(entry)} planKey={entry} />
+        ) : null;
       },
     },
   ];
@@ -495,6 +498,7 @@ export function OwnedBlueprintsPanel({
                 onRowClick={(row) => {
                   if (row.catalogEntry) startPlanFromRow(row.catalogEntry);
                 }}
+                rowClickable={(row) => Boolean(row.catalogEntry)}
                 virtualize="auto"
                 label={t('industry.ownedBlueprintsTitle')}
                 {...sortProps}

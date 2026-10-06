@@ -12,6 +12,7 @@
  * (issue #2321); `/market/lp-store` with no corporation is the picker's
  * landing state.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import {
   useCallback,
   useDeferredValue,
@@ -96,7 +97,7 @@ const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
  */
 function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
-  return <span className="text-text">{typeId === null ? row.itemName : itemName}</span>;
+  return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
 }
 
 /**

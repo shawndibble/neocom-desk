@@ -1,4 +1,4 @@
-import { useCallback, useRef, type MouseEvent } from 'react';
+import { useCallback, type MouseEvent } from 'react';
 
 const CONTROL =
   'a[href],button,input,select,textarea,label,summary,[role="button"],[role="checkbox"],[role="link"],[role="menuitem"],[role="switch"],[data-row-control]';
@@ -18,25 +18,45 @@ export function isCardOwnClick(event: MouseEvent<HTMLElement>): boolean {
 }
 
 /**
- * A row's click runs the same start-plan handler as its Start plan button, but
- * has no busy state of its own: this drops a second click while the first is
- * still saving the plan (a second plan), and re-arms when nothing opened.
+ * Plans being created right now, by the key a caller names (the catalog entry
+ * or row). One set for the row click and the Start plan button, so clicking
+ * the button and then the row (or the reverse) can't save two plans. A start
+ * stays claimed once it has navigated (the page unmounts); it is released when
+ * nothing opened.
  */
-export function useRowStartPlan<T>(start: (target: T) => Promise<boolean>): (target: T) => void {
-  const busy = useRef(false);
+const inFlight = new Set<unknown>();
+
+/** Runs `start` unless the same `key` is already being started; resolves like `start`, false when dropped. */
+export function startPlanOnce(key: unknown, start: () => Promise<boolean>): Promise<boolean> {
+  if (inFlight.has(key)) return Promise.resolve(false);
+  inFlight.add(key);
+  return start().then(
+    (navigated) => {
+      if (!navigated) inFlight.delete(key);
+      return navigated;
+    },
+    (error: unknown) => {
+      inFlight.delete(key);
+      throw error;
+    }
+  );
+}
+
+/**
+ * A row's click runs the same start-plan handler as its Start plan button,
+ * through the same in-flight guard (`startPlanOnce`): a second click while the
+ * first is still saving the plan is dropped, and it re-arms when nothing
+ * opened. `keyOf` names what is being planned (default: the target itself).
+ */
+export function useRowStartPlan<T>(
+  start: (target: T) => Promise<boolean>,
+  keyOf: (target: T) => unknown = (target) => target
+): (target: T) => void {
   return useCallback(
     (target: T) => {
-      if (busy.current) return;
-      busy.current = true;
-      start(target).then(
-        (navigated) => {
-          if (!navigated) busy.current = false;
-        },
-        () => {
-          busy.current = false;
-        }
-      );
+      startPlanOnce(keyOf(target), () => start(target)).catch(() => {});
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [start]
   );
 }

@@ -10,6 +10,7 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
@@ -364,7 +365,7 @@ export function OpportunitiesPanel({
         const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
         return (
           <span className="flex flex-wrap items-center gap-1.5">
-            {row.candidate.catalogEntry.productName}
+            <span className={entityLinkClassName()}>{row.candidate.catalogEntry.productName}</span>
             {verdict?.gated && (
               <SkillGateMarker
                 verdict={verdict}
@@ -475,7 +476,12 @@ export function OpportunitiesPanel({
       // Compare button, which needs 2+ selected rows to do anything.
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => onStartPlan(row.candidate.catalogEntry)} />,
+      render: (row) => (
+        <StartPlanButton
+          onStart={() => onStartPlan(row.candidate.catalogEntry)}
+          planKey={row.candidate.catalogEntry}
+        />
+      ),
     },
   ];
   const sortProps = useUrlSort(

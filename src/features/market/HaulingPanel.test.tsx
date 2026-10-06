@@ -125,6 +125,14 @@ describe('HaulingPanel item rows', () => {
     expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*type=2048/);
   });
 
+  it('lists a Route Safety link per hub in the expanded detail', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
+    const links = screen.getAllByRole('link', { name: /^Route safety:/ });
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link.getAttribute('href')).toMatch(/^\/travel/);
+  });
+
   it('carries the item context menu on every row', async () => {
     const { actions } = renderPanel();
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));

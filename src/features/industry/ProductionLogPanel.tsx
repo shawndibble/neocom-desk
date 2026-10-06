@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -467,8 +468,14 @@ export function ProductionLogPanel({
         id: 'item',
         header: t('industry.productionRunColumnItem'),
         sortValue: (r) => r.itemName,
-        // The row opens the run's plan (the plan page links the product to Market), so the name is plain.
-        render: (r) => r.itemName,
+        // A row that opens the run's plan carries the plan's accent cue (the plan page links the
+        // product to Market); an inert row (no plan, or no way to open it) keeps the Market link.
+        render: (r) =>
+          r.planExists && onOpenRun ? (
+            <span className={entityLinkClassName()}>{r.itemName}</span>
+          ) : (
+            <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>
+          ),
       },
       quantityColumn(t),
       totalCostColumn(t),
@@ -476,7 +483,7 @@ export function ProductionLogPanel({
       realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
       statusColumn(t),
     ],
-    [t, timeZone, skills, standingByPlanId]
+    [t, timeZone, skills, standingByPlanId, onOpenRun]
   );
 
   const itemsCsvColumns = useMemo(() => productionLogItemsCsvColumns(t), [t]);
@@ -647,6 +654,7 @@ export function ProductionLogPanel({
                   onRowClick={
                     onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined
                   }
+                  rowClickable={(r) => r.planExists}
                 />
               </div>
             </CollapsiblePanel>

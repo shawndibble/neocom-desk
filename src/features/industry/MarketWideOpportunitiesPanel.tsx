@@ -5,6 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -285,7 +286,11 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            {row.productName}
+            {catalog?.byProductTypeID.has(row.productTypeID) ? (
+              <span className={entityLinkClassName()}>{row.productName}</span>
+            ) : (
+              row.productName
+            )}
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
@@ -374,7 +379,7 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
+      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
   const { sort, onSortChange } = useUrlSort(
@@ -568,6 +573,7 @@ export function MarketWideOpportunitiesPanel({
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
                 onRowClick={startPlanFromRow}
+                rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />

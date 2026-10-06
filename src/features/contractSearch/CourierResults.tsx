@@ -8,6 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -744,7 +745,7 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
 function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
   const name = endpointSystemName(endpoint);
   // Plain: the row opens the contract modal, which carries the system link.
-  return <>{name}</>;
+  return <span className={entityLinkClassName()}>{name}</span>;
 }
 
 /**
