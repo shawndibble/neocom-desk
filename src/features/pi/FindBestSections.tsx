@@ -42,6 +42,7 @@ function useTypeName() {
 
 export function PlanetTypesPanel({
   hasColonies,
+  coloniesUnknown = false,
   colonyCount,
   toggles,
   chips,
@@ -50,6 +51,8 @@ export function PlanetTypesPanel({
   onWhatIf,
 }: {
   hasColonies: boolean;
+  /** The colony read failed: none are shown because they are unknown, not because there are none. */
+  coloniesUnknown?: boolean;
   colonyCount: number;
   toggles: readonly TypeToggle[];
   chips: readonly WhatIfChip[];
@@ -112,7 +115,11 @@ export function PlanetTypesPanel({
           </div>
         )}
         <div className="space-y-0.5 text-xs text-text-dim">
-          <p>{hasColonies ? t('piPlan.find.guideColonies') : t('piPlan.find.guideNone')}</p>
+          <p>
+            {hasColonies
+              ? t('piPlan.find.guideColonies')
+              : t(coloniesUnknown ? 'piPlan.find.guideUnknown' : 'piPlan.find.guideNone')}
+          </p>
           <p>
             {t('piPlan.find.guideRanked', { source: priceSource })}{' '}
             <ExternalLink href={EU_GUIDE}>{t('piPlan.find.euGuide')}</ExternalLink>

@@ -4,6 +4,7 @@ import { EmptyState, Spinner } from '@/components/ui';
 import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { PricesUnavailable } from '../PricesUnavailable';
 import { PlanMap } from './PlanMap';
+import { useRetryFocus } from '../useRetryFocus';
 import { useMapAdvice } from './useMapAdvice';
 
 /** The Map tab: loads what the recommendation model needs, then draws the explorer. */
@@ -11,11 +12,14 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const planetLabel = useCallback((id: number) => t('pi.planetLabel', { id }), [t]);
   const state = useMapAdvice(characterId, planetLabel);
+  const esi = state.status === 'ready' ? state.esiFailed : null;
+  const [resultRef, armRetryFocus] = useRetryFocus(
+    state.status !== 'ready' ? 'busy' : esi ? (esi.retrying ? 'busy' : 'failed') : 'ok'
+  );
 
   if (state.status === 'failed') {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
-  if (state.status === 'esi-failed') return <EsiDidntAnswer onRetry={state.retry} />;
   if (state.status === 'prices-failed') return <PricesUnavailable />;
   if (state.status === 'loading') {
     return (
@@ -25,12 +29,26 @@ export function PiMapTab({ characterId }: { characterId: number }) {
     );
   }
   return (
-    <PlanMap
-      graph={state.graph}
-      advice={state.advice}
-      adviceWithWhatIf={state.adviceWithWhatIf}
-      colonies={state.colonies}
-      finder={state.finder}
-    />
+    <div className="space-y-4">
+      {state.esiFailed && (
+        <EsiDidntAnswer
+          retrying={state.esiFailed.retrying}
+          onRetry={() => {
+            armRetryFocus();
+            state.esiFailed?.retry();
+          }}
+        />
+      )}
+      <div ref={resultRef} tabIndex={-1} className="outline-none">
+        <PlanMap
+          graph={state.graph}
+          advice={state.advice}
+          adviceWithWhatIf={state.adviceWithWhatIf}
+          colonies={state.colonies}
+          finder={state.finder}
+          coloniesUnknown={state.esiFailed !== null}
+        />
+      </div>
+    </div>
   );
 }

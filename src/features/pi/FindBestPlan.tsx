@@ -135,6 +135,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
     <div className="space-y-4">
       <PlanetTypesPanel
         hasColonies={best.hasColonies}
+        coloniesUnknown={snapshot.fetchFailed}
         colonyCount={snapshot.colonies.length}
         toggles={best.toggles}
         chips={best.chips}

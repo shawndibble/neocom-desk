@@ -25,7 +25,6 @@ export type MapAdviceState =
   | { status: 'loading' }
   | { status: 'failed' }
   | { status: 'prices-failed' }
-  | { status: 'esi-failed'; retry: () => void }
   | {
       status: 'ready';
       graph: MapGraph;
@@ -33,6 +32,8 @@ export type MapAdviceState =
       adviceWithWhatIf: (type: PlanetType) => PlanAdvice;
       colonies: MapColony[];
       finder: FinderOrigin;
+      /** The colony read failed: the board runs as for a pilot with no colonies, plus this notice. */
+      esiFailed: { retry: () => void; retrying: boolean } | null;
     };
 
 export function useMapAdvice(
@@ -45,8 +46,10 @@ export function useMapAdvice(
   } | null>(null);
   const [failedFor, setFailedFor] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  // Keep the last snapshot while re-reading: the board and the notice stay mounted, so Retry keeps focus.
   const retry = useCallback(() => {
-    setLoaded(null);
+    setRetrying(true);
     setReloadKey((key) => key + 1);
   }, []);
   useEffect(() => {
@@ -56,9 +59,12 @@ export function useMapAdvice(
         if (cancelled) return;
         setFailedFor(null);
         setLoaded({ characterId, snapshot });
+        setRetrying(false);
       },
       () => {
-        if (!cancelled) setFailedFor(characterId);
+        if (cancelled) return;
+        setFailedFor(characterId);
+        setRetrying(false);
       }
     );
     return () => {
@@ -119,8 +125,8 @@ export function useMapAdvice(
   }, [snapshot]);
 
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
-  if (snapshot?.fetchFailed) return { status: 'esi-failed', retry };
   if (inputs.status === 'prices-failed') return { status: 'prices-failed' };
   if (!built || !graph) return { status: 'loading' };
-  return { status: 'ready', graph, ...built, colonies, finder };
+  const esiFailed = snapshot?.fetchFailed ? { retry, retrying } : null;
+  return { status: 'ready', graph, ...built, colonies, finder, esiFailed };
 }
