@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { IskAmount } from '@/components/ui';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import { PiProductLink } from '../PiProductLink';
@@ -398,6 +399,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   );
 
   const toggleLabel = t('piColonies.toggleColony', { name: planetName });
+  const holdGuard = useLiftAfterHoldGuard();
 
   const menu = (
     <>
@@ -426,12 +428,17 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
   return (
     <div className="border-b border-line last:border-b-0" data-colony-status={row.status}>
-      <RowActionsMenu name={planetName} items={menu}>
-        <RowTappableContext.Provider value>
+      {/* Outside the menu: its trigger must be the row's own element, or the
+          right-click and touch-and-hold handlers land on a provider and drop. */}
+      <RowTappableContext.Provider value>
+        <RowActionsMenu name={planetName} items={menu} linksKeepBrowserMenu>
           <div
+            {...holdGuard.handlers}
             // A pointer convenience: the real controls are the toggle button, the
-            // action and the ⋮ menu. A click on a link or button inside is theirs.
+            // action and the ⋮ menu. A click on a link or button inside is theirs,
+            // and a finger lifting off a hold that opened the menu is the menu's.
             onClick={(event) => {
+              if (holdGuard.swallowClick(event)) return;
               const target = event.target as HTMLElement;
               if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
                 return;
@@ -565,8 +572,8 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               </div>
             )}
           </div>
-        </RowTappableContext.Provider>
-      </RowActionsMenu>
+        </RowActionsMenu>
+      </RowTappableContext.Provider>
 
       {expanded && (
         <div id={regionId} role="region" aria-labelledby={buttonId}>

@@ -506,6 +506,24 @@ describe('PlanetaryIndustry', () => {
     expect(within(coloniesPanel()).getByRole('region')).toBeInTheDocument();
   });
 
+  it("opens a colony's ⋮ menu by right-click on the row too, but leaves its links to the browser", async () => {
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    const row = within(panel)
+      .getByRole('button', { name: /^Show details for / })
+      .closest('[data-colony-status] > div');
+    if (!row) throw new Error('no row');
+    // A right-click on the planet link stays the browser's link menu (DESIGN.md §6c "Entities").
+    const link = within(panel).getAllByRole('link')[0];
+    const onLink = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    link.dispatchEvent(onLink);
+    expect(onLink.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    expect(await screen.findByRole('menuitem', { name: 'Hide details' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Plan this colony' })).toBeInTheDocument();
+  });
+
   it('leaves both yield figures blank for an extractor with no install-time baseline', async () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);

@@ -269,3 +269,41 @@ describe('restraint: a row menu needs at least two real actions (DESIGN.md §6c)
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (DESIGN.md §6c "Entities")', () => {
+  function LinkRow() {
+    return (
+      <RowActionsMenu
+        name="Plasmoids"
+        linksKeepBrowserMenu
+        items={
+          <>
+            <MenuItem>Show info</MenuItem>
+            <MenuItem>View in Market</MenuItem>
+          </>
+        }
+      >
+        <div>
+          <a href="/planetary-industry/map?product=2389">Plasmoids</a>
+          <span>row body</span>
+        </div>
+      </RowActionsMenu>
+    );
+  }
+
+  it('opens the row menu on a right-click on the row body', async () => {
+    render(<LinkRow />);
+    fireEvent.contextMenu(screen.getByText('row body'));
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it('leaves a right-click on the link to the browser', () => {
+    render(<LinkRow />);
+    const link = screen.getByRole('link', { name: 'Plasmoids' });
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+  // Touch-and-hold is checked in the browser: jsdom's pointer events carry no pointerType.
+});

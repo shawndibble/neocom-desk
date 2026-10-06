@@ -17,8 +17,11 @@ import {
   useContext,
   useEffect,
   type ComponentProps,
+  type MouseEvent,
+  type PointerEvent,
   type ReactElement,
   type ReactNode,
+  type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -175,6 +178,26 @@ function warnRestraint(name: string, items: ReactNode) {
   );
 }
 
+function onLink(event: SyntheticEvent): boolean {
+  return event.target instanceof Element && event.target.closest('a[href]') !== null;
+}
+
+/**
+ * Capture-phase handlers for `linksKeepBrowserMenu`. A right-click on a link
+ * stops before Radix's trigger sees it, without `preventDefault`, so the
+ * browser's own menu still shows. A touch or pen press on a link is marked
+ * `defaultPrevented` (which does not cancel the tap or the browser's hold
+ * menu), and Radix's long-press timer skips a prevented press.
+ */
+const linkMenuGuard = {
+  onContextMenuCapture(event: MouseEvent) {
+    if (onLink(event)) event.stopPropagation();
+  },
+  onPointerDownCapture(event: PointerEvent) {
+    if (event.pointerType !== 'mouse' && onLink(event)) event.preventDefault();
+  },
+};
+
 /**
  * Right-click menu around `trigger`, publishing the same items for
  * `RowMoreActions`. Touch-and-hold anywhere in the row opens it, so the
@@ -190,9 +213,23 @@ export function RowActionsMenu({
   items,
   onOpenChange,
   tooltip,
+  linksKeepBrowserMenu = false,
   children,
-}: RowActions & { tooltip?: string; children: ReactElement }) {
-  const trigger = <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>;
+}: RowActions & {
+  tooltip?: string;
+  /**
+   * A right-click or touch-and-hold on a link inside the row is the
+   * browser's (its own link menu: open in a new tab, copy link); the rest
+   * of the row still opens this menu (DESIGN.md §6c "Entities", guardrail 2).
+   */
+  linksKeepBrowserMenu?: boolean;
+  children: ReactElement;
+}) {
+  const trigger = (
+    <ContextMenuTrigger asChild {...(linksKeepBrowserMenu ? linkMenuGuard : undefined)}>
+      {children}
+    </ContextMenuTrigger>
+  );
   // Anything the surrounding table adds (DataTable's "Export table").
   // `RowMoreActions` appends the same itself, so the context value stays
   // the row's own items and a hand-rolled wrapper gets the extras too.
