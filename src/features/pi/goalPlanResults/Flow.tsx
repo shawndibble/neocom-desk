@@ -6,7 +6,7 @@ import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { DemandLine, DemandSource, PlanetType } from '@/engine/pi/goalTypes';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from '../PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { TierChip } from '../DirectiveRow';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
@@ -70,7 +70,7 @@ export function Flow({
   names: PlanNames;
 }) {
   const { t } = useTranslation();
-  const { pi, hub } = names;
+  const { pi } = names;
   // The live chain first, the blocked goals' chain folded below it: a type
   // both need then reads as two lines in two places, not a duplicate.
   const rows = useMemo(
@@ -90,9 +90,7 @@ export function Flow({
         render: (line) => (
           <span className="inline-flex items-center gap-2">
             <TierChip tier={line.tier} />
-            <MarketItemLink typeId={line.typeId} hubId={hub.id}>
-              {commodityName(line.typeId, pi)}
-            </MarketItemLink>
+            <PiProductLink typeId={line.typeId}>{commodityName(line.typeId, pi)}</PiProductLink>
           </span>
         ),
       },
@@ -139,7 +137,7 @@ export function Flow({
         },
       },
     ],
-    [t, pi, hub]
+    [t, pi]
   );
   const tableExport = useTableExport({
     surface: 'pi-plan-flow',

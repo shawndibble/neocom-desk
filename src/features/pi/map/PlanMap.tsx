@@ -13,11 +13,23 @@
  * the map at 1500px and up, a right-hand drawer below that, a bottom sheet on a
  * phone. The observed box is the same width docked or not, so docking never
  * changes the number it was decided on.
+ *
+ * ## The product drawer is the URL's `?product=`
+ *
+ * Tile clicks write it too, docked or not. An unknown id is dropped; so is one
+ * linked while docked once the layout narrows, so no stale drawer pops open.
+ * The "add a planet" drawer is local state with its own Back entry.
+ *
+ * `?planet=<id>` opens the richness override for one of the pilot's colonies
+ * (the Colonies row links here); a product link drops it, one drawer at a time.
  */
+import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
@@ -30,12 +42,25 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
+import {
+  hrefWithoutPiPlanet,
+  hrefWithoutPiProduct,
+  parsePiPlanet,
+  parsePiProduct,
+  PI_PLANET_PARAM,
+  PI_PRODUCT_PARAM,
+  piProductHref,
+  productNavigation,
+  wasProductPushedHere,
+} from '../piPlanLink';
+import { usePlanPreference } from '../planTicksPref';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
 import { MapBoard } from './MapBoard';
 import { MapHelp } from './MapHelp';
 import { MapPhone } from './MapPhone';
+import { ColonyRichness } from './ColonyRichness';
 import { PiDrawer } from './PiDrawer';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { readMapHintDismissed, writeMapHintDismissed } from './mapHintPref';
 import {
   canMake,
@@ -48,10 +73,12 @@ import {
   type ProductFigure,
 } from './mapModel';
 import { planetName } from './mapText';
+import { buildProductDetail } from './productDetailModel';
 
 const PHONE_QUERY = '(max-width: 47.99rem)';
 
 export interface MapColony {
+  planetId: number;
   type: PlanetType;
   name: string;
 }
@@ -71,6 +98,21 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
   const context = useTouchContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // The product the URL has open; an id the map does not know is ignored.
+  const linkedRaw = parsePiProduct(location.search);
+  const linked = linkedRaw !== null && graph.byId.has(linkedRaw) ? linkedRaw : null;
+  const hasProductParam =
+    linkedRaw !== null || new URLSearchParams(location.search).has(PI_PRODUCT_PARAM);
+  useEffect(() => {
+    if (!hasProductParam || linked !== null) return;
+    navigate(hrefWithoutPiProduct(location), {
+      replace: true,
+      state: location.state,
+    });
+  }, [hasProductParam, linked, location, navigate]);
 
   const owned = useMemo(() => new Set(colonies.map((c) => c.type)), [colonies]);
   const colonyNames = useMemo(() => {
@@ -86,6 +128,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   const picks = useMemo(() => planPicks(advice), [advice]);
+  const preference = usePlanPreference((state) => state.value);
   const pickRanks = useMemo(() => new Map(picks.picks.map((p, i) => [p.typeId, i + 1])), [picks]);
   const pickPlanets = useMemo(() => {
     const map = new Map<PlanetType, number[]>();
@@ -109,19 +152,57 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     () => (picks.picks[0] ? { id: picks.picks[0].typeId, explicit: false } : null),
     [picks]
   );
-  const [userTraced, setUserTraced] = useState<Traced | undefined>(undefined);
-  const traced = userTraced === undefined ? defaultTraced : userTraced;
-  const setTraced = setUserTraced;
+  const [userTraced, setUserTraced] = useState<Traced | undefined>(
+    linked !== null ? { id: linked, explicit: true } : undefined
+  );
   const [whatIf, setWhatIf] = useState<PlanetType | null>(null);
   const [preview, setPreview] = useState<PlanetType | null>(null);
   const [detailKind, setDetailKind] = useState<DetailKind>('product');
-  const [detailOpen, setDetailOpen] = useState(false);
+  // A newly linked product is traced, and stays traced once its drawer closes.
+  const [seenLinked, setSeenLinked] = useState(linked);
+  if (linked !== seenLinked) {
+    setSeenLinked(linked);
+    if (linked !== null) {
+      setUserTraced({ id: linked, explicit: true });
+      setDetailKind('product');
+    }
+  }
+  const traced = useMemo<Traced>(
+    () =>
+      linked !== null
+        ? { id: linked, explicit: true }
+        : userTraced === undefined
+          ? defaultTraced
+          : userTraced,
+    [linked, userTraced, defaultTraced]
+  );
+  /** The "add a planet" drawer; the product drawer is open while the URL names one. */
+  const [planetOpen, setPlanetOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [hintDismissed, setHintDismissed] = useState(readMapHintDismissed);
+
+  // The colony whose richness drawer the URL has open; an unknown id is dropped.
+  const planetRaw = parsePiPlanet(location.search);
+  const richnessColony = colonies.find((c) => c.planetId === planetRaw) ?? null;
+  const hasPlanetParam = new URLSearchParams(location.search).has(PI_PLANET_PARAM);
+  useEffect(() => {
+    if (!hasPlanetParam || richnessColony !== null) return;
+    navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
+  }, [hasPlanetParam, richnessColony, location, navigate]);
+  const dropPlanet = () =>
+    navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
 
   // --- Detail panel mode, by the layout box's own width -----------------------
   const layoutRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setPanelWidth] = useState(0);
+  // No drawer until the width is known: a linked product on a wide screen
+  // would otherwise mount a drawer for one frame before the panel docks.
+  const [measured, setMeasured] = useState(false);
+  useLayoutEffect(() => {
+    const width = layoutRef.current?.getBoundingClientRect().width ?? 0;
+    if (width > 0) setPanelWidth(width);
+    setMeasured(true);
+  }, []);
   useEffect(() => {
     const el = layoutRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -146,10 +227,27 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     returnFocus.current = null;
     if (el && el.isConnected) requestAnimationFrame(() => el.focus());
   }, []);
-  const closeDetail = useCallback(() => {
-    setDetailOpen(false);
+  const closePlanet = useCallback(() => {
+    setPlanetOpen(false);
     restore();
   }, [restore]);
+  const goingBack = useRef(false);
+  useEffect(() => {
+    goingBack.current = false;
+  }, [linked]);
+  /** Takes `product` off the URL: Back when this page pushed the entry, else a replace. */
+  const dropProduct = useCallback(() => {
+    // A second Close before Back lands would go Back twice, maybe off the page.
+    if (parsePiProduct(location.search) === null || goingBack.current) return;
+    if (wasProductPushedHere(location.state)) {
+      goingBack.current = true;
+      navigate(-1);
+    } else {
+      navigate(hrefWithoutPiProduct(location), {
+        replace: true,
+      });
+    }
+  }, [location, navigate]);
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
     restore();
@@ -185,6 +283,14 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     [advice, graph]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
+  const colonySales = useMemo(
+    () =>
+      advice.colonies.map((c) => ({
+        name: c.name ?? t('pi.planetLabel', { id: c.planetId }),
+        sells: c.sells,
+      })),
+    [advice, t]
+  );
 
   const whatIfAdvice = useMemo(
     () => (whatIf && !isHave(whatIf) ? adviceWithWhatIf(whatIf) : null),
@@ -196,18 +302,49 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   // --- Actions ---------------------------------------------------------------
-  const drawerShown = !docked && detailOpen;
+  // A product linked while docked stays in the docked panel: narrowing the
+  // window must not pop it open as a drawer, so it is dropped from the URL.
+  const [dockedLinked, setDockedLinked] = useState<number | null>(null);
+  if (docked && linked !== null && dockedLinked !== linked) setDockedLinked(linked);
+  if (linked === null && dockedLinked !== null) setDockedLinked(null);
+  const staleOnNarrow = !docked && linked !== null && linked === dockedLinked;
+  useEffect(() => {
+    if (staleOnNarrow) navigate(hrefWithoutPiProduct(location), { replace: true });
+  }, [staleOnNarrow, location, navigate]);
+  const productShown =
+    measured && !docked && linked !== null && !staleOnNarrow && detailKind === 'product';
+  const planetShown = !docked && planetOpen;
+  const richnessShown = measured && !docked && richnessColony !== null;
+  const drawerShown = productShown || planetShown || richnessShown;
+  // Back (or Close) took the product off the URL: focus goes back to the opener,
+  // unless another drawer is taking over.
+  const wasProductShown = useRef(productShown);
+  useEffect(() => {
+    if (wasProductShown.current && !productShown && !docked && !planetOpen && !helpOpen) restore();
+    wasProductShown.current = productShown;
+  }, [productShown, docked, planetOpen, helpOpen, restore]);
+
+  const productHref = useCallback(
+    (typeId: number) => piProductHref(typeId, location.search),
+    [location.search]
+  );
   const openProduct = (typeId: number) => {
     // Already in a drawer (the add-planet "best recipe" button): keep the
     // original opener as the place focus returns to.
     if (!docked && !drawerShown) remember();
-    setTraced({ id: typeId, explicit: true });
+    setUserTraced({ id: typeId, explicit: true });
     // Tracing a product answers the what-if question; board and panel agree.
     setWhatIf(null);
     setDetailKind('product');
-    // Docked, the panel is always on screen: a flag set now would pop a stale
-    // drawer open when the layout narrows.
-    if (!docked) setDetailOpen(true);
+    const href = piProductHref(typeId, location.search);
+    if (planetShown) {
+      // The planet drawer's own Back entry becomes the product's. No marker:
+      // what is under it may not be this page's, so Close replaces, never goes Back.
+      setPlanetOpen(false);
+      navigate(href, { replace: true });
+      return;
+    }
+    navigate(href, productNavigation(location));
   };
   const clickPlanet = (type: PlanetType) => {
     if (isHave(type)) {
@@ -221,21 +358,30 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     }
     if (whatIf === type) {
       setWhatIf(null);
-      closeDetail();
+      closePlanet();
       return;
     }
     if (!docked && !drawerShown) remember();
+    if (richnessColony) dropPlanet();
     setWhatIf(type);
     setDetailKind('planet');
-    if (!docked) setDetailOpen(true);
+    if (docked) return;
+    // One drawer at a time: the product's entry goes, the planet's own comes.
+    if (linked !== null) {
+      navigate(hrefWithoutPiProduct(location), {
+        replace: true,
+      });
+    }
+    setPlanetOpen(true);
   };
   const dismissHint = () => {
     writeMapHintDismissed();
     setHintDismissed(true);
   };
   const clearTrace = () => {
-    setTraced(null);
-    closeDetail();
+    setUserTraced(null);
+    if (linked !== null) dropProduct();
+    else restore();
   };
 
   const tracedProduct = traced ? graph.byId.get(traced.id) : null;
@@ -249,6 +395,18 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
 
   // --- Pieces ------------------------------------------------------------------
   const detailBody = (() => {
+    if (richnessColony) {
+      return (
+        <ColonyRichness
+          planetId={richnessColony.planetId}
+          type={richnessColony.type}
+          resources={graph.tiers[0]
+            .filter((raw) => raw.hosts.includes(richnessColony.type))
+            .map((raw) => ({ typeId: raw.typeId, name: raw.name }))}
+          onClose={docked ? dropPlanet : undefined}
+        />
+      );
+    }
     if (detailKind === 'planet' && whatIf && whatIfAdvice) {
       const weakest = [...advice.colonies]
         .filter((c) => c.todayPerDay !== null)
@@ -275,9 +433,10 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           }
           finder={finder}
           onTraceRecipe={openProduct}
+          productHref={productHref}
           onClose={() => {
             setWhatIf(null);
-            closeDetail();
+            closePlanet();
           }}
         />
       );
@@ -297,14 +456,23 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           owned={owned}
           colonyNames={colonyNames}
           finder={finder}
+          view={buildProductDetail({
+            graph,
+            typeId: traced.id,
+            trace,
+            figure: figureOf(traced.id),
+            colonies: colonySales,
+            ccLevel: advice.rankingBasis.ccLevel,
+          })}
           onClearTrace={clearTrace}
         />
       );
     }
     return <p className="text-xs text-text-dim">{t('piMap.detail.empty', { context })}</p>;
   })();
-  const detailTitle =
-    detailKind === 'planet' && whatIf
+  const detailTitle = richnessColony
+    ? t('piMap.richness.title', { name: richnessColony.name })
+    : detailKind === 'planet' && whatIf
       ? t('piMap.add.panelTitleFor', { type: planetName(t, whatIf) })
       : traced && tracedProduct
         ? t('piMap.detail.panelTitle')
@@ -341,10 +509,10 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
               key={pick.typeId}
               content={t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
             >
-              <button
-                type="button"
+              <Link
+                to={productHref(pick.typeId)}
                 aria-current={traced?.id === pick.typeId ? 'true' : undefined}
-                onClick={() => openProduct(pick.typeId)}
+                onClick={(event) => onPlanLinkClick(() => openProduct(pick.typeId))(event)}
                 className={cx(
                   'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
                   interactiveClassName,
@@ -361,17 +529,23 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
                   {picks.kind === 'rebuild' ? '+' : ''}
                   {formatIskCompact(pick.perDay)}
                   {t('piMap.perDaySuffix')}
-                  {/* A button cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
+                  {/* A link cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
                   <span className="sr-only">
                     {' '}
                     {t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
                   </span>
                 </span>
-              </button>
+              </Link>
             </Tooltip>
           ))}
           <span className="text-[11px] text-text-dim">
-            {picks.kind === 'rebuild' ? t('piMap.picksNoteRebuild') : t('piMap.picksNoteRecipes')}
+            {picks.kind === 'rebuild'
+              ? t('piMap.picksNoteRebuild', {
+                  preference: t(
+                    preference === 'haul' ? 'piMap.preferenceHaul' : 'piMap.preferenceIsk'
+                  ),
+                })
+              : t('piMap.picksNoteRecipes')}
           </span>
         </>
       )}
@@ -411,7 +585,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       <div className={cx(base, 'text-text')} aria-live="polite">
         <PlanetImage type={activeWhatIf} size={28} />
         <span className="text-[11px] font-semibold tracking-widest text-map-whatif uppercase">
-          {t('piMap.whatIfTitle', { type: name })}
+          {t('piMap.whatIfTitle', { aType: withArticle(name) })}
         </span>
         <span>
           {unlock.productIds.length === 0
@@ -449,6 +623,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       onPlanet={clickPlanet}
       onPreview={setPreview}
       onProduct={openProduct}
+      productHref={productHref}
     />
   );
 
@@ -499,6 +674,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
               figureOf={figureOf}
               onPlanet={clickPlanet}
               onProduct={openProduct}
+              productHref={productHref}
               between={<div className="-mx-3 border-y border-line">{whatIfLine}</div>}
               fullMap={board}
             />
@@ -517,11 +693,14 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
         {announce}
       </div>
 
+      {/* One drawer for both, so swapping planet for product never closes it
+          (a close hands focus back to the opener). The URL backs the product's. */}
       <PiDrawer
-        open={!docked && detailOpen}
-        onClose={closeDetail}
+        open={drawerShown}
+        onClose={richnessShown ? dropPlanet : productShown ? dropProduct : closePlanet}
         title={detailTitle}
         phone={phone}
+        closeOnBack={!productShown && !richnessShown}
       >
         {detailBody}
       </PiDrawer>

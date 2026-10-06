@@ -3,7 +3,8 @@
  * the ranked recipe cards, drawn from `FindBestView`. No figure is computed
  * here; components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item names are Market links; the planet-type
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`); the planet-type
  * chips toggle with `aria-pressed`; "Show me how" expands in place with a
  * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
  * colour alone.
@@ -18,13 +19,16 @@ import { HintText } from '@/components/ui/HintText';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { formatIsk } from '@/lib/isk';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
+import { SkillLink } from '@/features/entities';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { DAYS_PER_WEEK, setupParts } from './findBestHowTo';
 import type { RecipeCardView, TypeState, WhatIfChip, TypeToggle } from './findBestView';
+import { COMMAND_CENTER_UPGRADES_SKILL_ID } from './colonyBudget';
 import { PlanetImage } from './PlanetImage';
+import { Sentence } from './sentence';
 
 const MD_UP = '(min-width: 48rem)';
 const EU_GUIDE = 'https://wiki.eveuniversity.org/Planetary_Industry';
@@ -75,7 +79,7 @@ export function PlanetTypesPanel({
               size="md"
               selected={toggle.on}
               onToggle={() => onToggle(toggle.type)}
-              icon={<PlanetImage type={toggle.type} px={20} />}
+              icon={<PlanetImage type={toggle.type} size={20} />}
               label={typeName(toggle.type)}
             />
           ))}
@@ -96,7 +100,7 @@ export function PlanetTypesPanel({
                   size="md"
                   selected={chip.on}
                   onToggle={() => onWhatIf(chip.type)}
-                  icon={<PlanetImage type={chip.type} px={20} />}
+                  icon={<PlanetImage type={chip.type} size={20} />}
                   label={t('piPlan.find.whatIfChip', {
                     type: typeName(chip.type),
                     context: chip.on ? 'on' : chip.unlocks > 0 ? 'unlocks' : 'nothing',
@@ -323,13 +327,27 @@ function RecipeCard({
         <div className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-text-dim tabular-nums md:hidden">{card.rank}.</span>
-            <MarketItemLink typeId={recipe.typeId}>
+            <PiProductLink typeId={recipe.typeId}>
               <b className="text-sm font-semibold">{recipe.name}</b>
-            </MarketItemLink>
+            </PiProductLink>
             <TierChip tier={recipe.tier} />
             {card.isNew && (
               <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('piPlan.find.newWithPlanet')}
+              </span>
+            )}
+            {recipe.needsCcLevel && (
+              <span className="inline-flex h-[1.125rem] items-center gap-1 rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold whitespace-nowrap text-warning">
+                <Sentence
+                  text={t('piPlan.find.needsCc', { level: recipe.needsCcLevel, skill: '{skill}' })}
+                  slots={{
+                    skill: (
+                      <SkillLink typeId={COMMAND_CENTER_UPGRADES_SKILL_ID}>
+                        {t('piPlan.find.needsCcSkill', { level: recipe.needsCcLevel })}
+                      </SkillLink>
+                    ),
+                  }}
+                />
               </span>
             )}
           </div>
@@ -347,7 +365,7 @@ function RecipeCard({
         <ul className="space-y-0.5">
           {card.hosts.map((host) => (
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
-              <PlanetImage type={host.type} px={20} />
+              <PlanetImage type={host.type} size={20} />
               <b className="font-semibold">{typeName(host.type)}</b>
               <HostMark state={host.state} planet={typeName(host.type)} onFind={onFind} />
             </li>

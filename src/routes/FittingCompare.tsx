@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Button,
   EmptyState,
   IconButton,
-  MenuItem,
+  entityLinkClassName,
   PageHeader,
   Panel,
-  RowActionsMenu,
-  RowMoreActions,
+  Tooltip,
   Spinner,
   Checkbox,
 } from '@/components/ui';
@@ -59,7 +58,6 @@ import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
  */
 export function FittingCompare() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [codes, setCodes] = useCompareCodes();
   const slots = useCompareFittings(codes);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -213,61 +211,53 @@ export function FittingCompare() {
     const overage = fitStats ? firstResourceOverage(fitStats) : null;
     const name = slot.fitting?.name ?? '';
     const code = codes[index];
-    // A column's own actions, on right-click or its ⋮ (there is no baseline column to promote).
-    const items = (
-      <>
-        <MenuItem
-          disabled={code === undefined}
-          onSelect={() => code && navigate(fittingEditLocation(code))}
-        >
-          {t('fittings.compare.openInEditor')}
-        </MenuItem>
-        <MenuItem className="text-danger" onSelect={() => removeSlot(index)}>
-          {t('fittings.compare.remove')}
-        </MenuItem>
-      </>
-    );
     return (
-      <RowActionsMenu name={name} items={items}>
-        <div className="flex flex-col items-end gap-1">
-          <span className="max-w-40 truncate font-medium sm:max-w-full text-text">
-            {slot.fitting?.name}
+      <div className="flex flex-col items-end gap-1">
+        {code === undefined ? (
+          <span className="max-w-40 truncate font-medium sm:max-w-full text-text">{name}</span>
+        ) : (
+          <Tooltip content={t('fittings.compare.openInEditor')}>
+            <Link
+              to={fittingEditLocation(code)}
+              className={entityLinkClassName('max-w-40 truncate font-medium sm:max-w-full')}
+            >
+              {name}
+            </Link>
+          </Tooltip>
+        )}
+        {stats.failed[index] && (
+          <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
+        )}
+        {fitStats && (
+          <span className={overage ? 'text-danger' : 'text-success'}>
+            {overage
+              ? t('fittings.compare.overBy', {
+                  resource: t(`fittings.list.${overage.resource}`),
+                  amount: overage.amount.toFixed(0),
+                })
+              : t('fittings.compare.fitsYes')}
           </span>
-          {stats.failed[index] && (
-            <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
-          )}
-          {fitStats && (
-            <span className={overage ? 'text-danger' : 'text-success'}>
-              {overage
-                ? t('fittings.compare.overBy', {
-                    resource: t(`fittings.list.${overage.resource}`),
-                    amount: overage.amount.toFixed(0),
-                  })
-                : t('fittings.compare.fitsYes')}
-            </span>
-          )}
-          {flies !== null && flies !== undefined && (
-            <span className={flies ? 'text-success' : 'text-danger'}>
-              {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
-            </span>
-          )}
-          {canFly.failed[index] && (
-            <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
-          )}
-          {slot.fitting && characterOptions.length > 1 && (
-            <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
-          )}
-          <div className="flex items-center gap-1">
-            <RowMoreActions />
-            <IconButton
-              icon={<Icon.Close />}
-              label={t('fittings.compare.remove')}
-              onClick={() => removeSlot(index)}
-              tone="danger"
-            />
-          </div>
+        )}
+        {flies !== null && flies !== undefined && (
+          <span className={flies ? 'text-success' : 'text-danger'}>
+            {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
+          </span>
+        )}
+        {canFly.failed[index] && (
+          <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
+        )}
+        {slot.fitting && characterOptions.length > 1 && (
+          <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
+        )}
+        <div className="flex items-center gap-1">
+          <IconButton
+            icon={<Icon.Close />}
+            label={t('fittings.compare.remove')}
+            onClick={() => removeSlot(index)}
+            tone="danger"
+          />
         </div>
-      </RowActionsMenu>
+      </div>
     );
   }
 

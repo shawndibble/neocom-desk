@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton } from '@/components/ui';
+import { startPlanOnce } from './rowStartPlan';
 import * as Icon from '@/components/ui/icons';
 
 interface StartPlanButtonProps {
@@ -15,6 +16,11 @@ interface StartPlanButtonProps {
    * accessible label names.
    */
   compact?: { name: string };
+  /**
+   * What is being planned, the same key the row click uses (`useRowStartPlan`),
+   * so the button and the row can't both save a plan for it.
+   */
+  planKey?: unknown;
 }
 
 /**
@@ -25,12 +31,12 @@ interface StartPlanButtonProps {
  * when no plan opened. The pending state is the button's own, so a click
  * re-renders this button rather than the whole Opportunities tab.
  */
-export function StartPlanButton({ onStart, compact }: StartPlanButtonProps) {
+export function StartPlanButton({ onStart, compact, planKey }: StartPlanButtonProps) {
   const { t } = useTranslation();
   const [starting, setStarting] = useState(false);
   const start = () => {
     setStarting(true);
-    onStart().then(
+    (planKey === undefined ? onStart() : startPlanOnce(planKey, onStart)).then(
       (navigated) => {
         if (!navigated) setStarting(false);
       },

@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement } from 'react';
+import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -18,7 +18,7 @@ import {
   loadEmploymentHistory,
   type EmploymentHistoryRow,
 } from '@/features/character/employmentHistory';
-import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
+import { CorporationLink } from '@/features/entities/EntityLink';
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
@@ -104,11 +104,13 @@ export function EmploymentHistory() {
           // character record hasn't caught up to yet stay plain text. Never
           // a link to /corp: this route needs no scope and a typical viewer
           // has no Corp Access grant, so it would just land them on a
-          // rejection.
-          if (!row.ongoing || character?.corporationId !== row.corporationId) return name;
+          // rejection. The name opens Show Info instead (CONTEXT.md round 49,
+          // amended: an entity link, not a row menu).
+          const link = <CorporationLink id={row.corporationId}>{name}</CorporationLink>;
+          if (!row.ongoing || character?.corporationId !== row.corporationId) return link;
           return (
             <span className="inline-flex items-center gap-2">
-              {name}
+              {link}
               <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('employmentHistory.current')}
               </span>
@@ -140,17 +142,6 @@ export function EmploymentHistory() {
     rows,
     columns: csvColumns,
   });
-
-  function historyRowContextMenu(row: EmploymentHistoryRow, tr: ReactElement) {
-    return (
-      <CorpHistoryContextMenu
-        corporationId={row.corporationId}
-        name={corpNames.get(row.corporationId) ?? `#${row.corporationId}`}
-      >
-        {tr}
-      </CorpHistoryContextMenu>
-    );
-  }
 
   if (!hydrated) {
     return (
@@ -219,8 +210,6 @@ export function EmploymentHistory() {
               rows={rows}
               rowKey={(row) => row.recordId}
               rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
-              rowContextMenu={historyRowContextMenu}
-              rowMoreActions
               // Rows already arrive most-recent-first; match it so the
               // header shows this as the active sort rather than none.
               defaultSort={{ columnId: 'started', direction: 'desc' }}

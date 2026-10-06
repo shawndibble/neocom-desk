@@ -17,7 +17,7 @@ import {
 import { CUSTOMS_TAXABLE_VALUE, piTier } from '@/engine/pi/chain';
 import type { FactoryBalance } from '@/engine/pi/factoryBalance';
 import { hostRateFor } from './customsRate';
-import type { PlanetAdvice } from './advisorModel';
+import type { PlanetAdvice } from './systemPlanetModel';
 
 /** Schematic cycle times are in seconds. */
 const SECONDS_PER_HOUR = 3_600;

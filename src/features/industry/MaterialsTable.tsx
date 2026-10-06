@@ -34,7 +34,7 @@ import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
 import {
@@ -801,7 +801,7 @@ export function MaterialsTable({
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          <MarketItemLink typeId={material.typeID}>{name}</MarketItemLink>
+          <ItemInfoLink typeId={material.typeID}>{name}</ItemInfoLink>
           {/* Advice with nothing to act on here — a material something
               else produces. Inline after the name, not in a reserved slot
               before it, so every name starts at the same edge. */}

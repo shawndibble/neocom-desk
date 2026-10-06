@@ -14,7 +14,7 @@ describe('AssumedCustomsNote', () => {
     );
     expect(screen.getByText(/assume 10% customs on Hek VIII, Lustrevik III/)).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Set the rate on Plan' }).getAttribute('href')).toBe(
-      '/planetary-industry/plan'
+      '/planetary-industry/plan#customs'
     );
   });
 

@@ -1,7 +1,7 @@
 /**
  * Which Skill Plan Fit Check / the Market skill chip Add into. Deliberately
- * different from `SkillRowContextMenu.tsx`'s per-click plan submenu — that's
- * right for a one-off right-click, not a panel where "Add" repeats.
+ * different from per-click plan submenu (removed) — a one-off
+ * pick doesn't suit a panel where "Add" repeats.
  */
 import { useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';

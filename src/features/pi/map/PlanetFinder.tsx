@@ -19,6 +19,7 @@ import { SystemLink } from '@/features/entities';
 import { loadPiSystemPlanets } from '@/sde/loadSde';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { defaultHighsecOnly } from '../findBestView';
 import { planetName } from './mapText';
 
 const MAX_JUMPS = 12;
@@ -33,13 +34,17 @@ export function PlanetFinder({
   types,
   homeSystemId,
   homeName,
+  homeSecurity,
 }: {
   types: readonly PlanetType[];
   homeSystemId: number | null;
   homeName: string | null;
+  /** Seeds "Highsec only": on from a highsec home, off from low/null/wormhole or unknown. */
+  homeSecurity: number | null;
 }) {
   const { t } = useTranslation();
-  const [highsecOnly, setHighsecOnly] = useState(true);
+  const [highsecPick, setHighsecPick] = useState<boolean | null>(null);
+  const highsecOnly = highsecPick ?? defaultHighsecOnly(homeSecurity);
   const typesKey = types.join(',');
   const [state, setState] = useState<{ key: string; loaded: Loaded | 'failed' } | null>(null);
   const key = `${homeSystemId}|${typesKey}|${highsecOnly}`;
@@ -107,7 +112,7 @@ export function PlanetFinder({
       </h4>
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
         <label className={`inline-flex items-center gap-1.5 text-xs ${tappableRowClassName}`}>
-          <Checkbox checked={highsecOnly} onChange={(e) => setHighsecOnly(e.target.checked)} />
+          <Checkbox checked={highsecOnly} onChange={(e) => setHighsecPick(e.target.checked)} />
           {t('piMap.finder.highsecOnly')}
         </label>
       </div>

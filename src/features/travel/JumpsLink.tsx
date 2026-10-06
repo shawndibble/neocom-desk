@@ -20,9 +20,12 @@ export function JumpsLink({
   systemId,
   fromId,
   preference,
+  label,
   children,
 }: {
   systemId: number;
+  /** Accessible name, when the bare count isn't one ("5 jumps — open route safety"). */
+  label?: string;
   /** Where the count starts, when that isn't the Character's current system. */
   fromId?: number | null;
   /** The page's own route picker, when the count was worked out under it. */
@@ -35,6 +38,7 @@ export function JumpsLink({
       <Link
         to={routeToHref(systemId, fromId, preference)}
         className={entityLinkClassName()}
+        aria-label={label}
         onClick={stop}
       >
         {children}

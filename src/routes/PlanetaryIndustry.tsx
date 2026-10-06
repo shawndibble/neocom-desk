@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { hrefWithoutPiProduct, parsePiProduct } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
@@ -60,7 +63,10 @@ const PI_URL_PARAMS = {
  * `/planetary-industry/map`); every input each peer tab needs to redraw
  * its answer stays a scoped query param on top of it — Plan's goals and
  * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
- * cleared), Colonies' opened colony (`?colony=`) — so a plan
+ * cleared), the chosen question (`?q=`, PlanPanel) and Find best's filter
+ * (`?fb.filter=`, `?fb.mode=`, FindBestPlan), Colonies' opened colony
+ * (`?colony=`), Map's open product drawer (`?product=`, which every PI
+ * product name links to) — so a plan
  * survives a reload and can be deep-linked into later. All fall
  * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
  * unknown value is handled by each param's own default rather than rendering
@@ -84,6 +90,17 @@ export function PlanetaryIndustry() {
     undefined,
     { cacheKey: 'planetary-industry' }
   );
+  // Show info for every item name and menu on the three tabs.
+  const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
+
+  // A tab switch keeps the search, so the Map's `?product=` would reopen its
+  // drawer on the way back: it belongs to the Map alone.
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (tab === 'map' || parsePiProduct(location.search) === null) return;
+    navigate(hrefWithoutPiProduct(location), { replace: true, state: location.state });
+  }, [tab, location, navigate]);
 
   // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
   // Plan tab only, and only for a type the planner can plan.
@@ -122,81 +139,85 @@ export function PlanetaryIndustry() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
-      <PageHeader
-        title={t('pi.title')}
-        meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
-        actions={
-          <>
-            <Button size="md" onClick={() => setExplainerOpen(true)}>
-              {t('piPlan.newToPi')}
-            </Button>
-            <PageSettingsButton pageName={t('pi.title')} section="industry">
-              <PiSettingsForm />
-            </PageSettingsButton>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('pi.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
-          </>
-        }
-      />
-
-      <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
-
-      {data?.planetsNeedsReauth && (
-        <GrantBanner
-          characterId={activeCharacterId}
-          endpoints={['getCharacterPlanets']}
-          title={t('pi.reauthTitle')}
-          hint={t('pi.reauthHint')}
-          actionLabel={t('pi.reauthAction')}
+    <ItemActionsProvider page={itemActions}>
+      <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
+        <PageHeader
+          title={t('pi.title')}
+          meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
+          actions={
+            <>
+              <Button size="md" onClick={() => setExplainerOpen(true)}>
+                {t('piPlan.newToPi')}
+              </Button>
+              <PageSettingsButton pageName={t('pi.title')} section="industry">
+                <PiSettingsForm />
+              </PageSettingsButton>
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('pi.refresh')}
+                onClick={refresh}
+                disabled={loading}
+              />
+            </>
+          }
         />
-      )}
 
-      <Tabs
-        label={t('piPlan.tabsLabel')}
-        value={tab}
-        onChange={(id) => setTab(id as typeof tab)}
-        tabs={[
-          { id: 'plan', label: t('piPlan.planTab') },
-          { id: 'map', label: t('piPlan.mapTab') },
-          { id: 'colonies', label: t('piPlan.coloniesTab') },
-        ]}
-      />
+        <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
-      <PiHeaderStrip
-        colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-        estimate={tab === 'plan' || tab === 'map'}
-      />
+        {data?.planetsNeedsReauth && (
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterPlanets']}
+            title={t('pi.reauthTitle')}
+            hint={t('pi.reauthHint')}
+            actionLabel={t('pi.reauthAction')}
+          />
+        )}
 
-      {tab === 'map' ? (
-        <PiMapTab characterId={activeCharacterId} />
-      ) : tab === 'plan' ? (
-        <PlanPanel
-          seedingGoal={seedTypeId !== null}
-          characterId={activeCharacterId}
-          goals={goals}
-          onGoalsChange={setGoals}
-          disabled={disabledColonies}
-          onDisabledChange={setDisabledColonies}
+        <Tabs
+          label={t('piPlan.tabsLabel')}
+          value={tab}
+          onChange={(id) => setTab(id as typeof tab)}
+          tabs={[
+            { id: 'plan', label: t('piPlan.planTab') },
+            { id: 'map', label: t('piPlan.mapTab') },
+            { id: 'colonies', label: t('piPlan.coloniesTab') },
+          ]}
         />
-      ) : loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : (
-        <ColoniesTab
-          characterId={activeCharacterId}
-          snapshot={data}
-          loading={loading}
-          error={error}
-          linkedColonyId={linkedColonyId}
-          onClearLinkedColony={clearLinkedColony}
+
+        <PiHeaderStrip
+          colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
+          colonyCountUnknown={data?.planetsFetchFailed}
+          estimate={tab === 'plan' || tab === 'map'}
         />
-      )}
-    </div>
+
+        {tab === 'map' ? (
+          <PiMapTab characterId={activeCharacterId} />
+        ) : tab === 'plan' ? (
+          <PlanPanel
+            seedingGoal={seedTypeId !== null}
+            characterId={activeCharacterId}
+            goals={goals}
+            onGoalsChange={setGoals}
+            disabled={disabledColonies}
+            onDisabledChange={setDisabledColonies}
+          />
+        ) : loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : (
+          <ColoniesTab
+            characterId={activeCharacterId}
+            snapshot={data}
+            loading={loading}
+            error={error}
+            linkedColonyId={linkedColonyId}
+            onClearLinkedColony={clearLinkedColony}
+            onRetry={refresh}
+          />
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

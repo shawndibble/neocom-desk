@@ -2099,13 +2099,12 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 });
 
-describe('ContractSearchPanel — item name links to Market Browser (issue #2169)', () => {
-  it('renders the item cell as a link into the Market Browser, not a bare string', async () => {
+describe("ContractSearchPanel — a row's primary action beats its name links (§6c)", () => {
+  it('renders the item cell as plain text: the row opens the contract modal', async () => {
     renderWithRouter();
 
     const rows = await bodyRows();
-    const link = within(rows[0]).getByRole('link', { name: 'Tritanium' });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
-    expect(link).toHaveAttribute('href', expect.stringContaining('34'));
+    expect(within(rows[0]).queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    expect(within(rows[0]).getByText('Tritanium')).toBeInTheDocument();
   });
 });

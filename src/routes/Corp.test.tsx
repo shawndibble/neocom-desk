@@ -523,7 +523,7 @@ describe('the board (AC2, AC5, AC6)', () => {
   });
 
   describe('board rows are read-only', () => {
-    it('has no row menu or More actions button; an item subject links to Market', async () => {
+    it('has no row menu or More actions button; an item subject links to Show info', async () => {
       mocked.loadCorporationStructures.mockResolvedValue(cached([]));
       mocked.loadCorporationIndustryJobs.mockResolvedValue(
         cached([

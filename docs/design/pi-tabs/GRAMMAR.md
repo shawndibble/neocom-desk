@@ -11,6 +11,8 @@ leave out of any "differences from the mockup" list.
 | System names as plain text | Solar-system names link to Route Safety with that system as destination. Stations are not clickable. |
 | Native `title=` tooltips (▲ ≈ ▼ chips, icons, truncated text) | `Tooltip` / `HintText` (dotted underline) / `InfoTooltip`. The content is also in the accessible name; a tooltip is never the only place. |
 | A "?" button that opens "How to use the map" / "New to PI?" | Those are drawers, so use a labelled button, not the "?" circle (the "?" circle is a tooltip only). |
+| "Sell at" in both the strip and the settings modal | One picker, in the header strip ("Where do you sell?"). The strip also carries a labelled "PI settings" button (text, not a gear) for the rest of the settings; the modal has no sell picker. Settings → Industry has no strip, so it keeps the picker. |
+| A bare "EST." badge after an unrelated chip | The badge sits on the note it qualifies ("Estimated prices", a `HintText` saying why). |
 | A gear that opens PI settings | Fine (a gear opens this page's settings modal). Linking to the Settings page is labelled text, not a gear. |
 | Rows that jump to another page (Colonies row to Plan) | A real link ending in a faint `CaretRight` (accent on hover). A row that expands in place uses `Disclosure`'s rotating leading caret. |
 | Selected card / planet / product (tint or box) | Accent 2px left border + `panel-2` fill + accent label, `aria-current="true"` (single) or `aria-selected` (multi). A toggle uses `aria-pressed` with the accent tint. Selected must never look like hover. |

@@ -432,7 +432,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Item Actions**: What an item menu can do on the page it's on — add to the
   Quickbar, find the blueprint behind Build Plan, and open the page's one
   Item Detail (Show info). One set per page, shared by every item menu on it
-  (issue #2041).
+  (issue #2041). Show info is also URL-backed (`?info=type-<id>`), so an
+  item name anywhere can open it without a page-owned host.
 - **ISK/jump**: What a public courier haul pays per stargate jump of the trip
   it asks for — reward divided by the jump count, and the figure the Courier
   board ranks on (issue #943). A hauler's cost is the trip, and the trip is
@@ -765,6 +766,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   together both stay valid; whichever SSO returns is the one that completes.
   Bounded by a TTL, enforced when it is redeemed as well as when a later login
   prunes, and by a maximum count — so an abandoned one is forgotten.
+- **PI Product Detail**: What a product or item name on the Planetary Industry
+  tabs (Plan, Map, Colonies) opens: the Map tab with that product's drawer open,
+  addressed by `?product=<typeId>`. How to make it (factory, planet types,
+  inputs, the chain) and why or why not (the model's one-planet figure, hauling
+  load, what the pilot's colonies already make). Market and Show info sit in it,
+  or in the row's ⋮. The §6c "Entities" override for PI.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer

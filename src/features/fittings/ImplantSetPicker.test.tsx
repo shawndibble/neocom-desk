@@ -172,7 +172,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
 });
 
 describe('ImplantSetPicker — item info', () => {
-  it('links an item’s name to Market and opens its details from the ⓘ button', async () => {
+  it('links an item’s name to Show info and opens its details from the ⓘ button', async () => {
     const user = userEvent.setup();
     render(
       <ImplantSetPicker
@@ -184,7 +184,7 @@ describe('ImplantSetPicker — item info', () => {
     );
 
     const link = await screen.findByRole('link', { name: 'Standard Blue Pill Booster' });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('info=type-9950'));
     await user.click(
       screen.getByRole('button', { name: 'Show details of Standard Blue Pill Booster' })
     );

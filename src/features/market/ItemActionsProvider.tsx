@@ -27,6 +27,7 @@ export function ItemActionsProvider({
           typeId={shown.typeId}
           itemName={shown.itemName}
           location={detailLocation}
+          showOpenInMarket={detailLocation === undefined}
           onClose={closeInfo}
         />
       )}

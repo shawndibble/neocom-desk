@@ -19,14 +19,14 @@
  * can disagree on screen.
  *
  * So this derives instead: the mean of what the pilot's *own* extractors are
- * actually sustaining, off `advisorModel`'s measured `extractedPerHour`. That
+ * actually sustaining, off `systemPlanetModel`'s measured `extractedPerHour`. That
  * is better than any figure they could type, it needs no new control, and
  * `AssumedRate` carries its provenance so the card can say where it came from
  * — the same job `customsRateSource` does for the customs rate.
  *
  * When there is nothing measured, this refuses. It does not fall back to a
  * default rate, because a planet priced off an invented number is exactly the
- * confident-wrong-figure the Advisor exists to avoid — and `advisorModel`
+ * confident-wrong-figure the Advisor exists to avoid — and `systemPlanetModel`
  * already sets the precedent by dropping an extractor with no install-time
  * baseline rather than counting it as zero.
  */

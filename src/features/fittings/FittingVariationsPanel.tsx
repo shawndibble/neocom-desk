@@ -1,12 +1,12 @@
 /** Renders `useModuleVariations`' rows; clicking one swaps it in. One `DataTable` — its own stacked layout below `sm` is the mobile card view. */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { entityLinkClassName, IskAmount, TypeIcon } from '@/components/ui';
+import { IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 
@@ -79,9 +79,8 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
-          <MarketItemLink typeId={row.typeId} className={entityLinkClassName('min-w-0 truncate')}>
-            {row.name}
-          </MarketItemLink>
+          {/* Row click swaps this variant in, so the name is plain (DESIGN.md §6c); Market is in the row's ⋮ item menu. */}
+          <span className={entityLinkClassName('min-w-0 truncate')}>{row.name}</span>
           <span className="shrink-0 text-[0.6875rem] text-text-dim">{row.metaGroupName}</span>
         </span>
       ),

@@ -44,6 +44,8 @@ export interface ActiveColonies {
   planetsResult: CachedResult<CharacterPlanet[]> | null;
   /** 403 (scope never granted) means "log in again", not "offline". */
   planetsNeedsReauth: boolean;
+  /** ESI did not answer and nothing is cached: an error, not "no colonies". */
+  planetsFetchFailed: boolean;
   details: Map<number, StatusResult<CharacterPlanetDetail>>;
   planetNames: Map<number, string>;
   pinTypeNames: Map<number, string>;
@@ -66,14 +68,19 @@ async function loadActiveColonies(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<ActiveColonies> {
-  const { cached: planetsResult, needsReauth: planetsNeedsReauth } =
-    await loadCharacterPlanets(characterId);
+  const {
+    cached: planetsResult,
+    needsReauth: planetsNeedsReauth,
+    fetchFailed,
+  } = await loadCharacterPlanets(characterId);
+  const planetsFetchFailed = fetchFailed === true;
   const loadedAt = Date.now();
   const planets = planetsResult?.data ?? [];
 
   const empty: ActiveColonies = {
     planetsResult,
     planetsNeedsReauth,
+    planetsFetchFailed,
     details: new Map(),
     planetNames: new Map(),
     pinTypeNames: new Map(),
@@ -125,6 +132,7 @@ async function loadActiveColonies(
   return {
     planetsResult,
     planetsNeedsReauth,
+    planetsFetchFailed,
     details,
     planetNames,
     pinTypeNames,

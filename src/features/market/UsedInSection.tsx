@@ -20,6 +20,8 @@ import {
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
+import { ItemInfoLink } from '@/features/entities';
+import { withoutEntityInfo } from '@/lib/entityInfo';
 import { useOptionalItemActions } from './itemActions';
 
 /** Rows per page — the whole list for anything but a mineral or common component. */
@@ -122,7 +124,9 @@ export function UsedInSection({
                     height={20}
                     className="shrink-0"
                   />
-                  <span className="truncate text-text">{use.productName}</span>
+                  <ItemInfoLink typeId={use.productTypeID} className="truncate">
+                    {use.productName}
+                  </ItemInfoLink>
                   {use.activity === 'reaction' && (
                     <span className="shrink-0 text-text-dim">
                       {t('market.itemDetail.usedInReaction')}
@@ -154,12 +158,16 @@ export function UsedInSection({
   );
 }
 
-/** Calls `onNavigate` on the first location change after mount. */
+/** Calls `onNavigate` once the page or its params (other than `?info`) change after mount. */
 function CloseOnNavigate({ onNavigate }: { onNavigate: () => void }) {
-  const { key } = useLocation();
-  const mountedAt = useRef(key);
+  const { key, pathname, search } = useLocation();
+  const mountedAt = useRef({ key, pathname, search: withoutEntityInfo(search) });
   useEffect(() => {
-    if (key !== mountedAt.current) onNavigate();
-  }, [key, onNavigate]);
+    // A drill-down only moves `?info` (the same page, another item): not a navigation away.
+    const start = mountedAt.current;
+    if (key === start.key) return;
+    if (pathname === start.pathname && withoutEntityInfo(search) === start.search) return;
+    onNavigate();
+  }, [key, pathname, search, onNavigate]);
   return null;
 }

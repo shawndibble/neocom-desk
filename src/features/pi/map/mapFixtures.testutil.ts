@@ -101,6 +101,15 @@ export function snapshot(colonies: 'lean' | 'none' = 'lean'): PlannerSnapshot {
   };
 }
 
+/**
+ * Bacteria (the P1 made from this colony's Microorganisms) priced under the ore
+ * itself, so refining in place is no quick win and the rebuild is what Plan offers.
+ */
+const LEAN_PRICES = {
+  prices: { ...PRICES.prices, 2393: 50 },
+  buyPrices: { ...PRICES.buyPrices, 2393: 45 },
+};
+
 export function adviceInput(
   colonies: 'lean' | 'none' = 'lean',
   overrides: Partial<PlanAdviceInput> = {}
@@ -108,7 +117,7 @@ export function adviceInput(
   return {
     snapshot: snapshot(colonies),
     prefs: { restartHours: 72, fallbackRatePerHour: 12_000, customsOverrides: {} },
-    books: hubBooks(PRICES, 5),
+    books: hubBooks(colonies === 'lean' ? LEAN_PRICES : PRICES, 5),
     market: { kind: 'hub' },
     cadence: { restartDays: 3, haulDays: 1 },
     preference: 'isk',
