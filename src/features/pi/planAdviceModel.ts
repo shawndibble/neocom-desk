@@ -219,6 +219,12 @@ export interface PlanAdvice {
   slots: SlotNudge;
   recipes: RecipeRanking;
   /**
+   * `recipes` plus the setups a higher Command Center hosts, tagged
+   * `needsCcLevel` and ranked below every one that fits: what Plan's Find best
+   * lists, so the Map's picks and tiles read the same rows.
+   */
+  recipesWithTagged: RecipeRanking;
+  /**
    * Every priced one-planet recipe on every planet type, before filtering. Plan's
    * "Find the best thing to build" re-ranks these under its own toggles and
    * what-if planets, so the figures stay this model's.
@@ -443,6 +449,7 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
       bestOnePlanetGainPerDay: ranking.ranking.bestAnywherePerDay,
     }),
     recipes: ranking.ranking,
+    recipesWithTagged: ranking.withTagged,
     recipeRows: ranking.rows,
     rankingBasis: ranking.basis,
   };
@@ -937,7 +944,12 @@ function rankingFor(args: {
   books: SellBooks;
   pi: PiData;
   haulHours: number;
-}): { ranking: RecipeRanking; rows: RecipeRow[]; basis: RankingBasis } {
+}): {
+  ranking: RecipeRanking;
+  withTagged: RecipeRanking;
+  rows: RecipeRow[];
+  basis: RankingBasis;
+} {
   const { input, rows, books, pi, haulHours } = args;
   const withAdvice = rows.flatMap((row) => (row.advice ? [row.advice] : []));
 
@@ -1059,14 +1071,22 @@ function rankingFor(args: {
     ...new Set([...rows.map((row) => row.planetType), ...(input.whatIfTypes ?? [])]),
   ] as PlanetType[];
 
+  const unpricedIds = [...unpriced].sort((a, b) => a - b);
   return {
     rows: recipeRows,
+    // With no colony every planet type is one the pilot could go and find, as in Find best.
+    withTagged: rankRecipes({
+      rows: recipeRows,
+      haveTypes: have.length > 0 ? have : planetTypes,
+      filter: input.recipeFilter,
+      unpriced: unpricedIds,
+    }),
     ranking: rankRecipes({
       // Plan and Map stay within the trained skill; Find best re-ranks every row.
       rows: recipeRows.filter((row) => !row.needsCcLevel),
       haveTypes: have,
       filter: input.recipeFilter,
-      unpriced: [...unpriced].sort((a, b) => a - b),
+      unpriced: unpricedIds,
     }),
     basis: {
       rateSource: measured.length > 0 ? 'measured' : 'assumed',

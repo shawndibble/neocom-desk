@@ -20,15 +20,13 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { formatIsk } from '@/lib/isk';
 import { PiProductLink } from './PiProductLink';
-import { SkillLink } from '@/features/entities';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { DAYS_PER_WEEK, setupParts } from './findBestHowTo';
 import type { RecipeCardView, TypeState, WhatIfChip, TypeToggle } from './findBestView';
-import { COMMAND_CENTER_UPGRADES_SKILL_ID } from './colonyBudget';
 import { PlanetImage } from './PlanetImage';
-import { Sentence } from './sentence';
+import { CcLevelTag } from './CcLevelTag';
 
 const MD_UP = '(min-width: 48rem)';
 const EU_GUIDE = 'https://wiki.eveuniversity.org/Planetary_Industry';
@@ -336,20 +334,7 @@ function RecipeCard({
                 {t('piPlan.find.newWithPlanet')}
               </span>
             )}
-            {recipe.needsCcLevel && (
-              <span className="inline-flex h-[1.125rem] items-center gap-1 rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold whitespace-nowrap text-warning">
-                <Sentence
-                  text={t('piPlan.find.needsCc', { level: recipe.needsCcLevel, skill: '{skill}' })}
-                  slots={{
-                    skill: (
-                      <SkillLink typeId={COMMAND_CENTER_UPGRADES_SKILL_ID}>
-                        {t('piPlan.find.needsCcSkill', { level: recipe.needsCcLevel })}
-                      </SkillLink>
-                    ),
-                  }}
-                />
-              </span>
-            )}
+            {recipe.needsCcLevel && <CcLevelTag level={recipe.needsCcLevel} />}
           </div>
           {setup && (
             <p className="text-[0.6875rem] text-text-dim">
