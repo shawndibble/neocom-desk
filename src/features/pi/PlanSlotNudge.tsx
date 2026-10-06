@@ -36,7 +36,7 @@ export function SlotNudge({
   if (slots.free <= 0) return null;
   const dots = Array.from({ length: slots.allowed }, (_, i) => i < slots.used);
   const text = t('piPlan.make.slots', {
-    allowed: slots.allowed,
+    count: slots.allowed,
     used: slots.used,
     gain: '{gain}',
     skill: '{skill}',
@@ -47,7 +47,7 @@ export function SlotNudge({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span
           role="img"
-          aria-label={t('piPlan.make.slotsLabel', { used: slots.used, allowed: slots.allowed })}
+          aria-label={t('piPlan.make.slotsLabel', { used: slots.used, count: slots.allowed })}
           className="flex shrink-0 gap-1"
         >
           {dots.map((used, i) => (

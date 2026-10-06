@@ -229,7 +229,9 @@ function BuildStep({ how }: { how: HowTo }) {
         </PinLine>
         {how.extractors.map((extractor) => (
           <PinLine key={extractor.typeId} icon={icon(extractor.typeId)}>
-            {t('piPlan.find.pinExtractor')}{' '}
+            {how.headsPerExtractor === null
+              ? t('piPlan.find.pinExtractor')
+              : t('piPlan.find.pinExtractorHeads', { count: how.headsPerExtractor })}{' '}
             <ItemName typeId={extractor.typeId} name={extractor.name} />
           </PinLine>
         ))}
@@ -245,7 +247,7 @@ function BuildStep({ how }: { how: HowTo }) {
           </PinLine>
         )}
       </ul>
-      {how.fit && (
+      {how.fit ? (
         <div className="space-y-1">
           <p className="text-[0.6875rem] text-text-dim">
             {t('piPlan.find.needsLevel', { level: how.fit.level })}
@@ -261,6 +263,8 @@ function BuildStep({ how }: { how: HowTo }) {
             budget={how.fit.budget.powergrid}
           />
         </div>
+      ) : (
+        <p className="text-[0.6875rem] text-text-dim">{t('piPlan.find.fitUnknown')}</p>
       )}
     </Step>
   );

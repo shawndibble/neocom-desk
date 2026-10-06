@@ -1,18 +1,14 @@
 /**
  * "Show me how" for one recipe, shaped for drawing: the pins to build, the
  * Command Center it needs, and what a week of running it yields. All of it
- * comes from the recommendation model's layout for the recipe, so the steps
- * and the ISK figure are never two answers.
+ * comes from the recommendation model's layout for the recipe, so the steps,
+ * the meter and the ISK figure are never two answers.
  */
-import type { RecipeRank } from '@/engine/pi/planRecipes';
-import { pinsLoad } from '@/engine/pi/pinBudget';
-import type { PinCounts, PinLoad } from '@/engine/pi/types';
+import type { RecipeFit, RecipeRank } from '@/engine/pi/planRecipes';
+import type { PinCounts } from '@/engine/pi/types';
 import type { PiData } from '@/sde/types';
-import { colonyBudget } from './colonyBudget';
-import { DEFAULT_PLANNER_HEADS } from './goalPlannerModel';
 
 export const DAYS_PER_WEEK = 7;
-const MAX_CC_LEVEL = 5;
 
 export interface HowToItem {
   typeId: number;
@@ -26,19 +22,14 @@ export interface HowToFactoryLine {
   makes: HowToItem[];
 }
 
-export interface HowToFit {
-  /** The lowest Command Center upgrade level that hosts the layout. */
-  level: number;
-  used: PinLoad;
-  budget: PinLoad;
-}
-
 export interface HowTo {
   launchpads: number;
   storage: number;
   extractors: HowToItem[];
+  /** Heads on each extractor, as the fit assumed; null when the layout does not say. */
+  headsPerExtractor: number | null;
   factories: HowToFactoryLine[];
-  fit: HowToFit | null;
+  fit: RecipeFit | null;
   unitsPerWeek: number;
   m3PerWeek: number;
 }
@@ -78,28 +69,13 @@ export function buildHowTo(recipe: RecipeRank, pi: PiData): HowTo | null {
     }
   );
 
-  let fit: HowToFit | null = null;
-  try {
-    const used = pinsLoad(pins, pi.infrastructure, {
-      extractorHeads: (pins.extractorControlUnit ?? 0) * DEFAULT_PLANNER_HEADS,
-    });
-    for (let level = 0; level <= MAX_CC_LEVEL; level += 1) {
-      const { budget } = colonyBudget(level, pi);
-      if (used.cpu <= budget.cpu && used.powergrid <= budget.powergrid) {
-        fit = { level, used, budget };
-        break;
-      }
-    }
-  } catch {
-    fit = null;
-  }
-
   return {
     launchpads: pins.launchpad ?? 0,
     storage: pins.storage ?? 0,
     extractors: layout.extracts.map((typeId) => ({ typeId, name: nameOf(typeId) })),
+    headsPerExtractor: layout.headsPerExtractor ?? null,
     factories,
-    fit,
+    fit: layout.fit ?? null,
     unitsPerWeek: layout.unitsPerDay * DAYS_PER_WEEK,
     m3PerWeek: recipe.m3PerDay * DAYS_PER_WEEK,
   };
