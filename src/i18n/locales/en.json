@@ -3268,8 +3268,7 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred",
-      "remove": "Remove"
+      "starred": "Starred"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",
@@ -4326,10 +4325,6 @@
     "to": "To:",
     "recipientMore": "{{name}} +{{count}} more",
     "mailingList": "Mailing list",
-    "contextMenu": {
-      "viewSender": "View sender",
-      "copyMailId": "Copy mail ID"
-    },
     "unread": "Unread",
     "unreadCount": "{{count}} unread",
     "foldersLabel": "Mail folders",
@@ -5645,11 +5640,7 @@
     "corporation": "Corporation",
     "started": "Joined",
     "duration": "Duration",
-    "current": "Current",
-    "contextMenu": {
-      "copyName": "Copy name",
-      "showInfo": "Show info"
-    }
+    "current": "Current"
   },
   "contracts": {
     "title": "Contracts",
@@ -5729,11 +5720,7 @@
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
     "statusFilterLabel": "Status",
-    "typeFilterLabel": "Contract type",
-    "contextMenu": {
-      "copyTitle": "Copy title",
-      "copyContractId": "Copy contract ID"
-    }
+    "typeFilterLabel": "Contract type"
   },
   "contractDetail": {
     "regionLabel": "Region",
@@ -5741,6 +5728,7 @@
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
+    "copyContractId": "Copy contract ID",
     "contentsHeading": "Everything on this contract",
     "youReceiveHeading": "What you get",
     "youHandOverHeading": "What you hand over",
@@ -5941,12 +5929,7 @@
     "acrossNoResultsHint": "Turn off \"Only disagreements\" to see the full list.",
     "reauthTitle": "Log in again to see your contacts",
     "reauthHint": "Log in again to fetch this character's contacts.",
-    "reauthAction": "Log in again with EVE Online",
-    "contextMenu": {
-      "copyName": "Copy name",
-      "copyContactId": "Copy contact ID",
-      "showInfo": "Show info"
-    }
+    "reauthAction": "Log in again with EVE Online"
   },
   "loyalty": {
     "title": "Loyalty Points",
@@ -5957,9 +5940,6 @@
     "corporation": "Corporation",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
-    "openStore": "Open LP Store",
-    "openStoreFor": "Open LP Store for {{corporation}}",
-    "storeColumn": "LP Store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
@@ -5968,6 +5948,7 @@
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
+    "corporationInfo": "Corporation info",
     "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
     "priceBasisLabel": "Revenue basis",
@@ -6044,11 +6025,7 @@
     "state": "State",
     "stateExpired": "Expired",
     "stateCancelled": "Cancelled",
-    "filled": "Filled",
     "viewInMarket": "View in Market",
-    "sortBy": "Sort by {{column}}",
-    "sortedAsc": "{{column}}, sorted ascending",
-    "sortedDesc": "{{column}}, sorted descending",
     "searchPlaceholder": "Search by item…",
     "noResults": "No orders match your filters.",
     "noResultsHint": "Clear the search or reset the buy/sell and status filters to see every order.",
@@ -6790,17 +6767,16 @@
       "rowCount_one": "{{count}} row",
       "rowCount_other": "{{count}} rows",
       "noDifferences": "Every attribute is the same across the compared items.",
-      "stackBuy": "buy ",
-      "stackSpread": "spread ",
-      "stackNet": "net ",
-      "stackVolume": "vol "
+      "addItem": "Add {{name}} to Compare",
+      "removeItem": "Remove {{name}} from Compare"
     },
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}"
+      "reorderItem": "Reorder {{name}}",
+      "addItem": "Add {{name}} to Quickbar"
     },
     "priceAlert": {
       "button": "Set price alert for {{name}}",
