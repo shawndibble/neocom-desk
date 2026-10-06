@@ -618,7 +618,7 @@ describe('buildPlanAdvice: more quick wins', () => {
     }
   });
 
-  it('finds room for a factory fed by another colony’s surplus, and names where it comes from', () => {
+  const makeRoom = (otherSystem: number) => {
     const AQUEOUS_LIQUIDS = 2268;
     const WATER_SCHEMATIC = pi.schematics['3645'].schematicId;
     const factory = (pinId: number, schematic: number): PlanetPin => ({
@@ -653,7 +653,7 @@ describe('buildPlanAdvice: more quick wins', () => {
         snapshot: snapshot({
           colonies: [
             { ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 },
-            { ...planet(OCEANIC_ID, HIGHSEC_SYSTEM, 'oceanic'), upgrade_level: 5 },
+            { ...planet(OCEANIC_ID, otherSystem, 'oceanic'), upgrade_level: 5 },
           ],
           details: new Map([
             [TEMPERATE_ID, makesBacteria],
@@ -662,7 +662,11 @@ describe('buildPlanAdvice: more quick wins', () => {
         }),
       })
     );
-    const factoryWins = advice.quickWins.filter((win) => win.id.includes(':room-factories:'));
+    return advice.quickWins.filter((win) => win.id.includes(':room-factories:'));
+  };
+
+  it('finds room for a factory fed by another colony’s surplus in the same system, and names where it comes from', () => {
+    const factoryWins = makeRoom(HIGHSEC_SYSTEM);
     expect(factoryWins.length).toBeGreaterThan(0);
     for (const win of factoryWins) {
       expect(win.gainPerDay).toBeGreaterThan(0);
@@ -676,6 +680,15 @@ describe('buildPlanAdvice: more quick wins', () => {
           win.detail.routedFrom.length > 0
       )
     ).toBe(true);
+  });
+
+  it('offers no quick win that needs surplus hauled from another system (#2703)', () => {
+    const factoryWins = makeRoom(NULLSEC_SYSTEM);
+    for (const win of factoryWins) {
+      expect(win.detail.kind === 'spare-room' && win.detail.what === 'factories').toBe(true);
+      if (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
+        expect(win.detail.routedFrom).toEqual([]);
+    }
   });
 });
 

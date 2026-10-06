@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { NetworkOpportunity } from '@/engine/pi/network';
-import { dropSharedSurplus } from './factoryRoomDedupe';
+import { dropOtherSystemSurplus, dropSharedSurplus } from './factoryRoomDedupe';
 
 function opp(
   typeId: number,
@@ -43,5 +43,27 @@ describe('dropSharedSurplus', () => {
     const a = opp(10, 5, []);
     const b = opp(10, 9, []);
     expect(dropSharedSurplus([a, b])).toEqual([b]);
+  });
+});
+
+describe('dropOtherSystemSurplus', () => {
+  const systems = new Map([
+    [1, 100],
+    [2, 100],
+    [3, 200],
+  ]);
+  it('drops a win routed from a colony in another system', () => {
+    const far = opp(10, 5, [{ typeId: 100, fromPlanetId: 3, source: 'routed' }]);
+    expect(dropOtherSystemSurplus([far], systems)).toEqual([]);
+  });
+  it('keeps same-system routed, local and bought wins', () => {
+    const near = opp(10, 5, [{ typeId: 100, fromPlanetId: 2, source: 'routed' }]);
+    const local = opp(11, 5, [{ typeId: 101, fromPlanetId: null, source: 'local' }]);
+    const bought = opp(12, 5, [{ typeId: 102, fromPlanetId: null, source: 'bought' }]);
+    expect(dropOtherSystemSurplus([near, local, bought], systems)).toHaveLength(3);
+  });
+  it('drops a win whose source system is unknown', () => {
+    const lost = opp(10, 5, [{ typeId: 100, fromPlanetId: 9, source: 'routed' }]);
+    expect(dropOtherSystemSurplus([lost], systems)).toEqual([]);
   });
 });
