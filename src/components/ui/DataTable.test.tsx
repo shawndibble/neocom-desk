@@ -892,7 +892,7 @@ describe('DataTable opt-in phone features', () => {
     it('hides the column below sm on its th and tds in table mode', () => {
       render(<DataTable {...props} responsive="table" />);
       expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
-      expect(screen.getByRole('columnheader', { name: /Item/ })).not.toHaveClass('max-sm:hidden');
+      expect(screen.getByRole('columnheader', { name: /Name/ })).not.toHaveClass('max-sm:hidden');
       const cells = document.querySelectorAll('tbody tr:first-child td');
       expect(cells[0]).not.toHaveClass('max-sm:hidden');
       expect(cells[1]).toHaveClass('max-sm:hidden');
