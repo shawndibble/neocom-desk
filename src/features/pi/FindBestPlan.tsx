@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { enumParam } from '@/lib/urlState';
+import { useUrlParams } from '@/lib/useUrlState';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { PricesUnavailable } from './PricesUnavailable';
@@ -22,6 +24,12 @@ import { useFinderOrigin } from './usePlanetFinder';
 import { usePlanAdvice } from './usePlanAdvice';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
+
+/** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
+const FIND_BEST_PARAMS = {
+  'fb.filter': enumParam<RecipeFilter>(['any', 'p1', 'p2'], 'any'),
+  'fb.mode': enumParam<FindBestMode>(['picks', 'all'], 'picks'),
+};
 
 interface Props {
   snapshot: GoalPlannerSnapshot;
@@ -55,8 +63,10 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   const state = usePlanAdvice(snapshot, characterId, preference);
   const [off, setOff] = useState<ReadonlySet<PlanetType>>(new Set());
   const [whatIf, setWhatIf] = useState<ReadonlySet<PlanetType>>(new Set());
-  const [filter, setFilter] = useState<RecipeFilter>('any');
-  const [mode, setMode] = useState<FindBestMode>('picks');
+  const [{ 'fb.filter': filter, 'fb.mode': mode }, setFindBestParams] =
+    useUrlParams(FIND_BEST_PARAMS);
+  const setFilter = (next: RecipeFilter) => setFindBestParams({ 'fb.filter': next });
+  const setMode = (next: FindBestMode) => setFindBestParams({ 'fb.mode': next });
   const [openId, setOpenId] = useState<number | null>(null);
   // The finder's Highsec only box is remembered across cards; null follows the origin.
   const [highsecPick, setHighsecPick] = useState<boolean | null>(null);

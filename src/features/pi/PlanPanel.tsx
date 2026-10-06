@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
 import {
@@ -15,7 +15,13 @@ import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { PlanetImage } from './PlanetImage';
-import { openingQuestion, pickedQuestion, type PlanQuestion } from './planQuestion';
+import {
+  openingQuestion,
+  pickedQuestion,
+  planQuestionParam,
+  type PlanQuestion,
+} from './planQuestion';
+import { useUrlParam } from '@/lib/useUrlState';
 
 interface Props extends GoalPlannerPanelProps {
   /** A `?type=` seed is on its way to becoming a goal. */
@@ -97,12 +103,17 @@ export function PlanPanel(props: Props) {
     };
   }, [characterId, reloadKey]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
-  const { hash, key: locationKey } = useLocation();
+  const { hash, search, pathname, state: locationState } = useLocation();
+  const navigate = useNavigate();
+  const [urlQuestion] = useUrlParam('q', planQuestionParam);
   // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
-  // until the pilot picks a question on that same visit.
-  const [pick, setPickState] = useState<{ question: PlanQuestion; key: string } | null>(null);
-  const picked = pickedQuestion(pick, hash, locationKey);
-  const setPicked = (question: PlanQuestion) => setPickState({ question, key: locationKey });
+  // until the pilot picks a question; a pick writes `?q=` and drops the hash.
+  const picked = pickedQuestion(urlQuestion, hash);
+  const setPicked = (question: PlanQuestion) => {
+    const params = new URLSearchParams(search);
+    params.set('q', question);
+    navigate({ pathname, search: `?${params}` }, { replace: true, state: locationState });
+  };
 
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
