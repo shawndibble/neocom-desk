@@ -446,6 +446,32 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.recipes.recipes.filter((r) => r.tier === 2).length).toBeGreaterThan(0);
   });
 
+  it('keeps over-budget setups in the rows, tagged with the lowest Command Center level that hosts them', () => {
+    const noColonies = { snapshot: snapshot({ colonies: [], details: new Map() }) };
+    const low = buildPlanAdvice(
+      input({
+        ...noColonies,
+        skills: { commandCenterUpgrades: 0, interplanetaryConsolidation: null },
+      })
+    );
+    const tagged = low.recipeRows.filter((r) => r.needsCcLevel !== undefined);
+    expect(tagged.length).toBeGreaterThan(0);
+    expect(tagged.every((r) => r.needsCcLevel! > 0 && r.needsCcLevel! <= 5)).toBe(true);
+    expect(tagged.some((r) => r.tier === 2)).toBe(true);
+    // The shared ranking (Plan, Map) stays within the trained skill.
+    expect(low.recipes.recipes.every((r) => r.needsCcLevel === undefined)).toBe(true);
+    expect(low.recipes.recipes).toEqual([]);
+    expect(low.recipes.bestAnywherePerDay).toBeNull();
+
+    const high = buildPlanAdvice(
+      input({
+        ...noColonies,
+        skills: { commandCenterUpgrades: 5, interplanetaryConsolidation: null },
+      })
+    );
+    expect(high.recipeRows.some((r) => r.needsCcLevel !== undefined)).toBe(false);
+  });
+
   it('filters the ranking and marks the planet types the pilot has', () => {
     const p2 = buildPlanAdvice(input({ recipeFilter: 'p2' })).recipes.recipes;
     expect(p2.length).toBeGreaterThan(0);

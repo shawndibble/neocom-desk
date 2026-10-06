@@ -881,12 +881,13 @@ function rankingFor(args: {
   const planetTypes = [...new Set(pi.raw.flatMap((resource) => resource.planetTypes))].sort();
   const recipeRows: RecipeRow[] = [];
   const unpriced = new Set<number>();
+  const maxLevel = Math.max(pi.infrastructure.commandCenterUpgrades.length - 1, 0);
   for (const planetType of planetTypes) {
-    const adviceAt = (headsPerExtractor: number) =>
+    const adviceAt = (budget: PinLoad, headsPerExtractor: number) =>
       recommendStopTier(
         {
           localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
-          budget: ceiling.budget,
+          budget,
           infrastructure: pi.infrastructure,
           overhead: { launchpads: 1, storageFacilities: storage },
           headsPerExtractor,
@@ -905,21 +906,20 @@ function rankingFor(args: {
     // on each of a P2's two extractors overdraws even a level-5 Command Center's
     // powergrid, so a pilot with no colonies would see no P2 at all. Step the
     // assumption down until a P2 block fits; a measured count is never touched.
-    let advice = adviceAt(heads);
-    if (!headsMeasured) {
-      for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
-        advice = adviceAt(tryHeads);
+    const adviceFor = (budget: PinLoad) => {
+      let advice = adviceAt(budget, heads);
+      if (!headsMeasured) {
+        for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
+          advice = adviceAt(budget, tryHeads);
+        }
       }
-    }
-    for (const entry of advice.entries) {
-      if (entry.tier !== 1 && entry.tier !== 2) continue;
-      if (entry.status === 'needs-price') unpriced.add(entry.typeId);
-    }
-    for (const entry of recipeEntries(advice)) {
+      return advice;
+    };
+    const rowFor = (entry: ScoredStopTier, needsCcLevel: number | null): RecipeRow | null => {
       const volume = safeVolume(entry.typeId, pi);
       const isk = iskPerHourOf(entry, books, taxRate);
-      if (volume === null || isk === null) continue;
-      recipeRows.push({
+      if (volume === null || isk === null) return null;
+      return {
         typeId: entry.typeId,
         name: entry.name,
         tier: entry.tier,
@@ -931,7 +931,30 @@ function rankingFor(args: {
           pins: entry.pins,
           ...recipeOf(entry.typeId, pi),
         },
-      });
+        ...(needsCcLevel ? { needsCcLevel } : {}),
+      };
+    };
+
+    const advice = adviceFor(ceiling.budget);
+    for (const entry of advice.entries) {
+      if (entry.tier !== 1 && entry.tier !== 2) continue;
+      if (entry.status === 'needs-price') unpriced.add(entry.typeId);
+    }
+    const hosted = new Set<number>();
+    for (const entry of recipeEntries(advice)) {
+      const built = rowFor(entry, null);
+      if (built) recipeRows.push(built);
+      hosted.add(entry.typeId);
+    }
+    // What only a higher Command Center hosts still ranks, tagged with the
+    // lowest level that does, so an untrained pilot sees what training buys.
+    for (let level = ceiling.level + 1; level <= maxLevel; level += 1) {
+      for (const entry of recipeEntries(adviceFor(colonyBudget(level, pi).budget))) {
+        if (hosted.has(entry.typeId)) continue;
+        hosted.add(entry.typeId);
+        const built = rowFor(entry, level);
+        if (built) recipeRows.push(built);
+      }
     }
   }
 
@@ -942,7 +965,8 @@ function rankingFor(args: {
   return {
     rows: recipeRows,
     ranking: rankRecipes({
-      rows: recipeRows,
+      // Plan and Map stay within the trained skill; Find best re-ranks every row.
+      rows: recipeRows.filter((row) => !row.needsCcLevel),
       haveTypes: have,
       filter: input.recipeFilter,
       unpriced: [...unpriced].sort((a, b) => a - b),

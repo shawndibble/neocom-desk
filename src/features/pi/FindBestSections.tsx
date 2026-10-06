@@ -18,13 +18,16 @@ import { HintText } from '@/components/ui/HintText';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { formatIsk } from '@/lib/isk';
+import { SkillLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { DAYS_PER_WEEK, setupParts } from './findBestHowTo';
 import type { RecipeCardView, TypeState, WhatIfChip, TypeToggle } from './findBestView';
+import { COMMAND_CENTER_UPGRADES_SKILL_ID } from './colonyBudget';
 import { PlanetImage } from './PlanetImage';
+import { Sentence } from './sentence';
 
 const MD_UP = '(min-width: 48rem)';
 const EU_GUIDE = 'https://wiki.eveuniversity.org/Planetary_Industry';
@@ -330,6 +333,20 @@ function RecipeCard({
             {card.isNew && (
               <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('piPlan.find.newWithPlanet')}
+              </span>
+            )}
+            {recipe.needsCcLevel && (
+              <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold text-warning">
+                <Sentence
+                  text={t('piPlan.find.needsCc', { level: recipe.needsCcLevel, skill: '{skill}' })}
+                  slots={{
+                    skill: (
+                      <SkillLink typeId={COMMAND_CENTER_UPGRADES_SKILL_ID}>
+                        {t('piPlan.find.needsCcSkill', { level: recipe.needsCcLevel })}
+                      </SkillLink>
+                    ),
+                  }}
+                />
               </span>
             )}
           </div>

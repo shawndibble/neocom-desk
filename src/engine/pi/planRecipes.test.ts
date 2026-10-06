@@ -155,4 +155,60 @@ describe('rankRecipes', () => {
     });
     expect(recipes.map((r) => r.name)).toEqual(['C', 'A', 'B']);
   });
+
+  describe('recipes that need a higher Command Center', () => {
+    const gated = (r: RecipeRow, level: number): RecipeRow => ({ ...r, needsCcLevel: level });
+
+    it('ranks every setup that fits above any that needs more, then by lowest level, then by value', () => {
+      const { recipes } = rankRecipes({
+        rows: [
+          gated(row(20, 'Coolant', 2, 'lava', 150_000), 3),
+          gated(row(30, 'Rocket Fuel', 2, 'barren', 96_000), 2),
+          row(40, 'Water', 1, 'barren', 95_000),
+          gated(row(10, 'Silicon', 1, 'lava', 400_000), 2),
+        ],
+        haveTypes: [],
+        filter: 'any',
+      });
+      expect(recipes.map((r) => [r.name, r.needsCcLevel ?? 0])).toEqual([
+        ['Water', 0],
+        ['Silicon', 2],
+        ['Rocket Fuel', 2],
+        ['Coolant', 3],
+      ]);
+    });
+
+    it('prefers a host that fits over a richer one that does not', () => {
+      const { recipes } = rankRecipes({
+        rows: [
+          gated(row(10, 'Silicon', 1, 'lava', 500_000), 2),
+          row(10, 'Silicon', 1, 'barren', 90_000),
+        ],
+        haveTypes: [],
+        filter: 'any',
+      });
+      expect(recipes).toHaveLength(1);
+      expect(recipes[0]).toMatchObject({ useType: 'barren', iskPerDay: 90_000 });
+      expect(recipes[0].needsCcLevel).toBeUndefined();
+    });
+
+    it('carries the level on a recipe no host fits, and counts only fitting rows as the best anywhere', () => {
+      const ranking = rankRecipes({
+        rows: [
+          gated(row(10, 'Silicon', 1, 'lava', 500_000), 2),
+          row(40, 'Water', 1, 'barren', 95_000),
+        ],
+        haveTypes: [],
+        filter: 'any',
+      });
+      expect(ranking.recipes.find((r) => r.name === 'Silicon')?.needsCcLevel).toBe(2);
+      expect(ranking.bestAnywherePerDay).toBe(95_000);
+      const none = rankRecipes({
+        rows: [gated(row(10, 'Silicon', 1, 'lava', 500_000), 2)],
+        haveTypes: [],
+        filter: 'any',
+      });
+      expect(none.bestAnywherePerDay).toBeNull();
+    });
+  });
 });
