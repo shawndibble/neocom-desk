@@ -31,6 +31,7 @@ import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { piTypeNames } from './coloniesNames';
 import { useColoniesAdvice } from './useColoniesAdvice';
 import { buildAltAdvice } from './altAdvice';
+import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
 import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
@@ -97,7 +98,7 @@ function CharacterGroupHeader({
           <span className="shrink-0 font-normal tracking-normal normal-case">{summary}</span>
         )}
         {makesPerDay != null && (
-          <span className="font-normal tracking-normal normal-case">
+          <span className="font-normal tracking-normal whitespace-nowrap normal-case">
             <Trans
               i18nKey="pi.altColonies.makes"
               components={{ isk: <IskAmount value={makesPerDay} decimals={0} /> }}
@@ -371,12 +372,41 @@ export function ColoniesTab({
   // Character's own. Their figures come from `buildAltAdvice` (unknown skills,
   // priced conservatively) and are display-only: Plan and the Today figures
   // above read the active Character's advice alone.
+  // An alt's systems may be ones the active Character has no colony in: resolve
+  // their security (a globally cached public lookup) before pricing them.
+  const [altSecurity, setAltSecurity] = useState<ReadonlyMap<number, number | null>>(new Map());
+  const knownSecurity = planAdvice.snapshot?.securityBySystem;
+  useEffect(() => {
+    if (!showAltColonies || !knownSecurity) return;
+    const missing = [
+      ...new Set(roster.colonies.map((colony) => colony.planet.solar_system_id)),
+    ].filter((id) => !knownSecurity.has(id) && !altSecurity.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      missing.map((id) =>
+        loadSystemNameAndSecurity(id).then(
+          (system) => [id, system.security] as const,
+          () => [id, null] as const
+        )
+      )
+    ).then((resolved) => {
+      if (!cancelled) setAltSecurity((prev) => new Map([...prev, ...resolved]));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showAltColonies, roster.colonies, knownSecurity, altSecurity]);
   const altAdvice = useMemo(
     () =>
       planAdvice.input && showAltColonies
-        ? buildAltAdvice(planAdvice.input, roster.colonies)
+        ? buildAltAdvice(
+            planAdvice.input,
+            roster.colonies,
+            new Map([...altSecurity, ...(knownSecurity ?? [])])
+          )
         : null,
-    [planAdvice.input, roster.colonies, showAltColonies]
+    [planAdvice.input, roster.colonies, showAltColonies, altSecurity, knownSecurity]
   );
   const altGroups = useMemo(() => {
     const byCharacter = new Map<

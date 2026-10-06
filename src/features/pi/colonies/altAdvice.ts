@@ -24,12 +24,23 @@ export interface AltCharacterAdvice {
   makesPerDay: number | null;
 }
 
+/** Accounting level 0: an alt's skills are never read, so the full sales tax applies. */
+const UNKNOWN_ACCOUNTING_LEVEL = 0;
+
+/**
+ * @param securityBySystem Security of the alt colonies' systems, by id. A colony
+ *   whose system is missing or unresolved gets no figure: the model reads an
+ *   unknown security as highsec, which would price a nullsec colony at the cheap
+ *   customs rate and overstate it.
+ */
 export function buildAltAdvice(
   input: PlanAdviceInput,
-  colonies: readonly RosterColony[]
+  colonies: readonly RosterColony[],
+  securityBySystem: ReadonlyMap<number, number | null>
 ): ReadonlyMap<number, AltCharacterAdvice> {
   const byCharacter = new Map<number, RosterColony[]>();
   for (const colony of colonies) {
+    if (securityBySystem.get(colony.planet.solar_system_id) == null) continue;
     const list = byCharacter.get(colony.characterId);
     if (list) list.push(colony);
     else byCharacter.set(colony.characterId, [colony]);
@@ -47,9 +58,10 @@ export function buildAltAdvice(
           ...input.snapshot,
           colonies: owned.map((colony) => colony.planet),
           details,
+          securityBySystem,
           customsSkill: null,
         },
-        books: { ...input.books, salesTaxPct: salesTaxPct(0) },
+        books: { ...input.books, salesTaxPct: salesTaxPct(UNKNOWN_ACCOUNTING_LEVEL) },
         skills: { commandCenterUpgrades: null, interplanetaryConsolidation: null },
         whatIfTypes: undefined,
       });
@@ -63,6 +75,7 @@ export function buildAltAdvice(
         makesPerDay: advice.totals.todayPerDay,
       });
     } catch {
+      // Same as the active Character's hook: a model failure is no figure, never a broken tab.
       result.set(characterId, { byPlanetId: new Map(), makesPerDay: null });
     }
   }

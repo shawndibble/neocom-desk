@@ -71,6 +71,7 @@ const planet = (planetId: number): CharacterPlanet => ({
   num_pins: 4,
 });
 
+const SECURITY = new Map<number, number | null>([[SYSTEM, 0.95]]);
 const OWN = 40000001;
 const ALT_A = 40000002;
 const ALT_B = 40000003;
@@ -113,12 +114,24 @@ const rosterColony = (
 });
 
 describe('buildAltAdvice', () => {
+  it('gives no figure for a colony whose system security is unresolved, never a highsec guess', () => {
+    const nullsec = 30004759;
+    const colony = {
+      ...rosterColony(7, ALT_A),
+      planet: { ...planet(ALT_A), solar_system_id: nullsec },
+    };
+    expect(buildAltAdvice(input(), [colony], new Map()).has(7)).toBe(false);
+    expect(buildAltAdvice(input(), [colony], new Map([[nullsec, null]])).has(7)).toBe(false);
+    const known = buildAltAdvice(input(), [colony], new Map([[nullsec, -0.4]]));
+    expect(known.get(7)!.makesPerDay).toBeGreaterThan(0);
+  });
+
   it("gives each alt's colony its own ISK a day, grouped by character", () => {
-    const result = buildAltAdvice(input(), [
-      rosterColony(7, ALT_A),
-      rosterColony(7, ALT_B),
-      rosterColony(8, ALT_A),
-    ]);
+    const result = buildAltAdvice(
+      input(),
+      [rosterColony(7, ALT_A), rosterColony(7, ALT_B), rosterColony(8, ALT_A)],
+      SECURITY
+    );
     expect([...result.keys()].sort()).toEqual([7, 8]);
     const seven = result.get(7)!;
     expect(seven.byPlanetId.get(ALT_A)!.todayPerDay).toBeGreaterThan(0);
@@ -129,14 +142,14 @@ describe('buildAltAdvice', () => {
   });
 
   it('has no figure, not zero, for an alt colony whose detail is not cached', () => {
-    const result = buildAltAdvice(input(), [rosterColony(7, ALT_A, null)]);
+    const result = buildAltAdvice(input(), [rosterColony(7, ALT_A, null)], SECURITY);
     expect(result.get(7)!.byPlanetId.size).toBe(0);
     expect(result.get(7)!.makesPerDay).toBeNull();
   });
 
   it("prices with no alt skills: never the active Character's customs or tax", () => {
     const own = input();
-    const alt = buildAltAdvice(own, [rosterColony(7, ALT_A)]).get(7)!;
+    const alt = buildAltAdvice(own, [rosterColony(7, ALT_A)], SECURITY).get(7)!;
     const asActive = buildPlanAdvice({
       ...own,
       snapshot: {
@@ -151,7 +164,7 @@ describe('buildAltAdvice', () => {
   it("never changes the active Character's plan totals", () => {
     const own = input();
     const before = buildPlanAdvice(own).totals;
-    buildAltAdvice(own, [rosterColony(7, ALT_A), rosterColony(8, ALT_B)]);
+    buildAltAdvice(own, [rosterColony(7, ALT_A), rosterColony(8, ALT_B)], SECURITY);
     expect(buildPlanAdvice(own).totals).toEqual(before);
     expect(own.snapshot.colonies).toHaveLength(1);
     expect(own.snapshot.details.size).toBe(1);
