@@ -663,7 +663,7 @@ describe('FittingAddPanel', () => {
     expect(row).toBeDisabled();
     expect(
       within(row.closest('li')!).getByRole('button', {
-        name: "Can't add: No free medium slot left",
+        name: "Can't add: No free mid slot left",
       })
     ).toBeInTheDocument();
   });
