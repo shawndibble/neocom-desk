@@ -119,9 +119,9 @@ function LocationProbe() {
   return null;
 }
 
-function renderStore() {
+function renderStore(search = '') {
   return render(
-    <MemoryRouter initialEntries={['/loyalty/1000168']}>
+    <MemoryRouter initialEntries={[`/loyalty/1000168${search}`]}>
       <Routes>
         <Route
           path="/loyalty/:corporationId"
@@ -379,6 +379,30 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
     // The desktop split panel repaints in place with no dialog to announce
     // it — a live region says so, the way the mobile sheet does implicitly.
     expect(screen.getByText(`Showing ${ITEM_ROW.itemName}`)).toBeInTheDocument();
+  });
+});
+
+describe('LoyaltyStore linked offer', () => {
+  it('opens with the offer named in ?offer= already selected', () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [ITEM_ROW, BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    renderStore(`?offer=${ITEM_ROW.offer.offer_id}`);
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
   });
 });
 

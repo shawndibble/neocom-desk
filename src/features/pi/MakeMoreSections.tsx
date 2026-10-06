@@ -110,14 +110,19 @@ export function YourPlanetsPanel({
   onPreference,
   onFindBest,
   priceSource,
+  haulBetween,
+  onHaulBetween,
 }: {
   view: PlanView;
   preference: RebuildPreference;
   onPreference: (value: RebuildPreference) => void;
   onFindBest: () => void;
   priceSource: string;
+  haulBetween: boolean;
+  onHaulBetween: (on: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const haulHintId = useId();
   const mdUp = useMediaQuery(MD_UP);
   const smUp = useMediaQuery(SM_UP);
   const { headline, stats } = view;
@@ -213,6 +218,23 @@ export function YourPlanetsPanel({
         <p className="text-[0.6875rem] text-text-dim">
           {t('piPlan.make.basis', { source: priceSource })}
         </p>
+        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
+          <Checkbox
+            className="mt-0.5"
+            checked={haulBetween}
+            aria-labelledby={`${haulHintId}-label`}
+            aria-describedby={haulHintId}
+            onChange={(e) => onHaulBetween(e.target.checked)}
+          />
+          <span className="text-xs">
+            <span id={`${haulHintId}-label`} className="text-text">
+              {t('piPlan.chains.optIn')}
+            </span>
+            <span id={haulHintId} className="block text-[0.6875rem] text-text-dim">
+              {t('piPlan.chains.optInHint')}
+            </span>
+          </span>
+        </label>
       </div>
       <ul className="grid grid-cols-2 border-t border-line md:grid-cols-3 xl:grid-cols-6">
         {view.strips.map((strip) => (

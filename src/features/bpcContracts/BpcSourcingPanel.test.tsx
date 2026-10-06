@@ -160,6 +160,13 @@ vi.mock('@/features/market/orderBook', async (importOriginal) => {
   };
 });
 
+// LP Store source: the pilot's LP corporations' blueprint offers. None unless a test says otherwise.
+const findLpOfferMatches = vi.fn();
+vi.mock('@/features/market/appraisalLpAcquisition', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/market/appraisalLpAcquisition')>();
+  return { ...actual, findLpOfferMatches: (...args: unknown[]) => findLpOfferMatches(...args) };
+});
+
 // No item trades in a Global Market Region unless a test says otherwise.
 const loadGlobalMarkets = vi.fn<() => Promise<GlobalMarketEntry[]>>();
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
@@ -1657,6 +1664,88 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(within(table).getAllByText('Jita IV - Moon 4').length).toBeGreaterThan(0);
       // The hub's own station is marked (location 60003760 is the Jita hub).
       expect(within(table).getByText('Trade hub')).toBeInTheDocument();
+    });
+
+    it('opens the Market entry for the item when a market row is clicked', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      getOrderBook.mockImplementation(async (_regionId, typeId) => ({
+        orders: typeId === 638 ? [sellOrder({ price: 2_000_000 })] : [],
+        truncated: false,
+        fetchedAt: 0,
+      }));
+      loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await within(table).findByText(/BPO on market: 2M/);
+      await openFilters(user);
+      await toggleFilterOption(user, 'Market BPOs');
+      const marketCell = await within(table).findByText('2,000,000.00 ISK', {
+        selector: '.sr-only',
+      });
+
+      await user.click(marketCell);
+
+      await waitFor(() => expect(window.location.pathname).toBe('/market/browser'));
+      expect(window.location.search).toContain('638');
+    });
+
+    it('lists an LP Store blueprint and opens that store with the offer selected on click', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      findLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map([
+          [
+            638,
+            [
+              {
+                corporationId: 1000125,
+                corpName: 'Sisters of EVE',
+                playerLp: 9_000,
+                offer: {
+                  offer_id: 4321,
+                  type_id: 638,
+                  quantity: 1,
+                  isk_cost: 1_000_000,
+                  lp_cost: 400,
+                  required_items: [],
+                },
+              },
+            ],
+          ],
+        ]),
+        requiredItemTypeIds: [],
+      });
+      // The pilot's own LP Value, so no market rate is fetched.
+      await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+      const lpCell = await within(table).findByText('Sisters of EVE');
+      await user.click(lpCell);
+
+      await waitFor(() => expect(window.location.pathname).toBe('/market/lp-store/1000125'));
+      expect(window.location.search).toContain('offer=4321');
+    });
+
+    it('lists no LP Store rows, and no error, when the pilot holds no LP', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      findLpOfferMatches.mockResolvedValue({ matchesByTypeId: new Map(), requiredItemTypeIds: [] });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+      await waitFor(() => expect(findLpOfferMatches).toHaveBeenCalled());
+      expect(within(table).queryByText('Sisters of EVE')).not.toBeInTheDocument();
+      expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     });
 
     it("says which market books couldn't be checked, rather than reading a failure as no BPO", async () => {

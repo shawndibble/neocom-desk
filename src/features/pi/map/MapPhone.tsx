@@ -1,7 +1,8 @@
 /**
  * The Map on a phone: the planet types as a grid of 44px toggles, then one
  * tier at a time as a list (a tier switcher), then the full map in a container
- * that scrolls sideways on its own. Tapping a product opens the bottom sheet.
+ * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
+ * tapping the one you traced again clears it.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,12 +17,13 @@ import {
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
 import { ChainTileFigure } from './ChainTileFigure';
-import type { MapGraph, MapTier, ProductFigure } from './mapModel';
+import { tileChainIsk, type MapGraph, type MapTier, type ProductFigure } from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -128,6 +130,7 @@ export function MapPhone(props: MapPhoneProps) {
         <ul className="mt-1.5 divide-y divide-line border-y border-line">
           {shown.map((product) => {
             const figure = props.figureOf(product.typeId);
+            const chainIsk = tileChainIsk(figure);
             const glyph = verdictGlyph(figure);
             const rank = props.pickRanks.get(product.typeId);
             const traced = props.tracedId === product.typeId;
@@ -147,6 +150,7 @@ export function MapPhone(props: MapPhoneProps) {
                   data-map-key={`p:${product.typeId}`}
                   aria-current={traced ? 'true' : undefined}
                   onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
+                  onKeyDown={clickOnSpace}
                   className={cx(
                     'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
                     interactiveClassName,
@@ -171,11 +175,8 @@ export function MapPhone(props: MapPhoneProps) {
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
-                  {figure.kind === 'unranked' && figure.chain && (
-                    <ChainTileFigure
-                      iskPerDay={figure.chain.iskPerDay}
-                      className="shrink-0 text-xs"
-                    />
+                  {chainIsk !== null && (
+                    <ChainTileFigure iskPerDay={chainIsk} className="shrink-0 text-xs" />
                   )}
                   {glyph && figure.kind === 'ranked' && (
                     <span

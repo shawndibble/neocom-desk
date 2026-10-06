@@ -64,7 +64,7 @@ import {
 } from './loyaltyStoreColumns';
 import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -380,6 +380,8 @@ const FILTER_PARAMS = {
   search: textParam(),
   affordableOnly: boolParam(true),
   blueprintsOnly: boolParam(false),
+  /** The selected offer: a link (BPC Sourcing's LP rows) arrives with one already picked. */
+  offer: optionalIdParam(),
 };
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
@@ -473,8 +475,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // Rows filter on a deferred copy so a keystroke paints the box first
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
-  const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const selectedOfferId = filterParams.offer;
+  // A phone arriving on a linked offer opens its breakdown straight away.
+  const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
   const itemActions = usePageItemActions({ activeCharacterId });
@@ -502,7 +505,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const selectedRow = filteredRows.find((row) => row.offer.offer_id === selectedOfferId);
 
   function selectRow(row: LoyaltyOfferRow) {
-    setSelectedOfferId(row.offer.offer_id);
+    setFilterParams({ offer: row.offer.offer_id });
     if (!isDesktop) setSheetOpen(true);
   }
 

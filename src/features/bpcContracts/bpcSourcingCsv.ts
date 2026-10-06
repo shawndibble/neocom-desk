@@ -21,7 +21,7 @@ export interface BpcSourcingCsvContext {
  * figure). An owned row has no price.
  */
 function priceOf(row: BpcSearchRow): number | null {
-  if (row.source === 'market') return row.price;
+  if (row.source === 'market' || row.source === 'lp') return row.price;
   const contract = asContract(row);
   if (!contract) return null;
   if (contract.requestedPlex && !(contract.price > 0)) return null;
@@ -50,9 +50,14 @@ export function bpcSourcingCsvColumns(
           ? t('bpcContracts.sourceContractSingular')
           : row.source === 'market'
             ? t('bpcContracts.sourceMarketSingular')
-            : t('bpcContracts.sourceOwned'),
+            : row.source === 'lp'
+              ? t('bpcContracts.sourceLpStoreSingular')
+              : t('bpcContracts.sourceOwned'),
     },
-    location: { header: t('bpcContracts.locationColumn'), value: (row) => row.locationName },
+    location: {
+      header: t('bpcContracts.locationColumn'),
+      value: (row) => (row.source === 'lp' ? row.corpName : row.locationName),
+    },
     jumps: { header: t('bpcContracts.jumpsColumn'), value: (row) => context.jumpsFor(row) },
     me: { header: t('bpcContracts.meColumn'), value: (row) => row.me },
     te: { header: t('bpcContracts.teColumn'), value: (row) => row.te },

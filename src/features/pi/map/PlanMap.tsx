@@ -4,7 +4,8 @@
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
  * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
- * estimates via `chainOf`, and never prices anything. `useMapAdvice` builds the advice; tests hand one in.
+ * estimates via `chainOf`. It prices only a ticked what-if's Bigger chains
+ * (below). `useMapAdvice` builds the advice; tests hand one in.
  *
  * ## Where the detail panel goes
  *
@@ -22,15 +23,45 @@
  *
  * `?planet=<id>` opens the richness override for one of the pilot's colonies
  * (the Colonies row links here); a product link drops it, one drawer at a time.
+ *
+ * ## Who owns what (one source of truth each)
+ *
+ * - **Planet ticks** (types the pilot has): `userTicked`, `null` until they
+ *   touch one. Only a planet click changes it.
+ * - **The what-if tick** (one type they do not have): `whatIf`. Only a planet
+ *   click (or the add-planet panel's own Close) changes it: tracing, picking or
+ *   clearing a product never does. A type the trace needs that is not ticked
+ *   shows as NEED, drawn from the trace, never written into the ticks.
+ * - **What-if Bigger chains**: only when the pilot hauls between planets
+ *   (`piSettings.haulBetweenPlanets`) and a what-if is ticked (not hovered).
+ *   The P3/P4 tiles it makes possible light with their multi-planet estimate,
+ *   and the add-planet panel lists them. Never a pick: the picks strip reads
+ *   `advice` alone.
+ * - **The trace**: the URL's `?product=` while it names one, else `userTraced`
+ *   (`undefined` follows the first pick, `null` is cleared, else the pilot's
+ *   pick). A tile, phone row or pick toggles it: a click on the product the
+ *   pilot traced clears it, and the URL with it (Back if this page pushed it).
+ * - **Closing the product drawer** (Back, Escape, Close) keeps the trace; only
+ *   a toggle or "Clear trace" ends it. With no trace, the docked panel shows
+ *   the what-if planet, if one is ticked.
  */
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
-import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
+import { clickOnSpace } from '@/lib/clickOnSpace';
+import { Button, Panel, Spinner, Tooltip, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -41,6 +72,12 @@ import { cx } from '@/lib/cx';
 import { clampIskZero, formatIsk, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
+import type { PiData } from '@/sde/types';
+import { cardPlanetCount, whatIfChainsOf } from '../biggerChainsModel';
+import { WhatIfChainCards } from '../BiggerChainsPanel';
+import { usePiSettings } from '../piSettings';
+import { NO_WHAT_IF_CHAINS, type WhatIfChainsState } from '../useBiggerChains';
+import { WhatIfChainsFeed } from './WhatIfChainsFeed';
 import type { ChainEstimateOf } from '../useChainEstimates';
 import { CcLevelTag } from '../CcLevelTag';
 import { planPicks } from '../planPicks';
@@ -99,6 +136,8 @@ export interface PlanMapProps {
   finder: FinderOrigin;
   /** P3/P4 multi-planet chain estimates (`useChainEstimates`); none when left out. */
   chainOf?: ChainEstimateOf;
+  /** The PI data, for what-if Bigger chains; none are priced when left out. */
+  pi?: PiData | null;
 }
 
 const NO_CHAINS: ChainEstimateOf = () => null;
@@ -114,6 +153,7 @@ export function PlanMap({
   coloniesUnknown = false,
   pricesFailed = false,
   chainOf = NO_CHAINS,
+  pi = null,
 }: PlanMapProps) {
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
@@ -347,17 +387,68 @@ export function PlanMap({
     () => (activeWhatIf ? unlockedBy(graph, activeWhatIf, ticked) : null),
     [graph, activeWhatIf, ticked]
   );
-  const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
+  // Sizing only: every missing type's preview is laid out invisibly so the box fits the tallest.
+  const sizingUnlocks = useMemo(
+    () =>
+      graph.planetTypes
+        .filter((type) => !isHave(type))
+        .map((type) => ({ type, unlock: unlockedBy(graph, type, ticked) })),
+    [graph, isHave, ticked]
+  );
+  const haulBetween = usePiSettings((state) => state.value.haulBetweenPlanets === true);
+  const chainsOn = haulBetween && pi !== null && !pricesFailed;
+  const whatIfChainType = chainsOn && whatIf && !isHave(whatIf) ? whatIf : null;
+  const hasFreeSlot = advice.slots.free >= 1;
+  // Fed by `WhatIfChainsFeed`.
+  const [fed, setFed] = useState<{ advice: PlanAdvice; state: WhatIfChainsState } | null>(null);
+  const whatIfChains = fed?.advice === advice ? fed.state : NO_WHAT_IF_CHAINS;
+  const chainsPending = whatIfChainType !== null && !whatIfChains.byType.has(whatIfChainType);
+  const whatIfCards = useMemo(
+    () =>
+      whatIfChainType
+        ? (whatIfChainsOf(advice, whatIfChains.byType).find((row) => row.type === whatIfChainType)
+            ?.cards ?? [])
+        : [],
+    [whatIfChainType, whatIfChains.byType, advice]
+  );
+  const chainCards = useMemo(
+    () => new Map(whatIfCards.map((card) => [card.typeId, card])),
+    [whatIfCards]
+  );
+  // Lit only while the ticked what-if is the one shown: hovering another type previews that type alone.
+  const newIds = useMemo(() => {
+    const ids = unlock?.highlight ?? new Set<number>();
+    return activeWhatIf === whatIfChainType && chainCards.size > 0
+      ? new Set([...ids, ...chainCards.keys()])
+      : ids;
+  }, [unlock, chainCards, activeWhatIf, whatIfChainType]);
   const figures = useMemo(
     () =>
       new Map<number, ProductFigure>(
         [...graph.byId.keys()].map((id) => {
           const figure = productFigure(advice, id, graph, pricesFailed);
-          const chain = figure.kind === 'unranked' && figure.reason === 'tier' ? chainOf(id) : null;
-          return [id, chain ? { ...figure, chain } : figure];
+          if (figure.kind !== 'unranked' || figure.reason !== 'tier') return [id, figure];
+          const chain = chainOf(id);
+          const card = chainCards.get(id);
+          return [
+            id,
+            {
+              ...figure,
+              ...(chain ? { chain } : {}),
+              ...(card && whatIfChainType
+                ? {
+                    whatIf: {
+                      type: whatIfChainType,
+                      iskPerDay: card.iskPerDay,
+                      planets: cardPlanetCount(card),
+                    },
+                  }
+                : {}),
+            },
+          ];
         })
       ),
-    [advice, graph, pricesFailed, chainOf]
+    [advice, graph, pricesFailed, chainOf, chainCards, whatIfChainType]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
   const colonySales = useMemo(
@@ -377,6 +468,9 @@ export function PlanMap({
     () => (whatIf && whatIfAdvice ? unlockedRecipe(whatIfAdvice, whatIf, [...owned]) : null),
     [whatIf, whatIfAdvice, owned]
   );
+
+  /** The detail shows the what-if planet: chosen, or nothing else is traced. */
+  const showWhatIf = whatIf !== null && (detailKind === 'planet' || traced === null);
 
   // --- Actions ---------------------------------------------------------------
   // A product linked while docked stays in the docked panel: narrowing the
@@ -410,8 +504,6 @@ export function PlanMap({
     // original opener as the place focus returns to.
     if (!docked && !drawerShown) remember();
     setUserTraced({ id: typeId, explicit: true });
-    // Tracing a product answers the what-if question; board and panel agree.
-    setWhatIf(null);
     setDetailKind('product');
     const href = piProductHref(typeId, location.search);
     if (planetShown) {
@@ -433,23 +525,23 @@ export function PlanMap({
       });
       return;
     }
+    // Before the NEED branch: a ticked what-if unticks even when the trace needs it.
+    if (whatIf === type) {
+      setWhatIf(null);
+      closePlanet();
+      return;
+    }
     if (needTypes.has(type)) {
       // The traced product already shows what this planet is for and where to
       // find one. A what-if here would swap the panel and pile pink unlock
       // wires on top of the trace.
       if (!docked && !drawerShown) remember();
-      setWhatIf(null);
       setPlanetOpen(false);
       setDetailKind('product');
       // The product drawer is the URL's: bring it back if it was closed.
       if (linked === null && traced) {
         navigate(piProductHref(traced.id, location.search), productNavigation(location));
       }
-      return;
-    }
-    if (whatIf === type) {
-      setWhatIf(null);
-      closePlanet();
       return;
     }
     if (!docked && !drawerShown) remember();
@@ -474,6 +566,17 @@ export function PlanMap({
     if (linked !== null) dropProduct();
     else restore();
   };
+  /**
+   * The default first pick is not the pilot's choice: its first click opens it.
+   * While the docked panel shows a colony or the what-if, a click brings the
+   * product back instead of clearing it.
+   */
+  const toggleProduct = (typeId: number) => {
+    const ownTrace = traced?.explicit === true && traced.id === typeId;
+    const panelElsewhere = docked && (richnessColony !== null || showWhatIf);
+    if (ownTrace && !panelElsewhere) clearTrace();
+    else openProduct(typeId);
+  };
 
   const tracedProduct = traced ? graph.byId.get(traced.id) : null;
   const announce =
@@ -482,7 +585,9 @@ export function PlanMap({
           name: tracedProduct.name,
           planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
         })
-      : '';
+      : linked === null && userTraced === null
+        ? t('piMap.announceTraceCleared')
+        : '';
 
   // --- Pieces ------------------------------------------------------------------
   const detailBody = (() => {
@@ -498,7 +603,7 @@ export function PlanMap({
         />
       );
     }
-    if (detailKind === 'planet' && whatIf && whatIfAdvice) {
+    if (showWhatIf && whatIf && whatIfAdvice) {
       const weakest = [...advice.colonies]
         .filter((c) => c.todayPerDay !== null)
         .sort((a, b) => a.todayPerDay! - b.todayPerDay!)[0];
@@ -529,6 +634,28 @@ export function PlanMap({
             setWhatIf(null);
             closePlanet();
           }}
+          chains={
+            chainsOn && pi ? (
+              !hasFreeSlot ? (
+                <p className="text-xs text-text-dim">{t('piMap.add.chainsNoSlot')}</p>
+              ) : chainsPending ? (
+                <div className="flex items-center gap-2 text-xs text-text-dim">
+                  <Spinner size="sm" label={t('piMap.add.chainsPricing')} />
+                  {t('piMap.add.chainsPricing')}
+                </div>
+              ) : whatIfCards.length === 0 ? (
+                <p className="text-xs text-text-dim">{t('piMap.add.chainsNone')}</p>
+              ) : (
+                <WhatIfChainCards
+                  type={whatIf}
+                  cards={whatIfCards}
+                  advice={advice}
+                  pi={pi}
+                  stacked
+                />
+              )
+            ) : undefined
+          }
         />
       );
     }
@@ -563,7 +690,7 @@ export function PlanMap({
   })();
   const detailTitle = richnessColony
     ? t('piMap.richness.title', { name: richnessColony.name })
-    : detailKind === 'planet' && whatIf
+    : showWhatIf && whatIf
       ? t('piMap.add.panelTitleFor', { type: planetName(t, whatIf) })
       : traced && tracedProduct
         ? t('piMap.detail.panelTitle', {
@@ -606,7 +733,8 @@ export function PlanMap({
                 <Link
                   to={productHref(pick.typeId)}
                   aria-current={traced?.id === pick.typeId ? 'true' : undefined}
-                  onClick={(event) => onPlanLinkClick(() => openProduct(pick.typeId))(event)}
+                  onClick={(event) => onPlanLinkClick(() => toggleProduct(pick.typeId))(event)}
+                  onKeyDown={clickOnSpace}
                   className={cx(
                     'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
                     interactiveClassName,
@@ -661,11 +789,58 @@ export function PlanMap({
 
   const missingTypes = graph.planetTypes.filter((type) => !isHave(type));
   const whatIfLine = (() => {
-    const base =
-      'flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3 py-1.5 text-xs text-text-dim min-h-10';
-    if (!activeWhatIf || !unlock) {
+    // Placeholder and active states share one grid cell, so the box is as tall as the taller of the
+    // two and hovering never shifts the page (#2796). The idle one stays laid out but invisible.
+    const layer =
+      'col-start-1 row-start-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3 py-1.5 min-h-10';
+    const active = activeWhatIf && unlock ? activeWhatIf : null;
+    // `ghost` sizes the box without a second copy of the text in the DOM: the strings come from CSS.
+    const preview = (
+      type: PlanetType,
+      un: NonNullable<typeof unlock>,
+      bestText: string,
+      ghost = false
+    ) => {
+      const text = (s: string, cls?: string) =>
+        ghost ? (
+          <span data-text={s} className={cx(cls, 'after:content-[attr(data-text)]')} />
+        ) : (
+          <span className={cls}>{s}</span>
+        );
       return (
-        <div className={base} aria-live="polite">
+        <div
+          className={cx(layer, 'text-text', ghost && 'invisible')}
+          aria-hidden={ghost || undefined}
+        >
+          <PlanetImage type={type} size={28} />
+          {text(
+            t('piMap.whatIfTitle', { aType: withArticle(planetName(t, type)) }),
+            'text-[11px] font-semibold tracking-widest text-map-whatif uppercase'
+          )}
+          {text(
+            (un.productIds.length === 0
+              ? t('piMap.whatIfNothing')
+              : t('piMap.whatIfUnlocks', { count: un.productIds.length })) + bestText
+          )}
+          <span aria-hidden="true" className="flex flex-wrap gap-0.5">
+            {un.productIds.slice(0, 12).map((id) => (
+              <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
+            ))}
+          </span>
+        </div>
+      );
+    };
+    const best = whatIfRecipe ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}` : '';
+    return (
+      <div
+        className="grid border-b border-line text-xs text-text-dim"
+        aria-live="polite"
+        data-testid="map-whatif"
+      >
+        <div
+          className={cx(layer, active !== null && 'invisible')}
+          aria-hidden={active ? true : undefined}
+        >
           <span className="text-[11px] font-semibold tracking-widest uppercase">
             {t('piMap.whatIfBlank')}
           </span>
@@ -680,28 +855,10 @@ export function PlanMap({
                 : t('piMap.whatIfAll')}
           </span>
         </div>
-      );
-    }
-    const name = planetName(t, activeWhatIf);
-    return (
-      <div className={cx(base, 'text-text')} aria-live="polite">
-        <PlanetImage type={activeWhatIf} size={28} />
-        <span className="text-[11px] font-semibold tracking-widest text-map-whatif uppercase">
-          {t('piMap.whatIfTitle', { aType: withArticle(name) })}
-        </span>
-        <span>
-          {unlock.productIds.length === 0
-            ? t('piMap.whatIfNothing')
-            : t('piMap.whatIfUnlocks', { count: unlock.productIds.length })}
-          {whatIf === activeWhatIf && whatIfRecipe
-            ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}`
-            : ''}
-        </span>
-        <span aria-hidden="true" className="flex flex-wrap gap-0.5">
-          {unlock.productIds.slice(0, 12).map((id) => (
-            <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
-          ))}
-        </span>
+        {active && unlock ? preview(active, unlock, whatIf === active ? best : '') : null}
+        {sizingUnlocks.map((g) => (
+          <Fragment key={g.type}>{preview(g.type, g.unlock, best, true)}</Fragment>
+        ))}
       </div>
     );
   })();
@@ -725,7 +882,7 @@ export function PlanMap({
       figureOf={figureOf}
       onPlanet={clickPlanet}
       onPreview={setPreview}
-      onProduct={openProduct}
+      onProduct={toggleProduct}
       productHref={productHref}
     />
   );
@@ -776,7 +933,7 @@ export function PlanMap({
               pickRanks={pickRanks}
               figureOf={figureOf}
               onPlanet={clickPlanet}
-              onProduct={openProduct}
+              onProduct={toggleProduct}
               productHref={productHref}
               between={<div className="-mx-3 border-y border-line">{whatIfLine}</div>}
               fullMap={board}
@@ -795,6 +952,9 @@ export function PlanMap({
       <div role="status" aria-live="polite" className="sr-only">
         {announce}
       </div>
+      {whatIfChainType && hasFreeSlot && pi && (
+        <WhatIfChainsFeed advice={advice} pi={pi} type={whatIfChainType} onChange={setFed} />
+      )}
 
       {/* One drawer for both, so swapping planet for product never closes it
           (a close hands focus back to the opener). The URL backs the product's. */}

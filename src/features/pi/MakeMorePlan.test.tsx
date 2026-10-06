@@ -15,9 +15,72 @@ import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 let mockState: PlanAdviceState = { status: 'loading' };
 vi.mock('./usePlanAdvice', () => ({ usePlanAdvice: () => mockState }));
 
+const CONDENSATES = 2344;
+// A chain across both fixture colonies earning far more than both together: if any of it
+// leaked into a headline, quick win or total, the figures below would move.
+vi.mock('./useBiggerChains', () => ({
+  useBiggerChains: () => ({
+    estimates: new Map([
+      [
+        2344,
+        {
+          colonies: {
+            typeId: 2344,
+            iskPerDay: 9_000_000,
+            unitsPerDay: 10,
+            planetIds: [1, 2],
+            hostId: 1,
+            m3PerWeek: 700,
+            legs: [{ from: 2, to: 1, jumps: 3 }],
+          },
+          newPlanets: null,
+        },
+      ],
+    ]),
+    candidateCount: 1,
+    pending: false,
+  }),
+  NO_TYPES: [],
+  // A what-if planet's chain, as large: it must not move them either.
+  useWhatIfChains: () => ({
+    byType: new Map([
+      [
+        'lava',
+        new Map([
+          [
+            2345,
+            {
+              colonies: {
+                typeId: 2345,
+                iskPerDay: 9_000_000,
+                unitsPerDay: 10,
+                planetIds: [-1, 1],
+                hostId: 1,
+                m3PerWeek: 700,
+                legs: [{ from: -1, to: 1, jumps: null }],
+              },
+              newPlanets: null,
+            },
+          ],
+        ]),
+      ],
+    ]),
+    pending: false,
+  }),
+}));
+
 const snapshot = { pi: fixturePi, colonies: [] } as unknown as GoalPlannerSnapshot;
 
-function ready(advice: PlanAdvice = fixtureAdvice, hubName = 'Jita'): PlanAdviceState {
+const withChains = {
+  ...fixtureAdvice,
+  chainBasis: {
+    haulDays: 7,
+    books: { prices: {}, revenuePrices: { 2344: 100_000 }, salesTaxPct: 4 },
+  },
+  chainColonies: [],
+} as unknown as PlanAdvice;
+
+function ready(advice: PlanAdvice = withChains, hubName = 'Jita'): PlanAdviceState {
   return { status: 'ready', advice, pricesFetchedAt: new Date(), hubName };
 }
 
@@ -369,6 +432,51 @@ describe('MakeMorePlan', () => {
     expect(
       screen.getByRole('link', { name: 'Set the rate in “Make a specific product”' })
     ).toHaveAttribute('href', '/planetary-industry/plan#customs');
+  });
+
+  it('keeps Bigger chains off until the pilot opts in beside the plan’s preferences', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    expect(screen.queryByRole('heading', { name: /Bigger chains/ })).not.toBeInTheDocument();
+    const optIn = screen.getByRole('checkbox', { name: 'I will haul between my planets' });
+    expect(optIn).not.toBeChecked();
+    expect(optIn).toHaveAccessibleDescription(/Adds a Bigger chains section/);
+    await user.click(optIn);
+    await waitFor(() => expect(usePiSettings.getState().value.haulBetweenPlanets).toBe(true));
+    expect(await screen.findByRole('heading', { name: /Bigger chains/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'I will haul between my planets' }));
+    await waitFor(() => expect(usePiSettings.getState().value.haulBetweenPlanets).toBeUndefined());
+  });
+
+  it('draws a chain in its own section and never moves a headline, quick win or total', () => {
+    const { unmount } = renderPlan();
+    const figures = () => ({
+      live: screen.getByRole('status').textContent,
+      planets: screen.getByRole('heading', { name: /Your planets/ }).closest('section')!
+        .textContent,
+      wins: screen.getByRole('heading', { name: /Quick wins/ }).closest('section')!.textContent,
+      rebuild: screen.getByRole('heading', { name: /if you want more/i }).closest('section')!
+        .textContent,
+    });
+    const off = figures();
+    unmount();
+
+    usePiSettings.setState({
+      value: { ...DEFAULT_PI_SETTINGS, haulBetweenPlanets: true },
+      hydrated: true,
+    });
+    renderPlan();
+    expect(figures()).toEqual(off);
+    const chains = screen.getByRole('heading', { name: /Bigger chains/ }).closest('section')!;
+    expect(within(chains).getByRole('link', { name: 'Condensates' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(String(CONDENSATES))
+    );
+    expect(chains).toHaveTextContent(/on Hek VI and Uttindar II, with the factories on Hek VI/);
+    expect(chains).toHaveTextContent(
+      /more than these 2 planets earn on their best one-planet picks/
+    );
+    expect(chains).toHaveTextContent(/Uttindar II → Hek VI: 3/);
   });
 
   it('stays quiet when every customs rate is known', () => {

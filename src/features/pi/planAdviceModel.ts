@@ -47,7 +47,7 @@ import { extractorState, EFFICIENT_WINDOW_FRACTION } from '@/engine/pi/colonySta
 import { hasYieldBaseline, pastEfficientWindow } from '@/engine/pi/extraction';
 import { volumeOf } from '@/engine/pi/haulEffort';
 import { CUSTOMS_TAXABLE_VALUE, DEFAULT_CUSTOMS_TAX_RATE, isP0 } from '@/engine/pi/chain';
-import type { PlanetType } from '@/engine/pi/goalTypes';
+import type { PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import {
   colonyAdvice,
   HOURS_PER_DAY,
@@ -102,6 +102,7 @@ import { builtColonyEarnings, saleableOutputPerHour } from './colonyEarningsMode
 import { colonyHoursToFull } from './colonyThroughput';
 import {
   DEFAULT_PLANNER_HEADS,
+  goalPlannerInput,
   plannerColonies,
   plannerPolicy,
   type PlannerColonyRow,
@@ -248,6 +249,12 @@ export interface PlanAdvice {
    * (`chainEstimateModel.ts`): priced lazily, never part of the ranking.
    */
   chainBasis: ChainBasis;
+  /**
+   * The colonies as the Goal Planner's solver reads them (measured rates, own
+   * Command Center and customs): what Plan's Bigger chains lay a P3 or P4 on.
+   * Read only when the pilot opted in to hauling between planets.
+   */
+  chainColonies: PlannerColony[];
 }
 
 /** One raw P0 on one planet type: ISK a day from one planet selling it as extracted. */
@@ -495,6 +502,7 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
     rawUnpriced: ranking.rawUnpriced,
     rankingBasis: ranking.basis,
     chainBasis: ranking.chain,
+    chainColonies: goalPlannerInput(rows),
   };
 }
 

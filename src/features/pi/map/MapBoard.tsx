@@ -10,9 +10,9 @@
  *   they show is also written out in the detail panel.
  * - **Keyboard.** One tab stop for the whole board (roving `tabIndex`). Up and
  *   Down walk a column, Left and Right hop to the neighbouring column at about
- *   the same height, Home and End jump to a column's ends. Enter on a product
- *   traces it and opens its detail; Enter or Space on a planet toggles it or
- *   opens "add a planet".
+ *   the same height, Home and End jump to a column's ends. Enter or Space on
+ *   a product clicks it (PlanMap traces or clears); on a planet, toggles it
+ *   or opens "add a planet".
  * - **Ghost slots.** What the ticked planets cannot make keeps its place as an
  *   empty, `aria-hidden` slot so the layout never jumps, and it is not a tab
  *   stop.
@@ -40,6 +40,7 @@ import {
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from '../PlanetImage';
@@ -53,7 +54,13 @@ import {
   tierName,
   verdictGlyph,
 } from './mapText';
-import type { MapGraph, MapTier, ProductFigure, Trace } from './mapModel';
+import {
+  tileChainIsk,
+  type MapGraph,
+  type MapTier,
+  type ProductFigure,
+  type Trace,
+} from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -384,13 +391,18 @@ export function MapBoard(props: MapBoardProps) {
                       })
                     : comparisonSentence(t, figure),
                   figureSentence(t, figure),
-                  figure.kind === 'unranked' && figure.chain
-                    ? chainAssumptions(t, figure.chain)
-                    : null,
+                  figure.kind !== 'unranked'
+                    ? null
+                    : figure.whatIf
+                      ? t('piMap.add.chainsTip')
+                      : figure.chain
+                        ? chainAssumptions(t, figure.chain)
+                        : null,
                 ]
                   .filter(Boolean)
                   .join('\n');
                 const unlockedBy = isNew ? props.whatIfType : null;
+                const chainIsk = tileChainIsk(figure);
                 return (
                   <li key={product.typeId} className="relative flex-none">
                     <Tooltip content={tip}>
@@ -406,7 +418,7 @@ export function MapBoard(props: MapBoardProps) {
                           traced: goal,
                         })}
                         onFocus={() => setFocusKey(key)}
-                        onKeyDown={(e) => move(key, e)}
+                        onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
                         onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
                           'grid h-11 w-full md:h-[34px] touch:h-11 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
@@ -456,8 +468,8 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
-                        ) : figure.kind === 'unranked' && figure.chain ? (
-                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} stacked />
+                        ) : chainIsk !== null ? (
+                          <ChainTileFigure iskPerDay={chainIsk} stacked />
                         ) : (
                           <span aria-hidden="true" />
                         )}

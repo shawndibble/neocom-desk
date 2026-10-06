@@ -17,6 +17,7 @@ import { homeSystemId } from '../sellRoute';
 import { usePlanPreference } from '../planTicksPref';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
 import type { PlanetType } from '@/engine/pi/goalTypes';
+import type { PiData } from '@/sde/types';
 import type { FinderOrigin } from './MapDetail';
 import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
@@ -41,6 +42,7 @@ export type MapAdviceState =
       pricesFailed: boolean;
       /** P3/P4 multi-planet chain estimates, priced in slices after the board draws. */
       chainOf: ChainEstimateOf;
+      pi: PiData;
     };
 
 export function useMapAdvice(
@@ -140,7 +142,7 @@ export function useMapAdvice(
   );
 
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
-  if (!built || !graph) return { status: 'loading' };
+  if (!built || !graph || !pi) return { status: 'loading' };
   const esiFailed = snapshot?.fetchFailed ? { retry, retrying } : null;
   const coloniesUnknown = colonyCountUnknown(snapshot);
   return {
@@ -153,5 +155,6 @@ export function useMapAdvice(
     coloniesUnknown,
     pricesFailed: inputs.status === 'prices-failed',
     chainOf,
+    pi,
   };
 }

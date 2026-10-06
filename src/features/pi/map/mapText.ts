@@ -35,7 +35,7 @@ export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | nul
 export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: string): string {
   if (figure.kind !== 'ranked') {
     // The chain estimate's own sentence follows and says what the figure is.
-    if (figure.chain) return t('piMap.unranked.tierChain');
+    if (figure.chain || figure.whatIf) return t('piMap.unranked.tierChain');
     return t(`piMap.unranked.${figure.reason}`);
   }
   const type = planetName(t, figure.useType);
@@ -51,7 +51,16 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: s
  * this sentence is where their exact figure lives (tooltip, accessible name).
  */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
-  if (figure.kind !== 'ranked') return figure.chain ? chainFigureSentence(t, figure.chain) : null;
+  if (figure.kind !== 'ranked') {
+    if (figure.whatIf) {
+      return t('piShared.chain.whatIfFigure', {
+        aType: withArticle(planetName(t, figure.whatIf.type)),
+        isk: formatIsk(figure.whatIf.iskPerDay, 0),
+        count: figure.whatIf.planets,
+      });
+    }
+    return figure.chain ? chainFigureSentence(t, figure.chain) : null;
+  }
   const sentence = t('piMap.figure', {
     isk: formatIsk(figure.iskPerDay, 0),
     type: planetName(t, figure.useType),
