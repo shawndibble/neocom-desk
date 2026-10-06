@@ -5,6 +5,7 @@ import {
   SHORTCUTS,
   commandPaletteDisplayKey,
   isApplePlatform,
+  modChordDisplayKey,
   pasteDisplayKey,
 } from '@/lib/shortcuts';
 
@@ -49,6 +50,20 @@ export function ShortcutsPanel() {
               <kbd className={KBD}>{shortcut.displayKey}</kbd>
             </Row>
           ))}
+        </dl>
+      </Panel>
+      <Panel title={t('shortcuts.onPageTitle')}>
+        <p className="mb-2 text-sm text-text-dim">{t('shortcuts.onPageHint')}</p>
+        <dl className={LIST}>
+          <Row label={t('shortcuts.saveFitting')}>
+            <kbd className={KBD}>{modChordDisplayKey(apple, 'S')}</kbd>
+          </Row>
+          <Row label={t('shortcuts.saveFittingAsNew')}>
+            <kbd className={KBD}>{modChordDisplayKey(apple, 'S', { shift: true })}</kbd>
+          </Row>
+          <Row label={t('shortcuts.submitPaste')}>
+            <kbd className={KBD}>{modChordDisplayKey(apple, 'Enter')}</kbd>
+          </Row>
         </dl>
       </Panel>
       <Panel title={t('shortcuts.pasteTitle')}>

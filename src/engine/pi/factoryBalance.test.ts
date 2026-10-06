@@ -133,7 +133,7 @@ describe('factoryBalance', () => {
 
   it('says so when a colony has factories but no measured extraction at all', () => {
     // An extractor whose program carries no install-time baseline reports no
-    // rate (`advisorModel`'s `ratePerHour: null`), so its resource is absent
+    // rate (`systemPlanetModel`'s `ratePerHour: null`), so its resource is absent
     // from the map rather than zero. Zero would read as "these factories are
     // all surplus" and advise deleting a working colony.
     const [balance] = factoryBalance(

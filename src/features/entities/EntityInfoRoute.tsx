@@ -1,6 +1,6 @@
 /**
  * Mounted once in `App.tsx`: keeps the URL's `?info=` param and the two
- * shared modals (`PublicInfoModal`, `SkillDetailModal`) in step.
+ * shared modals (`PublicInfoModal`, `SkillDetailModal`, `ItemInfoModal`) in step.
  *
  * - `info` set (a link click, a pasted URL, Forward): the matching store's
  *   request is shown.
@@ -20,6 +20,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
+import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from './entityInfoState';
@@ -50,6 +51,7 @@ export function EntityInfoRoute() {
           if (parseEntityInfo(here.search) === null) {
             usePublicInfoModalStore.getState().clear();
             useSkillDetailModalStore.getState().clear();
+            useItemInfoModalStore.getState().clear();
           } else if (wasPushedHere(here.state)) {
             navigate(-1);
           } else {
@@ -80,17 +82,27 @@ export function EntityInfoRoute() {
   useEffect(() => {
     const publicInfo = usePublicInfoModalStore.getState();
     const skill = useSkillDetailModalStore.getState();
+    const item = useItemInfoModalStore.getState();
     if (kind === null || id === null) {
       publicInfo.clear();
       skill.clear();
+      item.clear();
+    } else if (kind === 'type') {
+      publicInfo.clear();
+      skill.clear();
+      const staged = item.staged;
+      item.show({ typeId: id, itemName: staged?.typeId === id ? staged.itemName : undefined });
+      item.stage(id, undefined);
     } else if (kind === 'skill') {
       publicInfo.clear();
+      item.clear();
       const staged = skill.staged?.typeID === id ? skill.staged.planEntries : undefined;
       skill.show({ typeID: id, planEntries: staged });
       // Consumed: a later open must not inherit them.
       skill.stage(id, undefined);
     } else {
       skill.clear();
+      item.clear();
       publicInfo.show({ kind, id });
     }
   }, [kind, id]);

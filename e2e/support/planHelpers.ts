@@ -21,6 +21,8 @@ export async function addCaldariCruiserToNewPlan(page: Page): Promise<void> {
   // The merged entry row renders "{name} {level}" as sibling text nodes in
   // one <span> (no element exposes the bare skill name), so wait on the
   // row's icon-only remove button instead — its accessible name is
-  // "Remove {name}", unambiguous and immune to that text-node splitting.
-  await expect(page.getByRole('button', { name: 'Remove Caldari Cruiser' })).toBeVisible();
+  // "More actions for {name}", unambiguous and immune to that text-node splitting.
+  await expect(
+    page.getByRole('button', { name: 'More actions for Caldari Cruiser' })
+  ).toBeVisible();
 }

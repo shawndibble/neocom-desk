@@ -99,6 +99,14 @@ describe('YieldDetailModal', () => {
     expect(screen.getByText('Miner Alt')).toBeInTheDocument();
   });
 
+  it('links the system to Route Safety and the pilot to Show Info', () => {
+    renderModal();
+    expect(screen.getByRole('link', { name: 'Jita' }).getAttribute('href')).toContain(
+      String(SYSTEM)
+    );
+    expect(screen.getByRole('link', { name: 'Miner Alt' })).toBeInTheDocument();
+  });
+
   it('lists each ore type with its units and m³', () => {
     renderModal();
     const ore = screen.getByRole('table', { name: 'Ore mined' });

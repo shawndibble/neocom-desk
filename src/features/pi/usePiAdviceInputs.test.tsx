@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
+import { db } from '@/db';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import type { PlanPrices } from './planPrices';
 
@@ -54,5 +55,29 @@ describe('usePiAdviceInputs', () => {
   it('stays loading until a snapshot arrives', () => {
     const { result } = renderHook(() => usePiAdviceInputs(null, 7, 'isk'));
     expect(result.current.status).toBe('loading');
+  });
+
+  it("carries the character's saved richness picks, live, with no migration", async () => {
+    pricesRead = async () => prices(false);
+    await db.planetRichness.clear();
+    await db.planetRichness.bulkPut([
+      { id: '7:40000001', characterId: 7, planetId: 40000001, order: [2073], updatedAt: 1 },
+      { id: '8:40000001', characterId: 8, planetId: 40000001, order: [2268], updatedAt: 1 },
+    ]);
+    const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const richnessOf = () =>
+      result.current.status === 'ready' ? result.current.input.prefs.richness : undefined;
+    expect(richnessOf()?.get(40000001)).toEqual([2073]);
+
+    await db.planetRichness.put({
+      id: '7:40000002',
+      characterId: 7,
+      planetId: 40000002,
+      order: [2305],
+      updatedAt: 2,
+    });
+    await waitFor(() => expect(richnessOf()?.get(40000002)).toEqual([2305]));
+    await db.planetRichness.clear();
   });
 });

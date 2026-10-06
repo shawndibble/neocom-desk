@@ -47,7 +47,7 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 /** Command Center Upgrades IV and Interplanetary Consolidation III: a pilot who can host a setup. */
-async function mockPiSkills(page: Page): Promise<void> {
+async function mockPiSkills(page: Page, commandCenterLevel = 4): Promise<void> {
   const trained = (skill_id: number, level: number) => ({
     skill_id,
     trained_skill_level: level,
@@ -60,17 +60,21 @@ async function mockPiSkills(page: Page): Promise<void> {
       contentType: 'application/json',
       body: JSON.stringify({
         ...CHARACTER_SKILLS,
-        skills: [...CHARACTER_SKILLS.skills, trained(2505, 4), trained(2495, 2)],
+        skills: [...CHARACTER_SKILLS.skills, trained(2505, commandCenterLevel), trained(2495, 2)],
       }),
     })
   );
 }
 
-async function openFindBest(page: Page, withColonies: boolean): Promise<void> {
+async function openFindBest(
+  page: Page,
+  withColonies: boolean,
+  commandCenterLevel = 4
+): Promise<void> {
   await signInAndGoto(page, './planetary-industry/colonies');
   await mockPlannerColonies(page, withColonies ? PLAN_WINS_COLONIES : []);
   await mockHubPrices(page);
-  await mockPiSkills(page);
+  await mockPiSkills(page, commandCenterLevel);
   await page.goto('./planetary-industry/plan');
   if (withColonies) {
     await page.getByRole('button', { name: /^Find the best thing to build/ }).click();
@@ -128,6 +132,19 @@ for (const [label, viewport] of [
       await expect(page.getByRole('region', { name: 'Advanced' })).toBeVisible();
       await assertNoOverflow(page);
       await shot(page, `${label}-all-products`);
+    });
+
+    test('untrained Command Center: setups still rank, tagged "needs CC level N"', async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await openFindBest(page, false, 0);
+      await expect(page.getByText(/No one-planet setup fits/)).toHaveCount(0);
+      const tag = page.getByText(/needs CC level \d/).first();
+      await expect(tag).toBeVisible();
+      await expect(tag.getByRole('link', { name: /CC level \d/ })).toBeVisible();
+      await assertNoOverflow(page);
+      await shot(page, `${label}-untrained-cc`);
     });
 
     test('with colonies: pre-marked types and what-if chips', async ({ page }) => {

@@ -5,6 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +50,7 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -273,6 +274,8 @@ export function MarketWideOpportunitiesPanel({
     return entry ? onStartPlan(entry) : Promise.resolve(false);
   };
 
+  const startPlanFromRow = useRowStartPlan(startPlanFor);
+
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
       id: 'product',
@@ -283,7 +286,11 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
+            {catalog?.byProductTypeID.has(row.productTypeID) ? (
+              <span className={entityLinkClassName()}>{row.productName}</span>
+            ) : (
+              row.productName
+            )}
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
@@ -372,7 +379,7 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
+      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
   const { sort, onSortChange } = useUrlSort(
@@ -565,6 +572,8 @@ export function MarketWideOpportunitiesPanel({
                 columns={columns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
+                onRowClick={startPlanFromRow}
+                rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />

@@ -61,7 +61,7 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
 }
 
 describe('CorpTransactionsPanel — a read-only ledger row', () => {
-  it('has no More actions button or context menu; the item name links to Market', async () => {
+  it('has no More actions button or context menu; the item name links to Show info', async () => {
     renderPanel();
 
     const row = await screen.findByRole('row', { name: /Damage Control II/ });

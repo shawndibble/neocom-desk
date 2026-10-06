@@ -15,7 +15,7 @@
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterLink, SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
@@ -195,9 +195,9 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
           row.shipTypeId === null ? (
             label(row.shipName, row.shipTypeId)
           ) : (
-            <MarketItemLink typeId={row.shipTypeId}>
+            <ItemInfoLink typeId={row.shipTypeId}>
               {label(row.shipName, row.shipTypeId)}
-            </MarketItemLink>
+            </ItemInfoLink>
           ),
         sortValue: (row) => row.shipName ?? undefined,
       },

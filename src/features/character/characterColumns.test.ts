@@ -64,21 +64,12 @@ describe('visibleAvailableColumns', () => {
 });
 
 describe('migrateVisibleColumns', () => {
-  it('appends group and remove when neither is present', () => {
-    expect(migrateVisibleColumns(['name', 'alerts'])).toEqual([
-      'name',
-      'alerts',
-      'group',
-      'remove',
-    ]);
+  it('appends group when it is missing', () => {
+    expect(migrateVisibleColumns(['name', 'alerts'])).toEqual(['name', 'alerts', 'group']);
   });
 
-  it('appends only the missing one', () => {
-    expect(migrateVisibleColumns(['name', 'group'])).toEqual(['name', 'group', 'remove']);
-  });
-
-  it('is a no-op once both are already present', () => {
-    expect(migrateVisibleColumns(['name', 'group', 'remove'])).toEqual(['name', 'group', 'remove']);
+  it('is a no-op once group is already present', () => {
+    expect(migrateVisibleColumns(['name', 'group'])).toEqual(['name', 'group']);
   });
 });
 
@@ -96,6 +87,12 @@ describe('useCharacterColumnsMigrated', () => {
 });
 
 describe('useVisibleCharacterColumns', () => {
+  it('drops the retired remove column from a stored list', async () => {
+    await db.settings.put({ key: VISIBLE_CHARACTER_COLUMNS_KEY, value: ['name', 'remove'] });
+    await useVisibleCharacterColumns.getState().hydrate();
+    expect(useVisibleCharacterColumns.getState().value).toEqual(['name']);
+  });
+
   it('defaults to the attention-signal columns', async () => {
     await useVisibleCharacterColumns.getState().hydrate();
     expect(useVisibleCharacterColumns.getState().value).toEqual(DEFAULT_VISIBLE_CHARACTER_COLUMNS);

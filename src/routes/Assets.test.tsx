@@ -682,13 +682,19 @@ describe('Assets', () => {
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+    // The ship row carries no ⋮ or menu; "Open in Fittings" lives in the opened ship's header.
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
     await openLocation(user, 'Drake');
     expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open in Fittings' })).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
     await openLocation(user, 'Cargo Hold');
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    // A bay is not a ship: no shortcut there.
+    expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
     // Back walks up exactly one level per press: Cargo Hold -> Drake -> the
     // station's own contents -> the root list.
@@ -792,13 +798,13 @@ describe('station pins (issue #84)', () => {
 });
 
 describe('item name and blueprint badge', () => {
-  it('links the item name to its Market listing', async () => {
+  it('links the item name to its Show info (Item Detail)', async () => {
     const user = userEvent.setup();
     render(<App />);
     await openLocation(user, JITA);
 
     const name = await screen.findByRole('link', { name: 'Tritanium' });
-    expect(name.getAttribute('href')).toMatch(/^\/market\/browser\?.*34/);
+    expect(name.getAttribute('href')).toMatch(/info=type-34$/);
     expect(name).not.toHaveAttribute('title');
   });
 

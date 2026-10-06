@@ -197,15 +197,19 @@ describe('Market top-level tabs', () => {
     expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('clicking a linked item name from Open Orders lands on the Market Browser tab', async () => {
+  it('an Open Orders item name opens the order details, whose Market link lands on the Market Browser tab', async () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
 
     // The fixture order is healthy, so it's folded until revealed.
     await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
-    const itemLink = await screen.findByRole('link', { name: 'Tritanium' });
-    await user.click(itemLink);
+    // The name is the row's own click, not a link.
+    expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    await user.click(await screen.findByText('Tritanium'));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('link', { name: 'View in Market' }));
 
     expect(await screen.findByRole('tab', { name: 'Market' })).toHaveAttribute(
       'aria-selected',

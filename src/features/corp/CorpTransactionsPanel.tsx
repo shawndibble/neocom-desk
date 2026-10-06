@@ -40,7 +40,7 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import {
   activeWalletTransactionFilterCount,
   EMPTY_WALLET_TRANSACTION_FILTER,
@@ -187,9 +187,7 @@ export function CorpTransactionsPanel({
         header: t('wallet.item'),
         /** Pinned while the figures scroll sideways on a phone. */
         stickyStart: true,
-        render: (txn) => (
-          <MarketItemLink typeId={txn.type_id}>{nameFor(txn.type_id)}</MarketItemLink>
-        ),
+        render: (txn) => <ItemInfoLink typeId={txn.type_id}>{nameFor(txn.type_id)}</ItemInfoLink>,
         sortValue: (txn) => nameFor(txn.type_id),
       },
       {

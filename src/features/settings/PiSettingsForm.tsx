@@ -28,10 +28,11 @@ const BUYBACK = 'buyback';
 /**
  * Planetary Industry's settings: Settings → Industry, and the PI page's
  * settings modal. The sell market, what may be bought at the hub and the haul
- * cadence are read by every PI tab, and the page header's "Sell at" picker
- * edits the same record (`piSettings.ts`).
+ * cadence are read by every PI tab. The sell market is picked in the PI header
+ * strip, so the modal leaves it out (`showSellAt` is for Settings, which has no
+ * strip); both edit the same record (`piSettings.ts`).
  */
-export function PiSettingsForm() {
+export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean }) {
   const { t } = useTranslation();
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
@@ -53,61 +54,72 @@ export function PiSettingsForm() {
         each === tier ? !settings.buyTiers.includes(tier) : settings.buyTiers.includes(each)
       ),
     });
-  const cadenceDays = (days: PiCadenceDays) => t('piAdvisor.cadenceDays', { count: days });
+  const cadenceDays = (days: PiCadenceDays) => t('piShared.cadenceDays', { count: days });
 
   return (
     <Fields variant="form">
-      <Field
-        label={t('settings.piSellAtLabel')}
-        htmlFor="settings-pi-sell-at"
-        note={t('settings.piSellAtHint')}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={settings.buybackPct === null ? settings.hub : BUYBACK}
-            onValueChange={(value) =>
-              void setSettings(
-                value === BUYBACK
-                  ? { ...settings, buybackPct: settings.buybackPct ?? DEFAULT_BUYBACK_PCT }
-                  : { ...settings, hub: value as TradeHub['id'], buybackPct: null }
-              )
-            }
-          >
-            <SelectTrigger id="settings-pi-sell-at" className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TRADE_HUBS.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.systemName}
-                </SelectItem>
-              ))}
-              <SelectItem value={BUYBACK}>{t('piPlan.strip.corpBuyback')}</SelectItem>
-            </SelectContent>
-          </Select>
-          {settings.buybackPct !== null && (
+      {showSellAt && (
+        <Field
+          label={t('piPlan.strip.sellAt')}
+          htmlFor="settings-pi-sell-at"
+          note={t('settings.piSellAtHint')}
+        >
+          <div className="flex flex-wrap items-center gap-2">
             <Select
-              value={String(settings.buybackPct)}
+              value={settings.buybackPct === null ? settings.hub : BUYBACK}
               onValueChange={(value) =>
-                void setSettings({ ...settings, buybackPct: Number(value) })
+                void setSettings(
+                  value === BUYBACK
+                    ? {
+                        ...settings,
+                        buybackPct: settings.buybackPct ?? DEFAULT_BUYBACK_PCT,
+                        hubChosen: true,
+                      }
+                    : {
+                        ...settings,
+                        hub: value as TradeHub['id'],
+                        buybackPct: null,
+                        hubChosen: true,
+                      }
+                )
               }
             >
-              <SelectTrigger aria-label={t('piPlan.strip.buybackRate')} className="w-44">
+              <SelectTrigger id="settings-pi-sell-at" className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[...new Set([...PI_BUYBACK_PCT_OPTIONS, settings.buybackPct])]
-                  .sort((a, b) => a - b)
-                  .map((pct) => (
-                    <SelectItem key={pct} value={String(pct)}>
-                      {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
-                    </SelectItem>
-                  ))}
+                {TRADE_HUBS.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.systemName}
+                  </SelectItem>
+                ))}
+                <SelectItem value={BUYBACK}>{t('piPlan.strip.corpBuyback')}</SelectItem>
               </SelectContent>
             </Select>
-          )}
-        </div>
-      </Field>
+            {settings.buybackPct !== null && (
+              <Select
+                value={String(settings.buybackPct)}
+                onValueChange={(value) =>
+                  void setSettings({ ...settings, buybackPct: Number(value) })
+                }
+              >
+                <SelectTrigger aria-label={t('piPlan.strip.buybackRate')} className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...new Set([...PI_BUYBACK_PCT_OPTIONS, settings.buybackPct])]
+                    .sort((a, b) => a - b)
+                    .map((pct) => (
+                      <SelectItem key={pct} value={String(pct)}>
+                        {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </Field>
+      )}
 
       <Field label={t('settings.piBuyTiersLabel')} note={t('settings.piBuyTiersHint')}>
         <div role="group" aria-label={t('settings.piBuyTiersLabel')} className="flex gap-2">

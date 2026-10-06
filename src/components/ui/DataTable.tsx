@@ -9,7 +9,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
@@ -28,8 +27,10 @@ import {
   type ControlSize,
 } from './controlStyles';
 import { useLiftAfterHoldGuard } from './liftAfterHold';
+import { isRowOwnEvent } from './rowEvents';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
+import { Caret } from './Disclosure';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
 import { RowTappableContext } from './tooltipHold';
@@ -171,46 +172,6 @@ export interface DataTableColumn<T> {
 }
 
 /**
- * What counts as a control of its own inside a clickable row: anything the
- * user can click to do something other than open the row. A bare
- * `tabIndex={0}` isn't enough — an ISK figure is focusable only so the
- * keyboard can reach its hover tooltip, and a click on it still opens the
- * row. A tap-to-open tooltip trigger marks itself with `data-row-control`.
- */
-const ROW_CONTROL_SELECTOR = [
-  'a[href]',
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'label',
-  'summary',
-  '[role="button"]',
-  '[role="checkbox"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="switch"]',
-  '[data-row-control]',
-].join(',');
-
-/**
- * Whether a click on a clickable row is the row's own — not one that landed on
- * a control inside it (a star button, a bulk-select checkbox, a tooltip
- * trigger), and not one bubbled up through React from something portaled out
- * of it (a menu or modal opened from the row). Keyboard activation of such a
- * control fires a click too, so this is also what keeps Enter/Space on it
- * from opening the row. Pages need no `stopPropagation` workaround of their
- * own.
- */
-function isRowOwnEvent(event: MouseEvent<HTMLElement>): boolean {
-  const row = event.currentTarget;
-  const target = event.target;
-  if (!(target instanceof Element) || !row.contains(target)) return false;
-  const control = target.closest(ROW_CONTROL_SELECTOR);
-  return control === null || control === row || !row.contains(control);
-}
-
-/**
  * Wraps a dense-stack (`stackLayout="dense"`) column's `render` output when
  * it's more than one inline piece (a value plus a badge, a name plus a
  * security-status suffix). The dense meta line puts a `·` separator right
@@ -241,6 +202,13 @@ export interface DataTableExpandableRow<T> {
    * disclosure already).
    */
   hideIcon?: boolean;
+  /**
+   * Draws the §6c expand-in-place cue instead: a leading rotating caret in
+   * the first cell, hidden in the stacked card layout (the card is the tap
+   * target). Implies `hideIcon`'s trailing chevron being dropped, so a row
+   * with a ⋮ keeps one trailing control.
+   */
+  leadingIcon?: boolean;
 }
 
 /**
@@ -354,6 +322,12 @@ interface DataTableProps<T> {
    * `rowContextMenu`.
    */
   onRowClick?: (row: T) => void;
+  /**
+   * Per-row opt-out of `onRowClick`: a row it returns false for is inert (no
+   * pointer cursor, no tab stop, no Enter/Space) so it never looks clickable
+   * while doing nothing. Omit when every row opens something.
+   */
+  rowClickable?: (row: T) => boolean;
   /**
    * Adds a per-row disclosure: clicking a row opens `renderDetail`'s content
    * in a full-width row beneath it. Independent of `onRowClick` — both fire
@@ -493,6 +467,7 @@ interface DataTableRowProps<T> {
   expandable: boolean;
   expanded: boolean;
   hideExpandIcon: boolean;
+  leadingExpandIcon: boolean;
   /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
   renderDetail: ((row: T) => ReactNode) | undefined;
   clickable: boolean;
@@ -545,6 +520,7 @@ function DataTableRowImpl<T>({
   expandable,
   expanded,
   hideExpandIcon,
+  leadingExpandIcon,
   renderDetail,
   clickable,
   tapOpensRow,
@@ -676,7 +652,16 @@ function DataTableRowImpl<T>({
             {/* Only the body cell is "inside a tappable row": the detail row, header,
                 footer and group headers sit outside this provider. */}
             <RowTappableContext.Provider value={tapOpensRow}>
-              {column.render(row)}
+              {i === 0 && leadingExpandIcon ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="dt-lead-caret inline-flex">
+                    <Caret expanded={expanded} />
+                  </span>
+                  {column.render(row)}
+                </span>
+              ) : (
+                column.render(row)
+              )}
             </RowTappableContext.Provider>
           </td>
         );
@@ -866,6 +851,7 @@ export function DataTable<T>({
   rowContextMenu,
   rowMoreActions = false,
   onRowClick,
+  rowClickable,
   expandableRow,
   responsive = 'stack',
   stackColumns = 1,
@@ -1188,8 +1174,8 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
-  const clickable = Boolean(onRowClick) || expandable;
-  const focusable = Boolean(rowContextMenu) || clickable;
+  const rowIsClickable = (row: T) =>
+    expandable || (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
 
   // Rows get one stable activator rather than `onRowClick` itself, which
   // callers pass inline — only ever called from a click or key handler, so
@@ -1249,11 +1235,12 @@ export function DataTable<T>({
         selected={selectedRowKey !== null && key === selectedRowKey}
         expandable={expandable}
         expanded={expanded}
-        hideExpandIcon={expandableRow?.hideIcon ?? false}
+        hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
+        leadingExpandIcon={expandableRow?.leadingIcon ?? false}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
-        clickable={clickable}
-        tapOpensRow={Boolean(onRowClick)}
-        focusable={focusable}
+        clickable={rowIsClickable(row)}
+        tapOpensRow={Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true)}
+        focusable={Boolean(rowContextMenu) || rowIsClickable(row)}
         onActivate={activateRow}
         rowClassName={rowClassName}
         rowContextMenu={rowContextMenu}

@@ -1,10 +1,10 @@
 /**
  * Market Browser Quickbar actions at phone width with no active character
- * (issue #2162): the price-alert bell, the item context menu's "Add to
- * Quickbar", and its "Set price alert…" entry all explained their disabled
- * state only via a native `title=`, unreachable on touch — a phone user saw
- * dead controls with no way to learn why. All three now wrap the disabled
- * trigger in a tap-reachable `Tooltip` instead (`RequireCharacter` gates on
+ * (issue #2162): the price-alert bell explained its disabled state only via a
+ * native `title=`, unreachable on touch — a phone user saw a dead control with
+ * no way to learn why. It now wraps the disabled trigger in a tap-reachable
+ * `Tooltip` instead (the tree leaf's item menu, which had two more such
+ * entries, is gone: DESIGN.md §6c Restraint) (`RequireCharacter` gates on
  * character *count*, not the active selection, so a phone with a signed-in
  * Character but none active — `clearActiveCharacter`'s own documented case —
  * still reaches the Market Browser to hit this).
@@ -77,29 +77,5 @@ test.describe('Quickbar actions with no active character', () => {
 
     // The tap explains rather than acts: no popover opened behind the bubble.
     await expect(page.getByRole('dialog')).toHaveCount(0);
-  });
-
-  test('"Add to Quickbar" and "Set price alert…" explain their disabled state on a tap', async ({
-    page,
-  }) => {
-    await page.setViewportSize(PHONE);
-    await signInAndGoto(page, './market?section=browser');
-    await clearActiveCharacter(page);
-
-    await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
-    const item = page.getByRole('button', { name: 'Tritanium', exact: true });
-    await expect(item).toBeVisible();
-    await item.click({ button: 'right' });
-
-    const addToQuickbar = page.getByRole('menuitem', { name: 'Add to Quickbar' });
-    await expect(addToQuickbar).toHaveAttribute('aria-disabled', 'true');
-    // `force`: see the price-alert bell test above.
-    await addToQuickbar.tap({ force: true });
-    await expect(page.getByRole('tooltip')).toHaveText(REASON);
-
-    const priceAlert = page.getByRole('menuitem', { name: 'Set price alert…' });
-    await expect(priceAlert).toHaveAttribute('aria-disabled', 'true');
-    await priceAlert.tap({ force: true });
-    await expect(page.getByRole('tooltip')).toHaveText(REASON);
   });
 });

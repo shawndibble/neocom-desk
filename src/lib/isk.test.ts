@@ -4,6 +4,7 @@ import {
   formatIsk,
   formatIskAuto,
   formatIskCompact,
+  formatIskCompactSigned,
   formatMarketIsk,
   marketIskDecimals,
   parseIskAmount,
@@ -102,6 +103,22 @@ describe('formatIskCompact', () => {
 
   it('clamps a rounding-noise negative near zero to "0" instead of "-0"', () => {
     expect(formatIskCompact(-0.3)).toBe('0');
+  });
+});
+
+describe('formatIskCompactSigned', () => {
+  it('prefixes a gain with one plus', () => {
+    expect(formatIskCompactSigned(756_000)).toBe('+756K');
+  });
+
+  it('keeps a single minus on a loss, never "+-"', () => {
+    expect(formatIskCompactSigned(-756_000)).toBe('-756K');
+    expect(formatIskCompactSigned(-1_400_000)).not.toContain('+');
+  });
+
+  it('prints zero and rounding noise unsigned', () => {
+    expect(formatIskCompactSigned(0)).toBe('0');
+    expect(formatIskCompactSigned(-0.3)).toBe('0');
   });
 });
 

@@ -45,6 +45,12 @@ export interface PiSettings {
   hub: TradeHub['id'];
   buybackPct: number | null;
   buyTiers: PiBuyTier[];
+  /**
+   * True once the pilot picked or dismissed a hub, so the strip stops
+   * suggesting the nearest one. Absent on the default; a stored row naming a
+   * hub other than the default counts as chosen (that was a pick).
+   */
+  hubChosen?: true;
 }
 
 export const DEFAULT_PI_SETTINGS: PiSettings = {
@@ -56,16 +62,23 @@ export const DEFAULT_PI_SETTINGS: PiSettings = {
 const isHubId = (value: unknown): value is TradeHub['id'] =>
   TRADE_HUBS.some((hub) => hub.id === value);
 
+/** A pick the pilot made: a non-default hub or a buyback. `hubChosen` is stored only when true. */
+const chosenFlag = (hub: TradeHub['id'], buybackPct: number | null): { hubChosen?: true } =>
+  hub !== DEFAULT_PI_SETTINGS.hub || buybackPct !== null ? { hubChosen: true } : {};
+
 export function parsePiSettings(raw: unknown): PiSettings | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   const pct = value.buybackPct;
   const tiers = Array.isArray(value.buyTiers) ? value.buyTiers : [];
+  const hub = isHubId(value.hub) ? value.hub : DEFAULT_PI_SETTINGS.hub;
+  const buybackPct =
+    typeof pct === 'number' && Number.isFinite(pct) && pct > 0 && pct <= 100 ? pct : null;
   return {
-    hub: isHubId(value.hub) ? value.hub : DEFAULT_PI_SETTINGS.hub,
-    buybackPct:
-      typeof pct === 'number' && Number.isFinite(pct) && pct > 0 && pct <= 100 ? pct : null,
+    hub,
+    buybackPct,
     buyTiers: PI_BUY_TIERS.filter((tier) => tiers.includes(tier)),
+    ...(value.hubChosen === true ? { hubChosen: true as const } : chosenFlag(hub, buybackPct)),
   };
 }
 
@@ -80,11 +93,20 @@ export function migrateLegacyPiSettings(sourcing: unknown, goalPlannerPrefs: unk
     typeof goalPlannerPrefs === 'object' && goalPlannerPrefs !== null
       ? (goalPlannerPrefs as { priceHub?: unknown }).priceHub
       : undefined;
-  if (isHubId(sourcing)) return { hub: sourcing, buybackPct: null, buyTiers: [1] };
+  if (isHubId(sourcing)) {
+    return {
+      hub: sourcing,
+      buybackPct: null,
+      buyTiers: [1],
+      ...chosenFlag(sourcing, null),
+    };
+  }
+  const hub = isHubId(priceHub) ? priceHub : DEFAULT_PI_SETTINGS.hub;
   return {
-    hub: isHubId(priceHub) ? priceHub : DEFAULT_PI_SETTINGS.hub,
+    hub,
     buybackPct: null,
     buyTiers: [],
+    ...chosenFlag(hub, null),
   };
 }
 

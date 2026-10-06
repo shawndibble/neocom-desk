@@ -45,6 +45,7 @@ describe('buildPlanView', () => {
     expect(card.target?.typeId).toBe(P2_A);
     expect(card.alternative).toMatchObject({ iskPerDayDelta: -1000, haulRatio: 4 });
     expect(card.anchor).toBe('plan-p1');
+    expect(card.sellsRaw).toBe(true);
   });
 
   it('a keep card stays on what it sells, at today after quick wins, with no gain', () => {
@@ -57,6 +58,7 @@ describe('buildPlanView', () => {
       keepReason: 'already-best',
     });
     expect(card.sells.map((s) => s.typeId)).toEqual([P2_B]);
+    expect(card.sellsRaw).toBe(false);
   });
 
   it('builds a checklist column per changed colony, steps keyed by recommendation', () => {
