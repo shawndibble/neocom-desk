@@ -7,7 +7,6 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { GrantBanner } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
@@ -107,18 +106,6 @@ export function PlanPanel(props: Props) {
       </div>
     );
   }
-  if (snapshot.needsReauth) {
-    return (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterPlanets']}
-        title={t('pi.reauthTitle')}
-        hint={t('pi.reauthHint')}
-        actionLabel={t('pi.reauthAction')}
-      />
-    );
-  }
-
   const colonyCount = snapshot.colonies.length;
   const opening = openingQuestion({
     goalCount: goals.length + (seedingGoal ? 1 : 0),
