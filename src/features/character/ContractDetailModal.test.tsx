@@ -265,6 +265,28 @@ describe('ContractDetailModal', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
+  it('shows a Received By row when a receiver is passed, none otherwise', () => {
+    const { unmount } = renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      receiver: { id: 42, kind: 'character', role: 'assignee' },
+      receiverName: 'Buyer Bob',
+      onClose: () => {},
+    });
+    expect(screen.getByText('Received By')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Buyer Bob' })).toBeInTheDocument();
+    expect(screen.getByText('(offered)')).toBeInTheDocument();
+    unmount();
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(screen.queryByText('Received By')).not.toBeInTheDocument();
+  });
+
   it('shows a standing tag beside the issuer when one is passed', () => {
     renderModal({
       characterId: CHAR_ID,

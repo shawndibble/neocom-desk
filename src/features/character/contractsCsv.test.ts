@@ -24,15 +24,25 @@ function contract(overrides: Partial<Contract> = {}): Contract {
 }
 
 describe('contractsCsvColumns', () => {
-  it('orders columns type, status, issuer, price, expires', () => {
+  it('orders columns type, status, issuer, receiver, price, expires', () => {
     const columns = contractsCsvColumns(t, nameFor);
     expect(columns.map((c) => c.header)).toEqual([
       'contracts.type',
       'contracts.status',
       'contracts.issuer',
+      'contracts.receiver',
       'contracts.price',
       'contracts.expires',
     ]);
+  });
+
+  it('names the receiver, blank when none or the pilot', () => {
+    const col = contractsCsvColumns(t, nameFor, 100).find(
+      (c) => c.header === 'contracts.receiver'
+    )!;
+    expect(col.value(contract({ acceptor_id: 400 }))).toBe('Issuer 400');
+    expect(col.value(contract({ acceptor_id: 0, assignee_id: 0 }))).toBeNull();
+    expect(col.value(contract({ acceptor_id: 100 }))).toBeNull();
   });
 
   it('prefers title over type when a title is set', () => {

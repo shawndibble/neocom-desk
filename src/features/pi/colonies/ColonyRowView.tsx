@@ -16,13 +16,15 @@ import { IskAmount } from '@/components/ui';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from '../PiProductLink';
+import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
 import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { groupFactoryPins } from '../adapters';
 import {
   HOUR_MS,
+  faultTagKey,
   type CheckStatus,
   type ColonyCheckRow,
   type FaultTag,
@@ -268,7 +270,7 @@ function FaultTags({ tags, planetName }: { tags: readonly FaultTag[]; planetName
         const { text, tone, hint } = tagText(tag, planetName, t);
         return (
           <li
-            key={tag.kind}
+            key={faultTagKey(tag)}
             className={`inline-flex min-h-[1.125rem] items-center gap-1 rounded-xs border px-1.5 text-[0.6875rem] ${tone}`}
           >
             {hint ? <HintText content={hint}>{text}</HintText> : text}
@@ -412,6 +414,13 @@ export function ColonyRowView(props: ColonyRowViewProps) {
           {t('pi.altColonies.switchTo', { name: props.switchTo.name })}
         </MenuItem>
       )}
+      {/* The product name opens its PI detail (§6c "Entities", Overrides): Market and Show info move here. */}
+      {shownProductId !== null && productName !== null && (
+        <>
+          <ViewInMarketMenuItem typeId={shownProductId} />
+          <ShowInfoMenuItem typeId={shownProductId} itemName={productName} />
+        </>
+      )}
     </>
   );
 
@@ -428,7 +437,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                 return;
               props.onToggle();
             }}
-            className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
+            className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
           >
             <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
               <button
@@ -453,7 +462,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
-                <p className="flex min-w-0 items-center gap-1.5 text-xs text-text-dim">
+                <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-dim">
                   {extractorProductId !== null && (
                     <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
                   )}
@@ -463,13 +472,15 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                       <TypeIcon typeId={outputId} size={32} width={16} height={16} />
                     </>
                   )}
-                  <span className="min-w-0 truncate">
+                  <span className="min-w-0">
                     {shownProductId !== null && productName !== null ? (
-                      <MarketItemLink typeId={shownProductId}>{productName}</MarketItemLink>
+                      <PiProductLink typeId={shownProductId}>{productName}</PiProductLink>
                     ) : (
                       t('piColonies.nothingMade')
                     )}
-                    {' · '}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap">
+                    {'· '}
                     {t(`pi.planetType.${row.planetType}`)}
                   </span>
                 </p>

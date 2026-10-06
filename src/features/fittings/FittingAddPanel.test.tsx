@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -537,17 +537,15 @@ describe('FittingAddPanel', () => {
     expect(onAddCargo).toHaveBeenCalledWith(4, 3);
   });
 
-  it('gives each Cargo tab result the List cargo row’s menu once it is in the hold', async () => {
+  it('adds a Cargo tab result on click and gives it no row menu', async () => {
     const user = userEvent.setup();
     const onAddCargo = vi.fn();
-    const actions = fakeItemActions({ names: { 4: 'Anchoring Array', 3: '1MN Afterburner II' } });
-    const holding: Fitting = { ...fitting, cargo: [{ typeId: 4, quantity: 2 }] };
     render(
       <MemoryRouter>
         <FakeItemActions>
-          <FittingItemActionsProvider value={actions}>
+          <FittingItemActionsProvider value={fakeItemActions({ names: { 4: 'Anchoring Array' } })}>
             <FittingAddPanel
-              fitting={holding}
+              fitting={fitting}
               catalogue={catalogue}
               target={{ kind: 'cargo' }}
               context={fakeFittingContext(catalogue, { engine, profile })}
@@ -559,64 +557,10 @@ describe('FittingAddPanel', () => {
       </MemoryRouter>
     );
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
-      {
-        button: 0,
-        pointerType: 'mouse',
-      }
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' }));
+    const result = await screen.findByRole('button', { name: /Anchoring Array/ });
+    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
+    await user.click(result);
     expect(onAddCargo).toHaveBeenCalledWith(4, 1);
-
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
-      {
-        button: 0,
-        pointerType: 'mouse',
-      }
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity…' }));
-    expect(actions.changeCargoQuantity).toHaveBeenCalledWith(4);
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
-      {
-        button: 0,
-        pointerType: 'mouse',
-      }
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Remove Anchoring Array' }));
-    expect(actions.removeCargo).toHaveBeenCalledWith(4);
-  });
-
-  it('offers no quantity change or removal for a result not in the hold yet', async () => {
-    const user = userEvent.setup();
-    const actions = fakeItemActions({ names: { 3: '1MN Afterburner II' } });
-    render(
-      <MemoryRouter>
-        <FakeItemActions>
-          <FittingItemActionsProvider value={actions}>
-            <FittingAddPanel
-              fitting={fitting}
-              catalogue={catalogue}
-              target={{ kind: 'cargo' }}
-              context={fakeFittingContext(catalogue, { engine, profile })}
-              onAdd={vi.fn()}
-              onAddCargo={vi.fn()}
-            />
-          </FittingItemActionsProvider>
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Afterburner');
-    fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'More actions for 1MN Afterburner II' }),
-      { button: 0, pointerType: 'mouse' }
-    );
-    expect(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
-    expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
   });
 
   it('shows the picked slot as its in-game icon, toggling the fits-this-slot filter', async () => {

@@ -29,11 +29,13 @@ test.describe('PI Map', () => {
     await expect(board).toBeVisible({ timeout: 20_000 });
     await expectNoPageOverflow(page);
 
-    const product = board.getByRole('button', { name: /^Coolant\. Refined/ });
+    // A product tile is a real link to its PI detail (`?product=`).
+    const product = board.getByRole('link', { name: /^Coolant\. Refined/ });
     await product.click();
     const drawer = page.getByRole('dialog', { name: 'How to make it' });
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByRole('link', { name: 'Coolant' })).toBeVisible();
+    await expect(page).toHaveURL(/[?&]product=9832\b/);
+    await expect(drawer.getByRole('link', { name: 'View in Market' })).toBeVisible();
     await expectNoPageOverflow(page);
 
     await page.keyboard.press('Escape');
@@ -48,7 +50,7 @@ test.describe('PI Map', () => {
     await expect(page.locator('[data-detail-mode="docked"]')).toBeVisible();
     await page
       .getByRole('group', { name: /^Planet map/ })
-      .getByRole('button', { name: /^Coolant\. Refined/ })
+      .getByRole('link', { name: /^Coolant\. Refined/ })
       .click();
     await expect(page.getByRole('complementary', { name: 'How to make it' })).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -63,7 +65,7 @@ test.describe('PI Map', () => {
 
     await page.getByRole('button', { name: 'P2', exact: true }).click();
     await page
-      .getByRole('button', { name: /Coolant/ })
+      .getByRole('link', { name: /Coolant/ })
       .first()
       .click();
     const sheet = page.getByRole('dialog', { name: 'How to make it' });

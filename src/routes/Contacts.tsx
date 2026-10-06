@@ -61,7 +61,6 @@ import {
   type ContactsFilter,
   type StandingCategory,
 } from '@/features/character/contactsFilter';
-import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
@@ -722,7 +721,6 @@ function AcrossCharactersPanel({
           {...sortProps}
           mobileSort
           stackLayout="dense"
-          className="dt-actions-pinned"
           onRowClick={(row) => {
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
@@ -730,15 +728,6 @@ function AcrossCharactersPanel({
           rowClassName={(row) =>
             contactPublicInfoKind(acrossIdentity(row)) ? undefined : NOT_CLICKABLE
           }
-          rowMoreActions
-          rowContextMenu={(row, tr) => (
-            <ContactContextMenu
-              contact={acrossIdentity(row)}
-              name={entityName(names, row.contactId)}
-            >
-              {tr}
-            </ContactContextMenu>
-          )}
         />
       )}
     </Panel>
@@ -843,17 +832,6 @@ export function Contacts() {
       ])
     );
   }, [contacts, affiliations, ownAffiliation]);
-
-  function contactRowContextMenu(contact: CharacterContact, tr: ReactElement) {
-    return (
-      <ContactContextMenu
-        contact={contact}
-        name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
-      >
-        {tr}
-      </ContactContextMenu>
-    );
-  }
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `CONTACTS_CHARACTER_COLUMN_IDS`' own order.
@@ -1217,7 +1195,6 @@ export function Contacts() {
               {...characterSortProps}
               mobileSort
               stackLayout="dense"
-              className="dt-actions-pinned"
               onRowClick={(contact) => {
                 const kind = contactPublicInfoKind(contact);
                 if (kind) openPublicInfo(kind, contact.contact_id);
@@ -1225,8 +1202,6 @@ export function Contacts() {
               rowClassName={(contact) =>
                 contactPublicInfoKind(contact) ? undefined : NOT_CLICKABLE
               }
-              rowContextMenu={contactRowContextMenu}
-              rowMoreActions
             />
           )}
         </Panel>

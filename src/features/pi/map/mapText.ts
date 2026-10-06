@@ -6,6 +6,7 @@
 import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk } from '@/lib/isk';
+import { withArticle } from '../article';
 import type { MapProduct, MapTier, ProductFigure } from './mapModel';
 
 export const planetName = (t: TFunction, type: PlanetType): string => t(`pi.planetType.${type}`);
@@ -68,7 +69,7 @@ export function productAccessibleName(
   }
   if (marks.rank !== null) parts.push(t('piMap.pickMark', { rank: marks.rank }));
   if (marks.unlockedBy) {
-    parts.push(t('piMap.unlockedMark', { type: planetName(t, marks.unlockedBy) }));
+    parts.push(t('piMap.unlockedMark', { aType: withArticle(planetName(t, marks.unlockedBy)) }));
   }
   if (marks.traced) parts.push(t('piMap.tracedMark'));
   return parts.join('. ');

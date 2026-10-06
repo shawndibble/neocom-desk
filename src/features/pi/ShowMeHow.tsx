@@ -4,7 +4,8 @@
  * 3. run it. Every figure comes from the recommendation model's layout
  * (`buildHowTo`), the system list from the SDE planet finder.
  *
- * Cues follow DESIGN.md §6c: item names are Market links, system names are
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`), system names are
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
@@ -17,12 +18,13 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { securityBand, securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import type { PiData } from '@/sde/types';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { LoadMeter, EstimateBadge, SectionLabel } from './DirectiveRow';
 import { buildHowTo, type HowTo } from './findBestHowTo';
 import { defaultHighsecOnly, needsSkyhookNote } from './findBestView';
+import { withArticle } from './article';
 import { PlanetImage } from './PlanetImage';
 import { usePlanetFinder, type FinderOrigin, type FoundSystem } from './usePlanetFinder';
 
@@ -55,9 +57,9 @@ function useTypeName() {
 
 function ItemName({ typeId, name }: { typeId: number; name: string }) {
   return (
-    <MarketItemLink typeId={typeId}>
+    <PiProductLink typeId={typeId}>
       <b className="font-semibold">{name}</b>
-    </MarketItemLink>
+    </PiProductLink>
   );
 }
 
@@ -352,7 +354,7 @@ export function ShowMeHow(props: Props) {
         <SectionLabel>
           {t('piPlan.find.howTitle', {
             item: recipe.name,
-            type: t(`pi.planetType.${recipe.useType}`),
+            aType: withArticle(t(`pi.planetType.${recipe.useType}`)),
           })}
         </SectionLabel>
         <Button size={mdUp ? 'sm' : 'md'} className="ml-auto" onClick={close}>

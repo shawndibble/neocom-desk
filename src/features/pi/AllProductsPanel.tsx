@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel, TypeIcon } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { formatIsk } from '@/lib/isk';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import type { ProductTile, TierColumn } from './findBestView';
@@ -36,9 +36,9 @@ function Tile({ tile }: { tile: ProductTile }) {
     <li className={cx('flex items-start gap-2 px-3 py-2', !tile.reachable && 'opacity-60')}>
       <TypeIcon typeId={tile.typeId} size={32} width={24} height={24} className="mt-0.5" />
       <div className="min-w-0 space-y-0.5 text-xs">
-        <MarketItemLink typeId={tile.typeId}>
+        <PiProductLink typeId={tile.typeId}>
           <b className="font-semibold">{tile.name}</b>
-        </MarketItemLink>
+        </PiProductLink>
         <p className="text-text-dim tabular-nums">
           {tile.perDay !== null && (
             <>

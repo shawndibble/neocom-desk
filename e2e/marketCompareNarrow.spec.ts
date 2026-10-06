@@ -19,22 +19,49 @@ import { signInAndGoto } from './support/authSeed';
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
-/** Searches for Tritanium in the Market Browser and adds it to the Compare Set, opening the drawer's handle. */
-async function addTritaniumToCompare(page: Page) {
-  await signInAndGoto(page, './market');
+/**
+ * Fills the Compare Set the way the Market Browser does now that the tree
+ * leaf has no menu: the item's Variations tab, "Compare". The set holds the
+ * whole variation group, so the handle reads `Compare (N)`.
+ */
+async function fillCompareSet(page: Page) {
+  await signInAndGoto(page);
+  // Empty order books: each variation row prices itself from its own book.
+  await page.route(/\/markets\/\d+\/orders/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  // Every compared variation reads `/universe/types/{id}`; the shared mock
+  // only carries a few fixture types.
+  await page.route(/\/universe\/types\/\d+$/, async (route) => {
+    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type_id: typeId,
+        name: `Type ${typeId}`,
+        description: '',
+        group_id: 46,
+        published: true,
+        dogma_attributes: [],
+      }),
+    });
+  });
+  await page.goto('./market');
 
-  await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
-  const item = page.getByRole('button', { name: 'Tritanium', exact: true });
-  await expect(item).toBeVisible();
-  await item.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Add to Compare' }).click();
+  await page.getByRole('searchbox', { name: 'Search items' }).fill('1MN Afterburner I');
+  await page.getByRole('button', { name: '1MN Afterburner I', exact: true }).click();
+  await page.getByRole('tab', { name: /^Variations/ }).click();
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
 }
+
+const HANDLE = /^Compare \(\d+\)$/;
 
 test('Compare drawer handle meets the 44px touch floor at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);
-  await addTritaniumToCompare(page);
+  await fillCompareSet(page);
 
-  const handle = page.getByRole('button', { name: 'Compare (1)' });
+  const handle = page.getByRole('button', { name: HANDLE });
   await expect(handle).toBeVisible();
 
   const box = await handle.boundingBox();
@@ -46,9 +73,9 @@ test('Compare drawer handle keeps its compact height at and above md (1280px)', 
   page,
 }) => {
   await page.setViewportSize(DESKTOP);
-  await addTritaniumToCompare(page);
+  await fillCompareSet(page);
 
-  const handle = page.getByRole('button', { name: 'Compare (1)' });
+  const handle = page.getByRole('button', { name: HANDLE });
   await expect(handle).toBeVisible();
 
   const box = await handle.boundingBox();

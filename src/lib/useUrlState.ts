@@ -46,9 +46,10 @@ export type UrlParamSchema = Record<
   }
 >;
 
-/** `push` adds a history entry instead of replacing the current one. */
+/** `push` adds a history entry instead of replacing the current one; `clearHash` drops the `#fragment`. */
 export interface UrlWriteOptions {
   push?: boolean;
+  clearHash?: boolean;
 }
 
 export type UrlParamValues<S extends UrlParamSchema> = {
@@ -92,7 +93,7 @@ export function useUrlParams<S extends UrlParamSchema>(
   );
 
   const flush = useCallback(
-    (values: Record<string, unknown>, push = false) => {
+    (values: Record<string, unknown>, options: UrlWriteOptions = {}) => {
       timer.current = null;
       // One transition for both: `BrowserRouter` applies a navigation inside
       // `startTransition`, so clearing `pending` urgently would commit a frame
@@ -100,7 +101,7 @@ export function useUrlParams<S extends UrlParamSchema>(
       // write in that frame would start from the stale query string.
       startTransition(() => {
         setPending({});
-        writeParams(latest.current.location, latest.current.navigate, codecs, values, push);
+        writeParams(latest.current.location, latest.current.navigate, codecs, values, options);
       });
     },
     [codecs]
@@ -125,11 +126,11 @@ export function useUrlParams<S extends UrlParamSchema>(
       // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
       if (immediate || wait === 0) {
-        flush(next, options?.push);
+        flush(next, options);
         return;
       }
       setPending(next);
-      timer.current = setTimeout(() => flush(latest.current.pending, options?.push), wait);
+      timer.current = setTimeout(() => flush(latest.current.pending, options), wait);
     },
     [codecs, flush]
   );
@@ -143,7 +144,7 @@ function writeParams(
   navigate: NavigateFunction,
   codecs: Record<string, AnyCodec>,
   values: Record<string, unknown>,
-  push: boolean
+  { push = false, clearHash = false }: UrlWriteOptions
 ): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(values)) {
@@ -154,7 +155,11 @@ function writeParams(
   const search = params.toString();
   if (`?${search}` === location.search || (search === '' && location.search === '')) return;
   navigate(
-    { pathname: location.pathname, search: search === '' ? '' : `?${search}`, hash: location.hash },
+    {
+      pathname: location.pathname,
+      search: search === '' ? '' : `?${search}`,
+      hash: clearHash ? '' : location.hash,
+    },
     { replace: !push, state: location.state }
   );
 }

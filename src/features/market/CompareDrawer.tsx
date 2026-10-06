@@ -28,7 +28,6 @@ import {
   IconButton,
   IskAmount,
   MenuItem,
-  RowMoreActions,
   SegmentedControl,
   Spinner,
 } from '@/components/ui';
@@ -55,7 +54,6 @@ import { formatVolume } from './format';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useCompareAttributesExport } from './useCompareAttributesExport';
-import { ItemContextMenu } from './ItemContextMenu';
 import { compareMargin, type AppraisalNetFees } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
@@ -265,30 +263,24 @@ export function CompareDrawer({
         id: 'item',
         header: t('market.compare.columnItem'),
         sortValue: (row) => row.itemName,
-        // The menu wraps only this cell, not the row (unlike sibling surfaces).
-        // The "×" on the icon removes the item; it stops its own click so it
-        // never opens the menu.
-        primary: true,
+        // The "×" on the icon removes the item; the name opens it in the
+        // Market (its panel carries the alert and Show Info).
+        stickyStart: true,
         render: (row) => (
-          <ItemContextMenu typeId={row.typeId} itemName={row.itemName}>
-            <span className="flex items-center gap-2.5">
-              <RemovableTypeIcon
-                typeId={row.typeId}
-                itemName={row.itemName}
-                onRemove={removeItem}
-                sizeClassName="size-6"
-              />
-              <MarketItemLink typeId={row.typeId}>{row.itemName}</MarketItemLink>
-              <RowMoreActions />
-            </span>
-          </ItemContextMenu>
+          <span className="flex items-center gap-2.5">
+            <RemovableTypeIcon
+              typeId={row.typeId}
+              itemName={row.itemName}
+              onRemove={removeItem}
+              sizeClassName="size-6"
+            />
+            <MarketItemLink typeId={row.typeId}>{row.itemName}</MarketItemLink>
+          </span>
         ),
       },
       {
         id: 'bestSell',
         header: t('market.compare.columnBestSell'),
-        // The figure a phone's two-line card leads with, beside the name.
-        cardCorner: true,
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -307,7 +299,6 @@ export function CompareDrawer({
       {
         id: 'bestBuy',
         header: t('market.compare.columnBestBuy'),
-        stackAffix: { before: t('market.compare.stackBuy') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -326,7 +317,6 @@ export function CompareDrawer({
       {
         id: 'spread',
         header: t('market.compare.columnSpread'),
-        stackAffix: { before: t('market.compare.stackSpread') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
@@ -358,7 +348,6 @@ export function CompareDrawer({
         id: 'afterFees',
         header: t('market.compare.columnAfterFees'),
         headerTooltip: t('market.compare.columnAfterFeesHelp'),
-        stackAffix: { before: t('market.compare.stackNet') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) => {
@@ -375,7 +364,6 @@ export function CompareDrawer({
       {
         id: 'volume',
         header: t('market.compare.columnVolume'),
-        stackAffix: { before: t('market.compare.stackVolume') },
         align: 'right',
         className: 'tabular-nums',
         render: (row) => (row.loading ? '…' : formatVolume(row.summary?.availableVolume ?? 0)),
@@ -546,17 +534,18 @@ export function CompareDrawer({
                     hint={t('market.compare.assumesBaseStandingsHint')}
                   />
                 )}
-                <DataTable
-                  {...pricesExport.tableProps}
-                  columns={columns}
-                  rows={rows}
-                  rowKey={(row) => row.typeId}
-                  label={t('market.compare.title')}
-                  // Two lines per item on a phone — name and best sell, then
-                  // the rest inline — instead of an eight-line labelled card.
-                  stackLayout="dense"
-                  mobileSort
-                />
+                <div className="overflow-x-auto">
+                  <DataTable
+                    {...pricesExport.tableProps}
+                    columns={columns}
+                    rows={rows}
+                    rowKey={(row) => row.typeId}
+                    label={t('market.compare.title')}
+                    // A compare table: read across columns, so a plain table on a
+                    // phone, scrolling sideways with the item pinned.
+                    responsive="table"
+                  />
+                </div>
               </>
             )}
           </div>

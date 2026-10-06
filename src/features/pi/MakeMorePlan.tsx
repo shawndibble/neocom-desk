@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, Spinner } from '@/components/ui';
+import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
+import { AssumedCustomsNote } from './AssumedCustomsNote';
+import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
@@ -137,17 +139,32 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       <div role="status" aria-live="polite" className="sr-only">
         {headlineText(view, t)}
       </div>
-      <YourPlanetsPanel
-        view={view}
-        preference={preference}
-        onPreference={(value) => void setPreference(value)}
-        onFindBest={onFindBest}
-        priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+      <AssumedCustomsNote
+        names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
-      {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
-      <RebuildPanel view={view} />
-      <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
-      <ChecklistPanel view={view} ticks={ticks} />
+      <IskFigureGroup>
+        <YourPlanetsPanel
+          view={view}
+          preference={preference}
+          onPreference={(value) => void setPreference(value)}
+          onFindBest={onFindBest}
+          priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+        />
+      </IskFigureGroup>
+      {view.quickWins.length > 0 && (
+        <IskFigureGroup>
+          <QuickWinsPanel view={view} ticks={ticks} />
+        </IskFigureGroup>
+      )}
+      <IskFigureGroup>
+        <RebuildPanel view={view} />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <ChecklistPanel view={view} ticks={ticks} />
+      </IskFigureGroup>
     </div>
   );
 }

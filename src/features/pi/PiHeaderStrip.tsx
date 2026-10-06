@@ -14,6 +14,10 @@ import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { routeExposure } from '@/features/contractSearch/routeExposure';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
+import { HintText } from '@/components/ui/HintText';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
@@ -26,6 +30,8 @@ const BUYBACK = 'buyback';
 interface Props {
   /** The solar system of each of the active Character's colonies. */
   colonySystemIds: readonly number[];
+  /** The colony list could not be read: the count is unknown, not 0. */
+  colonyCountUnknown?: boolean;
   /** Plan's prices and figures are projections; the other tabs show no such number. */
   estimate: boolean;
 }
@@ -41,9 +47,10 @@ interface Home {
  * are, how many, the way to the sell market, and which market that is. Only
  * what there is data for today: a field with no source is left out.
  */
-export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
+export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const homeId = homeSystemId(colonySystemIds);
@@ -135,7 +142,10 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
             }
           />
         )}
-        <StatChip label={t('piPlan.strip.colonies')} value={colonySystemIds.length} />
+        <StatChip
+          label={t('piPlan.strip.colonies')}
+          value={colonyCountUnknown ? '—' : colonySystemIds.length}
+        />
       </StatChips>
       <label className="flex items-center gap-2">
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -223,7 +233,29 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           />
         </StatChips>
       )}
-      {estimate && <EstimateBadge />}
+      <button
+        type="button"
+        className={`${inlineLinkClassName} ${tappableRowClassName} text-xs`}
+        onClick={() => setSettingsOpen(true)}
+      >
+        {t('piPlan.strip.settings')}
+      </button>
+      {estimate && (
+        <span className="inline-flex items-center gap-2 text-xs text-text-dim">
+          <EstimateBadge />
+          <HintText content={t('piPlan.strip.priceNoteHint')}>
+            {t('piPlan.strip.priceNote')}
+          </HintText>
+        </span>
+      )}
+      <PageSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        pageName={t('pi.title')}
+        section="industry"
+      >
+        <PiSettingsForm />
+      </PageSettingsModal>
     </div>
   );
 }

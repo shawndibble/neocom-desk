@@ -457,8 +457,6 @@
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
-      "cargoAddMenu_one": "Add {{count}} to cargo",
-      "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
@@ -1429,8 +1427,6 @@
       "chargeToCargo": "Put {{name}} in cargo…",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
-      "fitFirstFree": "Fit to first free slot",
-      "addToBay": "Add to drone bay",
       "addCargo": "Add cargo",
       "cargoHold": "{{used}} / {{total}} m³",
       "dragToMove": "Drag {{name}} to another slot",
@@ -1446,8 +1442,7 @@
       "alreadyHeld_one": "{{count}} already held it.",
       "alreadyHeld_other": "{{count}} already held it.",
       "changeCharge": "Change charge",
-      "noCharges": "No other charge fits this",
-      "launch": "Launch"
+      "noCharges": "No other charge fits this"
     },
     "libraryMenu": {
       "open": "Open",
@@ -1772,6 +1767,8 @@
     "csvLevel": "Level",
     "csvSp": "Skill points",
     "inspector": {
+      "addToPlan": "Add to Skill Plan",
+      "maxLevel": "Already at level 5",
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",
       "noPrereqs": "No prerequisites",
@@ -1796,11 +1793,6 @@
       "loadFailedHint": "Something went wrong loading this skill. Try again.",
       "notFoundTitle": "Skill not found",
       "notFoundHint": "This skill isn't in the skill catalog."
-    },
-    "contextMenu": {
-      "addToSkillPlan": "Add to Skill Plan",
-      "noPlans": "No skill plans yet",
-      "maxLevelTitle": "Already at level 5"
     },
     "certificates": {
       "grade": {
@@ -2098,13 +2090,12 @@
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
     "milestone": {
-      "addLabel": "Add milestone to {{name}}",
+      "add": "Add milestone…",
       "addTitle": "Name this milestone",
       "rename": "Rename…",
       "renameTitle": "Rename milestone",
-      "remove": "Remove",
+      "remove": "Remove milestone",
       "removeLabel": "Remove milestone {{name}}",
-      "menuLabel": "Milestone actions for {{name}}",
       "next": "Next milestone",
       "projected": "Projected",
       "reached": "Reached",
@@ -2373,8 +2364,6 @@
     "bpAcqShowingOf_one": "Showing {{shown}} of {{count}}",
     "bpAcqShowingOf_other": "Showing {{shown}} of {{count}}",
     "bpAcqAtHub": "At {{hub}}",
-    "bpAcqLpValueLabel": "Your LP value (ISK per LP)",
-    "bpAcqLpValueHint": "Leave at 0 to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead. Kept for next time.",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
     "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP",
     "bpAcqLpIskOnly": "ISK only — no market rate for this store’s LP",
@@ -3279,8 +3268,7 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred",
-      "remove": "Remove"
+      "starred": "Starred"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",
@@ -4337,10 +4325,6 @@
     "to": "To:",
     "recipientMore": "{{name}} +{{count}} more",
     "mailingList": "Mailing list",
-    "contextMenu": {
-      "viewSender": "View sender",
-      "copyMailId": "Copy mail ID"
-    },
     "unread": "Unread",
     "unreadCount": "{{count}} unread",
     "foldersLabel": "Mail folders",
@@ -4656,8 +4640,10 @@
     "picksTitle": "Your picks",
     "picksRecipes": "Best one-planet recipes",
     "picksNone": "Your planets already make their best product. The Plan tab lists quick wins.",
-    "picksNoteRebuild": "vs today · same as the Plan tab",
-    "picksNoteRecipes": "a day from one planet · same as the Plan tab",
+    "picksNoteRebuild": "vs today · ranked by {{preference}}, as on the Plan tab",
+    "preferenceIsk": "most ISK",
+    "preferenceHaul": "least hauling",
+    "picksNoteRecipes": "a day from one planet · every planet type, before the Plan tab's filters",
     "perDaySuffix": "/day",
     "clearTrace": "Clear trace",
     "whatIfBlank": "What if I add a ___ planet?",
@@ -4665,7 +4651,7 @@
     "whatIfHint": "Hover or focus a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark. Click it to see where to find one.",
     "whatIfHint_touch": "Tap a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark, and where to find one.",
     "whatIfAll": "You have every planet type.",
-    "whatIfTitle": "What if I add a {{type}} planet?",
+    "whatIfTitle": "What if I add {{aType}} planet?",
     "whatIfNothing": "Nothing new: every raw it yields already comes from your planets.",
     "whatIfUnlocks_one": "Unlocks {{count}} product on the map.",
     "whatIfUnlocks_other": "Unlocks {{count}} products on the map.",
@@ -4686,7 +4672,7 @@
     "tagWhatIf": "what if",
     "rawYields": "Raw resource, found on {{types}} planets",
     "pickMark": "Your pick number {{rank}}",
-    "unlockedMark": "Unlocked by adding a {{type}} planet",
+    "unlockedMark": "Unlocked by adding {{aType}} planet",
     "tracedMark": "Traced",
     "announceTrace": "Tracing {{name}}. Needs {{planets}}. The chain is written out in the details.",
     "figure": "About {{isk}} ISK a day from one {{type}} planet",
@@ -4726,12 +4712,30 @@
       "samePlanet": "On the same planet, then make:",
       "chainText": "In words: {{planets}} → {{steps}}.",
       "pickRebuild": "This is your #{{rank}} pick in Plan.",
-      "pickRecipe": "This is one of the best one-planet recipes in Plan (#{{rank}})."
+      "pickRecipe": "This is one of the best one-planet recipes in Plan (#{{rank}}).",
+      "anyPlanet": "any planet type",
+      "facility": {
+        "extractor": "Extracted with an Extractor Control Unit on {{types}}.",
+        "basic": "Made in a Basic Industry Facility, on {{types}}.",
+        "advanced": "Made in an Advanced Industry Facility, on {{types}}.",
+        "highTech": "Made in a High-Tech Production Plant, only on {{types}}."
+      },
+      "madeFrom": "Made from",
+      "haul": "About {{m3}} m³ a week to haul to market.",
+      "ccAssumed": "Figures assume a level {{level}} Command Center.",
+      "multiPlanet_one": "Multi-planet: needs {{count}} planet between them, so there is no one-planet ISK figure.",
+      "multiPlanet_other": "Multi-planet: needs {{count}} planets between them, so there is no one-planet ISK figure.",
+      "notRanked": "No one-planet ISK figure: Plan ranks one-planet P1 and P2 recipes only.",
+      "coloniesHeading": "Your colonies",
+      "makingIt": "Already made on {{colonies}}.",
+      "ownInputs": "Already making parts of the chain:",
+      "ownNone": "None of your colonies makes anything in this chain yet."
     },
     "add": {
       "panelTitle": "Where to put a new colony",
       "panelTitleFor": "Where to put a new {{type}} colony",
-      "title": "Add a {{type}} planet",
+      "title": "Add {{aType}} planet",
+      "unlockList": "Unlocked products: {{names}}.",
       "unlocks_one": "Unlocks {{count}} product (pink on the map)",
       "unlocks_other": "Unlocks {{count}} products (pink on the map)",
       "asOnePlanet_one": "{{count}} as a one-planet recipe",
@@ -4844,7 +4848,10 @@
       "corpBuyback": "My corp buyback",
       "buybackRate": "Buyback rate",
       "buybackPct": "{{pct}}% of {{hub}}",
-      "dropOff": "Drop off in your home system"
+      "dropOff": "Drop off in your home system",
+      "settings": "PI settings",
+      "priceNote": "Estimated prices",
+      "priceNoteHint": "Every ISK figure here is a projection from current market prices at your sell market, after customs and sales tax. What a sale actually fetches will differ."
     },
     "newToPi": "New to PI?",
     "picker": {
@@ -4888,8 +4895,11 @@
       "makeHint": "e.g. if your corp buyback asks for P2",
       "picksTitle": "Best picks for you",
       "picksMeta": "ISK/day per planet · {{source}}",
-      "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}. Training Command Center Upgrades raises it.",
-      "noneFitFilter": "No {{tier}} setup fits one planet at Command Center level {{level}}: it needs more power than that level has. Try Anything, or train Command Center Upgrades.",
+      "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}.",
+      "noneFitFilter": "No {{tier}} setup fits one planet at Command Center level {{level}}: it needs more power than that level has. Try Anything.",
+      "noneFitPrices": "Nothing could be priced at {{hub}} right now, so no setup is ranked. Prices load from the market; try again shortly.",
+      "needsCc": "needs {{skill}}",
+      "needsCcSkill": "CC level {{level}}",
       "noRecipes": "Nothing to rank with these planet types. Switch one back on, or add a what-if planet.",
       "unpriced_one": "{{count}} product has no price at {{hub}}, so it is left out instead of ranked at zero.",
       "unpriced_other": "{{count}} products have no price at {{hub}}, so they are left out instead of ranked at zero.",
@@ -4926,7 +4936,7 @@
       "hideSteps": "Hide steps",
       "close": "Close",
       "howLabel": "How to make {{item}}",
-      "howTitle": "Show me how · {{item}} on a {{type}} planet",
+      "howTitle": "Show me how · {{item}} on {{aType}} planet",
       "stepFind": "Find a planet: {{types}}",
       "or": "or",
       "haveOne": "You already have one:",
@@ -5066,6 +5076,8 @@
         "upgradeFirst": "Upgrade its Command Center first.",
         "keep": "Keep {{planet}} {{type}} on {{items}}. {{reason}}",
         "keepAsIs": "Keep {{planet}} {{type}} as it is. {{reason}}",
+        "raw": "{{planet}} {{type}} sells raw {{items}}. We have no refined product to recommend there yet.",
+        "rawQuickWin": "{{planet}} {{type}} sells raw {{items}}. Refine it with the quick win above rather than selling it raw.",
         "keepReason": {
           "already-best": "It's already the best earner there.",
           "gain-too-small": "A rebuild would add too little to be worth it.",
@@ -5304,6 +5316,9 @@
     "noColoniesTitle": "No colonies to plan with",
     "noColoniesHint": "The planner plans over your own colonies, and this character has none. Find planets on the Map.",
     "noColoniesBuying": "No colonies: goals at a tier you buy are bought outright. Anything else needs a colony to host the factories.",
+    "esiFailedTitle": "ESI didn't answer",
+    "esiFailedHint": "Your colonies could not be read, so this is not a sign you have none. Nothing is cached yet.",
+    "esiRetry": "Retry",
     "pricesFailedTitle": "Hub prices could not be fetched",
     "pricesFailedHint": "Figures that need them, ISK and haul volume, are hidden until they load. Check your connection, then refresh.",
     "loadFailedTitle": "The planner could not load",
@@ -5542,10 +5557,10 @@
       "idleWithHeads_one": "{{count}} factory has no input. Remove it and add {{heads}} extractor heads to feed the rest.",
       "idleWithHeads_other": "{{count}} factories have no input. Remove them and add {{heads}} extractor heads to feed the rest.",
       "storage": "The launchpad is full in {{in}}, before your haul. Haul now or add a storage unit.",
-      "roomExtractors_one": "Room for {{count}} more extractor.",
-      "roomExtractors_other": "Room for {{count}} more extractors.",
-      "roomFactories_one": "Room for {{count}} more factory making {{product}}.",
-      "roomFactories_other": "Room for {{count}} more factories making {{product}}."
+      "roomExtractors_one": "{{count}} more extractor.",
+      "roomExtractors_other": "{{count}} more extractors.",
+      "roomFactories_one": "{{count}} more factory making {{product}}.",
+      "roomFactories_other": "{{count}} more factories making {{product}}."
     },
     "fixVerb": {
       "restart": "Restart",
@@ -5646,11 +5661,7 @@
     "corporation": "Corporation",
     "started": "Joined",
     "duration": "Duration",
-    "current": "Current",
-    "contextMenu": {
-      "copyName": "Copy name",
-      "showInfo": "Show info"
-    }
+    "current": "Current"
   },
   "contracts": {
     "title": "Contracts",
@@ -5668,7 +5679,10 @@
     "issued": "Issued",
     "expires": "Expires",
     "issuer": "Issuer",
-    "searchPlaceholder": "Search issuer or title…",
+    "receiver": "Received by",
+    "offeredTag": "(offered)",
+    "offeredToHint": "Not accepted yet — offered to this party.",
+    "searchPlaceholder": "Search issuer, receiver or title…",
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "noFilterMatchesResetHint": "No contract matches the current search and filters.",
@@ -5699,6 +5713,7 @@
     "detailType": "Type",
     "detailStatus": "Status",
     "detailIssuedBy": "Issued By",
+    "detailReceivedBy": "Received By",
     "detailAvailability": "Availability",
     "detailLocation": "Location",
     "detailDestination": "Destination",
@@ -5726,18 +5741,16 @@
     "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
     "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
     "statusFilterLabel": "Status",
-    "typeFilterLabel": "Contract type",
-    "contextMenu": {
-      "copyTitle": "Copy title",
-      "copyContractId": "Copy contract ID"
-    }
+    "typeFilterLabel": "Contract type"
   },
   "contractDetail": {
     "regionLabel": "Region",
+    "systemLabel": "System",
     "locationLabel": "Location",
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
+    "copyContractId": "Copy contract ID",
     "contentsHeading": "Everything on this contract",
     "youReceiveHeading": "What you get",
     "youHandOverHeading": "What you hand over",
@@ -5938,12 +5951,7 @@
     "acrossNoResultsHint": "Turn off \"Only disagreements\" to see the full list.",
     "reauthTitle": "Log in again to see your contacts",
     "reauthHint": "Log in again to fetch this character's contacts.",
-    "reauthAction": "Log in again with EVE Online",
-    "contextMenu": {
-      "copyName": "Copy name",
-      "copyContactId": "Copy contact ID",
-      "showInfo": "Show info"
-    }
+    "reauthAction": "Log in again with EVE Online"
   },
   "loyalty": {
     "title": "Loyalty Points",
@@ -5954,9 +5962,6 @@
     "corporation": "Corporation",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
-    "openStore": "Open LP Store",
-    "openStoreFor": "Open LP Store for {{corporation}}",
-    "storeColumn": "LP Store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
@@ -5965,6 +5970,7 @@
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
+    "corporationInfo": "Corporation info",
     "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
     "priceBasisLabel": "Revenue basis",
@@ -6041,11 +6047,7 @@
     "state": "State",
     "stateExpired": "Expired",
     "stateCancelled": "Cancelled",
-    "filled": "Filled",
     "viewInMarket": "View in Market",
-    "sortBy": "Sort by {{column}}",
-    "sortedAsc": "{{column}}, sorted ascending",
-    "sortedDesc": "{{column}}, sorted descending",
     "searchPlaceholder": "Search by item…",
     "noResults": "No orders match your filters.",
     "noResultsHint": "Clear the search or reset the buy/sell and status filters to see every order.",
@@ -6075,11 +6077,6 @@
       "dismiss": "Not now"
     },
     "groupedTitle": "{{title}} x{{count}}",
-    "contextMenu": {
-      "browserOn": "Turn off device notifications",
-      "browserOff": "Turn on device notifications",
-      "hideInFeed": "Hide in feed"
-    },
     "eveTypeName": {
       "StructureUnderAttack": "Structure Under Attack",
       "StructureLostShields": "Structure Lost Shields",
@@ -6633,6 +6630,7 @@
         "showOrders": "Show orders",
         "hideOrders": "Hide orders",
         "openInMarket": "Price history and all orders in {{hub}} ›",
+        "routeSafety": "Route safety: {{hub}}",
         "instantNote": "Only buy orders at the {{hub}} hub station count. You sell into them on arrival, so there is no broker fee and no wait.",
         "sellInto": "Sell into buy orders in {{hub}}",
         "buyOrdersTitle": "Buy orders in {{hub}}",
@@ -6792,17 +6790,16 @@
       "rowCount_one": "{{count}} row",
       "rowCount_other": "{{count}} rows",
       "noDifferences": "Every attribute is the same across the compared items.",
-      "stackBuy": "buy ",
-      "stackSpread": "spread ",
-      "stackNet": "net ",
-      "stackVolume": "vol "
+      "addItem": "Add {{name}} to Compare",
+      "removeItem": "Remove {{name}} from Compare"
     },
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}"
+      "reorderItem": "Reorder {{name}}",
+      "addItem": "Add {{name}} to Quickbar"
     },
     "priceAlert": {
       "button": "Set price alert for {{name}}",
@@ -7322,6 +7319,9 @@
     },
     "industryDefaultsTitle": "Industry defaults",
     "marketDefaultsTitle": "Market defaults",
+    "lpValueLabel": "Your LP value (ISK per LP)",
+    "lpValueHint": "Leave blank (0) to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead.",
+    "lpValueUseMarket": "Use market rates",
     "avoidedSystems": {
       "title": "Avoided systems",
       "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
@@ -7657,7 +7657,6 @@
     "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
     "includeBlueprintCostLabel": "Count blueprint cost toward Industry profit",
     "includeBlueprintCostHint": "When a plan needs a blueprint copy, what covering it costs is added to totalCost and subtracted from profit — on the plan's own page, the Industry index's Profit column, and every Build Group's rollup. Turn this off to price plans as if every blueprint were already owned.",
-    "piSellAtLabel": "Sell at",
     "piSellAtHint": "Where Planetary Industry prices and sells its output. A corp buyback pays a percentage of the chosen hub's price.",
     "piBuyTiersLabel": "Buy at the hub when short",
     "piBuyTiersHint": "Off by default, because buying assumes a hub within reach. With a tier on, the Goal Planner buys it to finish a chain your colonies cannot, at the lowest tier that closes the gap. Priced at the ask, with import customs at the colony.",
@@ -8087,6 +8086,8 @@
     "volumeColumn": "Volume",
     "daysColumn": "Days",
     "jumpsColumn": "Jumps",
+    "jumpsLinkLabel_one": "{{count}} jump — open route safety",
+    "jumpsLinkLabel_other": "{{count}} jumps — open route safety",
     "iskPerJumpColumn": "ISK/jump",
     "iskPerVolumeColumn": "ISK/m³",
     "courierModalTitle": "Courier · {{origin}} → {{destination}}",

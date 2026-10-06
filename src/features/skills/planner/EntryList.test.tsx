@@ -238,7 +238,7 @@ describe('EntryList column visibility', () => {
     // Always-present parts remain regardless of the column toggle.
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
     expect(screen.getByText(/^Skill 1\b/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /more actions for skill 1/i })).toBeInTheDocument();
   });
 
   it('shows the attribute badge, priority control, per-level and cumulative time when enabled', () => {
@@ -295,7 +295,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
         />
       );
-      // Line 1 is the name and its remove button only: the finish date used to
+      // Line 1 is the name and its ⋮ only: the finish date used to
       // ride up here and squeeze the name.
       const nameLine = screen.getByText(/^Skill 1\b/).closest('div');
       expect(nameLine).not.toBeNull();
@@ -729,13 +729,34 @@ describe('EntryList one row per level', () => {
   });
 });
 
-describe('EntryList remove button (#2223: a later entry still needing this level)', () => {
-  it('is enabled when nothing depends on the row', () => {
+describe('EntryList row menu (#2223: a later entry still needing this level)', () => {
+  const openMenu = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole('button', { name: /more actions for skill 1/i }));
+
+  it('ends the row in one ⋮, with no standalone remove button', () => {
     render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /more actions for skill 1/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^remove skill 1/i })).toBeNull();
   });
 
-  it('marks the row blocked via aria-disabled, not the native attribute, so a click no-ops instead of accepting one that would silently undo itself', async () => {
+  it('removes the entry from the menu when nothing depends on the row', async () => {
+    const user = userEvent.setup();
+    const removed: unknown[] = [];
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onRemove={(...args) => removed.push(args)}
+      />
+    );
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /remove skill 1/i }));
+    expect(removed).toEqual([[1, 4]]);
+  });
+
+  it('marks the item blocked via aria-disabled, so a click no-ops instead of accepting one that would silently undo itself', async () => {
+    const user = userEvent.setup();
     const removed: unknown[] = [];
     render(
       <EntryList
@@ -746,18 +767,15 @@ describe('EntryList remove button (#2223: a later entry still needing this level
         removalBlockedReason={() => 'Required by Skill 2 V'}
       />
     );
-    const button = screen.getByRole('button', { name: /remove skill 1/i });
-    // Native `disabled` would take the button out of the tab order, so the
-    // Tooltip's "focus" reveal path (its own doc comment: "hover or focus")
-    // could never fire for a keyboard user — `aria-disabled` keeps it
-    // focusable and hoverable while the click itself still does nothing.
-    expect(button).toBeEnabled();
-    expect(button).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(button);
+    await openMenu(user);
+    const item = screen.getByRole('menuitem', { name: /remove skill 1/i });
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    await user.click(item);
     expect(removed).toEqual([]);
   });
 
   it('surfaces the blocked reason as the tooltip on hover', async () => {
+    const user = userEvent.setup();
     render(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
@@ -766,23 +784,9 @@ describe('EntryList remove button (#2223: a later entry still needing this level
         removalBlockedReason={() => 'Required by Skill 2 V'}
       />
     );
-    const button = screen.getByRole('button', { name: /remove skill 1/i });
-    await userEvent.hover(button);
+    await openMenu(user);
+    await user.hover(screen.getByRole('menuitem', { name: /remove skill 1/i }));
     expect(await screen.findByText('Required by Skill 2 V')).toBeInTheDocument();
-  });
-
-  it('surfaces the blocked reason on keyboard focus too, since a blocked button stays Tab-reachable', () => {
-    render(
-      <EntryList
-        rows={[entryRow(1, [0], [4])]}
-        bandsAt={new Map()}
-        {...defaultProps}
-        removalBlockedReason={() => 'Required by Skill 2 V'}
-      />
-    );
-    const button = screen.getByRole('button', { name: /remove skill 1/i });
-    fireEvent.focus(button);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Required by Skill 2 V');
   });
 });
 
@@ -799,7 +803,8 @@ describe('EntryList Plan Milestones (CONTEXT.md)', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /add milestone to skill 1 iv/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Add milestone…' }));
     expect(added).toEqual([[1, 4]]);
   });
 
@@ -826,12 +831,12 @@ describe('EntryList Plan Milestones (CONTEXT.md)', () => {
     expect(screen.getByText('Fly Loki')).toBeInTheDocument();
     expect(screen.getByText(formatLocalDate(finish))).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename…' }));
     expect(renamed).toEqual(['m1']);
 
-    await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove milestone' }));
     expect(removed).toEqual(['m1']);
   });
 
