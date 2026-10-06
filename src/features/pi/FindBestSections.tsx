@@ -182,14 +182,35 @@ const STATE_TEXT: Record<TypeState, string> = {
   find: 'text-danger',
 };
 
-function HostMark({ state }: { state: TypeState }) {
+function HostMark({
+  state,
+  planet,
+  onFind,
+}: {
+  state: TypeState;
+  planet: string;
+  onFind: () => void;
+}) {
   const { t } = useTranslation();
   const Glyph = state === 'find' ? Icon.Close : Icon.Done;
-  return (
-    <span className={cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state])}>
+  const inner = (
+    <>
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {t(`piPlan.find.state.${state}`)}
-    </span>
+    </>
+  );
+  const className = cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state]);
+  if (state !== 'find') return <span className={className}>{inner}</span>;
+  // "Find one" is the way in to Show me how, whose step 1 is the planet finder.
+  return (
+    <Button
+      size="sm"
+      aria-label={t('piPlan.find.findOneFor', { planet })}
+      className={className}
+      onClick={onFind}
+    >
+      {inner}
+    </Button>
   );
 }
 
@@ -266,11 +287,13 @@ function RecipeCard({
   open,
   panelId,
   onToggle,
+  onFind,
 }: {
   card: RecipeCardView;
   open: boolean;
   panelId: string;
   onToggle: () => void;
+  onFind: () => void;
 }) {
   const { t } = useTranslation();
   const typeName = useTypeName();
@@ -326,7 +349,7 @@ function RecipeCard({
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
               <PlanetImage type={host.type} px={20} />
               <b className="font-semibold">{typeName(host.type)}</b>
-              <HostMark state={host.state} />
+              <HostMark state={host.state} planet={typeName(host.type)} onFind={onFind} />
             </li>
           ))}
         </ul>
@@ -365,6 +388,7 @@ export function RecipeListPanel({
   estimate,
   openId,
   onToggle,
+  onFind,
   renderOpen,
   banner,
   unpricedCount,
@@ -375,6 +399,8 @@ export function RecipeListPanel({
   estimate: boolean;
   openId: number | null;
   onToggle: (typeId: number) => void;
+  /** Open the card's Show me how (never closes it), at step 1. */
+  onFind: (typeId: number) => void;
   renderOpen: (card: RecipeCardView, panelId: string) => ReactNode;
   banner: ReactNode;
   unpricedCount: number;
@@ -410,6 +436,15 @@ export function RecipeListPanel({
                     open={open}
                     panelId={panelId}
                     onToggle={() => onToggle(card.recipe.typeId)}
+                    onFind={() => {
+                      onFind(card.recipe.typeId);
+                      // Already open: bring step 1 back into view and focus.
+                      if (open) {
+                        const el = document.getElementById(panelId);
+                        el?.scrollIntoView?.({ block: 'nearest' });
+                        el?.focus({ preventScroll: true });
+                      }
+                    }}
                   />
                   {open && renderOpen(card, panelId)}
                 </li>
