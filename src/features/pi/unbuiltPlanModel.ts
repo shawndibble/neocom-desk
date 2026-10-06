@@ -36,7 +36,7 @@ import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import type { PinLoad } from '@/engine/pi/types';
-import { localResourcesFor } from './advisorModel';
+import { localResourcesFor } from './systemPlanetModel';
 import type { MaxColonyBudget } from './colonyBudget';
 import type { AssumedRate } from './richnessEstimate';
 

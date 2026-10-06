@@ -33,7 +33,7 @@ import {
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { ColonyExpanded } from './ColonyExpanded';
 import { planColonyHref } from './coloniesText';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { StatusWord } from './TodayPanel';
 
 const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';

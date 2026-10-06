@@ -25,7 +25,7 @@ import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, planetName, tierWithCode } from './mapText';
 import type { MapGraph, ProductFigure, Trace } from './mapModel';
 import type { ProductDetailView } from './productDetailModel';

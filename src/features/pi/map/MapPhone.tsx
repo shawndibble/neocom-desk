@@ -18,7 +18,7 @@ import { cx } from '@/lib/cx';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
 import type { MapGraph, MapTier, ProductFigure } from './mapModel';
 

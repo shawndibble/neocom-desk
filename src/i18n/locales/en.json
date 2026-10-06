@@ -5619,7 +5619,7 @@
       }
     }
   },
-  "piAdvisor": {
+  "piShared": {
     "system": "System",
     "systemLabel": "System #{{id}}",
     "budgetBarLabel": "{{axis}} used",
