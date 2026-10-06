@@ -41,7 +41,7 @@ export function PlanetTypesPanel({
   colonyCount,
   toggles,
   chips,
-  hubName,
+  priceSource,
   onToggle,
   onWhatIf,
 }: {
@@ -49,7 +49,7 @@ export function PlanetTypesPanel({
   colonyCount: number;
   toggles: readonly TypeToggle[];
   chips: readonly WhatIfChip[];
-  hubName: string;
+  priceSource: string;
   onToggle: (type: PlanetType) => void;
   onWhatIf: (type: PlanetType) => void;
 }) {
@@ -110,7 +110,7 @@ export function PlanetTypesPanel({
         <div className="space-y-0.5 text-xs text-text-dim">
           <p>{hasColonies ? t('piPlan.find.guideColonies') : t('piPlan.find.guideNone')}</p>
           <p>
-            {t('piPlan.find.guideRanked', { hub: hubName })}{' '}
+            {t('piPlan.find.guideRanked', { source: priceSource })}{' '}
             <ExternalLink href={EU_GUIDE}>{t('piPlan.find.euGuide')}</ExternalLink>
           </p>
         </div>
@@ -362,6 +362,7 @@ function RecipeCard({
 export function RecipeListPanel({
   cards,
   hubName,
+  priceSource,
   estimate,
   openId,
   onToggle,
@@ -372,6 +373,7 @@ export function RecipeListPanel({
 }: {
   cards: readonly RecipeCardView[];
   hubName: string;
+  priceSource: string;
   estimate: boolean;
   openId: number | null;
   onToggle: (typeId: number) => void;
@@ -390,7 +392,7 @@ export function RecipeListPanel({
         wrapMeta
         meta={
           <span className="text-[0.6875rem] text-text-dim max-md:basis-full">
-            {t('piPlan.find.picksMeta', { hub: hubName })}
+            {t('piPlan.find.picksMeta', { source: priceSource })}
           </span>
         }
         actions={estimate ? <EstimateBadge /> : undefined}
