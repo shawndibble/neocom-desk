@@ -4689,7 +4689,8 @@
       "raw": "A raw resource: sold as is, or refined on the way up",
       "tier": "Needs goods from several planets, so there is no per-planet figure",
       "unpriced": "The market has no price for it, so there is no figure",
-      "not-one-planet": "No single planet type makes it, so there is no per-planet figure"
+      "not-one-planet": "No single planet type makes it, so there is no per-planet figure",
+      "no-fit": "One planet type can make it, but not at the Command Center level assumed here, so there is no figure"
     },
     "estimateNote": "An estimate: ISK a day for one planet, after customs and sales tax, at your sell market. The same figures as the Plan tab.",
     "detail": {
