@@ -19,7 +19,8 @@ _Recorded 2026-10-05 · issue #2728._ The rule lives in `docs/DESIGN.md` §6c
   usually gives them. Once a page overrides the link, they're no longer one
   tap away, so they count.
 - **First override: Planetary Industry (Plan, Map, Colonies).** Every item or
-  product name opens the PI product detail: the Map drawer, URL-backed, so
-  the name stays a real link. Market and Show info move to the row or tile ⋮,
+  product name opens the PI product detail: the Map tab with that product's
+  drawer open, by URL, so the name stays a real link (from Plan and Colonies
+  too). Market and Show info move to the row or tile ⋮,
   or into the drawer where a row has no ⋮. Implementation is #2726; until it
   lands, PI names still open Market.

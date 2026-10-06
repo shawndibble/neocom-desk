@@ -7,7 +7,7 @@ leave out of any "differences from the mockup" list.
 
 | Mockup does | Build instead (§6c) |
 | --- | --- |
-| Product / item names as plain text or boxed chips | Item names are accent entity links (real `<a href>`) to the Market browser, underlined on hover and focus. A column is all links or none. |
+| Product / item names as plain text or boxed chips | Item names are accent entity links (real `<a href>`) to the PI product detail (the Map drawer, by URL; §6c Overrides, #2726), underlined on hover and focus. Market and Show info sit in the ⋮ or the drawer. A column is all links or none. |
 | System names as plain text | Solar-system names link to Route Safety with that system as destination. Stations are not clickable. |
 | Native `title=` tooltips (▲ ≈ ▼ chips, icons, truncated text) | `Tooltip` / `HintText` (dotted underline) / `InfoTooltip`. The content is also in the accessible name; a tooltip is never the only place. |
 | A "?" button that opens "How to use the map" / "New to PI?" | Those are drawers, so use a labelled button, not the "?" circle (the "?" circle is a tooltip only). |
