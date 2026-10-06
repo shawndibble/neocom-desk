@@ -63,7 +63,7 @@ export function SlotNudge({
             />
           ))}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 max-md:basis-full">
           <Sentence
             text={text}
             slots={{
