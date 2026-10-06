@@ -841,9 +841,9 @@ function rebuildFacts(args: {
  * The plan only offers a P2 no single colony already makes both inputs for
  * (that one is the rebuild scorer's question), so an opportunity usually draws
  * on another colony's surplus: `routedFrom` names those colonies so the page can
- * say what to move. A quick win must be doable within one system (#2703), so a
- * win routed from a colony in another system is dropped, not offered. Market sourcing is off, so nothing here is a purchase. The
- * network plan needs two measurable colonies.
+ * say what to move. A win routed from another system is dropped: a quick win
+ * is doable within one system. Market sourcing is off, so nothing here is a
+ * purchase. The network plan needs two measurable colonies.
  */
 function factoryRoom(
   built: readonly (PlannerColonyRow & { advice: BuiltColonyAdvice })[],
