@@ -380,9 +380,11 @@ export const Layout = memo(function Layout() {
           Footer: Help and Settings, then the active Character, in that reading
           order — the Character link is the very bottom of the rail. The
           `border-b` rules off the bottom of Settings, separating it from the
-          Character link below rather than from the scrollable nav above.
+          Character link below. The `border-t` rules off the scrollable nav
+          above: at a short height the last row is cut mid-line by this edge,
+          and without the rule it reads as an overlap, not a scroll.
         */}
-        <div className="flex shrink-0 flex-col gap-0.5 border-b border-line p-2">
+        <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
           {FOOTER_PAGES.map((page) => (
             <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
           ))}
