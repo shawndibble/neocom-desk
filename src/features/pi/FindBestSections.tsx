@@ -11,6 +11,11 @@
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, IskAmount, Panel, SegmentedControl, TypeIcon } from '@/components/ui';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -182,14 +187,32 @@ const STATE_TEXT: Record<TypeState, string> = {
   find: 'text-danger',
 };
 
-function HostMark({ state }: { state: TypeState }) {
+/** "Find one" is the way in to Show me how, whose step 1 is the planet finder. */
+function HostMark({ state, onFind }: { state: TypeState; onFind: () => void }) {
   const { t } = useTranslation();
   const Glyph = state === 'find' ? Icon.Close : Icon.Done;
-  return (
-    <span className={cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state])}>
+  const inner = (
+    <>
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {t(`piPlan.find.state.${state}`)}
-    </span>
+    </>
+  );
+  const className = cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state]);
+  if (state !== 'find') return <span className={className}>{inner}</span>;
+  return (
+    <button
+      type="button"
+      className={cx(
+        className,
+        'rounded-xs font-medium underline decoration-1 underline-offset-2 hover:decoration-2',
+        tappableRowClassName,
+        interactiveClassName,
+        focusRingClassName
+      )}
+      onClick={onFind}
+    >
+      {inner}
+    </button>
   );
 }
 
@@ -266,11 +289,13 @@ function RecipeCard({
   open,
   panelId,
   onToggle,
+  onFind,
 }: {
   card: RecipeCardView;
   open: boolean;
   panelId: string;
   onToggle: () => void;
+  onFind: () => void;
 }) {
   const { t } = useTranslation();
   const typeName = useTypeName();
@@ -326,7 +351,7 @@ function RecipeCard({
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
               <PlanetImage type={host.type} px={20} />
               <b className="font-semibold">{typeName(host.type)}</b>
-              <HostMark state={host.state} />
+              <HostMark state={host.state} onFind={onFind} />
             </li>
           ))}
         </ul>
@@ -365,6 +390,7 @@ export function RecipeListPanel({
   estimate,
   openId,
   onToggle,
+  onFind,
   renderOpen,
   banner,
   unpricedCount,
@@ -375,6 +401,8 @@ export function RecipeListPanel({
   estimate: boolean;
   openId: number | null;
   onToggle: (typeId: number) => void;
+  /** Open the card's Show me how (never closes it), at step 1. */
+  onFind: (typeId: number) => void;
   renderOpen: (card: RecipeCardView, panelId: string) => ReactNode;
   banner: ReactNode;
   unpricedCount: number;
@@ -410,6 +438,15 @@ export function RecipeListPanel({
                     open={open}
                     panelId={panelId}
                     onToggle={() => onToggle(card.recipe.typeId)}
+                    onFind={() => {
+                      onFind(card.recipe.typeId);
+                      // Already open: bring step 1 back into view and focus.
+                      if (open) {
+                        const el = document.getElementById(panelId);
+                        el?.scrollIntoView?.({ block: 'nearest' });
+                        el?.focus({ preventScroll: true });
+                      }
+                    }}
                   />
                   {open && renderOpen(card, panelId)}
                 </li>

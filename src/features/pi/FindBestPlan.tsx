@@ -156,6 +156,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           estimate
           openId={openId}
           onToggle={(typeId) => setOpenId((current) => (current === typeId ? null : typeId))}
+          onFind={setOpenId}
           unpricedCount={best.unpricedCount}
           emptyHint={
             advice.recipeRows.length === 0
