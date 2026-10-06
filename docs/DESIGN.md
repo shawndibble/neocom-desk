@@ -717,7 +717,8 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   (WCAG 1.4.1). Add touch-size extras alongside it, don't fork the recipe. It
   means navigation only; an in-sentence _action_ (Undo, Set runs) is a
   `textActionClassName` button. A table-cell entity name is accent at rest
-  with a hover underline, and where it goes is fixed per entity type (§6c).
+  with a hover underline; it goes to its entity type's default unless the
+  page records an override (§6c "Entities").
   `textActionClassName` stays the recipe for uppercase text actions.
   `inlineLinkClassName.test.ts` fails on a hand-rolled `text-accent underline`.
 - Status colors carry meaning; never use them decoratively. ISK amounts use
@@ -859,7 +860,7 @@ Retired meanings, each with its replacement:
   it opens a modal. Middle-click and Ctrl+click open a new tab, and Back
   closes the modal.
 
-| Entity                      | Click goes to                                                             |
+| Entity                      | Default destination                                                       |
 | --------------------------- | ------------------------------------------------------------------------- |
 | Item type                   | Market browser (Show Info is Market's ⓘ, and a ⋮ only if the row has one) |
 | Character, corp or alliance | Show Info (`PublicInfoModal`)                                             |
@@ -867,6 +868,36 @@ Retired meanings, each with its replacement:
 | Contract                    | Contract modal (the accent type cell)                                     |
 | Solar system                | Route Safety, with that system as the destination                         |
 | Station                     | Not clickable                                                             |
+
+**Destination follows the page.** The table is each type's default. A page
+whose job isn't the default's may override it with whatever answers the
+page's question: an item on Planetary Industry opens its PI detail, on Market
+or Contracts it opens Market; a character on Mail may open the thread or
+compose. Hard guardrails:
+
+1. **Same cue.** Accent at rest, underline on hover and focus, a real
+   `<a href>` (new tab, copy link work). What a link does is always a URL.
+2. **The rest one step away.** Destinations the page didn't pick go in the
+   row's or tile's ⋮ (right-click and touch-and-hold on the row or tile; on
+   the name itself the browser's link menu still wins). A row with no ⋮
+   under the restraint rules carries them in the detail the link opens.
+3. **One destination per entity type per page.** Never mixed.
+4. **Recorded, or it's a defect.** Name the page and the override in its
+   DESIGN.md section or a scope decision, and list it under Overrides below.
+5. **Unsure: use the default.**
+
+How to choose:
+
+- What is the pilot asking on this page?
+- Where is the answer for this entity? If it's the default, stop.
+- What stays one step away, and where (⋮ or the detail)?
+- Record it in the same PR.
+
+Overrides:
+
+| Page                                     | Entity    | Opens                                      | One step away                   | Recorded in                                                                                                     |
+| ---------------------------------------- | --------- | ------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Planetary Industry (Plan, Map, Colonies) | Item type | PI product detail (Map drawer, URL-backed) | Market, Show info (⋮ or drawer) | `docs/context/decisions/20261005-212941-entity-link-destination-follows-the-page-pi-item.md` (#2726 implements) |
 
 Rows:
 
@@ -890,10 +921,12 @@ is clutter, and clutter hides the actions that matter.
   view already gives that action. If it does, add nothing.
 - **A row gets a ⋮ only for two or more real actions** that can't be reached
   elsewhere in one tap. Show info, Copy, View in Market, a duplicate of a
-  visible control and a duplicate of the row click do not count. A menu with
-  nothing worth a ⋮ is deleted (the `RowActionsMenu` or `rowContextMenu`
-  too), not hidden: a row without a ⋮ has no custom right-click or
-  touch-and-hold menu, and the browser's own menu still copies text.
+  visible control and a duplicate of the row click do not count, except a
+  destination the page's link override displaced ("Entities"): no longer one
+  tap away, it counts. A menu with nothing worth a ⋮ is deleted (the
+  `RowActionsMenu` or `rowContextMenu` too), not hidden: a row without a ⋮
+  has no custom right-click or touch-and-hold menu, and the browser's own
+  menu still copies text.
 - **One trailing control cluster per row**, at the right edge, never
   mid-row. A › caret beside a ⋮ is redundant: drop the caret. A destructive ×
   beside a ⋮ is a mis-tap hazard: fold Delete into the menu as a danger item,
