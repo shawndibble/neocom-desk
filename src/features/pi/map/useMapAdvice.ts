@@ -10,7 +10,7 @@
  * demand and cached per input, so trying all eight types costs at most eight
  * builds and a re-render never repeats one.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from '../goalPlannerSnapshot';
 import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { homeSystemId } from '../sellRoute';
@@ -25,6 +25,7 @@ export type MapAdviceState =
   | { status: 'loading' }
   | { status: 'failed' }
   | { status: 'prices-failed' }
+  | { status: 'esi-failed'; retry: () => void }
   | {
       status: 'ready';
       graph: MapGraph;
@@ -43,6 +44,11 @@ export function useMapAdvice(
     snapshot: GoalPlannerSnapshot;
   } | null>(null);
   const [failedFor, setFailedFor] = useState<number | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retry = useCallback(() => {
+    setLoaded(null);
+    setReloadKey((key) => key + 1);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     loadGoalPlannerSnapshot(characterId).then(
@@ -58,7 +64,7 @@ export function useMapAdvice(
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, reloadKey]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
 
   // The Plan tab's Most ISK / Least hauling choice, so both tabs rank alike.
@@ -108,6 +114,7 @@ export function useMapAdvice(
   }, [snapshot]);
 
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
+  if (snapshot?.fetchFailed) return { status: 'esi-failed', retry };
   if (inputs.status === 'prices-failed') return { status: 'prices-failed' };
   if (!built || !graph) return { status: 'loading' };
   return { status: 'ready', graph, ...built, colonies, finder };
