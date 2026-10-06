@@ -200,7 +200,9 @@ async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   await expect(row.locator('td.dt-disclosure svg')).toBeHidden();
   const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
   expect(dy, `⋮ centre-y vs card centre-y (${tableLabel})`).toBeLessThanOrEqual(1);
-  expect(meta!.x + meta!.width).toBeLessThanOrEqual(more!.x + 2);
+  // Headroom, so a font a little wider than ours can't run text under the button.
+  const gap = more!.x - (meta!.x + meta!.width);
+  expect(gap, `line two to ⋮ (${tableLabel})`).toBeGreaterThanOrEqual(8);
 }
 
 test.describe('Market Browser — order book stacked cards', () => {

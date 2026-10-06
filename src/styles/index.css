@@ -572,8 +572,22 @@
     padding-right: 3rem;
   }
 
+  /* `-only`: the button flush to the card's edge, its 44px box overhanging
+     the row's right padding, so line two (a buy's five cells and an
+     8-figure quantity nearly fill it) keeps headroom before the box, and a
+     font a little wider than ours can't run text under it. Row padding and
+     the cell gap are a touch tighter for the same reason. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
+    right: 0;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
+    padding-left: 0.375rem;
+    column-gap: 0.0625rem;
+  }
+
   /* `-only` clears the button on line one alone (the headline figure's
-     right margin: button spans 0.25-3rem from the edge, row pads 0.75rem).
+     right margin: button spans 0-2.75rem from the edge, row pads 0.75rem).
      Line two keeps the full card width so a buy's five meta cells fit one
      line on a phone. */
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
