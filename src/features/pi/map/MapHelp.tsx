@@ -2,6 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { useTouchContext } from '@/lib/useMediaQuery';
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
@@ -24,14 +25,15 @@ function Sample({ className, children }: { className: string; children?: React.R
 
 export function MapHelp() {
   const { t } = useTranslation();
+  const context = useTouchContext();
   return (
     <div className="text-xs text-text-dim">
       <Heading>{t('piMap.help.stepsHeading')}</Heading>
       <ol className="list-decimal space-y-1.5 pl-4 leading-relaxed">
         {(['tick', 'read', 'trace', 'try'] as const).map((step) => (
           <li key={step}>
-            <b className="text-text">{t(`piMap.help.steps.${step}.title`)}</b>{' '}
-            {t(`piMap.help.steps.${step}.body`)}
+            <b className="text-text">{t(`piMap.help.steps.${step}.title`, { context })}</b>{' '}
+            {t(`piMap.help.steps.${step}.body`, { context })}
           </li>
         ))}
       </ol>
