@@ -460,7 +460,10 @@ exactly the markup above.
   chevron and no `end` box can add `className="dt-actions-pinned"` to pin
   the More actions button to the right edge across both lines instead, so
   line one stays text-tall, with a short `cardCorner` figure (a standing
-  icon) centred beside it (Contacts). A table with a tick box, a chevron
+  icon) centred beside it (Contacts). `dt-actions-pinned-only` pins the
+  button the same way but keeps the figure, and any chevron, in flow on
+  line one: the chevron ends 2rem before the card's edge so it sits beside
+  the 44px button, never under it (Market order book). A table with a tick box, a chevron
   and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line

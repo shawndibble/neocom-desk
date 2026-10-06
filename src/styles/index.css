@@ -576,8 +576,18 @@
      right margin: button spans 0.25-3rem from the edge, row pads 0.75rem).
      Line two keeps the full card width so a buy's five meta cells fit one
      line on a phone. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only
+    tr:has(> td.dt-actions):not(:has(> td.dt-disclosure:not(:empty)))
+    td.dt-corner {
     margin-right: 2.25rem;
+  }
+
+  /* With the expand chevron on line one too, the chevron is what clears the
+     pinned button: it ends 2rem before the row's padding edge, so the two
+     sit side by side, never one over the other. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-disclosure {
+    margin-right: 2rem;
+    margin-left: 0.25rem;
   }
 
   /* The headline figure (`cardCorner`) pinned beside it, centred across both

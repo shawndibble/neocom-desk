@@ -271,11 +271,14 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect((await readRow(page, 'Sell Orders', SELL_ORDER.order_id)).display).toBe('flex');
 
     // Fewer columns need less width (`orderBookWidthsRem`): this book fits them as a table.
+    // Two, not one: the budget counts the ⋮ column, so Sec alone no longer
+    // clears the 8-figure quantity at this width.
     await page
       .getByRole('region', { name: 'Sell Orders' })
       .getByRole('button', { name: 'Columns' })
       .click();
     await page.getByRole('menuitemcheckbox', { name: 'Sec' }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Jumps' }).click();
     await page.keyboard.press('Escape');
     const table = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(table.display).toBe('table-row');
