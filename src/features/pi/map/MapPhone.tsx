@@ -1,7 +1,8 @@
 /**
  * The Map on a phone: the planet types as a grid of 44px toggles, then one
  * tier at a time as a list (a tier switcher), then the full map in a container
- * that scrolls sideways on its own. Tapping a product opens the bottom sheet.
+ * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
+ * tapping the traced one again clears the trace.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
-import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace, onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';
@@ -147,6 +148,7 @@ export function MapPhone(props: MapPhoneProps) {
                   data-map-key={`p:${product.typeId}`}
                   aria-current={traced ? 'true' : undefined}
                   onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
+                  onKeyDown={clickOnSpace}
                   className={cx(
                     'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
                     interactiveClassName,

@@ -22,6 +22,21 @@
  *
  * `?planet=<id>` opens the richness override for one of the pilot's colonies
  * (the Colonies row links here); a product link drops it, one drawer at a time.
+ *
+ * ## Who owns what (one source of truth each)
+ *
+ * - **Planet ticks** (types the pilot has): `userTicked`, `null` until they
+ *   touch one. Only a planet click changes it.
+ * - **The what-if tick** (one type they do not have): `whatIf`. Only a planet
+ *   click (or the add-planet panel's own Close) changes it: tracing, picking or
+ *   clearing a product never does. A type the trace needs that is not ticked
+ *   shows as NEED, drawn from the trace, never written into the ticks.
+ * - **The trace**: the URL's `?product=` while it names one, else `userTraced`
+ *   (`undefined` follows the first pick, `null` is cleared, else the pilot's
+ *   pick). A tile, phone row or pick toggles it: a click on the product the
+ *   pilot traced clears it, and the URL with it (Back if this page pushed it).
+ * - **The product drawer** is open while the URL names a product. Closing it
+ *   (Back, Escape, Close) keeps the trace; only a toggle or "Clear trace" ends it.
  */
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
@@ -410,8 +425,7 @@ export function PlanMap({
     // original opener as the place focus returns to.
     if (!docked && !drawerShown) remember();
     setUserTraced({ id: typeId, explicit: true });
-    // Tracing a product answers the what-if question; board and panel agree.
-    setWhatIf(null);
+    // The panel shows the product; the what-if tick stays the pilot's.
     setDetailKind('product');
     const href = piProductHref(typeId, location.search);
     if (planetShown) {
@@ -433,23 +447,23 @@ export function PlanMap({
       });
       return;
     }
+    // The pilot's own what-if tick: a click unticks it, NEED or not.
+    if (whatIf === type) {
+      setWhatIf(null);
+      closePlanet();
+      return;
+    }
     if (needTypes.has(type)) {
       // The traced product already shows what this planet is for and where to
       // find one. A what-if here would swap the panel and pile pink unlock
       // wires on top of the trace.
       if (!docked && !drawerShown) remember();
-      setWhatIf(null);
       setPlanetOpen(false);
       setDetailKind('product');
       // The product drawer is the URL's: bring it back if it was closed.
       if (linked === null && traced) {
         navigate(piProductHref(traced.id, location.search), productNavigation(location));
       }
-      return;
-    }
-    if (whatIf === type) {
-      setWhatIf(null);
-      closePlanet();
       return;
     }
     if (!docked && !drawerShown) remember();
@@ -471,8 +485,21 @@ export function PlanMap({
   };
   const clearTrace = () => {
     setUserTraced(null);
+    // Docked, the panel falls back to the planet the pilot still has ticked.
+    if (docked && whatIf !== null) setDetailKind('planet');
     if (linked !== null) dropProduct();
     else restore();
+  };
+  /**
+   * A tile, phone row or pick: a click on the product the pilot traced clears
+   * it; any other click traces. The first pick traced by default is not the
+   * pilot's choice, so its first click opens it. Docked over the what-if
+   * panel, the click brings the product back into view instead.
+   */
+  const toggleProduct = (typeId: number) => {
+    const ownTrace = traced?.explicit === true && traced.id === typeId;
+    if (ownTrace && !(docked && detailKind === 'planet' && whatIf !== null)) clearTrace();
+    else openProduct(typeId);
   };
 
   const tracedProduct = traced ? graph.byId.get(traced.id) : null;
@@ -482,7 +509,9 @@ export function PlanMap({
           name: tracedProduct.name,
           planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
         })
-      : '';
+      : traced === null && userTraced === null
+        ? t('piMap.announceTraceCleared')
+        : '';
 
   // --- Pieces ------------------------------------------------------------------
   const detailBody = (() => {
@@ -606,7 +635,7 @@ export function PlanMap({
                 <Link
                   to={productHref(pick.typeId)}
                   aria-current={traced?.id === pick.typeId ? 'true' : undefined}
-                  onClick={(event) => onPlanLinkClick(() => openProduct(pick.typeId))(event)}
+                  onClick={(event) => onPlanLinkClick(() => toggleProduct(pick.typeId))(event)}
                   className={cx(
                     'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
                     interactiveClassName,
@@ -725,7 +754,7 @@ export function PlanMap({
       figureOf={figureOf}
       onPlanet={clickPlanet}
       onPreview={setPreview}
-      onProduct={openProduct}
+      onProduct={toggleProduct}
       productHref={productHref}
     />
   );
@@ -776,7 +805,7 @@ export function PlanMap({
               pickRanks={pickRanks}
               figureOf={figureOf}
               onPlanet={clickPlanet}
-              onProduct={openProduct}
+              onProduct={toggleProduct}
               productHref={productHref}
               between={<div className="-mx-3 border-y border-line">{whatIfLine}</div>}
               fullMap={board}

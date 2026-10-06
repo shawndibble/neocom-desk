@@ -4698,6 +4698,7 @@
     "unlockedMark": "Unlocked by adding {{aType}} planet",
     "tracedMark": "Traced",
     "announceTrace": "Tracing {{name}}. Needs {{planets}}. The chain is written out in the details.",
+    "announceTraceCleared": "Trace cleared.",
     "figure": "About {{isk}} ISK a day from one {{type}} planet",
     "cmp": {
       "better": "Better than {{name}}, the simplest product on {{type}} planets",
