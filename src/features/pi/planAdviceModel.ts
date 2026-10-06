@@ -74,6 +74,7 @@ import {
 import {
   rankRecipes,
   type RecipeFilter,
+  type RecipeFit,
   type RecipeRanking,
   type RecipeRow,
 } from '@/engine/pi/planRecipes';
@@ -193,7 +194,7 @@ export interface PlanColonyAdvice extends ColonyAdvice {
    * What the recommended rebuild draws against the Command Center it needs, for
    * the checklist's fit meters. Null unless the recommendation is a change.
    */
-  rebuildFit: { level: number; used: PinLoad; budget: PinLoad } | null;
+  rebuildFit: RecipeFit | null;
   /** The typeIDs the colony sells today: what a Keep card says it stays on. */
   sells: readonly number[];
 }
@@ -319,13 +320,29 @@ function candidateOf(
 /** Scored P1 and P2 candidates: one-planet recipes only, never raw P0. */
 function recipeEntries(advice: StopTierAdvice): ScoredStopTier[] {
   const entries: readonly StopTierEntry[] = advice.entries;
-  return entries
-    .filter((entry): entry is ScoredStopTier => entry.status === 'scored')
-    .filter((entry) => entry.tier === 1 || entry.tier === 2);
+  return entries.filter(isScoredRecipe);
+}
+
+function isScoredRecipe(entry: StopTierEntry): entry is ScoredStopTier {
+  return entry.status === 'scored' && (entry.tier === 1 || entry.tier === 2);
 }
 
 function hostsTier2(advice: StopTierAdvice): boolean {
   return advice.entries.some((entry) => entry.tier === 2 && entry.status !== 'does-not-fit');
+}
+
+/** A ranking candidate and the heads per extractor it was fitted with. */
+interface FittedEntry {
+  entry: StopTierEntry;
+  heads: number;
+}
+
+function isRecipeEntry(fitted: FittedEntry): fitted is FittedEntry & { entry: ScoredStopTier } {
+  return isScoredRecipe(fitted.entry);
+}
+
+function fitsBudget(used: PinLoad, budget: PinLoad): boolean {
+  return used.cpu <= budget.cpu && used.powergrid <= budget.powergrid;
 }
 
 function sellsOf(colony: BuiltColonyAdvice, pi: PiData): number[] {
@@ -934,9 +951,11 @@ function factoryRoom(
 /**
  * Every one-planet recipe on every planet type, valued the way a planet the
  * pilot has not built yet would be: at their own measured extraction rate
- * (else the typed fallback), their Command Center level, and a link cost
- * borrowed from their colonies (else a stated default). `rankingBasis` carries
- * which of those were assumed, so the page can badge the figures as estimates.
+ * (else the typed fallback; per head kept, for a P2 stepped to fewer heads),
+ * their Command Center level, and a link cost borrowed from their colonies
+ * (else a stated default). `rankingBasis` carries which of those were assumed,
+ * so the page can badge the figures as estimates. Each layout carries the fit
+ * it was scored with.
  */
 function rankingFor(args: {
   input: PlanAdviceInput;
@@ -991,8 +1010,19 @@ function rankingFor(args: {
   const recipeRows: RecipeRow[] = [];
   const unpriced = new Set<number>();
   const maxLevel = Math.max(pi.infrastructure.commandCenterUpgrades.length - 1, 0);
+  // The lowest level whose budget carries `used`: what Show me how and its meter
+  // name for a layout that fits the pilot's own Command Center.
+  const fitOf = (used: PinLoad, needsCcLevel: number | null): RecipeFit => {
+    let level = needsCcLevel ?? 0;
+    let { budget } = colonyBudget(level, pi);
+    while (level < ceiling.level && !fitsBudget(used, budget)) {
+      level += 1;
+      budget = colonyBudget(level, pi).budget;
+    }
+    return { level, used, budget };
+  };
   for (const planetType of planetTypes) {
-    const adviceAt = (budget: PinLoad, headsPerExtractor: number) =>
+    const adviceAt = (budget: PinLoad, headsPerExtractor: number, ratePerHour: number) =>
       recommendStopTier(
         {
           localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
@@ -1001,7 +1031,7 @@ function rankingFor(args: {
           overhead: { launchpads: 1, storageFacilities: storage },
           headsPerExtractor,
           newLinkCost: borrowed ?? ASSUMED_RANKING_LINK_COST,
-          extractionRatePerHour: rate,
+          extractionRatePerHour: ratePerHour,
           prices: books.prices,
           revenuePrices: books.revenuePrices,
           taxRate,
@@ -1011,20 +1041,43 @@ function rankingFor(args: {
         },
         pi
       );
-    // An assumed head count must not decide what a planet can host: ten heads
-    // on each of a P2's two extractors overdraws even a level-5 Command Center's
-    // powergrid, so a pilot with no colonies would see no P2 at all. Step the
-    // assumption down until a P2 block fits; a measured count is never touched.
-    const adviceFor = (budget: PinLoad) => {
-      let advice = adviceAt(budget, heads);
+    // Heads must not decide whether a planet hosts a P2: a P0 colony's heads
+    // overdraw a P2's two extractors. An assumed count steps the whole layout
+    // down; then each P2 that still does not fit takes the most heads that do,
+    // its rate scaled by heads kept. P1 keeps a measured count. `skip`: P2s a
+    // lower level already hosts.
+    const adviceFor = (budget: PinLoad, skip?: ReadonlySet<number>): FittedEntry[] => {
+      let base = adviceAt(budget, heads, rate);
+      let baseHeads = heads;
       if (!headsMeasured) {
-        for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
-          advice = adviceAt(budget, tryHeads);
+        for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(base); tryHeads -= 2) {
+          base = adviceAt(budget, tryHeads, rate);
+          baseHeads = tryHeads;
         }
       }
-      return advice;
+      const fitted = new Map(
+        base.entries.map((entry) => [entry.typeId, { entry, heads: baseHeads }])
+      );
+      const unhosted = new Set(
+        base.entries
+          .filter((entry) => entry.tier === 2 && entry.status === 'does-not-fit')
+          .filter((entry) => !skip?.has(entry.typeId))
+          .map((entry) => entry.typeId)
+      );
+      for (let tryHeads = baseHeads - 1; tryHeads >= 1 && unhosted.size > 0; tryHeads -= 1) {
+        for (const entry of adviceAt(budget, tryHeads, (rate * tryHeads) / baseHeads).entries) {
+          if (!unhosted.has(entry.typeId) || entry.status === 'does-not-fit') continue;
+          unhosted.delete(entry.typeId);
+          fitted.set(entry.typeId, { entry, heads: tryHeads });
+        }
+      }
+      return [...fitted.values()];
     };
-    const rowFor = (entry: ScoredStopTier, needsCcLevel: number | null): RecipeRow | null => {
+    const rowFor = (
+      fitted: FittedEntry & { entry: ScoredStopTier },
+      needsCcLevel: number | null
+    ): RecipeRow | null => {
+      const { entry } = fitted;
       const volume = safeVolume(entry.typeId, pi);
       const isk = iskPerHourOf(entry, books, taxRate);
       if (volume === null || isk === null) return null;
@@ -1039,29 +1092,33 @@ function rankingFor(args: {
           unitsPerDay: entry.unitsPerHour * HOURS_PER_DAY,
           pins: entry.pins,
           ...recipeOf(entry.typeId, pi),
+          headsPerExtractor: fitted.heads,
+          fit: fitOf(entry.used, needsCcLevel),
         },
         ...(needsCcLevel ? { needsCcLevel } : {}),
       };
     };
 
-    const advice = adviceFor(ceiling.budget);
-    for (const entry of advice.entries) {
+    const fitted = adviceFor(ceiling.budget);
+    for (const { entry } of fitted) {
       if (entry.tier !== 1 && entry.tier !== 2) continue;
       if (entry.status === 'needs-price') unpriced.add(entry.typeId);
     }
     const hosted = new Set<number>();
-    for (const entry of recipeEntries(advice)) {
-      const built = rowFor(entry, null);
+    for (const scored of fitted.filter(isRecipeEntry)) {
+      const built = rowFor(scored, null);
       if (built) recipeRows.push(built);
-      hosted.add(entry.typeId);
+      hosted.add(scored.entry.typeId);
     }
     // What only a higher Command Center hosts still ranks, tagged with the
     // lowest level that does, so an untrained pilot sees what training buys.
     for (let level = ceiling.level + 1; level <= maxLevel; level += 1) {
-      for (const entry of recipeEntries(adviceFor(colonyBudget(level, pi).budget))) {
-        if (hosted.has(entry.typeId)) continue;
-        hosted.add(entry.typeId);
-        const built = rowFor(entry, level);
+      for (const scored of adviceFor(colonyBudget(level, pi).budget, hosted).filter(
+        isRecipeEntry
+      )) {
+        if (hosted.has(scored.entry.typeId)) continue;
+        hosted.add(scored.entry.typeId);
+        const built = rowFor(scored, level);
         if (built) recipeRows.push(built);
       }
     }

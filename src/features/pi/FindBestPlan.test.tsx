@@ -56,6 +56,12 @@ const row = (
     pins: { extractorControlUnit: 1, basic: 2, launchpad: 1 },
     extracts: [rawId('Felsic Magma')],
     makes: [{ typeId, facility: tier === 1 ? 'basic' : 'advanced' }],
+    headsPerExtractor: 6,
+    fit: {
+      level: 2,
+      used: { cpu: 5_000, powergrid: 8_000 },
+      budget: { cpu: 12_136, powergrid: 12_000 },
+    },
   },
 });
 
@@ -219,6 +225,9 @@ describe('FindBestPlan', () => {
     expect(panel.closest('li')).toBe(button.closest('li'));
     expect(within(panel).getByRole('link', { name: 'Perimeter' })).toBeInTheDocument();
     expect(panel).toHaveTextContent('Command Center');
+    // The ranking's fit: its level, its meter and the heads it assumed.
+    expect(panel).toHaveTextContent('Needs a Command Center at upgrade level 2 or higher');
+    expect(panel).toHaveTextContent('Extractor with 6 heads:');
     expect(panel).toHaveTextContent('Reset the extractors every');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
     expect(document.getElementById(panel.id)).toBeNull();

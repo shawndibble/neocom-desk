@@ -64,6 +64,8 @@ export function fakeItemActions(
     openAddCargo: vi.fn(),
     changeCargoQuantity: vi.fn(),
     removeCargo: vi.fn(),
+    canFitFirstFree: () => true,
+    fitFirstFree: vi.fn(),
     dropHandlers: {
       addType: true,
       moveModule: true,

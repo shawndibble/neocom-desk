@@ -45,12 +45,22 @@ describe('buildHowTo', () => {
     expect(how?.m3PerWeek).toBe(70);
   });
 
-  it('names the lowest Command Center level that hosts the layout', () => {
+  it("reads the ranking's own fit and heads, never re-deriving them", () => {
+    const fit = {
+      level: 1,
+      used: { cpu: 5_000, powergrid: 8_000 },
+      budget: { cpu: 7_057, powergrid: 9_000 },
+    };
+    const base = recipe();
+    const how = buildHowTo({ ...base, layout: { ...base.layout!, headsPerExtractor: 6, fit } }, pi);
+    expect(how?.fit).toEqual(fit);
+    expect(how?.headsPerExtractor).toBe(6);
+  });
+
+  it('has no fit, rather than a guessed one, when the ranking carried none', () => {
     const how = buildHowTo(recipe(), pi);
-    expect(how?.fit).not.toBeNull();
-    const fit = how!.fit!;
-    expect(fit.used.cpu).toBeLessThanOrEqual(fit.budget.cpu);
-    expect(fit.used.powergrid).toBeLessThanOrEqual(fit.budget.powergrid);
+    expect(how?.fit).toBeNull();
+    expect(how?.headsPerExtractor).toBeNull();
   });
 
   it('has nothing to show without a layout', () => {
