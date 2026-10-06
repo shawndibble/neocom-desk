@@ -341,7 +341,9 @@ export function OrderSideCard({
               rowContextMenu={rowContextMenu}
               rowMoreActions
               rowClassName={rowClassName}
-              expandableRow={{ renderDetail }}
+              // Row click expands: the §6c leading caret on desktop (none on a card), so
+              // the ⋮ stays the one trailing control.
+              expandableRow={{ renderDetail, leadingIcon: true }}
             />
           </div>
           {onShowAll && (

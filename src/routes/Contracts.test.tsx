@@ -232,11 +232,10 @@ describe('Contracts', () => {
     expect(cue(finishedRow)).not.toBeInTheDocument();
   });
 
-  it('offers the row menu through a visible More-actions button', async () => {
+  it('has no More-actions button: the title cell opens the detail modal', async () => {
     render(<App />);
     await screen.findByText('Rifter fit');
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for Rifter fit' }));
-    expect(await screen.findByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
   it('opens the contract detail modal on click', async () => {
@@ -248,7 +247,9 @@ describe('Contracts', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
-    expect(await screen.findByRole('dialog', { name: 'Rifter fit' })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Rifter fit' });
+    // The row menu's "Copy contract ID" moved here: the modal is where the ID is read.
+    expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('falls back to cached contracts offline', async () => {
@@ -655,7 +656,7 @@ describe('Time format preference', () => {
   });
 });
 
-describe('Contracts row context menu (issue #676)', () => {
+describe('Contracts row right-click (issue #676)', () => {
   /** Right-clicks a contract row by its rendered title-cell text and returns the row. */
   async function openContractMenu(cellText: string) {
     await screen.findByText('Rifter fit');
@@ -667,21 +668,14 @@ describe('Contracts row context menu (issue #676)', () => {
     return row;
   }
 
-  it('offers Copy title and Copy Contract ID, without opening the detail modal', async () => {
+  it('has no custom row menu: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
     render(<App />);
     await openContractMenu('Rifter fit');
 
-    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
+    // Right-click may still offer the table's own Export; never row copies.
+    expect(screen.queryByRole('menuitem', { name: 'Copy title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Copy contract ID' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('offers the menu on a titleless contract, keyed off its type-label fallback', async () => {
-    render(<App />);
-    await openContractMenu('Courier');
-
-    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('left-click on the title cell still opens the detail modal, unaffected by the context menu', async () => {

@@ -18,7 +18,6 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
-  MenuItem,
   PageHeader,
   Panel,
   SearchInput,
@@ -1839,6 +1838,21 @@ export function Assets() {
                         </span>
                       </span>
                     )}
+                    {deepest && 'kind' in deepest && deepest.kind === 'ship' && (
+                      <Button
+                        size="md"
+                        className="shrink-0"
+                        onClick={() =>
+                          void assetShipEditLocation(deepest, nodeLabel(deepest)).then(
+                            (location) => {
+                              if (location) void navigate(location);
+                            }
+                          )
+                        }
+                      >
+                        {t('assets.openInFittings')}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -2108,31 +2122,12 @@ function NodeRowView({
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
-  const navigate = useNavigate();
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
   if (node.kind !== 'item') {
     return (
       <ContainerRow
-        menu={
-          node.kind === 'ship'
-            ? {
-                name: label,
-                items: (
-                  <MenuItem
-                    onSelect={() =>
-                      void assetShipEditLocation(node, label).then((location) => {
-                        if (location) navigate(location);
-                      })
-                    }
-                  >
-                    {t('assets.openInFittings')}
-                  </MenuItem>
-                ),
-              }
-            : undefined
-        }
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
         itemCount={node.itemCount}

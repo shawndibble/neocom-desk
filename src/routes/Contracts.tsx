@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -32,7 +32,6 @@ import {
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
-import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { CharacterLink } from '@/features/entities';
@@ -268,10 +267,6 @@ function ContractsFilterBar({
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const contractRowKey = (contract: Contract) => contract.contract_id;
-
-function contractRowContextMenu(contract: Contract, tr: ReactElement) {
-  return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
-}
 
 const CONTRACT_STATUSES = Object.keys(CONTRACT_STATUS_KEY) as Contract['status'][];
 const CONTRACT_TYPES = Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][];
@@ -689,8 +684,6 @@ export function Contracts() {
               rowKey={contractRowKey}
               virtualize="auto"
               highlightRowKey={highlightedContractId}
-              rowContextMenu={contractRowContextMenu}
-              rowMoreActions
               {...historySortProps}
             />
           )}
