@@ -68,9 +68,9 @@ interface Home {
 
 /**
  * The strip under the PI tabs, shared by all three: where the pilot's colonies
- * are (with none, where the pilot is), how many, the way to the sell market, which market that is, and (on
- * Colonies) EVE time. Only
- * what there is data for today: a field with no source is left out.
+ * are (with none, where the pilot is), how many, the way to the sell market,
+ * which market that is, and (on Colonies) EVE time. Only what there is data
+ * for today: a field with no source is left out.
  */
 export function PiHeaderStrip({
   colonySystemIds,
@@ -107,7 +107,11 @@ export function PiHeaderStrip({
       : null;
   // Where the route and the nearest-hub nudge start: the colonies, else the pilot.
   const homeId = colonyHome ?? locationId;
-  const fromLocation = colonyHome === null && homeId !== null;
+  // With no colony, the chips say where the figures start: here, not home.
+  const label =
+    colonyHome === null && homeId !== null
+      ? { home: 'location', route: 'routeFromHere', dropOff: 'dropOffHere' }
+      : { home: 'home', route: 'route', dropOff: 'dropOff' };
   const [home, setHome] = useState<Home | null>(null);
   const [route, setRoute] = useState<{ key: string; figures: RouteFigures | null } | null>(null);
 
@@ -164,7 +168,7 @@ export function PiHeaderStrip({
       <StatChips>
         {homeId !== null && shownHome?.name && (
           <StatChip
-            label={t(fromLocation ? 'piPlan.strip.location' : 'piPlan.strip.home')}
+            label={t(`piPlan.strip.${label.home}`)}
             value={
               <>
                 {shownHome.name}
@@ -256,15 +260,15 @@ export function PiHeaderStrip({
       {buybackPct !== null && homeId !== null && (
         <StatChips>
           <StatChip
-            label={t(fromLocation ? 'piPlan.strip.routeFromHere' : 'piPlan.strip.route')}
-            value={t(fromLocation ? 'piPlan.strip.dropOffHere' : 'piPlan.strip.dropOff')}
+            label={t(`piPlan.strip.${label.route}`)}
+            value={t(`piPlan.strip.${label.dropOff}`)}
           />
         </StatChips>
       )}
       {figures && (
         <StatChips>
           <StatChip
-            label={t(fromLocation ? 'piPlan.strip.routeFromHere' : 'piPlan.strip.route')}
+            label={t(`piPlan.strip.${label.route}`)}
             value={
               <>
                 {t('piPlan.strip.jumps', { count: figures.jumps, hub: hub.systemName })}

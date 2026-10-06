@@ -150,7 +150,7 @@ export interface ProductTile {
   typeId: number;
   name: string;
   tier: 0 | 1 | 2 | 3 | 4;
-  /** ISK a day from one planet; for a raw, selling it as extracted. Null where the model has no one-planet figure. */
+  /** ISK a day from one planet (a raw: sold as extracted); null without a one-planet figure. */
   perDay: number | null;
   /** A raw the sell market quotes no price for, so it has no figure. */
   noPrice: boolean;
@@ -171,7 +171,7 @@ export interface TierColumn {
 
 export function buildAllProducts(
   input: Pick<FindBestInput, 'rows' | 'colonyTypes' | 'off' | 'whatIf'> & {
-    /** Raw P0 sell figures per planet type (`PlanAdvice.rawRows`): shown, never ranked. */
+    /** From `PlanAdvice.rawRows` / `rawUnpriced`. */
     rawRows?: readonly RawRow[];
     rawUnpriced?: readonly number[];
   },
@@ -190,7 +190,6 @@ export function buildAllProducts(
   const ranked = new Map(
     rankRecipes({ rows, haveTypes: [...have], filter: 'any' }).recipes.map((r) => [r.typeId, r])
   );
-  // A raw's best figure on a planet type the toggles keep.
   const rawBest = new Map<number, number>();
   for (const raw of input.rawRows ?? []) {
     if (!have.has(raw.planetType)) continue;

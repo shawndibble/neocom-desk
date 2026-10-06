@@ -43,9 +43,7 @@ describe('Tooltip', () => {
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
-  // The PI settings gear: its modal handed focus back and took it again in one
-  // tick (a dev remount), Radix ignored the close against the stale `open`,
-  // and the bubble stayed over the modal, eating its first Escape.
+  // PI settings gear: its modal returned and retook focus in one tick (dev remount).
   it('ends closed when focus arrives and leaves in the same tick', () => {
     render(
       <Tooltip content="Page settings">

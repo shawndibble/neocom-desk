@@ -96,8 +96,6 @@ export function PlanetaryIndustry() {
   // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
-  // A tab switch keeps the search, so the Map's `?product=` or `?planet=`
-  // would reopen its drawer on the way back: they belong to the Map alone.
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
@@ -106,8 +104,6 @@ export function PlanetaryIndustry() {
     if (!MAP_ONLY_PARAMS.some((key) => params.has(key))) return;
     navigate(hrefWithout(location, MAP_ONLY_PARAMS), { replace: true, state: location.state });
   }, [tab, location, navigate]);
-  // Back from a Map drawer remounts Plan or Colonies behind a spinner, too
-  // short for the browser's own restore: put the scroll back once it has grown.
   usePopScrollRestore();
 
   // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the

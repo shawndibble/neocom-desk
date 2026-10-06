@@ -22,10 +22,8 @@ export function usePopScrollRestore(): void {
   const location = useLocation();
   const navigationType = useNavigationType();
 
-  // Updated at commit, so a scroll the browser fires after the next page
-  // replaced this one (clamping it) is filed under the new entry, not this
-  // one. The target is read in the same commit, before that clamp's scroll
-  // event can overwrite it with 0.
+  // Key and target set at commit: a clamp scroll fired after the next page commits is filed
+  // under the new key, and the target is read before that scroll can zero it.
   const keyRef = useRef(location.key);
   const targetRef = useRef<number | null>(null);
   useLayoutEffect(() => {

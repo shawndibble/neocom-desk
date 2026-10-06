@@ -19,10 +19,7 @@ interface SlideOverProps {
   className?: string;
   /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
-  /**
-   * Where focus goes on close when what held it at open is gone: a panel a
-   * link on another tab opened (the PI product drawer) has no opener left.
-   */
+  /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
   returnFocusFallback?: () => HTMLElement | null;
 }
 

@@ -65,15 +65,8 @@ export function parsePiPlanet(search: string): number | null {
 }
 
 /** The same location without `planet`. */
-export function hrefWithoutPiPlanet(location: {
-  pathname: string;
-  search: string;
-  hash: string;
-}): string {
-  const params = new URLSearchParams(location.search);
-  params.delete(PI_PLANET_PARAM);
-  const rest = params.toString();
-  return `${location.pathname}${rest === '' ? '' : `?${rest}`}${location.hash}`;
+export function hrefWithoutPiPlanet(location: UrlLocation): string {
+  return hrefWithout(location, [PI_PLANET_PARAM]);
 }
 
 /** The product a search string opens, or null when absent or not a positive whole id. */
@@ -84,28 +77,19 @@ export function parsePiProduct(search: string): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-/** The search string without `product` (`''` or `'?a=b'`). */
-export function withoutPiProduct(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete(PI_PRODUCT_PARAM);
-  const rest = params.toString();
-  return rest === '' ? '' : `?${rest}`;
+/** The same location without `product`. */
+export function hrefWithoutPiProduct(location: UrlLocation): string {
+  return hrefWithout(location, [PI_PRODUCT_PARAM]);
 }
 
-/** The same location without `product`. */
-export function hrefWithoutPiProduct(location: {
+interface UrlLocation {
   pathname: string;
   search: string;
   hash: string;
-}): string {
-  return `${location.pathname}${withoutPiProduct(location.search)}${location.hash}`;
 }
 
 /** The same location without `keys`. */
-export function hrefWithout(
-  location: { pathname: string; search: string; hash: string },
-  keys: readonly string[]
-): string {
+export function hrefWithout(location: UrlLocation, keys: readonly string[]): string {
   const params = new URLSearchParams(location.search);
   for (const key of keys) params.delete(key);
   const rest = params.toString();

@@ -190,11 +190,9 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   }
 
   /**
-   * Radix's own close on click and blur goes through its controllable state,
-   * which drops a close that matches the `open` prop it last rendered: so an
-   * open and a close in one tick (a modal handing focus back and taking it
-   * again) left the bubble open over the modal, eating its first Escape.
-   * Clearing our own state here closes it whatever Radix last rendered.
+   * Radix's controllable state drops a close matching the `open` it last rendered: open+close
+   * in one tick (a modal returning then retaking focus) left the bubble up, eating the modal's
+   * first Escape. Clearing our own state closes it regardless.
    */
   function forceClose() {
     setHoverOpen(false);

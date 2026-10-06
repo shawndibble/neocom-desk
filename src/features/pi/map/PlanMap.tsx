@@ -204,11 +204,10 @@ export function PlanMap({
   const dropProductParam = hasProductParam && (linked === null || richnessColony !== null);
   const dropPlanetParam = hasPlanetParam && richnessColony === null;
   useEffect(() => {
-    if (!dropProductParam && !dropPlanetParam) return;
-    const keys = [
-      ...(dropProductParam ? [PI_PRODUCT_PARAM] : []),
-      ...(dropPlanetParam ? [PI_PLANET_PARAM] : []),
-    ];
+    const keys: string[] = [];
+    if (dropProductParam) keys.push(PI_PRODUCT_PARAM);
+    if (dropPlanetParam) keys.push(PI_PLANET_PARAM);
+    if (keys.length === 0) return;
     navigate(hrefWithout(location, keys), { replace: true, state: location.state });
   }, [dropProductParam, dropPlanetParam, location, navigate]);
   const dropPlanet = () =>
@@ -284,7 +283,7 @@ export function PlanMap({
       id === null
         ? null
         : (layoutRef.current?.querySelector<HTMLElement>(`[data-map-key="p:${id}"]`) ?? null);
-    return item ?? document.querySelector<HTMLElement>('h1[tabindex]');
+    return item ?? document.querySelector<HTMLElement>('main h1[tabindex]');
   }, []);
   const closeHelp = useCallback(() => {
     setHelpOpen(false);

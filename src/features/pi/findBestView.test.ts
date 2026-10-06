@@ -208,7 +208,7 @@ describe('buildAllProducts', () => {
     const raw = (id: number) => tiers[0].items.find((i) => i.typeId === id);
     expect(raw(MICRO)).toMatchObject({ perDay: 40_000, noPrice: false, comparison: null });
     expect(raw(BASE_METALS)).toMatchObject({ perDay: null, noPrice: false });
-    // Shown, never ranked: the raw column keeps name order whatever the figures.
+    // Raw column keeps name order whatever the figures.
     const names = tiers[0].items.map((i) => i.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   });

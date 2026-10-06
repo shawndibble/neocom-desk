@@ -5,12 +5,12 @@ import {
   piPlanHref,
   hrefWithout,
   hrefWithoutPiPlanet,
+  hrefWithoutPiProduct,
   MAP_ONLY_PARAMS,
   parsePiPlanet,
   piPlanetHref,
   piProductHref,
   productNavigation,
-  withoutPiProduct,
   PI_PRODUCT_PUSHED_STATE,
 } from './piPlanLink';
 
@@ -63,10 +63,13 @@ describe('parsePiProduct', () => {
   );
 });
 
-describe('withoutPiProduct', () => {
+describe('hrefWithoutPiProduct', () => {
   it('drops only the product', () => {
-    expect(withoutPiProduct('?goals=1&product=2393')).toBe('?goals=1');
-    expect(withoutPiProduct('?product=2393')).toBe('');
+    const at = (search: string) => ({ pathname: '/planetary-industry/map', search, hash: '' });
+    expect(hrefWithoutPiProduct(at('?goals=1&product=2393'))).toBe(
+      '/planetary-industry/map?goals=1'
+    );
+    expect(hrefWithoutPiProduct(at('?product=2393'))).toBe('/planetary-industry/map');
   });
 });
 

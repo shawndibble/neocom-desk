@@ -1171,11 +1171,12 @@ function rankingFor(args: {
     ccAssumed: skill === null,
     linkCost: borrowed ? 'borrowed' : 'assumed',
   };
+  const rawPriced = new Set(rawRows.map((row) => row.typeId));
   return {
     rows: recipeRows,
     rawRows,
-    // Priced on one planet type is priced: the market quotes the type, not the planet.
-    rawUnpriced: [...rawUnpriced].filter((id) => !rawRows.some((row) => row.typeId === id)),
+    // Priced on any planet type = priced: the market prices the item, not the planet.
+    rawUnpriced: [...rawUnpriced].filter((id) => !rawPriced.has(id)),
     // With no colony every planet type is one the pilot could go and find, as in Find best.
     withTagged: rankRecipes({
       rows: recipeRows,
