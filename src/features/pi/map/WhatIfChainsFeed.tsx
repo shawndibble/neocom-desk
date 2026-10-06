@@ -8,7 +8,7 @@ import { useEffect, useMemo } from 'react';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
 import type { PlanAdvice } from '../planAdviceModel';
-import { NO_WHAT_IF_CHAINS, useWhatIfChains, type WhatIfChainsState } from '../useBiggerChains';
+import { useWhatIfChains, type WhatIfChainsState } from '../useBiggerChains';
 
 export function WhatIfChainsFeed({
   advice,
@@ -19,11 +19,12 @@ export function WhatIfChainsFeed({
   advice: PlanAdvice;
   pi: PiData;
   type: PlanetType;
-  onChange: (state: WhatIfChainsState) => void;
+  /** With the advice it was priced for: the parent drops a state that is a render behind. */
+  onChange: (fed: { advice: PlanAdvice; state: WhatIfChainsState } | null) => void;
 }) {
   const wanted = useMemo(() => [type], [type]);
   const state = useWhatIfChains(advice, pi, wanted);
-  useEffect(() => onChange(state), [state, onChange]);
-  useEffect(() => () => onChange(NO_WHAT_IF_CHAINS), [onChange]);
+  useEffect(() => onChange({ advice, state }), [advice, state, onChange]);
+  useEffect(() => () => onChange(null), [onChange]);
   return null;
 }

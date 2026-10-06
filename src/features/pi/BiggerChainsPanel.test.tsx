@@ -19,6 +19,7 @@ let mockState: BiggerChainsEstimateState;
 let mockWhatIf: WhatIfChainsState;
 const askedFor = vi.fn();
 vi.mock('./useBiggerChains', () => ({
+  NO_TYPES: [],
   useBiggerChains: () => mockState,
   useWhatIfChains: (_advice: unknown, _pi: unknown, wanted: readonly PlanetType[]) => {
     askedFor([...wanted]);

@@ -44,6 +44,7 @@ import {
   type ChainBasis,
   type ChainEstimateView,
 } from './chainEstimateModel';
+import type { PlanAdvice } from './planAdviceModel';
 import { rawInputsOf } from './productPlanets';
 
 /** One haul between two of the chain's colonies. */
@@ -341,6 +342,21 @@ export interface WhatIfChainsRow {
  * chain gains most first. The new planet is compared with a free slot at the
  * best one-planet recipe, as a chain on new planets is.
  */
+/** `whatIfChainsView` over Plan's own figures: the same comparison on Plan and the Map. */
+export function whatIfChainsOf(
+  advice: Pick<PlanAdvice, 'colonies' | 'slots' | 'chainBasis'>,
+  byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>
+): WhatIfChainsRow[] {
+  return whatIfChainsView({
+    byType,
+    afterRebuildPerDay: new Map(
+      advice.colonies.map((colony) => [colony.planetId, colony.afterRebuildPerDay])
+    ),
+    slots: { free: advice.slots.free, gainPerPlanetPerDay: advice.slots.gainPerPlanetPerDay },
+    haulDays: advice.chainBasis.haulDays,
+  });
+}
+
 export function whatIfChainsView(
   input: Omit<BiggerChainsInput, 'estimates'> & {
     byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>;

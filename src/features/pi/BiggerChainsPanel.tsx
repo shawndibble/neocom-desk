@@ -22,7 +22,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import { withArticle } from './article';
 import {
   biggerChainsView,
-  whatIfChainsView,
+  whatIfChainsOf,
   WHAT_IF_PLANET_ID,
   type BiggerChainCard,
 } from './biggerChainsModel';
@@ -32,7 +32,7 @@ import { PiProductLink } from './PiProductLink';
 import type { PlanAdvice } from './planAdviceModel';
 import { Sentence } from './sentence';
 import { planetTypesOf } from './productPlanets';
-import { useBiggerChains, useWhatIfChains } from './useBiggerChains';
+import { NO_TYPES, useBiggerChains, useWhatIfChains } from './useBiggerChains';
 
 const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
 const m3 = (value: number) => Math.round(value).toLocaleString('en');
@@ -315,17 +315,11 @@ function WhatIfSection({
   const noSlot = advice.slots.free < 1;
   const wanted = ready && !noSlot ? missing : NO_TYPES;
   const state = useWhatIfChains(advice, pi, wanted);
+  const pending = !ready || state.pending;
+  // All at once when every type is priced: rows landing one by one would re-sort under the pointer.
   const rows = useMemo(
-    () =>
-      whatIfChainsView({
-        byType: state.byType,
-        afterRebuildPerDay: new Map(
-          advice.colonies.map((colony) => [colony.planetId, colony.afterRebuildPerDay])
-        ),
-        slots: { free: advice.slots.free, gainPerPlanetPerDay: advice.slots.gainPerPlanetPerDay },
-        haulDays: advice.chainBasis.haulDays,
-      }),
-    [state.byType, advice.colonies, advice.slots, advice.chainBasis.haulDays]
+    () => (pending ? [] : whatIfChainsOf(advice, state.byType)),
+    [pending, advice, state.byType]
   );
   if (missing.length === 0) return null;
   const toggle = (type: PlanetType) =>
@@ -354,6 +348,12 @@ function WhatIfSection({
               aType: withArticle(t(`pi.planetType.${row.type}`)),
               count: row.cards.length,
             })}
+            trailing={
+              <>
+                <IskAmount value={row.cards[0].iskPerDay} decimals={0} />
+                {t('piPlan.make.perDay')}
+              </>
+            }
             expanded={open.has(row.type)}
             onToggle={() => toggle(row.type)}
           >
@@ -364,7 +364,7 @@ function WhatIfSection({
         </div>
       ))}
       {!noSlot &&
-        (!ready || state.pending ? (
+        (pending ? (
           <div className="flex items-center gap-2 border-t border-line px-3 py-3 text-xs text-text-dim">
             <Spinner size="sm" label={t('piPlan.chains.whatIfPricing')} />
             {t('piPlan.chains.whatIfPricing')}
@@ -379,8 +379,6 @@ function WhatIfSection({
     </section>
   );
 }
-
-const NO_TYPES: readonly PlanetType[] = [];
 
 export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiData }) {
   const { t } = useTranslation();

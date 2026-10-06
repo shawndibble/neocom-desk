@@ -316,6 +316,12 @@ export type ProductFigure =
       whatIf?: { type: PlanetType; iskPerDay: number; planets: number };
     };
 
+/** The multi-planet figure a P3/P4 tile shows: the what-if planet's Bigger chain first, else its chain estimate. */
+export function tileChainIsk(figure: ProductFigure): number | null {
+  if (figure.kind !== 'unranked') return null;
+  return (figure.whatIf ?? figure.chain)?.iskPerDay ?? null;
+}
+
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from
  * several planets, so it has no per-planet figure, and a P1 or P2 the hub does

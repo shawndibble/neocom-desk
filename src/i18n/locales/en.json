@@ -4775,6 +4775,7 @@
       "chainsHeading": "Bigger chains with it",
       "chainsPricing": "Pricing the Bigger chains it makes possible…",
       "chainsNone": "It makes no Bigger chain possible in your free planet slots.",
+      "chainsNoSlot": "You have no free planet slot, so its Bigger chains need a colony dropped first.",
       "chainsTip": "Its planets, haul and jumps are in the add-planet panel."
     },
     "slots": {

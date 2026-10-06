@@ -40,6 +40,7 @@ vi.mock('./useBiggerChains', () => ({
     candidateCount: 1,
     pending: false,
   }),
+  NO_TYPES: [],
   // A what-if planet's chain, as large: it must not move them either.
   useWhatIfChains: () => ({
     byType: new Map([

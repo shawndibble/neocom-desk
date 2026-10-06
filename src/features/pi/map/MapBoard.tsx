@@ -54,7 +54,13 @@ import {
   tierName,
   verdictGlyph,
 } from './mapText';
-import type { MapGraph, MapTier, ProductFigure, Trace } from './mapModel';
+import {
+  tileChainIsk,
+  type MapGraph,
+  type MapTier,
+  type ProductFigure,
+  type Trace,
+} from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -461,11 +467,8 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
-                        ) : figure.kind === 'unranked' && (figure.whatIf ?? figure.chain) ? (
-                          <ChainTileFigure
-                            iskPerDay={(figure.whatIf ?? figure.chain)!.iskPerDay}
-                            stacked
-                          />
+                        ) : tileChainIsk(figure) !== null ? (
+                          <ChainTileFigure iskPerDay={tileChainIsk(figure)!} stacked />
                         ) : (
                           <span aria-hidden="true" />
                         )}

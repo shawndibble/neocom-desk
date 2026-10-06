@@ -40,18 +40,28 @@ export interface BiggerChainsEstimateState {
 }
 
 let cached: { key: string; results: Map<number, BiggerChainEstimates> } | null = null;
-/** What-if chains by planet type added, for the same inputs as `cached`. */
-let whatIfCached: {
-  key: string;
-  byType: Map<PlanetType, Map<number, BiggerChainEstimates>>;
-} | null = null;
+/** What-if chains by planet type added, per set of inputs: Plan's and the Map's may differ. */
+const whatIfCache = new Map<string, Map<PlanetType, Map<number, BiggerChainEstimates>>>();
+const WHAT_IF_CACHE_SIZE = 4;
+
+function whatIfResultsFor(key: string): Map<PlanetType, Map<number, BiggerChainEstimates>> {
+  let byType = whatIfCache.get(key);
+  if (!byType) {
+    byType = new Map();
+    whatIfCache.set(key, byType);
+    while (whatIfCache.size > WHAT_IF_CACHE_SIZE) {
+      whatIfCache.delete(whatIfCache.keys().next().value!);
+    }
+  }
+  return byType;
+}
 /** The last jump count, so coming back to Plan neither recounts nor waits. */
 let cachedPairs: { key: string; byPair: Map<string, number | null> } | null = null;
 
 /** Test seam: forget every priced chain and counted jump. */
 export function resetBiggerChains(): void {
   cached = null;
-  whatIfCached = null;
+  whatIfCache.clear();
   cachedPairs = null;
 }
 
@@ -88,7 +98,9 @@ function useColonyJumps(
   const basis = useJumpBasis();
   const systemKey = [...new Set(systemOf.values())].sort((a, b) => a - b).join(',');
   const wanted = `${basis.key}|${systemKey}`;
-  const [pairs, setPairs] = useState(cachedPairs);
+  const [own, setPairs] = useState(cachedPairs);
+  // Another hook on the page may have counted them since this one mounted.
+  const pairs = own?.key === wanted ? own : cachedPairs?.key === wanted ? cachedPairs : own;
   useEffect(() => {
     if (!enabled || !basis.hydrated || pairs?.key === wanted) return;
     let cancelled = false;
@@ -234,7 +246,7 @@ type WhatIfUnit =
   | { type: PlanetType; typeId: number; layout: 'new' | 'colonies' }
   | { type: PlanetType; layout: 'done' };
 
-const NO_TYPES: readonly PlanetType[] = [];
+export const NO_TYPES: readonly PlanetType[] = [];
 
 /**
  * The Bigger chains each of `wanted` would make possible, one planet type at a
@@ -254,8 +266,7 @@ export function useWhatIfChains(
 
   useEffect(() => {
     if (key === null || !pi) return;
-    if (whatIfCached?.key !== key) whatIfCached = { key, byType: new Map() };
-    const byType = whatIfCached.byType;
+    const byType = whatIfResultsFor(key);
     const todo: WhatIfUnit[] = wanted
       .filter((type) => !byType.has(type))
       .flatMap((type) => [
@@ -274,6 +285,8 @@ export function useWhatIfChains(
         partial.set(unit.type, chains);
         if (unit.layout === 'done') {
           byType.set(unit.type, chains);
+          // Another set of inputs may have evicted this one mid-run: put it back.
+          if (whatIfCache.get(key) !== byType) whatIfCache.set(key, byType);
           return true;
         }
         const entry = chains.get(unit.typeId) ?? { colonies: null, newPlanets: null };
@@ -310,7 +323,7 @@ export function useWhatIfChains(
 
   return useMemo(() => {
     void version;
-    const results = key !== null && whatIfCached?.key === key ? whatIfCached.byType : null;
+    const results = key !== null ? whatIfCache.get(key) : undefined;
     const asked = wantedKey === '' ? [] : (wantedKey.split(',') as PlanetType[]);
     const byType = new Map(
       asked.flatMap((type) => {

@@ -150,6 +150,20 @@ describe('useWhatIfChains', () => {
     expect(jumpsBetween).toHaveBeenCalledTimes(1);
   });
 
+  it('reuses the jumps Plan’s own chains counted, mounted beside them', async () => {
+    const { result, rerender } = renderHook(
+      ({ wanted }: { wanted: PlanetType[] }) => ({
+        own: useBiggerChains(twoGas, pi),
+        whatIf: useWhatIfChains(twoGas, pi, wanted),
+      }),
+      { initialProps: { wanted: [] as PlanetType[] } }
+    );
+    await waitFor(() => expect(result.current.own.pending).toBe(false), { timeout: 5_000 });
+    rerender({ wanted: LAVA });
+    await waitFor(() => expect(result.current.whatIf.pending).toBe(false), { timeout: 5_000 });
+    expect(jumpsBetween).toHaveBeenCalledTimes(1);
+  });
+
   it('counts no route and prices nothing while asked for no type', async () => {
     const { result } = renderHook(() => useWhatIfChains(twoGas, pi, []));
     expect(result.current).toEqual({ byType: new Map(), pending: false });

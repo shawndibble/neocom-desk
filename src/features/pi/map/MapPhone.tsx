@@ -23,7 +23,7 @@ import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
 import { ChainTileFigure } from './ChainTileFigure';
-import type { MapGraph, MapTier, ProductFigure } from './mapModel';
+import { tileChainIsk, type MapGraph, type MapTier, type ProductFigure } from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -174,9 +174,9 @@ export function MapPhone(props: MapPhoneProps) {
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
-                  {figure.kind === 'unranked' && (figure.whatIf ?? figure.chain) && (
+                  {tileChainIsk(figure) !== null && (
                     <ChainTileFigure
-                      iskPerDay={(figure.whatIf ?? figure.chain)!.iskPerDay}
+                      iskPerDay={tileChainIsk(figure)!}
                       className="shrink-0 text-xs"
                     />
                   )}
