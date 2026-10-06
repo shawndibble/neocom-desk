@@ -8497,7 +8497,6 @@
       "title": "Route rules",
       "show": "Show route rules",
       "hide": "Hide route rules",
-      "thisRoute": "This route only · kept in the link",
       "travelSettings": "Your travel settings · used everywhere the app counts jumps",
       "preferenceLabel": "Route preference",
       "preference": {

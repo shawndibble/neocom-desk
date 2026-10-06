@@ -2,12 +2,11 @@
  * Route Safety's Route rules panel (issue #2472): what this route avoids,
  * changeable while planning instead of a trip to Settings → Travel and back.
  *
- * Three groups, labelled so it is clear what each setting touches (decision
- * `20261003-161302`):
- * - the Route Preference, this route only and kept in the link;
- * - the pilot's Travel Settings — the same synced stores and the same
- *   controls Settings → Travel shows (`features/route/TravelRuleFields.tsx`),
- *   never a copy;
+ * Two groups, labelled so it is clear what each setting touches (decision
+ * `20261003-161302`, amended by the Route Preference decision of 2026-10-06):
+ * - the pilot's Travel Settings — the Route Preference and the rest, all the
+ *   same synced stores and controls Settings → Travel shows
+ *   (`features/route/TravelRuleFields.tsx`), never a copy;
  * - Route Safety only (issue #2476): routing through the Thera / Turnur
  *   holes. Saved as this page's default and overridable in the link, and
  *   deliberately not in Settings → Travel — no other page's jumps use holes.
@@ -261,7 +260,7 @@ export function RouteRulesPanel({
 }: {
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
-  /** Writes the link only — never the saved default. */
+  /** Saves the pilot's default (the one Settings → Travel shows), and drops the link's override. */
   onPreferenceChange: (next: RoutePreferenceKind) => void;
   /** The wormhole settings this route is drawn with: the link's, else the page's defaults. */
   holeQuery: RouteHoleQuery;
@@ -294,8 +293,8 @@ export function RouteRulesPanel({
     >
       {settingsHydrated && holeQuery.hydrated && bridges.bridgeQuery.hydrated ? (
         <div className="space-y-5 text-xs">
-          <section className="space-y-2">
-            <GroupLabel>{t('travel.rules.thisRoute')}</GroupLabel>
+          <section className="space-y-4">
+            <GroupLabel>{t('travel.rules.travelSettings')}</GroupLabel>
             <SegmentedControl
               label={t('travel.rules.preferenceLabel')}
               options={ROUTE_PREFERENCES.map((value) => ({
@@ -308,10 +307,6 @@ export function RouteRulesPanel({
               fill
               uppercase={false}
             />
-          </section>
-
-          <section className="space-y-4 border-t border-line pt-4">
-            <GroupLabel>{t('travel.rules.travelSettings')}</GroupLabel>
             <div className="space-y-1.5">
               <label htmlFor={penaltyId} className="block font-semibold">
                 {t('settings.travel.penaltyLabel')}
