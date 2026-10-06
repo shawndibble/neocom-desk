@@ -20,9 +20,9 @@
  *   (`plannerColonies`, so overrides and the unknown-rate assumption apply),
  *   not `colonyBaseline`, which is a modelled best P1 rather than measured
  *   income. A colony whose storage fills before the pilot's haul does not earn
- *   its nominal rate: today is the nominal figure less the stalled share, and
- *   the storage quick win gives that share back. So today plus every quick win
- *   is the colony running at full, with nothing counted twice.
+ *   its nominal rate: today is the nominal figure less the stalled share. The
+ *   storage quick win shows that share as a saving and no total adds it
+ *   (decision 20261006-094549).
  * - **Quick wins**: stopped or decayed extractors, idle factories, storage that
  *   fills early, spare room. Each is priced by re-running the same earnings
  *   model with the fix applied and taking the difference, so a quick win's
