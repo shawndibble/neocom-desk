@@ -85,7 +85,9 @@ import {
 } from '@/engine/pi/stopTier';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import type { PinLoad } from '@/engine/pi/types';
+import type { NetworkOpportunity } from '@/engine/pi/network';
 import { colonyNetwork } from './networkModel';
+import { dropSharedSurplus } from './factoryRoomDedupe';
 import { salesTaxPct } from '@/engine/industry/fees';
 import { colonyPlan } from './colonyPlan';
 import { colonyBudget } from './colonyBudget';
@@ -624,6 +626,60 @@ function analyseColony(args: {
     }
   }
 
+  // Raw P0 sold as it comes out of the ground: basic factories refine it to P1.
+  // Priced against what the raw earns today (never against zero), so a refinement
+  // that would pay less than the ore is not offered, and a colony is never
+  // steered towards selling raw.
+  let basicRoom = plan.headroom.basic ?? 0;
+  let refined = colony;
+  let refinedEarnings = nominal;
+  const rawsByRate = [...colony.extractedPerHour].sort(
+    (a, b) => b.unitsPerHour - a.unitsPerHour || a.typeId - b.typeId
+  );
+  for (const raw of rawsByRate) {
+    if (basicRoom <= 0 || refinedEarnings === null) break;
+    const found = Object.entries(pi.schematics).find(
+      ([, s]) =>
+        s.facility === 'basic' && s.inputs.length === 1 && s.inputs[0].typeID === raw.typeId
+    );
+    if (!found || found[1].cycleTime <= 0) continue;
+    const [productKey, schematic] = found;
+    const productTypeId = Number(productKey);
+    const running = new Set(refined.production.map((group) => group.schematicId));
+    const refinesItAlready = Object.values(pi.schematics).some(
+      (s) => running.has(s.schematicId) && s.inputs.some((i) => i.typeID === raw.typeId)
+    );
+    if (refinesItAlready) continue;
+    const drawPerFactory = (schematic.inputs[0].quantity * 3600) / schematic.cycleTime;
+    const factories = Math.min(basicRoom, Math.ceil(raw.unitsPerHour / drawPerFactory));
+    if (factories <= 0) continue;
+    const candidate: BuiltColonyAdvice = {
+      ...refined,
+      production: [...refined.production, { schematicId: schematic.schematicId, count: factories }],
+    };
+    const after = earningsOf(candidate);
+    if (after.unpriced.length > 0 || after.iskPerHour === null) continue;
+    const gain = gainPerDay(after.iskPerHour, refinedEarnings);
+    if (gain === null || !(gain > 0)) continue;
+    wins.push(
+      quickWin(
+        planetId,
+        {
+          kind: 'spare-room',
+          what: 'factories',
+          productTypeId,
+          factories,
+          routedFrom: [],
+          needsRemoval: plan.idle !== null,
+        },
+        gain
+      )
+    );
+    basicRoom -= factories;
+    refined = candidate;
+    refinedEarnings = after.iskPerHour;
+  }
+
   // Spare room for more extractors. Priced only for a colony on one resource:
   // with two, no figure says which one a new ECU would pull.
   const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
@@ -632,8 +688,11 @@ function analyseColony(args: {
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
   // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
   // headroom, so when the idle win already buys heads, this one would count it twice.
+  // The same goes for the basic factories above: they take the room first.
   const headroomSpent = wins.some(
-    (win) => win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null
+    (win) =>
+      (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
+      (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
   );
   if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
     const only = colony.extractedPerHour[0];
@@ -653,7 +712,24 @@ function analyseColony(args: {
     }
   }
 
-  wins.push(...args.factoryWins.map((win) => ({ ...win, planetId })));
+  // A network factory win for a product this colony already refines locally is the same gain.
+  const localProducts = new Set(
+    wins.flatMap((win) =>
+      win.detail.kind === 'spare-room' && win.detail.what === 'factories'
+        ? [win.detail.productTypeId]
+        : []
+    )
+  );
+  wins.push(
+    ...args.factoryWins
+      .filter(
+        (win) =>
+          win.detail.kind !== 'spare-room' ||
+          win.detail.what !== 'factories' ||
+          !localProducts.has(win.detail.productTypeId)
+      )
+      .map((win) => ({ ...win, planetId }))
+  );
 
   // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;
@@ -796,7 +872,14 @@ function factoryRoom(
   const hasIdle = new Map(
     built.map((row) => [row.planetId, colonyPlan(row.advice, pi).idle !== null])
   );
+  const byHost = new Map<number, NetworkOpportunity[]>();
   for (const opportunity of network.plan.opportunities) {
+    const group = byHost.get(opportunity.hostPlanetId) ?? [];
+    group.push(opportunity);
+    byHost.set(opportunity.hostPlanetId, group);
+  }
+  const opportunities = [...byHost.values()].flatMap((group) => dropSharedSurplus(group));
+  for (const opportunity of opportunities) {
     const gain = opportunity.marginPerHour * HOURS_PER_DAY;
     if (!(gain > 0)) continue;
     const wins = out.get(opportunity.hostPlanetId) ?? [];

@@ -11,6 +11,7 @@ import { buildPlanAdvice, hubBooks } from '../planAdviceModel';
 import {
   checkStatus,
   colonyCheckRow,
+  faultTagKey,
   compareRows,
   primaryAction,
   sortRows,
@@ -546,5 +547,17 @@ describe('colonyCheckRow against the shared advice model', () => {
     expect(stale.tags).toContainEqual({ kind: 'stale', hours: 26 });
     const fresh = colonyCheckRow({ ...input(d, null), dataAgeHours: 3 });
     expect(fresh.tags.some((tag) => tag.kind === 'stale')).toBe(false);
+  });
+});
+
+describe('faultTagKey', () => {
+  it('keys two room-factories tags (the Hek VIII shape) apart, so React sees no duplicate', () => {
+    const tags = [
+      { kind: 'room-factories', productTypeId: 1, count: 1, gainPerDay: 5 },
+      { kind: 'room-factories', productTypeId: 2, count: 1, gainPerDay: 4 },
+      { kind: 'idle-factories', count: 2 },
+    ] as const;
+    const keys = tags.map(faultTagKey);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
