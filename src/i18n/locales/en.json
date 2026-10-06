@@ -2364,8 +2364,6 @@
     "bpAcqShowingOf_one": "Showing {{shown}} of {{count}}",
     "bpAcqShowingOf_other": "Showing {{shown}} of {{count}}",
     "bpAcqAtHub": "At {{hub}}",
-    "bpAcqLpValueLabel": "Your LP value (ISK per LP)",
-    "bpAcqLpValueHint": "Leave at 0 to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead. Kept for next time.",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
     "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP",
     "bpAcqLpIskOnly": "ISK only — no market rate for this store’s LP",
@@ -7304,6 +7302,9 @@
     },
     "industryDefaultsTitle": "Industry defaults",
     "marketDefaultsTitle": "Market defaults",
+    "lpValueLabel": "Your LP value (ISK per LP)",
+    "lpValueHint": "Leave blank (0) to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead.",
+    "lpValueUseMarket": "Use market rates",
     "avoidedSystems": {
       "title": "Avoided systems",
       "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
