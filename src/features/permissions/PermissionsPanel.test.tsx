@@ -110,6 +110,65 @@ describe('PermissionsPanel — every Permission', () => {
   });
 });
 
+describe('PermissionsPanel — granting several at once', () => {
+  beforeEach(() => mockedGrantedScopes.mockReturnValue([...CORE_GRANT]));
+
+  it('offers a checkbox only on rows that are missing', () => {
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    render(<PermissionsPanel />);
+    expect(within(row('Wallet')).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(
+      within(row('Structure markets')).getByRole('checkbox', { name: 'Select Structure markets' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides the bulk button until something is ticked', () => {
+    render(<PermissionsPanel />);
+    expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
+  });
+
+  it('sends every ticked Permission in one login', async () => {
+    render(<PermissionsPanel />);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Mail' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Wallet' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Grant selected (2)' }));
+
+    expect(mockedGrant).toHaveBeenCalledTimes(1);
+    const call = mockedGrant.mock.calls[0]![0]!;
+    expect(call.characterId).toBe(CHARACTER_ID);
+    expect([...call.groups!].sort()).toEqual(['mail', 'wallet']);
+  });
+
+  it('unticking removes it from the request', async () => {
+    render(<PermissionsPanel />);
+    const mail = screen.getByRole('checkbox', { name: 'Select Mail' });
+    await userEvent.click(mail);
+    await userEvent.click(mail);
+    expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
+  });
+
+  it('Select all ticks every missing row; Select none clears them', async () => {
+    render(<PermissionsPanel />);
+    await userEvent.click(screen.getByRole('button', { name: 'Select all' }));
+    expect(
+      screen.getByRole('button', { name: `Grant selected (${SCOPE_GROUPS.length})` })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Select none' }));
+    expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
+  });
+
+  it('shows no selection controls when nothing is missing', () => {
+    mockedGrantedScopes.mockReturnValue(
+      SCOPE_GROUPS.flatMap((group) => [...scopesForGroup(group)])
+    );
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
+    render(<PermissionsPanel />);
+    expect(screen.queryByRole('button', { name: 'Select all' })).not.toBeInTheDocument();
+  });
+});
+
 /**
  * The Corporation row keeps the old Corp access row's role awareness: a line
  * member is never offered a grant that unlocks nothing.
