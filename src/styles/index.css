@@ -576,19 +576,24 @@
      right margin: button spans 0.25-3rem from the edge, row pads 0.75rem).
      Line two keeps the full card width so a buy's five meta cells fit one
      line on a phone. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned-only
-    tr:has(> td.dt-actions):not(:has(> td.dt-disclosure:not(:empty)))
-    td.dt-corner {
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
     margin-right: 2.25rem;
   }
 
-  /* With the expand chevron on line one too, the chevron is what clears the
-     pinned button (the corner rule's 2.25rem, moved onto it): the button
-     spans 0.25-3rem from the edge, the row pads 0.75rem, so the two sit
-     side by side, never one over the other. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-disclosure {
-    margin-right: 2.25rem;
-    margin-left: 0.25rem;
+  /* No expand chevron on the card: line two runs the card's full width (a
+     buy's five meta cells, an 8-figure quantity reach the button's edge), so
+     a chevron beside the pinned button either rides line one, off the
+     button's axis, or lands on the meta text. The whole card is the tap
+     target (§6c phone cards) and the ⋮ is the one visible control. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-disclosure {
+    display: none;
+  }
+
+  /* The row menu's ⋮ in the text colour, not the shared plain button's dim
+     one: this table's only visible way into the row menu. `!important`
+     because the button's own `text-text-dim` utility sits in a later layer. */
+  .dt-actions-pinned-only td.dt-actions button {
+    color: var(--color-text) !important;
   }
 
   /* The headline figure (`cardCorner`) pinned beside it, centred across both
