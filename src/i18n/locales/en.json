@@ -4726,7 +4726,23 @@
       "samePlanet": "On the same planet, then make:",
       "chainText": "In words: {{planets}} → {{steps}}.",
       "pickRebuild": "This is your #{{rank}} pick in Plan.",
-      "pickRecipe": "This is one of the best one-planet recipes in Plan (#{{rank}})."
+      "pickRecipe": "This is one of the best one-planet recipes in Plan (#{{rank}}).",
+      "anyPlanet": "any planet type",
+      "facility": {
+        "extractor": "Extracted with an Extractor Control Unit on {{types}}.",
+        "basic": "Made in a Basic Industry Facility, on {{types}}.",
+        "advanced": "Made in an Advanced Industry Facility, on {{types}}.",
+        "highTech": "Made in a High-Tech Production Plant, only on {{types}}."
+      },
+      "madeFrom": "Made from",
+      "haul": "About {{m3}} m³ a week to haul to market.",
+      "ccAssumed": "Figures assume a level {{level}} Command Center.",
+      "multiPlanet_one": "No one-planet ISK figure: Plan ranks one-planet P1 and P2 recipes only.",
+      "multiPlanet_other": "Multi-planet: needs {{count}} planets between them, so there is no one-planet ISK figure.",
+      "coloniesHeading": "Your colonies",
+      "makingIt": "Already made on {{colonies}}.",
+      "ownInputs": "Already making parts of the chain:",
+      "ownNone": "None of your colonies makes anything in this chain yet."
     },
     "add": {
       "panelTitle": "Where to put a new colony",

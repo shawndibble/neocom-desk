@@ -8,7 +8,7 @@ import type { FlowEnd, GoalPlan } from '@/engine/pi/goalTypes';
 import type { BaselineTotal } from '@/engine/pi/baseline';
 import { volumeOf } from '@/engine/pi/haulEffort';
 import { piTier as piTierOf } from '@/engine/pi/chain';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from '../PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import { formatVolume } from '@/features/industry/format';
@@ -109,9 +109,7 @@ export function Hauling({
         render: (row) => (
           <span className="inline-flex items-center gap-2">
             <TierChip tier={piTierOf(row.typeId, names.pi)} />
-            <MarketItemLink typeId={row.typeId} hubId={names.hub.id}>
-              {row.name}
-            </MarketItemLink>
+            <PiProductLink typeId={row.typeId}>{row.name}</PiProductLink>
           </span>
         ),
       },

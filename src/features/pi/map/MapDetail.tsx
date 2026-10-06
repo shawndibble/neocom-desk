@@ -3,20 +3,30 @@
  * words, what to find) or an "add a planet" (what it unlocks, the best
  * one-planet recipe, free slots, nearby planets). The same content fills the
  * docked panel, the right-hand drawer and the phone's bottom sheet.
+ *
+ * The product panel is the PI product detail every product name on the PI tabs
+ * opens (DESIGN.md §6c "Entities", Overrides), so its own name is plain text
+ * and it carries the two destinations that link displaced: View in Market and
+ * Show info.
  */
 import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, TypeIcon } from '@/components/ui';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import * as Icon from '@/components/ui/icons';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useOptionalItemActions } from '@/features/market/itemActions';
+import { DAYS_PER_WEEK } from '../findBestHowTo';
+import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { PlanetFinder } from './PlanetFinder';
 import { PlanetImage } from './PlanetImage';
 import { comparisonSentence, planetName, tierWithCode } from './mapText';
 import type { MapGraph, ProductFigure, Trace } from './mapModel';
+import type { ProductDetailView } from './productDetailModel';
 
 export interface FinderOrigin {
   systemId: number | null;
@@ -35,6 +45,7 @@ export interface ProductDetailProps {
   owned: ReadonlySet<PlanetType>;
   colonyNames: ReadonlyMap<PlanetType, string[]>;
   finder: FinderOrigin;
+  view: ProductDetailView;
   onClearTrace: () => void;
 }
 
@@ -50,9 +61,21 @@ function Heading({ children }: { children: React.ReactNode }) {
 }
 
 export function ProductDetail(props: ProductDetailProps) {
-  const { graph, typeId, figure, trace, owned } = props;
+  const { graph, typeId, figure, trace, owned, view } = props;
   const { t } = useTranslation();
+  const itemActions = useOptionalItemActions();
   const product = graph.byId.get(typeId)!;
+  const hostTypes =
+    view.hosts.length === graph.planetTypes.length
+      ? t('piMap.detail.anyPlanet')
+      : view.hosts.map((type) => planetName(t, type)).join(', ');
+  const colonyItems = (items: ProductDetailView['ownInputs']) =>
+    items.map((item, i) => (
+      <span key={item.typeId}>
+        {i > 0 && '; '}
+        <PiProductLink typeId={item.typeId}>{item.name}</PiProductLink> ({item.colonies.join(', ')})
+      </span>
+    ));
 
   const oneHost = trace.alternatives.length > 0;
   const haveHere = oneHost
@@ -69,12 +92,35 @@ export function ProductDetail(props: ProductDetailProps) {
       <div className="flex items-center gap-3">
         <TypeIcon typeId={typeId} size={64} width={48} height={48} />
         <div className="min-w-0">
-          <div className="text-base leading-tight font-semibold">
-            <MarketItemLink typeId={typeId}>{product.name}</MarketItemLink>
-          </div>
+          <div className="text-base leading-tight font-semibold">{product.name}</div>
           <div className="text-xs text-text-dim">{tierWithCode(t, product.tier)}</div>
         </div>
       </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <MarketItemLink typeId={typeId} className={buttonClassName({ size: 'sm' })}>
+          {t('market.contextMenu.viewInMarket')}
+        </MarketItemLink>
+        {itemActions && (
+          <Button size="sm" onClick={() => itemActions.showInfo(typeId, product.name)}>
+            {t('market.contextMenu.showInfo')}
+          </Button>
+        )}
+      </div>
+
+      <p className="mt-3 text-xs text-text">
+        {t(`piMap.detail.facility.${view.facility}`, { types: hostTypes })}
+      </p>
+      {view.inputs.length > 0 && (
+        <p className="mt-1 text-xs text-text-dim">
+          {t('piMap.detail.madeFrom')}{' '}
+          {view.inputs.map((input, i) => (
+            <span key={input.typeId}>
+              {i > 0 && ', '}
+              <PiProductLink typeId={input.typeId}>{input.name}</PiProductLink>
+            </span>
+          ))}
+        </p>
+      )}
 
       {figure.kind === 'ranked' ? (
         <div className="mt-3">
@@ -86,7 +132,23 @@ export function ProductDetail(props: ProductDetailProps) {
           </div>
         </div>
       ) : null}
-      <p className="mt-2 text-xs text-text">{comparisonSentence(t, figure)}</p>
+      {view.money.kind !== 'multi-planet' && (
+        <p className="mt-2 text-xs text-text">{comparisonSentence(t, figure)}</p>
+      )}
+      {view.money.kind === 'one-planet' && (
+        <p className="mt-1 text-xs text-text-dim">
+          {t('piMap.detail.haul', {
+            m3: Math.round(view.money.m3PerDay * DAYS_PER_WEEK).toLocaleString('en'),
+          })}
+          {view.money.ccLevel !== null &&
+            ` ${t('piMap.detail.ccAssumed', { level: view.money.ccLevel })}`}
+        </p>
+      )}
+      {view.money.kind === 'multi-planet' && (
+        <p className="mt-2 text-xs font-semibold text-warning">
+          {t('piMap.detail.multiPlanet', { count: view.money.planets })}
+        </p>
+      )}
 
       <Heading>{t('piMap.detail.needHeading')}</Heading>
       <p className="text-xs text-text-dim">
@@ -167,6 +229,26 @@ export function ProductDetail(props: ProductDetailProps) {
           ).join(' → '),
         })}
       </p>
+
+      {props.colonyNames.size > 0 && (
+        <>
+          <Heading>{t('piMap.detail.coloniesHeading')}</Heading>
+          {view.makingIt.length > 0 && (
+            <p className="text-xs text-success">
+              {t('piMap.detail.makingIt', { colonies: view.makingIt.join(', ') })}
+            </p>
+          )}
+          {view.ownInputs.length > 0 ? (
+            <p className="text-xs text-text-dim">
+              {t('piMap.detail.ownInputs')} {colonyItems(view.ownInputs)}
+            </p>
+          ) : (
+            view.makingIt.length === 0 && (
+              <p className="text-xs text-text-dim">{t('piMap.detail.ownNone')}</p>
+            )
+          )}
+        </>
+      )}
 
       {props.rank !== null && props.pickPerDay !== null && (
         <p className="mt-3 text-xs text-warning">

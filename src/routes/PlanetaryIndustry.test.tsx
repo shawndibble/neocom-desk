@@ -568,7 +568,7 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).queryByText('Needs a look')).not.toBeInTheDocument();
   });
 
-  it('names each extractor by its product, as a Market link, not by the extractor pin type', async () => {
+  it('names each extractor by its product, as a link to its PI detail, not by the extractor pin type', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(decayedDetailPayload)
@@ -581,7 +581,7 @@ describe('PlanetaryIndustry', () => {
     // extractor and identifies nothing; the resolved product is what names it.
     expect(within(region).getByRole('link', { name: 'Felsic Magma' })).toHaveAttribute(
       'href',
-      expect.stringContaining('/market/browser')
+      `/planetary-industry/map?product=${PRODUCT_ID}`
     );
     expect(within(panel).queryByText('Extractor Control Unit')).not.toBeInTheDocument();
   });
@@ -920,6 +920,66 @@ describe('PlanetaryIndustry', () => {
     expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByText('The PI map is coming')).toBeNull();
+  });
+
+  describe("a product's PI detail is a URL (?product=)", () => {
+    const BIOFUELS = 2396;
+    const drawer = () => screen.findByRole('dialog', { name: 'How to make it' });
+
+    it('opens the Map with that product drawer open, and a reload reopens it', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      const first = render(<App />);
+      expect(within(await drawer()).getByText('Biofuels')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+      first.unmount();
+      render(<App />);
+      expect(within(await drawer()).getByText('Biofuels')).toBeInTheDocument();
+    });
+
+    it('carries View in Market and Show info, the destinations the name link displaced', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      const dialog = await drawer();
+      expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('/market/browser')
+      );
+      expect(within(dialog).getByRole('button', { name: 'Show info' })).toBeInTheDocument();
+    });
+
+    it('closes on Back: a tile click pushes the entry, Back pops it', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/map');
+      render(<App />);
+      const board = await screen.findByRole('group', { name: /^Planet map/ });
+      const tile = within(board).getByRole('link', { name: /^Biofuels\. / });
+      expect(tile).toHaveAttribute('href', `/planetary-industry/map?product=${BIOFUELS}`);
+      await user.click(tile);
+      await drawer();
+      expect(window.location.search).toBe(`?product=${BIOFUELS}`);
+      window.history.back();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(window.location.pathname).toBe('/planetary-industry/map');
+      expect(window.location.search).toBe('');
+    });
+
+    it.each(['999999999', 'abc', '-1'])('ignores a junk product id (%s)', async (junk) => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${junk}`);
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('drops ?product= when a tab switch leaves the Map', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      await drawer();
+      await user.click(screen.getByRole('tab', { name: 'Colonies' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/colonies'));
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+    });
   });
 
   it('redirects the retired Advisor URL to Colonies, with no Advisor left on the page', async () => {

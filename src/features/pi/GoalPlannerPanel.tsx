@@ -31,8 +31,6 @@ import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
-import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
-import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
@@ -102,16 +100,9 @@ function Loading() {
   );
 }
 
+/** Item menus here read the page's Item Actions, which the Planetary Industry route provides. */
 export function GoalPlannerPanel(props: GoalPlannerPanelProps) {
-  const itemActions = usePageItemActions({
-    activeCharacterId: props.characterId,
-    lazyBlueprints: true,
-  });
-  return (
-    <ItemActionsProvider page={itemActions}>
-      <GoalPlanner {...props} />
-    </ItemActionsProvider>
-  );
+  return <GoalPlanner {...props} />;
 }
 
 function GoalPlanner({
@@ -432,13 +423,7 @@ function GoalPlanner({
   return (
     <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr]">
       <div className="md:col-start-1 md:row-start-1">
-        <GoalsSection
-          goals={goals}
-          products={products}
-          onGoalsChange={onGoalsChange}
-          hubId={hub.id}
-          size={size}
-        />
+        <GoalsSection goals={goals} products={products} onGoalsChange={onGoalsChange} size={size} />
       </div>
       <div className="md:col-start-1 md:row-start-2">
         <ColoniesSection

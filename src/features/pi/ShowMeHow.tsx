@@ -4,7 +4,8 @@
  * 3. run it. Every figure comes from the recommendation model's layout
  * (`buildHowTo`), the system list from the SDE planet finder.
  *
- * Cues follow DESIGN.md §6c: item names are Market links, system names are
+ * Cues follow DESIGN.md §6c: item and product names open their PI detail (the Map
+ * tab's product drawer, `PiProductLink`; §6c "Entities", Overrides), system names are
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
@@ -17,7 +18,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { securityBand, securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import type { PiData } from '@/sde/types';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { LoadMeter, EstimateBadge, SectionLabel } from './DirectiveRow';
@@ -55,9 +56,9 @@ function useTypeName() {
 
 function ItemName({ typeId, name }: { typeId: number; name: string }) {
   return (
-    <MarketItemLink typeId={typeId}>
+    <PiProductLink typeId={typeId}>
       <b className="font-semibold">{name}</b>
-    </MarketItemLink>
+    </PiProductLink>
   );
 }
 

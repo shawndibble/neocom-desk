@@ -898,9 +898,9 @@ How to choose:
 
 Overrides:
 
-| Page                                     | Entity    | Opens                                                                                               | One step away                   | Recorded in                                                                                                                                  |
-| ---------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Planetary Industry (Plan, Map, Colonies) | Item type | PI product detail: the Map tab with that product's drawer open, by URL (from Plan and Colonies too) | Market, Show info (⋮ or drawer) | `docs/context/decisions/20261005-212941-entity-link-destination-follows-the-page-pi-item.md`. Pending #2726; until then PI names open Market |
+| Page                                     | Entity    | Opens                                                                                               | One step away                   | Recorded in                                                                                                                        |
+| ---------------------------------------- | --------- | --------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Planetary Industry (Plan, Map, Colonies) | Item type | PI product detail: the Map tab with that product's drawer open, by URL (from Plan and Colonies too) | Market, Show info (⋮ or drawer) | `docs/context/decisions/20261005-212941-entity-link-destination-follows-the-page-pi-item.md`; `?product=` (`piProductHref`, #2726) |
 
 Rows:
 

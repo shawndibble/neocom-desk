@@ -17,6 +17,12 @@ interface SlideOverProps {
   side?: 'left' | 'right';
   /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
+  /**
+   * Whether it owns a history entry so Back closes it (default). Pass `false`
+   * only for a panel already backed by a URL (the PI Map's `?product=`),
+   * whose own entry would otherwise be pushed twice. Same as `Modal`'s.
+   */
+  closeOnBack?: boolean;
 }
 
 const SIDE_CLASS = {
@@ -44,10 +50,11 @@ export function SlideOver({
   children,
   side = 'right',
   className,
+  closeOnBack = true,
 }: SlideOverProps) {
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
-  useOverlayHistory(open, onClose);
+  useOverlayHistory(open, onClose, closeOnBack);
   return (
     <DialogPrimitive.Root
       open={open}
