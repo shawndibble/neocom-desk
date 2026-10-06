@@ -26,6 +26,7 @@ import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
+import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { useColoniesAdvice } from './useColoniesAdvice';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -53,6 +54,8 @@ interface ColoniesTabProps {
   /** `?colony=`: a colony to open and focus. */
   linkedColonyId: number | null;
   onClearLinkedColony: () => void;
+  /** Re-run the route's load: the Retry on the ESI-did-not-answer notice. */
+  onRetry: () => void;
 }
 
 function characterNames(characters: readonly RosterCharacter[]): string {
@@ -173,6 +176,7 @@ export function ColoniesTab({
   error,
   linkedColonyId,
   onClearLinkedColony,
+  onRetry,
 }: ColoniesTabProps) {
   const { t } = useTranslation();
   const expiringWindowMs = useExpiringWindowMs();
@@ -428,8 +432,11 @@ export function ColoniesTab({
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       )}
 
+      {data?.planetsFetchFailed && <EsiDidntAnswer onRetry={onRetry} />}
+
       {!hasAnyColoniesSurface ? (
         !error &&
+        !data?.planetsFetchFailed &&
         (planetsResult && !planetsResult.fromCache ? (
           <NoColonies planHref={PLAN_HREF} />
         ) : (

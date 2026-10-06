@@ -195,6 +195,7 @@ export function PlanetaryIndustry() {
           error={error}
           linkedColonyId={linkedColonyId}
           onClearLinkedColony={clearLinkedColony}
+          onRetry={refresh}
         />
       )}
     </div>

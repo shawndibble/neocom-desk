@@ -914,6 +914,57 @@ describe('PlanetaryIndustry', () => {
     });
   });
 
+  describe('when ESI does not answer the planets read (issue #2691)', () => {
+    const NOTICE = "ESI didn't answer";
+    const down = () =>
+      http.get(`${ESI}/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+      );
+
+    it.each([
+      ['plan', '/planetary-industry/plan'],
+      ['map', '/planetary-industry/map'],
+      ['colonies', '/planetary-industry/colonies'],
+    ])(
+      'says so on %s, never "no colonies", and Retry re-reads',
+      async (_tab, path) => {
+        server.use(down());
+        window.history.pushState({}, '', path);
+        const user = userEvent.setup();
+        render(<App />);
+        expect(await screen.findByText(NOTICE, {}, { timeout: 15_000 })).toBeInTheDocument();
+        expect(screen.queryByText('No colonies yet')).toBeNull();
+        expect(screen.queryByText(/no colonies yet/i)).toBeNull();
+        expect(screen.queryByText(/Reconnect/)).toBeNull();
+
+        server.resetHandlers();
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByText(NOTICE)).toBeNull(), { timeout: 15_000 });
+      },
+      30_000
+    );
+
+    it('keeps a warm cache on screen instead of the notice', async () => {
+      await db.esiCache.put({
+        characterId: CHAR_ID,
+        key: 'planets',
+        value: planetsPayload,
+        fetchedAt: 1234,
+      });
+      server.use(down());
+      render(<App />);
+      await colonyPanelFor(/Jita IV/);
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+
+    it('still says "no colonies" for an answer that really is empty', async () => {
+      server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
+      render(<App />);
+      expect(await screen.findByText('No colonies yet')).toBeInTheDocument();
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+  });
+
   it('draws the planet map on the Map tab', async () => {
     window.history.pushState({}, '', '/planetary-industry/map');
     render(<App />);
