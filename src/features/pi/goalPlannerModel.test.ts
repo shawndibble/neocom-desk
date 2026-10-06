@@ -172,6 +172,10 @@ describe('plannerColonies', () => {
     ]);
     const full = plannerColonies(snapshot(), PREFS).find((row) => row.planetId === TEMPERATE_ID)!
       .colony!.ratePerEcu;
+    // The P0 the colony runs today stays rated, so its current layout still scores.
+    expect(
+      [...picked(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]])).keys()].sort((a, b) => a - b)
+    ).toEqual([MICROORGANISMS, AQUEOUS_LIQUIDS].sort((a, b) => a - b));
     expect(picked(new Map([[TEMPERATE_ID, [999_999]]])).size).toBe(full.size);
     expect(picked(new Map([[OCEANIC_ID, [AQUEOUS_LIQUIDS]]])).size).toBe(full.size);
   });

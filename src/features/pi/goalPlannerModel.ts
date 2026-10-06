@@ -207,7 +207,13 @@ export function plannerColonies(
     const newLinkCost: PinLoad | null = own.pinLoad.newLinkLoad ?? borrowedLink;
     if (!newLinkCost) return excluded('no-link-cost');
 
-    const local = effectiveLocalResources(planet.planet_type, pi, prefs.richness?.get(planetId));
+    // What the colony runs today stays rated whatever was picked: the capacity
+    // model refuses a layout whose P0 has no rate.
+    const running = own.extractors.flatMap((e) =>
+      e.productTypeId === null ? [] : [e.productTypeId]
+    );
+    const picked = prefs.richness?.get(planetId);
+    const local = effectiveLocalResources(planet.planet_type, pi, picked, running);
     const ownMeasured = measured.get(planetId) ?? new Map<number, number[]>();
     const ratePerEcu = new Map<number, EcuRate>();
     for (const resource of local) {

@@ -36,4 +36,13 @@ describe('effectiveLocalResources', () => {
     const offType = pi.raw.find((r) => !r.planetTypes.includes('temperate'))!.typeID;
     expect(ids(effectiveLocalResources('temperate', pi, [offType, 999_999]))).toEqual(all);
   });
+
+  it('keeps the named resources when a usable pick narrows, and not when it does not', () => {
+    const keep = [all[3]];
+    expect(ids(effectiveLocalResources('temperate', pi, [all[0]], keep))).toEqual(
+      all.filter((id) => id === all[0] || id === all[3])
+    );
+    expect(ids(effectiveLocalResources('temperate', pi, [999_999], keep))).toEqual(all);
+    expect(ids(effectiveLocalResources('temperate', pi, undefined, keep))).toEqual(all);
+  });
 });

@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type PlanetRichnessRecord } from '@/db';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { RouteSystem } from '@/engine/pi/planHaul';
 import { routeExposure } from '@/features/contractSearch/routeExposure';
@@ -12,7 +10,7 @@ import { loadGoalPlannerPrices, type GoalPlannerSnapshot } from './goalPlannerSn
 import { hubBooks, type PlanAdviceInput } from './planAdviceModel';
 import type { PlanPrices } from './planPrices';
 import { loadInterplanetaryConsolidation } from './planetSlots';
-import type { RichnessByPlanet } from './richnessOverride';
+import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
 
 export type PiAdviceInputsState =
@@ -58,22 +56,7 @@ export function usePiAdviceInputs(
     void hydrateGoalPrefs();
   }, [hydrateCadence, hydrateGoalPrefs]);
 
-  // The pilot's richness picks, live: a toggle on the Map recomputes every tab
-  // with no reload. `undefined` until the first read, held as loading below.
-  const richnessRows = useLiveQuery(
-    async (): Promise<PlanetRichnessRecord[]> =>
-      characterId === null
-        ? []
-        : db.planetRichness.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
-  const richness = useMemo<RichnessByPlanet | null>(
-    () =>
-      richnessRows === undefined
-        ? null
-        : new Map(richnessRows.map((row) => [row.planetId, row.order])),
-    [richnessRows]
-  );
+  const richness = usePlanetRichness(characterId);
 
   const pi = snapshot?.pi ?? null;
   // Keyed by hub only: a refresh of the colonies keeps the last prices on

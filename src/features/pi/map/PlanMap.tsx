@@ -47,6 +47,7 @@ import {
   hrefWithoutPiProduct,
   parsePiPlanet,
   parsePiProduct,
+  PI_PLANET_PARAM,
   PI_PRODUCT_PARAM,
   piProductHref,
   productNavigation,
@@ -183,12 +184,13 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   // The colony whose richness drawer the URL has open; an unknown id is dropped.
   const planetRaw = parsePiPlanet(location.search);
   const richnessColony = colonies.find((c) => c.planetId === planetRaw) ?? null;
-  const hasPlanetParam = new URLSearchParams(location.search).has('planet');
+  const hasPlanetParam = new URLSearchParams(location.search).has(PI_PLANET_PARAM);
   useEffect(() => {
     if (!hasPlanetParam || richnessColony !== null) return;
     navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
   }, [hasPlanetParam, richnessColony, location, navigate]);
-  const dropPlanet = () => navigate(hrefWithoutPiPlanet(location), { replace: true });
+  const dropPlanet = () =>
+    navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
 
   // --- Detail panel mode, by the layout box's own width -----------------------
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -360,6 +362,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       return;
     }
     if (!docked && !drawerShown) remember();
+    if (richnessColony) dropPlanet();
     setWhatIf(type);
     setDetailKind('planet');
     if (docked) return;

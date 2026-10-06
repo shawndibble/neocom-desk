@@ -57,6 +57,7 @@ import {
   loadGoalPlannerSnapshot,
   type GoalPlannerSnapshot,
 } from './goalPlannerSnapshot';
+import { usePlanetRichness } from './richnessOverride';
 import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
 import {
   changeSteps,
@@ -200,6 +201,7 @@ function GoalPlanner({
   // --- Inputs, deferred so typing a rate never waits on a re-plan ---
   const restartHours = cadence.restartDays * HOURS_PER_DAY;
   const haulHours = cadence.haulDays * HOURS_PER_DAY;
+  const richness = usePlanetRichness(characterId);
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
   const liveRows = useMemo(
     () =>
@@ -209,9 +211,10 @@ function GoalPlanner({
             fallbackRatePerHour: prefs.fallbackRatePerHour,
             customsOverrides,
             disabled: disabledSet,
+            ...(richness ? { richness } : {}),
           })
         : [],
-    [snapshot, customsOverrides, restartHours, prefs.fallbackRatePerHour, disabledSet]
+    [snapshot, customsOverrides, restartHours, prefs.fallbackRatePerHour, disabledSet, richness]
   );
   const rows = useDeferredValue(liveRows);
   const products = useMemo(() => (pi ? productOptions(pi) : []), [pi]);

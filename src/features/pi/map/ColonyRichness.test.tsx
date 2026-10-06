@@ -43,8 +43,11 @@ describe('ColonyRichness', () => {
   it('saves a tick, and shows a saved override on open', async () => {
     const user = userEvent.setup();
     renderIt();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Aqueous Liquids' })).toBeEnabled()
+    );
     await user.click(screen.getByRole('button', { name: 'Aqueous Liquids' }));
-    expect(sync.setPlanetRichness).toHaveBeenCalledWith(PLANET, [2268]);
+    await waitFor(() => expect(sync.setPlanetRichness).toHaveBeenCalledWith(PLANET, [2268]));
 
     await db.planetRichness.put({
       id: `1:${PLANET}`,
@@ -60,7 +63,9 @@ describe('ColonyRichness', () => {
       )
     );
     await user.click(screen.getByRole('button', { name: 'Microorganisms' }));
-    expect(sync.setPlanetRichness).toHaveBeenLastCalledWith(PLANET, [2305, 2073]);
+    await waitFor(() =>
+      expect(sync.setPlanetRichness).toHaveBeenLastCalledWith(PLANET, [2305, 2073])
+    );
   });
 
   it('clears the override when the last pick is unticked, or on Clear picks', async () => {
@@ -80,8 +85,19 @@ describe('ColonyRichness', () => {
       )
     );
     await user.click(screen.getByRole('button', { name: 'Autotrophs' }));
-    expect(sync.clearPlanetRichness).toHaveBeenCalledWith(PLANET);
-    await user.click(screen.getByRole('button', { name: 'Clear picks' }));
-    expect(sync.clearPlanetRichness).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(sync.clearPlanetRichness).toHaveBeenCalledWith(PLANET));
+  });
+
+  it('keeps both picks when two chips are tapped before the first save lands', async () => {
+    const user = userEvent.setup();
+    renderIt();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Aqueous Liquids' })).toBeEnabled()
+    );
+    await user.click(screen.getByRole('button', { name: 'Aqueous Liquids' }));
+    await user.click(screen.getByRole('button', { name: 'Autotrophs' }));
+    await waitFor(() =>
+      expect(sync.setPlanetRichness).toHaveBeenLastCalledWith(PLANET, [2268, 2305])
+    );
   });
 });

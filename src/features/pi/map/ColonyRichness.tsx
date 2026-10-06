@@ -8,6 +8,7 @@
  * Plan solver score (`richnessOverride.ts`), on Plan, Map and Colonies alike.
  * Optional: with nothing picked, every resource the planet type yields counts.
  */
+import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
@@ -36,15 +37,35 @@ export function ColonyRichness({
   onClose?: () => void;
 }) {
   const { t } = useTranslation();
-  const saved = useLiveQuery(
-    () => db.planetRichness.where('planetId').equals(planetId).first(),
+  // An array, so "no row yet" (empty) differs from "not read yet" (undefined).
+  const rows = useLiveQuery(
+    () => db.planetRichness.where('planetId').equals(planetId).toArray(),
     [planetId]
   );
+  const saved = rows?.[0];
+  const loaded = rows !== undefined;
   const yields = new Set(resources.map((resource) => resource.typeId));
-  const picked = (saved?.order ?? []).filter((id) => yields.has(id));
+  const savedPicks = (saved?.order ?? []).filter((id) => yields.has(id));
 
-  const change = (next: number[]) =>
-    void (next.length === 0 ? clearPlanetRichness(planetId) : setPlanetRichness(planetId, next));
+  // Taps build on the pick shown, not the last save, and writes run one after
+  // another: a quick second tap must not drop the first, nor a clear race a
+  // pending save. Once the live query shows what was written it is the source.
+  const savedKey = savedPicks.join(',');
+  const [shown, setShown] = useState<{ key: string; picks: number[] | null }>({
+    key: savedKey,
+    picks: null,
+  });
+  if (shown.key !== savedKey) setShown({ key: savedKey, picks: null });
+  const picked = shown.key === savedKey && shown.picks ? shown.picks : savedPicks;
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const change = (next: number[]) => {
+    setShown({ key: savedKey, picks: next });
+    queue.current = queue.current
+      .then(() =>
+        next.length === 0 ? clearPlanetRichness(planetId) : setPlanetRichness(planetId, next)
+      )
+      .catch(() => {});
+  };
 
   return (
     <div className="space-y-3">
@@ -65,6 +86,7 @@ export function ColonyRichness({
           <FilterChip
             key={resource.typeId}
             label={resource.name}
+            disabled={!loaded}
             selected={picked.includes(resource.typeId)}
             onToggle={() =>
               change(
