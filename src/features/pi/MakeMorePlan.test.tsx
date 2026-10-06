@@ -253,6 +253,24 @@ describe('MakeMorePlan', () => {
     expect(within(column).getAllByRole('progressbar')).toHaveLength(2);
   });
 
+  it.each([
+    [3, 'Upgrade the Command Center to level 4 first (+1 step)'],
+    [2, 'Upgrade the Command Center to level 4 first (+2 steps)'],
+  ])('words a Command Center upgrade from level %i with the right plural', (from, text) => {
+    mockState = ready({
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((c) =>
+        c.rebuild.status === 'change'
+          ? { ...c, rebuild: { ...c.rebuild, upgradeFromLevel: from } }
+          : c
+      ),
+    });
+    renderPlan();
+    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    expect(column).toHaveTextContent(text);
+    expect(column).not.toHaveTextContent('piPlan.make.fitNeedsUpgrade');
+  });
+
   it('names a hauling problem for the route, in the pilot units', () => {
     renderPlan();
     const haul = screen.getByRole('heading', { name: 'Hauling and upkeep' }).closest('section')!;
