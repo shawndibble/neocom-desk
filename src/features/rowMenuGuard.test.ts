@@ -11,13 +11,9 @@ const ALLOWED = new Set([
   'src/features/character/EventContextMenu.tsx',
   // Table-only shortcuts to pages the nav already reaches.
   'src/features/character/CharacterRowContextMenu.tsx',
-  // No mounted call site (dead code, separate cleanup).
-  'src/features/notifications/NotificationContextMenu.tsx',
   // Build Plan menus carry their own visible twins.
   'src/features/industry/BuildPlanList.tsx',
   'src/features/industry/BuildPlanRowContextMenu.tsx',
-  // Hand-rolled wrapper that provides RowActionsContext itself.
-  'src/features/skills/SkillRowContextMenu.tsx',
   // Component gallery demonstrating the primitive.
   'src/routes/Styleguide.tsx',
 ]);

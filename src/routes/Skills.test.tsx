@@ -160,7 +160,7 @@ describe('Skills', () => {
   it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
     // Frigate (typeID 2) is trained to III; a plan targets V. The row's
     // context menu can add to *any* of the character's plans (no single
-    // "target plan" here — see SkillRowContextMenu), so the mark reflects
+    // "target plan" here — see SkillPlanAdd), so the mark reflects
     // every plan, not just one (issue: the bar gave no indication a skill
     // was already queued anywhere).
     await db.skillPlans.put({

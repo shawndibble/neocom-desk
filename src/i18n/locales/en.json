@@ -1765,6 +1765,8 @@
     "csvLevel": "Level",
     "csvSp": "Skill points",
     "inspector": {
+      "addToPlan": "Add to Skill Plan",
+      "maxLevel": "Already at level 5",
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",
       "noPrereqs": "No prerequisites",
@@ -1789,11 +1791,6 @@
       "loadFailedHint": "Something went wrong loading this skill. Try again.",
       "notFoundTitle": "Skill not found",
       "notFoundHint": "This skill isn't in the skill catalog."
-    },
-    "contextMenu": {
-      "addToSkillPlan": "Add to Skill Plan",
-      "noPlans": "No skill plans yet",
-      "maxLevelTitle": "Already at level 5"
     },
     "certificates": {
       "grade": {

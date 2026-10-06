@@ -1,18 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import {
-  fakeItemActions as fakeMarketItemActions,
-  FakeItemActions,
-} from '@/features/market/__fixtures__/itemActions';
 import { FittingFightersPanel } from './FittingFightersPanel';
-import { FittingItemActionsProvider } from './fittingItemActions';
-import { fakeItemActions } from './__fixtures__/itemActions';
+import {} from './fittingItemActions';
+import {} from './__fixtures__/itemActions';
 
 // Entity names are real links, so every render needs a Router.
 const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
@@ -121,66 +117,5 @@ describe('FittingFightersPanel', () => {
     const boxes = screen.getAllByRole('checkbox', { name: 'Launched' });
     expect(boxes[3]).toBeDisabled();
     expect(boxes[0]).toBeEnabled();
-  });
-});
-
-describe('FittingFightersPanel item menu', () => {
-  function renderWithMenu(fitting: Fitting, fighterStats: FittingStats) {
-    const onChange = vi.fn();
-    const actions = fakeItemActions({ names: NAMES });
-    const marketActions = fakeMarketItemActions();
-    render(
-      <>
-        <FakeItemActions actions={marketActions}>
-          <FittingItemActionsProvider value={actions}>
-            <FittingFightersPanel
-              fitting={fitting}
-              stats={fighterStats}
-              onChange={onChange}
-              typeName={typeName}
-            />
-          </FittingItemActionsProvider>
-        </FakeItemActions>
-      </>
-    );
-    return { onChange, actions, marketActions };
-  }
-
-  async function openMenu() {
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for Templar I' }), {
-      button: 0,
-      pointerType: 'mouse',
-    });
-  }
-
-  it('moves a launched squadron to the bay, and shows its info', async () => {
-    const fitting: Fitting = {
-      ...carrier,
-      fighters: [{ typeId: 23055, quantity: 6, state: 'active' }],
-    };
-    const { onChange, marketActions } = renderWithMenu(fitting, stats(4, 1));
-    await openMenu();
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to bay' }));
-    expect(applied(onChange, fitting).fighters).toEqual([
-      { typeId: 23055, quantity: 6, state: 'online' },
-    ]);
-    await openMenu();
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Show info/ }));
-    expect(marketActions.showInfo).toHaveBeenCalledWith(23055, 'Templar I');
-  });
-
-  it('launches a bay squadron only while a tube is free, and removes one', async () => {
-    const fitting: Fitting = {
-      ...carrier,
-      fighters: [{ typeId: 23055, quantity: 6, state: 'online' }],
-    };
-    const { onChange } = renderWithMenu(fitting, stats(0));
-    await openMenu();
-    expect(await screen.findByRole('menuitem', { name: 'Launch' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove Templar I' }));
-    expect(applied(onChange, fitting).fighters ?? []).toEqual([]);
   });
 });

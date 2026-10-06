@@ -306,7 +306,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
@@ -323,7 +324,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
