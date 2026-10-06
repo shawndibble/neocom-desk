@@ -102,9 +102,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const product = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}\\. `) });
+// A product tile is a link to its PI detail (`?product=`), not a button.
+const product = (name: string) => screen.getByRole('link', { name: new RegExp(`^${name}\\. `) });
 const maybeProduct = (name: string) =>
-  screen.queryByRole('button', { name: new RegExp(`^${name}\\. `) });
+  screen.queryByRole('link', { name: new RegExp(`^${name}\\. `) });
 const planet = (name: string) =>
   screen.getByRole('button', { name: new RegExp(`^${name} planet`) });
 
@@ -163,7 +164,7 @@ describe('PlanMap: what if I add a planet', () => {
     expect(screen.getByText(/Unlocks \d+ products? on the map/)).toBeInTheDocument();
     // The mark is in the tile's accessible name, not only a colour.
     expect(
-      screen.getByRole('button', { name: /^Felsic Magma\. .*Unlocked by adding a Lava planet/ })
+      screen.getByRole('link', { name: /^Felsic Magma\. .*Unlocked by adding a Lava planet/ })
     ).toBeInTheDocument();
     await user.unhover(planet('Lava'));
     expect(maybeProduct('Felsic Magma')).toBeNull();
@@ -217,10 +218,13 @@ describe('PlanMap: trace', () => {
     expect(
       within(dialog).getByText(/In words: Temperate → .*Carbon Compounds.*→ .*Biofuels/)
     ).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: 'Biofuels' })).toHaveAttribute(
+    // Its own name is plain text in its own detail; Market is one step away.
+    expect(within(dialog).queryByRole('link', { name: 'Biofuels' })).toBeNull();
+    expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       expect.stringContaining('/market/browser')
     );
+    expect(product('Biofuels')).toHaveAttribute('href', expect.stringContaining('product=2396'));
     // Moving the trace moves `aria-current`.
     await user.click(product('Proteins'));
     expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
@@ -247,7 +251,7 @@ describe('PlanMap: the same numbers as Plan', () => {
     expect(picks.picks.length).toBeGreaterThan(0);
     const strip = screen.getByRole('group', { name: 'Your picks' });
     const buttons = within(strip)
-      .getAllByRole('button')
+      .getAllByRole('link')
       .filter((b) => /^#\d/.test(b.textContent ?? ''));
     expect(buttons).toHaveLength(picks.picks.length);
     picks.picks.forEach((pick, i) => {
@@ -366,7 +370,7 @@ describe('PlanMap: the detail drawer', () => {
     renderMap();
     await user.click(planet('Lava'));
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
-    await user.click(within(dialog).getByRole('button', { name: /Best one-planet recipe:/ }));
+    await user.click(within(dialog).getByRole('link', { name: /Best one-planet recipe:/ }));
     expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
     await user.keyboard('{Escape}');
@@ -434,7 +438,8 @@ describe("PlanMap: docked or drawer, by the map panel's own width", () => {
     await user.click(product('Proteins'));
     expect(screen.queryByRole('dialog')).toBeNull();
     const aside = screen.getByRole('complementary', { name: 'How to make it' });
-    expect(within(aside).getByRole('link', { name: 'Proteins' })).toBeInTheDocument();
+    expect(within(aside).getByText('Proteins', { selector: 'div' })).toBeInTheDocument();
+    expect(within(aside).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
 
     // And back, without a stale panel.
     reportWidth(1200);
@@ -534,9 +539,9 @@ describe('PlanMap: phone', () => {
     expect(screen.queryByRole('group', { name: /^Planet map/ })).toBeNull();
     const switcher = screen.getByRole('group', { name: 'Product tier' });
     await user.click(within(switcher).getByRole('button', { name: 'P1' }));
-    await user.click(screen.getByRole('button', { name: /^Biofuels/ }));
+    await user.click(screen.getByRole('link', { name: /^Biofuels/ }));
     const sheet = screen.getByRole('dialog', { name: 'How to make it' });
-    expect(within(sheet).getByRole('link', { name: 'Biofuels' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
     await user.click(within(sheet).getByRole('button', { name: 'Close' }));
     await user.click(screen.getByRole('button', { name: 'Show full map' }));
     expect(screen.getByRole('group', { name: /^Planet map/ })).toBeInTheDocument();

@@ -5,6 +5,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { Button, SegmentedControl, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from './PlanetImage';
@@ -35,6 +37,8 @@ export interface MapPhoneProps {
   figureOf: (typeId: number) => ProductFigure;
   onPlanet: (type: PlanetType) => void;
   onProduct: (typeId: number) => void;
+  /** The product's PI detail URL: a row is a real link. */
+  productHref: (typeId: number) => string;
   /** The what-if line, picks and so on, rendered between the toggles and the list. */
   between: ReactNode;
   /** The full map, rendered when asked for. */
@@ -137,10 +141,10 @@ export function MapPhone(props: MapPhoneProps) {
             ].filter(Boolean);
             return (
               <li key={product.typeId}>
-                <button
-                  type="button"
+                <Link
+                  to={props.productHref(product.typeId)}
                   aria-current={traced ? 'true' : undefined}
-                  onClick={() => props.onProduct(product.typeId)}
+                  onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                   className={cx(
                     'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
                     interactiveClassName,
@@ -182,7 +186,7 @@ export function MapPhone(props: MapPhoneProps) {
                       {formatIskCompact(figure.iskPerDay)}
                     </span>
                   )}
-                </button>
+                </Link>
               </li>
             );
           })}
