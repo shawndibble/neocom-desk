@@ -17,7 +17,7 @@ import type { PiData } from '@/sde/types';
 import type { FactoryBalance } from '@/engine/pi/factoryBalance';
 import { extractionUpgrade, type ExtractionUpgrade } from '@/engine/pi/extractionUpgrade';
 import type { PinLoad } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 
 type Measured = Extract<FactoryBalance, { status: 'measured' }>;
 

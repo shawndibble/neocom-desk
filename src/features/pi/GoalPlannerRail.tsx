@@ -421,7 +421,7 @@ function Hint({ id, children }: { id: string; children: ReactNode }) {
 function SettingsSummary(props: AssumptionsProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const days = (count: number) => t('piAdvisor.cadenceDays', { count });
+  const days = (count: number) => t('piShared.cadenceDays', { count });
   return (
     <div className="space-y-1">
       <ul className="space-y-0.5 text-xs text-text">

@@ -79,7 +79,7 @@ export function PlanetTypesPanel({
               size="md"
               selected={toggle.on}
               onToggle={() => onToggle(toggle.type)}
-              icon={<PlanetImage type={toggle.type} px={20} />}
+              icon={<PlanetImage type={toggle.type} size={20} />}
               label={typeName(toggle.type)}
             />
           ))}
@@ -100,7 +100,7 @@ export function PlanetTypesPanel({
                   size="md"
                   selected={chip.on}
                   onToggle={() => onWhatIf(chip.type)}
-                  icon={<PlanetImage type={chip.type} px={20} />}
+                  icon={<PlanetImage type={chip.type} size={20} />}
                   label={t('piPlan.find.whatIfChip', {
                     type: typeName(chip.type),
                     context: chip.on ? 'on' : chip.unlocks > 0 ? 'unlocks' : 'nothing',
@@ -365,7 +365,7 @@ function RecipeCard({
         <ul className="space-y-0.5">
           {card.hosts.map((host) => (
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
-              <PlanetImage type={host.type} px={20} />
+              <PlanetImage type={host.type} size={20} />
               <b className="font-semibold">{typeName(host.type)}</b>
               <HostMark state={host.state} planet={typeName(host.type)} onFind={onFind} />
             </li>

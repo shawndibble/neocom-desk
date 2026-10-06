@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import {
   colonyStopTierAdvice,
   meanExtractorRate,

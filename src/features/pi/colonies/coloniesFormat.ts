@@ -1,17 +1,4 @@
-import type { PlanetType } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
-
-/** The planet render the image server holds for each type (their SDE type ids). */
-export const PLANET_TYPE_ID: Record<PlanetType, number> = {
-  temperate: 11,
-  ice: 12,
-  gas: 13,
-  oceanic: 2014,
-  lava: 2015,
-  barren: 2016,
-  storm: 2017,
-  plasma: 2063,
-};
 
 const EVE_CLOCK = new Intl.DateTimeFormat('en-GB', {
   weekday: 'short',

@@ -158,12 +158,12 @@ export function PlanPanel(props: Props) {
                     <PlanetImage
                       key={i}
                       type={type}
-                      px={32}
+                      size={32}
                       className="rounded-full ring-2 ring-panel"
                     />
                   ))
               ) : (
-                <PlanetImage type="barren" px={32} />
+                <PlanetImage type="barren" size={32} />
               )
             }
             title={t('piPlan.picker.makeMore')}
@@ -178,7 +178,7 @@ export function PlanPanel(props: Props) {
             onSelect={() => setPicked('find-best')}
             art={
               <>
-                <PlanetImage type="gas" px={32} />
+                <PlanetImage type="gas" size={32} />
                 {FIND_BEST_ICONS.map((id) => (
                   <TypeIcon key={id} typeId={id} size={32} width={28} height={28} />
                 ))}

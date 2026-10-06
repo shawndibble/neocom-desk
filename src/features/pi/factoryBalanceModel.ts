@@ -14,7 +14,7 @@ const SECONDS_PER_HOUR = 3_600;
 import { factoryBalance, type FactoryBalance } from '@/engine/pi/factoryBalance';
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import type { PinLoad } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import { productBySchematicId } from './products';
 
 /**

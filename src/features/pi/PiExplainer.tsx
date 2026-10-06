@@ -69,7 +69,7 @@ export function PiExplainer({ open, onClose }: { open: boolean; onClose: () => v
       <div className="space-y-1 pb-3 text-xs">
         <p className="py-2 text-xs text-text-dim">{t('piPlan.explainer.intro')}</p>
         <Step
-          art={<PlanetImage type="gas" px={32} />}
+          art={<PlanetImage type="gas" size={32} />}
           title={t('piPlan.explainer.planet')}
           body={t('piPlan.explainer.planetBody')}
         />

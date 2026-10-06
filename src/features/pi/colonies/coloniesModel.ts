@@ -42,7 +42,7 @@ import {
   hasUnverifiedExtractors,
   pinRole,
 } from '../adapters';
-import { builtAdvice } from '../advisorModel';
+import { builtAdvice } from '../systemPlanetModel';
 import { colonyPlan } from '../colonyPlan';
 import { colonyStorage } from '../colonyThroughput';
 import { fillsBeforeHaul } from '../colonyStripModel';

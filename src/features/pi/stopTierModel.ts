@@ -39,7 +39,7 @@ import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import type { PinLoad } from '@/engine/pi/types';
-import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
+import { localResourcesFor, type BuiltColonyAdvice } from './systemPlanetModel';
 import { productBySchematicId } from './products';
 
 export type ColonyStopTierAdvice =
