@@ -116,18 +116,30 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore: BUILT_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL },
+      // Default (CI): the production bundle on the preview server. The dev
+      // server makes every spec's fresh browser context re-fetch its module
+      // waterfall, which was most of the suite's wall time. `E2E_SKIP_BUILT=1`
+      // keeps the dev server for a local run that cannot build.
+      use: skipBuilt
+        ? { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL }
+        : {
+            ...devices['Desktop Chrome'],
+            baseURL: PREVIEW_BASE_URL,
+            // Same reason as the `built` project: no precache race.
+            serviceWorkers: 'block',
+          },
     },
     ...(skipBuilt ? [] : [BUILT_PROJECT]),
   ],
-  webServer: [
-    {
-      // Port 5173 is pinned+busy elsewhere; 5199 is this suite's own port.
-      command: `npm run dev -- --port ${DEV_PORT} --strictPort`,
-      url: DEV_BASE_URL,
-      reuseExistingServer: !process.env.CI,
-      env: E2E_ENV,
-    },
-    ...(skipBuilt ? [] : [PREVIEW_SERVER]),
-  ],
+  webServer: skipBuilt
+    ? [
+        {
+          // Port 5173 is pinned+busy elsewhere; 5199 is this suite's own port.
+          command: `npm run dev -- --port ${DEV_PORT} --strictPort`,
+          url: DEV_BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          env: E2E_ENV,
+        },
+      ]
+    : [PREVIEW_SERVER],
 });
