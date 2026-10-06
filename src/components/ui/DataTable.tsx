@@ -90,6 +90,15 @@ export interface DataTableColumn<T> {
    * reader could get wrong; most columns explain themselves.
    */
   headerTooltip?: string;
+  /**
+   * Drops the column below `sm` (CSS `max-sm:hidden` on its header and cells)
+   * when the table renders as a table: `responsive="table"`, or `stacked`
+   * false. A read-only display table that is a few columns too wide for a
+   * phone sheds its low-value columns this way instead of stacking into
+   * cards. Ignored in the stacked card layout, where every cell is a labelled
+   * row. The column still sorts and exports.
+   */
+  phoneHidden?: boolean;
   render: (row: T) => ReactNode;
   /**
    * Declares the column sortable and extracts its comparable value.
@@ -355,8 +364,10 @@ interface DataTableProps<T> {
   /**
    * How the table behaves below `sm`. `'stack'` (the default) collapses each
    * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
-   * `'table'` keeps real columns, and is only right for a table narrow enough
-   * to fit a 390px screen unaided — roughly two short columns.
+   * `'table'` keeps real columns: right when comparing across columns is
+   * the point (compare table, matrix, roster, wide numbers), interactive or
+   * not: it scrolls sideways, with the key column pinned by `stickyStart`
+   * (§6c Restraint). Cards are for rows read as a unit.
    */
   responsive?: 'stack' | 'table';
   /**
@@ -474,6 +485,8 @@ interface DataTableRowProps<T> {
   cardActionsIndex: number;
   firstMetaIndex: number;
   dense: boolean;
+  /** Card layout is on: `phoneHidden` columns stay (cards show every cell). */
+  isStacked: boolean;
   activeSortId: string | undefined;
   highlighted: boolean;
   selected: boolean;
@@ -525,6 +538,7 @@ function DataTableRowImpl<T>({
   cardActionsIndex,
   firstMetaIndex,
   dense,
+  isStacked,
   activeSortId,
   highlighted,
   selected,
@@ -645,6 +659,7 @@ function DataTableRowImpl<T>({
             data-stack-after={column.stackAffix?.after}
             className={cx(
               cellClass[i],
+              column.phoneHidden && !isStacked && 'max-sm:hidden',
               i === primaryIndex && 'dt-primary',
               i === cardCornerIndex && 'dt-corner',
               i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
@@ -1228,6 +1243,7 @@ export function DataTable<T>({
         cardActionsIndex={cardActionsIndex}
         firstMetaIndex={firstMetaIndex}
         dense={dense}
+        isStacked={isStacked}
         activeSortId={activeSortId}
         highlighted={highlightRowKey !== null && key === highlightRowKey}
         selected={selectedRowKey !== null && key === selectedRowKey}
@@ -1278,25 +1294,29 @@ export function DataTable<T>({
 
   const sortableColumns = columns.filter((column) => column.sortValue !== undefined);
   // Hidden by CSS above `sm` when the viewport decides; by JS when the caller does.
-  const sortBar = mobileSort && sortableColumns.length > 0 && stacked !== false && (
-    <div
-      className={cx(
-        'flex min-h-[52px] items-center justify-between gap-3 px-3',
-        stacked === undefined && 'sm:hidden'
-      )}
-    >
-      {stackSummary !== undefined && (
-        <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
-      )}
-      <DataTableSortPicker
-        columns={sortableColumns}
-        sort={sort && activeSortId ? sort : undefined}
-        onSortChange={setSort}
-        className="ml-auto"
-      />
-      {stackActions}
-    </div>
-  );
+  // Only for a table that can stack: in table mode the header sort buttons are on screen.
+  const sortBar = mobileSort &&
+    sortableColumns.length > 0 &&
+    responsive === 'stack' &&
+    stacked !== false && (
+      <div
+        className={cx(
+          'flex min-h-[52px] items-center justify-between gap-3 px-3',
+          stacked === undefined && 'sm:hidden'
+        )}
+      >
+        {stackSummary !== undefined && (
+          <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
+        )}
+        <DataTableSortPicker
+          columns={sortableColumns}
+          sort={sort && activeSortId ? sort : undefined}
+          onSortChange={setSort}
+          className="ml-auto"
+        />
+        {stackActions}
+      </div>
+    );
 
   const table = (
     <table
@@ -1345,6 +1365,7 @@ export function DataTable<T>({
                 className={cx(
                   sortable ? 'p-0' : headerTextClass[i],
                   column.stickyStart && STICKY_START,
+                  column.phoneHidden && !isStacked && 'max-sm:hidden',
                   column.headerCellClassName
                 )}
                 aria-sort={

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, type ReactElement } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -25,7 +25,6 @@ import { soldUnitsMargin } from '@/engine/industry/realizedProfit';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -518,19 +517,6 @@ export function ProductionLogPanel({
     avgMarginPct,
   } = rollup;
 
-  // A product the catalog doesn't know (name fell back to `#<typeID>`) has no
-  // menu to offer: the row renders bare rather than opening one titled "#123".
-  const itemMenuFor = (typeId: number, itemName: string, tr: ReactElement): ReactElement => {
-    const entry = catalog.byProductTypeID.get(typeId);
-    return entry ? (
-      <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={entry.blueprintTypeID}>
-        {tr}
-      </ItemContextMenu>
-    ) : (
-      tr
-    );
-  };
-
   const runColumns = [...baseRunColumns, soldActionsColumn(sale)];
 
   return (
@@ -624,8 +610,6 @@ export function ProductionLogPanel({
                 columns={columns}
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
-                rowContextMenu={(r, tr) => itemMenuFor(r.productTypeID, r.itemName, tr)}
-                rowMoreActions
                 label={t('industry.byItem')}
                 sort={knownSort(itemSort, columns)}
                 onSortChange={setItemSort}
@@ -654,8 +638,6 @@ export function ProductionLogPanel({
                   columns={runColumns}
                   rows={runRows}
                   rowKey={(r) => r.run.id}
-                  rowContextMenu={(r, tr) => itemMenuFor(r.run.productTypeID, r.itemName, tr)}
-                  rowMoreActions
                   label={t('industry.allProductionRuns')}
                   sort={knownSort(runSort, runColumns)}
                   onSortChange={setRunSort}

@@ -1488,7 +1488,9 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Default characters shown: This character' })
+    ).toBeInTheDocument();
   });
 
   it('persists a switch to "All characters"', async () => {
@@ -1497,10 +1499,14 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Default characters shown: This character' })
+    );
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
-    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Default characters shown: All characters' })
+    ).toBeInTheDocument();
     await waitFor(async () => {
       expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
     });

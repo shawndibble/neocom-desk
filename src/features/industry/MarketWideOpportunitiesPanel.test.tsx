@@ -115,41 +115,13 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
   });
 
-  it('opens the item menu for the row product', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-
-    fireEvent.contextMenu(screen.getByText('Widget Beta').closest('tr')!);
-    fireEvent.click(await screen.findByText('Add to Quickbar'));
-
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-    expect(screen.getAllByRole('button', { name: 'Plan' })[0]).toBeInTheDocument();
-  });
-
-  it('shows no blueprint for a product the catalog has no entry for', async () => {
+  it('has no row menu: Start plan is the row’s one control', () => {
     renderPanel();
-
-    fireEvent.contextMenu(screen.getByText('Widget Gamma').closest('tr')!);
-
-    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
-  });
-
-  it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-    const user = userEvent.setup();
     const row = screen.getByText('Widget Beta').closest('tr')!;
-
-    await user.click(within(row).getByRole('button', { name: 'More actions for Widget Beta' }));
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
   });
 });
 
