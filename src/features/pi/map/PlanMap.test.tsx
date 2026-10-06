@@ -315,6 +315,138 @@ describe('PlanMap: trace', () => {
   });
 });
 
+// Ownership rules: PlanMap's header, "Who owns what".
+describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s', () => {
+  function Search() {
+    const location = useLocation();
+    return <output data-testid="search">{location.pathname + location.search}</output>;
+  }
+  function renderWithSearch(entry = '/planetary-industry/map') {
+    return render(
+      // A page before the map: a clear that went Back twice would land there.
+      <MemoryRouter initialEntries={['/planetary-industry/plan', entry]} initialIndex={1}>
+        <PlanMap {...props()} />
+        <Search />
+      </MemoryRouter>
+    );
+  }
+  const search = () => screen.getByTestId('search').textContent;
+  const productDialog = () =>
+    screen.queryByRole('dialog', { name: /^(How to make|Where to get) / });
+
+  it('clears the trace on a second click once its drawer is closed, and traces it on a third', async () => {
+    const user = userEvent.setup();
+    renderWithSearch();
+    await user.click(product('Biofuels'));
+    expect(productDialog()).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(productDialog()).toBeNull());
+    // Closing the drawer is not clearing the trace.
+    expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
+    expect(search()).toBe('/planetary-industry/map');
+    await user.click(product('Biofuels'));
+    expect(product('Biofuels')).not.toHaveAttribute('aria-current');
+    expect(productDialog()).toBeNull();
+    expect(search()).toBe('/planetary-industry/map');
+    expect(screen.getByText('Trace cleared.')).toBeInTheDocument();
+    await user.click(product('Biofuels'));
+    expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
+    expect(productDialog()).toBeInTheDocument();
+  });
+
+  it('docked: a second click clears the trace and takes ?product= off the URL', async () => {
+    const user = userEvent.setup();
+    renderWithSearch();
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    await user.click(product('Proteins'));
+    expect(search()).toMatch(/product=/);
+    await user.click(product('Proteins'));
+    await waitFor(() => expect(search()).toBe('/planetary-industry/map'));
+    expect(product('Proteins')).not.toHaveAttribute('aria-current');
+  });
+
+  it('docked: clearing a product a link opened replaces the URL', async () => {
+    const user = userEvent.setup();
+    renderWithSearch('/planetary-industry/map?product=9832');
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    expect(product('Coolant')).toHaveAttribute('aria-current', 'true');
+    await user.click(product('Coolant'));
+    await waitFor(() => expect(search()).toBe('/planetary-industry/map'));
+    // Lit only for the planets its trace needed: with the trace gone, so is the tile.
+    expect(maybeProduct('Coolant')).toBeNull();
+    expect(screen.getByText('Trace cleared.')).toBeInTheDocument();
+  });
+
+  it('Enter and Space on the traced tile clear it', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    act(() => product('Proteins').focus());
+    await user.keyboard('{Enter}');
+    expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
+    await user.keyboard('{Enter}');
+    expect(product('Proteins')).not.toHaveAttribute('aria-current');
+    await user.keyboard(' ');
+    expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
+    await user.keyboard(' ');
+    expect(product('Proteins')).not.toHaveAttribute('aria-current');
+  });
+
+  it('on a phone, tapping the traced row again clears it', async () => {
+    stubPhone(true);
+    const user = userEvent.setup();
+    renderMap();
+    await user.click(
+      within(screen.getByRole('group', { name: 'Product tier' })).getByRole('button', {
+        name: 'P1',
+      })
+    );
+    const row = () => screen.getByRole('link', { name: /^Biofuels/ });
+    await user.click(row());
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(row()).toHaveAttribute('aria-current', 'true');
+    await user.click(row());
+    expect(row()).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps a planet type you ticked through picking and clearing a product', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    await user.click(planet('Barren'));
+    await user.keyboard('{Escape}');
+    expect(planet('Barren')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(product('Biofuels'));
+    expect(planet('Barren')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('What if I add a Barren planet?')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(product('Biofuels'));
+    expect(product('Biofuels')).not.toHaveAttribute('aria-current');
+    expect(planet('Barren')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('What if I add a Barren planet?')).toBeInTheDocument();
+  });
+
+  it('docked: the panel goes back to the ticked planet once the product is cleared', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    await user.click(planet('Barren'));
+    expect(
+      screen.getByRole('complementary', { name: 'Where to put a new Barren colony' })
+    ).toBeInTheDocument();
+    await user.click(product('Biofuels'));
+    expect(
+      screen.getByRole('complementary', { name: /^(How to make|Where to get) / })
+    ).toBeInTheDocument();
+    await user.click(product('Biofuels'));
+    expect(
+      screen.getByRole('complementary', { name: 'Where to put a new Barren colony' })
+    ).toBeInTheDocument();
+    expect(planet('Barren')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
 function graphName(typeId: number): string {
   return graph.byId.get(typeId)!.name;
 }
@@ -431,10 +563,12 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => expect(tile).toHaveFocus());
 
-    await user.click(tile);
+    // Biofuels is still traced, so a click on it would clear it: open another.
+    const other = product('Proteins');
+    await user.click(other);
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    await waitFor(() => expect(tile).toHaveFocus());
+    await waitFor(() => expect(other).toHaveFocus());
   });
 
   it('opens "Add a Lava planet" for a type you do not have: unlocks, best recipe, slots, finder', async () => {
@@ -458,17 +592,24 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
   });
 
-  it('keeps a traced product on screen when you hover or click a planet it needs', async () => {
+  it('keeps a traced product on screen when you untick, hover or click a planet it needs', async () => {
     const user = userEvent.setup();
     renderMap();
-    // Felsic Magma is a Lava product; the pilot has no Lava colony. It only
-    // shows on the map while Lava is a what-if, and tracing it ends that.
+    // Felsic Magma is a Lava product; the pilot has no Lava colony. It shows
+    // on the map once Lava is a what-if, and tracing it keeps that tick.
     await user.click(planet('Lava'));
-    await user.click(product('Felsic Magma'));
-    expect(
-      screen.getByRole('dialog', { name: /^(How to make|Where to get) / })
-    ).toBeInTheDocument();
     await user.keyboard('{Escape}');
+    await user.click(product('Felsic Magma'));
+    const dialog = screen.getByRole('dialog', { name: /^(How to make|Where to get) / });
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // A click on the ticked what-if unticks it, even though the trace needs it.
+    await user.click(planet('Lava'));
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(product('Felsic Magma')).toHaveAttribute('aria-current', 'true');
     await user.hover(planet('Lava'));
     // No what-if preview: the trace already shows the chain, pink wires would bury it.
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
@@ -477,9 +618,10 @@ describe('PlanMap: the detail drawer', () => {
       screen.getByRole('dialog', { name: /^(How to make|Where to get) / })
     ).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Where to put a new Lava colony' })).toBeNull();
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('tracing the best recipe from the add-planet drawer keeps the opener and clears the what-if', async () => {
+  it('tracing the best recipe from the add-planet drawer keeps the opener and the what-if', async () => {
     const user = userEvent.setup();
     renderMap();
     await user.click(planet('Lava'));
@@ -488,7 +630,8 @@ describe('PlanMap: the detail drawer', () => {
     expect(
       screen.getByRole('dialog', { name: /^(How to make|Where to get) / })
     ).toBeInTheDocument();
-    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(planet('Lava')).toHaveFocus());
   });

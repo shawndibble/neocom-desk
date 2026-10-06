@@ -944,6 +944,10 @@ Rows:
 - **A row that opens a modal** carries its cue on the primary cell (the
   accent entity name). The row click is a pointer convenience.
 - **A row that selects** for a detail pane shows the selected treatment.
+  Where having nothing selected is a valid state (the PI Map's traced
+  product), a click on the selected row clears it, the same as a toggle;
+  closing its detail pane does not. When such a row is a link, Space clicks
+  it as Enter does.
 - **A row with a menu** shows the ⋮ (`rowMoreActions`) only if the menu
   passes the restraint rules below. Right-click and touch-and-hold open the
   same menu, never the only way in. A row without a ⋮ has no custom menu.
