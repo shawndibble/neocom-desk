@@ -112,6 +112,18 @@ describe('MakeMorePlan', () => {
     expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
   });
 
+  it('leaves quick wins out of the live region when there are none', () => {
+    mockState = ready({
+      ...fixtureAdvice,
+      quickWins: [],
+      colonies: fixtureAdvice.colonies.map((c) => ({ ...c, quickWins: [] })),
+    } as unknown as PlanAdvice);
+    renderPlan();
+    const live = screen.getByRole('status');
+    expect(live).not.toHaveTextContent(/Quick wins add/);
+    expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
+  });
+
   it.each([
     [-756_000, /Rebuilding 1 planet costs 756K ISK a day\./],
     [-0.3, /^((?!costs).)*$/s],
@@ -335,10 +347,9 @@ describe('MakeMorePlan', () => {
     });
     renderPlan();
     expect(screen.getByText(/assume 10% customs on/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Set the rate on Plan' })).toHaveAttribute(
-      'href',
-      '/planetary-industry/plan#customs'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Set the rate in Make a specific product' })
+    ).toHaveAttribute('href', '/planetary-industry/plan#customs');
   });
 
   it('stays quiet when every customs rate is known', () => {

@@ -31,12 +31,16 @@ interface Props {
 /** The sentence a screen reader hears when the plan recomputes. */
 function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t']): string {
   const { headline } = view;
-  const parts = [
-    t('piPlan.make.liveQuick', {
-      gain: formatIskCompact(headline.quickWinPerDay),
-      count: headline.quickWinMinutes,
-    }),
-  ];
+  const parts: string[] = [];
+  // No quick wins: say nothing rather than "add 0 ISK a day in about 0 minutes".
+  if (view.quickWins.length > 0) {
+    parts.push(
+      t('piPlan.make.liveQuick', {
+        gain: formatIskCompact(headline.quickWinPerDay),
+        count: headline.quickWinMinutes,
+      })
+    );
+  }
   if (headline.rebuildCount > 0) {
     parts.push(
       t(
@@ -156,6 +160,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         {headlineText(view, t)}
       </div>
       <AssumedCustomsNote
+        onPlan
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
       <IskFigureGroup>

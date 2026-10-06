@@ -12,9 +12,12 @@ import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
  */
 export function AssumedCustomsNote({
   names,
+  onPlan = false,
   className,
 }: {
   names: readonly string[];
+  /** Already on Plan: name the question the link opens, not the tab. */
+  onPlan?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -31,7 +34,7 @@ export function AssumedCustomsNote({
         })}
       </span>
       <Link className={inlineLinkClassName} to={PLAN_CUSTOMS_HREF}>
-        {t('piPlan.customsSetOnPlan')}
+        {t(onPlan ? 'piPlan.customsSetInPlanner' : 'piPlan.customsSetOnPlan')}
       </Link>
     </p>
   );

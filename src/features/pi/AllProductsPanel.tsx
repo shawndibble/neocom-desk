@@ -115,12 +115,12 @@ export function AllProductsPanel({
       <div className="grid divide-y divide-line lg:grid-cols-5 lg:divide-x lg:divide-y-0">
         {tiers.map((column) => (
           <section key={column.tier} aria-label={t(`piPlan.find.tier.${TIER_KEY[column.tier]}`)}>
-            <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-line px-3 py-2">
               <TierChip tier={column.tier} />
-              <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className="text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap text-text-dim uppercase">
                 {t(`piPlan.find.tier.${TIER_KEY[column.tier]}`)}
               </h3>
-              <span className="ml-auto text-[0.6875rem] text-text-dim tabular-nums">
+              <span className="ml-auto text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
                 {t('piPlan.find.canMake', {
                   count: column.reachableCount,
                   total: column.items.length,
