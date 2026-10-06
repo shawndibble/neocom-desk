@@ -1,3 +1,5 @@
+import { PLAN_CUSTOMS_HASH } from './piPlanLink';
+
 /** The three questions the Plan tab opens on. */
 export type PlanQuestion = 'make-more' | 'find-best' | 'product';
 
@@ -20,4 +22,18 @@ export function openingQuestion(input: {
   if (input.goalCount > 0) return { question: 'product', reason: 'goals' };
   if (input.colonyCount > 0) return { question: 'make-more', reason: 'colonies' };
   return { question: 'find-best', reason: 'no-colonies' };
+}
+
+/**
+ * The question the pilot picked, or the one a `#customs` link forces. A pick
+ * made on an earlier visit to the same `#customs` URL (another `location.key`)
+ * no longer overrides it; with no hash, a pick always stands.
+ */
+export function pickedQuestion(
+  pick: { question: PlanQuestion; key: string } | null,
+  hash: string,
+  locationKey: string
+): PlanQuestion | null {
+  if (hash !== PLAN_CUSTOMS_HASH) return pick?.question ?? null;
+  return pick?.key === locationKey ? pick.question : 'product';
 }

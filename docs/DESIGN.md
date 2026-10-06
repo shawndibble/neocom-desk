@@ -811,6 +811,8 @@ link goes and _what_ a view shows is Neocom Desk's own. When this section is
 silent, follow the platform convention (WCAG 2.2, WAI-ARIA APG, Apple HIG,
 Material, Windows).
 
+**Deep links that name a field.** A link whose job is "set this value" (the PI "Set the rate on Plan" link, `#customs`) opens the view with the section expanded and the first field focused, so the pilot lands on the control, not a page that merely mentions it.
+
 Some primitives named here are still being built during the rollout. Until
 one exists, follow the rule it encodes. Where §3 or a §4 component row describes
 older behaviour (the touch tier keyed on width alone, hold-to-reveal inside

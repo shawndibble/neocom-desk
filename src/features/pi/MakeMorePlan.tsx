@@ -4,6 +4,8 @@ import { useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { IskTabStopContext } from '@/components/ui/tooltipHold';
 import { formatIskCompact } from '@/lib/isk';
+import { AssumedCustomsNote } from './AssumedCustomsNote';
+import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
@@ -139,6 +141,9 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         <div role="status" aria-live="polite" className="sr-only">
           {headlineText(view, t)}
         </div>
+        <AssumedCustomsNote
+          names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
+        />
         <YourPlanetsPanel
           view={view}
           preference={preference}
