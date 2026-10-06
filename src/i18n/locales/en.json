@@ -5296,7 +5296,7 @@
     "noColoniesHint": "The planner plans over your own colonies, and this character has none. Find planets on the Map.",
     "noColoniesBuying": "No colonies: goals at a tier you buy are bought outright. Anything else needs a colony to host the factories.",
     "pricesFailedTitle": "Hub prices could not be fetched",
-    "pricesFailedHint": "The planner needs live market prices. Check your connection, then refresh.",
+    "pricesFailedHint": "Figures that need them, ISK and haul volume, are hidden until they load. Check your connection, then refresh.",
     "loadFailedTitle": "The planner could not load",
     "loadFailedHint": "Your colonies or planetary schematics failed to load. Refresh to try again.",
     "planFailedTitle": "No plan for these goals",
