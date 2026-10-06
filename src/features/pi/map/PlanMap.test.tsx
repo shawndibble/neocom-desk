@@ -38,7 +38,7 @@ function props(overrides: Partial<PlanMapProps> = {}): PlanMapProps {
     advice,
     adviceWithWhatIf: withWhatIf('lean'),
     colonies: [{ type: 'temperate', name: 'Hek VIII' }],
-    finder: { systemId: 30000142, name: 'Jita' },
+    finder: { systemId: 30000142, name: 'Jita', security: 0.9 },
     ...overrides,
   };
 }

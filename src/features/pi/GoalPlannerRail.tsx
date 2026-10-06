@@ -230,6 +230,7 @@ function ColonyRow({
   name,
   systemName,
   size,
+  focusCustoms,
   onToggle,
   onCustomsChange,
 }: {
@@ -237,6 +238,7 @@ function ColonyRow({
   name: string;
   systemName: string;
   size: ControlSize;
+  focusCustoms: boolean;
   onToggle: (enabled: boolean) => void;
   onCustomsChange: (percent: number | null) => void;
 }) {
@@ -282,6 +284,7 @@ function ColonyRow({
             </label>
             <PercentInput
               id={inputId}
+              autoFocus={focusCustoms}
               commitOn="blur"
               size={size}
               value={row.taxAssumed ? null : customsRatePercent(row.taxRate)}
@@ -333,6 +336,7 @@ export function ColoniesSection({
   planetName,
   systemName,
   size,
+  focusCustoms = false,
   expanded,
   onToggleExpanded,
   onToggle,
@@ -342,6 +346,8 @@ export function ColoniesSection({
   planetName: (planetId: number) => string;
   systemName: (systemId: number) => string;
   size: ControlSize;
+  /** Focus the first colony's customs rate on mount (the `#customs` deep link). */
+  focusCustoms?: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggle: (planetId: number, enabled: boolean) => void;
@@ -349,6 +355,7 @@ export function ColoniesSection({
 }) {
   const { t } = useTranslation();
   const enabled = rows.filter((row) => row.enabled).length;
+  const firstRateRow = focusCustoms ? rows.find((row) => row.excluded === null) : undefined;
   return (
     <CollapsiblePanel
       title={t('piPlan.coloniesTitle')}
@@ -373,6 +380,7 @@ export function ColoniesSection({
           {rows.map((row) => (
             <ColonyRow
               key={row.planetId}
+              focusCustoms={focusCustoms && row.planetId === firstRateRow?.planetId}
               row={row}
               name={planetName(row.planetId)}
               systemName={systemName(row.systemId)}
