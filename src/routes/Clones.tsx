@@ -18,7 +18,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones, loadImplantDescriptions } from '@/features/character/clones';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -142,7 +142,7 @@ function ImplantLink({
   name: string;
   description?: string;
 }) {
-  const link = <MarketItemLink typeId={typeId}>{name}</MarketItemLink>;
+  const link = <ItemInfoLink typeId={typeId}>{name}</ItemInfoLink>;
   return description ? <Tooltip content={description}>{link}</Tooltip> : link;
 }
 

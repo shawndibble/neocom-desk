@@ -34,8 +34,7 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { entityLinkClassName } from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
 import {
   displayValue,
@@ -586,9 +585,9 @@ function SlotBar({
           {t('fittings.implantFinder.showingSlot', { slot: label })}
         </span>{' '}
         {occupant !== undefined && name !== null ? (
-          <MarketItemLink typeId={occupant} className={entityLinkClassName('font-semibold')}>
+          <ItemInfoLink typeId={occupant} className="font-semibold">
             {name}
-          </MarketItemLink>
+          </ItemInfoLink>
         ) : (
           <span className="text-text-dim">{t('fittings.implantFinder.empty')}</span>
         )}

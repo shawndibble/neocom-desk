@@ -7,15 +7,8 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Checkbox,
-  entityLinkClassName,
-  IconButton,
-  SearchInput,
-  TypeIcon,
-} from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { Button, Checkbox, IconButton, SearchInput, TypeIcon } from '@/components/ui';
+import { ItemInfoLink } from '@/features/entities';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -99,12 +92,9 @@ export function FittingFightersPanel({
               >
                 <TypeIcon typeId={squadron.typeId} size={32} width={24} height={24} />
                 <span className="min-w-0 flex-1 basis-40">
-                  <MarketItemLink
-                    typeId={squadron.typeId}
-                    className={entityLinkClassName('block truncate text-sm')}
-                  >
+                  <ItemInfoLink typeId={squadron.typeId} className="block truncate text-sm">
                     {name}
-                  </MarketItemLink>
+                  </ItemInfoLink>
                   {kind && (
                     <span className="block text-text-dim">
                       {t(`fittings.fighters.class.${kind}`)}
