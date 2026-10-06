@@ -40,6 +40,32 @@ vi.mock('./useBiggerChains', () => ({
     candidateCount: 1,
     pending: false,
   }),
+  // A what-if planet's chain, as large: it must not move them either.
+  useWhatIfChains: () => ({
+    byType: new Map([
+      [
+        'lava',
+        new Map([
+          [
+            2345,
+            {
+              colonies: {
+                typeId: 2345,
+                iskPerDay: 9_000_000,
+                unitsPerDay: 10,
+                planetIds: [-1, 1],
+                hostId: 1,
+                m3PerWeek: 700,
+                legs: [{ from: -1, to: 1, jumps: null }],
+              },
+              newPlanets: null,
+            },
+          ],
+        ]),
+      ],
+    ]),
+    pending: false,
+  }),
 }));
 
 const snapshot = { pi: fixturePi, colonies: [] } as unknown as GoalPlannerSnapshot;

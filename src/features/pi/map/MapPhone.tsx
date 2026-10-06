@@ -174,9 +174,9 @@ export function MapPhone(props: MapPhoneProps) {
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
-                  {figure.kind === 'unranked' && figure.chain && (
+                  {figure.kind === 'unranked' && (figure.whatIf ?? figure.chain) && (
                     <ChainTileFigure
-                      iskPerDay={figure.chain.iskPerDay}
+                      iskPerDay={(figure.whatIf ?? figure.chain)!.iskPerDay}
                       className="shrink-0 text-xs"
                     />
                   )}

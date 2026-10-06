@@ -385,9 +385,13 @@ export function MapBoard(props: MapBoardProps) {
                       })
                     : comparisonSentence(t, figure),
                   figureSentence(t, figure),
-                  figure.kind === 'unranked' && figure.chain
-                    ? chainAssumptions(t, figure.chain)
-                    : null,
+                  figure.kind !== 'unranked'
+                    ? null
+                    : figure.whatIf
+                      ? t('piMap.add.chainsTip')
+                      : figure.chain
+                        ? chainAssumptions(t, figure.chain)
+                        : null,
                 ]
                   .filter(Boolean)
                   .join('\n');
@@ -457,8 +461,11 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
-                        ) : figure.kind === 'unranked' && figure.chain ? (
-                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} stacked />
+                        ) : figure.kind === 'unranked' && (figure.whatIf ?? figure.chain) ? (
+                          <ChainTileFigure
+                            iskPerDay={(figure.whatIf ?? figure.chain)!.iskPerDay}
+                            stacked
+                          />
                         ) : (
                           <span aria-hidden="true" />
                         )}

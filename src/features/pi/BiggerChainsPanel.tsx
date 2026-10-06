@@ -1,4 +1,8 @@
-/** Plan's "Bigger chains" panel: draws `biggerChainsModel`'s view, computes no figure. */
+/**
+ * Plan's "Bigger chains" panel: draws `biggerChainsModel`'s view, computes no
+ * figure. Its "What if I add a planet?" part, and the Map's add-planet panel,
+ * draw a what-if planet's chains with `WhatIfChainCards`.
+ */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,15 +15,24 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
+import { cx } from '@/lib/cx';
 import type { PiData } from '@/sde/types';
 import { piTier } from '@/engine/pi/chain';
-import { biggerChainsView, type BiggerChainCard } from './biggerChainsModel';
+import type { PlanetType } from '@/engine/pi/goalTypes';
+import { withArticle } from './article';
+import {
+  biggerChainsView,
+  whatIfChainsView,
+  WHAT_IF_PLANET_ID,
+  type BiggerChainCard,
+} from './biggerChainsModel';
 import { chainAssumptions, planetTypeList } from './chainEstimateText';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { PiProductLink } from './PiProductLink';
 import type { PlanAdvice } from './planAdviceModel';
 import { Sentence } from './sentence';
-import { useBiggerChains } from './useBiggerChains';
+import { planetTypesOf } from './productPlanets';
+import { useBiggerChains, useWhatIfChains } from './useBiggerChains';
 
 const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
 const m3 = (value: number) => Math.round(value).toLocaleString('en');
@@ -52,7 +65,14 @@ function ChainSentence({
         slots={{
           item,
           planets: (
-            <b className="font-semibold">{listFormat.format(card.planetIds.map(names.of))}</b>
+            <b className="font-semibold">
+              {/* A what-if planet reads last: "Gas I, Gas II and a new Lava planet". */}
+              {listFormat.format(
+                [...card.planetIds]
+                  .sort((a, b) => Number(a === WHAT_IF_PLANET_ID) - Number(b === WHAT_IF_PLANET_ID))
+                  .map(names.of)
+              )}
+            </b>
           ),
           host: <b className="font-semibold">{names.of(card.hostId)}</b>,
         }}
@@ -117,11 +137,13 @@ function Legs({ card, names }: { card: BiggerChainCard; names: Names }) {
       {card.legs
         .map((leg) =>
           t(
-            leg.jumps === null
-              ? 'piPlan.chains.legUnknown'
-              : leg.jumps === 0
-                ? 'piPlan.chains.legSameSystem'
-                : 'piPlan.chains.leg',
+            leg.from === WHAT_IF_PLANET_ID || leg.to === WHAT_IF_PLANET_ID
+              ? 'piPlan.chains.legNew'
+              : leg.jumps === null
+                ? 'piPlan.chains.legUnknown'
+                : leg.jumps === 0
+                  ? 'piPlan.chains.legSameSystem'
+                  : 'piPlan.chains.leg',
             {
               from: names.of(leg.from),
               to: names.of(leg.to),
@@ -140,17 +162,20 @@ function ChainCard({
   free,
   pi,
   assumptions,
+  stacked = false,
 }: {
   card: BiggerChainCard;
   names: Names;
   free: number;
   pi: PiData;
   assumptions: string;
+  /** The figure on its own line at every width: a narrow panel, such as the Map's. */
+  stacked?: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <li className="px-3 py-3">
-      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+    <li className={stacked ? 'py-3' : 'px-3 py-3'}>
+      <div className={cx('flex flex-wrap items-start gap-3', !stacked && 'sm:flex-nowrap')}>
         <TypeIcon typeId={card.typeId} size={64} width={36} height={36} />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm text-text">
@@ -176,7 +201,14 @@ function ChainCard({
             <Legs card={card} names={names} />
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2 max-sm:order-last max-sm:basis-full max-sm:pl-12">
+        <div
+          className={cx(
+            'flex shrink-0 items-center gap-2',
+            stacked
+              ? 'order-last basis-full pl-12'
+              : 'max-sm:order-last max-sm:basis-full max-sm:pl-12'
+          )}
+        >
           <TierChip tier={piTier(card.typeId, pi)} />
           <span className="text-sm font-semibold text-text tabular-nums">
             <IskAmount value={card.iskPerDay} decimals={0} />
@@ -192,6 +224,163 @@ function ChainCard({
     </li>
   );
 }
+
+/** Planet and product names, a what-if planet included ("a new Barren planet"). */
+function useNames(advice: PlanAdvice, pi: PiData, whatIfType: PlanetType | null): Names {
+  const { t } = useTranslation();
+  const byId = new Map(advice.colonies.map((colony) => [colony.planetId, colony]));
+  const type = (planet: string) => t(`pi.planetType.${planet}`);
+  return {
+    of: (id) =>
+      id === WHAT_IF_PLANET_ID && whatIfType
+        ? t('piPlan.chains.newPlanet', { type: type(whatIfType) })
+        : (byId.get(id)?.name ?? t('pi.planetLabel', { id })),
+    type,
+    product: (typeId) => pi.schematics[String(typeId)]?.name ?? `#${typeId}`,
+  };
+}
+
+/** What a card's figure assumes, the what-if planet's own assumptions included. */
+function useAssumptions(advice: PlanAdvice, whatIfType: PlanetType | null) {
+  const { t } = useTranslation();
+  const basis = advice.chainBasis;
+  const onColonies = t('piPlan.chains.assumesColonies', { count: basis.haulDays });
+  const added = whatIfType
+    ? t('piPlan.chains.assumesWhatIf', {
+        type: t(`pi.planetType.${whatIfType}`),
+        level: basis.ccLevel,
+        heads: basis.headsPerExtractor,
+        rate: Math.round(basis.ratePerHour).toLocaleString('en'),
+      })
+    : null;
+  return (card: BiggerChainCard) =>
+    card.kind === 'new-planets'
+      ? chainAssumptions(t, card.estimate)
+      : added && card.planetIds.includes(WHAT_IF_PLANET_ID)
+        ? `${onColonies} ${added}`
+        : onColonies;
+}
+
+/** The chains one what-if planet type makes possible, drawn as Bigger chains cards. */
+export function WhatIfChainCards({
+  type,
+  cards,
+  advice,
+  pi,
+  stacked = false,
+}: {
+  type: PlanetType;
+  cards: readonly BiggerChainCard[];
+  advice: PlanAdvice;
+  pi: PiData;
+  stacked?: boolean;
+}) {
+  const names = useNames(advice, pi, type);
+  const assumptionsOf = useAssumptions(advice, type);
+  return (
+    <ul className="divide-y divide-line">
+      {cards.map((card) => (
+        <ChainCard
+          key={card.typeId}
+          card={card}
+          names={names}
+          free={advice.slots.free}
+          pi={pi}
+          assumptions={assumptionsOf(card)}
+          stacked={stacked}
+        />
+      ))}
+    </ul>
+  );
+}
+
+/** Plan's "What if I add a planet?": every type the pilot does not run, one at a time, once the chains above are priced. */
+function WhatIfSection({
+  advice,
+  pi,
+  ready,
+}: {
+  advice: PlanAdvice;
+  pi: PiData;
+  /** The pilot's own chains are priced: the what-ifs wait for them. */
+  ready: boolean;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState<ReadonlySet<PlanetType>>(new Set());
+  const colonies = advice.chainColonies;
+  const missing = useMemo(() => {
+    const have = new Set(colonies.map((colony) => colony.planetType));
+    return colonies.length === 0 ? [] : planetTypesOf(pi).filter((type) => !have.has(type));
+  }, [colonies, pi]);
+  const noSlot = advice.slots.free < 1;
+  const wanted = ready && !noSlot ? missing : NO_TYPES;
+  const state = useWhatIfChains(advice, pi, wanted);
+  const rows = useMemo(
+    () =>
+      whatIfChainsView({
+        byType: state.byType,
+        afterRebuildPerDay: new Map(
+          advice.colonies.map((colony) => [colony.planetId, colony.afterRebuildPerDay])
+        ),
+        slots: { free: advice.slots.free, gainPerPlanetPerDay: advice.slots.gainPerPlanetPerDay },
+        haulDays: advice.chainBasis.haulDays,
+      }),
+    [state.byType, advice.colonies, advice.slots, advice.chainBasis.haulDays]
+  );
+  if (missing.length === 0) return null;
+  const toggle = (type: PlanetType) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+
+  return (
+    <section aria-labelledby="pi-chains-whatif" className="border-t border-line">
+      <h3
+        id="pi-chains-whatif"
+        className="px-3 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      >
+        {t('piPlan.chains.whatIfTitle')}
+      </h3>
+      <p className="px-3 pt-1 pb-2 text-xs text-text-dim">
+        {noSlot ? t('piPlan.chains.whatIfNoSlot') : t('piPlan.chains.whatIfIntro')}
+      </p>
+      {rows.map((row) => (
+        <div key={row.type} className="border-t border-line">
+          <Disclosure
+            label={t('piPlan.chains.whatIfRow', {
+              aType: withArticle(t(`pi.planetType.${row.type}`)),
+              count: row.cards.length,
+            })}
+            expanded={open.has(row.type)}
+            onToggle={() => toggle(row.type)}
+          >
+            {open.has(row.type) && (
+              <WhatIfChainCards type={row.type} cards={row.cards} advice={advice} pi={pi} />
+            )}
+          </Disclosure>
+        </div>
+      ))}
+      {!noSlot &&
+        (!ready || state.pending ? (
+          <div className="flex items-center gap-2 border-t border-line px-3 py-3 text-xs text-text-dim">
+            <Spinner size="sm" label={t('piPlan.chains.whatIfPricing')} />
+            {t('piPlan.chains.whatIfPricing')}
+          </div>
+        ) : (
+          rows.length === 0 && (
+            <p className="border-t border-line px-3 py-3 text-sm text-text-dim">
+              {t('piPlan.chains.whatIfNone')}
+            </p>
+          )
+        ))}
+    </section>
+  );
+}
+
+const NO_TYPES: readonly PlanetType[] = [];
 
 export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiData }) {
   const { t } = useTranslation();
@@ -212,16 +401,9 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
       }),
     [state.estimates, afterRebuildPerDay, advice.slots, haulDays]
   );
-  const byId = new Map(advice.colonies.map((colony) => [colony.planetId, colony]));
-  const names: Names = {
-    of: (id) => byId.get(id)?.name ?? t('pi.planetLabel', { id }),
-    type: (type) => t(`pi.planetType.${type}`),
-    product: (typeId) => pi.schematics[String(typeId)]?.name ?? `#${typeId}`,
-  };
+  const names = useNames(advice, pi, null);
   const free = advice.slots.free;
-  const onColonies = t('piPlan.chains.assumesColonies', { count: haulDays });
-  const assumptionsOf = (card: BiggerChainCard) =>
-    card.kind === 'colonies' ? onColonies : chainAssumptions(t, card.estimate);
+  const assumptionsOf = useAssumptions(advice, null);
   const priced = view.recommended.length + view.others.length;
   const renderCards = (cards: readonly BiggerChainCard[]) => (
     <ul className="divide-y divide-line">
@@ -275,6 +457,7 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
           </Disclosure>
         </div>
       )}
+      <WhatIfSection advice={advice} pi={pi} ready={!state.pending} />
     </Panel>
   );
 }

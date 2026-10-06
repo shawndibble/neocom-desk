@@ -12,6 +12,20 @@ import { adviceInput, pi } from './mapFixtures.testutil';
 import { MAP_HINT_KEY } from './mapHintPref';
 import { buildMapGraph, DOCK_MIN_PANEL_WIDTH, productFigure } from './mapModel';
 import { PlanMap, type PlanMapProps } from './PlanMap';
+import { DEFAULT_PI_SETTINGS, usePiSettings } from '../piSettings';
+import { WHAT_IF_PLANET_ID } from '../biggerChainsModel';
+import type { WhatIfChainsState } from '../useBiggerChains';
+
+// What-if Bigger chains: the solver is `useWhatIfChains`'s own test; here only what the Map draws.
+let mockWhatIf: WhatIfChainsState = { byType: new Map(), pending: false };
+const whatIfAskedFor = vi.fn();
+vi.mock('../useBiggerChains', () => ({
+  NO_WHAT_IF_CHAINS: { byType: new Map(), pending: false },
+  useWhatIfChains: (_advice: unknown, _pi: unknown, wanted: readonly string[]) => {
+    whatIfAskedFor([...wanted]);
+    return mockWhatIf;
+  },
+}));
 
 // The finder reads the SDE and the stargate graph; its own behaviour is not under test here.
 vi.mock('./PlanetFinder', () => ({
@@ -905,5 +919,86 @@ describe('PlanMap with hub prices unreadable', () => {
     expect(screen.queryByText(/already make their best product/)).not.toBeInTheDocument();
     expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
     expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
+  });
+});
+
+describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets', () => {
+  const CAMERA_DRONES = 2345;
+  beforeEach(() => {
+    whatIfAskedFor.mockClear();
+    mockWhatIf = {
+      byType: new Map([
+        [
+          'lava',
+          new Map([
+            [
+              CAMERA_DRONES,
+              {
+                colonies: {
+                  typeId: CAMERA_DRONES,
+                  iskPerDay: 50_000,
+                  unitsPerDay: 10,
+                  planetIds: [WHAT_IF_PLANET_ID, 40000001],
+                  hostId: 40000001,
+                  m3PerWeek: 900,
+                  legs: [{ from: WHAT_IF_PLANET_ID, to: 40000001, jumps: null }],
+                },
+                newPlanets: null,
+              },
+            ],
+          ]),
+        ],
+      ]),
+      pending: false,
+    };
+  });
+  afterEach(() => usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: true }));
+
+  const haulBetween = (on: boolean) =>
+    usePiSettings.setState({
+      value: { ...DEFAULT_PI_SETTINGS, ...(on ? { haulBetweenPlanets: true as const } : {}) },
+      hydrated: true,
+    });
+
+  it('lights the P3/P4 a ticked what-if planet makes possible with its multi-planet estimate, never a pick', async () => {
+    const user = userEvent.setup();
+    haulBetween(true);
+    renderMap({ pi });
+    const picksBefore = screen.getByRole('group', { name: /picks/i }).textContent;
+    await user.click(planet('Lava'));
+    expect(whatIfAskedFor).toHaveBeenLastCalledWith(['lava']);
+    expect(product('Camera Drones')).toHaveAccessibleName(
+      /With a Lava planet added, a Bigger chain on your planets \(multi-planet estimate, needs hauling\): about 50,000 ISK a day across 2 planets/
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
+    expect(within(dialog).getByText('Bigger chains with it')).toBeInTheDocument();
+    const card = within(dialog).getByRole('link', { name: 'Camera Drones' }).closest('li')!;
+    expect(card).toHaveTextContent(/a new Lava planet/);
+    expect(card).toHaveTextContent(/not known yet, the planet is new/);
+    expect(screen.getByRole('group', { name: /picks/i }).textContent).toBe(picksBefore);
+  });
+
+  it('keeps the what-if tick, and its chains, when a product is traced', async () => {
+    const user = userEvent.setup();
+    haulBetween(true);
+    renderMap({ pi });
+    await user.click(planet('Lava'));
+    await user.keyboard('{Escape}');
+    await user.click(product('Camera Drones'));
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
+    expect(product('Camera Drones')).toHaveAccessibleName(/With a Lava planet added/);
+  });
+
+  it('prices nothing and shows no chains with the setting off', async () => {
+    const user = userEvent.setup();
+    haulBetween(false);
+    renderMap({ pi });
+    await user.click(planet('Lava'));
+    expect(whatIfAskedFor).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
+    expect(within(dialog).queryByText('Bigger chains with it')).toBeNull();
+    // Gas and Lava raws: not lit by a Lava planet alone, and no what-if figure anywhere.
+    expect(maybeProduct('Camera Drones')).toBeNull();
+    expect(screen.queryAllByRole('link', { name: /With a Lava planet added/ })).toEqual([]);
   });
 });

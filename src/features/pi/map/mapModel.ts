@@ -308,6 +308,12 @@ export type ProductFigure =
        * never a ranked one-planet recipe (`chainEstimateModel.ts`).
        */
       chain?: ChainEstimateView;
+      /**
+       * The Bigger chain the ticked what-if planet makes possible, when the
+       * pilot hauls between planets: a multi-planet estimate with that planet
+       * added, never a pick (`biggerChainsModel.ts`).
+       */
+      whatIf?: { type: PlanetType; iskPerDay: number; planets: number };
     };
 
 /**

@@ -388,6 +388,8 @@ export interface AddPlanetDetailProps {
   /** The recipe's PI detail URL. */
   productHref: (typeId: number) => string;
   onClose: () => void;
+  /** The Bigger chains this type makes possible, when the pilot hauls between planets; left out otherwise. */
+  chains?: React.ReactNode;
 }
 
 export function AddPlanetDetail(props: AddPlanetDetailProps) {
@@ -450,6 +452,13 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
         </div>
       ) : (
         <p className="mt-3 text-xs text-text-dim">{t('piMap.add.nothingAlone')}</p>
+      )}
+
+      {props.chains && (
+        <>
+          <Heading>{t('piMap.add.chainsHeading')}</Heading>
+          {props.chains}
+        </>
       )}
 
       <Heading>{t('piMap.add.slotsHeading')}</Heading>
