@@ -376,13 +376,10 @@ export const Layout = memo(function Layout() {
             the footer below pinned: the rail is `h-screen`, so a tall list
             (large text scale) would otherwise push it off the bottom. */}
         <RailNav unreadAlerts={unreadAlerts} />
-        {/*
-          Footer: Help and Settings, then the active Character, in that reading
-          order — the Character link is the very bottom of the rail. The
-          `border-b` rules off the bottom of Settings, separating it from the
-          Character link below rather than from the scrollable nav above.
-        */}
-        <div className="flex shrink-0 flex-col gap-0.5 border-b border-line p-2">
+        {/* Footer: Help, Settings, then Character (very bottom). `border-t`: at short
+            heights the scrolling nav's last row is cut by this edge; the rule makes
+            that read as scroll, not overlap. */}
+        <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
           {FOOTER_PAGES.map((page) => (
             <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
           ))}
