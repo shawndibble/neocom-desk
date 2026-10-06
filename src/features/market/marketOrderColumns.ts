@@ -104,8 +104,12 @@ const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, nu
  */
 const ORDER_BOOK_FIGURE = { charRem: 0.36, paddingRem: 2.5 } as const;
 
-/** The row's expand toggle (`expandableRow`), plus the card's border. */
-const ORDER_BOOK_FIXED_REM = 2.5 + 0.25;
+/**
+ * The row's expand toggle (`expandableRow`), its ⋮ column (`rowMoreActions`:
+ * a 1.75rem button in `px-2`), plus the card's border. Leaving the ⋮ column
+ * out let Buy, the wider table, scroll its ⋮ out of the card.
+ */
+const ORDER_BOOK_FIXED_REM = 2.5 + 2.75 + 0.25;
 
 /** `BaitFlag`'s icon and its margin, beside a flagged price. */
 const ORDER_BOOK_BAIT_FLAG_REM = 1.25;

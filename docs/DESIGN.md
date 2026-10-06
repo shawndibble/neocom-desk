@@ -460,8 +460,12 @@ exactly the markup above.
   chevron and no `end` box can add `className="dt-actions-pinned"` to pin
   the More actions button to the right edge across both lines instead, so
   line one stays text-tall, with a short `cardCorner` figure (a standing
-  icon) centred beside it (Contacts). A table with a tick box, a chevron
-  and an `end` box can add `className="dt-dense-tight"` instead: the tick
+  icon) centred beside it (Contacts). `dt-actions-pinned-only` pins the
+  button the same way but keeps the figure in flow on line one, hides the
+  expand chevron (line two runs the card's full width, so a chevron beside
+  the button would sit off its axis or on the text; the whole card is the
+  tap target), draws the ⋮ in the text colour, and gives it a 44px gutter of its own: the Range cell ellipsizes before text could meet the button (Market order book). A table with
+  a tick box, a chevron and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line
   two centres on a 28px `end` box (Hauling). BPC Sourcing uses it too,
