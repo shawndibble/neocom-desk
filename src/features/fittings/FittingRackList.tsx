@@ -2,7 +2,6 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  entityLinkClassName,
   IconButton,
   NativeSelect,
   Panel,
@@ -18,7 +17,7 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -158,12 +157,9 @@ function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();
   if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
-    <MarketItemLink
-      typeId={typeId}
-      className={entityLinkClassName(`${SLOT_NAME_CLASS} ${tappableRowClassName}`)}
-    >
+    <ItemInfoLink typeId={typeId} className={`${SLOT_NAME_CLASS} ${tappableRowClassName}`}>
       {name}
-    </MarketItemLink>
+    </ItemInfoLink>
   );
 }
 

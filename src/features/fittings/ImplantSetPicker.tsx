@@ -29,7 +29,7 @@ import {
 } from '@/components/ui';
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeInSet } from '@/engine/fittings/implantFinder';
@@ -161,14 +161,14 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
               >
                 <div className="flex items-center gap-2">
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
-                  <MarketItemLink
+                  <ItemInfoLink
                     typeId={typeId}
                     className={entityLinkClassName(
                       `${tappableRowClassName} flex min-w-0 flex-1 items-center text-sm`
                     )}
                   >
                     <span className="truncate">{name}</span>
-                  </MarketItemLink>
+                  </ItemInfoLink>
                   <IconButton
                     variant="plain"
                     size="sm"

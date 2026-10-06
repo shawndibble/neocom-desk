@@ -14,8 +14,7 @@
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import * as Icon from '@/components/ui/icons';
 import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 import { formatDuration } from '@/lib/duration';
@@ -152,9 +151,7 @@ export function CorpBoardRow({ item }: { item: CorpBoardItem }) {
             {item.typeId === null ? (
               item.subject
             ) : (
-              <MarketItemLink typeId={item.typeId} className={entityLinkClassName()}>
-                {item.subject}
-              </MarketItemLink>
+              <ItemInfoLink typeId={item.typeId}>{item.subject}</ItemInfoLink>
             )}
           </p>
         </Tooltip>

@@ -1,6 +1,5 @@
 import { Tooltip, TypeIcon } from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { ItemInfoLink } from '@/features/entities';
 
 interface ImplantChipProps {
   typeId: number;
@@ -15,10 +14,10 @@ interface ImplantChipProps {
  */
 export function ImplantChip({ typeId, name, description }: ImplantChipProps) {
   const link = (
-    <MarketItemLink typeId={typeId} className={entityLinkClassName('flex items-center gap-1.5')}>
+    <ItemInfoLink typeId={typeId} className="flex items-center gap-1.5">
       <TypeIcon typeId={typeId} size={32} width={16} height={16} className="size-4 shrink-0" />
       {name}
-    </MarketItemLink>
+    </ItemInfoLink>
   );
 
   return description ? <Tooltip content={description}>{link}</Tooltip> : link;

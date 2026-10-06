@@ -6,6 +6,9 @@
  * - `CharacterLink`, `CorporationLink`, `AllianceLink`, `SkillLink` point at
  *   the *current* page plus `?info=<kind>-<id>`; `EntityInfoRoute` opens the
  *   Show Info / Skill modal from that param.
+ * - `ItemInfoLink` opens an item's Item Detail (Show info) the same way
+ *   (`?info=type-<typeId>`). It is the default for an item name; the Market
+ *   browser link (`MarketItemLink`) is for pages whose context is market.
  * - `SystemLink` goes to Route Safety with the system as the destination.
  *
  * Every one forwards its ref and spreads extra anchor props, so a `Tooltip`
@@ -17,6 +20,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { PlanEntry } from '@/engine/types';
 import { entityInfoHref, parseEntityInfo, type EntityInfoTarget } from '@/lib/entityInfo';
+import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { ENTITY_INFO_PUSHED_STATE } from './entityInfoState';
@@ -95,6 +99,31 @@ export const SkillLink = forwardRef<
         // Only the click react-router handles in-app opens the modal here; a
         // Ctrl/middle click opens a new tab and must not leave entries staged.
         if (isPlainPrimaryClick(event)) stage(typeId, planEntries);
+      }}
+    />
+  );
+});
+
+/** An item name that opens its Item Detail (Show info) over the current page. */
+export const ItemInfoLink = forwardRef<
+  HTMLAnchorElement,
+  EntityLinkProps & {
+    typeId: number;
+    /** The item's name for the modal title; looked up from the type when omitted. */
+    itemName?: string;
+  }
+>(function ItemInfoLink({ typeId, itemName, onClick, ...rest }, ref) {
+  const stage = useItemInfoModalStore((state) => state.stage);
+  return (
+    <InfoLink
+      {...rest}
+      ref={ref}
+      entity={{ kind: 'type', id: typeId }}
+      onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+        onClick?.(event);
+        if (!isPlainPrimaryClick(event)) return;
+        const name = itemName ?? (typeof rest.children === 'string' ? rest.children : undefined);
+        stage(typeId, name);
       }}
     />
   );
