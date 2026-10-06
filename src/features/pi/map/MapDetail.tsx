@@ -212,22 +212,18 @@ export function ProductDetail(props: ProductDetailProps) {
               <div className="min-w-0">
                 <div>
                   <span className="font-semibold">{planetName(t, planet.type)}</span>{' '}
-                  <span className={planet.have ? 'text-success' : 'text-danger'}>
-                    {planet.have ? (
-                      <>
-                        <Icon.Done
-                          size={Icon.ICON_SIZE.sm}
-                          aria-hidden="true"
-                          className="mr-0.5 inline align-text-bottom"
-                        />
-                        {t('piMap.detail.have', {
-                          colonies: colonyList.length > 0 ? ` (${colonyList.join(', ')})` : '',
-                        })}
-                      </>
-                    ) : (
-                      `✕ ${t('piMap.detail.findOne')}`
-                    )}
-                  </span>
+                  {planet.have && (
+                    <span className="text-success">
+                      <Icon.Done
+                        size={Icon.ICON_SIZE.sm}
+                        aria-hidden="true"
+                        className="mr-0.5 inline align-text-bottom"
+                      />
+                      {t('piMap.detail.have', {
+                        colonies: colonyList.length > 0 ? ` (${colonyList.join(', ')})` : '',
+                      })}
+                    </span>
+                  )}
                 </div>
                 <div className="text-text-dim">
                   <NameChain graph={graph} ids={planet.made} open={typeId} />
