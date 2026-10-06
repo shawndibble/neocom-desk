@@ -15,6 +15,7 @@ import {
 } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram } from '@/engine/pi/types';
 import { PiProductLink } from '../PiProductLink';
+import { piPlanetHref } from '../piPlanLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -409,6 +410,15 @@ export function ColonyExpanded({
             {t('piColonies.expanded.planHint', { type: t(`pi.planetType.${planet.planet_type}`) })}
           </span>
         )}
+        <Link
+          to={piPlanetHref(planet.planet_id)}
+          className={entityLinkClassName(
+            'inline-flex min-h-11 items-center gap-1 font-semibold md:min-h-0'
+          )}
+        >
+          {t('piColonies.expanded.richness')}
+          <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        </Link>
         <StatChip
           label={t('pi.lastUpdate')}
           value={t('piColonies.expanded.lastUpdateValue', {

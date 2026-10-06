@@ -32,8 +32,8 @@ export const PI_MAP_HREF = '/planetary-industry/map';
  */
 export const PI_PRODUCT_PARAM = 'product';
 
-/** Params a product link drops: a goal seed (Plan), an open colony (Colonies), an open Show info. */
-const DROPPED_ON_PRODUCT = ['type', 'colony', 'info'] as const;
+/** Params a product link drops: a goal seed (Plan), an open colony (Colonies), an open Show info, an open planet drawer. */
+const DROPPED_ON_PRODUCT = ['type', 'colony', 'info', 'planet'] as const;
 
 /** The Map tab with `typeId`'s drawer open, keeping the page's other params (goals, switched-off colonies). */
 export function piProductHref(typeId: number, search: string): string {
@@ -42,6 +42,38 @@ export function piProductHref(typeId: number, search: string): string {
   params.delete(PI_PRODUCT_PARAM);
   params.set(PI_PRODUCT_PARAM, String(typeId));
   return `${PI_MAP_HREF}?${params.toString()}`;
+}
+
+/**
+ * `?planet=<planetId>`: the Map drawer for one of the pilot's own colonies,
+ * where its richness override is set (issue #2685). The Colonies row links
+ * here. A product link drops it, so one drawer is open at a time.
+ */
+export const PI_PLANET_PARAM = 'planet';
+
+/** The Map tab with that colony's richness drawer open. */
+export function piPlanetHref(planetId: number): string {
+  return `${PI_MAP_HREF}?${PI_PLANET_PARAM}=${planetId}`;
+}
+
+/** The planet a search string opens, or null when absent or not a positive whole id. */
+export function parsePiPlanet(search: string): number | null {
+  const raw = new URLSearchParams(search).get(PI_PLANET_PARAM);
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/** The same location without `planet`. */
+export function hrefWithoutPiPlanet(location: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): string {
+  const params = new URLSearchParams(location.search);
+  params.delete(PI_PLANET_PARAM);
+  const rest = params.toString();
+  return `${location.pathname}${rest === '' ? '' : `?${rest}`}${location.hash}`;
 }
 
 /** The product a search string opens, or null when absent or not a positive whole id. */

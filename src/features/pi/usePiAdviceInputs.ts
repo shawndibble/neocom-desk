@@ -10,6 +10,7 @@ import { loadGoalPlannerPrices, type GoalPlannerSnapshot } from './goalPlannerSn
 import { hubBooks, type PlanAdviceInput } from './planAdviceModel';
 import type { PlanPrices } from './planPrices';
 import { loadInterplanetaryConsolidation } from './planetSlots';
+import { usePlanetRichness } from './richnessOverride';
 import { useSellHub } from './sellHub';
 
 export type PiAdviceInputsState =
@@ -54,6 +55,8 @@ export function usePiAdviceInputs(
     void hydrateCadence();
     void hydrateGoalPrefs();
   }, [hydrateCadence, hydrateGoalPrefs]);
+
+  const richness = usePlanetRichness(characterId);
 
   const pi = snapshot?.pi ?? null;
   // Keyed by hub only: a refresh of the colonies keeps the last prices on
@@ -146,7 +149,7 @@ export function usePiAdviceInputs(
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
     if (pricesFailed) return { status: 'prices-failed' };
-    if (!prices || !skills) return { status: 'loading' };
+    if (!prices || !skills || !richness) return { status: 'loading' };
     return {
       status: 'ready',
       prices,
@@ -157,6 +160,7 @@ export function usePiAdviceInputs(
           restartHours: cadence.restartDays * 24,
           fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
           customsOverrides: snapshot.customsOverrides,
+          richness,
         },
         books: hubBooks(prices, snapshot.accountingLevel),
         market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
@@ -173,6 +177,7 @@ export function usePiAdviceInputs(
     prices,
     pricesFailed,
     skills,
+    richness,
     cadence,
     goalPrefs,
     buybackPct,

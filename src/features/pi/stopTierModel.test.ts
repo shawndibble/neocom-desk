@@ -228,3 +228,22 @@ describe('colonyStopTierAdvice', () => {
     expect(entries.some((entry) => entry.typeId === TEST_CULTURES)).toBe(false);
   });
 });
+
+describe('colonyStopTierAdvice richness override', () => {
+  const entryIds = (advice: ReturnType<typeof colonyStopTierAdvice>) =>
+    advice.status === 'advised' ? advice.advice.entries.map((e) => e.typeId).sort() : [];
+
+  it('is unchanged by an absent or empty override', () => {
+    const base = colonyStopTierAdvice(input());
+    expect(colonyStopTierAdvice(input({ picked: [] }))).toEqual(base);
+    expect(colonyStopTierAdvice(input({ picked: undefined }))).toEqual(base);
+  });
+
+  it('scores only what the picked resources can make', () => {
+    const base = entryIds(colonyStopTierAdvice(input()));
+    const narrowed = entryIds(colonyStopTierAdvice(input({ picked: [MICROORGANISMS] })));
+    expect(narrowed.length).toBeGreaterThan(0);
+    expect(narrowed.length).toBeLessThan(base.length);
+    for (const id of narrowed) expect(base).toContain(id);
+  });
+});

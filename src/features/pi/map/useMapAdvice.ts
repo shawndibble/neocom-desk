@@ -103,6 +103,7 @@ export function useMapAdvice(
   const colonies = useMemo<MapColony[]>(
     () =>
       (snapshot?.colonies ?? []).map((colony) => ({
+        planetId: colony.planet_id,
         type: colony.planet_type as PlanetType,
         name: snapshot?.planetNames.get(colony.planet_id) ?? planetLabel(colony.planet_id),
       })),
