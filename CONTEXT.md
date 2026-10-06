@@ -432,7 +432,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Item Actions**: What an item menu can do on the page it's on — add to the
   Quickbar, find the blueprint behind Build Plan, and open the page's one
   Item Detail (Show info). One set per page, shared by every item menu on it
-  (issue #2041).
+  (issue #2041). Show info is also URL-backed (`?info=type-<id>`), so an
+  item name anywhere can open it without a page-owned host.
 - **ISK/jump**: What a public courier haul pays per stargate jump of the trip
   it asks for — reward divided by the jump count, and the figure the Courier
   board ranks on (issue #943). A hauler's cost is the trip, and the trip is
