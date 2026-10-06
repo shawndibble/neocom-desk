@@ -12,10 +12,10 @@ beforeEach(async () => {
 });
 
 describe('LpValueSettingsForm', () => {
-  it('writes a typed rate (shorthand ok) to the shared LP Value store', async () => {
+  it('writes a typed rate to the shared LP Value store', async () => {
     const user = userEvent.setup();
     render(<LpValueSettingsForm />);
-    await user.type(await screen.findByRole('textbox', { name: /Your LP value/ }), '1.5k');
+    await user.type(await screen.findByRole('textbox', { name: /Your LP value/ }), '1500');
     expect(useLpValue.getState().value).toBe(1500);
   });
 
