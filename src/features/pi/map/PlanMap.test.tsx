@@ -323,7 +323,7 @@ describe('PlanMap: the detail drawer', () => {
     expect(within(dialog).getByText('Add a Lava planet')).toBeInTheDocument();
     expect(within(dialog).getByText(/Unlocks \d+ products/)).toBeInTheDocument();
     // Assistive tech gets the product names, not only the count.
-    expect(within(dialog).getByText(/^Unlocked products: .+\.$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Unlocked products: .*Plasmoids.*\.$/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Best one-planet recipe:/)).toBeInTheDocument();
     expect(
       within(dialog).getByText("You're using 1 of 4 planets: room for 3 more.")

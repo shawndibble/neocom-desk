@@ -35,7 +35,9 @@ interface IskAmountProps {
  * naming an element with no role, so many readers drop such a label and,
  * with the shorthand hidden, read an empty cell.
  *
- * It stays a tab stop (unless `IskTabStopContext` says a dense surface has its own). The tooltip is the only way a sighted keyboard user
+ * It stays a tab stop, unless a dense surface that already has one
+ * stop per row turns it off with `IskTabStopContext` (the PI Plan): there the
+ * exact figure is still read aloud and still shows on hover or tap. The tooltip is the only way a sighted keyboard user
  * reaches the exact figure, and `Tooltip` reveals on focus, so a figure that
  * cannot take focus would hide that value from the keyboard entirely.
  *

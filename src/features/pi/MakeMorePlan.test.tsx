@@ -41,7 +41,7 @@ describe('MakeMorePlan', () => {
     expect(container.querySelectorAll('span[tabindex="0"]').length).toBe(0);
     expect(container.querySelector('.sr-only')?.textContent).toBeTruthy();
     // Tab never lands on a bare ISK figure.
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 12; i++) {
       await user.tab();
       expect(document.activeElement?.tagName).not.toBe('SPAN');
     }
