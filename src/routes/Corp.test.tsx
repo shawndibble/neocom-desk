@@ -560,7 +560,8 @@ describe('the board (AC2, AC5, AC6)', () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
     await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
-    expect(screen.getByText('30m ago').getAttribute('title')).toContain('about an hour');
+    fireEvent.focus(screen.getByText('30m ago'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('about an hour');
   });
 
   it('offers the section’s sub-nav, which Members will join', async () => {

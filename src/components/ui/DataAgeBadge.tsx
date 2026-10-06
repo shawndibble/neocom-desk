@@ -7,6 +7,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 // badge's ~15 callers would otherwise have to thread the same global through.
 import { useTimeZone } from '@/lib/timeFormat';
 import { useTicker } from '@/lib/ticker';
+import { Tooltip } from './Tooltip';
 
 /** One shared 30 s clock for every badge on screen, not an interval each. */
 const TICK_MS = 30_000;
@@ -38,6 +39,12 @@ interface DataAgeBadgeProps {
    * Characters page's "Last synced" column and card dot.
    */
   alwaysVisible?: boolean;
+  /**
+   * `false` renders plain text with no tooltip and no tab stop. For a badge
+   * inside a button (a `Disclosure`'s `trailing`), where a focusable trigger
+   * would nest interactive content in a control; the age text still shows.
+   */
+  tooltip?: boolean;
   className?: string;
 }
 
@@ -63,6 +70,7 @@ export function DataAgeBadge({
   note,
   dotOnly = false,
   alwaysVisible = false,
+  tooltip = true,
   className = '',
 }: DataAgeBadgeProps) {
   const { t } = useTranslation();
@@ -72,21 +80,25 @@ export function DataAgeBadge({
   const ms = Math.max(0, now - date.getTime());
   const age = formatAge(ms, t);
   // `dotOnly` drops the age from the visible text but must not drop it
-  // altogether — it moves to the front of the tooltip instead.
-  const title = [dotOnly ? age : null, formatTimestamp(date, timeZone), note]
+  // altogether — it moves to the front of the tooltip, and stays in the
+  // accessible name as screen-reader text.
+  const content = [dotOnly ? age : null, formatTimestamp(date, timeZone), note]
     .filter(Boolean)
     .join(' — ');
 
-  return (
+  const badge = (
     <time
       dateTime={date.toISOString()}
-      title={title}
+      // A tooltip trigger must take focus, or a keyboard reader never sees it.
+      tabIndex={tooltip ? 0 : undefined}
       className={`items-center gap-1.5 text-[0.6875rem] tabular-nums ${
         alwaysVisible ? 'inline-flex' : 'hidden md:inline-flex'
       } ${toneFor(ms)} ${className}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {!dotOnly && age}
+      {dotOnly ? <span className="sr-only">{age}</span> : age}
     </time>
   );
+
+  return tooltip ? <Tooltip content={content}>{badge}</Tooltip> : badge;
 }

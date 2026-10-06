@@ -323,8 +323,8 @@ describe('Characters', () => {
     expect(pilotOneCard).toHaveTextContent('250M');
     const badges = pilotOneCard.querySelectorAll('time');
     expect(badges).toHaveLength(1);
-    expect(badges[0].getAttribute('title')).toContain('3d ago');
-    expect(badges[0].getAttribute('title')).not.toContain('5m ago');
+    expect(badges[0]).toHaveTextContent('3d ago');
+    expect(badges[0]).not.toHaveTextContent('5m ago');
 
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
     const spChip = within(pilotTwoCard).getByText('SP').parentElement as HTMLElement;
