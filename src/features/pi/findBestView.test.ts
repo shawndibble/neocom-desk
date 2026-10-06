@@ -52,6 +52,26 @@ const input = (over: Partial<FindBestInput> = {}): FindBestInput => ({
 });
 
 describe('buildFindBestView', () => {
+  it('ranks what the pilot can make today above what needs a planet they lack', () => {
+    // Oceanic Proteins (200) is the top ISK pick, but the pilot only runs lava.
+    const view = buildFindBestView(input({ colonyTypes: ['lava'] }));
+    const names = view.cards.map((card) => card.recipe.name);
+    expect(names).toEqual(['Coolant', 'Silicon', 'Proteins', 'Water']);
+    expect(view.cards.map((card) => card.makeableNow)).toEqual([true, true, false, false]);
+    expect(view.cards.map((card) => card.rank)).toEqual([1, 2, 3, 4]);
+    expect(view.addDividerBefore).toBe(3);
+  });
+
+  it('puts no divider where nothing, or everything, is makeable today', () => {
+    expect(buildFindBestView(input()).addDividerBefore).toBeNull();
+    expect(
+      buildFindBestView(input({ colonyTypes: ['lava'], filter: 'p2' })).addDividerBefore
+    ).toBeNull();
+    expect(
+      buildFindBestView(input({ colonyTypes: ['oceanic'], filter: 'p1' })).cards[0].recipe.name
+    ).toBe('Proteins');
+  });
+
   it('with no colonies, every type is on and every recipe reads find one', () => {
     const view = buildFindBestView(input());
     expect(view.hasColonies).toBe(false);

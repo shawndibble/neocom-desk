@@ -62,6 +62,8 @@ export interface RecipeCardView {
   hosts: { type: PlanetType; state: TypeState }[];
   /** Only a what-if planet makes it reachable: highlighted, and labelled, not colour alone. */
   isNew: boolean;
+  /** One of the pilot's own planet types hosts it, so they can make it today. Always true with no colonies. */
+  makeableNow: boolean;
 }
 
 export interface FindBestView {
@@ -69,6 +71,8 @@ export interface FindBestView {
   toggles: TypeToggle[];
   chips: WhatIfChip[];
   cards: RecipeCardView[];
+  /** Rank of the first card that needs a planet the pilot lacks, under cards they can make now. Null with no such split. */
+  addDividerBefore: number | null;
   /** The best recipe is one the pilot's colonies already make. */
   alreadyBest: boolean;
   unpricedCount: number;
@@ -94,15 +98,30 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
   const stateOf = (type: PlanetType): TypeState =>
     !hasColonies ? 'find' : base.has(type) ? 'have' : input.whatIf.has(type) ? 'whatif' : 'find';
 
-  const cards = ranking.recipes.map((recipe, i): RecipeCardView => {
+  const makeableNow = (recipe: RecipeRank) =>
+    !hasColonies || recipe.hostTypes.some((type) => base.has(type));
+  // Fits the Command Center first (the engine's order), then what the pilot can make
+  // today, then ISK a day. The sort is stable, so each group keeps the engine's order.
+  const ordered = [...ranking.recipes].sort(
+    (a, b) =>
+      (a.needsCcLevel ?? 0) - (b.needsCcLevel ?? 0) ||
+      Number(!makeableNow(a)) - Number(!makeableNow(b))
+  );
+  const cards = ordered.map((recipe, i): RecipeCardView => {
     const unlockedByBase = recipe.hostTypes.some((type) => base.has(type));
     return {
       rank: i + 1,
       recipe,
       hosts: recipe.hostTypes.map((type) => ({ type, state: stateOf(type) })),
       isNew: hasColonies && !unlockedByBase && recipe.hostTypes.some((t) => input.whatIf.has(t)),
+      makeableNow: makeableNow(recipe),
     };
   });
+  const firstAdd = cards.findIndex((card) => !card.makeableNow);
+  // A divider only when the can-make-now cards are a clean top block: an over-budget
+  // setup the pilot hosts sorts below every fitting one, so it can split the groups.
+  const clean = firstAdd > 0 && cards.slice(firstAdd).every((card) => !card.makeableNow);
+  const addDividerBefore = clean ? cards[firstAdd].rank : null;
 
   const toggles = (hasColonies ? owned : [...input.allTypes]).map((type) => ({
     type,
@@ -133,6 +152,7 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
     toggles,
     chips,
     cards,
+    addDividerBefore,
     alreadyBest:
       hasColonies &&
       cards.length > 0 &&

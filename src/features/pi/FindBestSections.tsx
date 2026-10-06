@@ -317,7 +317,7 @@ function RecipeCard({
     <div
       className={cx(
         'grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-2 px-3 py-3 md:items-center',
-        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_auto_7rem_minmax(0,1.1fr)_auto]'
+        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_12rem_7rem_minmax(0,1.1fr)_7.5rem]'
       )}
     >
       <span className="hidden text-sm text-text-dim tabular-nums md:block">{card.rank}</span>
@@ -331,7 +331,7 @@ function RecipeCard({
             </PiProductLink>
             <TierChip tier={recipe.tier} />
             {card.isNew && (
-              <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+              <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('piPlan.find.newWithPlanet')}
               </span>
             )}
@@ -388,6 +388,7 @@ function RecipeCard({
 
 export function RecipeListPanel({
   cards,
+  addDividerBefore,
   hubName,
   priceSource,
   estimate,
@@ -400,6 +401,8 @@ export function RecipeListPanel({
   emptyHint,
 }: {
   cards: readonly RecipeCardView[];
+  /** Rank of the first card under the "Add a planet to unlock" divider, if any. */
+  addDividerBefore: number | null;
   hubName: string;
   priceSource: string;
   estimate: boolean;
@@ -437,6 +440,11 @@ export function RecipeListPanel({
               const panelId = `find-how-${card.recipe.typeId}`;
               return (
                 <li key={card.recipe.typeId}>
+                  {card.rank === addDividerBefore && (
+                    <p className="bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('piPlan.find.addToUnlock')}
+                    </p>
+                  )}
                   <RecipeCard
                     card={card}
                     open={open}
