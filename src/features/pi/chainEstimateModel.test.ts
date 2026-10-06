@@ -4,7 +4,12 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { piTier } from '@/engine/pi/chain';
 import { colonyBudget } from './colonyBudget';
-import { buildChainEstimate, chainPlanets, type ChainBasis } from './chainEstimateModel';
+import {
+  buildChainEstimate,
+  chainPlanets,
+  chainProductIds,
+  type ChainBasis,
+} from './chainEstimateModel';
 import { rawInputsOf } from './productPlanets';
 
 const pi = JSON.parse(
@@ -41,9 +46,7 @@ function basis(overrides: Partial<ChainBasis> = {}): ChainBasis {
   };
 }
 
-const p3p4 = Object.keys(pi.schematics)
-  .map(Number)
-  .filter((id) => piTier(id, pi) >= 3);
+const p3p4 = chainProductIds(pi);
 
 describe('chainPlanets', () => {
   it('covers every raw, at most two a planet, with one planet able to host the factories', () => {

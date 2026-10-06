@@ -143,9 +143,7 @@ export function AllProductsPanel({
                 <Tile
                   key={tile.typeId}
                   tile={tile}
-                  chain={
-                    tile.tier >= 3 && tile.perDay === null ? (chainOf?.(tile.typeId) ?? null) : null
-                  }
+                  chain={tile.perDay === null ? (chainOf?.(tile.typeId) ?? null) : null}
                 />
               ))}
             </ul>

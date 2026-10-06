@@ -1,8 +1,8 @@
 /**
  * What the PI product detail says about one product: how to make it (inputs,
  * the factory, the planet types, whether one planet is enough) and why or why
- * not (the model's one-planet figure, its hauling load, what the pilot's
- * colonies already make). Pure over the Map's graph, trace and figure; it
+ * not (the model's one-planet figure, its hauling load, a P3/P4's chain
+ * estimate, what the pilot's colonies already make). Pure over the Map's graph, trace and figure; it
  * prices nothing.
  */
 import type { PlanetType } from '@/engine/pi/goalTypes';

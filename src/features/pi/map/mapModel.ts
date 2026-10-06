@@ -1,8 +1,9 @@
 /**
  * The PI Map's own logic, pure over `PiData` and the recommendation model's
- * output. Nothing here prices anything: every ISK figure the Map shows is read
- * off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is the number
- * Plan shows for the same product. This module only decides what is
+ * output. Nothing here prices anything: every one-planet ISK figure the Map
+ * shows is read off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is
+ * the number Plan shows for the same product; a P3/P4's chain estimate comes
+ * from `useChainEstimates`, the same as All products. This module only decides what is
  * reachable, what a chain looks like, and how the panels sit.
  */
 import { piTier } from '@/engine/pi/chain';

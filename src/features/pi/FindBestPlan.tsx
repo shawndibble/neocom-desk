@@ -84,7 +84,11 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   );
 
   const advice = state.status === 'ready' ? state.advice : null;
-  const chainOf = useChainEstimates(advice?.chainBasis ?? null, snapshot.pi);
+  // Only All products shows chain estimates: no point pricing them behind the picks.
+  const chainOf = useChainEstimates(
+    mode === 'all' ? (advice?.chainBasis ?? null) : null,
+    snapshot.pi
+  );
   const view = useMemo(() => {
     if (!advice) return null;
     const input = {

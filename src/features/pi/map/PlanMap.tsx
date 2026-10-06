@@ -3,8 +3,8 @@
  * the board) and the detail panel beside or over it.
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
- * `planPicks`, per-product figures via `productFigure`) and never prices
- * anything. `useMapAdvice` builds the advice; tests hand one in.
+ * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
+ * estimates via `chainOf`, and never prices anything. `useMapAdvice` builds the advice; tests hand one in.
  *
  * ## Where the detail panel goes
  *
@@ -318,7 +318,6 @@ export function PlanMap({
       new Map<number, ProductFigure>(
         [...graph.byId.keys()].map((id) => {
           const figure = productFigure(advice, id, graph, pricesFailed);
-          // A P3/P4's chain estimate rides on its unranked figure, never as a ranked one.
           const chain = figure.kind === 'unranked' && figure.reason === 'tier' ? chainOf(id) : null;
           return [id, chain ? { ...figure, chain } : figure];
         })

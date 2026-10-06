@@ -89,13 +89,17 @@ export function useChainEstimates(basis: ChainBasis | null, pi: PiData | null): 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const slice = () => {
       const start = performance.now();
+      let landed = false;
       while (todo.length > 0 && performance.now() - start < SLICE_MS) {
         const typeId = todo.shift()!;
-        results.set(typeId, buildChainEstimate(typeId, basis, pi));
+        const view = buildChainEstimate(typeId, basis, pi);
+        results.set(typeId, view);
+        landed ||= view !== null;
       }
       // Another assumption set may have evicted this one mid-run: put it back before rendering from it.
       if (cache.get(key) !== results) cache.set(key, results);
-      setVersion((v) => v + 1);
+      // Re-render only for something to show, and once at the end so "pending" settles.
+      if (landed || todo.length === 0) setVersion((v) => v + 1);
       if (todo.length > 0) timer = setTimeout(slice, 0);
     };
     timer = setTimeout(slice, 0);

@@ -31,8 +31,8 @@ export function ChainTileFigure({
       <span className="font-semibold">{formatIskCompact(iskPerDay)}</span>
       <span
         className={cx(
-          'rounded-xs border border-warning/60 px-1 font-semibold text-warning',
-          stacked ? 'text-[0.625rem] leading-[0.6875rem]' : 'text-[0.625rem] leading-[0.875rem]'
+          'rounded-xs border border-warning/60 px-1 text-[0.625rem] font-semibold text-warning',
+          stacked ? 'leading-[0.6875rem]' : 'leading-[0.875rem]'
         )}
       >
         {t('piShared.estimateBadge')}

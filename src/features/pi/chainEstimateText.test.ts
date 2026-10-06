@@ -19,7 +19,6 @@ const view: ChainEstimateView = {
   ccLevel: 4,
   ccAssumed: true,
   rateSource: 'assumed',
-  linkCost: 'assumed',
   headsPerExtractor: 8,
   ratePerHour: 4_800,
 };

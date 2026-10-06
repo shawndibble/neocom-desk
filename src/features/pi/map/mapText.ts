@@ -41,7 +41,8 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure): string 
 }
 
 /**
- * "About 717,234 ISK a day from one Barren planet", or null when there is no figure.
+ * "About 717,234 ISK a day from one Barren planet", a P3/P4's chain estimate
+ * sentence, or null when there is no figure.
  * Whole ISK, not shorthand: the tile and the phone row show the shorthand, and
  * this sentence is where their exact figure lives (tooltip, accessible name).
  */

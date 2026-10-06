@@ -1137,6 +1137,12 @@ function rankingFor(args: {
   ] as PlanetType[];
 
   const unpricedIds = [...unpriced].sort((a, b) => a - b);
+  const basis: RankingBasis = {
+    rateSource: measured.length > 0 ? 'measured' : 'assumed',
+    ccLevel: ceiling.level,
+    ccAssumed: skill === null,
+    linkCost: borrowed ? 'borrowed' : 'assumed',
+  };
   return {
     rows: recipeRows,
     // With no colony every planet type is one the pilot could go and find, as in Find best.
@@ -1153,21 +1159,13 @@ function rankingFor(args: {
       filter: input.recipeFilter,
       unpriced: unpricedIds,
     }),
-    basis: {
-      rateSource: measured.length > 0 ? 'measured' : 'assumed',
-      ccLevel: ceiling.level,
-      ccAssumed: skill === null,
-      linkCost: borrowed ? 'borrowed' : 'assumed',
-    },
+    basis,
     chain: {
-      ccLevel: ceiling.level,
-      ccAssumed: skill === null,
+      ...basis,
       budget: ceiling.budget,
       newLinkCost: borrowed ?? ASSUMED_RANKING_LINK_COST,
-      linkCost: borrowed ? 'borrowed' : 'assumed',
       headsPerExtractor: heads,
       ratePerHour: rate,
-      rateSource: measured.length > 0 ? 'measured' : 'assumed',
       taxRate,
       books,
       haulDays: input.cadence.haulDays,
