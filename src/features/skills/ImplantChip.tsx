@@ -8,8 +8,8 @@ interface ImplantChipProps {
 }
 
 /**
- * One fitted implant: icon + name, a Market item link (#405, DESIGN.md §6c:
- * item -> Market) preserving the page's region/hub. A real anchor, so Tab and
+ * One fitted implant: icon + name, an item link that opens its Show info
+ * (DESIGN.md §6c: item -> Show info). A real anchor, so Tab and
  * middle-click work; the tooltip carries the item's description.
  */
 export function ImplantChip({ typeId, name, description }: ImplantChipProps) {

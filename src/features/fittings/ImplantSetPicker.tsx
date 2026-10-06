@@ -19,7 +19,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
-  entityLinkClassName,
   IconButton,
   Modal,
   SearchInput,
@@ -163,9 +162,7 @@ function SlotList({ heading, typeIds, names, onRemove, onInfo, renderDetail }: S
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                   <ItemInfoLink
                     typeId={typeId}
-                    className={entityLinkClassName(
-                      `${tappableRowClassName} flex min-w-0 flex-1 items-center text-sm`
-                    )}
+                    className={`${tappableRowClassName} flex min-w-0 flex-1 items-center text-sm`}
                   >
                     <span className="truncate">{name}</span>
                   </ItemInfoLink>

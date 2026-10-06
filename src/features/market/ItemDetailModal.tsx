@@ -85,8 +85,8 @@ export interface ItemDetailModalProps {
   location?: OrderBookLocation;
   /**
    * An "Open in Market" link in the header, for an Item Detail opened away
-   * from the Market Browser (the Command Palette, #2319). Opt-in: on the
-   * Market Browser itself it would link to the page already open.
+   * from the Market Browser (Show info on any page, the Command Palette).
+   * Opt-in: on the Market Browser itself it would link to the page already open.
    */
   showOpenInMarket?: boolean;
   /**
@@ -241,6 +241,8 @@ export function ItemDetailModal({
     <Modal
       open
       onClose={onClose}
+      // The URL-backed host already owns the history entry (`?info`).
+      closeOnBack={onLeave === undefined}
       title={itemName}
       titleActions={
         showOpenInMarket ? (

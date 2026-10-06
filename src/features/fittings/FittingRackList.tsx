@@ -149,9 +149,9 @@ export interface ModuleRowProps extends EditContext {
 }
 
 /**
- * A fitted item's name: a link to the item in Market, when the page has Item
+ * A fitted item's name: a link to its Show info, when the page has Item
  * Actions (a shared-fitting preview renders no provider, and stays a span).
- * Show Info is in the row's ⋮ menu.
+ * View in Market is in the row's ⋮ menu.
  */
 function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();

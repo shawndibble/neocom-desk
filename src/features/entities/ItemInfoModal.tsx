@@ -8,6 +8,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { loadTypeName } from '@/features/character/typeNames';
+import { ItemActionsContext } from '@/features/market/itemActions';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 
 const ItemDetailModal = lazy(() =>
@@ -17,6 +20,14 @@ const ItemDetailModal = lazy(() =>
 );
 
 export function ItemInfoModal() {
+  const open = useItemInfoModalStore((state) => state.request !== null);
+  return open ? <ItemInfoHost /> : null;
+}
+
+/** Mounted only while open: it brings the page-less Item Actions Used-in's menus need. */
+function ItemInfoHost() {
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const { actions } = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
   const request = useItemInfoModalStore((state) => state.request);
   const close = useItemInfoModalStore((state) => state.close);
   const clear = useItemInfoModalStore((state) => state.clear);
@@ -41,15 +52,17 @@ export function ItemInfoModal() {
   const name = request.itemName ?? (looked?.typeId === request.typeId ? looked.name : null);
   if (name === null) return null;
   return (
-    <Suspense fallback={null}>
-      <ItemDetailModal
-        key={request.typeId}
-        typeId={request.typeId}
-        itemName={name}
-        showOpenInMarket
-        onClose={close}
-        onLeave={clear}
-      />
-    </Suspense>
+    <ItemActionsContext.Provider value={actions}>
+      <Suspense fallback={null}>
+        <ItemDetailModal
+          key={request.typeId}
+          typeId={request.typeId}
+          itemName={name}
+          showOpenInMarket
+          onClose={close}
+          onLeave={clear}
+        />
+      </Suspense>
+    </ItemActionsContext.Provider>
   );
 }

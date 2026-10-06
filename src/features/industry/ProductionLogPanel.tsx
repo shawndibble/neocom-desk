@@ -469,7 +469,7 @@ export function ProductionLogPanel({
         header: t('industry.productionRunColumnItem'),
         sortValue: (r) => r.itemName,
         // A row that opens the run's plan carries the plan's accent cue (the plan page links the
-        // product to Market); an inert row (no plan, or no way to open it) keeps the Market link.
+        // product); an inert row (no plan, or no way to open it) links the item's Show info.
         render: (r) =>
           r.planExists && onOpenRun ? (
             <span className={entityLinkClassName()}>{r.itemName}</span>

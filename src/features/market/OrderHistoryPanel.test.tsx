@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('OrderHistoryPanel — the row as an item', () => {
-  it('has no row menu or More actions button: the item name links to the Market', async () => {
+  it('has no row menu or More actions button: the item name links to Show info', async () => {
     mockedLoadHistory.mockResolvedValue({
       cached: {
         data: [historyOrder()],
