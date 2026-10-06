@@ -84,11 +84,11 @@ function Tile({ tile }: { tile: ProductTile }) {
 
 export function AllProductsPanel({
   tiers,
-  hubName,
+  priceSource,
   estimate,
 }: {
   tiers: readonly TierColumn[];
-  hubName: string;
+  priceSource: string;
   estimate: boolean;
 }) {
   const { t } = useTranslation();
@@ -98,7 +98,7 @@ export function AllProductsPanel({
       wrapMeta
       meta={
         <span className="text-[0.6875rem] text-text-dim max-md:basis-full">
-          {t('piPlan.find.picksMeta', { hub: hubName })}
+          {t('piPlan.find.picksMeta', { source: priceSource })}
         </span>
       }
       actions={estimate ? <EstimateBadge /> : undefined}

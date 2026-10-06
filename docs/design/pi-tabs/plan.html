@@ -423,7 +423,7 @@ const price = id => B[id].sell * mf();
 const raws = id => [...PI.rawLeaves(id)];
 const oneTypes = id => ALL.filter(t => raws(id).every(p => B[p].planets.includes(t)));
 const rateOne = id => B[id].tier===0 ? CAP : CAP / PI.p0PerUnit(id);
-const volWeek = id => rateOne(id)*B[id].vol*168;
+const volDay = id => rateOne(id)*B[id].vol*24;
 function coverPlanets(id){ // greedy: each planet extracts up to 2 of the raws it can yield
   let left = raws(id), n = 0;
   while(left.length){ let best=null, bc=[];
@@ -485,13 +485,13 @@ function routeText(){ const [j,l]=route(); if(S.market==='Buyback') return 'Corp
 const QWDATA = {
   six:[
     {p:'Hek VIII',k:'reset',icon:2305,txt:"Restart Hek VIII's Autotrophs extractor: it stops in 6 h and has slowed to 60% of its first day.",gain:95000,m:1},
-    {p:'Lustrevik III',k:'store',icon:2395,txt:"Lustrevik III's launchpad is full in 16 h, before your weekly haul. Haul now or add a storage unit.",save:120000,m:2},
+    {p:'Lustrevik III',k:'store',icon:2395,txt:"Lustrevik III's launchpad is full in 16 h, before your next haul. Haul now or add a storage unit.",save:120000,m:2},
     {p:'Uttindar V',k:'idle',icon:2392,txt:'Uttindar V has 2 Basic factories with no input. Remove them, or set them to Oxidizing Compound to use the spare raw.',gain:40000,m:1},
     {p:'Hek VI',k:'room',icon:2267,txt:'Hek VI has room for 2 more extractor heads.',gain:55000,m:2},
   ],
   two:[
     {p:'Hek VIII',k:'reset',icon:2305,txt:"Restart Hek VIII's Autotrophs extractor: it stops in 6 h and has slowed to 60% of its first day.",gain:95000,m:1},
-    {p:'Hek VI',k:'store',icon:2398,txt:"Hek VI's launchpad is full in 20 h, before your weekly haul. Haul now or add a storage unit.",save:80000,m:2},
+    {p:'Hek VI',k:'store',icon:2398,txt:"Hek VI's launchpad is full in 20 h, before your next haul. Haul now or add a storage unit.",save:80000,m:2},
   ],
 };
 const quickWins = () => (QWDATA[S.pilot]||[]).filter(q=>cols().some(c=>c.name===q.p)).slice().sort((a,b)=>((b.gain||b.save)/b.m)-((a.gain||a.save)/a.m));
@@ -560,7 +560,7 @@ function renderQ1(){
   if(!n) return panel('Your planets', `<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 16px;text-align:center"><div class="micro" style="font-size:14px">No colonies yet</div><div class="cap" style="font-size:12px;max-width:384px">When you set up your first planet, this shows what each one should make.</div><button class="btn sm" data-q="2" style="margin-top:8px">Find the best thing to build</button></div>`);
   const rows=planRows(S.pref);
   const today=rows.reduce((s,r)=>s+value(r.today),0), rec=rows.reduce((s,r)=>s+value(r.pick),0), gain=rec-today;
-  const vToday=rows.reduce((s,r)=>s+volWeek(r.today),0), vRec=rows.reduce((s,r)=>s+volWeek(r.pick),0);
+  const vToday=rows.reduce((s,r)=>s+volDay(r.today),0), vRec=rows.reduce((s,r)=>s+volDay(r.pick),0);
   const changed=rows.filter(r=>!r.same);
   const QW=quickWins(), QX=QW.reduce((s,x)=>s+(x.gain||0),0), QM=QW.reduce((s,x)=>s+x.m,0);
   const finalOf = rs => rs.reduce((s,r)=>s+(r.same ? value(r.today)+qwOn(r.c.name) : value(r.pick)),0);
@@ -571,13 +571,13 @@ function renderQ1(){
   const strip = `<div class="pstrip ${n<=2?'n2':''}">${rows.map(r=>{const q=qwOn(r.c.name), d=value(r.pick)-value(r.today)-q; return `<button class="pcell" data-jump="${r.c.name}">${pl(r.c.type)}<span class="t"><b>${r.c.name}</b>${q?`<span class="q">+${fm(q)} quick win</span>`:''}<span class="r">${r.same?'Keep':`Rebuild <span class="${d>=0?'pos':'neg'}">${sg(d)}</span>`}</span></span></button>`;}).join('')}</div>`;
   const summary = `<section class="panel"><div class="ph"><h2>Your planets</h2><span class="meta">${n} of 6</span><div class="acts"><span class="micro" style="margin-right:4px">What matters more?</span>${seg}</div></div>
     <div class="pb"><div class="hero">${h1}${h2}</div>
-      <div class="hero-sub"><div class="stats">${stat('Now', fm(today)+'/day')}${QW.length?stat('After quick wins', fm(today+QX)+'/day'):''}${stat('After rebuild', fm(fin)+'/day')}${stat('Haul', Math.round(vRec).toLocaleString()+' m³/wk')}</div>${estTag()}</div></div>
+      <div class="hero-sub"><div class="stats">${stat('Now', fm(today)+'/day')}${QW.length?stat('After quick wins', fm(today+QX)+'/day'):''}${stat('After rebuild', fm(fin)+'/day')}${stat('Haul', Math.round(vRec).toLocaleString()+' m³/day')}</div>${estTag()}</div></div>
     ${strip}${n<6?nudge():''}</section>`;
   const qwPanel = QW.length ? panel('Quick wins · no rebuild', `<div class="rows">${QW.map((x,i)=>{const c=cols().find(c=>c.name===x.p), key='qw'+S.pilot+i; return `<label class="row qwrow ${S.done.has(key)?'done':''}" data-step="${key}"><input type="checkbox" ${S.done.has(key)?'checked':''} tabindex="-1"><span class="pimg">${pl(c.type)}<span class="g">${QWG[x.k]}</span></span>${ic(x.icon)}<span class="tx">${x.txt}</span><span class="gain ${x.gain?'pos':'warn'}">${x.gain?`+${fm(x.gain)}/day`:`saves ~${fm(x.save)}`}<span class="tm2 hide-d"></span></span><span class="tm">~${x.m} min</span></label>`;}).join('')}</div>`,
     {flush:true, meta:`~${QM} min · <span class="pos">+${fm(QX)}/day</span>`, foot:'Found by the Advisor · sorted by ISK per minute · sample'}) : '';
   const plist = panel(QW.length?'Then, if you want more: rebuild':'What to change', `<div class="rows">${rows.map(r=>planetRow(r)).join('')}</div>`, {flush:true, meta:`${changed.length} of ${n} planets change`});
   const fitI = SHIPS.findIndex(s=>vRec<=s[1]);
-  const upkeep = panel('Hauling and upkeep', `<div class="stats">${stat('Haul', Math.round(vRec).toLocaleString()+' m³/wk')}${Math.round(vRec)!==Math.round(vToday)?stat('Today', Math.round(vToday).toLocaleString()+' m³/wk'):''}${stat('Trips','1 / week')}${S.market==='Buyback'?stat('Route','home system'):stat('Route', `${route()[0]} jumps to ${S.market}`)}${route()[1]?stat(P().sec<=0?'Low/null':'Lowsec', route()[1]+' jumps', P().sec<=0?'bad':'warn'):''}${stat('Reset extractors','every 3 days')}${stat('Rebuild','~'+changed.reduce((s,r)=>s+stepsFor(r).mins,0)+' min once')}</div>
+  const upkeep = panel('Hauling and upkeep', `<div class="stats">${stat('Haul', Math.round(vRec).toLocaleString()+' m³/day')}${Math.round(vRec)!==Math.round(vToday)?stat('Today', Math.round(vToday).toLocaleString()+' m³/day'):''}${stat('Trips','1 / day')}${S.market==='Buyback'?stat('Route','home system'):stat('Route', `${route()[0]} jumps to ${S.market}`)}${route()[1]?stat(P().sec<=0?'Low/null':'Lowsec', route()[1]+' jumps', P().sec<=0?'bad':'warn'):''}${stat('Restart extractors','every day')}${stat('Rebuild','~'+changed.reduce((s,r)=>s+stepsFor(r).mins,0)+' min once')}</div>
     <div style="font-size:14px;margin-top:8px">${haulText(vRec)}.</div>
     <div class="ships">${SHIPS.map((s,i)=>`<span class="${vRec<=s[1]?'ok':'dim'}">${vRec<=s[1]?'✓':'✕'} ${s[0]} <span class="dim">~${s[1].toLocaleString()} m³</span></span>`).join('')}</div>`, {meta: S.market==='Buyback'?'':'sample route'});
   const steps = changed.length ? panel('What to do in-game', `<div class="stepcols">${changed.map((r,i)=>{const s=stepsFor(r);return `<div class="scol" id="st-${r.c.name.replace(/\s/g,'')}"><div class="shead">${pl(r.c.type)}<div><b>${i+1}. ${r.c.name}</b><small>${B[r.today].name} → ${B[r.pick].name}</small></div><span class="m">~${s.mins} min</span></div>${s.items.map(srow).join('')}<div class="sfit">${fitMeter(s.pins,r.c.cc)}</div></div>`;}).join('')}</div>`, {flush:true, meta:'tick steps off as you go'}) : '';
@@ -588,10 +588,10 @@ function planetRow(r){
   const c=r.c, it=B[r.pick], qw=qwOn(c.name), d=value(r.pick)-value(r.today)-qw, mins=stepsFor(r).mins;
   const say = r.same
     ? `<b>Keep ${c.name}</b> <span class="dim">(${cap(c.type)})</span> on <b>${it.name}</b>. It's already the ${S.pref==='isk'?'best earner':'best low-hauling option'} there.`
-    : `<b>Change ${c.name}</b> <span class="dim">(${cap(c.type)})</span> to make <b>${it.name}</b>: <span class="${d>=0?'pos':'neg'}">${sg(d)}/day</span>${qw?' on top of its quick win':''}, ~${mins} min, then haul once a week.`;
+    : `<b>Change ${c.name}</b> <span class="dim">(${cap(c.type)})</span> to make <b>${it.name}</b>: <span class="${d>=0?'pos':'neg'}">${sg(d)}/day</span>${qw?' on top of its quick win':''}, ~${mins} min, then haul every day.`;
   let alt='';
   if(r.other!==r.pick){ const dd=value(r.other)-value(r.pick), o=B[r.other];
-    const hv = volWeek(r.other) < volWeek(r.pick) ? `hauls ${Math.round(volWeek(r.pick)/volWeek(r.other))}× less` : `hauls ${Math.round(volWeek(r.other)/volWeek(r.pick))}× more`;
+    const hv = volDay(r.other) < volDay(r.pick) ? `hauls ${Math.round(volDay(r.pick)/volDay(r.other))}× less` : `hauls ${Math.round(volDay(r.other)/volDay(r.pick))}× more`;
     alt = `<details class="alt"><summary class="textact">1 alternative ›</summary><div class="body">${ic(r.other)}<span>${o.tier===2?`A one-planet ${o.name} factory`:`Making ${o.name}`} here earns <b class="${dd>=0?'pos':'neg'}">${fm(Math.abs(dd))}/day ${dd>=0?'more':'less'}</b> but ${hv}.</span></div></details>`; }
   return `<div class="row prow" id="plan-${c.name.toLowerCase().replace(/\s+/g,'-')}">${pl(c.type)}<div><div class="say">${say}</div>${alt}</div>
     <div class="fig">${r.same?'':`${ic(r.today)}<span class="o">${fm(value(r.today))}</span><span class="a">→</span>`}${ic(r.pick)}<b>${fm(value(r.pick))}</b><span class="a">/day</span></div>
@@ -636,7 +636,7 @@ function recipeRow(id,i){
     <div class="prod">${ic(id)}<div><b>${it.name}</b><div class="s">${tierTag(it.tier)}<span class="cap">one-planet setup · ${parts}</span>${s==='new'?'<span class="vtag new">New with this planet</span>':''}</div></div></div>
     <div class="need"><span class="micro">You need${ts.length>1?' one of':''}</span>${need}</div>
     <div class="chain" title="Raw → processed${it.tier===2?' → refined':''}">${p0.map(p=>ic(p)).join('')}<span class="a">→</span>${it.tier===2?p1.map(p=>ic(p)).join('')+'<span class="a">→</span>'+ic(id,'end'):ic(id,'end')}</div>
-    <div class="val"><span class="v">${fm(value(id))}</span><span class="c">ISK/day · ${Math.round(volWeek(id)).toLocaleString()} m³/wk</span></div>
+    <div class="val"><span class="v">${fm(value(id))}</span><span class="c">ISK/day · ${Math.round(volDay(id)).toLocaleString()} m³/day</span></div>
     <div class="cmp ${c.cls}" title="Compared with ${B[c.ref].name}: ${fm(value(c.ref))}/day">${c.txt}</div>
     <button class="btn sm ${S.how===id?'':'accent'}" data-how="${id}">${S.how===id?'Hide steps':'Show me how'}</button></div>`;
   return row + (S.how===id ? `<div class="row howrow" id="howto">${howBody(id)}</div>` : '');
@@ -662,8 +662,8 @@ function howBody(id){
         ${it.tier===2?it.inputs.map(x=>`<div>${ic(x.id)}Basic factory: ${B[x.id].name}</div>`).join('')+`<div>${ic(id)}Advanced factory: ${it.name}</div>`:`<div>${ic(id)}2 basic factories: ${it.name}</div>`}</div>
       <div class="sfit" style="padding:0">${fitMeter(fit,mine[0]?mine[0].cc:null)}</div></div>
     <div class="hcol"><div class="micro">3 · Run it</div>
-      <div class="runl"><div>${G.clock}<span>Reset the extractors every 3 days (~5 min).</span></div>
-        <div>${G.box}<span>Collect ~${Math.round(rateOne(id)*168).toLocaleString()} ${it.name} a week (${Math.round(volWeek(id)).toLocaleString()} m³) from the launchpad.</span></div>
+      <div class="runl"><div>${G.clock}<span>Restart the extractors every day (~5 min).</span></div>
+        <div>${G.box}<span>Collect ~${Math.round(rateOne(id)*24).toLocaleString()} ${it.name} a day (${Math.round(volDay(id)).toLocaleString()} m³) from the launchpad.</span></div>
         <div>${G.ship}<span>${S.market==='Buyback'?routeText():`Sell at ${marketLabel()}: ${routeText()}`}.</span></div>
         <div>${ic(id)}<span>Earns about <span class="pos">${fm(value(id))} ISK/day</span>.</span></div></div>${estTag()}</div>
   </div>`;

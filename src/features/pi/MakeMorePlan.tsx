@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
+import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
   ChecklistPanel,
@@ -14,6 +15,8 @@ import {
 } from './MakeMoreSections';
 import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
+import { priceSourceLabel } from './priceSource';
+import { useSellHub } from './sellHub';
 import { usePlanAdvice } from './usePlanAdvice';
 
 interface Props {
@@ -67,6 +70,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [hydratePreference, hydrateTicks]);
 
   const state = usePlanAdvice(snapshot, characterId, preference);
+  const { buybackPct } = useSellHub();
   const view = useMemo(
     () =>
       state.status === 'ready'
@@ -105,7 +109,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
-    return <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />;
+    return <PricesUnavailable />;
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.make.failedTitle')} hint={t('piPlan.make.failedHint')} />;
@@ -138,7 +142,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         preference={preference}
         onPreference={(value) => void setPreference(value)}
         onFindBest={onFindBest}
-        hubName={state.hubName}
+        priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
       />
       {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
       <RebuildPanel view={view} />

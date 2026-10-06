@@ -72,5 +72,9 @@ export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<
     const bid = snapshot.hubBuyPrices[typeId];
     if (bid != null && Number.isFinite(bid)) buyPrices[typeId] = bid;
   }
-  return { prices, buyPrices, unpriced, failed: false, fetchedAt: new Date() };
+  // `getHubPrices` degrades an unreachable Fuzzwork (a 503) to per-type nulls
+  // rather than throwing, so a hub that quotes none of the types asked for is
+  // the same outage as a thrown read. A real hub quotes some of ~80 commodities.
+  const failed = Object.keys(prices).length === 0;
+  return { prices, buyPrices, unpriced, failed, fetchedAt: new Date() };
 }

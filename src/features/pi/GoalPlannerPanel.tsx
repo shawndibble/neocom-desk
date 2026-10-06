@@ -34,6 +34,7 @@ import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
 import { PI_MAP_HREF } from './piPlanLink';
 import { useSellHub } from './sellHub';
@@ -348,9 +349,7 @@ function GoalPlanner({
   } else if (!prices || !result) {
     results = <Loading />;
   } else if (prices.failed) {
-    results = (
-      <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />
-    );
+    results = <PricesUnavailable />;
   } else if ('error' in result) {
     results = <EmptyState title={t('piPlan.planFailedTitle')} hint={t('piPlan.planFailedHint')} />;
   } else {
