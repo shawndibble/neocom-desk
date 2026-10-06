@@ -76,7 +76,7 @@ import {
   type GradeResult,
 } from './useImplantFinder';
 
-const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'tank', 'navigation'];
+const GROUPS: readonly GoalGroup[] = ['fitting', 'weapons', 'mining', 'tank', 'navigation'];
 const IMPLANT_SLOTS = Array.from({ length: 10 }, (_, i) => i + 1);
 /** Booster slots the strip shows at least; more when the set already fills a higher one. */
 const MIN_BOOSTER_SLOTS = 3;
