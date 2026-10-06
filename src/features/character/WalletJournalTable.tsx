@@ -226,21 +226,24 @@ export function JournalTable({
           }
         />
       ) : (
-        <DataTable
-          {...tableExport.tableProps}
-          label={label}
-          columns={shownColumns}
-          rows={filteredJournal}
-          rowKey={journalRowKey}
-          highlightRowKey={highlightRowKey}
-          sort={sort}
-          onSortChange={onSortChange}
-          // A phone's stacked cards hide the header sort buttons (DESIGN.md §4a).
-          mobileSort
-          // Every page of the journal, uncapped: thousands of rows for an
-          // active trader.
-          virtualize="auto"
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            {...tableExport.tableProps}
+            label={label}
+            columns={shownColumns}
+            rows={filteredJournal}
+            rowKey={journalRowKey}
+            highlightRowKey={highlightRowKey}
+            sort={sort}
+            onSortChange={onSortChange}
+            // A ledger read across columns: a plain table on a phone, scrolling
+            // sideways (DESIGN.md §6c Restraint).
+            responsive="table"
+            // Every page of the journal, uncapped: thousands of rows for an
+            // active trader.
+            virtualize="auto"
+          />
+        </div>
       )}
     </>
   );

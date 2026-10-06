@@ -31,15 +31,12 @@ interface OpenOrdersListProps {
 /**
  * Open Orders below `sm`: three lines per order — item/character/price,
  * the problem badge with its sentence, then remaining (and floor, off-hub)
- * — tapping anywhere on the row opens `OrderDetailModal`, the same pattern
- * `OrderHistoryList` and `TransactionsDayList` already ship for their own
- * phone views.
+ * — tapping anywhere on the row opens `OrderDetailModal`.
  *
  * The item name is the card's accent cue (§6c), not a `MarketItemLink`, and the badge
  * renders with `interactive={false}` (no "?" trigger): both are otherwise
  * focusable content nested inside the row's own `<button>`, which a
- * `<button>` cannot legally contain — `OrderHistoryList`'s docblock gives
- * the same reasoning for dropping its own station tooltip. Location and
+ * `<button>` cannot legally contain. Location and
  * expiry are dropped entirely here; both already show in the detail modal
  * once the row is open.
  */

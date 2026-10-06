@@ -28,9 +28,6 @@ export const CHARACTER_COLUMN_IDS = [
   // structure, so this is `starred` internally (same feature the card view's
   // star toggle already drives), header text says "Starred".
   'starred',
-  // Truly last: a destructive action reads worst leading, same reasoning as
-  // the card's separate red X sitting after its group Select (issue #2077).
-  'remove',
 ] as const;
 
 export type CharacterColumnId = (typeof CHARACTER_COLUMN_IDS)[number];
@@ -47,7 +44,6 @@ export const DEFAULT_VISIBLE_CHARACTER_COLUMNS: readonly CharacterColumnId[] = [
   'alerts',
   'lastSynced',
   'starred',
-  'remove',
 ];
 
 function isCharacterColumnId(raw: unknown): raw is CharacterColumnId {
@@ -62,18 +58,23 @@ export const useVisibleCharacterColumns = createLocalSetting<readonly CharacterC
   // An empty stored array is rejected rather than honoured (miningTax's
   // since-retired statusFilterPref.ts precedent) — it would render a table with only the
   // row header, no columns and no explanation.
-  parse: (raw) =>
-    Array.isArray(raw) && raw.length > 0 && raw.every(isCharacterColumnId)
-      ? (raw as CharacterColumnId[])
-      : null,
+  // `remove` was a trailing column until it folded into the row's ⋮ menu
+  // (decision 20260927-071415, reversed); drop it from a stored list rather
+  // than rejecting the whole preference.
+  parse: (raw) => {
+    if (!Array.isArray(raw)) return null;
+    const kept = raw.filter((id) => id !== 'remove');
+    return kept.length > 0 && kept.every(isCharacterColumnId)
+      ? (kept as CharacterColumnId[])
+      : null;
+  },
 });
 
 /**
- * `group`/`remove` shipped after `charactersVisibleColumns` was already in
- * use on real devices (issue #2077), so a stored preference from before this
- * change is missing both ids — not because a pilot hid them, since they
- * didn't exist yet to hide. Appends whichever of the two is missing, in the
- * catalog's own order; a no-op once both are already present.
+ * `group` shipped after `charactersVisibleColumns` was already in use on
+ * real devices (issue #2077), so a stored preference from before that change
+ * is missing it — not because a pilot hid it, since it didn't exist yet to
+ * hide. Appends it when missing; a no-op once present.
  *
  * This function alone can't tell "never had it" from "pilot deliberately hid
  * it after the migration already ran" — calling it on every hydrate would
@@ -84,8 +85,7 @@ export const useVisibleCharacterColumns = createLocalSetting<readonly CharacterC
 export function migrateVisibleColumns(
   stored: readonly CharacterColumnId[]
 ): readonly CharacterColumnId[] {
-  const missing = (['group', 'remove'] as const).filter((id) => !stored.includes(id));
-  return missing.length === 0 ? stored : [...stored, ...missing];
+  return stored.includes('group') ? stored : [...stored, 'group'];
 }
 
 export const CHARACTER_COLUMNS_MIGRATED_KEY = 'charactersColumnsMigratedGroupRemove';

@@ -711,6 +711,13 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     ).toBeInTheDocument();
   });
 
+  it("offers the corporation's Show Info from the header", () => {
+    renderAt('/loyalty/1000168');
+    expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
+      'info=corporation-1000168'
+    );
+  });
+
   it('opens the picked store from the URL', () => {
     renderAt('/loyalty/1000168');
     fireEvent.click(screen.getByRole('button', { name: /^picker:/ }));

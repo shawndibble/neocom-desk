@@ -22,6 +22,8 @@ import type { MapGraph, ProductFigure, Trace } from './mapModel';
 export interface FinderOrigin {
   systemId: number | null;
   name: string | null;
+  /** Home system security, to seed the finder's "Highsec only"; null when unknown. */
+  security: number | null;
 }
 
 export interface ProductDetailProps {
@@ -183,6 +185,7 @@ export function ProductDetail(props: ProductDetailProps) {
             types={missing}
             homeSystemId={props.finder.systemId}
             homeName={props.finder.name}
+            homeSecurity={props.finder.security}
           />
         </div>
       )}
@@ -295,6 +298,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           types={[props.type]}
           homeSystemId={props.finder.systemId}
           homeName={props.finder.name}
+          homeSecurity={props.finder.security}
         />
       </div>
       <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>

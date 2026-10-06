@@ -23,7 +23,7 @@
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
@@ -36,7 +36,7 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
-import { PI_MAP_HREF } from './piPlanLink';
+import { PI_MAP_HREF, PLAN_CUSTOMS_HASH } from './piPlanLink';
 import { useSellHub } from './sellHub';
 import {
   SYNCED_PI_CUSTOMS_KEY,
@@ -126,7 +126,10 @@ function GoalPlanner({
   // Phone-sized (44px) controls below `md`; the dense tier beside a pointer.
   const size = mdUp ? 'sm' : 'md';
   // Folded on a phone, open beside a pointer, until the pilot says otherwise.
-  const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(null);
+  // `#customs` lands on the customs rate fields: Colonies open, first rate focused.
+  const { hash } = useLocation();
+  const [toCustoms, setToCustoms] = useState(hash === PLAN_CUSTOMS_HASH);
+  const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(toCustoms ? true : null);
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
   // --- Reads ---
@@ -446,8 +449,12 @@ function GoalPlanner({
           planetName={names.planet}
           systemName={systemName}
           size={size}
+          focusCustoms={toCustoms}
           expanded={coloniesOpen ?? mdUp}
-          onToggleExpanded={() => setColoniesOpen(!(coloniesOpen ?? mdUp))}
+          onToggleExpanded={() => {
+            setToCustoms(false); // the deep link's focus is one-shot
+            setColoniesOpen(!(coloniesOpen ?? mdUp));
+          }}
           onToggle={(planetId, enabled) =>
             onDisabledChange(
               enabled ? disabled.filter((id) => id !== planetId) : [...disabled, planetId]

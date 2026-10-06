@@ -232,18 +232,18 @@ describe('CompareDrawer', () => {
     expect(useCompareSet.getState().items).toEqual([]);
   });
 
-  it('opens the item context menu from the item cell only, requesting the blueprint catalog', async () => {
+  it('has no item menu or More actions button on the item cell: the name links to the Market', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
     renderDrawer();
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
 
+    expect(within(region).getByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
     fireEvent.contextMenu(within(region).getByText('Tritanium'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
-    expect(actions.requestBlueprints).toHaveBeenCalled();
-    expect(actions.showInfo).toHaveBeenCalledWith(ITEM_A.typeId, ITEM_A.itemName);
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(within(region).queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
   it('clears the whole set from the drawer header', async () => {

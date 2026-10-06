@@ -646,8 +646,7 @@ function buildColumns(
   onToggleStarred: (characterId: number) => void,
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
-  onMoveToGroup: (characterId: number, groupId: string | null) => void,
-  onRemove: (characterId: number, name: string) => void
+  onMoveToGroup: (characterId: number, groupId: string | null) => void
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -858,23 +857,6 @@ function buildColumns(
         />
       ),
     },
-    // Trailing danger `IconButton`, matching the card's separate red X
-    // (issue #2077) — same confirm dialog, not folded into the row's nav-only
-    // context menu (decision 20260927-071415).
-    remove: {
-      id: 'remove',
-      header: t('characters.column.remove'),
-      align: 'right',
-      render: (row) => (
-        <IconButton
-          size="sm"
-          icon={<Icon.Close />}
-          tone="danger"
-          label={t('characters.removeButtonLabel', { name: row.character.name })}
-          onClick={() => onRemove(row.character.characterId, row.character.name)}
-        />
-      ),
-    },
   };
 }
 
@@ -985,8 +967,7 @@ export function Characters() {
     (id) => void handleToggleStar(id),
     timeZone,
     groupsValue.groups,
-    (id, groupId) => void handleMoveToGroup(id, groupId),
-    (id, name) => requestRemoveCharacter(id, name)
+    (id, groupId) => void handleMoveToGroup(id, groupId)
   );
   const availableColumnIds = availableCharacterColumns(
     spExtractionEnabled,
@@ -1439,6 +1420,7 @@ export function Characters() {
             <CharacterRowContextMenu
               characterId={row.character.characterId}
               name={row.character.name}
+              onRemove={() => requestRemoveCharacter(row.character.characterId, row.character.name)}
             >
               {tr}
             </CharacterRowContextMenu>
