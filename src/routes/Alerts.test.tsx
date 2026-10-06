@@ -3,7 +3,7 @@
  *
  * The paths worth guarding are the ones with no counterpart anywhere else in
  * the app: grouping hundreds of fires into a dozen type rows, showing a type
- * that has been muted (nothing else does — `NotificationContextMenu`'s own
+ * that has been muted (nothing else does — a feed row's own
  * mute is one-way from a row that vanishes as it applies), and setting that
  * mute across several Characters that disagreed about it beforehand.
  */
@@ -238,8 +238,8 @@ describe('Alerts', () => {
   });
 
   /*
-   * The reason this page can un-mute at all. `NotificationContextMenu` calls
-   * its own mute one-way, because the row it was set from is gone the instant
+   * The reason this page can un-mute at all. a feed row's
+   * mute is one-way, because the row it was set from is gone the instant
    * it applies — so before this page existed, Settings was the only way back.
    */
   it('hides a muted type until the chip asks for it', async () => {
