@@ -110,8 +110,8 @@ function priceForMaxFilter(row: BpcContractRow): number | null {
   return row.buyout ?? null;
 }
 
-/** Where a unified row came from. `market` = a region's BPO sell order (issue #1241). */
-export type BpcSearchSource = 'contract' | 'owned' | 'market';
+/** Where a unified row came from. `market` = a region's BPO sell order (issue #1241); `lp` = a blueprint copy an LP store the pilot holds points with hands out. */
+export type BpcSearchSource = 'contract' | 'owned' | 'market' | 'lp';
 
 /** The fields `filterBpcSearchRows`/`ownedBlueprintToSearchRow` need out of a character's owned blueprint (ESI's `CharacterBlueprint`) — kept local to this module rather than importing the ESI type, so `src/engine` stays decoupled from `src/esi`. */
 export interface OwnedBlueprintInput {
@@ -190,6 +190,29 @@ export type BpcSearchRow =
       locationName: string | null;
       space: SpaceKind | null;
       systemId: number | null;
+    }
+  | {
+      /** A blueprint copy an LP store sells. ESI gives an offer no ME/TE/runs, so `runs` is `null` — not `-1`, which means an original. */
+      source: 'lp';
+      typeId: number;
+      me: 0;
+      te: 0;
+      runs: null;
+      quantity: number;
+      corporationId: number;
+      offerId: number;
+      corpName: string;
+      /** ISK-equivalent cost: ISK + LP at the pilot's rate + turn-ins (`lpOfferRows`'s `price`). */
+      price: number;
+      iskCost: number;
+      lpCost: number;
+      /** False when nothing priced the LP: `price` is the ISK cost only. */
+      lpPriced: boolean;
+      /** A store has no region/location of its own here, so a Region, Space or Jump Range filter drops the row. */
+      regionId: null;
+      locationName: null;
+      space: null;
+      systemId: null;
     };
 
 /**
@@ -227,6 +250,41 @@ export function marketBpoToSearchRow(order: MarketBpoInput): BpcSearchRow {
     locationName: order.locationName ?? null,
     space: order.space ?? null,
     systemId: order.systemId ?? null,
+  };
+}
+
+/** One LP store offer for a blueprint, as BPC Sourcing's LP Store source lists it. */
+export interface LpOfferInput {
+  corporationId: number;
+  offerId: number;
+  corpName: string;
+  typeId: number;
+  quantity: number;
+  price: number;
+  iskCost: number;
+  lpCost: number;
+  lpPriced: boolean;
+}
+
+export function lpOfferToSearchRow(offer: LpOfferInput): BpcSearchRow {
+  return {
+    source: 'lp',
+    typeId: offer.typeId,
+    me: 0,
+    te: 0,
+    runs: null,
+    quantity: offer.quantity,
+    corporationId: offer.corporationId,
+    offerId: offer.offerId,
+    corpName: offer.corpName,
+    price: offer.price,
+    iskCost: offer.iskCost,
+    lpCost: offer.lpCost,
+    lpPriced: offer.lpPriced,
+    regionId: null,
+    locationName: null,
+    space: null,
+    systemId: null,
   };
 }
 
@@ -299,7 +357,9 @@ export function filterBpcSearchRows(
     if (filter.typeIds && !filter.typeIds.has(row.typeId)) return false;
     if (filter.minMe != null && row.me < filter.minMe) return false;
     if (filter.minTe != null && row.te < filter.minTe) return false;
-    if (filter.minRuns != null && row.runs !== -1 && row.runs < filter.minRuns) return false;
+    // An original's -1 is unlimited runs, and an LP offer's runs are unknown (null): neither is too few.
+    if (filter.minRuns != null && row.runs !== -1 && row.runs !== null && row.runs < filter.minRuns)
+      return false;
     if (filter.regionId != null) {
       const regionId = row.source === 'contract' ? row.contract.regionId : row.regionId;
       if (regionId !== filter.regionId) return false;
@@ -317,7 +377,11 @@ export function filterBpcSearchRows(
       const price = priceForMaxFilter(row.contract);
       if (price != null && price > filter.maxPrice) return false;
     }
-    if (row.source === 'market' && filter.maxPrice != null && row.price > filter.maxPrice) {
+    if (
+      (row.source === 'market' || row.source === 'lp') &&
+      filter.maxPrice != null &&
+      row.price > filter.maxPrice
+    ) {
       return false;
     }
     if (row.source === 'contract' && filter.hideAuctions && row.contract.isAuction) return false;

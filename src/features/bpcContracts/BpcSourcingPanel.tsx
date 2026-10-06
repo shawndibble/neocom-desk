@@ -10,6 +10,8 @@ import {
 } from 'react';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { marketLinkParams } from '@/engine/market/urlState';
 import {
   Button,
   ColumnPickerMenu,
@@ -83,6 +85,8 @@ import {
   type BpcSearchColumnId,
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import { useLpBlueprintOffers } from '@/features/bpcContracts/useLpBlueprintOffers';
+import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
@@ -331,7 +335,9 @@ function waypointItemFor(row: BpcSearchRow, ownedPlaceIds: ReadonlyMap<number, n
       ? row.contract.locationId
       : row.source === 'market'
         ? row.locationId
-        : ownedPlaceIds.get(row.itemId);
+        : row.source === 'owned'
+          ? ownedPlaceIds.get(row.itemId)
+          : undefined;
   return placeId === undefined ? null : (
     <SetWaypointMenuItem locationId={placeId} placeName={row.locationName} />
   );
@@ -348,12 +354,14 @@ const SOURCE_LABEL_KEYS: Record<SourceToggle, string> = {
   contract: 'bpcContracts.sourceContracts',
   contractBpo: 'bpcContracts.sourceContractBpos',
   market: 'bpcContracts.sourceMarketBpos',
+  lp: 'bpcContracts.sourceLpStore',
   owned: 'bpcContracts.sourceOwned',
 };
 
 const SOURCE_TOOLTIP_KEYS: Partial<Record<SourceToggle, string>> = {
   contractBpo: 'bpcContracts.sourceContractBposTooltip',
   market: 'bpcContracts.sourceMarketBposTooltip',
+  lp: 'bpcContracts.sourceLpStoreTooltip',
 };
 
 interface BpcFilterBarProps {
@@ -691,6 +699,8 @@ export function BpcSourcingPanel() {
   const selectedTypeId = params['sourcing.type'];
   /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
   /** Contract originals (issue #1241). Absent on a snapshot cached before #1240. */
@@ -1132,6 +1142,31 @@ export function BpcSourcingPanel() {
     return filterBpcSearchRows(searchRows, nonTypeFilter);
   }, [market.booksByType, market.locations, marketRegionId, marketHubStationId, nonTypeFilter]);
 
+  const lpValue = useLpValue((state) => state.value);
+  const hydrateLpValue = useLpValue((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateLpValue();
+  }, [hydrateLpValue]);
+  const blueprintTypeIds = useMemo(() => [...blueprintNames.keys()], [blueprintNames]);
+  const lpOffers = useLpBlueprintOffers({
+    characterId: activeCharacterId,
+    enabled: sources.has('lp'),
+    blueprintTypeIds,
+    hub: marketHub,
+    lpValue,
+  });
+  // The loaded offers cover every blueprint; the search narrows them here.
+  const lpSearchRows = useMemo(() => {
+    const searched =
+      selectedTypeId !== null || uiFilter.typeQuery.trim() !== ''
+        ? new Set(marketLookup.typeIds)
+        : null;
+    return filterBpcSearchRows(
+      searched ? lpOffers.rows.filter((row) => searched.has(row.typeId)) : lpOffers.rows,
+      nonTypeFilter
+    );
+  }, [lpOffers.rows, selectedTypeId, uiFilter.typeQuery, marketLookup.typeIds, nonTypeFilter]);
+
   /**
    * The cheapest BPO per blueprint type in the results (issue #1241):
    * contract originals in the Region filter's scope, market orders for the
@@ -1175,8 +1210,16 @@ export function BpcSourcingPanel() {
     const ownedRows = sources.has('owned') ? filteredOwnedRows : [];
     const marketRows = sources.has('market') ? marketSearchRows : [];
     const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
-    return [...ownedRows, ...marketRows, ...contractBpoRows, ...contractRows];
-  }, [sources, contractSearchRows, filteredOwnedRows, marketSearchRows, contractBpoSearchRows]);
+    const lpRows = sources.has('lp') ? lpSearchRows : [];
+    return [...ownedRows, ...marketRows, ...contractBpoRows, ...lpRows, ...contractRows];
+  }, [
+    sources,
+    contractSearchRows,
+    filteredOwnedRows,
+    marketSearchRows,
+    contractBpoSearchRows,
+    lpSearchRows,
+  ]);
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
   // they describe what is actually on screen: narrowing to ME ≥ 10 should move
@@ -1236,16 +1279,22 @@ export function BpcSourcingPanel() {
               ? t('bpcContracts.sourceContractSingular')
               : row.source === 'market'
                 ? t('bpcContracts.sourceMarketSingular')
-                : t('bpcContracts.sourceOwned')}
+                : row.source === 'lp'
+                  ? t('bpcContracts.sourceLpStoreSingular')
+                  : t('bpcContracts.sourceOwned')}
           </span>
         ),
       },
       location: {
         id: 'location',
         header: t('bpcContracts.locationColumn'),
-        sortValue: (row) => row.locationName ?? '',
+        sortValue: (row) => (row.source === 'lp' ? row.corpName : (row.locationName ?? '')),
         render: (row) => {
-          const name = row.locationName ?? t('bpcContracts.notApplicable');
+          // An LP offer has no station here: the store's corporation is its place.
+          const name =
+            row.source === 'lp'
+              ? row.corpName
+              : (row.locationName ?? t('bpcContracts.notApplicable'));
           // The station's security after its name, the figure a buyer weighs
           // a trip by. On the phone card's meta line a fifty-character
           // station name is cut short — it opens with its system's name, so
@@ -1318,12 +1367,16 @@ export function BpcSourcingPanel() {
         header: t('bpcContracts.runsColumn'),
         align: 'right',
         className: 'tabular-nums',
-        sortValue: (row) => row.runs,
+        sortValue: (row) => row.runs ?? undefined,
         stackAffix: { after: t('bpcContracts.mobile.runsAffix') },
         // A BPO's -1 renders as ∞, not a nonsensical negative count.
         render: (row) => (
           <QualityValue omitOnCard={blueprintPicked}>
-            {row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs}
+            {row.runs === null
+              ? t('bpcContracts.notApplicable')
+              : row.runs === -1
+                ? t('bpcContracts.unlimitedRuns')
+                : row.runs}
           </QualityValue>
         ),
       },
@@ -1349,7 +1402,7 @@ export function BpcSourcingPanel() {
         // top of the table while rendering — and now summarising — at its real
         // price. Owned rows sort last (Infinity) rather than reading as cheapest.
         sortValue: (row) => {
-          if (row.source === 'market') return row.price;
+          if (row.source === 'market' || row.source === 'lp') return row.price;
           const contract = asContract(row);
           if (!contract) return Infinity;
           // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
@@ -1361,6 +1414,18 @@ export function BpcSourcingPanel() {
         },
         render: (row) => {
           if (row.source === 'market') return <IskAmount value={row.price} />;
+          if (row.source === 'lp') {
+            return (
+              <span
+                title={t('bpcContracts.lpOfferCost', {
+                  isk: row.iskCost.toLocaleString(),
+                  lp: row.lpCost.toLocaleString(),
+                })}
+              >
+                <IskAmount value={row.price} />
+              </span>
+            );
+          }
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
           // An auction's figure carries a short "buyout"/"bid" tag after
@@ -1562,9 +1627,10 @@ export function BpcSourcingPanel() {
             ) : (
               // Ellipsised on the phone card, so a long name stops short of the
               // price beside it instead of running under it.
-              // Plain text: the row opens the contract modal, which lists the
-              // item with its Market link (DESIGN.md §6c, a row's primary
-              // action beats name links inside it).
+              // Plain text: the row opens the contract modal (which lists the
+              // item with its Market link) or, for a market row, the item's
+              // Market entry (DESIGN.md §6c, a row's primary action beats
+              // name links inside it).
               <span className={entityLinkClassName('max-sm:block max-sm:truncate')}>{name}</span>
             );
           if (!bpo && !owned) return title;
@@ -2006,7 +2072,9 @@ export function BpcSourcingPanel() {
                     ? `${row.contract.contractId}:${row.typeId}:${index}`
                     : row.source === 'market'
                       ? `market:${row.orderId}`
-                      : `owned:${row.itemId}`
+                      : row.source === 'lp'
+                        ? `lp:${row.corporationId}:${row.offerId}`
+                        : `owned:${row.itemId}`
                 }
                 {...sortProps}
                 // A two-line card per offer on a phone — price at the right of
@@ -2027,8 +2095,25 @@ export function BpcSourcingPanel() {
                       })
                     : t('bpcContracts.mobile.offerCount', { count: displayRows.length })
                 }
-                // No contract exists for an owned row — nothing to open.
-                onRowClick={(row) => setOpenRow(asContract(row))}
+                // A contract row opens its contract; a market row opens the
+                // item's Market entry. No contract exists for an owned row —
+                // nothing to open.
+                onRowClick={(row) => {
+                  if (row.source === 'lp') {
+                    // The store, with this offer picked; `affordableOnly=0` so an
+                    // offer the pilot can't yet afford is not filtered out of view.
+                    navigate(
+                      `/market/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
+                    );
+                    return;
+                  }
+                  if (row.source === 'market') {
+                    const params = marketLinkParams(row.typeId, location.search);
+                    navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+                    return;
+                  }
+                  setOpenRow(asContract(row));
+                }}
                 rowMoreActions
                 rowContextMenu={(row, tr) => (
                   // The Offer's own ME/TE/runs, not the defaults, so a pilot
@@ -2038,7 +2123,11 @@ export function BpcSourcingPanel() {
                   <BuildPlanContextMenu
                     typeId={row.typeId}
                     itemName={blueprintNames.get(row.typeId)}
-                    seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
+                    seed={
+                      row.runs === -1 || row.runs === null
+                        ? null
+                        : { me: row.me, te: row.te, runs: row.runs }
+                    }
                     trigger={tr}
                     omitViewInMarket
                     extraItems={waypointItemFor(row, ownedPlaceIds)}
