@@ -1616,7 +1616,10 @@
         "fighterDps": "Fighters",
         "appliedDps": "Applied DPS",
         "weaponRange": "Weapon range",
-        "signatureRadius": "Signature radius"
+        "signatureRadius": "Signature radius",
+        "miningYield": "Mining yield",
+        "warpSpeed": "Warp speed",
+        "sensorStrength": "Sensor strength"
       },
       "unit": {
         "cpu": "tf",
@@ -1635,7 +1638,10 @@
         "fighterDps": "DPS",
         "appliedDps": "DPS",
         "weaponRange": "km",
-        "signatureRadius": "m"
+        "signatureRadius": "m",
+        "miningYield": "m³/h",
+        "warpSpeed": "AU/s",
+        "sensorStrength": "pts"
       },
       "updating": "Updating for your change…",
       "budgetOver": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} over",
@@ -1644,6 +1650,7 @@
       "group": {
         "fitting": "Fitting",
         "weapons": "Weapons",
+        "mining": "Mining",
         "tank": "Tank",
         "navigation": "Navigation & targeting"
       },
@@ -4813,6 +4820,10 @@
     }
   },
   "piPlan": {
+    "priceSource": {
+      "market": "{{hub}} prices",
+      "buyback": "your corp buyback rate"
+    },
     "tabsLabel": "Planetary Industry views",
     "coloniesTab": "Colonies",
     "planTab": "Plan",
@@ -4820,7 +4831,7 @@
     "strip": {
       "home": "Home",
       "colonies": "Colonies",
-      "route": "Route",
+      "route": "Home route",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
@@ -4861,7 +4872,7 @@
       "whatIfChip_nothing": "+ {{type}} · nothing new",
       "guideColonies": "Pre-marked from your colonies. Tap one to switch it off; tap a + planet to see what it unlocks.",
       "guideNone": "You have no colonies yet, so every type is in play. Tap one you can't reach to hide it.",
-      "guideRanked": "Ranked by ISK/day per planet at {{hub}}, after customs. New to PI?",
+      "guideRanked": "Ranked by ISK/day per planet at {{source}}, after customs. New to PI?",
       "euGuide": "EVE University guide",
       "modeLabel": "View",
       "modePicks": "Best picks",
@@ -4872,7 +4883,7 @@
       "makeP2": "Factory goods (P2)",
       "makeHint": "e.g. if your corp buyback asks for P2",
       "picksTitle": "Best picks for you",
-      "picksMeta": "ISK/day per planet · {{hub}}",
+      "picksMeta": "ISK/day per planet · {{source}}",
       "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}. Training Command Center Upgrades raises it.",
       "noneFitFilter": "No {{tier}} setup fits one planet at Command Center level {{level}}: it needs more power than that level has. Try Anything, or train Command Center Upgrades.",
       "noRecipes": "Nothing to rank with these planet types. Switch one back on, or add a what-if planet.",
@@ -4892,6 +4903,7 @@
       "setupHighTech_other": "{{count}} high-tech factories",
       "youNeed_one": "You need",
       "youNeed_other": "You need one of",
+      "findOneFor": "Find one: {{planet}}",
       "state": {
         "have": "You have",
         "whatif": "If added",
@@ -5004,7 +5016,7 @@
       "statHaul": "Haul",
       "m3PerWeek": "{{value}} m³/wk",
       "m3PerTrip": "{{value}} m³/trip",
-      "basis": "ISK a day after customs tax, at {{hub}} prices. Estimates.",
+      "basis": "ISK a day after customs tax, at {{source}}. Estimates.",
       "stripQuickWin": "quick win",
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
@@ -5078,7 +5090,7 @@
       "todayChip": "Today",
       "tripsChip": "Trips",
       "tripsPerWeek": "{{value}} / week",
-      "routeChip": "Route",
+      "routeChip": "Worst colony",
       "routeLocal": "Collected at home",
       "routeUnknown": "Not resolved",
       "lowsecChip": "Lowsec",
@@ -5289,7 +5301,7 @@
     "noColoniesHint": "The planner plans over your own colonies, and this character has none. Find planets on the Map.",
     "noColoniesBuying": "No colonies: goals at a tier you buy are bought outright. Anything else needs a colony to host the factories.",
     "pricesFailedTitle": "Hub prices could not be fetched",
-    "pricesFailedHint": "The planner needs live market prices. Check your connection, then refresh.",
+    "pricesFailedHint": "Figures that need them, ISK and haul volume, are hidden until they load. Check your connection, then refresh.",
     "loadFailedTitle": "The planner could not load",
     "loadFailedHint": "Your colonies or planetary schematics failed to load. Refresh to try again.",
     "planFailedTitle": "No plan for these goals",

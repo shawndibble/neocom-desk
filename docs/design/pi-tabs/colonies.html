@@ -327,7 +327,7 @@ body.gl .scrim{display:block}body.gl .drawer{transform:none}
 (function(){
 const B = PI_BY_ID, N = PI_BY_NAME;
 const CAP = 6000, TAX = 0.10;
-const PROG = 72;            // extractor program length the pilot sets (reset every 3 days, as Plan says)
+const PROG = 24;            // extractor program length the pilot sets (restart every day, the app default, as Plan says)
 const NOW = {day:'Tue', h:12}; // EVE time for the sample
 const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
@@ -345,7 +345,7 @@ const MARKETS = {Jita:1, Amarr:.98, Dodixie:.96, Rens:.97, Hek:.95, Buyback:null
 const LS = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
 const keyToPilot = k => Object.keys(PILOTS).find(p=>PILOTS[p].key===k);
 
-const S = { pilot:'six', market:'Amarr', buyback:90, open:null, alts:false, haul:168, done:new Set() };
+const S = { pilot:'six', market:'Amarr', buyback:90, open:null, alts:false, haul:24, done:new Set() };
 const P = () => PILOTS[S.pilot];
 
 // ---------- formatting ----------
@@ -365,7 +365,7 @@ const marketLabel = () => S.market==='Buyback' ? `corp buyback (${S.buyback}% of
 
 // ---------- glossary ("i") ----------
 const TERMS = {
-  extractor:['Extractor','The building that drills one raw resource out of the planet. You start it for a set time (here 3 days). When the time runs out it stops, and you restart it in the game.'],
+  extractor:['Extractor','The building that drills one raw resource out of the planet. You start it for a set time (here 1 day). When the time runs out it stops, and you restart it in the game.'],
   launchpad:['Launchpad','Your colony\'s warehouse and shipping dock. Finished products pile up here until you send them up to the customs office and haul them away. Holds 10,000 m³.'],
   storage:['Storage','Space on the planet for goods (launchpad or storage unit). When it is full, the factories stop and you lose production until you haul.'],
   cc:['Command Center','Your base on the planet. Its upgrade level (0–5) sets how much CPU and power you have for buildings.'],
@@ -401,11 +401,11 @@ const STATE = {
       fixes:[{k:'idle',icon:2392,short:'2 idle factories',txt:'Uttindar V has 2 Basic factories with no input. Remove them, or set them to Oxidizing Compound to use the spare raw.',gain:40000,m:1,verb:'Fix 2 factories'}]},
     'Uttindar VII':{upd:2.5, ext:[[14,302500,81,9000],[14,296800,81,8000]], fac:[{n:4,idle:0}], heads:8, store:{used:4030,rate:7.6,extra:[]}, fixes:[]},
     'Lustrevik III':{upd:2.5, ext:[[44,201300,39,3000],[44,198000,39,3000]], fac:[{n:4,idle:0}], heads:8, store:{used:9520,rate:30,extra:[[2287,1310000]]},
-      fixes:[{k:'store',icon:2395,short:'Launchpad full in 16 h',txt:"Lustrevik III's launchpad is full in 16 h, before your weekly haul. Haul now or add a storage unit.",save:120000,m:2,verb:'Haul now'}]},
+      fixes:[{k:'store',icon:2395,short:'Launchpad full in 16 h',txt:"Lustrevik III's launchpad is full in 16 h, before your next haul. Haul now or add a storage unit.",save:120000,m:2,verb:'Haul now'}]},
   },
   two:{
     'Hek VI':{upd:1.2, ext:[[50,182400,31,2000]], fac:[{n:2,idle:0}], heads:5, store:{used:9700,rate:15,extra:[[2267,960000]]},
-      fixes:[{k:'store',icon:2398,short:'Launchpad full in 20 h',txt:"Hek VI's launchpad is full in 20 h, before your weekly haul. Haul now or add a storage unit.",save:80000,m:2,verb:'Haul now'}]},
+      fixes:[{k:'store',icon:2398,short:'Launchpad full in 20 h',txt:"Hek VI's launchpad is full in 20 h, before your next haul. Haul now or add a storage unit.",save:80000,m:2,verb:'Haul now'}]},
     'Hek VIII':{upd:1.2, ext:[[6,371300,92,58000],[6,358700,92,37000]], fac:[{n:4,idle:0}], heads:8, store:{used:3420,rate:7.6,extra:[]}, decayed:60,
       fixes:[{k:'reset',icon:2305,short:'Slowed to 60% of its first day',txt:"Restart Hek VIII's Autotrophs extractor: it stops in 6 h and has slowed to 60% of its first day.",gain:95000,m:1,verb:'Restart'}]},
   },
@@ -507,7 +507,7 @@ function today(ms){
         ${trip.length?`<ul class="trip">${trip.map(x=>`<li>${pl(x.m.c.type)}<span class="verb ${x.verb==='Haul'?'warn':'go'}">${x.verb}</span><span class="tx">${x.m.c.name}</span>${whoTag(x.m)}<em>~${x.mins} min</em></li>`).join('')}</ul>
           <div class="note">${chars.length>1?`<b class="t-w">${chars.length} logins</b>, ~${mins} min: ${chars.join(', then ')}. Each character can only reach its own colonies.`:`One login, ~${mins} min, covers everything due in the next day.`} Doing it a few hours early costs almost nothing.</div>`
          :`<div class="note">Nothing needs you before then.</div>`}
-        <div class="habit">You haul <select class="sel" id="haul">${[[24,'every day'],[72,'every 3 days'],[168,'once a week']].map(([v,l])=>`<option value="${v}" ${S.haul===v?'selected':''}>${l}</option>`).join('')}</select> · restart every 3 days</div>
+        <div class="habit">You haul <select class="sel" id="haul">${[[24,'every day'],[72,'every 3 days'],[168,'once a week']].map(([v,l])=>`<option value="${v}" ${S.haul===v?'selected':''}>${l}</option>`).join('')}</select> · restart every day</div>
       </div>
     </div></section>`;
 }
@@ -574,7 +574,7 @@ function detail(m){
     return `<div class="ex">${ic(m.p0)}<div class="n">${B[m.p0].name} extractor <small>· ${Math.round(st.heads/st.ext.length)} heads</small></div>
       <div class="rs">${worth?`<button class="btn sm ${left<=0?'danger':'accent'}" data-done="${k}">${S.done.has(k)?'✓ Done':`Reset now +${fm(g)}/day`}</button>`:`<div class="nw">Reset now: +${fm(gain)}/day. Not worth a trip yet.</div>`}</div>
       <div class="chips">${sc('Stops',left<=0?`${-left} h ago`:`in ${dur(left)}`,cls)}${sc('Banked'+ib('banked'),`${banked.toLocaleString()} (${pct}%)`)}</div>
-      <div class="decay" title="Each bar is a slice of the 3-day run; it slows down over time">${bars}</div><div class="dcap"><span>Speed at start</span><span>${left<=0?'stopped':'now ▮'}</span></div></div>`;
+      <div class="decay" title="Each bar is a slice of the 1-day run; it slows down over time">${bars}</div><div class="dcap"><span>Speed at start</span><span>${left<=0?'stopped':'now ▮'}</span></div></div>`;
   }).join('');
   const groups = st.fac.map(f=>{ const idle=f.idle===f.n;
     return `<div class="hrow">${ic(m.p0)}<span class="ar">→</span>${ic(m.p1)}<span class="tx">${f.n}× Basic factory → ${B[m.p1].name}</span><span class="r ${idle?'t-bad':'t-ok'}">${idle?`${f.idle} idle: no input`:'Running'}</span></div>`;}).join('');
@@ -583,7 +583,7 @@ function detail(m){
   const used=st.store.used, fp=used/100, ft=m.fillBad?(m.fullIn<24?'bad':'w'):'';
   const cpuFree=m.ccMax.cpu-m.cpu, pgFree=m.ccMax.pg-m.pg, cp=m.cpu/m.ccMax.cpu*100, gp=m.pg/m.ccMax.pg*100;
   return `<div class="detail">
-    <div class="dsec"><h3 class="micro">${G.ext}Extractors${ib('extractor')}<span class="r">3-day runs</span></h3>${exs}</div>
+    <div class="dsec"><h3 class="micro">${G.ext}Extractors${ib('extractor')}<span class="r">daily runs</span></h3>${exs}</div>
     <div class="dsec"><h3 class="micro">${G.fac}Production<span class="r">${Math.round(prodPerH)} ${B[m.p1].name}/h</span></h3>${groups}
       <h3 class="micro" style="margin-top:14px">${G.cc}Command Center${ib('cc')}<span class="r">level ${m.c.cc}</span></h3>
       <div class="ccm"><div class="lm"><span class="k">CPU</span><div class="track"><i class="acc" style="width:${cp}%"></i></div><span class="p">${m.cpu.toLocaleString()} / ${m.ccMax.cpu.toLocaleString()} tf</span></div>
