@@ -4894,7 +4894,7 @@
       "assumesColonies_one": "Your colonies as they are: their own extraction rates, Command Centers and customs. Sold at your sell market after customs and sales tax; nothing bought. Per trip at your haul every {{count}} day.",
       "assumesColonies_other": "Your colonies as they are: their own extraction rates, Command Centers and customs. Sold at your sell market after customs and sales tax; nothing bought. Per trip at your haul every {{count}} days.",
       "newPlanet": "a new {{type}} planet",
-      "legNew": "{{from}} → {{to}}: not known yet, the planet is new",
+      "legNew": "{{from}} → {{to}}: not known yet",
       "assumesWhatIf": "The new {{type}} planet is assumed: a level {{level}} Command Center, extractors with {{heads}} heads pulling about {{rate}} units an hour each, and your customs rate.",
       "whatIfTitle": "What if I add a planet?",
       "whatIfIntro": "One planet type you don't run at a time, and the Bigger chains it would make possible. It takes a free planet slot. Facts only: never a recommendation, and never in a pick or total.",

@@ -974,7 +974,7 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     expect(within(dialog).getByText('Bigger chains with it')).toBeInTheDocument();
     const card = within(dialog).getByRole('link', { name: 'Camera Drones' }).closest('li')!;
     expect(card).toHaveTextContent(/a new Lava planet/);
-    expect(card).toHaveTextContent(/not known yet, the planet is new/);
+    expect(card).toHaveTextContent(/→ .*: not known yet/);
     expect(screen.getByRole('group', { name: /picks/i }).textContent).toBe(picksBefore);
   });
 

@@ -179,7 +179,7 @@ describe('BiggerChainsPanel: what if I add a planet?', () => {
     );
     const card = screen.getByRole('link', { name: 'Camera Drones' }).closest('li')!;
     expect(card).toHaveTextContent(/on Hek VI and a new Lava planet/);
-    expect(card).toHaveTextContent(/a new Lava planet → Hek VI: not known yet, the planet is new/);
+    expect(card).toHaveTextContent(/a new Lava planet → Hek VI: not known yet/);
     expect(card).toHaveTextContent(/Haul900 m³\/wk/);
     // Hek VI after its rebuild, plus a free slot at the best one-planet recipe for the new planet.
     expect(card).toHaveTextContent(
