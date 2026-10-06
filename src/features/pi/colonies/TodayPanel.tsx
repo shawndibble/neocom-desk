@@ -337,7 +337,8 @@ export function TodayPanel(props: TodayPanelProps) {
                     ? `${initials(characterNameOf(row.characterId))} · ${nameOf(row)}`
                     : nameOf(row)}
                 </span>
-                <StatusWord status={row.status} />
+                {/* The count chip and each row already say "Stopped". */}
+                {row.status !== 'stopped' && <StatusWord status={row.status} />}
               </li>
             ))}
           </ul>

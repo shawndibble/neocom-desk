@@ -352,7 +352,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   })();
   const extractorNote = (() => {
     if (extractor.expiryMs === null) return null;
-    if (stopped) return t('piColonies.nothingExtracted');
+    if (stopped) return null;
     if (row.slowedToFraction !== null) {
       return t('piColonies.slowedTo', { percent: Math.round(row.slowedToFraction * 100) });
     }
