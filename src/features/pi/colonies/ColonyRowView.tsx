@@ -444,11 +444,12 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start min-[90rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_15rem_auto]"
+          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start min-[82rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] min-[90rem]:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_15rem_auto]"
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
-            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
+            {/* Below 82rem the six columns cannot fit: name, action and menu share row 1, the three meters row 2. */}
+            <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11 md:col-span-2 md:row-start-1 min-[82rem]:col-span-1 min-[82rem]:row-auto">
               <button
                 type="button"
                 id={buttonId}
@@ -563,17 +564,17 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               <LoadLine label={t('piColonies.power')} fraction={row.load.power} />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-1 md:items-stretch">
+            <div className="flex min-w-0 flex-col gap-1 md:col-start-3 md:row-start-1 md:items-stretch min-[82rem]:col-auto min-[82rem]:row-auto">
               {actionWithExact}
               <p className="text-center text-[0.6875rem] text-text-dim">{note}</p>
             </div>
 
-            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:items-start">
+            <div className="flex justify-end max-md:absolute max-md:top-1 max-md:right-1 md:col-start-4 md:row-start-1 md:items-start min-[82rem]:col-auto min-[82rem]:row-auto">
               <RowMoreActions />
             </div>
 
             {row.tags.length > 0 && (
-              <div className="md:col-span-6 md:col-start-1 md:pl-[4.6rem]">
+              <div className="md:col-span-4 md:col-start-1 md:pl-[4.6rem] min-[82rem]:col-span-6">
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}
