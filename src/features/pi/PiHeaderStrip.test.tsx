@@ -20,7 +20,7 @@ describe('PiHeaderStrip', () => {
         <PiHeaderStrip colonySystemIds={[]} estimate />
       </MemoryRouter>
     );
-    await user.click(await screen.findByRole('button', { name: 'More market settings' }));
+    await user.click(await screen.findByRole('button', { name: 'PI settings' }));
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('group', { name: 'Buy at the hub when short' });
     expect(screen.getAllByRole('combobox', { name: 'Where do you sell?' })).toHaveLength(1);
@@ -33,14 +33,14 @@ describe('PiHeaderStrip', () => {
     });
     render(<PiHeaderStrip colonySystemIds={[]} estimate />);
     const strip = await screen.findByTestId('pi-header-strip');
-    const note = within(strip).getByText('Prices');
+    const note = within(strip).getByText('Estimated prices');
     expect(note).toHaveAttribute('tabindex', '0');
-    expect(note.parentElement).toHaveTextContent(/est\.\s*prices/i);
+    expect(note.parentElement).toHaveTextContent(/est\.\s*estimated prices/i);
   });
 
   it('shows no estimate note on tabs without projections', async () => {
     render(<PiHeaderStrip colonySystemIds={[]} estimate={false} />);
     await screen.findByTestId('pi-header-strip');
-    expect(screen.queryByText('Prices')).not.toBeInTheDocument();
+    expect(screen.queryByText('Estimated prices')).not.toBeInTheDocument();
   });
 });

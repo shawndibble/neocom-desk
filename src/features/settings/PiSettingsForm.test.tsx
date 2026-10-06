@@ -55,7 +55,7 @@ describe('PiSettingsForm', () => {
   });
 
   it('offers the sell market only where asked, under the strip label', async () => {
-    render(<PiSettingsForm sellAt />);
+    render(<PiSettingsForm showSellAt />);
     expect(await screen.findByRole('combobox', { name: 'Where do you sell?' })).toHaveTextContent(
       'Jita'
     );

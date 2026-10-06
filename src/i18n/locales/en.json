@@ -4820,8 +4820,8 @@
       "buybackRate": "Buyback rate",
       "buybackPct": "{{pct}}% of {{hub}}",
       "dropOff": "Drop off in your home system",
-      "settings": "More market settings",
-      "priceNote": "Prices",
+      "settings": "PI settings",
+      "priceNote": "Estimated prices",
       "priceNoteHint": "Every ISK figure here is a projection from current market prices at your sell market, after customs and sales tax. What a sale actually fetches will differ."
     },
     "newToPi": "New to PI?",
