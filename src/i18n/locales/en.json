@@ -4707,7 +4707,6 @@
       "chainHeading": "How it is made",
       "chainLabel": "Steps to make {{name}}, by planet",
       "have": "you have one{{colonies}}",
-      "findOne": "find one",
       "shipTo": "Bring the goods to one factory planet, then make:",
       "samePlanet": "On the same planet, then make:",
       "chainText": "In words: {{planets}} → {{steps}}.",
