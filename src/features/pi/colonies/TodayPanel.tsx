@@ -342,7 +342,6 @@ export function TodayPanel(props: TodayPanelProps) {
           </ul>
           <p className="text-xs text-text-dim">
             {props.todayPerDay === null ? (
-              // The price notice already says why there are no figures; do not contradict it.
               props.pricesFailed ? null : (
                 <span>{t('piColonies.today.noFigures')}</span>
               )

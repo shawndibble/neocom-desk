@@ -822,7 +822,7 @@ describe('customs parity across Plan, Colonies and Map', () => {
   });
 });
 
-describe('buildPlanAdvice: hub prices unreadable (#2761)', () => {
+describe('buildPlanAdvice: hub prices unreadable', () => {
   const NO_PRICES = hubBooks({ prices: {}, buyPrices: {} }, 5);
 
   it('keeps the restart of a stopped extractor, with no gain, and no figure anywhere is zero', () => {

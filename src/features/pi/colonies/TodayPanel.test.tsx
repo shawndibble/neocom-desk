@@ -30,7 +30,7 @@ function renderPanel(pricesFailed: boolean) {
   );
 }
 
-describe('TodayPanel no-figures line (#2761)', () => {
+describe('TodayPanel no-figures line', () => {
   it('says prices or skills are still loading when nothing failed', () => {
     renderPanel(false);
     expect(screen.getByText(/still loading/)).toBeInTheDocument();

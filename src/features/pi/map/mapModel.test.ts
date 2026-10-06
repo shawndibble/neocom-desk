@@ -228,7 +228,7 @@ describe('detailMode', () => {
   });
 });
 
-describe('productFigure: hub prices unreadable (#2761)', () => {
+describe('productFigure: hub prices unreadable', () => {
   it('says unpriced for a one-planet product, never "no fit at this Command Center level"', () => {
     const advice = buildPlanAdvice(
       adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })

@@ -628,7 +628,7 @@ describe('PlanMap richness drawer', () => {
   });
 });
 
-describe('PlanMap with hub prices unreadable (#2761)', () => {
+describe('PlanMap with hub prices unreadable', () => {
   it('does not claim the planets already make their best product', () => {
     const unpriced = buildPlanAdvice(
       adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })

@@ -15,13 +15,7 @@ import { useSellHub } from './sellHub';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
-  /**
-   * The hub's prices could not be read. The one place `{failed:true}` is consumed.
-   * `input` is the same input with empty books (null until skills and richness
-   * are in): the model prices nothing from it, so only what needs no price
-   * survives (a stopped extractor's restart, the Map board), every ISK figure
-   * unknown, never zero.
-   */
+  /** Prices unreadable. `input` runs on empty books (null until skills load): only price-free wins survive, ISK figures null. */
   | { status: 'prices-failed'; input: PlanAdviceInput | null }
   | { status: 'ready'; input: PlanAdviceInput; prices: PlanPrices; hubName: string };
 
@@ -154,9 +148,11 @@ export function usePiAdviceInputs(
 
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
-    if (!skills || !richness)
+    const usable = pricesFailed ? null : prices;
+    if (!skills || !richness) {
       return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
-    if (!pricesFailed && !prices) return { status: 'loading' };
+    }
+    if (!pricesFailed && !usable) return { status: 'loading' };
     const input: PlanAdviceInput = {
       snapshot,
       prefs: {
@@ -165,10 +161,7 @@ export function usePiAdviceInputs(
         customsOverrides: snapshot.customsOverrides,
         richness,
       },
-      books: hubBooks(
-        pricesFailed || !prices ? { prices: {}, buyPrices: {} } : prices,
-        snapshot.accountingLevel
-      ),
+      books: hubBooks(usable ?? { prices: {}, buyPrices: {} }, snapshot.accountingLevel),
       market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
       cadence,
       preference,
@@ -177,8 +170,8 @@ export function usePiAdviceInputs(
       ...(routes ? { routesBySystem: routes } : {}),
       planetNames: snapshot.planetNames,
     };
-    if (pricesFailed || !prices) return { status: 'prices-failed', input };
-    return { status: 'ready', prices, hubName: hub.systemName, input };
+    if (!usable) return { status: 'prices-failed', input };
+    return { status: 'ready', prices: usable, hubName: hub.systemName, input };
   }, [
     snapshot,
     prices,

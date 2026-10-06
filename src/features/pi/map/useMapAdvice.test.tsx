@@ -55,7 +55,7 @@ describe('useMapAdvice follows the Plan preference', () => {
   });
 });
 
-describe('useMapAdvice when hub prices could not be read (#2761)', () => {
+describe('useMapAdvice when hub prices could not be read', () => {
   afterEach(() => {
     pricesDown = false;
   });

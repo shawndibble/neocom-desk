@@ -1,8 +1,6 @@
 /**
- * PI with the hub price read failing (#2761): prices blank ISK and nothing
- * else. Map keeps its board, Plan's Make more keeps wins that need no price,
- * Colonies shows the price notice without "still loading". `PI_SHOTS=<dir>`
- * also writes screenshots.
+ * PI with the hub price read failing: ISK is blanked, nothing else.
+ * `PI_SHOTS=<dir>` also writes screenshots.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';

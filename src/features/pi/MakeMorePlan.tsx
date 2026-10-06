@@ -122,7 +122,9 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       <div className="space-y-4">
         <PricesUnavailable />
         {view && view.quickWins.length > 0 && (
-          <QuickWinsPanel view={view} ticks={ticks} pricesDown />
+          <IskFigureGroup>
+            <QuickWinsPanel view={view} ticks={ticks} pricesDown />
+          </IskFigureGroup>
         )}
       </div>
     );
