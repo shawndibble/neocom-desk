@@ -735,6 +735,32 @@ describe('ItemDetailModal best sell/buy price', () => {
     expect(screen.getByText('420,000 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
+  it('links best sell and best buy to the item in the Market, keeping the hub', async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([
+          order({ order_id: 1, is_buy_order: false, price: 450_000 }),
+          order({ order_id: 2, is_buy_order: true, price: 420_000 }),
+        ])
+      )
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/assets?hub=amarr']}>
+        <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />
+      </MemoryRouter>
+    );
+
+    const sell = await screen.findByRole('link', {
+      name: 'Best sell 450,000 ISK — open in Market',
+    });
+    const buy = screen.getByRole('link', { name: 'Best buy 420,000 ISK — open in Market' });
+    expect(sell.getAttribute('href')).toMatch(new RegExp(`^/market/browser\\?.*type=${TYPE_ID}`));
+    expect(sell.getAttribute('href')).toContain('hub=amarr');
+    expect(buy.getAttribute('href')).toBe(sell.getAttribute('href'));
+  });
+
   it('shows a dash for a side with no orders', async () => {
     serveRifter();
     server.use(

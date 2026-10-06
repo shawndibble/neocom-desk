@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { entityLinkClassName, Panel } from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { Panel } from '@/components/ui';
+import { ItemInfoLink } from '@/features/entities';
 import { FITTING_SLOT_KINDS, type Fitting } from '@/engine/fittings/types';
 
 interface FittingModuleListProps {
@@ -25,13 +25,7 @@ export function FittingModuleList({
 }: FittingModuleListProps) {
   const { t } = useTranslation();
   const name = (typeId: number) =>
-    linkNames ? (
-      <MarketItemLink typeId={typeId} className={entityLinkClassName()}>
-        {typeName(typeId)}
-      </MarketItemLink>
-    ) : (
-      typeName(typeId)
-    );
+    linkNames ? <ItemInfoLink typeId={typeId}>{typeName(typeId)}</ItemInfoLink> : typeName(typeId);
 
   const groups = FITTING_SLOT_KINDS.map((rack) => ({
     rack,

@@ -798,13 +798,13 @@ describe('station pins (issue #84)', () => {
 });
 
 describe('item name and blueprint badge', () => {
-  it('links the item name to its Market listing', async () => {
+  it('links the item name to its Show info (Item Detail)', async () => {
     const user = userEvent.setup();
     render(<App />);
     await openLocation(user, JITA);
 
     const name = await screen.findByRole('link', { name: 'Tritanium' });
-    expect(name.getAttribute('href')).toMatch(/^\/market\/browser\?.*34/);
+    expect(name.getAttribute('href')).toMatch(/info=type-34$/);
     expect(name).not.toHaveAttribute('title');
   });
 

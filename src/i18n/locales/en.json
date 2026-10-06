@@ -6840,6 +6840,8 @@
       "volume": "Volume: {{volume}} m3",
       "bestSell": "Best sell:",
       "bestBuy": "Best buy:",
+      "bestSellOpen": "Best sell {{price}} — open in Market",
+      "bestBuyOpen": "Best buy {{price}} — open in Market",
       "planetaryTitle": "Planetary production",
       "planetaryCycle": "{{quantity}} per {{duration}} cycle",
       "planetaryInput": "{{quantity}} x {{name}}",

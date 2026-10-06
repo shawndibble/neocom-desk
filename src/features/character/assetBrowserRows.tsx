@@ -18,9 +18,8 @@ import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui'
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
@@ -427,19 +426,16 @@ export function ItemRow({
               {typeId === undefined ? (
                 <span className="truncate text-sm">{name}</span>
               ) : (
-                <MarketItemLink
+                <ItemInfoLink
                   typeId={typeId}
-                  className={cx(
-                    entityLinkClassName('flex min-w-0 items-center text-sm'),
-                    tappableRowClassName
-                  )}
+                  className={cx('flex min-w-0 items-center text-sm', tappableRowClassName)}
                   {...guard.handlers}
                   onClick={(e) => {
                     if (guard.swallowClick(e)) e.preventDefault();
                   }}
                 >
                   <span className="truncate">{name}</span>
-                </MarketItemLink>
+                </ItemInfoLink>
               )}
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
               {characterBadge && <CharacterBadge characterName={characterBadge} />}

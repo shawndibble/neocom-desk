@@ -26,7 +26,7 @@ import { soldUnitsMargin } from '@/engine/industry/realizedProfit';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
@@ -395,7 +395,7 @@ export function ProductionLogPanel({
         header: t('industry.product'),
         primary: true,
         sortValue: (r) => r.itemName,
-        render: (r) => <MarketItemLink typeId={r.productTypeID}>{r.itemName}</MarketItemLink>,
+        render: (r) => <ItemInfoLink typeId={r.productTypeID}>{r.itemName}</ItemInfoLink>,
       },
       {
         id: 'runsLogged',
@@ -469,12 +469,12 @@ export function ProductionLogPanel({
         header: t('industry.productionRunColumnItem'),
         sortValue: (r) => r.itemName,
         // A row that opens the run's plan carries the plan's accent cue (the plan page links the
-        // product to Market); an inert row (no plan, or no way to open it) keeps the Market link.
+        // product); an inert row (no plan, or no way to open it) links the item's Show info.
         render: (r) =>
           r.planExists && onOpenRun ? (
             <span className={entityLinkClassName()}>{r.itemName}</span>
           ) : (
-            <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>
+            <ItemInfoLink typeId={r.run.productTypeID}>{r.itemName}</ItemInfoLink>
           ),
       },
       quantityColumn(t),

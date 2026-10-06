@@ -224,7 +224,7 @@ describe('Wallet', () => {
     expect(screen.getByText('Donation')).toBeInTheDocument();
   });
 
-  it('names the item a market transaction line bought, linked to its Market listing', async () => {
+  it('names the item a market transaction line bought, linked to its Show info', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
         HttpResponse.json([
@@ -259,8 +259,7 @@ describe('Wallet', () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
     const link = await screen.findByRole('link', { name: /Tritanium/ });
-    expect(link.getAttribute('href')).toContain('/market/browser?');
-    expect(link.getAttribute('href')).toContain('34');
+    expect(link.getAttribute('href')).toContain('info=type-34');
     // The bounty line has no fill behind it, so it names no item.
     const bountyRow = document.querySelector('[data-row-key="1"]') as HTMLElement;
     expect(within(bountyRow).queryByRole('link')).not.toBeInTheDocument();
