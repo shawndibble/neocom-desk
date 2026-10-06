@@ -203,7 +203,12 @@ export function InteractionGrammar() {
               rowContextMenu={(row, tr) => (
                 <RowActionsMenu
                   name={row.name}
-                  items={<MenuItem>{k('samples.menuItem')}</MenuItem>}
+                  items={
+                    <>
+                      <MenuItem>{k('samples.menuItem')}</MenuItem>
+                      <MenuItem>{k('samples.menuItemDuplicate')}</MenuItem>
+                    </>
+                  }
                 >
                   {tr}
                 </RowActionsMenu>

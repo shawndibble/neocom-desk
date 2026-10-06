@@ -364,8 +364,10 @@ interface DataTableProps<T> {
   /**
    * How the table behaves below `sm`. `'stack'` (the default) collapses each
    * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
-   * `'table'` keeps real columns, and is only right for a table narrow enough
-   * to fit a 390px screen unaided — roughly two short columns.
+   * `'table'` keeps real columns: right when comparing across columns is
+   * the point (compare table, matrix, roster, wide numbers), interactive or
+   * not: it scrolls sideways, with the key column pinned by `stickyStart`
+   * (§6c Restraint). Cards are for rows read as a unit.
    */
   responsive?: 'stack' | 'table';
   /**
