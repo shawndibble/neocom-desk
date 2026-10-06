@@ -72,7 +72,19 @@ export interface ChainEstimateView {
 }
 
 /** Most raws one planet is added for: one per extractor, and `plannerPolicy` allows two P0 types a colony. */
-const RAWS_PER_PLANET = 2;
+export const RAWS_PER_PLANET = 2;
+
+/** The solver's books and policy for a chain: the sell market's, nothing bought. */
+export function chainPricing(basis: ChainBasis) {
+  return {
+    books: {
+      ask: basis.books.prices,
+      bid: basis.books.revenuePrices,
+      salesTaxPct: basis.books.salesTaxPct,
+    },
+    policy: plannerPolicy({ maxP0Types: RAWS_PER_PLANET, buyTiers: [] }),
+  };
+}
 
 const yields = (type: PlanetType, raw: number, pi: PiData) => hostsOf(raw, pi).includes(type);
 
@@ -87,7 +99,7 @@ interface ChainLayout {
 export function chainHostTypes(
   typeId: number,
   pi: PiData,
-  types: readonly PlanetType[] = planetTypesOf(pi)
+  types: readonly PlanetType[]
 ): PlanetType[] {
   const high = madeHighOf([{ typeId, unitsPerDay: 1 }], pi);
   return types.filter((type) =>
@@ -166,9 +178,8 @@ function coloniesFor(
 
 /**
  * The estimate for a P3 or P4, or null: another tier, no price, or no layout
- * that makes it. `planetTypes` limits the planets to those types (Plan's Bigger
- * chains: the types the pilot already runs), and `maxPlanets` refuses a layout
- * needing more planets than that.
+ * that makes it. `planetTypes` limits the planets to those types, and
+ * `maxPlanets` refuses a layout needing more planets than that.
  */
 export function buildChainEstimate(
   typeId: number,
@@ -180,12 +191,7 @@ export function buildChainEstimate(
   const layout = chainLayout(typeId, pi, options.planetTypes);
   if (!layout) return null;
   const { planets: covered, raws, hostTypes } = layout;
-  const books = {
-    ask: basis.books.prices,
-    bid: basis.books.revenuePrices,
-    salesTaxPct: basis.books.salesTaxPct,
-  };
-  const policy = plannerPolicy({ maxP0Types: RAWS_PER_PLANET, buyTiers: [] });
+  const { books, policy } = chainPricing(basis);
   // A dedicated factory planet, unless the cover already ends in one.
   const layouts = covered.some((planet) => planet.raws.length === 0)
     ? [covered]

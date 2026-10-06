@@ -16,8 +16,7 @@
  *
  * - `haulBetweenPlanets`: the pilot will haul goods from one of their planets
  *   to another, so Plan may recommend a Bigger chain (a P3 or P4 made across
- *   several planets) in its own section. Stored only when on; off is the
- *   default because frequent hauls are never assumed: pilots live everywhere,
+ *   several planets) in its own section. Off by default: frequent hauls are never assumed: pilots live everywhere,
  *   nullsec included.
  *
  * The restart and haul cadence are the separate `cadencePref` record: they

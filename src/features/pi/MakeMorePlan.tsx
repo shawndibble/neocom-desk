@@ -188,7 +188,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       <IskFigureGroup>
         <RebuildPanel view={view} />
       </IskFigureGroup>
-      {/* Its own section, opted in: nothing in it enters a pick, a quick win or a total above. */}
       {haulBetween && (
         <IskFigureGroup>
           <BiggerChainsPanel advice={state.advice} pi={snapshot.pi} />

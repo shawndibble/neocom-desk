@@ -1,9 +1,4 @@
-/**
- * Plan's "Bigger chains" section: P3 and P4 made across several of the
- * pilot's planets, drawn only while they opted in to hauling between planets.
- * Its own panel, below the one-planet answers: no figure here enters a pick, a
- * quick win or a total. The figures come from `biggerChainsModel`.
- */
+/** Plan's "Bigger chains" panel: draws `biggerChainsModel`'s view, computes no figure. */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -64,14 +59,15 @@ function ChainSentence({
       />
     );
   }
-  const types = planetTypeList(t, card.planetTypes);
+  const { planets, hostType } = card.estimate;
+  const types = planetTypeList(t, planets);
   return (
     <Sentence
       text={t('piPlan.chains.onNewPlanets', {
         item: '{item}',
-        count: card.planetTypes.length,
+        count: planets.length,
         types,
-        host: names.type(card.hostType),
+        host: names.type(hostType),
         free,
       })}
       slots={{ item }}
@@ -97,7 +93,7 @@ function Verdict({ card }: { card: BiggerChainCard }) {
       {t('piPlan.make.perDay')}
     </>
   );
-  const count = card.kind === 'colonies' ? card.planetIds.length : card.planetTypes.length;
+  const count = card.kind === 'colonies' ? card.planetIds.length : card.estimate.planets.length;
   return (
     <Sentence
       text={t(`piPlan.chains.${card.verdict === 'beats' ? 'beats' : 'short'}${where}`, {
@@ -202,17 +198,19 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
   const [othersOpen, setOthersOpen] = useState(false);
   const state = useBiggerChains(advice, pi);
   const haulDays = advice.chainBasis.haulDays;
+  const afterRebuildPerDay = useMemo(
+    () => new Map(advice.colonies.map((colony) => [colony.planetId, colony.afterRebuildPerDay])),
+    [advice.colonies]
+  );
   const view = useMemo(
     () =>
       biggerChainsView({
         estimates: state.estimates,
-        afterRebuildPerDay: new Map(
-          advice.colonies.map((colony) => [colony.planetId, colony.afterRebuildPerDay])
-        ),
+        afterRebuildPerDay,
         slots: { free: advice.slots.free, gainPerPlanetPerDay: advice.slots.gainPerPlanetPerDay },
         haulDays,
       }),
-    [state.estimates, advice.colonies, advice.slots, haulDays]
+    [state.estimates, afterRebuildPerDay, advice.slots, haulDays]
   );
   const byId = new Map(advice.colonies.map((colony) => [colony.planetId, colony]));
   const names: Names = {
@@ -223,12 +221,7 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
   const free = advice.slots.free;
   const onColonies = t('piPlan.chains.assumesColonies', { count: haulDays });
   const assumptionsOf = (card: BiggerChainCard) =>
-    card.kind === 'colonies'
-      ? onColonies
-      : (() => {
-          const estimate = state.estimates.get(card.typeId)?.newPlanets;
-          return estimate ? chainAssumptions(t, estimate) : onColonies;
-        })();
+    card.kind === 'colonies' ? onColonies : chainAssumptions(t, card.estimate);
   const priced = view.recommended.length + view.others.length;
   const renderCards = (cards: readonly BiggerChainCard[]) => (
     <ul className="divide-y divide-line">
@@ -278,7 +271,7 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
             expanded={othersOpen}
             onToggle={() => setOthersOpen(!othersOpen)}
           >
-            {renderCards(view.others)}
+            {othersOpen && renderCards(view.others)}
           </Disclosure>
         </div>
       )}

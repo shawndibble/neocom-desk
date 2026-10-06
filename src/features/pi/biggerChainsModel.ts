@@ -23,7 +23,6 @@
  * Pure: colonies, assumptions, jumps and prices are parameters.
  */
 import type { PiData } from '@/sde/types';
-import { piTier } from '@/engine/pi/chain';
 import { estimateChain } from '@/engine/pi/chainEstimate';
 import { haulingOf } from '@/engine/pi/goalPlanSteps/flows';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
@@ -31,11 +30,11 @@ import { HOURS_PER_DAY } from '@/engine/pi/planAdvice';
 import {
   buildChainEstimate,
   chainHostTypes,
+  chainPricing,
   chainProductIds,
   type ChainBasis,
   type ChainEstimateView,
 } from './chainEstimateModel';
-import { plannerPolicy } from './goalPlannerModel';
 import { rawInputsOf } from './productPlanets';
 
 /** One haul between two of the chain's colonies. */
@@ -66,9 +65,6 @@ export interface BiggerChainEstimates {
   newPlanets: ChainEstimateView | null;
 }
 
-/** Most raws a colony extracts in a chain: one per extractor, as the one-planet estimate. */
-const RAWS_PER_COLONY = 2;
-
 /**
  * The P3s and P4s the pilot's own planet types can make: every raw yielded by
  * one of their colonies, and one of them a type that hosts every factory.
@@ -95,12 +91,7 @@ export function estimateOnColonies(
     {
       typeId,
       colonies,
-      policy: plannerPolicy({ maxP0Types: RAWS_PER_COLONY, buyTiers: [] }),
-      books: {
-        ask: basis.books.prices,
-        bid: basis.books.revenuePrices,
-        salesTaxPct: basis.books.salesTaxPct,
-      },
+      ...chainPricing(basis),
       ...(jumps ? { jumps } : {}),
     },
     pi
@@ -146,18 +137,14 @@ export function estimateOnNewPlanets(
   basis: ChainBasis,
   pi: PiData
 ): ChainEstimateView | null {
-  if (freeSlots < 2 || piTier(typeId, pi) < 3) return null;
   return buildChainEstimate(typeId, basis, pi, { planetTypes: types, maxPlanets: freeSlots });
 }
-
-// --- The verdict ---------------------------------------------------------------
 
 export type BiggerChainVerdict = 'beats' | 'short' | 'unknown';
 
 interface CardBase {
   typeId: number;
   iskPerDay: number;
-  unitsPerDay: number;
   m3PerWeek: number;
   /** m³ a trip at the pilot's haul cadence. */
   m3PerHaul: number;
@@ -170,7 +157,7 @@ interface CardBase {
 
 export type BiggerChainCard =
   | (CardBase & { kind: 'colonies'; planetIds: number[]; hostId: number; legs: ChainLeg[] })
-  | (CardBase & { kind: 'new-planets'; planetTypes: PlanetType[]; hostType: PlanetType });
+  | (CardBase & { kind: 'new-planets'; estimate: ChainEstimateView });
 
 export interface BiggerChainsView {
   /** Chains that beat the one-planet picks, most gained first. */
@@ -211,7 +198,6 @@ function colonyCard(estimate: ColonyChainEstimate, input: BiggerChainsInput): Bi
     kind: 'colonies',
     typeId: estimate.typeId,
     iskPerDay: estimate.iskPerDay,
-    unitsPerDay: estimate.unitsPerDay,
     m3PerWeek: estimate.m3PerWeek,
     m3PerHaul: (estimate.m3PerWeek * input.haulDays) / 7,
     planetIds: estimate.planetIds,
@@ -227,11 +213,9 @@ function newPlanetCard(view: ChainEstimateView, input: BiggerChainsInput): Bigge
     kind: 'new-planets',
     typeId: view.typeId,
     iskPerDay: view.iskPerDay,
-    unitsPerDay: view.unitsPerDay,
     m3PerWeek: view.m3PerWeek,
-    m3PerHaul: (view.m3PerWeek * input.haulDays) / 7,
-    planetTypes: view.planets,
-    hostType: view.hostType,
+    m3PerHaul: view.m3PerHaul,
+    estimate: view,
     ...verdictOf(view.iskPerDay, perSlot === null ? null : perSlot * view.planets.length),
   };
 }
@@ -254,7 +238,7 @@ export function biggerChainsView(input: BiggerChainsInput): BiggerChainsView {
   for (const estimate of input.estimates.values()) {
     const options: BiggerChainCard[] = [];
     if (estimate.colonies) options.push(colonyCard(estimate.colonies, input));
-    if (estimate.newPlanets && estimate.newPlanets.planets.length <= input.slots.free) {
+    if (estimate.newPlanets) {
       options.push(newPlanetCard(estimate.newPlanets, input));
     }
     if (options.length > 0) cards.push(options.sort(better)[0]);

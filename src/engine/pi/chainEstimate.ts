@@ -11,8 +11,9 @@
  * search is capped and keeps the best rate it saw reached, never a guess.
  *
  * The figure is the plan's absolute `netPerHour` a day (sales after sales tax,
- * less customs and anything bought), never a Lift over a Baseline: the
- * colonies are hypothetical, so what they "would earn anyway" means nothing.
+ * less customs and anything bought), never a Lift over a Baseline: for
+ * hypothetical colonies what they "would earn anyway" means nothing. A caller
+ * on real colonies reads the plan's `perColony` for the ones the chain uses.
  * Nothing is bought: the policy's `buyTiers` is cleared, since a chain that
  * buys its inputs is a trade spread, not a planet chain.
  *

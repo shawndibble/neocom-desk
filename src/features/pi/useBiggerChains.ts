@@ -141,9 +141,10 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
     // One unit is one layout of one product: the solver on real colonies can take a while.
     const todo = candidates
       .filter((typeId) => !results.has(typeId))
+      // The cheap layout first, so a run cut short drops at most one solver result.
       .flatMap((typeId) => [
-        { typeId, layout: 'colonies' as const },
         { typeId, layout: 'new' as const },
+        { typeId, layout: 'colonies' as const },
       ]);
     if (todo.length === 0) return;
     const partial = new Map<number, BiggerChainEstimates>();
@@ -153,11 +154,11 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
       while (todo.length > 0 && performance.now() - start < SLICE_MS) {
         const { typeId, layout } = todo.shift()!;
         const entry = partial.get(typeId) ?? { colonies: null, newPlanets: null };
-        if (layout === 'colonies') {
-          entry.colonies = estimateOnColonies(typeId, colonies, advice.chainBasis, jumps.fn, pi);
+        if (layout === 'new') {
+          entry.newPlanets = estimateOnNewPlanets(typeId, types, free, advice.chainBasis, pi);
           partial.set(typeId, entry);
         } else {
-          entry.newPlanets = estimateOnNewPlanets(typeId, types, free, advice.chainBasis, pi);
+          entry.colonies = estimateOnColonies(typeId, colonies, advice.chainBasis, jumps.fn, pi);
           partial.delete(typeId);
           results.set(typeId, entry);
         }

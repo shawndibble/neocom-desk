@@ -118,7 +118,6 @@ export function YourPlanetsPanel({
   onPreference: (value: RebuildPreference) => void;
   onFindBest: () => void;
   priceSource: string;
-  /** The pilot opted in to hauling between their planets (Bigger chains). */
   haulBetween: boolean;
   onHaulBetween: (on: boolean) => void;
 }) {
