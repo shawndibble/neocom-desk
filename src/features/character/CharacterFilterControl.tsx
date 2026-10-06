@@ -53,7 +53,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
 export interface CharacterFilterControlProps {
@@ -72,6 +77,15 @@ export interface CharacterFilterControlProps {
    * Mining Tax Overview) — see `PageHeader`'s own doc comment.
    */
   size?: 'sm' | 'md';
+  /**
+   * `'icon'` (default): the compact header trigger above. `'field'`: a form
+   * control for a settings row — field chrome (§6c "a box sized like a field")
+   * with the current value as text and a trailing `CaretDown` at every width.
+   * The icon-only trigger has no label or caret and, where the portrait does
+   * not load, reads as a blank square; it only suits a header row where the
+   * panel title says what it filters.
+   */
+  variant?: 'icon' | 'field';
 }
 
 /**
@@ -111,11 +125,50 @@ export function CharacterFilterControl({
   value,
   onChange,
   size = 'sm',
+  variant = 'icon',
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
   const isAll = resolved === 'all';
   const label = isAll ? t('character.filter.allCharacters') : t('character.filter.thisCharacter');
+  const options = (
+    <DropdownMenuContent align="start" className="w-40">
+      <DropdownMenuRadioGroup
+        value={isAll ? 'all' : 'current'}
+        onValueChange={(next) => onChange(next as CharacterFilterValue)}
+      >
+        {activeCharacterId !== null && (
+          <DropdownMenuRadioItem value="current">
+            {t('character.filter.thisCharacter')}
+          </DropdownMenuRadioItem>
+        )}
+        <DropdownMenuRadioItem value="all">
+          {t('character.filter.allCharacters')}
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  );
+
+  if (variant === 'field') {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`${fieldBaseClassName} ${fieldSizeClassName.md} ${interactiveClassName} ${focusRingClassName} flex w-full max-w-60 items-center justify-between gap-2 text-left`}
+          >
+            <span className="min-w-0 truncate">{label}</span>
+            <Icon.Expanded
+              size={ICON_SIZE.md}
+              aria-hidden="true"
+              className="shrink-0 text-text-dim"
+            />
+          </button>
+        </DropdownMenuTrigger>
+        {options}
+      </DropdownMenu>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -141,21 +194,7 @@ export function CharacterFilterControl({
           <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-40">
-        <DropdownMenuRadioGroup
-          value={isAll ? 'all' : 'current'}
-          onValueChange={(next) => onChange(next as CharacterFilterValue)}
-        >
-          {activeCharacterId !== null && (
-            <DropdownMenuRadioItem value="current">
-              {t('character.filter.thisCharacter')}
-            </DropdownMenuRadioItem>
-          )}
-          <DropdownMenuRadioItem value="all">
-            {t('character.filter.allCharacters')}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
+      {options}
     </DropdownMenu>
   );
 }

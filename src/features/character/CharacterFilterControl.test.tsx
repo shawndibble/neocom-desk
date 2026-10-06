@@ -12,6 +12,38 @@ async function openMenu() {
 }
 
 describe('CharacterFilterControl', () => {
+  it('field variant shows the value as visible text with a caret, at any width', () => {
+    const { container } = render(
+      <CharacterFilterControl
+        variant="field"
+        activeCharacterId={1}
+        value="current"
+        onChange={() => {}}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'This character' });
+    expect(trigger.querySelector('span')).toHaveTextContent('This character');
+    expect(trigger.querySelector('span')?.className).not.toMatch(/hidden/);
+    expect(trigger.querySelector('svg')).toBeInTheDocument();
+    expect(trigger.className).toMatch(/\bh-11\b/);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('field variant opens the same two-option menu', async () => {
+    const onChange = vi.fn();
+    render(
+      <CharacterFilterControl
+        variant="field"
+        activeCharacterId={1}
+        value="current"
+        onChange={onChange}
+      />
+    );
+    const user = await openMenu();
+    await user.click(screen.getByRole('menuitemradio', { name: 'All characters' }));
+    expect(onChange).toHaveBeenCalledWith('all');
+  });
+
   it('labels the trigger "This character" for the literal \'current\'', () => {
     render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();

@@ -804,6 +804,7 @@ function CharacterDefaultsPanel() {
             note={t('settings.defaultCharacterFilterHint')}
           >
             <CharacterFilterControl
+              variant="field"
               activeCharacterId={activeCharacterId}
               value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
               onChange={(next) =>
