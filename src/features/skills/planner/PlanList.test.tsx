@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -22,7 +22,7 @@ const planHref = (id: string) => `/skills/plans/${id}`;
 const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('PlanList delete confirmation (#408: names the plan)', () => {
-  it('names the plan being deleted in the confirmation modal', () => {
+  it('names the plan being deleted in the confirmation modal', async () => {
     render(
       <PlanList
         plans={[plan('1', 'Titan pilot')]}
@@ -32,11 +32,12 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
         onRename={noop}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /delete titan pilot/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
   });
 
-  it('deletes the plan whose row triggered the confirmation, even with multiple plans', () => {
+  it('deletes the plan whose row triggered the confirmation, even with multiple plans', async () => {
     const onDelete = vi.fn();
     render(
       <PlanList
@@ -47,9 +48,10 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
         onRename={noop}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /delete beta/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');
   });
 });

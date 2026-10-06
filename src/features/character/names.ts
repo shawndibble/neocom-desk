@@ -18,6 +18,9 @@ import {
   writeCachedMany,
 } from '@/esi/cache';
 
+/** ESI's per-request cap for /universe/names. */
+const NAMES_BATCH = 1000;
+
 function cacheKey(id: number): string {
   return `name:${id}`;
 }
@@ -84,18 +87,21 @@ export async function readCachedNames(ids: readonly number[]): Promise<Map<numbe
 /** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> {
   const resolved = new Map<number, string>();
-  try {
-    const entries = await postUniverseNames([...ids]);
-    const fetchedAt = Date.now();
-    for (const entry of entries) resolved.set(entry.id, entry.name);
-    await writeCachedMany(
-      GLOBAL_CACHE_CHARACTER_ID,
-      entries.map((entry) => [cacheKey(entry.id), entry.name] as const),
-      fetchedAt
-    );
-  } catch {
-    // Offline or ESI failure. Whatever the caller already read from cache
-    // stands; an id with nothing cached is simply absent from its map.
+  // One POST per batch, each guarded, so a failed batch keeps the others' names.
+  for (let i = 0; i < ids.length; i += NAMES_BATCH) {
+    try {
+      const entries = await postUniverseNames(ids.slice(i, i + NAMES_BATCH));
+      const fetchedAt = Date.now();
+      for (const entry of entries) resolved.set(entry.id, entry.name);
+      await writeCachedMany(
+        GLOBAL_CACHE_CHARACTER_ID,
+        entries.map((entry) => [cacheKey(entry.id), entry.name] as const),
+        fetchedAt
+      );
+    } catch {
+      // Offline or ESI failure. Whatever the caller already read from cache
+      // stands; an id with nothing cached is simply absent from its map.
+    }
   }
   return resolved;
 }
