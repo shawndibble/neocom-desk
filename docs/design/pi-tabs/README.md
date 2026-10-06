@@ -4,6 +4,8 @@ Design spec for the three Planetary Industry tabs. The Advisor tab retires.
 Scope: [decision 20261005-114103](../../context/decisions/20261005-114103-pi-section-becomes-plan-map-and-colonies-tabs.md).
 Published review page: <https://claude.ai/artifact/6Ms9osyfLW5nDAh1QNo9e5>.
 
+**Cadence.** The refs assume the app default: restart extractors every day, haul every day (volumes are per day). The pilot can change both in PI settings; the app does not default to a 3-day restart or a weekly haul.
+
 ## Who each tab serves
 
 1. **"I have planets. What do I do with them?"** This is the most common question. **Plan** ([plan.html](plan.html)) opens here when the pilot has colonies: quick wins first, then rebuilds as an alternative, then an in-game checklist.
