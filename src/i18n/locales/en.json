@@ -7339,7 +7339,8 @@
     "avoidedSystems": {
       "title": "Avoided systems",
       "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
-      "add": "Add system",
+      "add": "Add",
+      "addLabel": "Add an avoided system",
       "remove": "Remove {{name}}",
       "empty": "No systems avoided yet.",
       "enabled": "Keep routes out of these systems"
@@ -8329,8 +8330,6 @@
       "addLabel": "Add a stop",
       "full_one": "Up to {{count}} stop.",
       "full_other": "Up to {{count}} stops.",
-      "moveUp": "Move {{name}} up",
-      "moveDown": "Move {{name}} down",
       "remove": "Remove {{name}}",
       "reorder": "Reorder {{name}}",
       "dragInstructions": "Press space to pick up a stop. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel. Each stop's move up and move down buttons do the same without dragging.",

@@ -148,8 +148,8 @@ export function AvoidRuleToggles({ podKillsUnavailable }: { podKillsUnavailable:
  * solar-system search, and one row per system to remove it. Each row shows the
  * system's security the way every other system mention in the app does.
  *
- * `narrow` is for a side column: the picker under the switch and the list in
- * one column. `switchLabel` replaces the switch's own wording.
+ * The Add button sits inline after the switch, wrapping under it only when the
+ * row is too tight. `narrow` is for a side column: the list in one column. `switchLabel` replaces the switch's own wording.
  */
 export function AvoidedSystemsEditor({
   narrow = false,
@@ -189,12 +189,7 @@ export function AvoidedSystemsEditor({
 
   return (
     <div className="space-y-3">
-      <div
-        className={cx(
-          'flex flex-wrap gap-x-6 gap-y-3',
-          narrow ? 'flex-col items-start' : 'items-center justify-between'
-        )}
-      >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Off routes straight through the list without the pilot losing it. */}
         <label className={`flex items-center gap-2 text-xs font-semibold ${tappableRowClassName}`}>
           <Checkbox checked={enabled} onChange={() => void setEnabled(!enabled)} />
@@ -203,7 +198,7 @@ export function AvoidedSystemsEditor({
         <SolarSystemPicker
           value={null}
           onChange={(systemId) => void setAvoided(addAvoidedSystem(avoided, systemId))}
-          ariaLabel={t('settings.avoidedSystems.add')}
+          ariaLabel={t('settings.avoidedSystems.addLabel')}
           triggerLabel={
             <span className="flex items-center gap-1.5">
               <Icon.AddRow size={Icon.ICON_SIZE.sm} aria-hidden="true" />
