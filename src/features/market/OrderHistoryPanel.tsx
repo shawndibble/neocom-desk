@@ -21,7 +21,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadOrderHistory } from '@/features/character/orders';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { MarketItemLink } from './MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -197,9 +197,9 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         stickyStart: true,
         sortValue: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
         render: (order) => (
-          <MarketItemLink typeId={order.type_id}>
+          <ItemInfoLink typeId={order.type_id}>
             {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
-          </MarketItemLink>
+          </ItemInfoLink>
         ),
       },
       {

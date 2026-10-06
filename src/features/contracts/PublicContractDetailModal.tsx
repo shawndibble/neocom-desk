@@ -46,7 +46,7 @@ import {
   type PublicContractItemsOutcome,
 } from '@/features/bpcContracts/publicContractItems';
 import { SystemLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { loadPlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { useMarketHub } from '@/features/market/hub';
@@ -359,7 +359,7 @@ function ContractItemRow({ line, name }: { line: ContractItemLine; name: string 
           />
           <span className="min-w-0 flex-1">
             <span className="block truncate">
-              <MarketItemLink typeId={line.typeId}>{name}</MarketItemLink>
+              <ItemInfoLink typeId={line.typeId}>{name}</ItemInfoLink>
             </span>
             {line.isBlueprintCopy && (
               <span className="block text-[0.6875rem] tabular-nums text-text-dim">

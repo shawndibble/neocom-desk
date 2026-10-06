@@ -327,7 +327,11 @@ export function Market() {
   // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
   // one Item Detail modal, priced at `orderBookLocation`) and the lazy
   // blueprint catalog behind Build Plan.
-  const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
+  const itemActions = usePageItemActions({
+    activeCharacterId,
+    lazyBlueprints: true,
+    localInfo: true,
+  });
   const {
     items: quickbarItems,
     write: writeQuickbar,

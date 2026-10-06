@@ -28,7 +28,7 @@ import {
 } from '@/features/character/walletTransactionFilter';
 import { useUrlFilter } from '@/lib/useUrlState';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { MarketItemLink } from './MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
@@ -178,9 +178,9 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         header: t('wallet.item'),
         stickyStart: true,
         render: (txn) => (
-          <MarketItemLink typeId={txn.type_id}>
+          <ItemInfoLink typeId={txn.type_id}>
             {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
-          </MarketItemLink>
+          </ItemInfoLink>
         ),
         sortValue: (txn) => nameFor(txn.type_id),
       },

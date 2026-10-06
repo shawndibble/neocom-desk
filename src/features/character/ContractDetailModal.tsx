@@ -36,7 +36,7 @@ import {
   CONTRACT_STATUS_KEY,
   CONTRACT_TYPE_KEY,
 } from './contractLabels';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -177,7 +177,7 @@ export function ContractDetailModal({
       header: t('contracts.detailItemName'),
       sortValue: (item) => items.typeNames.get(item.type_id) ?? `#${item.type_id}`,
       render: (item) => (
-        <MarketItemLink typeId={item.type_id}>
+        <ItemInfoLink typeId={item.type_id}>
           <span className="flex items-center gap-1.5">
             <TypeIcon
               typeId={item.type_id}
@@ -188,7 +188,7 @@ export function ContractDetailModal({
             />
             {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
           </span>
-        </MarketItemLink>
+        </ItemInfoLink>
       ),
     },
     {
