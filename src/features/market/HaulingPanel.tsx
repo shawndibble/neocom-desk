@@ -38,8 +38,6 @@ import {
   DataTableDenseCell,
   type DataTableColumn,
 } from '@/components/ui';
-import { SystemLink } from '@/features/entities';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import {
   focusRingClassName,
   touchCheckboxLabelClassName,
@@ -81,7 +79,6 @@ import {
   type StoredHaulingFilter,
 } from './haulingFilterPref';
 import { ItemContextMenu } from './ItemContextMenu';
-import { MarketItemLink } from './MarketItemLink';
 import {
   EVERYTHING_CATEGORY_ID,
   DEFAULT_HAULING_CATEGORY_ID,
@@ -516,12 +513,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
           {!cards && <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />}
-          <MarketItemLink
-            typeId={row.typeId}
-            className={entityLinkClassName('min-w-0 truncate font-medium')}
-          >
-            {row.name}
-          </MarketItemLink>
+          <span className="min-w-0 truncate font-medium">{row.name}</span>
           {row.flags.length > 0 && (
             <IconButton
               variant="plain"
@@ -556,7 +548,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
             render: (row: HaulingViewRow) => {
               const hub = hubAtAnyEnd(row, anyEnd);
-              return <SystemLink systemId={hub.systemId}>{hub.systemName}</SystemLink>;
+              return hub.systemName;
             },
           },
         ]),

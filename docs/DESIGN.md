@@ -884,6 +884,15 @@ The cues above say what a control means. They never say a row needs one.
 Decide by the surroundings: a control that repeats what the row already does
 is clutter, and clutter hides the actions that matter.
 
+- **A row's primary action beats name links inside it.** When a click on a
+  row (or phone card) opens a modal, opens a detail pane, selects or expands,
+  an entity name inside it (item, system, character, corp) is not a link: it
+  is plain text, with the primary cell's accent cue marking the row's
+  handle. The entity link (Market, Show Info, Route Safety) lives in the
+  opened modal or detail. A name is a link only where the row has no primary
+  action of its own, or where the name is the only action. A link that
+  steals the click from the row it sits in makes "click the name" mean
+  something different from "click the row".
 - **Check first.** Before adding any cue or control, check whether the row
   click, a visible link or name, a header action, a bulk action or the detail
   view already gives that action. If it does, add nothing.

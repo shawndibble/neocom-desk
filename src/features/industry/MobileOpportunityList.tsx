@@ -44,8 +44,7 @@ import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
-import { CharacterLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 import { formatIsk } from '@/lib/isk';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
@@ -171,6 +170,7 @@ export function MobileOpportunityList({
 }: MobileOpportunityListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
   const fields = sortFields(t);
 
   const { sort, onSortChange: setSort } = useUrlSort(
@@ -215,6 +215,10 @@ export function MobileOpportunityList({
             <li
               key={row.candidate.id}
               aria-current={selected ? 'true' : undefined}
+              // A tap on the card is Start plan's action; its controls are exempt.
+              onClick={(event) => {
+                if (isCardOwnClick(event)) startPlanFromRow(row.candidate.catalogEntry);
+              }}
               className={cx(
                 'grid grid-cols-[2.75rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
                 selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
@@ -234,13 +238,7 @@ export function MobileOpportunityList({
                 {/* The hero rides the name row's right edge like a price tag, matching the owned-blueprint cards. */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-semibold break-words">
-                      {productTypeID !== null ? (
-                        <MarketItemLink typeId={productTypeID}>{productName}</MarketItemLink>
-                      ) : (
-                        productName
-                      )}
-                    </span>
+                    <span className="text-sm font-semibold break-words">{productName}</span>
                     {members.length > 1 && (
                       <span className="text-[0.6875rem] font-semibold text-text-dim">
                         {t('industry.opportunitiesCopies', { count: members.length })}
@@ -255,9 +253,7 @@ export function MobileOpportunityList({
                     )}
                     {showCharacterColumn && (
                       <span className="text-[0.6875rem] text-text-dim">
-                        <CharacterLink id={row.candidate.characterId}>
-                          {row.candidate.characterName}
-                        </CharacterLink>
+                        {row.candidate.characterName}
                       </span>
                     )}
                   </div>

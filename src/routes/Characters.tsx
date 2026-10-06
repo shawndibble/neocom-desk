@@ -1,5 +1,4 @@
 import { cx } from '@/lib/cx';
-import { AllianceLink, CorporationLink } from '@/features/entities';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -292,21 +291,13 @@ function characterLastSynced(
   return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
 }
 
-/** A corp or alliance name as its Show Info link (§6c); plain text until the id and name are known. */
-function AffiliationName({
-  name,
-  id,
-  kind,
-}: {
-  name: string | null | undefined;
-  id: number | undefined;
-  kind: 'corp' | 'alliance';
-}) {
+/**
+ * A corp or alliance name, plain: a roster row or card selects the Character,
+ * so its Show Info links live in the selected Character's header (§6c).
+ */
+function AffiliationName({ name }: { name: string | null | undefined }) {
   const { t } = useTranslation();
-  if (!name) return <>{t('common.unknown')}</>;
-  if (id === undefined) return <>{name}</>;
-  const Link = kind === 'corp' ? CorporationLink : AllianceLink;
-  return <Link id={id}>{name}</Link>;
+  return <>{name || t('common.unknown')}</>;
 }
 
 function CharacterCard({
@@ -391,10 +382,10 @@ function CharacterCard({
               )}
             </span>
             <span className="block truncate text-xs text-text-dim">
-              <AffiliationName name={info?.corporationName} id={info?.corporationId} kind="corp" />
+              <AffiliationName name={info?.corporationName} />
             </span>
             <span className="block truncate text-xs text-text-dim">
-              <AffiliationName name={info?.allianceName} id={info?.allianceId} kind="alliance" />
+              <AffiliationName name={info?.allianceName} />
             </span>
           </span>
         </div>
@@ -682,13 +673,7 @@ function buildColumns(
       header: t('characters.column.corp'),
       className: 'text-text-dim',
       sortValue: (row) => row.info?.corporationName ?? '',
-      render: (row) => (
-        <AffiliationName
-          name={row.info?.corporationName}
-          id={row.info?.corporationId}
-          kind="corp"
-        />
-      ),
+      render: (row) => <AffiliationName name={row.info?.corporationName} />,
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu

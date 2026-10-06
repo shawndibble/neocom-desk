@@ -11,7 +11,6 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { CharacterLink } from '@/features/entities';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -45,7 +44,7 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -329,6 +328,9 @@ export function OpportunitiesPanel({
     columns: csvColumns,
   });
 
+  // A row click is the Start plan button's action, so the product name needs no link of its own.
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
+
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
       // Desktop-only column now (`isDesktop` gates this whole `DataTable`
@@ -362,13 +364,7 @@ export function OpportunitiesPanel({
         const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
         return (
           <span className="flex flex-wrap items-center gap-1.5">
-            {productTypeID !== null ? (
-              <MarketItemLink typeId={productTypeID}>
-                {row.candidate.catalogEntry.productName}
-              </MarketItemLink>
-            ) : (
-              row.candidate.catalogEntry.productName
-            )}
+            {row.candidate.catalogEntry.productName}
             {verdict?.gated && (
               <SkillGateMarker
                 verdict={verdict}
@@ -377,9 +373,7 @@ export function OpportunitiesPanel({
               />
             )}
             {showCharacterColumn && (
-              <CharacterLink id={row.candidate.characterId} className="text-[0.6875rem]">
-                {row.candidate.characterName}
-              </CharacterLink>
+              <span className="text-[0.6875rem]">{row.candidate.characterName}</span>
             )}
           </span>
         );
@@ -620,6 +614,7 @@ export function OpportunitiesPanel({
             rowKey={opportunityRowKey}
             virtualize="auto"
             label={t('industry.opportunitiesTitle')}
+            onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
             {...sortProps}
           />
         </div>

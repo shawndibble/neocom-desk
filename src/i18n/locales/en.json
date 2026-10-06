@@ -5707,6 +5707,7 @@
   },
   "contractDetail": {
     "regionLabel": "Region",
+    "systemLabel": "System",
     "locationLabel": "Location",
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
@@ -6606,6 +6607,7 @@
         "showOrders": "Show orders",
         "hideOrders": "Hide orders",
         "openInMarket": "Price history and all orders in {{hub}} ›",
+        "routeSafety": "Route safety: {{hub}}",
         "instantNote": "Only buy orders at the {{hub}} hub station count. You sell into them on arrival, so there is no broker fee and no wait.",
         "sellInto": "Sell into buy orders in {{hub}}",
         "buyOrdersTitle": "Buy orders in {{hub}}",

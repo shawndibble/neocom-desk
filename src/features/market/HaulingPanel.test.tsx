@@ -117,9 +117,11 @@ describe('HaulingPanel item rows', () => {
     useActiveCharacter.setState({ activeCharacterId: null });
   });
 
-  it('links the item name into the Market Browser', () => {
+  it('keeps the item name plain; the expanded detail links to Market', () => {
     renderPanel();
-    const link = screen.getByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByRole('link', { name: 'Damage Control II' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
+    const link = screen.getByRole('link', { name: /Price history and all orders/ });
     expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*type=2048/);
   });
 

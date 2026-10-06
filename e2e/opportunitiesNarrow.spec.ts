@@ -267,6 +267,14 @@ test.describe('Opportunities — ranked phone list', () => {
 
     await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
   });
+  test('tapping the product name opens the plan, not the Market page', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    await page.getByText('Rifter', { exact: true }).click();
+
+    await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
+  });
   test('identical copies share one card; a different ME keeps its own', async ({ page }) => {
     const copy = {
       type_id: BLUEPRINT_TYPE_ID,

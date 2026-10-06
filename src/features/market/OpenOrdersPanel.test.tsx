@@ -755,6 +755,31 @@ describe('OpenOrdersPanel', () => {
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
   });
 
+  it('opens the detail modal when the item name is clicked, with the name not a link', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Tritanium/ });
+    expect(within(row).queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+    await user.click(within(row).getByText('Tritanium'));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
+    expect(within(dialog).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
+  });
+
   it('fetches price history on opening a row\'s details and feeds it into the "sells out in" chip', async () => {
     // This is the wiring `loadPriceHistory` exists for (issue #5): if
     // `openDetails` stopped calling it, this test — not just the modal's own

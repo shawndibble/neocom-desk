@@ -25,8 +25,7 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAsset, CharacterBlueprint } from '@/esi/endpoints';
-import { CharacterLink } from '@/features/entities';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { iskToneClass } from '@/features/character/format';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
@@ -231,6 +230,9 @@ export function OwnedBlueprintsPanel({
     columns: csvColumns,
   });
 
+  // A row click is the Start plan button's action (a blueprint with no catalog entry has none).
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
+
   const columns: DataTableColumn<OwnedBlueprintRow>[] = [
     {
       id: 'blueprint',
@@ -239,7 +241,7 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          <MarketItemLink typeId={row.blueprint.type_id}>{row.name}</MarketItemLink>
+          {row.name}
           {row.activity === 'reaction' && (
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.ownedBlueprintsActivity.reaction')}
@@ -302,11 +304,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsOwner'),
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
       render: (row) =>
-        row.owner.kind === 'character' ? (
-          <CharacterLink id={row.owner.characterId}>{row.owner.name}</CharacterLink>
-        ) : (
-          t('industry.ownedBlueprintsCorporation')
-        ),
+        row.owner.kind === 'character' ? row.owner.name : t('industry.ownedBlueprintsCorporation'),
     },
     {
       id: 'iskPerHour',
@@ -494,6 +492,9 @@ export function OwnedBlueprintsPanel({
                 columns={shownColumns}
                 rows={filteredRows}
                 rowKey={ownedRowKey}
+                onRowClick={(row) => {
+                  if (row.catalogEntry) startPlanFromRow(row.catalogEntry);
+                }}
                 virtualize="auto"
                 label={t('industry.ownedBlueprintsTitle')}
                 {...sortProps}

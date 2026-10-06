@@ -9,7 +9,6 @@
  * everything that is only true of a haul.
  */
 import { HintText } from '@/components/ui/HintText';
-import { SystemLink } from '@/features/entities';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -741,14 +740,11 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
   return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }
 
-/** A system name that links to Route Safety when the system is known; plain otherwise (station, structure, unplaced). */
+/** A system name, plain: a courier row opens its contract modal, where the system links to Route Safety. */
 function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
   const name = endpointSystemName(endpoint);
-  return endpoint.systemId == null ? (
-    <>{name}</>
-  ) : (
-    <SystemLink systemId={endpoint.systemId}>{name}</SystemLink>
-  );
+  // Plain: the row opens the contract modal, which carries the system link.
+  return <>{name}</>;
 }
 
 /**

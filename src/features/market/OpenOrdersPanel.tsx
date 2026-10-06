@@ -65,7 +65,6 @@ import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
-import { MarketItemLink } from './MarketItemLink';
 import { OpenOrdersList } from './OpenOrdersList';
 import { isOffHubStation } from './hubStation';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
@@ -427,7 +426,7 @@ export function OpenOrdersPanel() {
               sortValue: (row) => row.typeName,
               render: (row) => (
                 <span className="flex flex-wrap items-center gap-1">
-                  <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+                  <span>{row.typeName}</span>
                   {showCharacterStrip && <CharacterBadge characterName={row.characterName} />}
                 </span>
               ),
@@ -1100,6 +1099,7 @@ export function OpenOrdersPanel() {
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
                       rowMoreActions
+                      onRowClick={(row) => setDetailOrderId(row.orderId)}
                       label={`${groupTitle} · ${group.rows.length}`}
                       highlightRowKey={highlightId}
                     />

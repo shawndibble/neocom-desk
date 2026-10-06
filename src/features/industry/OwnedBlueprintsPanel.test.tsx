@@ -146,10 +146,12 @@ describe('OwnedBlueprintsPanel', () => {
     expect(screen.getByText('In container')).toBeInTheDocument();
   });
 
-  it('links the blueprint name to its Market listing', () => {
-    renderPanel();
-    const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
-    expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*100/);
+  it('shows the blueprint name as plain text and starts the plan on a row click', async () => {
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(onStartPlan);
+    expect(screen.queryByRole('link', { name: 'Rifter Blueprint' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Rifter Blueprint'));
+    expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
   it('filters by BPO/BPC and activity', async () => {

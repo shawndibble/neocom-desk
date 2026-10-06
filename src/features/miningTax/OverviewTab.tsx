@@ -27,7 +27,6 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
-import { CharacterLink, SystemLink } from '@/features/entities';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -374,7 +373,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      render: (row) => <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>,
+      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
+      render: (row) => row.characterName,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -382,7 +382,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          <SystemLink systemId={row.entry.solarSystemId}>{systemName(row)}</SystemLink>
+          {systemName(row)}
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),

@@ -21,7 +21,6 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { CorporationLink } from '@/features/entities';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import {
@@ -323,13 +322,9 @@ export function Wallet() {
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        // The name is the corporation's Show Info link (§6c); the row's own
-        // destination, the LP Store, is the trailing link column below.
-        render: (entry) => (
-          <CorporationLink id={entry.corporation_id}>
-            {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-          </CorporationLink>
-        ),
+        // Plain: the row's primary action is the LP Store (the trailing link
+        // column below); the corporation's Show Info is in the row menu (§6c).
+        render: (entry) => corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
         sortValue: (entry) =>
           corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
       },

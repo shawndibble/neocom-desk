@@ -110,9 +110,10 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
-  it('links the product name to its Market listing', () => {
+  it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
-    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
   });
 
   it('has no row menu: Start plan is the row’s one control', () => {
@@ -333,8 +334,8 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
   const productOrder = () =>
     screen
-      .getAllByRole('link')
-      .map((link) => link.textContent)
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
       .filter((name) => name?.startsWith('Widget'));
 
   afterEach(() => {

@@ -89,17 +89,14 @@ function iskPerLpTone(value: number | null): string {
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
 
 /**
- * Item name: Market link (§6c); plain when the product type is unknown. A
- * blueprint row is labelled with the product the link opens, so the label
- * says where it goes; the BP badge beside it still marks the row as a blueprint.
+ * Item name: plain text. The row's click selects it for the detail pane, so
+ * the name is not a link (DESIGN.md §6c); `OfferDetail`'s View in Market is
+ * the Market link. A blueprint row is labelled with the product that button
+ * opens; the BP badge beside it still marks the row as a blueprint.
  */
 function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
   const { typeId, itemName } = resolveLoyaltyRowItem(row);
-  return typeId === null ? (
-    <span className="text-text">{row.itemName}</span>
-  ) : (
-    <MarketItemLink typeId={typeId}>{itemName}</MarketItemLink>
-  );
+  return <span className="text-text">{typeId === null ? row.itemName : itemName}</span>;
 }
 
 /**

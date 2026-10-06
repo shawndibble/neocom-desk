@@ -467,7 +467,8 @@ export function ProductionLogPanel({
         id: 'item',
         header: t('industry.productionRunColumnItem'),
         sortValue: (r) => r.itemName,
-        render: (r) => <MarketItemLink typeId={r.run.productTypeID}>{r.itemName}</MarketItemLink>,
+        // The row opens the run's plan (the plan page links the product to Market), so the name is plain.
+        render: (r) => r.itemName,
       },
       quantityColumn(t),
       totalCostColumn(t),

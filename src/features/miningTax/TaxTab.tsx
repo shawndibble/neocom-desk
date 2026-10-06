@@ -38,7 +38,6 @@ import {
   interactiveClassName,
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
-import { CharacterLink, SystemLink } from '@/features/entities';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
@@ -1261,9 +1260,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             id: 'character',
             headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
-            render: (dr: DisplayRow) => (
-              <CharacterLink id={dr.row.characterId}>{dr.row.characterName}</CharacterLink>
-            ),
+            // Plain: the row opens the detail modal, which links the pilot (§6c).
+            render: (dr: DisplayRow) => dr.row.characterName,
             sortValue: (dr: DisplayRow) => dr.row.characterName,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -1315,7 +1313,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.systemColumn'),
       render: (dr) => (
         <DataTableDenseCell>
-          <SystemLink systemId={dr.row.entry.solarSystemId}>{systemName(dr)}</SystemLink>
+          {systemName(dr)}
           <SecurityValue security={systemSecurityOf(dr)} />
         </DataTableDenseCell>
       ),

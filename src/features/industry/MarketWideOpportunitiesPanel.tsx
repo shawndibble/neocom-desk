@@ -49,7 +49,7 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -273,6 +273,8 @@ export function MarketWideOpportunitiesPanel({
     return entry ? onStartPlan(entry) : Promise.resolve(false);
   };
 
+  const startPlanFromRow = useRowStartPlan(startPlanFor);
+
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
       id: 'product',
@@ -283,7 +285,7 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
+            {row.productName}
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
@@ -565,6 +567,7 @@ export function MarketWideOpportunitiesPanel({
                 columns={columns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
+                onRowClick={startPlanFromRow}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />
