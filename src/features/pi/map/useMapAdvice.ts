@@ -95,7 +95,11 @@ export function useMapAdvice(
   );
   const finder = useMemo<FinderOrigin>(() => {
     const id = homeSystemId((snapshot?.colonies ?? []).map((c) => c.solar_system_id));
-    return { systemId: id, name: id === null ? null : (snapshot?.systemNames.get(id) ?? null) };
+    return {
+      systemId: id,
+      name: id === null ? null : (snapshot?.systemNames.get(id) ?? null),
+      security: id === null ? null : (snapshot?.securityBySystem.get(id) ?? null),
+    };
   }, [snapshot]);
 
   if (failedFor === characterId || built === 'error') return { status: 'failed' };

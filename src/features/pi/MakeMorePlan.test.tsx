@@ -181,4 +181,22 @@ describe('MakeMorePlan', () => {
     expect(screen.getByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
   });
+
+  it('says it assumes the default customs rate, with a link to the rate editor', () => {
+    mockState = ready({
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((c, i) => (i === 0 ? { ...c, taxAssumed: true } : c)),
+    });
+    renderPlan();
+    expect(screen.getByText(/assume 10% customs on/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set the rate on Plan' })).toHaveAttribute(
+      'href',
+      '/planetary-industry/plan#customs'
+    );
+  });
+
+  it('stays quiet when every customs rate is known', () => {
+    renderPlan();
+    expect(screen.queryByText(/assume 10% customs/)).not.toBeInTheDocument();
+  });
 });

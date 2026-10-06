@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
 import {
@@ -13,6 +14,7 @@ import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { PlanetImage } from './PlanetImage';
+import { PLAN_CUSTOMS_HASH } from './piPlanLink';
 import { openingQuestion, type PlanQuestion } from './planQuestion';
 
 interface Props extends GoalPlannerPanelProps {
@@ -94,7 +96,17 @@ export function PlanPanel(props: Props) {
     };
   }, [characterId]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
-  const [picked, setPicked] = useState<PlanQuestion | null>(null);
+  const { hash, key: locationKey } = useLocation();
+  // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
+  // until the pilot picks a question on that same visit.
+  const [pick, setPickState] = useState<{ question: PlanQuestion; key: string } | null>(null);
+  const picked =
+    pick !== null && (hash !== PLAN_CUSTOMS_HASH || pick.key === locationKey)
+      ? pick.question
+      : hash === PLAN_CUSTOMS_HASH
+        ? ('product' as const)
+        : null;
+  const setPicked = (question: PlanQuestion) => setPickState({ question, key: locationKey });
 
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
