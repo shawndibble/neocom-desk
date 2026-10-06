@@ -4,18 +4,19 @@ import { PiProductList } from '../PiProductLink';
 import { Sentence } from '../sentence';
 
 /**
- * A translated sentence whose product names are links to their PI detail
- * (DESIGN.md §6c "Entities", PI override). The caller passes
- * `t(key, { p0: '{p0}', … })` so i18next resolves everything else, and the
- * type id behind each token here; a list of ids reads comma-separated.
+ * Translated sentence with product names as PI-detail links (§6c). Caller passes
+ * `t(key, { p0: '{p0}', … })` and the type id (or ids, comma-separated) behind each token.
  */
+/** Token name to the product (or products) it stands for. */
+export type ProductSlots = Readonly<Record<string, number | readonly number[]>>;
+
 export function ProductSentence({
   text,
   products,
   pi,
 }: {
   text: string;
-  products: Readonly<Record<string, number | readonly number[]>>;
+  products: ProductSlots;
   pi: PiData;
 }) {
   const slots = Object.fromEntries(

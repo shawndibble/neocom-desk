@@ -186,19 +186,19 @@ function targetsBrowserMenu(event: SyntheticEvent): boolean {
 }
 
 /**
- * Capture-phase handlers for `linksKeepBrowserMenu`. A right-click on a link
- * or field stops before Radix's trigger sees it, without `preventDefault`, so
- * the browser's own menu still shows. A touch or pen press there is marked
- * `defaultPrevented` (which cancels neither the tap nor the browser's hold
- * menu), and Radix's long-press timer skips a prevented press. That also
- * skips any Radix `onPointerDown` on the link itself: keep such links plain.
+ * Right-click there stops before Radix's trigger (no `preventDefault`, so the browser menu shows).
+ * A touch/pen press marks only React's event as prevented, in the trigger's own `onPointerDown`,
+ * which Radix runs just before its long-press handler and skips that on a prevented event. The
+ * native default (a tapped field taking focus, the browser's hold menu) still runs.
  */
 const browserMenuGuard = {
   onContextMenuCapture(event: MouseEvent) {
     if (targetsBrowserMenu(event)) event.stopPropagation();
   },
-  onPointerDownCapture(event: PointerEvent) {
-    if (event.pointerType !== 'mouse' && targetsBrowserMenu(event)) event.preventDefault();
+  onPointerDown(event: PointerEvent) {
+    if (event.pointerType !== 'mouse' && targetsBrowserMenu(event)) {
+      (event as { defaultPrevented: boolean }).defaultPrevented = true;
+    }
   },
 };
 
@@ -222,11 +222,7 @@ export function RowActionsMenu({
   children,
 }: RowActions & {
   tooltip?: string;
-  /**
-   * A right-click or touch-and-hold on a link or text field inside the row is
-   * the browser's (open in a new tab, copy link, paste); the rest of the row
-   * still opens this menu (DESIGN.md §6c "Entities", guardrail 2).
-   */
+  /** Right-click or hold on a link or text field stays the browser's (§6c "Entities", guardrail 2). */
   linksKeepBrowserMenu?: boolean;
   children: ReactElement;
 }) {

@@ -6,10 +6,8 @@ import { PiProductLink } from './PiProductLink';
 import { Sentence } from './sentence';
 
 /**
- * "Better than Silicon, the simplest product on Lava planets": the compared
- * product is a link to its PI detail (DESIGN.md §6c "Entities", PI override),
- * and what it earns sits behind an "i" after the sentence rather than a
- * dotted underline around it, which a link can't sit inside.
+ * A recipe's comparison line, the compared product a PI-detail link (§6c "Entities"). What it earns
+ * sits behind an "i", not a dotted underline around the sentence, which a link can't sit inside.
  */
 export function ComparisonText({
   comparison,

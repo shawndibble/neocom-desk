@@ -7,7 +7,7 @@ import { DirectiveRow, type DirectiveVerb } from '../DirectiveRow';
 import type { ColonyStep, StepKind } from '../goalPlanView';
 import { ColonyLink } from './ColonyLink';
 import { endName, signedCompact, type PlanNames } from './format';
-import { ProductSentence } from './ProductSentence';
+import { ProductSentence, type ProductSlots } from './ProductSentence';
 
 const STEP_VERB: Record<StepKind, DirectiveVerb> = {
   'as-is': 'asIs',
@@ -50,11 +50,7 @@ function StepDetail({
 }) {
   const { t } = useTranslation();
   const { pi } = names;
-  const lines: {
-    text: string;
-    products: Record<string, number | readonly number[]>;
-    tone?: 'tip';
-  }[] = [];
+  const lines: { text: string; products: ProductSlots; tone?: 'tip' }[] = [];
   for (const stop of step.stop) {
     lines.push({
       text: t('piPlan.stepRemove', { count: stop.ecus, p0: '{p0}' }),

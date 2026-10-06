@@ -443,7 +443,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
           }}
           className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
         >
-          {/* Inside the trigger's div, not around it: the trigger needs the row's own element, and the menu's portal content stays out of the row's tap context. */}
+          {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
             <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
               <button
