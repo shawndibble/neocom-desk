@@ -1151,6 +1151,16 @@ describe('PlanetaryIndustry', () => {
       await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/colonies'));
       await waitFor(() => expect(window.location.search).not.toContain('product'));
     });
+
+    it('drops ?planet= when a tab switch leaves the Map', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', `/planetary-industry/map?planet=${PLANET_ID}`);
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await user.click(screen.getByRole('tab', { name: 'Plan' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/plan'));
+      await waitFor(() => expect(window.location.search).not.toContain('planet'));
+    });
   });
 
   it('redirects the retired Advisor URL to Colonies, with no Advisor left on the page', async () => {

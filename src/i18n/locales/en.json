@@ -5071,6 +5071,7 @@
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
       "stripUnknown": "Not measured",
+      "stripNoLinkCost": "Size unknown",
       "excluded_one": "Left out: {{names}}. Its details have not loaded. Refresh to try again.",
       "excluded_other": "Left out: {{names}}. Their details have not loaded. Refresh to try again.",
       "slotsLabel_one": "{{used}} of {{count}} planet slot used",
@@ -5127,7 +5128,8 @@
           "no-candidates": "No other setup fits there.",
           "no-haul-saving": "A rebuild would not cut your hauling."
         },
-        "unknown": "{{planet}} {{type}}: we can't measure this colony yet, so there is nothing to recommend."
+        "unknown": "{{planet}} {{type}}: we can't measure this colony yet, so there is nothing to recommend.",
+        "needsLinkCost": "{{planet}} {{type}}: we don't have this planet's size, so a rebuild's links can't be costed and there is nothing to recommend. What it earns today still counts."
       },
       "to": "to",
       "tagRebuild": "Rebuild",
@@ -5203,7 +5205,8 @@
         "remove": "{{count}} × {{pin}}",
         "place": "{{count}} × {{pin}}",
         "placeExtractor": "{{count}} × {{pin}} (scan for a bright spot)",
-        "set": "{{pin}} → {{item}}",
+        "set_one": "{{pin}} → {{item}}",
+        "set_other": "{{count}} × {{pin}} → {{item}}",
         "route": "Send {{item}} to the launchpad"
       },
       "fitsCc": "Fits your Command Center (upgrade level {{level}})",

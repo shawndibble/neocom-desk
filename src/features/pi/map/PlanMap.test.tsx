@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -686,6 +686,25 @@ describe('PlanMap richness drawer', () => {
     ).toBeVisible();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(within(aside).getByRole('button', { name: 'Back to the map' })).toBeVisible();
+  });
+
+  it('keeps only the drawer it shows when the URL names a planet and a product', async () => {
+    stubPhone(true);
+    function Search() {
+      return <output data-testid="search">{useLocation().search}</output>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/planetary-industry/map?planet=40000001&product=9832']}>
+        <PlanMap {...props()} />
+        <Search />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByTestId('search')).toHaveTextContent(/^\?planet=40000001$/)
+    );
   });
 
   it('ignores a planet the pilot has no colony on', async () => {

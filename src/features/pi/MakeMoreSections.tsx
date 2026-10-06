@@ -240,7 +240,13 @@ export function YourPlanetsPanel({
                 ) : strip.rebuild.kind === 'keep' ? (
                   <span className="text-text-dim">{t('piPlan.make.stripKeep')}</span>
                 ) : (
-                  <span className="text-text-dim">{t('piPlan.make.stripUnknown')}</span>
+                  <span className="text-text-dim">
+                    {t(
+                      strip.rebuild.reason === 'link-cost'
+                        ? 'piPlan.make.stripNoLinkCost'
+                        : 'piPlan.make.stripUnknown'
+                    )}
+                  </span>
                 )}
               </div>
             </div>
@@ -533,7 +539,12 @@ function RebuildSentence({
   }
   return (
     <Sentence
-      text={t('piPlan.make.rebuild.unknown', { planet: '{planet}', type: '{type}' })}
+      text={t(
+        card.refusal === 'link-cost'
+          ? 'piPlan.make.rebuild.needsLinkCost'
+          : 'piPlan.make.rebuild.unknown',
+        { planet: '{planet}', type: '{type}' }
+      )}
       slots={{ planet, type }}
     />
   );
@@ -627,7 +638,7 @@ function RebuildCard({
             </>
           )}
         </div>
-        {card.status !== 'unknown' && (
+        {(card.status !== 'unknown' || card.toPerDay !== null) && (
           <div className="flex shrink-0 items-center gap-3 max-sm:order-last max-sm:basis-full max-sm:pl-14">
             <span className="flex items-center gap-1.5 text-xs text-text-dim tabular-nums">
               {card.status === 'change' && card.fromPerDay !== null && (
@@ -640,7 +651,7 @@ function RebuildCard({
                   )}
                 </>
               )}
-              {card.status === 'keep' && nowItem && (
+              {card.status !== 'change' && nowItem && (
                 <TypeIcon typeId={nowItem.typeId} size={32} width={20} height={20} />
               )}
               {card.toPerDay !== null && (
@@ -836,7 +847,7 @@ function StepText({ step }: { step: ChecklistStep }) {
     case 'set':
       return (
         <Sentence
-          text={t('piPlan.make.step.set', { pin, item: '{item}', count: 1 })}
+          text={t('piPlan.make.step.set', { pin, item: '{item}', count: step.count ?? 1 })}
           slots={{
             item:
               step.typeId !== null && step.subject !== null ? (

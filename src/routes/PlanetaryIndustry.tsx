@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { hrefWithoutPiProduct, parsePiProduct } from '@/features/pi/piPlanLink';
+import { hrefWithout, MAP_ONLY_PARAMS } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
@@ -24,6 +24,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
+import { usePopScrollRestore } from '@/lib/usePopScrollRestore';
 import { useUrlParams } from '@/lib/useUrlState';
 import { type UrlParamCodec } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
@@ -95,14 +96,19 @@ export function PlanetaryIndustry() {
   // Show info for every item name and menu on the three tabs.
   const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
-  // A tab switch keeps the search, so the Map's `?product=` would reopen its
-  // drawer on the way back: it belongs to the Map alone.
+  // A tab switch keeps the search, so the Map's `?product=` or `?planet=`
+  // would reopen its drawer on the way back: they belong to the Map alone.
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
-    if (tab === 'map' || parsePiProduct(location.search) === null) return;
-    navigate(hrefWithoutPiProduct(location), { replace: true, state: location.state });
+    if (tab === 'map') return;
+    const params = new URLSearchParams(location.search);
+    if (!MAP_ONLY_PARAMS.some((key) => params.has(key))) return;
+    navigate(hrefWithout(location, MAP_ONLY_PARAMS), { replace: true, state: location.state });
   }, [tab, location, navigate]);
+  // Back from a Map drawer remounts Plan or Colonies behind a spinner, too
+  // short for the browser's own restore: put the scroll back once it has grown.
+  usePopScrollRestore();
 
   // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
   // Plan tab only, and only for a type the planner can plan.

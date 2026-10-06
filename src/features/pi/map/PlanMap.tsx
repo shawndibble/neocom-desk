@@ -45,6 +45,7 @@ import type { ChainEstimateOf } from '../useChainEstimates';
 import { CcLevelTag } from '../CcLevelTag';
 import { planPicks } from '../planPicks';
 import {
+  hrefWithout,
   hrefWithoutPiPlanet,
   hrefWithoutPiProduct,
   parsePiPlanet,
@@ -125,13 +126,6 @@ export function PlanMap({
   const linked = linkedRaw !== null && graph.byId.has(linkedRaw) ? linkedRaw : null;
   const hasProductParam =
     linkedRaw !== null || new URLSearchParams(location.search).has(PI_PRODUCT_PARAM);
-  useEffect(() => {
-    if (!hasProductParam || linked !== null) return;
-    navigate(hrefWithoutPiProduct(location), {
-      replace: true,
-      state: location.state,
-    });
-  }, [hasProductParam, linked, location, navigate]);
 
   const owned = useMemo(() => new Set(colonies.map((c) => c.type)), [colonies]);
   const colonyNames = useMemo(() => {
@@ -204,10 +198,19 @@ export function PlanMap({
   const planetRaw = parsePiPlanet(location.search);
   const richnessColony = colonies.find((c) => c.planetId === planetRaw) ?? null;
   const hasPlanetParam = new URLSearchParams(location.search).has(PI_PLANET_PARAM);
+  // The URL keeps only what the view uses, in one navigation (two would each
+  // start from the same stale search and undo each other): an id the map does
+  // not know goes, and with a colony's richness drawer open the product does too.
+  const dropProductParam = hasProductParam && (linked === null || richnessColony !== null);
+  const dropPlanetParam = hasPlanetParam && richnessColony === null;
   useEffect(() => {
-    if (!hasPlanetParam || richnessColony !== null) return;
-    navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
-  }, [hasPlanetParam, richnessColony, location, navigate]);
+    if (!dropProductParam && !dropPlanetParam) return;
+    const keys = [
+      ...(dropProductParam ? [PI_PRODUCT_PARAM] : []),
+      ...(dropPlanetParam ? [PI_PLANET_PARAM] : []),
+    ];
+    navigate(hrefWithout(location, keys), { replace: true, state: location.state });
+  }, [dropProductParam, dropPlanetParam, location, navigate]);
   const dropPlanet = () =>
     navigate(hrefWithoutPiPlanet(location), { replace: true, state: location.state });
 

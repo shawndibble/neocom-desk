@@ -101,6 +101,23 @@ export function hrefWithoutPiProduct(location: {
   return `${location.pathname}${withoutPiProduct(location.search)}${location.hash}`;
 }
 
+/** The same location without `keys`. */
+export function hrefWithout(
+  location: { pathname: string; search: string; hash: string },
+  keys: readonly string[]
+): string {
+  const params = new URLSearchParams(location.search);
+  for (const key of keys) params.delete(key);
+  const rest = params.toString();
+  return `${location.pathname}${rest === '' ? '' : `?${rest}`}${location.hash}`;
+}
+
+/**
+ * Params only the Map reads (its two drawers). A tab switch keeps the search,
+ * so these would reopen a drawer on the way back: they are dropped on leaving.
+ */
+export const MAP_ONLY_PARAMS = [PI_PRODUCT_PARAM, PI_PLANET_PARAM] as const;
+
 /** History state a product link or tile click carries, so Close can go Back instead of replacing. */
 export const PI_PRODUCT_PUSHED_STATE = { piProduct: true } as const;
 
