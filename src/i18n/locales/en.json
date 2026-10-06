@@ -1616,7 +1616,10 @@
         "fighterDps": "Fighters",
         "appliedDps": "Applied DPS",
         "weaponRange": "Weapon range",
-        "signatureRadius": "Signature radius"
+        "signatureRadius": "Signature radius",
+        "miningYield": "Mining yield",
+        "warpSpeed": "Warp speed",
+        "sensorStrength": "Sensor strength"
       },
       "unit": {
         "cpu": "tf",
@@ -1635,7 +1638,10 @@
         "fighterDps": "DPS",
         "appliedDps": "DPS",
         "weaponRange": "km",
-        "signatureRadius": "m"
+        "signatureRadius": "m",
+        "miningYield": "m³/h",
+        "warpSpeed": "AU/s",
+        "sensorStrength": "pts"
       },
       "updating": "Updating for your change…",
       "budgetOver": "{{used}} / {{total}} {{unit}} · {{value}} {{unit}} over",
@@ -1644,6 +1650,7 @@
       "group": {
         "fitting": "Fitting",
         "weapons": "Weapons",
+        "mining": "Mining",
         "tank": "Tank",
         "navigation": "Navigation & targeting"
       },
