@@ -85,7 +85,9 @@ import {
 } from '@/engine/pi/stopTier';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import type { PinLoad } from '@/engine/pi/types';
+import type { NetworkOpportunity } from '@/engine/pi/network';
 import { colonyNetwork } from './networkModel';
+import { dropSharedSurplus } from './factoryRoomDedupe';
 import { salesTaxPct } from '@/engine/industry/fees';
 import { colonyPlan } from './colonyPlan';
 import { colonyBudget } from './colonyBudget';
@@ -796,7 +798,15 @@ function factoryRoom(
   const hasIdle = new Map(
     built.map((row) => [row.planetId, colonyPlan(row.advice, pi).idle !== null])
   );
+  const byHost = new Map<number, NetworkOpportunity[]>();
   for (const opportunity of network.plan.opportunities) {
+    byHost.set(opportunity.hostPlanetId, [
+      ...(byHost.get(opportunity.hostPlanetId) ?? []),
+      opportunity,
+    ]);
+  }
+  const opportunities = [...byHost.values()].flatMap((group) => dropSharedSurplus(group));
+  for (const opportunity of opportunities) {
     const gain = opportunity.marginPerHour * HOURS_PER_DAY;
     if (!(gain > 0)) continue;
     const wins = out.get(opportunity.hostPlanetId) ?? [];

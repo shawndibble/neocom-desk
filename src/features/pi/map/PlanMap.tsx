@@ -14,6 +14,7 @@
  * phone. The observed box is the same width docked or not, so docking never
  * changes the number it was decided on.
  */
+import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -411,7 +412,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       <div className={cx(base, 'text-text')} aria-live="polite">
         <PlanetImage type={activeWhatIf} size={28} />
         <span className="text-[11px] font-semibold tracking-widest text-map-whatif uppercase">
-          {t('piMap.whatIfTitle', { type: name })}
+          {t('piMap.whatIfTitle', { aType: withArticle(name) })}
         </span>
         <span>
           {unlock.productIds.length === 0
