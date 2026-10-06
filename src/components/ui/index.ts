@@ -29,6 +29,7 @@ export { Modal } from './Modal';
 export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
 export { DataTable, DataTableDenseCell, DataTableSortPicker } from './DataTable';
+export { isRowOwnEvent } from './rowEvents';
 export type {
   DataTableColumn,
   DataTableExpandableRow,

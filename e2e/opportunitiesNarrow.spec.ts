@@ -258,6 +258,9 @@ test.describe('Opportunities — ranked phone list', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
+    // Wait for the card to be fully rendered (its controls mounted) before tapping.
+    await expect(page.getByRole('checkbox', { name: /Select Rifter/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /More actions for Rifter/ })).toBeVisible();
     await page.getByText('Rifter', { exact: true }).click();
 
     await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);

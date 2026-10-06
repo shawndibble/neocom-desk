@@ -85,7 +85,9 @@ import {
 } from '@/engine/pi/stopTier';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import type { PinLoad } from '@/engine/pi/types';
+import type { NetworkOpportunity } from '@/engine/pi/network';
 import { colonyNetwork } from './networkModel';
+import { dropSharedSurplus } from './factoryRoomDedupe';
 import { salesTaxPct } from '@/engine/industry/fees';
 import { colonyPlan } from './colonyPlan';
 import { colonyBudget } from './colonyBudget';
@@ -624,6 +626,60 @@ function analyseColony(args: {
     }
   }
 
+  // Raw P0 sold as it comes out of the ground: basic factories refine it to P1.
+  // Priced against what the raw earns today (never against zero), so a refinement
+  // that would pay less than the ore is not offered, and a colony is never
+  // steered towards selling raw.
+  let basicRoom = plan.headroom.basic ?? 0;
+  let refined = colony;
+  let refinedEarnings = nominal;
+  const rawsByRate = [...colony.extractedPerHour].sort(
+    (a, b) => b.unitsPerHour - a.unitsPerHour || a.typeId - b.typeId
+  );
+  for (const raw of rawsByRate) {
+    if (basicRoom <= 0 || refinedEarnings === null) break;
+    const found = Object.entries(pi.schematics).find(
+      ([, s]) =>
+        s.facility === 'basic' && s.inputs.length === 1 && s.inputs[0].typeID === raw.typeId
+    );
+    if (!found || found[1].cycleTime <= 0) continue;
+    const [productKey, schematic] = found;
+    const productTypeId = Number(productKey);
+    const running = new Set(refined.production.map((group) => group.schematicId));
+    const refinesItAlready = Object.values(pi.schematics).some(
+      (s) => running.has(s.schematicId) && s.inputs.some((i) => i.typeID === raw.typeId)
+    );
+    if (refinesItAlready) continue;
+    const drawPerFactory = (schematic.inputs[0].quantity * 3600) / schematic.cycleTime;
+    const factories = Math.min(basicRoom, Math.ceil(raw.unitsPerHour / drawPerFactory));
+    if (factories <= 0) continue;
+    const candidate: BuiltColonyAdvice = {
+      ...refined,
+      production: [...refined.production, { schematicId: schematic.schematicId, count: factories }],
+    };
+    const after = earningsOf(candidate);
+    if (after.unpriced.length > 0 || after.iskPerHour === null) continue;
+    const gain = gainPerDay(after.iskPerHour, refinedEarnings);
+    if (gain === null || !(gain > 0)) continue;
+    wins.push(
+      quickWin(
+        planetId,
+        {
+          kind: 'spare-room',
+          what: 'factories',
+          productTypeId,
+          factories,
+          routedFrom: [],
+          needsRemoval: plan.idle !== null,
+        },
+        gain
+      )
+    );
+    basicRoom -= factories;
+    refined = candidate;
+    refinedEarnings = after.iskPerHour;
+  }
+
   // Spare room for more extractors. Priced only for a colony on one resource:
   // with two, no figure says which one a new ECU would pull.
   const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
@@ -632,8 +688,11 @@ function analyseColony(args: {
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
   // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
   // headroom, so when the idle win already buys heads, this one would count it twice.
+  // The same goes for the basic factories above: they take the room first.
   const headroomSpent = wins.some(
-    (win) => win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null
+    (win) =>
+      (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
+      (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
   );
   if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
     const only = colony.extractedPerHour[0];
@@ -653,7 +712,24 @@ function analyseColony(args: {
     }
   }
 
-  wins.push(...args.factoryWins.map((win) => ({ ...win, planetId })));
+  // A network factory win for a product this colony already refines locally is the same gain.
+  const localProducts = new Set(
+    wins.flatMap((win) =>
+      win.detail.kind === 'spare-room' && win.detail.what === 'factories'
+        ? [win.detail.productTypeId]
+        : []
+    )
+  );
+  wins.push(
+    ...args.factoryWins
+      .filter(
+        (win) =>
+          win.detail.kind !== 'spare-room' ||
+          win.detail.what !== 'factories' ||
+          !localProducts.has(win.detail.productTypeId)
+      )
+      .map((win) => ({ ...win, planetId }))
+  );
 
   // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;
@@ -796,7 +872,14 @@ function factoryRoom(
   const hasIdle = new Map(
     built.map((row) => [row.planetId, colonyPlan(row.advice, pi).idle !== null])
   );
+  const byHost = new Map<number, NetworkOpportunity[]>();
   for (const opportunity of network.plan.opportunities) {
+    const group = byHost.get(opportunity.hostPlanetId) ?? [];
+    group.push(opportunity);
+    byHost.set(opportunity.hostPlanetId, group);
+  }
+  const opportunities = [...byHost.values()].flatMap((group) => dropSharedSurplus(group));
+  for (const opportunity of opportunities) {
     const gain = opportunity.marginPerHour * HOURS_PER_DAY;
     if (!(gain > 0)) continue;
     const wins = out.get(opportunity.hostPlanetId) ?? [];
@@ -881,12 +964,13 @@ function rankingFor(args: {
   const planetTypes = [...new Set(pi.raw.flatMap((resource) => resource.planetTypes))].sort();
   const recipeRows: RecipeRow[] = [];
   const unpriced = new Set<number>();
+  const maxLevel = Math.max(pi.infrastructure.commandCenterUpgrades.length - 1, 0);
   for (const planetType of planetTypes) {
-    const adviceAt = (headsPerExtractor: number) =>
+    const adviceAt = (budget: PinLoad, headsPerExtractor: number) =>
       recommendStopTier(
         {
           localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
-          budget: ceiling.budget,
+          budget,
           infrastructure: pi.infrastructure,
           overhead: { launchpads: 1, storageFacilities: storage },
           headsPerExtractor,
@@ -905,21 +989,20 @@ function rankingFor(args: {
     // on each of a P2's two extractors overdraws even a level-5 Command Center's
     // powergrid, so a pilot with no colonies would see no P2 at all. Step the
     // assumption down until a P2 block fits; a measured count is never touched.
-    let advice = adviceAt(heads);
-    if (!headsMeasured) {
-      for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
-        advice = adviceAt(tryHeads);
+    const adviceFor = (budget: PinLoad) => {
+      let advice = adviceAt(budget, heads);
+      if (!headsMeasured) {
+        for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
+          advice = adviceAt(budget, tryHeads);
+        }
       }
-    }
-    for (const entry of advice.entries) {
-      if (entry.tier !== 1 && entry.tier !== 2) continue;
-      if (entry.status === 'needs-price') unpriced.add(entry.typeId);
-    }
-    for (const entry of recipeEntries(advice)) {
+      return advice;
+    };
+    const rowFor = (entry: ScoredStopTier, needsCcLevel: number | null): RecipeRow | null => {
       const volume = safeVolume(entry.typeId, pi);
       const isk = iskPerHourOf(entry, books, taxRate);
-      if (volume === null || isk === null) continue;
-      recipeRows.push({
+      if (volume === null || isk === null) return null;
+      return {
         typeId: entry.typeId,
         name: entry.name,
         tier: entry.tier,
@@ -931,7 +1014,30 @@ function rankingFor(args: {
           pins: entry.pins,
           ...recipeOf(entry.typeId, pi),
         },
-      });
+        ...(needsCcLevel ? { needsCcLevel } : {}),
+      };
+    };
+
+    const advice = adviceFor(ceiling.budget);
+    for (const entry of advice.entries) {
+      if (entry.tier !== 1 && entry.tier !== 2) continue;
+      if (entry.status === 'needs-price') unpriced.add(entry.typeId);
+    }
+    const hosted = new Set<number>();
+    for (const entry of recipeEntries(advice)) {
+      const built = rowFor(entry, null);
+      if (built) recipeRows.push(built);
+      hosted.add(entry.typeId);
+    }
+    // What only a higher Command Center hosts still ranks, tagged with the
+    // lowest level that does, so an untrained pilot sees what training buys.
+    for (let level = ceiling.level + 1; level <= maxLevel; level += 1) {
+      for (const entry of recipeEntries(adviceFor(colonyBudget(level, pi).budget))) {
+        if (hosted.has(entry.typeId)) continue;
+        hosted.add(entry.typeId);
+        const built = rowFor(entry, level);
+        if (built) recipeRows.push(built);
+      }
     }
   }
 
@@ -942,7 +1048,8 @@ function rankingFor(args: {
   return {
     rows: recipeRows,
     ranking: rankRecipes({
-      rows: recipeRows,
+      // Plan and Map stay within the trained skill; Find best re-ranks every row.
+      rows: recipeRows.filter((row) => !row.needsCcLevel),
       haveTypes: have,
       filter: input.recipeFilter,
       unpriced: [...unpriced].sort((a, b) => a - b),
