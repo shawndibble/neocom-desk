@@ -18,7 +18,7 @@ import { PI_CADENCE_DAYS, type PiCadence, type PiCadenceDays } from '../cadenceP
 import { EstimateBadge } from '../DirectiveRow';
 import { HOUR_MS, type CheckStatus, type ColonyCheckRow, type TodayCheck } from './coloniesModel';
 import { eveClock, hoursLabel, initials } from './coloniesFormat';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { STATUS_DOT_CLASS, STATUS_TONE_CLASS } from './statusStyles';
 
 /** A status word with a dot: the word carries it, the colour only reinforces. */

@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -122,7 +123,6 @@ import {
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
@@ -1562,9 +1562,10 @@ export function BpcSourcingPanel() {
             ) : (
               // Ellipsised on the phone card, so a long name stops short of the
               // price beside it instead of running under it.
-              <span className="max-sm:block max-sm:truncate">
-                <MarketItemLink typeId={row.typeId}>{name}</MarketItemLink>
-              </span>
+              // Plain text: the row opens the contract modal, which lists the
+              // item with its Market link (DESIGN.md §6c, a row's primary
+              // action beats name links inside it).
+              <span className={entityLinkClassName('max-sm:block max-sm:truncate')}>{name}</span>
             );
           if (!bpo && !owned) return title;
           return (

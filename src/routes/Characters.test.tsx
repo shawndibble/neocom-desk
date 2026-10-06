@@ -446,13 +446,11 @@ describe('Characters', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('links the card corp and alliance names to their Show Info (§6c)', async () => {
+  it("keeps the card corp and alliance names plain: the card's click selects (§6c)", async () => {
     renderCharacters();
-    const corp = await screen.findByRole('link', { name: 'Test Corp' });
-    expect(corp.getAttribute('href')).toContain('info=corporation-1001');
-    expect(screen.getByRole('link', { name: 'Test Alliance' }).getAttribute('href')).toContain(
-      'info=alliance-2001'
-    );
+    await screen.findByText('Test Corp');
+    expect(screen.queryByRole('link', { name: 'Test Corp' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Test Alliance' })).not.toBeInTheDocument();
   });
 
   it('selecting a character persists it as active and navigates to /overview', async () => {
@@ -1096,7 +1094,6 @@ describe('Characters table view', () => {
       'Rxn',
       'Training',
       'Starred',
-      'Remove',
     ]) {
       await user.click(await screen.findByRole('button', { name: 'Columns' }));
       await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
@@ -1512,13 +1509,18 @@ describe('Characters table view', () => {
     expect(screen.queryByRole('combobox', { name: 'Group' })).not.toBeInTheDocument();
   });
 
-  it('removes a character from the table via its Remove column, same confirm dialog as the card', async () => {
+  it('removes a character from the table via the danger item in its row menu, same confirm dialog as the card', async () => {
     const user = userEvent.setup();
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: 'Table' }));
     await screen.findByText('Pilot One');
 
-    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    // No trailing × column beside the ⋮: Remove lives in the menu.
+    expect(
+      within(screen.getByRole('table')).queryByRole('button', { name: 'Remove Pilot One' })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'More actions for Pilot One' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Pilot One' }));
     const dialog = await screen.findByRole('dialog', { name: 'Remove' });
     expect(dialog).toHaveTextContent('Pilot One');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));

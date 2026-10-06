@@ -47,7 +47,7 @@ test('offers a jump-to-it link that scrolls the newly added row into view, at 39
   await page.getByRole('button', { name: /^Social/ }).click();
   await page.getByRole('button', { name: 'Level I', exact: true }).click();
 
-  const newRow = page.getByRole('button', { name: 'Remove Social' });
+  const newRow = page.getByRole('button', { name: 'More actions for Social' });
   await expect(newRow).not.toBeInViewport();
 
   await page.getByRole('button', { name: 'Jump to it' }).click();

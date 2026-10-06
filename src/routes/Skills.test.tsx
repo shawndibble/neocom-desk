@@ -160,7 +160,7 @@ describe('Skills', () => {
   it('marks a skill already in a Skill Plan on its level bar, regardless of which plan it is in', async () => {
     // Frigate (typeID 2) is trained to III; a plan targets V. The row's
     // context menu can add to *any* of the character's plans (no single
-    // "target plan" here — see SkillRowContextMenu), so the mark reflects
+    // "target plan" here — see SkillPlanAdd), so the mark reflects
     // every plan, not just one (issue: the bar gave no indication a skill
     // was already queued anywhere).
     await db.skillPlans.put({
@@ -609,6 +609,21 @@ describe('Skills', () => {
     expect(
       description.compareDocumentPosition(prereqsHeading) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+  });
+
+  it('offers Add to Skill Plan in the inspector, not on the row, and keeps its Undo state per skill', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: /^Frigate/ }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Skill Plan and add' }));
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Gunnery/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Small Hybrid Turret/ }));
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
   });
 
   it('deselects a skill (closing the inspector) on a second click', async () => {

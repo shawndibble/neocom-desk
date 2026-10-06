@@ -20,7 +20,7 @@ describe('assumedExtractionRate', () => {
   });
 
   it('refuses when the pilot has no measured extraction at all', () => {
-    // Not a zero, and not a made-up default. `advisorModel` already drops an
+    // Not a zero, and not a made-up default. `systemPlanetModel` already drops an
     // extractor whose program has no install-time baseline rather than
     // counting it as zero; the estimate has to refuse on the same terms or it
     // would price a planet off an empty set.

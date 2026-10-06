@@ -14,6 +14,13 @@ describe('parseEntityInfo', () => {
     expect(parseEntityInfo('?info=corporation-98')).toEqual({ kind: 'corporation', id: 98 });
     expect(parseEntityInfo('?info=alliance-5')).toEqual({ kind: 'alliance', id: 5 });
     expect(parseEntityInfo('?info=skill-3300')).toEqual({ kind: 'skill', id: 3300 });
+    expect(parseEntityInfo('?info=type-34')).toEqual({ kind: 'type', id: 34 });
+  });
+
+  it('writes and rejects item types', () => {
+    expect(formatEntityInfo({ kind: 'type', id: 34 })).toBe('type-34');
+    expect(parseEntityInfo('?info=type-0')).toBeNull();
+    expect(parseEntityInfo('?info=type-x')).toBeNull();
   });
 
   it('accepts a search without the leading ? and finds it among other params', () => {

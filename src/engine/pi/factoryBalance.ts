@@ -33,7 +33,7 @@
  * is for — so its factories are reported `inputs-not-local`, never surplus.
  * Treating an absent supply as zero would tell a pilot to delete the very
  * factories their imports feed. The same refusal covers an extractor whose
- * program carries no install-time baseline: `advisorModel` reports its rate as
+ * program carries no install-time baseline: `systemPlanetModel` reports its rate as
  * `null` and leaves the resource out of the map, and out is not zero.
  *
  * ## Sharing one input between two schematics

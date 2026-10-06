@@ -1078,13 +1078,17 @@ export async function postUniverseNames(
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseName[]> {
   if (ids.length === 0) return [];
-  const result = await esiFetch<UniverseName[]>('/universe/names', {
-    method: 'POST',
-    body: ids,
-    signal: options.signal,
-    endpointId: 'postUniverseNames',
-  });
-  return result.data ?? [];
+  const out: UniverseName[] = [];
+  for (const batch of chunk(ids, AFFILIATION_BATCH_LIMIT)) {
+    const result = await esiFetch<UniverseName[]>('/universe/names', {
+      method: 'POST',
+      body: batch,
+      signal: options.signal,
+      endpointId: 'postUniverseNames',
+    });
+    out.push(...(result.data ?? []));
+  }
+  return out;
 }
 
 // --- POST /characters/affiliation (public) ---

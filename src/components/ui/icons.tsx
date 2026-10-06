@@ -40,7 +40,6 @@ import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
 import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { Bell } from '@phosphor-icons/react/dist/csr/Bell';
-import { BellSlash } from '@phosphor-icons/react/dist/csr/BellSlash';
 import { BlueprintIcon } from '@phosphor-icons/react/dist/csr/Blueprint';
 import { Broadcast } from '@phosphor-icons/react/dist/csr/Broadcast';
 import { Buildings } from '@phosphor-icons/react/dist/csr/Buildings';
@@ -296,8 +295,6 @@ export const ZoomOut = withWeight(Minus);
 export const ZoomIn = withWeight(Plus);
 /** Toggles text labels drawn over a map, e.g. the Ship Tree's hull names. */
 export const ShowLabels = withWeight(TextAa);
-/** A row's browser-notification channel is currently on (issue #364). */
-export const BrowserNotifyOn = withWeight(Bell);
 
 /**
  * Marks a Notification Event the backend can schedule ahead of time, so it
@@ -306,8 +303,6 @@ export const BrowserNotifyOn = withWeight(Bell);
  * property of the event, not of a channel.
  */
 export const ScheduledPush = withWeight(Broadcast);
-/** A row's browser-notification channel is currently off (issue #364). */
-export const BrowserNotifyOff = withWeight(BellSlash);
 /** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
 export const HideInFeed = withWeight(EyeSlash);
 /** A Quickbar item's price alert target (issue #680) — the same crosshair `OptimizeAtMarkers` uses for a different feature, distinct by name here. */
@@ -371,8 +366,7 @@ export const Faction = withWeight(Flag);
 export const MoonMining = withWeight(Moon);
 /**
  * The notification *feature* as a whole, as sold on the login page. Distinct
- * from `BrowserNotifyOn`/`BrowserNotifyOff`, which are the two states of one
- * row's toggle and must stay a pair.
+ * from the per-channel notification toggles.
  */
 export const Notifications = withWeight(Bell);
 /**

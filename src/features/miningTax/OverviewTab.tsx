@@ -10,6 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +28,6 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
-import { CharacterLink, SystemLink } from '@/features/entities';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -374,7 +374,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      render: (row) => <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>,
+      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
+      render: (row) => <span className={entityLinkClassName()}>{row.characterName}</span>,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -382,7 +383,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          <SystemLink systemId={row.entry.solarSystemId}>{systemName(row)}</SystemLink>
+          <span className={entityLinkClassName()}>{systemName(row)}</span>
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),

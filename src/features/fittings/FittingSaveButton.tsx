@@ -10,6 +10,8 @@ import {
   Tooltip,
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
+import { isApplePlatform, modChordDisplayKey } from '@/lib/shortcuts';
+import { useChord } from '@/lib/useChord';
 
 interface FittingSaveButtonProps {
   /** Save (or update) to My Fittings — the button itself. */
@@ -42,11 +44,16 @@ export function FittingSaveButton({
   saveToEveBlockedReason,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
+  const apple = isApplePlatform();
+  // Ctrl/Cmd+S saves, Ctrl/Cmd+Shift+S saves a copy — in any field too. Both
+  // always swallow the browser's own "save page", even while Save is off.
+  useChord('s', onSave, { enabled: canSave });
+  useChord('s', onSaveAsNew, { shift: true, enabled: canSave && updating });
   const withReason = (button: ReactElement<{ className?: string }>) =>
     !canSave && saveBlockedReason ? (
       <Tooltip content={saveBlockedReason}>{button}</Tooltip>
     ) : (
-      button
+      <Tooltip content={modChordDisplayKey(apple, 'S')}>{button}</Tooltip>
     );
   return (
     <div className="flex">
@@ -55,6 +62,7 @@ export function FittingSaveButton({
         <Button
           variant="primary"
           aria-disabled={!canSave || undefined}
+          aria-keyshortcuts={apple ? 'Meta+S' : 'Control+S'}
           onClick={onSave}
           className="rounded-r-none"
         >
@@ -76,6 +84,9 @@ export function FittingSaveButton({
             <>
               <DropdownMenuItem disabled={!canSave} onSelect={onSaveAsNew}>
                 {t('fittings.myFittings.saveAsNew')}
+                <span className="ml-auto pl-4 text-text-dim">
+                  {modChordDisplayKey(apple, 'S', { shift: true })}
+                </span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>

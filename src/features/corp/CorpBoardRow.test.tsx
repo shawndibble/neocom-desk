@@ -53,10 +53,10 @@ describe('CorpBoardRow', () => {
     );
   });
 
-  it('links an item subject to its Market listing and leaves other subjects plain', () => {
+  it('links an item subject to its Show info and leaves other subjects plain', () => {
     renderRow(jobItem);
     expect(screen.getByRole('link', { name: 'Rifter Blueprint' }).getAttribute('href')).toContain(
-      '/market/browser'
+      'info=type-587'
     );
   });
 });

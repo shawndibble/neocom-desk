@@ -29,6 +29,7 @@ export { Modal } from './Modal';
 export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
 export { DataTable, DataTableDenseCell, DataTableSortPicker } from './DataTable';
+export { isRowOwnEvent } from './rowEvents';
 export type {
   DataTableColumn,
   DataTableExpandableRow,
@@ -119,3 +120,4 @@ export { TextArea } from './TextArea';
 export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';
 export { IskAmount } from './IskAmount';
+export { IskFigureGroup } from './IskFigureGroup';

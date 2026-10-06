@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { Tooltip } from './Tooltip';
-import { RowTappableContext } from './tooltipHold';
+import { IskFigureGroupContext, RowTappableContext } from './tooltipHold';
 
 interface IskAmountProps {
   value: number;
@@ -35,9 +35,11 @@ interface IskAmountProps {
  * naming an element with no role, so many readers drop such a label and,
  * with the shorthand hidden, read an empty cell.
  *
- * It stays a tab stop. The tooltip is the only way a sighted keyboard user
- * reaches the exact figure, and `Tooltip` reveals on focus, so a figure that
- * cannot take focus would hide that value from the keyboard entirely.
+ * It stays keyboard-reachable. The tooltip is the only way a sighted keyboard
+ * user reaches the exact figure, and `Tooltip` reveals on focus, so a figure
+ * that cannot take focus would hide that value from the keyboard entirely.
+ * A dense card can wrap its figures in `IskFigureGroup`: one tab stop for the
+ * group, arrow keys between figures, each still revealing on focus.
  *
  * Shorthand rounds to one fraction digit, so two different values can render
  * the same string. That is the trade a scanning surface makes, and it is why
@@ -49,11 +51,14 @@ export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProp
   const { t } = useTranslation();
   // Inside a clickable row the tap opens the row, whose detail carries the exact figure.
   const rowTappable = useContext(RowTappableContext);
+  // Inside an `IskFigureGroup` the group owns the tab stop (roving tabindex).
+  const inGroup = useContext(IskFigureGroupContext);
   const exact = t('common.iskExact', { amount: formatIsk(value, decimals) });
   return (
     <Tooltip content={exact} openOnTap={!rowTappable}>
       <span
-        tabIndex={0}
+        tabIndex={inGroup ? -1 : 0}
+        data-isk-figure={inGroup ? '' : undefined}
         className={cx(
           'cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
           className

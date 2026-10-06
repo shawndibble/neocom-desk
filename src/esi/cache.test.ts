@@ -1489,3 +1489,70 @@ describe('corpCacheKey', () => {
     expect(await readCached(CHAR_ID, corpCacheKey(CORP_A, 'structures'))).toBe('corp A structures');
   });
 });
+
+describe('loadWithCacheStatus — fetchFailed (issue #2691)', () => {
+  const OPT = { reportFetchFailure: true };
+
+  it('is off unless asked for: the result shape is unchanged', async () => {
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new EsiError(503, 'unavailable');
+    });
+    expect(result).toEqual({ cached: null, needsReauth: false });
+  });
+
+  it('cold cache + 5xx: cached null, fetchFailed true', async () => {
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new EsiError(503, 'unavailable');
+      },
+      OPT
+    );
+    expect(result).toEqual({ cached: null, needsReauth: false, fetchFailed: true });
+  });
+
+  it('cold cache + offline (plain throw): fetchFailed true', async () => {
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new Error('offline');
+      },
+      OPT
+    );
+    expect(result.fetchFailed).toBe(true);
+  });
+
+  it('warm cache + 5xx: keeps the cached row, no fetchFailed', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new EsiError(503, 'unavailable');
+      },
+      OPT
+    );
+    expect(result.cached).toMatchObject({ data: 'stale', fromCache: true });
+    expect(result.fetchFailed).toBeUndefined();
+  });
+
+  it('auth failure with no cache: needsReauth, not fetchFailed', async () => {
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new EsiError(403, 'forbidden');
+      },
+      OPT
+    );
+    expect(result.needsReauth).toBe(true);
+    expect(result.fetchFailed).toBeUndefined();
+  });
+
+  it('success leaves the field unset', async () => {
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => 'live', OPT);
+    expect(result).not.toHaveProperty('fetchFailed');
+  });
+});

@@ -117,10 +117,20 @@ describe('HaulingPanel item rows', () => {
     useActiveCharacter.setState({ activeCharacterId: null });
   });
 
-  it('links the item name into the Market Browser', () => {
+  it('keeps the item name plain; the expanded detail links to Market', () => {
     renderPanel();
-    const link = screen.getByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByRole('link', { name: 'Damage Control II' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
+    const link = screen.getByRole('link', { name: /Price history and all orders/ });
     expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*type=2048/);
+  });
+
+  it('lists a Route Safety link per hub in the expanded detail', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('row', { name: /Damage Control II/ }));
+    const links = screen.getAllByRole('link', { name: /^Route safety:/ });
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link.getAttribute('href')).toMatch(/^\/travel/);
   });
 
   it('carries the item context menu on every row', async () => {

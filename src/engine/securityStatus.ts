@@ -58,7 +58,8 @@ function toHex(channel: number): string {
   return clamp(channel, 0, 255).toString(16).padStart(2, '0');
 }
 
-function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: number): string {
+/** Blend two `{r,g,b}` colors `t` (0-1) of the way from `a` to `b`, as `#rrggbb`. */
+export function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: number): string {
   return `#${toHex(lerpChannel(a.r, b.r, t))}${toHex(lerpChannel(a.g, b.g, t))}${toHex(lerpChannel(a.b, b.b, t))}`;
 }
 

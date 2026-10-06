@@ -214,7 +214,7 @@ describe('the roster table', () => {
       within(row as HTMLElement)
         .getByRole('link', { name: 'Rifter' })
         .getAttribute('href')
-    ).toContain('/market/browser');
+    ).toContain('info=type-587');
   });
 
   it('says Never for a member who joined and has not logged in', async () => {

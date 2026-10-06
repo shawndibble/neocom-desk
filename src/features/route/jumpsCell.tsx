@@ -51,6 +51,11 @@ export function renderJumpsCell(
   return systemId == null ? (
     String(cell.count)
   ) : (
-    <JumpsLink systemId={systemId}>{cell.count}</JumpsLink>
+    <JumpsLink
+      systemId={systemId}
+      label={t('contractSearch.jumpsLinkLabel', { count: cell.count })}
+    >
+      {cell.count}
+    </JumpsLink>
   );
 }

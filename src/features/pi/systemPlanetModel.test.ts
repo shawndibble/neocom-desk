@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
-import { systemAdvice } from './advisorModel';
+import { systemAdvice } from './systemPlanetModel';
 
 const DAY_MS = 86_400_000;
 const INSTALL = Date.parse('2026-09-01T00:00:00Z');

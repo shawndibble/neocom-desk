@@ -188,6 +188,20 @@ test.describe('PI Colonies — alt group data age (issue #2291)', () => {
     await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
       route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
     );
+    // An alt's system security is read to price its colonies.
+    await page.route('https://esi.evetech.net/universe/systems/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          system_id: 30000142,
+          name: 'Jita',
+          security_status: 0.95,
+          constellation_id: 20000020,
+          star_id: 40009076,
+        }),
+      })
+    );
     await page.route(`https://esi.evetech.net/universe/planets/${ALT_PLANET_ID}**`, (route) =>
       route.fulfill({
         status: 200,

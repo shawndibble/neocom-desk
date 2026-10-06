@@ -5,6 +5,7 @@ import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { BuildPlanList } from './BuildPlanList';
+import { rowStateClassName } from './planRowStyles';
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }): BuildPlanRecord {
   return {
@@ -574,6 +575,126 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
 
     await expectRenameFieldHeld('Rename');
+  });
+});
+
+describe('BuildPlanList: the whole row opens it', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderRows(overrides: Record<string, unknown> = {}) {
+    const onSelect = vi.fn();
+    const onSelectGroup = vi.fn();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={onSelect}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        onSelectGroup={onSelectGroup}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+    return { onSelect, onSelectGroup };
+  }
+
+  const rowOf = (name: string) => screen.getByRole('button', { name }).closest('li')!;
+
+  it('opens the plan from a click on blank row space, once', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(rowOf('Rokh'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith('c');
+  });
+
+  it('opens the plan once from the name, not twice', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'Rokh' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the group from a click on its blank header space', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup, onSelect } = renderRows();
+    await user.click(rowOf('Buzzard fit'));
+    expect(onSelectGroup).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the caret toggle separate from opening the group', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup } = renderRows();
+    await user.click(screen.getByRole('button', { name: /Show or hide the plans in Buzzard fit/ }));
+    expect(onSelectGroup).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the ⋮, its menu items or the drag handle', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    await user.click(screen.getAllByTestId('plan-drag-handle')[1]);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the compare checkbox', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows({ compareMode: true });
+    await user.click(screen.getByRole('checkbox', { name: /Rokh/ }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('renames on double-click of the name', async () => {
+    const user = userEvent.setup();
+    renderRows();
+    await user.dblClick(screen.getByRole('button', { name: 'Rokh' }));
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+  });
+
+  it('does not open the plan from the click that ends a long touch press', () => {
+    const { onSelect } = renderRows();
+    const row = rowOf('Rokh');
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.contextMenu(row);
+    fireEvent.click(row, { detail: 1 });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('gives the plan and group names the entity link style', () => {
+    renderRows();
+    for (const name of ['Rokh', 'Buzzard fit']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'text-accent',
+        'underline',
+        'dt-primary'
+      );
+    }
+  });
+
+  it('keeps the row hover fill off a live drop target so the accent fill shows', () => {
+    // Pure class recipe: the drop state is internal to a dnd-kit drag.
+    expect(rowStateClassName(false, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(true, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(false, false)).toContain('hover:bg-panel-2');
+  });
+
+  it('marks the row as clickable with hover and pressed states', () => {
+    renderRows();
+    const row = rowOf('Rokh');
+    expect(row).toHaveClass('cursor-pointer', 'hover:bg-panel-2', 'active:bg-panel');
   });
 });
 
