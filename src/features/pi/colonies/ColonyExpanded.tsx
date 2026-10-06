@@ -14,7 +14,7 @@ import {
   yieldBankedBy,
 } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram } from '@/engine/pi/types';
-import { PiProductLink } from '../PiProductLink';
+import { PiProductLink, PiProductList } from '../PiProductLink';
 import { piPlanetHref } from '../piPlanLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -27,6 +27,7 @@ import {
 import { HOUR_MS, type ColonyCheckRow } from './coloniesModel';
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';
+import { Sentence } from '../sentence';
 
 const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 const DAY_MS = 86_400_000;
@@ -371,7 +372,12 @@ export function ColonyExpanded({
                   <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-accent/45 bg-accent/10 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                     {t(`piColonies.fixVerb.${line.verb}`)}
                   </span>
-                  <span className="min-w-0 flex-1">{line.text}</span>
+                  <span className="min-w-0 flex-1">
+                    <Sentence
+                      text={line.text}
+                      slots={{ product: <PiProductList items={line.products} /> }}
+                    />
+                  </span>
                   <span className="shrink-0 text-isk-pos tabular-nums">
                     {win.gainPerDay === null ? (
                       t('piColonies.noFigure')

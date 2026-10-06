@@ -23,6 +23,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { CcLevelTag } from '../CcLevelTag';
 import { PiProductLink } from '../PiProductLink';
+import { Sentence } from '../sentence';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
@@ -168,7 +169,27 @@ export function ProductDetail(props: ProductDetailProps) {
         </div>
       ) : null}
       {view.money.kind !== 'multi-planet' && (
-        <p className="mt-2 text-xs text-text">{comparisonSentence(t, figure)}</p>
+        <p className="mt-2 text-xs text-text">
+          {figure.kind === 'ranked' &&
+          !figure.isReference &&
+          figure.verdict !== null &&
+          figure.versus !== null ? (
+            // The compared product links to its own detail, as the chain's names do.
+            <Sentence
+              text={t(`piMap.cmp.${figure.verdict}`, {
+                name: '{name}',
+                type: planetName(t, figure.useType),
+              })}
+              slots={{
+                name: (
+                  <PiProductLink typeId={figure.versus.typeId}>{figure.versus.name}</PiProductLink>
+                ),
+              }}
+            />
+          ) : (
+            comparisonSentence(t, figure)
+          )}
+        </p>
       )}
       {view.money.kind === 'one-planet' && (
         <p className="mt-1 text-xs text-text-dim">
@@ -258,13 +279,23 @@ export function ProductDetail(props: ProductDetailProps) {
         )}
       </ol>
       <p className="mt-2 text-xs text-text-dim">
-        {t('piMap.detail.chainText', {
-          planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
-          steps: names(
-            graph,
-            [...trace.ids].sort((a, b) => graph.byId.get(a)!.tier - graph.byId.get(b)!.tier)
-          ).join(' → '),
-        })}
+        <Sentence
+          text={t('piMap.detail.chainText', {
+            planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
+            steps: '{steps}',
+          })}
+          slots={{
+            steps: (
+              <NameChain
+                graph={graph}
+                ids={[...trace.ids].sort(
+                  (a, b) => graph.byId.get(a)!.tier - graph.byId.get(b)!.tier
+                )}
+                open={typeId}
+              />
+            ),
+          }}
+        />
       </p>
 
       {props.colonyNames.size > 0 && (

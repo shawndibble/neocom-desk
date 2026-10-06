@@ -19,6 +19,7 @@ import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { securityBand, securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { SystemLink } from '@/features/entities';
 import { PiProductLink } from './PiProductLink';
+import { Sentence } from './sentence';
 import type { PiData } from '@/sde/types';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { LoadMeter, EstimateBadge, SectionLabel } from './DirectiveRow';
@@ -282,11 +283,16 @@ function RunStep({
     },
     {
       icon: <Icon.Container size={Icon.ICON_SIZE.md} aria-hidden="true" />,
-      text: t('piPlan.find.runCollect', {
-        units: Math.round(how.unitsPerWeek).toLocaleString('en'),
-        item: recipe.name,
-        m3: Math.round(how.m3PerWeek).toLocaleString('en'),
-      }),
+      text: (
+        <Sentence
+          text={t('piPlan.find.runCollect', {
+            units: Math.round(how.unitsPerWeek).toLocaleString('en'),
+            item: '{item}',
+            m3: Math.round(how.m3PerWeek).toLocaleString('en'),
+          })}
+          slots={{ item: <PiProductLink typeId={recipe.typeId}>{recipe.name}</PiProductLink> }}
+        />
+      ),
     },
     {
       icon: <Icon.Route size={Icon.ICON_SIZE.md} aria-hidden="true" />,

@@ -1,4 +1,4 @@
-import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import { Fragment, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { productNavigation, piProductHref } from './piPlanLink';
@@ -27,5 +27,19 @@ export function PiProductLink({ typeId, children, className, ...rest }: PiProduc
     >
       {children}
     </Link>
+  );
+}
+
+/** Several products in a sentence, comma-separated, each its own `PiProductLink`. */
+export function PiProductList({ items }: { items: readonly { typeId: number; name: string }[] }) {
+  return (
+    <>
+      {items.map((item, i) => (
+        <Fragment key={item.typeId}>
+          {i > 0 && ', '}
+          <PiProductLink typeId={item.typeId}>{item.name}</PiProductLink>
+        </Fragment>
+      ))}
+    </>
   );
 }

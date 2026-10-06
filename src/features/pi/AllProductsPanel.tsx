@@ -7,8 +7,8 @@
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel, TypeIcon } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import { formatIsk } from '@/lib/isk';
 import { PiProductLink } from './PiProductLink';
+import { ComparisonText } from './ComparisonText';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import type { ProductTile, TierColumn } from './findBestView';
@@ -18,14 +18,6 @@ const TIER_KEY = ['raw', 'processed', 'refined', 'specialized', 'advanced'] as c
 function Tile({ tile }: { tile: ProductTile }) {
   const { t } = useTranslation();
   const { comparison } = tile;
-  const cmpText = comparison
-    ? comparison.isReference
-      ? t('piPlan.find.allBestSimple', { type: t(`pi.planetType.${comparison.versus.planetType}`) })
-      : t(`piPlan.find.cmp.${comparison.verdict}`, {
-          item: comparison.versus.name,
-          type: t(`pi.planetType.${comparison.versus.planetType}`),
-        })
-    : null;
   const tone =
     !comparison || comparison.isReference || comparison.verdict === 'same'
       ? 'text-text-dim'
@@ -63,17 +55,14 @@ function Tile({ tile }: { tile: ProductTile }) {
           <p className="text-warning">
             <HintText content={t('piPlan.find.rawHint')}>{t('piPlan.find.rawLabel')}</HintText>
           </p>
-        ) : cmpText && comparison ? (
+        ) : comparison ? (
           <p className={tone}>
-            <HintText
-              content={t('piPlan.find.cmpHint', {
-                item: comparison.versus.name,
-                isk: formatIsk(comparison.versus.iskPerDay, 0),
+            <ComparisonText
+              comparison={comparison}
+              referenceText={t('piPlan.find.allBestSimple', {
                 type: t(`pi.planetType.${comparison.versus.planetType}`),
               })}
-            >
-              {cmpText}
-            </HintText>
+            />
           </p>
         ) : null}
         {!tile.reachable && <p className="sr-only">{t('piPlan.find.allUnreachable')}</p>}

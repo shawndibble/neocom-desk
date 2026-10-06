@@ -7,9 +7,10 @@ import type { PiData } from '@/sde/types';
 import type { ColonyAssignment, ExtractionSlot } from '@/engine/pi/goalTypes';
 import { EstimateBadge, LoadMeter } from '../DirectiveRow';
 import type { PlannerColonyRow } from '../goalPlannerModel';
-import { commodityName, formatUnits } from '../goalPlannerFormat';
+import { formatUnits } from '../goalPlannerFormat';
 import { slotEstimate, type ColonyStep, type SlotEstimate } from '../goalPlanView';
 import { ColonyLink } from './ColonyLink';
+import { ProductSentence } from './ProductSentence';
 import { limitsText, type PlanNames } from './format';
 
 function estimateText(estimate: SlotEstimate, ecusToday: number | undefined, t: TFunction): string {
@@ -47,17 +48,20 @@ function SlotLine({
   pi: PiData;
 }) {
   const { t } = useTranslation();
-  const p1 = commodityName(slot.p1TypeId, pi);
   const estimate = slotEstimate(slot, ecusToday);
   return (
     <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text">
       <span>
-        {t('piPlan.slotLine', {
-          p0: commodityName(slot.p0TypeId, pi),
-          p1,
-          count: slot.ecus,
-          rate: formatUnits(Math.round(slot.p1PerHour)),
-        })}
+        <ProductSentence
+          text={t('piPlan.slotLine', {
+            p0: '{p0}',
+            p1: '{p1}',
+            count: slot.ecus,
+            rate: formatUnits(Math.round(slot.p1PerHour)),
+          })}
+          products={{ p0: slot.p0TypeId, p1: slot.p1TypeId }}
+          pi={pi}
+        />
       </span>
       {estimate !== null && (
         <span className="inline-flex items-center gap-1">

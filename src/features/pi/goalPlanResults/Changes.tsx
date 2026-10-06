@@ -4,10 +4,10 @@ import type { TFunction } from 'i18next';
 import { Panel } from '@/components/ui';
 import { clampIskZero } from '@/lib/isk';
 import { DirectiveRow, type DirectiveVerb } from '../DirectiveRow';
-import { commodityName } from '../goalPlannerFormat';
 import type { ColonyStep, StepKind } from '../goalPlanView';
 import { ColonyLink } from './ColonyLink';
-import { endName, namesList, signedCompact, type PlanNames } from './format';
+import { endName, signedCompact, type PlanNames } from './format';
+import { ProductSentence } from './ProductSentence';
 
 const STEP_VERB: Record<StepKind, DirectiveVerb> = {
   'as-is': 'asIs',
@@ -50,57 +50,62 @@ function StepDetail({
 }) {
   const { t } = useTranslation();
   const { pi } = names;
-  const lines: { key: string; text: string; tone?: 'tip' }[] = [];
-  const push = (text: string, tone?: 'tip') => lines.push({ key: text, text, tone });
+  const lines: {
+    text: string;
+    products: Record<string, number | readonly number[]>;
+    tone?: 'tip';
+  }[] = [];
   for (const stop of step.stop) {
-    push(t('piPlan.stepRemove', { count: stop.ecus, p0: commodityName(stop.p0TypeId, pi) }));
+    lines.push({
+      text: t('piPlan.stepRemove', { count: stop.ecus, p0: '{p0}' }),
+      products: { p0: stop.p0TypeId },
+    });
   }
   if (step.kind !== 'as-is' && step.kind !== 'idle') {
     for (const slot of step.extract) {
-      push(
-        t('piPlan.stepExtract', {
+      lines.push({
+        text: t('piPlan.stepExtract', {
           count: slot.ecus,
-          p0: commodityName(slot.p0TypeId, pi),
+          p0: '{p0}',
           basics: slot.basicFactories,
-          p1: commodityName(slot.p1TypeId, pi),
-        })
-      );
+          p1: '{p1}',
+        }),
+        products: { p0: slot.p0TypeId, p1: slot.p1TypeId },
+      });
     }
     for (const factory of step.factories) {
-      push(
-        t('piPlan.stepFactory', {
-          count: factory.count,
-          product: commodityName(factory.typeId, pi),
-        })
-      );
+      lines.push({
+        text: t('piPlan.stepFactory', { count: factory.count, product: '{product}' }),
+        products: { product: factory.typeId },
+      });
     }
   }
   for (const ship of step.ships) {
     // A colony left as it is already sells at the hub: only a new leg is a step.
     if (step.kind === 'as-is' && !ship.isNew) continue;
-    const text = t('piPlan.stepShip', {
-      item: commodityName(ship.typeId, pi),
-      to: endName(ship.to, names),
+    const text = t('piPlan.stepShip', { item: '{item}', to: endName(ship.to, names) });
+    lines.push({
+      text: ship.isNew ? t('piPlan.stepNew', { step: text }) : text,
+      products: { item: ship.typeId },
     });
-    push(ship.isNew ? t('piPlan.stepNew', { step: text }) : text);
   }
   if (step.switchTo.length > 0) {
-    push(
-      switchGainPerDay !== null && clampIskZero(switchGainPerDay, 0) > 0
-        ? t('piPlan.stepTipGain', {
-            p1s: namesList(step.switchTo, pi),
-            isk: signedCompact(switchGainPerDay),
-          })
-        : t('piPlan.stepTip', { p1s: namesList(step.switchTo, pi) }),
-      'tip'
-    );
+    lines.push({
+      text:
+        switchGainPerDay !== null && clampIskZero(switchGainPerDay, 0) > 0
+          ? t('piPlan.stepTipGain', { p1s: '{p1s}', isk: signedCompact(switchGainPerDay) })
+          : t('piPlan.stepTip', { p1s: '{p1s}' }),
+      products: { p1s: step.switchTo },
+      tone: 'tip',
+    });
   }
   if (lines.length === 0) return null;
   return (
     <ul className="col-span-full space-y-0.5 pl-1 text-[0.6875rem] text-text-dim">
-      {lines.map((line) => (
-        <li key={line.key} className={line.tone === 'tip' ? 'italic' : undefined}>
-          {line.text}
+      {lines.map((line, i) => (
+        // Positional: the lines are rebuilt whole each render, never reordered.
+        <li key={i} className={line.tone === 'tip' ? 'italic' : undefined}>
+          <ProductSentence text={line.text} products={line.products} pi={pi} />
         </li>
       ))}
     </ul>

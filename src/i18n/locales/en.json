@@ -4950,6 +4950,7 @@
       },
       "cmpReference": "The simplest product on {{type}} planets",
       "cmpHint": "{{item}} earns {{isk}}/day on one {{type}} planet.",
+      "cmpHintLabel": "What {{item}} earns",
       "showHow": "Show me how",
       "hideSteps": "Hide steps",
       "close": "Close",
