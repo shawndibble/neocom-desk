@@ -62,6 +62,10 @@ export const DEFAULT_PI_SETTINGS: PiSettings = {
 const isHubId = (value: unknown): value is TradeHub['id'] =>
   TRADE_HUBS.some((hub) => hub.id === value);
 
+/** A pick the pilot made: a non-default hub or a buyback. `hubChosen` is stored only when true. */
+const chosenFlag = (hub: TradeHub['id'], buybackPct: number | null): { hubChosen?: true } =>
+  hub !== DEFAULT_PI_SETTINGS.hub || buybackPct !== null ? { hubChosen: true } : {};
+
 export function parsePiSettings(raw: unknown): PiSettings | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
@@ -74,9 +78,7 @@ export function parsePiSettings(raw: unknown): PiSettings | null {
     hub,
     buybackPct,
     buyTiers: PI_BUY_TIERS.filter((tier) => tiers.includes(tier)),
-    ...(value.hubChosen === true || hub !== DEFAULT_PI_SETTINGS.hub || buybackPct !== null
-      ? { hubChosen: true as const }
-      : {}),
+    ...(value.hubChosen === true ? { hubChosen: true as const } : chosenFlag(hub, buybackPct)),
   };
 }
 
@@ -96,7 +98,7 @@ export function migrateLegacyPiSettings(sourcing: unknown, goalPlannerPrefs: unk
       hub: sourcing,
       buybackPct: null,
       buyTiers: [1],
-      ...(sourcing !== DEFAULT_PI_SETTINGS.hub ? { hubChosen: true as const } : {}),
+      ...chosenFlag(sourcing, null),
     };
   }
   const hub = isHubId(priceHub) ? priceHub : DEFAULT_PI_SETTINGS.hub;
@@ -104,7 +106,7 @@ export function migrateLegacyPiSettings(sourcing: unknown, goalPlannerPrefs: unk
     hub,
     buybackPct: null,
     buyTiers: [],
-    ...(hub !== DEFAULT_PI_SETTINGS.hub ? { hubChosen: true as const } : {}),
+    ...chosenFlag(hub, null),
   };
 }
 

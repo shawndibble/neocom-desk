@@ -47,21 +47,30 @@ export interface HubRoute {
   figures: RouteFigures | null;
 }
 
+export type NearestHub = RouteFigures & { hub: TradeHub['id'] };
+
 /**
  * The trade hub fewest gate jumps from home; a tie goes to the route with
- * fewer lowsec jumps (the safer one), then to the earlier entry so the answer
- * is stable. Hubs without a known route are skipped; null when none is known.
+ * fewer lowsec jumps (the safer one), then to `current` (so an equally near
+ * hub is never suggested over the one already used), then to the earlier
+ * entry so the answer is stable. Hubs without a known route are skipped; null
+ * when none is known.
  */
 export function nearestHub(
-  routes: readonly HubRoute[]
-): (RouteFigures & { hub: TradeHub['id'] }) | null {
-  let best: (RouteFigures & { hub: TradeHub['id'] }) | null = null;
+  routes: readonly HubRoute[],
+  current?: TradeHub['id']
+): NearestHub | null {
+  let best: NearestHub | null = null;
   for (const { hub, figures } of routes) {
     if (!figures) continue;
     if (
       !best ||
       figures.jumps < best.jumps ||
-      (figures.jumps === best.jumps && figures.lowsecJumps < best.lowsecJumps)
+      (figures.jumps === best.jumps && figures.lowsecJumps < best.lowsecJumps) ||
+      (figures.jumps === best.jumps &&
+        figures.lowsecJumps === best.lowsecJumps &&
+        hub === current &&
+        best.hub !== current)
     ) {
       best = { hub, ...figures };
     }

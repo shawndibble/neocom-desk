@@ -53,6 +53,9 @@ describe('nearestHub', () => {
   it('breaks a full tie by listed order so it never flickers', () => {
     expect(nearestHub([r('amarr', 5), r('jita', 5)])?.hub).toBe('amarr');
   });
+  it('prefers the current hub on a full tie', () => {
+    expect(nearestHub([r('amarr', 5), r('jita', 5)], 'jita')?.hub).toBe('jita');
+  });
   it('skips hubs with no known route', () => {
     expect(nearestHub([{ hub: 'jita', figures: null }, r('rens', 12)])?.hub).toBe('rens');
   });

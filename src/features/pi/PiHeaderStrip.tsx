@@ -21,7 +21,13 @@ import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
-import { homeSystemId, nearestHub, routeFigures, type RouteFigures } from './sellRoute';
+import {
+  homeSystemId,
+  nearestHub,
+  routeFigures,
+  type NearestHub,
+  type RouteFigures,
+} from './sellRoute';
 import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
 
@@ -74,16 +80,9 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
   useEffect(() => {
     if (homeId === null || !basis.hydrated || buybackPct !== null) return;
     let cancelled = false;
-    void routeExposure(homeId, hub.systemId, basis.rules, basis.network)
-      .catch(() => ({ kind: 'unknown' as const }))
-      .then((result) => {
-        if (cancelled) return;
-        setRoute({
-          key: routeKey,
-          figures:
-            result.kind === 'known' ? routeFigures(result.path.map((s) => s.security)) : null,
-        });
-      });
+    void hubRouteFigures(homeId, hub.systemId, basis).then((found) => {
+      if (!cancelled) setRoute({ key: routeKey, figures: found });
+    });
     return () => {
       cancelled = true;
     };
@@ -91,30 +90,21 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
 
   // Until the pilot picks a hub, find the nearest one by gate route (#2705).
   const suggestKey = `${basis.key}|${homeId}`;
-  const [suggest, setSuggest] = useState<{
-    key: string;
-    nearest: ReturnType<typeof nearestHub>;
-  } | null>(null);
+  const [suggest, setSuggest] = useState<{ key: string; nearest: NearestHub | null } | null>(null);
   useEffect(() => {
     if (homeId === null || !basis.hydrated || hubChosen) return;
     let cancelled = false;
     void Promise.all(
       TRADE_HUBS.map((h) =>
-        routeExposure(homeId, h.systemId, basis.rules, basis.network)
-          .catch(() => ({ kind: 'unknown' as const }))
-          .then((result) => ({
-            hub: h.id,
-            figures:
-              result.kind === 'known' ? routeFigures(result.path.map((x) => x.security)) : null,
-          }))
+        hubRouteFigures(homeId, h.systemId, basis).then((figures) => ({ hub: h.id, figures }))
       )
     ).then((routes) => {
-      if (!cancelled) setSuggest({ key: suggestKey, nearest: nearestHub(routes) });
+      if (!cancelled) setSuggest({ key: suggestKey, nearest: nearestHub(routes, hub.id) });
     });
     return () => {
       cancelled = true;
     };
-  }, [homeId, basis, suggestKey, hubChosen]);
+  }, [homeId, basis, suggestKey, hubChosen, hub.id]);
   const nearest = !hubChosen && suggest?.key === suggestKey ? suggest.nearest : null;
   const nearestOption = nearest && nearest.hub !== hub.id ? getTradeHub(nearest.hub) : null;
 
@@ -195,7 +185,11 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
         )}
       </label>
       {nearest && nearestOption && buybackPct === null && (
-        <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="pi-nearest-hub">
+        <div
+          className="flex flex-wrap items-center gap-2 text-sm"
+          role="status"
+          data-testid="pi-nearest-hub"
+        >
           <span className="text-text-dim">
             {t('piPlan.strip.nearestHub', {
               count: nearest.jumps,
@@ -258,6 +252,18 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
       </PageSettingsModal>
     </div>
   );
+}
+
+/** Figures for the gate route home to a hub, or null when it is unknown or there is none. */
+async function hubRouteFigures(
+  homeId: number,
+  hubSystemId: number,
+  basis: ReturnType<typeof useJumpBasis>
+): Promise<RouteFigures | null> {
+  const result = await routeExposure(homeId, hubSystemId, basis.rules, basis.network).catch(() => ({
+    kind: 'unknown' as const,
+  }));
+  return result.kind === 'known' ? routeFigures(result.path.map((x) => x.security)) : null;
 }
 
 function shownSecurityText(security: number): string {
