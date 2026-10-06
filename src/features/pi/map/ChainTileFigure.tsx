@@ -1,6 +1,7 @@
 /**
  * A P3/P4 tile's multi-planet chain estimate: the shorthand figure, dimmed
- * and marked "Est." so it never reads as a one-planet figure. Decorative: the
+ * and marked "Est." so it never reads as a one-planet figure. No ▲ ≈ ▼: those
+ * compare a one-planet figure with its planet's simplest product. Decorative: the
  * tile's accessible name and tooltip carry the exact figure and its wording.
  */
 import { useTranslation } from 'react-i18next';
@@ -9,19 +10,31 @@ import { formatIskCompact } from '@/lib/isk';
 
 export function ChainTileFigure({
   iskPerDay,
+  stacked = false,
   className,
 }: {
   iskPerDay: number;
+  /** The mark under the figure: a desk tile is narrow, and two short lines fit its height. */
+  stacked?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
   return (
     <span
       aria-hidden="true"
-      className={cx('flex items-center gap-1 text-[11px] text-text-dim tabular-nums', className)}
+      className={cx(
+        'flex text-[11px] text-text-dim tabular-nums',
+        stacked ? 'flex-col items-end gap-px leading-[11px]' : 'items-center gap-1',
+        className
+      )}
     >
-      <span className="font-semibold">≈{formatIskCompact(iskPerDay)}</span>
-      <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">
+      <span className="font-semibold">{formatIskCompact(iskPerDay)}</span>
+      <span
+        className={cx(
+          'rounded-xs border border-warning/60 px-1 font-semibold text-warning',
+          stacked ? 'text-[9px] leading-[11px]' : 'text-[10px] leading-[14px]'
+        )}
+      >
         {t('piShared.estimateBadge')}
       </span>
     </span>

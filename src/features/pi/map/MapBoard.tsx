@@ -453,7 +453,7 @@ export function MapBoard(props: MapBoardProps) {
                             )}
                           </span>
                         ) : figure.kind === 'unranked' && figure.chain ? (
-                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} />
+                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} stacked />
                         ) : (
                           <span aria-hidden="true" />
                         )}

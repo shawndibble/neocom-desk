@@ -59,5 +59,7 @@ describe('chain estimate wording', () => {
     });
     expect(name).toContain('Multi-planet estimate, needs hauling');
     expect(name).toContain('4,262,069 ISK a day across 5 planets');
+    // No "there is no figure" beside a figure.
+    expect(name).not.toContain('no per-planet figure');
   });
 });

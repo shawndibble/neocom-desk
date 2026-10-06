@@ -4701,6 +4701,7 @@
     "unranked": {
       "raw": "A raw resource: sold as is, or refined on the way up",
       "tier": "Needs goods from several planets, so there is no per-planet figure",
+      "tierChain": "Needs goods from several planets",
       "unpriced": "The market has no price for it, so there is no figure",
       "not-one-planet": "No single planet type makes it, so there is no per-planet figure",
       "no-fit": "One planet type can make it, but not at the Command Center level assumed here, so there is no figure"

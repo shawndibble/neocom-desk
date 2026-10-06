@@ -1,6 +1,6 @@
 # Scope decisions — PI P3 and P4 get a multi-planet chain estimate, never a pick (issue #2770)
 
-_Recorded 2026-10-06 · issue #2770. Code: `src/engine/pi/chainEstimate.ts`, `src/features/pi/chainEstimateModel.ts`, `useChainEstimates.ts`. Amends [20261005-123211](20261005-123211-pi-recommendation-model-stoptier-scorer-absolute.md) ("P3+ are never offered")._
+_Recorded 2026-10-06 · issue #2770. Code: `src/engine/pi/chainEstimate.ts`, `src/features/pi/chainEstimateModel.ts`, `useChainEstimates.ts`. Amends [20261005-123211](20261005-123211-pi-recommendation-model-stoptier-scorer-absolute-income-stalled.md) ("P3+ are never offered")._
 
 - **Every P3 and P4 shows an ISK-a-day estimate for its whole multi-planet chain, in All products, the Map's tiles and its product drawer.** Before, they read "needs N planets" with no figure, so a pilot could not tell whether a chain was worth doing. The figure is labelled "multi-planet, needs hauling" and "Est." everywhere, and the drawer (and a tooltip elsewhere) says what it assumes.
 - **It is never ranked against one-planet figures.** It stays out of the recipe ranking, Plan's picks, the Map's pick numbers, the slot nudge and every total. P3 and P4 are still never offered as a pick: decision 20261005-123211 stands for picks; this adds only a separate figure.

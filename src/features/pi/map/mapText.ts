@@ -30,6 +30,8 @@ export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | nul
 /** "Better than Proteins, the simplest product on Ice planets", or why there is no comparison. */
 export function comparisonSentence(t: TFunction, figure: ProductFigure): string {
   if (figure.kind !== 'ranked') {
+    // The chain estimate's own sentence follows and says what the figure is.
+    if (figure.chain) return t('piMap.unranked.tierChain');
     return t(`piMap.unranked.${figure.reason}`);
   }
   const type = planetName(t, figure.useType);

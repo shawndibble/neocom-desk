@@ -320,7 +320,10 @@ export function ProductDetail(props: ProductDetailProps) {
         </div>
       )}
 
-      <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+      {/* A chain estimate states its own basis above; this note is about one-planet figures. */}
+      {!(view.money.kind === 'multi-planet' && view.money.estimate) && (
+        <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>
+      )}
       <Button size="sm" className="mt-3" onClick={props.onClearTrace}>
         {t('piMap.clearTrace')}
       </Button>
