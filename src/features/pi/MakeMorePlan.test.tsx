@@ -46,7 +46,10 @@ const snapshot = { pi: fixturePi, colonies: [] } as unknown as GoalPlannerSnapsh
 
 const withChains = {
   ...fixtureAdvice,
-  chainBasis: { haulDays: 7 },
+  chainBasis: {
+    haulDays: 7,
+    books: { prices: {}, revenuePrices: { 2344: 100_000 }, salesTaxPct: 4 },
+  },
   chainColonies: [],
 } as unknown as PlanAdvice;
 

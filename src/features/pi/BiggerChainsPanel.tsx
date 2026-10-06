@@ -124,11 +124,18 @@ function Legs({ card, names }: { card: BiggerChainCard; names: Names }) {
     <>
       {card.legs
         .map((leg) =>
-          t(leg.jumps === null ? 'piPlan.chains.legUnknown' : 'piPlan.chains.leg', {
-            from: names.of(leg.from),
-            to: names.of(leg.to),
-            count: leg.jumps ?? 0,
-          })
+          t(
+            leg.jumps === null
+              ? 'piPlan.chains.legUnknown'
+              : leg.jumps === 0
+                ? 'piPlan.chains.legSameSystem'
+                : 'piPlan.chains.leg',
+            {
+              from: names.of(leg.from),
+              to: names.of(leg.to),
+              count: leg.jumps ?? 0,
+            }
+          )
         )
         .join(' · ')}
     </>
@@ -227,6 +234,9 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
           return estimate ? chainAssumptions(t, estimate) : onColonies;
         })();
   const priced = view.recommended.length + view.others.length;
+  // No figure at all: say which, since "no price" and "doesn't fit" ask different things of the pilot.
+  const prices = advice.chainBasis.books.revenuePrices;
+  const noPrice = [...state.estimates.keys()].every((id) => prices[id] === undefined);
   const renderCards = (cards: readonly BiggerChainCard[]) => (
     <ul className="divide-y divide-line">
       {cards.map((card) => (
@@ -263,7 +273,9 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
             {state.candidateCount === 0
               ? t('piPlan.chains.noneBuildable')
               : priced === 0
-                ? t('piPlan.chains.noneFigure')
+                ? t(noPrice ? 'piPlan.chains.noneFigure' : 'piPlan.chains.noneFits', {
+                    count: state.candidateCount,
+                  })
                 : t('piPlan.chains.noneBeat', { count: priced })}
           </p>
         )

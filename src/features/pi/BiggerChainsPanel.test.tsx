@@ -17,7 +17,10 @@ const CONDENSATES = 2344;
 
 const advice = {
   ...fixtureAdvice,
-  chainBasis: { haulDays: 7 },
+  chainBasis: {
+    haulDays: 7,
+    books: { prices: {}, revenuePrices: { 2344: 100_000 }, salesTaxPct: 4 },
+  },
   chainColonies: [],
 } as unknown as PlanAdvice;
 
@@ -80,6 +83,12 @@ describe('BiggerChainsPanel', () => {
   it('explains when the pilot’s planet types make no P3 or P4 between them', () => {
     renderPanel();
     expect(screen.getByText(/Your planet types can't make a P3 or P4/)).toBeInTheDocument();
+  });
+
+  it('says when the pilot’s colonies can make no candidate in full, rather than blaming prices', () => {
+    state({ colonies: null, newPlanets: null });
+    renderPanel();
+    expect(screen.getByText(/your colonies can't make it in full/)).toBeInTheDocument();
   });
 
   it('recommends nothing when no chain beats the one-planet picks, and keeps those chains one click away', async () => {
