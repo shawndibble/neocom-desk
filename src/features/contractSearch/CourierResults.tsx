@@ -1225,6 +1225,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               systemId={row.destination.systemId}
               fromId={row.origin.systemId}
               preference={preferenceOverride}
+              label={t('contractSearch.jumpsLinkLabel', { count })}
             >
               {count}
             </JumpsLink>

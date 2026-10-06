@@ -8062,6 +8062,8 @@
     "volumeColumn": "Volume",
     "daysColumn": "Days",
     "jumpsColumn": "Jumps",
+    "jumpsLinkLabel_one": "{{count}} jump — open route safety",
+    "jumpsLinkLabel_other": "{{count}} jumps — open route safety",
     "iskPerJumpColumn": "ISK/jump",
     "iskPerVolumeColumn": "ISK/m³",
     "courierModalTitle": "Courier · {{origin}} → {{destination}}",
