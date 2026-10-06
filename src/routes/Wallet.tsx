@@ -13,6 +13,7 @@ import {
   PageHeader,
   Panel,
   Spinner,
+  RowCaret,
   Tabs,
   type DataTableColumn,
 } from '@/components/ui';
@@ -20,7 +21,6 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { CorporationLink } from '@/features/entities';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import {
@@ -321,12 +321,16 @@ export function Wallet() {
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        // The name is the corporation's Show Info link (§6c); the row's own
-        // destination, the LP Store, is the trailing link column below.
+        // The row navigates to the LP Store (§6c): the name is its accent
+        // link, the caret column closes the row. Show Info for the corporation
+        // is on the LP Store page header.
         render: (entry) => (
-          <CorporationLink id={entry.corporation_id}>
+          <Link
+            to={`/market/lp-store/${entry.corporation_id}`}
+            className={entityLinkClassName('group')}
+          >
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-          </CorporationLink>
+          </Link>
         ),
         sortValue: (entry) =>
           corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
@@ -340,23 +344,10 @@ export function Wallet() {
         sortValue: (entry) => entry.loyalty_points,
       },
       {
-        // A real link as well as the row click: the row alone has no link role
-        // or name. DataTable ignores row clicks that land on a link, so the two
-        // never double-navigate.
-        id: 'store',
-        header: t('loyalty.storeColumn'),
-        render: (entry) => (
-          <Link
-            to={`/market/lp-store/${entry.corporation_id}`}
-            className={entityLinkClassName('inline-flex items-center gap-1')}
-            aria-label={t('loyalty.openStoreFor', {
-              corporation: corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
-            })}
-          >
-            {t('loyalty.openStore')}
-            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          </Link>
-        ),
+        id: 'go',
+        header: '',
+        align: 'right',
+        render: () => <RowCaret />,
       },
     ],
     [t, corporationNames]
@@ -731,6 +722,7 @@ export function Wallet() {
                 sort={loyaltySortProps.sort}
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
+                rowClassName={() => 'group'}
                 onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
               />
             )}

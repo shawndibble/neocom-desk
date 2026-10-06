@@ -123,18 +123,17 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
-  it("links each loyalty row's corporation name to Show Info and its store link to the LP Store", async () => {
+  it("links each loyalty row's corporation name to the LP Store, with a trailing caret and no store column", async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Caldari Navy' }).getAttribute('href')).toContain(
-      'info=corporation-1000167'
-    );
-    // A real link, not just a row click — a screen reader or keyboard user
-    // reaches the LP Store without the row.
-    expect(screen.getByRole('link', { name: 'Open LP Store for Caldari Navy' })).toHaveAttribute(
+    // A real link, not just a row click: a keyboard or screen-reader user
+    // reaches the LP Store without the row. Not a Show Info link any more.
+    expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
       'href',
       '/market/lp-store/1000167'
     );
+    expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open LP Store/ })).not.toBeInTheDocument();
   });
 
   it('offers the LP Store picker even when the Character holds no LP anywhere (issue #2321)', async () => {
@@ -148,12 +147,11 @@ describe('Wallet', () => {
     expect(await screen.findByRole('button', { name: /LP Store corporation/ })).toBeInTheDocument();
   });
 
-  it('has no row menu or More actions button on a loyalty row: the name links to Show Info, the trailing link opens the store', async () => {
+  it('has no row menu or More actions button on a loyalty row: the name and row open the store', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
     const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
     expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
-    expect(within(row).getByRole('link', { name: 'Caldari Navy' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
   });

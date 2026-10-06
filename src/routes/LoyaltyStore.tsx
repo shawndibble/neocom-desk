@@ -21,6 +21,7 @@ import {
   type ReactElement,
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CorporationLink } from '@/features/entities/EntityLink';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -701,6 +702,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
+              <CorporationLink id={corporationId}>
+                {t('loyaltyStore.corporationInfo')}
+              </CorporationLink>
               <StatChips>
                 <StatChip
                   label={t('loyaltyStore.yourLp')}
