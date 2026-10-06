@@ -44,7 +44,10 @@ export function useMapAdvice(
   } | null>(null);
   const [failedFor, setFailedFor] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const retry = useCallback(() => setReloadKey((key) => key + 1), []);
+  const retry = useCallback(() => {
+    setLoaded(null);
+    setReloadKey((key) => key + 1);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     loadGoalPlannerSnapshot(characterId).then(

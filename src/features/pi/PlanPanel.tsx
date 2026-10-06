@@ -102,7 +102,14 @@ export function PlanPanel(props: Props) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (snapshot?.fetchFailed) {
-    return <EsiDidntAnswer onRetry={() => setReloadKey((key) => key + 1)} />;
+    return (
+      <EsiDidntAnswer
+        onRetry={() => {
+          setLoaded(null);
+          setReloadKey((key) => key + 1);
+        }}
+      />
+    );
   }
   if (!snapshot) {
     return (

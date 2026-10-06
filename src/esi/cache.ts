@@ -33,10 +33,11 @@ export interface StatusResult<T> {
   /** True when the live call failed with 401/403 (or refresh itself failed): re-login is the fix, not a refresh. */
   needsReauth: boolean;
   /**
-   * The live call failed (5xx, offline, timeout) and nothing is cached to fall
-   * back on, so `cached: null` means "ESI did not answer", not "no data". Set
-   * only by `loadWithCacheStatus` when `reportFetchFailure` is passed, only when true; absent on success, on a
-   * warm-cache fallback, and on an auth failure (`needsReauth` owns that).
+   * The live call failed (5xx, offline, timeout, or no body) and nothing is
+   * cached to fall back on, so `cached: null` means "ESI did not answer", not
+   * "no data". Set only by `loadWithCacheStatus` when `reportFetchFailure` is
+   * passed, and only when true; absent on success, on a warm-cache fallback,
+   * and on an auth failure (`needsReauth` owns that).
    */
   fetchFailed?: boolean;
 }
