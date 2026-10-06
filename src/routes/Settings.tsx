@@ -16,6 +16,7 @@ import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
+import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
@@ -748,6 +749,8 @@ function MarketDefaultsPanel() {
               onSelect={(ratio) => void setCollateralRatio(ratio)}
               labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
             />
+
+            <LpValueField id="settings-lp-value" />
           </Fields>
         </div>
       ) : (
