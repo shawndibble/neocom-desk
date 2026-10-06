@@ -17,6 +17,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
+import { useLpValue } from '@/features/loyalty/lpValue';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
@@ -304,6 +305,8 @@ async function resetSession() {
   localJumpDistances.mockReset();
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
   usePickedSystems.setState({ value: {}, hydrated: false });
+  // Else a store hydrated at 0 by an earlier render ignores a test's own LP Value and fetches market rates for real (~2.5s).
+  useLpValue.setState({ value: 0, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
