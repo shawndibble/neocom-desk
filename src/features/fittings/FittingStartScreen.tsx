@@ -345,7 +345,7 @@ export function FittingStartScreen({
                               : t('fittings.start.sourceInGame')}
                           </span>
                           {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
-                          {!previewing && (
+                          {!previewing && !rowMenus && (
                             <Icon.Descend
                               aria-hidden
                               className="shrink-0 text-text-faint group-hover:text-accent"

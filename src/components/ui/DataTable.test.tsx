@@ -198,6 +198,24 @@ describe('DataTable selectedRowKey', () => {
   });
 });
 
+describe('DataTable rowClickable', () => {
+  it('makes a row it rejects inert: no pointer cursor, tab stop or activation', () => {
+    const onRowClick = vi.fn();
+    renderTable({ onRowClick, rowClickable: (row: Row) => row.item !== 'Pyerite' });
+    const live = screen.getByText('Tritanium').closest('tr')!;
+    const inert = screen.getByText('Pyerite').closest('tr')!;
+    expect(live).toHaveAttribute('tabindex', '0');
+    expect(live.className).toContain('cursor-pointer');
+    expect(inert).not.toHaveAttribute('tabindex');
+    expect(inert.className).not.toContain('cursor-pointer');
+    fireEvent.click(inert);
+    fireEvent.keyDown(inert, { key: 'Enter' });
+    expect(onRowClick).not.toHaveBeenCalled();
+    fireEvent.click(live);
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+  });
+});
+
 describe('DataTable lift-after-hold', () => {
   function setup() {
     const onRowClick = vi.fn();

@@ -470,13 +470,12 @@ describe('Travel › Route Safety › Stops', () => {
     expect(await screen.findByRole('list', { name: 'Itinerary by leg' })).toBeInTheDocument();
   });
 
-  it('reorders and removes stops with each row’s buttons', async () => {
+  it('removes a stop with its row button, and reorders only by the drag handle', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&stops=${UEDAMA},${SOBASEKI}`);
 
-    await user.click(await screen.findByRole('button', { name: 'Move Sobaseki up' }));
-    expect(stopsInLink()).toBe(`${SOBASEKI},${UEDAMA}`);
-    expect(screen.getByRole('button', { name: 'Move Sobaseki up' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Reorder Sobaseki' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove Uedama' }));
     expect(stopsInLink()).toBe(String(SOBASEKI));
@@ -535,6 +534,25 @@ describe('Travel › Route Safety › Stops', () => {
       expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
     } finally {
       matchMedia.mockRestore();
+    }
+  });
+
+  it('colors the last hour: ship kills by a heat ramp, any pod kill red', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
+    await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12'));
+
+    // 12 ship kills is past the red stop; 4 pod kills is red outright.
+    expect(within(lastHour(body[2])).getByText('12')).toHaveStyle({ color: '#ff7369' });
+    expect(within(lastHour(body[2])).getByText('4')).toHaveClass('text-danger');
+    // A quiet system keeps the default text.
+    const quiet = within(lastHour(body[0])).getAllByText('0');
+    for (const figure of quiet) {
+      expect(figure).not.toHaveClass('text-danger');
+      expect(figure.getAttribute('style')).toBeNull();
     }
   });
 

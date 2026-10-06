@@ -2,7 +2,6 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  entityLinkClassName,
   IconButton,
   NativeSelect,
   Panel,
@@ -18,7 +17,7 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -54,7 +53,6 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { ListChargePicker } from './ListChargePicker';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
 import {
-  CargoMenuItems,
   DroneMenuItems,
   EmptySlotMenuItems,
   FittingItemMenu,
@@ -151,20 +149,17 @@ export interface ModuleRowProps extends EditContext {
 }
 
 /**
- * A fitted item's name: a link to the item in Market, when the page has Item
+ * A fitted item's name: a link to its Show info, when the page has Item
  * Actions (a shared-fitting preview renders no provider, and stays a span).
- * Show Info is in the row's ⋮ menu.
+ * View in Market is in the row's ⋮ menu.
  */
 function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();
   if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
-    <MarketItemLink
-      typeId={typeId}
-      className={entityLinkClassName(`${SLOT_NAME_CLASS} ${tappableRowClassName}`)}
-    >
+    <ItemInfoLink typeId={typeId} className={`${SLOT_NAME_CLASS} ${tappableRowClassName}`}>
       {name}
-    </MarketItemLink>
+    </ItemInfoLink>
   );
 }
 
@@ -884,7 +879,7 @@ export function FittingRackList({
 
 /**
  * The cargo hold: how full it is, each item with its count — a charge drags
- * onto the modules that take it, and its menu loads it — and "Add cargo".
+ * onto the modules that take it (or loads from a module's own menu) — and "Add cargo".
  * An Add panel item or charge dropped on it goes in the hold.
  * The List's Cargo section; the Ring shows the same items as tiles.
  */
@@ -917,7 +912,6 @@ export function CargoSection({
         return (
           <SlotCard
             key={item.typeId}
-            menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
             grip={
               draggable && actions
                 ? (() => {

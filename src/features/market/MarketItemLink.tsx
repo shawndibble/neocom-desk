@@ -13,6 +13,10 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
 }
 
 /**
+ * Market context only (prices, order books, Compare, Appraisal). An item
+ * name elsewhere is an `ItemInfoLink` (`features/entities`), which opens Show
+ * info; the Market stays in the row menu and the Item Detail's best prices.
+ *
  * Wraps an item name with a link to its Market listing (#411), preserving
  * whatever region/hub the current page is already scoped to — same
  * `marketLinkParams` precedence as `ImplantChip` (#405) and the item context

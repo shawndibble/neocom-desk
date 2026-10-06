@@ -10,6 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +28,6 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
-import { CharacterLink, SystemLink } from '@/features/entities';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -46,7 +46,7 @@ import {
   type MiningYieldRow,
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
-import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
+import { iskPerMinedDay } from '@/engine/miningTax/yieldRate';
 import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
 import { scaleUnitPrices, scaleValuation } from '@/engine/miningTax/buybackRate';
 import { useMiningYieldRange } from './yieldRangePref';
@@ -288,7 +288,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       refineValue,
       volume: { m3: volumeM3, missingTypeIds: [...missingVolumeTypeIds] },
       dates,
-      iskPerHour: iskPerCalendarHour(rawValue, dates),
+      iskPerDay: iskPerMinedDay(rawValue, dates),
     };
   }, [visibleRows, data]);
 
@@ -313,7 +313,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       const sources = sourcesByDate.get(date);
       return {
         date,
-        iskPerHour: (byDate.get(date) ?? 0) / 24,
+        iskValue: byDate.get(date) ?? 0,
         source: sources ? weakestSource(sources) : null,
       };
     });
@@ -374,7 +374,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      render: (row) => <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>,
+      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
+      render: (row) => <span className={entityLinkClassName()}>{row.characterName}</span>,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -382,7 +383,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          <SystemLink systemId={row.entry.solarSystemId}>{systemName(row)}</SystemLink>
+          <span className={entityLinkClassName()}>{systemName(row)}</span>
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),
@@ -656,17 +657,17 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.iskPerHourStat')}
+                    {t('miningTax.overview.iskPerDayStat')}
                   </p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
-                    {totals.iskPerHour !== null ? (
-                      <IskAmount value={totals.iskPerHour} decimals={0} />
+                    {totals.iskPerDay !== null ? (
+                      <IskAmount value={totals.iskPerDay} decimals={0} />
                     ) : (
                       '—'
                     )}
                   </p>
                   <p className="text-[0.6875rem] text-text-dim">
-                    {t('miningTax.overview.iskPerHourBasisHint')}
+                    {t('miningTax.overview.iskPerDayBasisHint')}
                   </p>
                 </Panel>
                 <Panel>

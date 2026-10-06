@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
+import type { QuickWin } from '@/engine/pi/planAdvice';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { piTier } from '@/engine/pi/chain';
 import { rankRecipes } from '@/engine/pi/planRecipes';
 import { builtColonyEarnings } from './colonyEarningsModel';
-import { builtAdvice } from './advisorModel';
+import { builtAdvice } from './systemPlanetModel';
 import type { PiCadence } from './cadencePref';
 import { plannerColonies, type PlannerSnapshot } from './goalPlannerModel';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
@@ -22,6 +23,7 @@ const pi = JSON.parse(
 ) as PiData;
 
 const MICROORGANISMS = 2073;
+const AQUEOUS_LIQUIDS = 2268;
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30004759;
 const NOW = Date.parse('2026-10-01T00:00:00Z');
@@ -173,6 +175,9 @@ function input(overrides: Partial<PlanAdviceInput> = {}): PlanAdviceInput {
 const temperate = (advice: ReturnType<typeof buildPlanAdvice>) =>
   advice.colonies.find((colony) => colony.planetId === TEMPERATE_ID)!;
 
+const isFactoryWin = (win: QuickWin) =>
+  win.detail.kind === 'spare-room' && win.detail.what === 'factories';
+
 describe('buildPlanAdvice: today', () => {
   it("is the colony's own earnings model, in ISK a day, at its own customs rate", () => {
     const advice = buildPlanAdvice(input());
@@ -191,7 +196,11 @@ describe('buildPlanAdvice: today', () => {
       salesTaxPct: hubBooks(PRICES, 5).salesTaxPct,
     }).iskPerHour!;
     // 7 days between hauls fills this colony's pad, so only the stalled share differs.
-    expect(colony.todayPerDay! + colony.quickWinGainPerDay).toBeCloseTo(hourly * 24, 3);
+    // The factory suggestion adds a refinement the colony does not run: not part of today's ore.
+    const inPlace = colony.quickWins
+      .filter((win) => !isFactoryWin(win))
+      .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
+    expect(colony.todayPerDay! + inPlace).toBeCloseTo(hourly * 24, 3);
   });
 
   it('has no figure, not zero, for a colony with nothing measurable, and counts it', () => {
@@ -271,9 +280,21 @@ function leanSnapshot(upgradeLevel = 4): PlannerSnapshot {
   });
 }
 
+/**
+ * Bacteria priced below the ore it is made from, so refining it in place is no
+ * quick win: these tests are about a rebuild, not the basic-factory suggestion.
+ */
+function leanInput(overrides: Partial<PlanAdviceInput> = {}): PlanAdviceInput {
+  const prices = { ...PRICES.prices, [2393]: 50 };
+  return input({
+    books: hubBooks({ prices, buyPrices: { ...PRICES.buyPrices, [2393]: 45 } }, 5),
+    ...overrides,
+  });
+}
+
 describe('buildPlanAdvice: rebuild', () => {
   it('changes a colony to a P1 or P2 recipe, never raw P0, and quotes the gain on top of quick wins', () => {
-    const colony = temperate(buildPlanAdvice(input({ snapshot: leanSnapshot() })));
+    const colony = temperate(buildPlanAdvice(leanInput({ snapshot: leanSnapshot() })));
     if (colony.rebuild.status !== 'change') throw new Error('expected a change');
     for (const option of [colony.rebuild.pick, colony.rebuild.alternative]) {
       if (option) expect([1, 2]).toContain(option.tier);
@@ -287,8 +308,38 @@ describe('buildPlanAdvice: rebuild', () => {
     expect(colony.rebuild.steps.some((step) => step.verb === 'set')).toBe(true);
   });
 
+  it("builds a rebuild only from the resources the pilot picked for that planet, and leaves others' alone", () => {
+    const rebuildOf = (richness?: ReadonlyMap<number, readonly number[]>) =>
+      temperate(
+        buildPlanAdvice(
+          leanInput({
+            snapshot: leanSnapshot(),
+            prefs: {
+              restartHours: 72,
+              fallbackRatePerHour: 12_000,
+              customsOverrides: {},
+              richness,
+            },
+          })
+        )
+      ).rebuild;
+    const picked = rebuildOf(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]]));
+    if (picked.status !== 'change') throw new Error('expected a change');
+    for (const option of [picked.pick, picked.alternative]) {
+      if (option) expect(option.recipe.extracts).toEqual([AQUEOUS_LIQUIDS]);
+    }
+    // The unrestricted pick works another resource, so the override is what narrowed it.
+    const open = rebuildOf();
+    if (open.status !== 'change') throw new Error('expected a change');
+    expect(open.alternative?.recipe.extracts).not.toEqual([AQUEOUS_LIQUIDS]);
+    // Absent, empty, or on another planet: the same answer as no override at all.
+    expect(rebuildOf(new Map())).toEqual(rebuildOf());
+    expect(rebuildOf(new Map([[TEMPERATE_ID, []]]))).toEqual(rebuildOf());
+    expect(rebuildOf(new Map([[OCEANIC_ID, [MICROORGANISMS]]]))).toEqual(rebuildOf());
+  });
+
   it('carries the rebuild layout draw against the Command Center it needs, for the fit meters', () => {
-    const changed = temperate(buildPlanAdvice(input({ snapshot: leanSnapshot() })));
+    const changed = temperate(buildPlanAdvice(leanInput({ snapshot: leanSnapshot() })));
     if (changed.rebuild.status !== 'change') throw new Error('expected a change');
     expect(changed.rebuildFit).not.toBeNull();
     const fit = changed.rebuildFit!;
@@ -307,15 +358,17 @@ describe('buildPlanAdvice: rebuild', () => {
   });
 
   it('compares a rebuild with absolute income: a rebuild is never a loss that looks like a gain', () => {
-    const colony = temperate(buildPlanAdvice(input({ snapshot: leanSnapshot() })));
+    const colony = temperate(buildPlanAdvice(leanInput({ snapshot: leanSnapshot() })));
     if (colony.rebuild.status === 'refused') throw new Error('expected a scored rebuild');
     expect(colony.rebuild.best!.iskPerDay).toBeGreaterThan(0);
   });
 
   it('re-picks under least hauling: no more m3 than the most-ISK pick, and no more ISK', () => {
-    const isk = temperate(buildPlanAdvice(input({ snapshot: leanSnapshot(), preference: 'isk' })));
+    const isk = temperate(
+      buildPlanAdvice(leanInput({ snapshot: leanSnapshot(), preference: 'isk' }))
+    );
     const haul = temperate(
-      buildPlanAdvice(input({ snapshot: leanSnapshot(), preference: 'haul' }))
+      buildPlanAdvice(leanInput({ snapshot: leanSnapshot(), preference: 'haul' }))
     );
     if (isk.rebuild.status === 'refused' || haul.rebuild.status === 'refused') throw new Error('x');
     expect(haul.rebuild.best!.m3PerDay).toBeLessThanOrEqual(isk.rebuild.best!.m3PerDay);
@@ -325,7 +378,7 @@ describe('buildPlanAdvice: rebuild', () => {
   it('puts an upgrade first when the recipe needs a higher Command Center the pilot has trained', () => {
     const colony = temperate(
       buildPlanAdvice(
-        input({
+        leanInput({
           snapshot: leanSnapshot(1),
           skills: { commandCenterUpgrades: 5, interplanetaryConsolidation: 3 },
         })
@@ -342,7 +395,7 @@ describe('buildPlanAdvice: rebuild', () => {
     for (const trained of [null, 1]) {
       const colony = temperate(
         buildPlanAdvice(
-          input({
+          leanInput({
             snapshot: leanSnapshot(1),
             skills: { commandCenterUpgrades: trained, interplanetaryConsolidation: 3 },
           })
@@ -446,6 +499,32 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.recipes.recipes.filter((r) => r.tier === 2).length).toBeGreaterThan(0);
   });
 
+  it('keeps over-budget setups in the rows, tagged with the lowest Command Center level that hosts them', () => {
+    const noColonies = { snapshot: snapshot({ colonies: [], details: new Map() }) };
+    const low = buildPlanAdvice(
+      input({
+        ...noColonies,
+        skills: { commandCenterUpgrades: 0, interplanetaryConsolidation: null },
+      })
+    );
+    const tagged = low.recipeRows.filter((r) => r.needsCcLevel !== undefined);
+    expect(tagged.length).toBeGreaterThan(0);
+    expect(tagged.every((r) => r.needsCcLevel! > 0 && r.needsCcLevel! <= 5)).toBe(true);
+    expect(tagged.some((r) => r.tier === 2)).toBe(true);
+    // The shared ranking (Plan, Map) stays within the trained skill.
+    expect(low.recipes.recipes.every((r) => r.needsCcLevel === undefined)).toBe(true);
+    expect(low.recipes.recipes).toEqual([]);
+    expect(low.recipes.bestAnywherePerDay).toBeNull();
+
+    const high = buildPlanAdvice(
+      input({
+        ...noColonies,
+        skills: { commandCenterUpgrades: 5, interplanetaryConsolidation: null },
+      })
+    );
+    expect(high.recipeRows.some((r) => r.needsCcLevel !== undefined)).toBe(false);
+  });
+
   it('filters the ranking and marks the planet types the pilot has', () => {
     const p2 = buildPlanAdvice(input({ recipeFilter: 'p2' })).recipes.recipes;
     expect(p2.length).toBeGreaterThan(0);
@@ -508,7 +587,7 @@ describe('buildPlanAdvice: more quick wins', () => {
     };
     const colony = temperate(
       buildPlanAdvice(
-        input({
+        leanInput({
           snapshot: snapshot({
             colonies: [{ ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 }],
             details: new Map([[TEMPERATE_ID, oneEcu]]),
@@ -570,7 +649,7 @@ describe('buildPlanAdvice: more quick wins', () => {
     }
   });
 
-  it('finds room for a factory fed by another colony’s surplus, and names where it comes from', () => {
+  const roomFactoryWins = (otherSystem: number) => {
     const AQUEOUS_LIQUIDS = 2268;
     const WATER_SCHEMATIC = pi.schematics['3645'].schematicId;
     const factory = (pinId: number, schematic: number): PlanetPin => ({
@@ -605,7 +684,7 @@ describe('buildPlanAdvice: more quick wins', () => {
         snapshot: snapshot({
           colonies: [
             { ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 },
-            { ...planet(OCEANIC_ID, HIGHSEC_SYSTEM, 'oceanic'), upgrade_level: 5 },
+            { ...planet(OCEANIC_ID, otherSystem, 'oceanic'), upgrade_level: 5 },
           ],
           details: new Map([
             [TEMPERATE_ID, makesBacteria],
@@ -614,7 +693,11 @@ describe('buildPlanAdvice: more quick wins', () => {
         }),
       })
     );
-    const factoryWins = advice.quickWins.filter((win) => win.id.includes(':room-factories:'));
+    return advice.quickWins.filter((win) => win.id.includes(':room-factories:'));
+  };
+
+  it('finds room for a factory fed by another colony’s surplus in the same system, and names where it comes from', () => {
+    const factoryWins = roomFactoryWins(HIGHSEC_SYSTEM);
     expect(factoryWins.length).toBeGreaterThan(0);
     for (const win of factoryWins) {
       expect(win.gainPerDay).toBeGreaterThan(0);
@@ -628,6 +711,70 @@ describe('buildPlanAdvice: more quick wins', () => {
           win.detail.routedFrom.length > 0
       )
     ).toBe(true);
+  });
+
+  it('offers no quick win that needs surplus hauled from another system (#2703)', () => {
+    const sameSystem = roomFactoryWins(HIGHSEC_SYSTEM);
+    const routed = (wins: typeof sameSystem) =>
+      wins.filter(
+        (win) =>
+          win.detail.kind === 'spare-room' &&
+          win.detail.what === 'factories' &&
+          win.detail.routedFrom.length > 0
+      );
+    expect(routed(sameSystem).length).toBeGreaterThan(0);
+    expect(routed(roomFactoryWins(NULLSEC_SYSTEM))).toEqual([]);
+  });
+});
+
+describe('buildPlanAdvice: a raw-only colony (#2715)', () => {
+  const BACTERIA = 2393;
+
+  it('suggests basic factories as a quick win rather than endorsing the raw it sells', () => {
+    const colony = temperate(buildPlanAdvice(input()));
+    expect(colony.sells).toEqual([MICROORGANISMS]);
+    const win = colony.quickWins.find((w) => w.id === `${TEMPERATE_ID}:room-factories:${BACTERIA}`);
+    expect(win?.detail).toMatchObject({
+      kind: 'spare-room',
+      what: 'factories',
+      productTypeId: BACTERIA,
+      routedFrom: [],
+      needsRemoval: false,
+    });
+    if (win?.detail.kind !== 'spare-room' || win.detail.what !== 'factories') throw new Error();
+    expect(win.detail.factories).toBeGreaterThan(0);
+    expect(win.gainPerDay).toBeGreaterThan(0);
+  });
+
+  it('prices the factory win against raw, so it never shows as a gain when raw earns more', () => {
+    const rawRich = {
+      prices: { ...PRICES.prices, [MICROORGANISMS]: 50 },
+      buyPrices: { ...PRICES.buyPrices, [MICROORGANISMS]: 50 },
+    };
+    const colony = temperate(buildPlanAdvice(input({ books: hubBooks(rawRich, 5) })));
+    expect(colony.quickWins.some((w) => isFactoryWin(w))).toBe(false);
+  });
+
+  it('offers no factory win for a colony already refining what it extracts', () => {
+    const refining: CharacterPlanetDetail = {
+      pins: [
+        ecuPin(1, MICROORGANISMS, 7, 70, 3_000),
+        pin(3, LAUNCHPAD),
+        { ...pin(4, BASIC), schematic_id: pi.schematics[String(BACTERIA)].schematicId },
+      ],
+      links: [
+        { source_pin_id: 3, destination_pin_id: 1, link_level: 0 },
+        { source_pin_id: 3, destination_pin_id: 4, link_level: 0 },
+      ],
+      routes: [],
+    };
+    const colony = temperate(
+      buildPlanAdvice(
+        input({ snapshot: snapshot({ details: new Map([[TEMPERATE_ID, refining]]) }) })
+      )
+    );
+    expect(colony.sells).toEqual([BACTERIA]);
+    expect(colony.quickWins.some((w) => isFactoryWin(w))).toBe(false);
   });
 });
 
@@ -672,5 +819,33 @@ describe('customs parity across Plan, Colonies and Map', () => {
     expect(nullsec.taxRate).toBe(ASSUMED_UNKNOWN_CUSTOMS);
     expect(nullsec.taxAssumed).toBe(true);
     expect(temperate(advice).taxAssumed).toBe(false);
+  });
+});
+
+describe('buildPlanAdvice: hub prices unreadable', () => {
+  const NO_PRICES = hubBooks({ prices: {}, buyPrices: {} }, 5);
+
+  it('keeps the restart of a stopped extractor, with no gain, and no figure anywhere is zero', () => {
+    const advice = buildPlanAdvice(
+      input({
+        books: NO_PRICES,
+        snapshot: snapshot({ details: new Map([[TEMPERATE_ID, temperateDetail(-10)]]) }),
+      })
+    );
+    const restart = temperate(advice).quickWins.find(
+      (win) => win.id === `${TEMPERATE_ID}:restart-stopped`
+    );
+    expect(restart?.detail).toMatchObject({ kind: 'restart', reason: 'stopped' });
+    expect(restart?.gainPerDay).toBeNull();
+    expect(advice.quickWins.every((win) => win.gainPerDay === null)).toBe(true);
+    expect(advice.recipes.recipes).toEqual([]);
+  });
+
+  it('drops a win that only exists because of a price', () => {
+    const priced = buildPlanAdvice(input());
+    const unpriced = buildPlanAdvice(input({ books: NO_PRICES }));
+    const pricedKinds = priced.quickWins.filter((w) => w.detail.kind === 'spare-room');
+    expect(pricedKinds.length).toBeGreaterThan(0);
+    expect(unpriced.quickWins.filter((w) => w.detail.kind === 'spare-room')).toEqual([]);
   });
 });

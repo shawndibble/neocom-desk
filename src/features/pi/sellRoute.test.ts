@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homeSystemId, routeFigures } from './sellRoute';
+import { homeSystemId, nearestHub, routeFigures } from './sellRoute';
 
 describe('homeSystemId', () => {
   it('is the system holding the most colonies', () => {
@@ -28,5 +28,39 @@ describe('routeFigures', () => {
   });
   it('is zero jumps when home is the hub', () => {
     expect(routeFigures([0.9])).toEqual({ jumps: 0, lowsecJumps: 0 });
+  });
+});
+
+describe('nearestHub', () => {
+  const r = (
+    hub: 'jita' | 'amarr' | 'dodixie' | 'rens' | 'hek',
+    jumps: number,
+    lowsecJumps = 0
+  ) => ({
+    hub,
+    figures: { jumps, lowsecJumps },
+  });
+  it('is the hub with the fewest jumps', () => {
+    expect(nearestHub([r('jita', 28), r('amarr', 20), r('hek', 9)])).toEqual({
+      hub: 'hek',
+      jumps: 9,
+      lowsecJumps: 0,
+    });
+  });
+  it('breaks a jump tie toward the route with fewer lowsec jumps', () => {
+    expect(nearestHub([r('jita', 5, 2), r('rens', 5, 0)])?.hub).toBe('rens');
+  });
+  it('breaks a full tie by listed order so it never flickers', () => {
+    expect(nearestHub([r('amarr', 5), r('jita', 5)])?.hub).toBe('amarr');
+  });
+  it('prefers the current hub on a full tie', () => {
+    expect(nearestHub([r('amarr', 5), r('jita', 5)], 'jita')?.hub).toBe('jita');
+  });
+  it('skips hubs with no known route', () => {
+    expect(nearestHub([{ hub: 'jita', figures: null }, r('rens', 12)])?.hub).toBe('rens');
+  });
+  it('is null when no route is known', () => {
+    expect(nearestHub([{ hub: 'jita', figures: null }])).toBeNull();
+    expect(nearestHub([])).toBeNull();
   });
 });

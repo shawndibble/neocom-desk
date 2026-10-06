@@ -3,6 +3,8 @@ import {
   SHORTCUTS,
   commandPaletteDisplayKey,
   isCommandPaletteShortcut,
+  isModChord,
+  modChordDisplayKey,
   type ChordEvent,
 } from './shortcuts';
 
@@ -35,6 +37,49 @@ describe('isCommandPaletteShortcut', () => {
       isCommandPaletteShortcut(press({ key: 'k', ctrlKey: true, shiftKey: true }), false)
     ).toBe(false);
     expect(isCommandPaletteShortcut(press({ key: 'j', ctrlKey: true }), false)).toBe(false);
+  });
+});
+
+describe('isModChord', () => {
+  const press = (init: Partial<ChordEvent> & { key: string }): ChordEvent => ({
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    ...init,
+  });
+
+  it('matches the platform modifier plus the key, whatever the case', () => {
+    expect(isModChord(press({ key: 's', ctrlKey: true }), false, 's')).toBe(true);
+    expect(isModChord(press({ key: 'S', ctrlKey: true }), false, 's')).toBe(true);
+    expect(isModChord(press({ key: 's', metaKey: true }), true, 's')).toBe(true);
+    expect(isModChord(press({ key: 'Enter', ctrlKey: true }), false, 'Enter')).toBe(true);
+  });
+
+  it('leaves the other platform’s modifier, a bare key and Alt alone', () => {
+    expect(isModChord(press({ key: 's', ctrlKey: true }), true, 's')).toBe(false);
+    expect(isModChord(press({ key: 's', metaKey: true }), false, 's')).toBe(false);
+    expect(isModChord(press({ key: 's' }), false, 's')).toBe(false);
+    expect(isModChord(press({ key: 's', ctrlKey: true, altKey: true }), false, 's')).toBe(false);
+  });
+
+  it('treats Shift as part of the chord: Ctrl+S and Ctrl+Shift+S are different keys', () => {
+    expect(isModChord(press({ key: 'S', ctrlKey: true, shiftKey: true }), false, 's')).toBe(false);
+    expect(
+      isModChord(press({ key: 'S', ctrlKey: true, shiftKey: true }), false, 's', { shift: true })
+    ).toBe(true);
+    expect(isModChord(press({ key: 's', ctrlKey: true }), false, 's', { shift: true })).toBe(false);
+  });
+});
+
+describe('modChordDisplayKey', () => {
+  it('shows the chord as the pilot’s own keyboard labels it', () => {
+    expect(modChordDisplayKey(true, 'S')).toBe('⌘S');
+    expect(modChordDisplayKey(false, 'S')).toBe('Ctrl S');
+    expect(modChordDisplayKey(true, 'S', { shift: true })).toBe('⇧⌘S');
+    expect(modChordDisplayKey(false, 'S', { shift: true })).toBe('Ctrl Shift S');
+    expect(modChordDisplayKey(true, '↵')).toBe('⌘↵');
+    expect(modChordDisplayKey(false, 'Enter')).toBe('Ctrl Enter');
   });
 });
 

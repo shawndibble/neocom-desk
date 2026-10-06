@@ -7,8 +7,9 @@ import type { PlanAdviceState } from './usePlanAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
-import { fixtureAdvice, fixturePi } from './planViewFixture';
+import { P2_B, RAW, fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
+import type { QuickWin } from '@/engine/pi/planAdvice';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 
 let mockState: PlanAdviceState = { status: 'loading' };
@@ -37,17 +38,64 @@ beforeEach(async () => {
 });
 
 describe('MakeMorePlan', () => {
+  it('gives each panel one ISK tab stop, and the exact figure still shows on focus', async () => {
+    const { container } = renderPlan();
+    const figures = container.querySelectorAll('[data-isk-figure]');
+    expect(figures.length).toBeGreaterThan(1);
+    // At most one stop per panel, never one per figure.
+    const stops = container.querySelectorAll('[data-isk-figure][tabindex="0"]');
+    expect(stops.length).toBeGreaterThan(0);
+    expect(stops.length).toBeLessThan(figures.length);
+    expect(stops.length).toBeLessThanOrEqual(5);
+    expect(container.querySelector('.sr-only')?.textContent).toBeTruthy();
+    (stops[0] as HTMLElement).focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/ISK/);
+  });
+
   it('shows the loading, prices-failed and error states', () => {
     mockState = { status: 'loading' };
     const { rerender } = renderPlan();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
-    mockState = { status: 'prices-failed' };
+    mockState = { status: 'prices-failed', advice: null };
     rerender(
       <MemoryRouter>
         <MakeMorePlan snapshot={snapshot} characterId={1} onFindBest={vi.fn()} />
       </MemoryRouter>
     );
     expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+  });
+
+  it('with prices down keeps the wins that need no price, with no gain and no other figure', () => {
+    const unpriced = {
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((colony) => ({
+        ...colony,
+        quickWins: colony.quickWins.map((win) => ({
+          ...win,
+          gainPerDay: null,
+          iskPerMinute: null,
+        })),
+      })),
+    } as unknown as PlanAdvice;
+    mockState = { status: 'prices-failed', advice: unpriced };
+    const { container } = renderPlan();
+    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    const panel = screen.getByRole('heading', { name: /Quick wins/ }).closest('section')!;
+    expect(within(panel).getAllByRole('checkbox')).toHaveLength(2);
+    expect(panel).not.toHaveTextContent(/ISK/);
+    expect(panel).not.toHaveTextContent('No ISK figure');
+    expect(container.querySelector('[data-isk-figure]')).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Rebuild/ })).not.toBeInTheDocument();
+  });
+
+  it('with prices down and nothing price-free to do, shows only the notice', () => {
+    mockState = {
+      status: 'prices-failed',
+      advice: { ...fixtureAdvice, colonies: [] } as unknown as PlanAdvice,
+    };
+    renderPlan();
+    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Quick wins/ })).not.toBeInTheDocument();
   });
 
   it('puts "What matters more?" on its own row in the body below sm, not in the header', () => {
@@ -62,6 +110,28 @@ describe('MakeMorePlan', () => {
     const live = screen.getByRole('status');
     expect(live).toHaveTextContent(/Quick wins add .* ISK a day/);
     expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
+  });
+
+  it.each([
+    [-756_000, /Rebuilding 1 planet costs 756K ISK a day\./],
+    [-0.3, /^((?!costs).)*$/s],
+  ])('words a rebuild of %d ISK a day as a cost, never "adds -"', (gain, pattern) => {
+    const [changing, ...rest] = fixtureAdvice.colonies;
+    const advice = {
+      ...fixtureAdvice,
+      colonies: [
+        {
+          ...changing,
+          rebuild: { ...changing.rebuild, gainPerDay: gain },
+        },
+        ...rest,
+      ],
+    } as unknown as PlanAdvice;
+    mockState = ready(advice);
+    renderPlan();
+    const live = screen.getByRole('status');
+    expect(live.textContent).toMatch(pattern);
+    expect(live.textContent).not.toMatch(/adds -/);
   });
 
   it('lists quick wins in the model order, each tickable, and remembers the tick', async () => {
@@ -94,6 +164,39 @@ describe('MakeMorePlan', () => {
     expect(cards[1]).toHaveTextContent(/Keep Uttindar II \(Barren\) on/);
     expect(cards[1]).toHaveTextContent(/already the best earner/);
     expect(cards[1]).toHaveTextContent(/As-is/);
+  });
+
+  it('never says Keep on raw ore: a raw-only colony points at the refinement when there is one', () => {
+    const [changing, keeping] = fixtureAdvice.colonies;
+    const refine = {
+      id: '2:room-factories:1',
+      planetId: 2,
+      detail: {
+        kind: 'spare-room',
+        what: 'factories',
+        productTypeId: P2_B,
+        factories: 2,
+        routedFrom: [],
+        needsRemoval: false,
+      },
+      gainPerDay: 500,
+      minutes: 4,
+      iskPerMinute: 125,
+    } as unknown as QuickWin;
+    const cardFor = (colony: typeof keeping) => {
+      mockState = ready({ ...fixtureAdvice, colonies: [changing, colony] });
+      const { unmount } = renderPlan();
+      const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
+      const text = card.textContent ?? '';
+      unmount();
+      return text;
+    };
+    const plain = cardFor({ ...keeping, sells: [RAW] });
+    expect(plain).not.toMatch(/Keep Uttindar II/);
+    expect(plain).toMatch(/sells raw/);
+    expect(plain).not.toMatch(/Refine it/);
+    const withWin = cardFor({ ...keeping, sells: [RAW], quickWins: [refine] });
+    expect(withWin).toMatch(/Refine it with the quick win above/);
   });
 
   it('opens an alternative in place and says what it trades', async () => {
@@ -150,6 +253,24 @@ describe('MakeMorePlan', () => {
     expect(within(column).getAllByRole('progressbar')).toHaveLength(2);
   });
 
+  it.each([
+    [3, 'Upgrade the Command Center to level 4 first (+1 step)'],
+    [2, 'Upgrade the Command Center to level 4 first (+2 steps)'],
+  ])('words a Command Center upgrade from level %i with the right plural', (from, text) => {
+    mockState = ready({
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((c) =>
+        c.rebuild.status === 'change'
+          ? { ...c, rebuild: { ...c.rebuild, upgradeFromLevel: from } }
+          : c
+      ),
+    });
+    renderPlan();
+    const column = screen.getByRole('region', { name: '1. Hek VI' });
+    expect(column).toHaveTextContent(text);
+    expect(column).not.toHaveTextContent('piPlan.make.fitNeedsUpgrade');
+  });
+
   it('names a hauling problem for the route, in the pilot units', () => {
     renderPlan();
     const haul = screen.getByRole('heading', { name: 'Hauling and upkeep' }).closest('section')!;
@@ -180,5 +301,23 @@ describe('MakeMorePlan', () => {
     renderPlan();
     expect(screen.getByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
+  });
+
+  it('says it assumes the default customs rate, with a link to the rate editor', () => {
+    mockState = ready({
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((c, i) => (i === 0 ? { ...c, taxAssumed: true } : c)),
+    });
+    renderPlan();
+    expect(screen.getByText(/assume 10% customs on/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set the rate on Plan' })).toHaveAttribute(
+      'href',
+      '/planetary-industry/plan#customs'
+    );
+  });
+
+  it('stays quiet when every customs rate is known', () => {
+    renderPlan();
+    expect(screen.queryByText(/assume 10% customs/)).not.toBeInTheDocument();
   });
 });

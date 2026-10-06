@@ -8,7 +8,7 @@
 import { piTier } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
-import type { PiData } from '@/sde/types';
+import type { PiData, PiFactoryKind } from '@/sde/types';
 import type { PlanAdvice } from '../planAdviceModel';
 
 export type MapTier = 0 | 1 | 2 | 3 | 4;
@@ -28,6 +28,9 @@ const PLANET_ORDER: readonly PlanetType[] = [
   'temperate',
 ];
 
+/** An extractor pulls a raw material; anything made runs in the factory its schematic names. */
+export type MapFacility = 'extractor' | PiFactoryKind;
+
 export interface MapProduct {
   typeId: number;
   name: string;
@@ -38,6 +41,7 @@ export interface MapProduct {
   raws: number[];
   /** Planet types that yield it (raw) or carry a factory for it (made). */
   hosts: PlanetType[];
+  facility: MapFacility;
 }
 
 export interface MapGraph {
@@ -66,6 +70,7 @@ export function buildMapGraph(pi: PiData): MapGraph {
       inputs: [],
       raws: [raw.typeID],
       hosts: [...raw.planetTypes],
+      facility: 'extractor',
     });
   }
   for (const [key, schematic] of Object.entries(pi.schematics)) {
@@ -77,6 +82,7 @@ export function buildMapGraph(pi: PiData): MapGraph {
       inputs: schematic.inputs.map((input) => input.typeID),
       raws: rawLeaves(typeId),
       hosts: [...schematic.planetTypes],
+      facility: schematic.facility,
     });
   }
   const all = [...byId.values()];
@@ -263,6 +269,8 @@ export type ProductFigure =
       kind: 'ranked';
       /** ISK a day from one planet of `useType`, after customs and sales tax. */
       iskPerDay: number;
+      /** m³ a day that planet ships: the hauling load. */
+      m3PerDay: number;
       useType: PlanetType;
       hostTypes: PlanetType[];
       haveTypes: PlanetType[];
@@ -270,20 +278,28 @@ export type ProductFigure =
       verdict: 'better' | 'same' | 'worse' | null;
       isReference: boolean;
       versus: { typeId: number; name: string; planetType: PlanetType; iskPerDay: number } | null;
+      /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
+      needsCcLevel: number | null;
     }
   | { kind: 'unranked'; reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit' };
 
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from
  * several planets, so it has no per-planet figure, and a P1 or P2 the hub does
- * not price has none either: unknown, never zero. `advice` must be built with
+ * not price has none either: unknown, never zero (`pricesFailed`: every product is
+ * unpriced, so every unranked one says so). `advice` must be built with
  * `recipeFilter: 'any'`.
  */
-export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGraph): ProductFigure {
+export function productFigure(
+  advice: PlanAdvice,
+  typeId: number,
+  graph: MapGraph,
+  pricesFailed = false
+): ProductFigure {
   const product = graph.byId.get(typeId);
   if (!product || product.tier === 0) return { kind: 'unranked', reason: 'raw' };
   if (product.tier > 2) return { kind: 'unranked', reason: 'tier' };
-  const recipe = advice.recipes.recipes.find((r) => r.typeId === typeId);
+  const recipe = advice.recipesWithTagged.recipes.find((r) => r.typeId === typeId);
   if (!recipe) {
     const onePlanet = graph.planetTypes.some(
       (type) =>
@@ -292,22 +308,26 @@ export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGrap
     );
     return {
       kind: 'unranked',
-      reason: advice.recipes.unpriced.includes(typeId)
-        ? 'unpriced'
-        : onePlanet
-          ? 'no-fit'
-          : 'not-one-planet',
+      // With the hub unread nothing is priced; "no fit at this level" would be a false reason.
+      reason:
+        pricesFailed || advice.recipes.unpriced.includes(typeId)
+          ? 'unpriced'
+          : onePlanet
+            ? 'no-fit'
+            : 'not-one-planet',
     };
   }
   return {
     kind: 'ranked',
     iskPerDay: recipe.iskPerDay,
+    m3PerDay: recipe.m3PerDay,
     useType: recipe.useType,
     hostTypes: recipe.hostTypes,
     haveTypes: recipe.haveTypes,
     verdict: recipe.comparison?.verdict ?? null,
     isReference: recipe.comparison?.isReference ?? false,
     versus: recipe.comparison?.versus ?? null,
+    needsCcLevel: recipe.needsCcLevel ?? null,
   };
 }
 

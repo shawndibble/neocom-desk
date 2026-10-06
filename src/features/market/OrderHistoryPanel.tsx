@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -20,10 +20,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadOrderHistory } from '@/features/character/orders';
-import { ItemContextMenu } from './ItemContextMenu';
-import { OrderHistoryList } from './OrderHistoryList';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { MarketItemLink } from './MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -83,7 +81,7 @@ async function loadOrderHistorySnapshot(
 interface HistoryFilterBarProps {
   filter: HistoryFilter;
   onChange: (filter: HistoryFilter) => void;
-  /** The column picker — omitted on a phone, where `OrderHistoryList` renders instead and ignores it. */
+  /** The column picker — omitted on a phone. */
   actions?: ReactNode;
 }
 
@@ -196,16 +194,18 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'item',
         header: t('orders.item'),
+        stickyStart: true,
         sortValue: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
         render: (order) => (
-          <MarketItemLink typeId={order.type_id}>
+          <ItemInfoLink typeId={order.type_id}>
             {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
-          </MarketItemLink>
+          </ItemInfoLink>
         ),
       },
       {
         id: 'side',
         header: t('orders.side'),
+        phoneHidden: true,
         sortValue: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
         render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
       },
@@ -238,6 +238,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'state',
         header: t('orders.state'),
+        phoneHidden: true,
         className: 'text-text-dim',
         sortValue: (order) => order.state,
         render: (order) => order.state,
@@ -271,20 +272,6 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         columns.filter((column) => column.id !== 'item').map((column) => [column.id, column])
       ) as Record<OrderHistoryColumnId, DataTableColumn<MarketOrderHistory>>,
     [columns]
-  );
-
-  /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
-  // Stable, so the table's memoized rows skip re-rendering on every panel render.
-  const rowContextMenu = useCallback(
-    (order: MarketOrderHistory, tr: ReactElement) => {
-      const itemName = nameFor(order.type_id);
-      return (
-        <ItemContextMenu typeId={order.type_id} itemName={itemName}>
-          {tr}
-        </ItemContextMenu>
-      );
-    },
-    [nameFor]
   );
 
   if (!hydrated) {
@@ -397,25 +384,19 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
                 ) : undefined
               }
             />
-          ) : isPhone ? (
-            <OrderHistoryList
-              orders={filteredHistory}
-              nameFor={nameFor}
-              label={t('orders.historyTab')}
-              rowContextMenu={rowContextMenu}
-            />
           ) : (
-            <DataTable
-              {...historyExport.tableProps}
-              columns={tableColumns}
-              rows={filteredHistory}
-              rowKey={orderHistoryRowKey}
-              virtualize="auto"
-              label={t('orders.historyTab')}
-              rowContextMenu={rowContextMenu}
-              rowMoreActions
-              {...sortProps}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                {...historyExport.tableProps}
+                columns={tableColumns}
+                rows={filteredHistory}
+                rowKey={orderHistoryRowKey}
+                virtualize="auto"
+                label={t('orders.historyTab')}
+                responsive="table"
+                {...sortProps}
+              />
+            </div>
           )}
         </>
       )}

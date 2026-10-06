@@ -433,6 +433,20 @@ describe('CourierResults ISK/jump cell', () => {
     const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
     expect(within(ordinaryRow).queryByText('Over rate')).not.toBeInTheDocument();
   });
+
+  it('keeps system names plain and makes the jump count the Route Safety link', async () => {
+    knownJumps();
+    renderLanes();
+
+    const row = await waitFor(() => {
+      const el = document.querySelector('tr[data-row-key="100"]');
+      if (!el) throw new Error('expected row');
+      return el as HTMLElement;
+    });
+    const links = await within(row).findAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName('9 jumps — open route safety');
+  });
 });
 
 describe('CourierResults on a phone', () => {

@@ -232,11 +232,10 @@ describe('Contracts', () => {
     expect(cue(finishedRow)).not.toBeInTheDocument();
   });
 
-  it('offers the row menu through a visible More-actions button', async () => {
+  it('has no More-actions button: the title cell opens the detail modal', async () => {
     render(<App />);
     await screen.findByText('Rifter fit');
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for Rifter fit' }));
-    expect(await screen.findByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
   it('opens the contract detail modal on click', async () => {
@@ -248,7 +247,9 @@ describe('Contracts', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
-    expect(await screen.findByRole('dialog', { name: 'Rifter fit' })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Rifter fit' });
+    // The row menu's "Copy contract ID" moved here: the modal is where the ID is read.
+    expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('falls back to cached contracts offline', async () => {
@@ -335,7 +336,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'rifter');
+    await user.type(screen.getByPlaceholderText('Search issuer, receiver or title…'), 'rifter');
 
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
     expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
@@ -349,7 +350,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
     openFilters();
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await user.type(
+      screen.getByPlaceholderText('Search issuer, receiver or title…'),
+      'zzzznomatch'
+    );
 
     expect(await screen.findByText('No contracts match your filters.')).toBeInTheDocument();
     expect(
@@ -365,7 +369,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     const table = await screen.findByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
     expect(within(table).getByText('Courier')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search issuer or title…')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Search issuer, receiver or title…')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -383,7 +387,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
 
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await user.type(
+      screen.getByPlaceholderText('Search issuer, receiver or title…'),
+      'zzzznomatch'
+    );
     await waitFor(() => expect(window.location.search).toContain('history.q=zzzznomatch'));
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
@@ -416,7 +423,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       let sheet = await screen.findByRole('dialog');
       await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
       await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
-      await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+      await user.type(
+        screen.getByPlaceholderText('Search issuer, receiver or title…'),
+        'zzzznomatch'
+      );
 
       await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
       await screen.findAllByText('Rifter fit');
@@ -559,6 +569,41 @@ describe('Contact standing cross-reference', () => {
  * guard assertion in each states that premise out loud so this can never
  * quietly go vacuous if the config's zone ever changes.
  */
+describe('Received by column', () => {
+  const base = contractPage1[0];
+  it('shows the acceptor, the offered-to assignee with a tag, and a dash for the pilot', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([
+          {
+            ...base,
+            contract_id: 11,
+            title: 'Accepted one',
+            status: 'finished',
+            acceptor_id: 600001,
+          },
+          { ...base, contract_id: 12, title: 'Offered one', assignee_id: 700001 },
+          { ...base, contract_id: 13, title: 'Mine one', assignee_id: CHAR_ID },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([
+          { id: 500001, name: 'Some Trader', category: 'character' },
+          { id: 600001, name: 'Buyer Bob', category: 'character' },
+          { id: 700001, name: 'Offered Olga', category: 'character' },
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Accepted one');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).getByRole('link', { name: 'Buyer Bob' })).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'Offered Olga' })).toBeInTheDocument();
+    expect(within(table).getAllByText('(offered)')).toHaveLength(1);
+    expect(within(table).getAllByText('—').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe('Time format preference', () => {
   /** The instant is fixed; only its rendering depends on the zone below. */
   const EXPIRES = new Date(contractPage1[0].date_expired);
@@ -611,7 +656,7 @@ describe('Time format preference', () => {
   });
 });
 
-describe('Contracts row context menu (issue #676)', () => {
+describe('Contracts row right-click (issue #676)', () => {
   /** Right-clicks a contract row by its rendered title-cell text and returns the row. */
   async function openContractMenu(cellText: string) {
     await screen.findByText('Rifter fit');
@@ -623,21 +668,14 @@ describe('Contracts row context menu (issue #676)', () => {
     return row;
   }
 
-  it('offers Copy title and Copy Contract ID, without opening the detail modal', async () => {
+  it('has no custom row menu: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
     render(<App />);
     await openContractMenu('Rifter fit');
 
-    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
+    // Right-click may still offer the table's own Export; never row copies.
+    expect(screen.queryByRole('menuitem', { name: 'Copy title' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Copy contract ID' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('offers the menu on a titleless contract, keyed off its type-label fallback', async () => {
-    render(<App />);
-    await openContractMenu('Courier');
-
-    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('left-click on the title cell still opens the detail modal, unaffected by the context menu', async () => {

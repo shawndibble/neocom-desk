@@ -1,9 +1,10 @@
 import type { Contract } from '@/esi/endpoints';
+import { contractReceiver } from './contractCounterparty';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
 
 /**
  * The contracts filter bar's state (issue #417): status, type, and free text
- * against the issuer name or title. `null` (or an empty string for `text`)
+ * against the issuer name, receiver name or title. `null` (or an empty string for `text`)
  * means that criterion is inactive — every field inactive is the identity
  * filter, same shape as `WalletJournalFilter`.
  */
@@ -20,14 +21,15 @@ export const EMPTY_CONTRACTS_FILTER: ContractsFilter = {
 };
 
 /**
- * Every active criterion is ANDed. Free text matches either the resolved
- * issuer name or the contract's own title, since either is what a search box
+ * Every active criterion is ANDed. Free text matches the resolved
+ * issuer or receiver name, or the contract's own title, since either is what a search box
  * labeled "issuer or title" implies.
  */
 export function filterContracts(
   contracts: readonly Contract[],
   filter: ContractsFilter,
-  issuerNames: ReadonlyMap<number, string>
+  issuerNames: ReadonlyMap<number, string>,
+  selfId?: number
 ): Contract[] {
   const text = filter.text.trim().toLowerCase();
   return contracts.filter((contract) => {
@@ -35,8 +37,14 @@ export function filterContracts(
     if (filter.type !== null && contract.type !== filter.type) return false;
     if (text !== '') {
       const issuerName = issuerNames.get(contract.issuer_id) ?? '';
+      const receiver = selfId === undefined ? null : contractReceiver(contract, selfId);
+      const receiverName = receiver ? (issuerNames.get(receiver.id) ?? '') : '';
       const title = contract.title ?? '';
-      if (!issuerName.toLowerCase().includes(text) && !title.toLowerCase().includes(text)) {
+      if (
+        !issuerName.toLowerCase().includes(text) &&
+        !receiverName.toLowerCase().includes(text) &&
+        !title.toLowerCase().includes(text)
+      ) {
         return false;
       }
     }

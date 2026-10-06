@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, Spinner } from '@/components/ui';
-import { formatIskCompact } from '@/lib/isk';
+import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
+import { clampIskZero, formatIskCompact } from '@/lib/isk';
+import { AssumedCustomsNote } from './AssumedCustomsNote';
+import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
@@ -37,10 +39,15 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
   ];
   if (headline.rebuildCount > 0) {
     parts.push(
-      t('piPlan.make.liveRebuild', {
-        gain: formatIskCompact(headline.rebuildGainPerDay),
-        count: headline.rebuildCount,
-      })
+      t(
+        clampIskZero(headline.rebuildGainPerDay, 0) < 0
+          ? 'piPlan.make.liveRebuildCost'
+          : 'piPlan.make.liveRebuild',
+        {
+          gain: formatIskCompact(Math.abs(headline.rebuildGainPerDay)),
+          count: headline.rebuildCount,
+        }
+      )
     );
   }
   if (view.stats.unknownColonies > 0) {
@@ -73,7 +80,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { buybackPct } = useSellHub();
   const view = useMemo(
     () =>
-      state.status === 'ready'
+      (state.status === 'ready' || state.status === 'prices-failed') && state.advice
         ? buildPlanView(state.advice, snapshot.pi, (id) => t('pi.planetLabel', { id }))
         : null,
     [state, snapshot.pi, t]
@@ -81,10 +88,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
 
   // A row that is gone takes its tick with it.
   useEffect(() => {
-    if (!view || !ticksHydrated) return;
+    // With prices down the list is shorter: pruning now would drop ticks on wins that return.
+    if (!view || !ticksHydrated || state.status !== 'ready') return;
     const kept = pruneTicks(ticked, tickableIds(view), coveredPlanets(view));
     if (kept.length !== ticked.length) void setTicked(kept);
-  }, [view, ticked, ticksHydrated, setTicked]);
+  }, [view, ticked, ticksHydrated, setTicked, state.status]);
 
   const ticks = useMemo<Ticks>(() => {
     const set = new Set(ticked);
@@ -109,7 +117,17 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
-    return <PricesUnavailable />;
+    // A win that needs no price (restart a stopped extractor) still stands; every figure is hidden.
+    return (
+      <div className="space-y-4">
+        <PricesUnavailable />
+        {view && view.quickWins.length > 0 && (
+          <IskFigureGroup>
+            <QuickWinsPanel view={view} ticks={ticks} pricesDown />
+          </IskFigureGroup>
+        )}
+      </div>
+    );
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.make.failedTitle')} hint={t('piPlan.make.failedHint')} />;
@@ -137,17 +155,32 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       <div role="status" aria-live="polite" className="sr-only">
         {headlineText(view, t)}
       </div>
-      <YourPlanetsPanel
-        view={view}
-        preference={preference}
-        onPreference={(value) => void setPreference(value)}
-        onFindBest={onFindBest}
-        priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+      <AssumedCustomsNote
+        names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
-      {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
-      <RebuildPanel view={view} />
-      <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
-      <ChecklistPanel view={view} ticks={ticks} />
+      <IskFigureGroup>
+        <YourPlanetsPanel
+          view={view}
+          preference={preference}
+          onPreference={(value) => void setPreference(value)}
+          onFindBest={onFindBest}
+          priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+        />
+      </IskFigureGroup>
+      {view.quickWins.length > 0 && (
+        <IskFigureGroup>
+          <QuickWinsPanel view={view} ticks={ticks} />
+        </IskFigureGroup>
+      )}
+      <IskFigureGroup>
+        <RebuildPanel view={view} />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
+      </IskFigureGroup>
+      <IskFigureGroup>
+        <ChecklistPanel view={view} ticks={ticks} />
+      </IskFigureGroup>
     </div>
   );
 }

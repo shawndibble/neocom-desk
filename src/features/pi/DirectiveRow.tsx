@@ -76,7 +76,7 @@ export function VerbTag({ verb, label }: { verb: DirectiveVerb; label?: string }
     <span
       className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${VERB_CLASS[verb]}`}
     >
-      {label ?? t(`piAdvisor.verb.${verb}`)}
+      {label ?? t(`piShared.verb.${verb}`)}
     </span>
   );
 }
@@ -195,7 +195,7 @@ export function LoadMeter({
       </span>
       <div
         role="progressbar"
-        aria-label={t('piAdvisor.budgetBarLabel', { axis: label })}
+        aria-label={t('piShared.budgetBarLabel', { axis: label })}
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -233,7 +233,7 @@ export function EstimateBadge() {
   const { t } = useTranslation();
   return (
     <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-      {t('piAdvisor.estimateBadge')}
+      {t('piShared.estimateBadge')}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 /**
- * The Fitting editor's one item menu: every fitted module, empty slot, drone,
- * cargo item and Add panel item offers its actions through it, on the Ring
+ * The Fitting editor's one item menu: every fitted module, empty slot, drone
+ * and Ring cargo tile offers its actions through it, on the Ring
  * and the List alike. Built on the app's `RowActionsMenu`, so each gets the
  * right-click menu, Radix's own touch-and-hold for it, and — where the row
  * has room — a visible "More actions" (⋮) button a keyboard or touch user
@@ -280,7 +280,6 @@ export function ModuleMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
-      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem onSelect={() => actions.removeAllOfType(typeId)}>
         {t('fittings.item.removeAllOfType')}
@@ -397,7 +396,6 @@ export function WeaponMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={first.typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={first.typeId} />
-      <BuildPlanMenuItems typeId={first.typeId} />
     </>
   );
 }
@@ -472,7 +470,6 @@ export function DroneMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
-      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeDrones(typeId)}>
         {t('fittings.ring.menu.remove', { name })}
@@ -546,7 +543,6 @@ export function CargoMenuItems({ typeId }: { typeId: number }) {
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
-      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeCargo(typeId)}>
         {t('fittings.ring.menu.remove', { name })}

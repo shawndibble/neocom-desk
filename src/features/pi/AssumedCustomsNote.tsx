@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { PLAN_PATH } from './piPlanLink';
+import { PLAN_CUSTOMS_HREF } from './piPlanLink';
 import { customsRatePercent } from './customsRate';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 
 /**
  * Says an ISK figure leans on the assumed customs rate, and sends the pilot to
- * where it is set (Plan's colony list). Renders nothing when no figure is assumed.
+ * where it is set (Plan's colony customs fields). Renders nothing when no figure is assumed.
  */
 export function AssumedCustomsNote({
   names,
@@ -30,7 +30,7 @@ export function AssumedCustomsNote({
           percent: customsRatePercent(ASSUMED_UNKNOWN_CUSTOMS),
         })}
       </span>
-      <Link className={inlineLinkClassName} to={PLAN_PATH}>
+      <Link className={inlineLinkClassName} to={PLAN_CUSTOMS_HREF}>
         {t('piPlan.customsSetOnPlan')}
       </Link>
     </p>

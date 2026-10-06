@@ -75,7 +75,7 @@ function shortfallText(
         </>
       );
     case 'no-factory-host':
-      return t('piPlan.shortNoHost', { facility: t(`piAdvisor.pinKind.${shortfall.facility}`) });
+      return t('piPlan.shortNoHost', { facility: t(`piShared.pinKind.${shortfall.facility}`) });
     case 'host-over-budget':
       return (
         <>

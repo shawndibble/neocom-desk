@@ -49,6 +49,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => piData),
   loadPiPlanetRadius: vi.fn(async () => ({ [String(40000001)]: 5_000 })),
+  // The product drawer's planet finder: no systems needed for these tests.
+  loadPiSystemPlanets: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
@@ -122,7 +124,7 @@ const detailPayload = {
   routes: [],
 };
 
-const PRODUCT_ID = 2288;
+const PRODUCT_ID = 2307; // Felsic Magma in pi.json
 const FACTORY_TYPE_ID = 3001;
 const STORAGE_TYPE_ID = 3002;
 const SCHEMATIC_ID = 131;
@@ -568,7 +570,7 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).queryByText('Needs a look')).not.toBeInTheDocument();
   });
 
-  it('names each extractor by its product, as a Market link, not by the extractor pin type', async () => {
+  it('names each extractor by its product, as a link to its PI detail, not by the extractor pin type', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(decayedDetailPayload)
@@ -581,7 +583,7 @@ describe('PlanetaryIndustry', () => {
     // extractor and identifies nothing; the resolved product is what names it.
     expect(within(region).getByRole('link', { name: 'Felsic Magma' })).toHaveAttribute(
       'href',
-      expect.stringContaining('/market/browser')
+      `/planetary-industry/map?product=${PRODUCT_ID}`
     );
     expect(within(panel).queryByText('Extractor Control Unit')).not.toBeInTheDocument();
   });
@@ -853,6 +855,41 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
   });
 
+  it('restores the question from ?q= on load', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ignores a junk ?q= and opens on the default question', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=bogus');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan#customs');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    await user.click(screen.getByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('writes the picked question to ?q= without adding history entries', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    const before = window.history.length;
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.history.length).toBe(before);
+  });
+
   it('keeps the Goal Planner behind a ?goals= link, with no picker choice needed', async () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
@@ -914,12 +951,154 @@ describe('PlanetaryIndustry', () => {
     });
   });
 
+  describe('when ESI does not answer the planets read (issue #2691)', () => {
+    const NOTICE = "ESI didn't answer";
+    const down = () =>
+      http.get(`${ESI}/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+      );
+
+    it.each([
+      ['plan', '/planetary-industry/plan'],
+      ['map', '/planetary-industry/map'],
+      ['colonies', '/planetary-industry/colonies'],
+    ])(
+      'says so on %s, never "no colonies", and Retry re-reads',
+      async (_tab, path) => {
+        server.use(down());
+        window.history.pushState({}, '', path);
+        const user = userEvent.setup();
+        render(<App />);
+        expect(await screen.findByText(NOTICE, {}, { timeout: 15_000 })).toBeInTheDocument();
+        expect(screen.queryByText('No colonies yet')).toBeNull();
+        expect(screen.queryByText(/no colonies yet/i)).toBeNull();
+        expect(screen.queryByText(/Reconnect/)).toBeNull();
+        if (_tab === 'map') {
+          expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+        }
+
+        server.resetHandlers();
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByText(NOTICE)).toBeNull(), { timeout: 15_000 });
+      },
+      30_000
+    );
+
+    it('keeps a warm cache on screen instead of the notice', async () => {
+      await db.esiCache.put({
+        characterId: CHAR_ID,
+        key: 'planets',
+        value: planetsPayload,
+        fetchedAt: 1234,
+      });
+      server.use(down());
+      render(<App />);
+      await colonyPanelFor(/Jita IV/);
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+
+    it('still says "no colonies" for an answer that really is empty', async () => {
+      server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
+      render(<App />);
+      expect(await screen.findByText('No colonies yet')).toBeInTheDocument();
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+  });
+
   it('draws the planet map on the Map tab', async () => {
     window.history.pushState({}, '', '/planetary-industry/map');
     render(<App />);
     expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByText('The PI map is coming')).toBeNull();
+  });
+
+  describe("a product's PI detail is a URL (?product=)", () => {
+    const BIOFUELS = 2396;
+    const drawer = () => screen.findByRole('dialog', { name: 'How to make it' });
+
+    it('opens the Map with that product drawer open, and a reload reopens it', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      const first = render(<App />);
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+      first.unmount();
+      render(<App />);
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
+    });
+
+    it('carries View in Market and Show info, the destinations the name link displaced', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      const dialog = await drawer();
+      expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('/market/browser')
+      );
+      expect(within(dialog).getByRole('button', { name: 'Show info' })).toBeInTheDocument();
+    });
+
+    it('closes on Back: a tile click pushes the entry, Back pops it', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/map');
+      render(<App />);
+      const board = await screen.findByRole('group', { name: /^Planet map/ });
+      const tile = within(board).getByRole('link', { name: /^Biofuels\. / });
+      expect(tile).toHaveAttribute('href', `/planetary-industry/map?product=${BIOFUELS}`);
+      await user.click(tile);
+      await drawer();
+      expect(window.location.search).toBe(`?product=${BIOFUELS}`);
+      window.history.back();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(window.location.pathname).toBe('/planetary-industry/map');
+      expect(window.location.search).toBe('');
+    });
+
+    it.each(['999999999', 'abc', '-1'])('ignores a junk product id (%s)', async (junk) => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${junk}`);
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it("keeps Plan's ?q= beside ?product=: a name on Plan opens the drawer, Back returns to the question", async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+      render(<App />);
+      const link = await waitFor(() => {
+        const found = document.querySelector<HTMLAnchorElement>('main a[href*="product="]');
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      expect(link.getAttribute('href')).toMatch(
+        /^\/planetary-industry\/map\?q=find-best&product=\d+$/
+      );
+      await user.click(link);
+      await drawer();
+      expect(window.location.search).toMatch(/^\?q=find-best&product=\d+$/);
+      window.history.back();
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/plan'));
+      expect(window.location.search).toBe('?q=find-best');
+    });
+
+    it('ignores a junk product id beside ?q=, keeping ?q=', async () => {
+      window.history.pushState({}, '', '/planetary-industry/map?q=find-best&product=abc');
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).toBe('?q=find-best'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('drops ?product= when a tab switch leaves the Map', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      await drawer();
+      await user.click(screen.getByRole('tab', { name: 'Colonies' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/colonies'));
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+    });
   });
 
   it('redirects the retired Advisor URL to Colonies, with no Advisor left on the page', async () => {

@@ -13,7 +13,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { cx } from '@/lib/cx';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
@@ -318,9 +318,9 @@ export function ZkillTopShips({ ships }: { ships: PilotTopShip[] }) {
             />
             <span className="min-w-0 space-y-1">
               <span className="block truncate text-sm text-text">
-                <MarketItemLink typeId={ship.shipTypeId}>
+                <ItemInfoLink typeId={ship.shipTypeId}>
                   {names.get(ship.shipTypeId) ?? t('common.unknownType', { id: ship.shipTypeId })}
-                </MarketItemLink>
+                </ItemInfoLink>
               </span>
               <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-bg">
                 <span

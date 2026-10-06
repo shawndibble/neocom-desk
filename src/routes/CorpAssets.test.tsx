@@ -446,13 +446,13 @@ describe('item name and blueprint badge', () => {
     });
   });
 
-  it('links the item name to its Market listing', async () => {
+  it('links the item name to its Show info', async () => {
     const user = userEvent.setup();
     renderAssets();
     await user.click(await screen.findByRole('link', { name: /Division 1/ }));
 
     const name = await screen.findByRole('link', { name: 'Tritanium' });
-    expect(name.getAttribute('href')).toMatch(/^\/market\/browser\?.*34/);
+    expect(name.getAttribute('href')).toMatch(/info=type-34$/);
   });
 
   it('badges a corp BPO and BPC, and leaves an ordinary item bare', async () => {

@@ -21,14 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  IconButton,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  RowMoreActions,
-  TypeIcon,
-} from '@/components/ui';
+import { IconButton, Popover, PopoverContent, PopoverTrigger, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
@@ -38,7 +31,6 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
-import { ItemContextMenu } from './ItemContextMenu';
 import { PriceAlertForm } from './PriceAlertForm';
 import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
@@ -84,33 +76,28 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
       >
         <Icon.DragHandle />
       </button>
-      <ItemContextMenu typeId={item.typeId} itemName={item.name}>
-        {/* The trigger holds the More actions button beside the item
-            button (buttons don't nest), so both sit inside the menu. */}
-        <div className="flex min-w-0 flex-1 items-center">
-          <button
-            type="button"
-            onClick={() => onSelect(item.typeId)}
-            aria-current={selected ? 'true' : undefined}
-            className={cx(
-              'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-accent hover:underline',
-              interactiveClassName,
-              focusRingClassName
-            )}
-          >
-            <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-            <span className="truncate">{item.name}</span>
-            {hasTarget && (
-              <span className="shrink-0 text-text-dim">
-                {/* Compact stays text: IskAmount's focusable trigger can't nest in this button. */}
-                {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
-                  formatIskCompact(item.targetPrice!)}
-              </span>
-            )}
-          </button>
-          <RowMoreActions />
-        </div>
-      </ItemContextMenu>
+      <div className="flex min-w-0 flex-1 items-center">
+        <button
+          type="button"
+          onClick={() => onSelect(item.typeId)}
+          aria-current={selected ? 'true' : undefined}
+          className={cx(
+            'flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-accent hover:underline',
+            interactiveClassName,
+            focusRingClassName
+          )}
+        >
+          <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+          <span className="truncate">{item.name}</span>
+          {hasTarget && (
+            <span className="shrink-0 text-text-dim">
+              {/* Compact stays text: IskAmount's focusable trigger can't nest in this button. */}
+              {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
+                formatIskCompact(item.targetPrice!)}
+            </span>
+          )}
+        </button>
+      </div>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <IconButton

@@ -39,7 +39,8 @@ describe('ItemRow volume', () => {
 });
 
 function LocationProbe() {
-  return <output data-testid="loc">{useLocation().pathname}</output>;
+  const { pathname, search } = useLocation();
+  return <output data-testid="loc">{`${pathname}${search}`}</output>;
 }
 
 function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
@@ -64,10 +65,10 @@ function renderItemRow(overrides: Partial<Parameters<typeof ItemRow>[0]> = {}) {
 }
 
 describe('ItemRow name', () => {
-  it('links the name to the item in Market', () => {
+  it('links the name to the item Show info', () => {
     renderItemRow({ typeId: 11 });
     const link = screen.getByRole('link', { name: 'Rifter Blueprint' });
-    expect(link.getAttribute('href')).toMatch(/^\/market\/browser\?.*11/);
+    expect(link.getAttribute('href')).toMatch(/\?info=type-11$/);
     expect(link).not.toHaveAttribute('title');
   });
 
@@ -76,7 +77,7 @@ describe('ItemRow name', () => {
     const onToggleSelection = vi.fn();
     renderItemRow({ typeId: 11, onToggleSelection, selectMode: true });
     await userEvent.click(screen.getByRole('link', { name: 'Rifter Blueprint' }));
-    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
+    expect(screen.getByTestId('loc')).toHaveTextContent('?info=type-11');
     expect(onToggleSelection).not.toHaveBeenCalled();
   });
 
@@ -87,12 +88,12 @@ describe('ItemRow name', () => {
     fireEvent.contextMenu(link);
     fireEvent.click(link, { detail: 1 });
     expect(screen.getByTestId('loc')).toHaveTextContent('/');
-    expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
+    expect(screen.getByTestId('loc')).not.toHaveTextContent('info=');
 
     // The next ordinary tap still follows it.
     fireEvent.pointerDown(link, { pointerType: 'touch' });
     fireEvent.click(link, { detail: 1 });
-    expect(screen.getByTestId('loc')).toHaveTextContent('/market/browser');
+    expect(screen.getByTestId('loc')).toHaveTextContent('?info=type-11');
   });
 
   it('does not follow the name when a touch is held past the long-press delay', () => {
@@ -103,7 +104,7 @@ describe('ItemRow name', () => {
       fireEvent.pointerDown(link, { pointerType: 'touch' });
       vi.advanceTimersByTime(800);
       fireEvent.click(link, { detail: 1 });
-      expect(screen.getByTestId('loc')).not.toHaveTextContent('/market');
+      expect(screen.getByTestId('loc')).not.toHaveTextContent('info=');
     } finally {
       vi.useRealTimers();
     }

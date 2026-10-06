@@ -39,7 +39,7 @@ describe('MiningYieldCharts — ISK metric', () => {
     render(
       <MiningYieldCharts
         metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'saved' }]}
+        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'saved' }]}
         dailyVolume={[]}
         dailyCount={[]}
         typeComparison={typeComparison}
@@ -48,8 +48,8 @@ describe('MiningYieldCharts — ISK metric', () => {
         showRefining
       />
     );
-    const rate = screen.getByRole('table', { name: 'ISK/hr trend' });
-    expect(within(rate).getByRole('columnheader', { name: 'ISK/hr' })).toBeInTheDocument();
+    const rate = screen.getByRole('table', { name: 'ISK mined per day' });
+    expect(within(rate).getByRole('columnheader', { name: 'ISK mined' })).toBeInTheDocument();
     expect(within(rate).getByText('1,234,567 ISK')).toBeInTheDocument();
 
     const compare = screen.getByRole('table', { name: 'Raw vs. refined value by type' });
@@ -62,7 +62,7 @@ describe('MiningYieldCharts — ISK metric', () => {
     render(
       <MiningYieldCharts
         metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'live' }]}
+        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'live' }]}
         dailyVolume={[]}
         dailyCount={[]}
         typeComparison={typeComparison}
@@ -71,7 +71,7 @@ describe('MiningYieldCharts — ISK metric', () => {
         showRefining
       />
     );
-    const rate = screen.getByRole('table', { name: 'ISK/hr trend' });
+    const rate = screen.getByRole('table', { name: 'ISK mined per day' });
     expect(within(rate).getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
     expect(within(rate).getByRole('cell', { name: 'Live' })).toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe('MiningYieldCharts — ISK metric', () => {
       ({
         active: true,
         label: '2026-09-01',
-        payload: [{ payload: { date: '2026-09-01', iskPerHour: 1234567, source } }],
+        payload: [{ payload: { date: '2026-09-01', iskValue: 1234567, source } }],
       }) as unknown as Parameters<typeof RateTooltip>[0];
 
     const { unmount } = render(<RateTooltip {...tooltipProps('live')} />);
@@ -96,7 +96,7 @@ describe('MiningYieldCharts — ISK metric', () => {
     render(
       <MiningYieldCharts
         metric="isk"
-        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'saved' }]}
+        dailyRate={[{ date: '2026-09-01', iskValue: 1234567, source: 'saved' }]}
         dailyVolume={[]}
         dailyCount={[]}
         typeComparison={typeComparison}
@@ -105,9 +105,7 @@ describe('MiningYieldCharts — ISK metric', () => {
         showRefining
       />
     );
-    expect(
-      screen.getByText("Each day's value ÷ 24 h, averaged over calendar time")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Total value of each day's ore")).toBeInTheDocument();
   });
 
   it('drops the refined column from the type table when refining is hidden', () => {
@@ -161,13 +159,13 @@ describe('MiningYieldCharts — volume metric', () => {
         showRefining
       />
     );
-    expect(screen.getByText('m³/hr trend')).toBeInTheDocument();
+    expect(screen.getByText('m³ mined per day')).toBeInTheDocument();
     expect(screen.getByText('m³ by ore type')).toBeInTheDocument();
     expect(screen.queryByText('Refining hidden. Raw value only.')).not.toBeInTheDocument();
     expect(screen.queryByText('Refined value')).not.toBeInTheDocument();
 
-    const rate = screen.getByRole('table', { name: 'm³/hr trend' });
-    expect(within(rate).getByRole('columnheader', { name: 'm³/hr' })).toBeInTheDocument();
+    const rate = screen.getByRole('table', { name: 'm³ mined per day' });
+    expect(within(rate).getByRole('columnheader', { name: 'm³' })).toBeInTheDocument();
 
     const compare = screen.getByRole('table', { name: 'm³ by ore type' });
     expect(within(compare).getByText('Veldspar')).toBeInTheDocument();
@@ -205,11 +203,11 @@ describe('MiningYieldCharts — count metric', () => {
         showRefining
       />
     );
-    expect(screen.getByText('Count/hr trend')).toBeInTheDocument();
+    expect(screen.getByText('Count mined per day')).toBeInTheDocument();
     expect(screen.getByText('Count by ore type')).toBeInTheDocument();
 
-    const rate = screen.getByRole('table', { name: 'Count/hr trend' });
-    expect(within(rate).getByRole('columnheader', { name: 'Count/hr' })).toBeInTheDocument();
+    const rate = screen.getByRole('table', { name: 'Count mined per day' });
+    expect(within(rate).getByRole('columnheader', { name: 'Count' })).toBeInTheDocument();
 
     const compare = screen.getByRole('table', { name: 'Count by ore type' });
     expect(within(compare).getByText('Veldspar')).toBeInTheDocument();

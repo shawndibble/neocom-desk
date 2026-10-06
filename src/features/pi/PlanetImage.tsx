@@ -10,25 +10,25 @@ import { PLANET_TYPE_ICON_ID } from './planetTypeIcons';
  */
 export function PlanetImage({
   type,
-  px = 40,
+  size = 40,
   badge,
   className,
 }: {
   type: PlanetType;
-  px?: number;
+  size?: number;
   badge?: ReactNode;
   className?: string;
 }) {
   return (
     <span
-      className={cx('relative inline-flex shrink-0', className)}
-      style={{ width: px, height: px }}
+      className={cx('relative inline-flex shrink-0 rounded-full', className)}
+      style={{ width: size, height: size }}
     >
       <TypeIcon
         typeId={PLANET_TYPE_ICON_ID[type]}
         size={64}
-        width={px}
-        height={px}
+        width={size}
+        height={size}
         className="rounded-full"
       />
       {badge && (

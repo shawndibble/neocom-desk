@@ -1,32 +1,18 @@
 /**
- * The **Shared Appraisal** page's stacked result card at 390px (issue #1113) —
- * the follow-up `marketAppraisalNarrow.spec.ts`'s own ticket (#1097) scoped
- * out so the two pages wouldn't drift mid-ticket. Same defect, same fix
- * (`stackColumns={2}`), different page: the share view hung five short
- * numeric columns off the item name at `DataTable`'s default
- * `stackColumns={1}`, so a shared fifteen-item pile was fifteen six-line
- * cards to scroll — on the page most likely to be opened from a chat client
- * on a phone.
+ * The **Shared Appraisal** page at 390px: a plain table, not stacked cards
+ * (DESIGN.md §6c Restraint). Six numeric columns hang off the item name, a
+ * table read across columns, so it keeps real columns on a phone — item pinned
+ * (`stickyStart`), Buy each / Sell each / Volume shed (`phoneHidden`) — and the
+ * page never scrolls sideways. History: #1113 paired the six values into a
+ * two-up card; that card is gone.
  *
- * Playwright rather than jsdom for the same reason that spec gives: the
- * pairing lives in `.dt-stack-2col`'s phone grid (`.dt-stacked`,
- * `src/styles/index.css`), which jsdom cannot evaluate, so only a real
- * engine can tell a paired card from the six-line one that shipped. Hence
- * assertions on bounding boxes — which cells share a line, how wide each
- * is — rather than on the class token, which `src/routes/SharedLink.test.tsx`
- * already guards.
+ * Playwright rather than jsdom: `max-sm:hidden` and the sticky column are CSS
+ * a real engine has to evaluate.
  *
- * Only one column count exists here. A Shared Appraisal carries no
- * refine-then-sell comparison, so the optional extra column `AppraisalPanel`
- * can grow never applies — this page's `columns` array is fixed. Since the
- * Volume column joined (issue #2337) that is six values, 2+2+2, so the odd
- * trailing cell #1113 asked about no longer arises here;
- * `marketAppraisalNarrow.spec.ts` still covers that shape on the live tab.
- *
- * No login: a Share Link opens for anyone, which is the whole point of one
- * sent to a stranger. The share itself is served by mocking Firestore's
- * document read — the e2e build carries a placeholder project id for exactly
- * this (`playwright.config.ts`'s `E2E_ENV`), and no API key, so sync stays off.
+ * No login: a Share Link opens for anyone. The share itself is served by
+ * mocking Firestore's document read — the e2e build carries a placeholder
+ * project id for exactly this (`playwright.config.ts`'s `E2E_ENV`), and no API
+ * key, so sync stays off.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -128,13 +114,11 @@ interface CellBox {
   top: number;
   left: number;
   width: number;
-  /** `::before`'s `position` — `static` is the paired card's label-above-value, `absolute` the default card's pinned 6.5rem gutter. */
-  labelPosition: string;
 }
 
 interface RowGeometry {
   display: string;
-  /** The `tr`'s own content box — what the card's cells have to share. */
+  /** The `tr`'s own content box — what the cells have to share. */
   contentWidth: number;
   rowHeight: number;
   cells: CellBox[];
@@ -163,7 +147,6 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
           top: cellBox.top,
           left: cellBox.left,
           width: cellBox.width,
-          labelPosition: getComputedStyle(td, '::before').position,
         };
       });
       return {
@@ -202,53 +185,31 @@ function labelLines(cells: CellBox[]): string[][] {
   return lines(cells).map((line) => line.map((cell) => cell.label));
 }
 
-test.describe('Shared appraisal — stacked result card', () => {
+test.describe('Shared appraisal — phone table', () => {
   test.beforeEach(async ({ page }) => {
     await mockShare(page);
   });
 
-  test('pairs its six value columns two-per-row at 390px', async ({ page }) => {
+  test('stays a plain table at 390px, shedding the per-unit prices and volume', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await openShare(page);
 
-    const { display, contentWidth, cells } = await readRow(page, TRITANIUM);
-    expect(display).toBe('grid');
+    const { display, cells } = await readRow(page, TRITANIUM);
+    expect(display).toBe('table-row');
 
-    // Six values under a full-width title: 2+2+2. Asserted as the whole card
-    // at once — a per-pair check would pass just as happily on a card that
-    // had quietly dropped a column.
-    expect(labelLines(cells)).toEqual([
-      ['Item'],
-      ['Qty', 'Buy each'],
-      ['Sell each', 'Buy total'],
-      ['Sell total', 'Volume (m³)'],
-    ]);
+    // Rendered cells only: `phoneHidden` columns are `display: none` here, so
+    // they have no box. Asserted as the whole row at once.
+    const shown = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
+    expect(shown).toEqual(['Qty', 'Item', 'Buy total', 'Sell total']);
 
-    const [[item], ...valueLines] = lines(cells);
-    // The name still titles the card across both tracks (`grid-column: 1 / -1`).
-    expect(item.width).toBeCloseTo(contentWidth, 0);
-
-    for (const [first, second] of valueLines) {
-      // Side by side, each roughly half the card: same width, same line, and
-      // the second starting past the end of the first (the 0.75rem gap).
-      expect(second.left).toBeGreaterThan(first.left + first.width);
-      expect(first.width).toBeCloseTo(second.width, 0);
-      expect(first.width).toBeLessThan(contentWidth * 0.55);
-      expect(first.width).toBeGreaterThan(contentWidth * 0.4);
-    }
-
-    const [firstOfPair] = valueLines[0];
-    const [lastLineStart] = valueLines.at(-1)!;
-    // The last pair stays in step with the first: same track, same width.
-    expect(lastLineStart.left).toBeCloseTo(firstOfPair.left, 0);
-    expect(lastLineStart.width).toBeCloseTo(firstOfPair.width, 0);
-    // Its label sits above the value in flow, not pinned into the default
-    // card's 6.5rem gutter — which inside a ~160px cell would leave the
-    // figure nowhere to render.
-    expect(lastLineStart.labelPosition).toBe('static');
-
-    // And the halved card still costs the page no sideways scroll, which is
-    // the risk a two-track grid runs on a 390px screen.
+    // The item cell is pinned while the table scrolls sideways inside its
+    // wrapper, never the page.
+    const sticky = await page
+      .locator(`table[aria-label="${TABLE}"] tr[data-row-key="${TRITANIUM}"] td[data-label="Item"]`)
+      .evaluate((td) => getComputedStyle(td).position);
+    expect(sticky).toBe('sticky');
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
@@ -261,8 +222,7 @@ test.describe('Shared appraisal — stacked result card', () => {
     await openShare(page);
 
     const { display, contentWidth, rowHeight, cells } = await readRow(page, PYERITE);
-    // `stackColumns` may only ever affect the card below `sm` — above it the
-    // row is still a table row, all six values plus the name on one line.
+    // Above `sm` nothing is shed: all six values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
       ['Qty', 'Item', 'Buy each', 'Sell each', 'Buy total', 'Sell total', 'Volume (m³)'],

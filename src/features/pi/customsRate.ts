@@ -89,11 +89,11 @@ export function customsRateSource(space: ColonySpace, level: number | null): Cus
 export function customsSourceText(source: CustomsRateSource, t: TFunction): string {
   switch (source.kind) {
     case 'highsec-skill':
-      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
+      return t('piShared.customsRateSource.highsec-skill', { level: source.level });
     case 'highsec-unknown-skill':
-      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
+      return t('piShared.customsRateSource.highsec-unknown-skill');
     case 'player-poco':
-      return t('piAdvisor.customsRateSource.player-poco', {
+      return t('piShared.customsRateSource.player-poco', {
         space: t(`common.spaceOption.${source.space}`),
       });
   }

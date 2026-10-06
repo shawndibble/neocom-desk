@@ -1,15 +1,18 @@
 /**
- * The map itself: planets, then P0 to P4, each a column of real buttons in
- * list markup, with SVG wires drawn behind them.
+ * The map itself: planets, then P0 to P4, each a column of real buttons
+ * (planets) and links (products) in list markup, with SVG wires drawn behind
+ * them.
  *
  * - **Non-visual equivalent.** Every tier is a labelled `<section>` with a
- *   heading and a `<ul>`; each product is a button whose accessible name is the
+ *   heading and a `<ul>`; each product is a link to its PI detail (`?product=`,
+ *   DESIGN.md §6c "Entities", Overrides) whose accessible name is the
  *   whole comparison sentence and price. The wires are `aria-hidden`: the chain
  *   they show is also written out in the detail panel.
  * - **Keyboard.** One tab stop for the whole board (roving `tabIndex`). Up and
  *   Down walk a column, Left and Right hop to the neighbouring column at about
- *   the same height, Home and End jump to a column's ends. Enter or Space on a
- *   product traces it; on a planet it toggles or opens "add a planet".
+ *   the same height, Home and End jump to a column's ends. Enter on a product
+ *   traces it and opens its detail; Enter or Space on a planet toggles it or
+ *   opens "add a planet".
  * - **Ghost slots.** What the ticked planets cannot make keeps its place as an
  *   empty, `aria-hidden` slot so the layout never jumps, and it is not a tab
  *   stop.
@@ -26,6 +29,7 @@ import {
   type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { InfoTooltip, Tooltip, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -35,9 +39,10 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import {
   comparisonSentence,
   figureSentence,
@@ -57,6 +62,8 @@ export interface MapBoardProps {
   noColonies: boolean;
   /** Planet types the map is filtered to: what it can make is lit, the rest leaves ghost slots. */
   ticked: ReadonlySet<PlanetType>;
+  /** Missing planet types the traced product needs: drawn lit, tagged NEED, though not ticked. */
+  needTypes: ReadonlySet<PlanetType>;
   /** Products the ticked planet types can make. */
   litIds: ReadonlySet<number>;
   /** Products a what-if planet (hovered, focused or open in the detail panel) would unlock. */
@@ -78,6 +85,8 @@ export interface MapBoardProps {
   onPlanet: (type: PlanetType) => void;
   onPreview: (type: PlanetType | null) => void;
   onProduct: (typeId: number) => void;
+  /** The product's PI detail URL: a tile is a real link, so new tab and copy link work. */
+  productHref: (typeId: number) => string;
 }
 
 type Key = string;
@@ -322,6 +331,7 @@ export function MapBoard(props: MapBoardProps) {
                   onKeyDown={(e) => move(planetKey(type), e)}
                   onClick={() => props.onPlanet(type)}
                   onPreview={props.onPreview}
+                  needed={props.needTypes.has(type)}
                   whatIf={props.whatIfType === type && !owned.has(type) && !props.noColonies}
                 />
               </li>
@@ -379,8 +389,8 @@ export function MapBoard(props: MapBoardProps) {
                 return (
                   <li key={product.typeId} className="relative flex-none">
                     <Tooltip content={tip}>
-                      <button
-                        type="button"
+                      <Link
+                        to={props.productHref(product.typeId)}
                         ref={register(key)}
                         data-map-key={key}
                         tabIndex={activeKey === key ? 0 : -1}
@@ -392,7 +402,7 @@ export function MapBoard(props: MapBoardProps) {
                         })}
                         onFocus={() => setFocusKey(key)}
                         onKeyDown={(e) => move(key, e)}
-                        onClick={() => props.onProduct(product.typeId)}
+                        onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
                           'grid h-11 w-full md:h-[34px] touch:h-11 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0 pr-[5px] pl-[3px] text-left text-xs',
                           interactiveClassName,
@@ -435,11 +445,16 @@ export function MapBoard(props: MapBoardProps) {
                             <span className="font-semibold">
                               {formatIskCompact(figure.iskPerDay)}
                             </span>
+                            {figure.needsCcLevel && (
+                              <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">
+                                {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <span aria-hidden="true" />
                         )}
-                      </button>
+                      </Link>
                     </Tooltip>
                     {rank !== null && (
                       <span
@@ -506,6 +521,7 @@ function PlanetToggle({
   ranks: number[];
   tracedNeed: { have: boolean } | null;
   whatIf: boolean;
+  needed: boolean;
   tabbable: boolean;
   registerNode: (el: HTMLElement | null) => void;
   boardRef: RefObject<HTMLElement | null>;
@@ -580,7 +596,7 @@ function PlanetToggle({
           size={40}
           className={cx(
             'outline-2 outline-offset-1',
-            !pressed && 'brightness-[.45] grayscale',
+            !pressed && !props.needed && 'brightness-[.45] grayscale',
             props.ranks.length > 0 && have ? 'outline-warning' : 'outline-transparent',
             props.whatIf && 'outline-map-whatif brightness-100 grayscale-0'
           )}

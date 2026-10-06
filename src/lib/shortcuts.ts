@@ -72,16 +72,40 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 export type ChordEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>;
 
 export function isCommandPaletteShortcut(event: ChordEvent, apple: boolean): boolean {
-  // One modifier per platform: Ctrl+K on a Mac is the text fields' kill-line
-  // (Emacs keys), and Win+K elsewhere is the OS's own Cast panel.
+  return isModChord(event, apple, 'k');
+}
+
+/**
+ * The platform's command modifier (Cmd on Apple, Ctrl elsewhere) plus `key`.
+ * One modifier per platform: Ctrl+K on a Mac is the text fields' kill-line
+ * (Emacs keys), and Win+K elsewhere is the OS's own Cast panel. Alt narrows,
+ * and so does Shift unless the chord asks for it (Ctrl+S and Ctrl+Shift+S are
+ * two different chords).
+ */
+export function isModChord(
+  event: ChordEvent,
+  apple: boolean,
+  key: string,
+  options: { shift?: boolean } = {}
+): boolean {
   const modifier = apple ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-  if (!modifier || event.altKey || event.shiftKey) return false;
-  return event.key.toLowerCase() === 'k';
+  if (!modifier || event.altKey || event.shiftKey !== (options.shift ?? false)) return false;
+  return event.key.toLowerCase() === key.toLowerCase();
+}
+
+/** A modifier chord as the pilot's own keyboard labels it: `⌘S` / `Ctrl S`, `⇧⌘S` / `Ctrl Shift S`. */
+export function modChordDisplayKey(
+  apple: boolean,
+  key: string,
+  options: { shift?: boolean } = {}
+): string {
+  if (apple) return `${options.shift ? '⇧' : ''}⌘${key}`;
+  return `Ctrl ${options.shift ? 'Shift ' : ''}${key}`;
 }
 
 /** The chord as the pilot's own keyboard labels it. */
 export function commandPaletteDisplayKey(apple: boolean): string {
-  return apple ? '⌘K' : 'Ctrl K';
+  return modChordDisplayKey(apple, 'K');
 }
 
 /** The page-level paste chord the app-wide paste router listens for. */

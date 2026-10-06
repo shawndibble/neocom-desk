@@ -41,7 +41,7 @@ import type { ChartMetric } from './chartMetricPref';
 
 export interface DailyRatePoint {
   date: string;
-  iskPerHour: number;
+  iskValue: number;
   /** The day's weakest price source (issue #1279); null on a day with no mining. */
   source: PriceSource | null;
 }
@@ -100,9 +100,9 @@ export function RateTooltip({
         {typeof label === 'string' ? formatDateTick(label) : ''}
       </p>
       <p>
-        {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
+        {t('miningTax.overview.iskDay')}: {formatIsk(point.iskValue, 0)} ISK
       </p>
-      <p className="text-text-dim">{t('miningTax.overview.rateChartBasis')}</p>
+      <p className="text-text-dim">{t('miningTax.overview.dayChartBasis')}</p>
       {point.source && (
         <p>
           {t('miningTax.overview.sourceColumn')}:{' '}
@@ -168,7 +168,7 @@ function MetricRateTooltip({
   const point = payload[0]?.payload as DailyMetricPoint | undefined;
   if (!point) return null;
   const valueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
   );
   return (
     <ChartTooltipShell>
@@ -181,8 +181,8 @@ function MetricRateTooltip({
       <p className="text-text-dim">
         {t(
           metric === 'volume'
-            ? 'miningTax.overview.rateChartBasisVolume'
-            : 'miningTax.overview.rateChartBasisCount'
+            ? 'miningTax.overview.dayChartBasisVolume'
+            : 'miningTax.overview.dayChartBasisCount'
         )}
       </p>
     </ChartTooltipShell>
@@ -243,9 +243,9 @@ function IskCharts({
         render: (point) => formatDateTick(point.date),
       },
       {
-        id: 'iskPerHour',
-        header: t('miningTax.overview.iskPerHour'),
-        render: (point) => `${formatIsk(point.iskPerHour, 0)} ISK`,
+        id: 'iskValue',
+        header: t('miningTax.overview.iskDay'),
+        render: (point) => `${formatIsk(point.iskValue, 0)} ISK`,
       },
       {
         id: 'source',
@@ -310,12 +310,12 @@ function IskCharts({
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.overview.rateChartTitle')}
+          {t('miningTax.overview.dayChartTitle')}
         </p>
         <p className="mb-1 text-[0.6875rem] text-text-dim">
-          {t('miningTax.overview.rateChartBasis')}
+          {t('miningTax.overview.dayChartBasis')}
         </p>
-        <div role="img" aria-label={t('miningTax.overview.rateChartTitle')} className="h-64 w-full">
+        <div role="img" aria-label={t('miningTax.overview.dayChartTitle')} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={dailyRate}
@@ -338,8 +338,8 @@ function IskCharts({
               <Tooltip content={(props) => <RateTooltip {...props} />} />
               <Bar
                 isAnimationActive={false}
-                dataKey="iskPerHour"
-                name={t('miningTax.overview.iskPerHour')}
+                dataKey="iskValue"
+                name={t('miningTax.overview.iskDay')}
               >
                 {dailyRate.map((point) => (
                   <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
@@ -356,7 +356,7 @@ function IskCharts({
             responsive="table"
             rows={dailyRate}
             rowKey={(point) => point.date}
-            label={t('miningTax.overview.rateChartTitle')}
+            label={t('miningTax.overview.dayChartTitle')}
           />
         </div>
         <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
@@ -474,13 +474,13 @@ function MetricCharts({
   const { t } = useTranslation();
   const rateChartTitle = t(
     metric === 'volume'
-      ? 'miningTax.overview.rateChartTitleVolume'
-      : 'miningTax.overview.rateChartTitleCount'
+      ? 'miningTax.overview.dayChartTitleVolume'
+      : 'miningTax.overview.dayChartTitleCount'
   );
   const rateChartBasis = t(
     metric === 'volume'
-      ? 'miningTax.overview.rateChartBasisVolume'
-      : 'miningTax.overview.rateChartBasisCount'
+      ? 'miningTax.overview.dayChartBasisVolume'
+      : 'miningTax.overview.dayChartBasisCount'
   );
   const compareChartTitle = t(
     metric === 'volume'
@@ -488,7 +488,7 @@ function MetricCharts({
       : 'miningTax.overview.compareChartTitleCount'
   );
   const rateValueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
   );
   const totalValueLabel = t(
     metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'

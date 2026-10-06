@@ -18,9 +18,8 @@ import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import { Tooltip, TypeIcon } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { BountyFactionSummary } from './BountyFactionSummary';
@@ -80,16 +79,16 @@ export function JournalDescriptionCell({
       )}
       {transaction && fill && (
         <Tooltip content={fill}>
-          <MarketItemLink
+          <ItemInfoLink
             typeId={transaction.type_id}
-            className={entityLinkClassName('inline-flex w-fit items-center gap-1.5')}
+            className="inline-flex w-fit items-center gap-1.5"
           >
             <TypeIcon typeId={transaction.type_id} size={32} className="h-4 w-4 shrink-0" />
             <span>
               {itemName}
               <span className="text-text-dim"> ×{transaction.quantity.toLocaleString()}</span>
             </span>
-          </MarketItemLink>
+          </ItemInfoLink>
         </Tooltip>
       )}
     </div>
