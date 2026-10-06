@@ -36,6 +36,7 @@ import {
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from './PlanetImage';
 import {
   comparisonSentence,
@@ -89,6 +90,7 @@ interface Wire {
 }
 
 export function MapBoard(props: MapBoardProps) {
+  const touchCtx = useTouchContext();
   const { graph, owned, ticked, litIds, newIds, trace, dimOthers } = props;
   const { t } = useTranslation();
   const headingId = useId();
@@ -269,7 +271,7 @@ export function MapBoard(props: MapBoardProps) {
           if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
         }}
         aria-labelledby={headingId}
-        className="relative mx-auto grid w-max grid-cols-[72px_116px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
+        className="relative mx-auto grid w-max grid-cols-[96px_116px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
       >
         <h3 id={headingId} className="sr-only">
           {t('piMap.boardLabel')}
@@ -295,7 +297,7 @@ export function MapBoard(props: MapBoardProps) {
             id={`${headingId}-planets`}
             title={t('piMap.planetsTitle')}
             sub={t('piMap.planetsSub')}
-            info={t('piMap.planetsInfo')}
+            info={t('piMap.planetsInfo', { context: touchCtx })}
             infoLabel={t('piMap.infoLabel', { name: t('piMap.planetsTitle') })}
           />
           <ul className="flex flex-1 flex-col justify-between">
@@ -513,6 +515,7 @@ function PlanetToggle({
   onPreview: (type: PlanetType | null) => void;
 }) {
   const { t } = useTranslation();
+  const touchCtx = useTouchContext();
   const { type, have, togglable, pressed } = props;
   const name = planetName(t, type);
   const label = have
@@ -521,8 +524,8 @@ function PlanetToggle({
       ? t('piMap.planetToggle', { name })
       : t('piMap.planetMissing', { name });
   const tip = togglable
-    ? t(pressed ? 'piMap.planetTipOn' : 'piMap.planetTipOff', { name })
-    : t('piMap.planetTipMissing', { name });
+    ? t(pressed ? 'piMap.planetTipOn' : 'piMap.planetTipOff', { name, context: touchCtx })
+    : t('piMap.planetTipMissing', { name, context: touchCtx });
   const previewable = !togglable;
   return (
     <Tooltip content={tip}>

@@ -70,6 +70,16 @@ function stubPhone(phone: boolean) {
     }) as unknown as MediaQueryList) as typeof window.matchMedia;
 }
 
+function stubCoarse() {
+  window.matchMedia = ((media: string) =>
+    ({
+      media,
+      matches: media.includes('pointer: coarse'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+}
+
 beforeEach(() => {
   localStorage.clear();
   observers.length = 0;
@@ -472,6 +482,21 @@ describe('PlanMap: first-visit hint', () => {
     first.unmount();
     renderMap();
     expect(screen.queryByText(/Click a planet type to filter/)).toBeNull();
+  });
+
+  it('keeps "Got it" on one line', () => {
+    renderMap();
+    expect(screen.getByRole('button', { name: 'Got it' })).toHaveClass('whitespace-nowrap');
+  });
+
+  it('says Tap, not Click or Hover, on a coarse pointer', () => {
+    stubCoarse();
+    renderMap();
+    expect(
+      screen.getByText('Tap a planet type to filter, or a product to trace it.')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Tap a planet type you don't have \(/)).toBeInTheDocument();
+    expect(screen.queryByText(/Hover|Click/)).toBeNull();
   });
 
   it('still shows when storage is blocked', () => {
