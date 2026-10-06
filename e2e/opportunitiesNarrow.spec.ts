@@ -251,22 +251,9 @@ test.describe('Opportunities — ranked phone list', () => {
   });
 
   /**
-   * Issue #1781: the card's own face stays uncrowded — "Plan" lives
-   * in the row's card menu, the same per-row action the market-wide table
-   * gives its own row directly.
+   * Issue #1781: the card's own face stays uncrowded. Tapping the card (its
+   * name included) is Start plan; the ⋯ menu keeps price history only.
    */
-  test('the card menu\'s "Start a plan" action creates a plan and opens it (issue #1781)', async ({
-    page,
-  }) => {
-    await page.setViewportSize(PHONE);
-    await page.goto('./industry/opportunities');
-
-    await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: /More actions for Rifter/ }).click();
-    await page.getByRole('menuitem', { name: 'Plan', exact: true }).click();
-
-    await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
-  });
   test('tapping the product name opens the plan, not the Market page', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
@@ -337,7 +324,7 @@ test.describe('Opportunities — ranked phone list', () => {
     await expect(bar).toHaveCount(0);
   });
 
-  test('the card menu holds start plan and price history, not a duplicate market link', async ({
+  test('the card menu holds price history, not a duplicate plan or market link', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
