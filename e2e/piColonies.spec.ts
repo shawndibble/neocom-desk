@@ -148,6 +148,8 @@ test.describe('PI Colonies, the daily check', () => {
       row.getByRole('button', { name: /^More actions for / }),
       row.locator('button', { hasText: /Restart|Haul|Fix|Add|Details/ }).first(),
     ]) {
+      // boundingBox() doesn't wait: a control still rendering reads as null.
+      await expect(control).toBeVisible();
       expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
     await shot(page, 'colonies-phone');
