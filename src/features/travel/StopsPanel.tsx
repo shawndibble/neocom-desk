@@ -1,7 +1,7 @@
 /**
  * Route Safety's Stops panel (issue #2475): where the trip starts, then up to
  * `MAX_STOPS` Stops in the order typed — added, removed, and reordered by
- * dragging or with each row's move up / move down.
+ * dragging the grip (Space + arrow keys from the keyboard).
  *
  * Optimize stop order flies the stops in the order with the lowest total
  * route cost under the Route rules; the list here keeps the typed order, and
@@ -64,18 +64,14 @@ function Badge({ children }: { children: ReactNode }) {
 function StopRow({
   systemId,
   index,
-  count,
   name,
   security,
-  onMove,
   onRemove,
 }: {
   systemId: number;
   index: number;
-  count: number;
   name: string;
   security: number | null;
-  onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
 }) {
   const { t } = useTranslation();
@@ -108,20 +104,6 @@ function StopRow({
         {name}
         {security !== null && <SecurityStatus security={security} className="ml-1" />}
       </span>
-      <IconButton
-        size="sm"
-        icon={<Icon.Ascending />}
-        label={t('travel.stops.moveUp', { name })}
-        disabled={index === 0}
-        onClick={() => onMove(index, index - 1)}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Descending />}
-        label={t('travel.stops.moveDown', { name })}
-        disabled={index >= count - 1}
-        onClick={() => onMove(index, index + 1)}
-      />
       <IconButton
         size="sm"
         icon={<Icon.Close />}
@@ -249,10 +231,8 @@ export function StopsPanel({
                     key={systemId}
                     systemId={systemId}
                     index={index}
-                    count={stops.length}
                     name={nameOf(systemId)}
                     security={systems?.get(systemId)?.security ?? null}
-                    onMove={move}
                     onRemove={remove}
                   />
                 ))}

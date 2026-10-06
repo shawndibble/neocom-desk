@@ -140,6 +140,15 @@ Computed, not a fixed token set: call the function rather than hand-picking a
 color, and always render the numeric value (`0.9`, `-0.3`, …) alongside the
 color — colour is never the only signal (§7).
 
+### Kill heat
+
+`shipKillHeatColor(kills)` (`src/engine/route/killHeat.ts`) tints Route
+Safety's last-hour ship-kill count: default text at none, blending to
+`warning` yellow at 3, orange (halfway along `warning`→`danger`) at 6, and
+`danger` red from 10. Any pod kill in the last hour is `danger` red outright.
+Computed like `securityStatusColor`; the count is always printed beside the
+color (§7).
+
 ### Damage types
 
 | Token           | Value     | Use                          |
