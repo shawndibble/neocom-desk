@@ -620,35 +620,6 @@ function analyseColony(args: {
     }
   }
 
-  // Spare room for more extractors. Priced only for a colony on one resource:
-  // with two, no figure says which one a new ECU would pull.
-  const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
-  const room = plan.headroom.extractorControlUnit ?? 0;
-  const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
-  const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
-  // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
-  // headroom, so when the idle win already buys heads, this one would count it twice.
-  const headroomSpent = wins.some(
-    (win) => win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null
-  );
-  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
-    const only = colony.extractedPerHour[0];
-    const perEcu = only.unitsPerHour / ecus;
-    // The same flat falloff the rebuild scorer applies to every ECU after the first.
-    const extra =
-      perEcu * extraEcus * plannerPolicy({ maxP0Types: 1, buyTiers: [] }).extraEcuFactor;
-    const gain = gainPerDay(earnWith(new Map([[only.typeId, extra]])), nominal);
-    if (gain !== null && gain > 0) {
-      wins.push(
-        quickWin(
-          planetId,
-          { kind: 'spare-room', what: 'extractors', extraEcus, resourceTypeId: only.typeId },
-          gain
-        )
-      );
-    }
-  }
-
   // Raw P0 sold as it comes out of the ground: basic factories refine it to P1.
   // Priced against what the raw earns today (never against zero), so a refinement
   // that would pay less than the ore is not offered, and a colony is never
@@ -661,13 +632,13 @@ function analyseColony(args: {
   );
   for (const raw of rawsByRate) {
     if (basicRoom <= 0 || refinedEarnings === null) break;
-    const entry = Object.entries(pi.schematics).find(
+    const found = Object.entries(pi.schematics).find(
       ([, s]) =>
         s.facility === 'basic' && s.inputs.length === 1 && s.inputs[0].typeID === raw.typeId
     );
-    if (!entry || entry[1].cycleTime <= 0) continue;
-    const productTypeId = Number(entry[0]);
-    const schematic = entry[1];
+    if (!found || found[1].cycleTime <= 0) continue;
+    const [productKey, schematic] = found;
+    const productTypeId = Number(productKey);
     const running = new Set(refined.production.map((group) => group.schematicId));
     const refinesItAlready = Object.values(pi.schematics).some(
       (s) => running.has(s.schematicId) && s.inputs.some((i) => i.typeID === raw.typeId)
@@ -693,7 +664,7 @@ function analyseColony(args: {
           productTypeId,
           factories,
           routedFrom: [],
-          needsRemoval: false,
+          needsRemoval: plan.idle !== null,
         },
         gain
       )
@@ -703,7 +674,56 @@ function analyseColony(args: {
     refinedEarnings = after.iskPerHour;
   }
 
-  wins.push(...args.factoryWins.map((win) => ({ ...win, planetId })));
+  // Spare room for more extractors. Priced only for a colony on one resource:
+  // with two, no figure says which one a new ECU would pull.
+  const ecus = colony.pinLoad.counts.extractorControlUnit ?? 0;
+  const room = plan.headroom.extractorControlUnit ?? 0;
+  const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
+  const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
+  // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
+  // headroom, so when the idle win already buys heads, this one would count it twice.
+  // The same goes for the basic factories above: they take the room first.
+  const headroomSpent = wins.some(
+    (win) =>
+      (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
+      (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
+  );
+  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
+    const only = colony.extractedPerHour[0];
+    const perEcu = only.unitsPerHour / ecus;
+    // The same flat falloff the rebuild scorer applies to every ECU after the first.
+    const extra =
+      perEcu * extraEcus * plannerPolicy({ maxP0Types: 1, buyTiers: [] }).extraEcuFactor;
+    const gain = gainPerDay(earnWith(new Map([[only.typeId, extra]])), nominal);
+    if (gain !== null && gain > 0) {
+      wins.push(
+        quickWin(
+          planetId,
+          { kind: 'spare-room', what: 'extractors', extraEcus, resourceTypeId: only.typeId },
+          gain
+        )
+      );
+    }
+  }
+
+  // A network factory win for a product this colony already refines locally is the same gain.
+  const localProducts = new Set(
+    wins.flatMap((win) =>
+      win.detail.kind === 'spare-room' && win.detail.what === 'factories'
+        ? [win.detail.productTypeId]
+        : []
+    )
+  );
+  wins.push(
+    ...args.factoryWins
+      .filter(
+        (win) =>
+          win.detail.kind !== 'spare-room' ||
+          win.detail.what !== 'factories' ||
+          !localProducts.has(win.detail.productTypeId)
+      )
+      .map((win) => ({ ...win, planetId }))
+  );
 
   // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;

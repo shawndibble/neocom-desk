@@ -7,8 +7,9 @@ import type { PlanAdviceState } from './usePlanAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
-import { RAW, fixtureAdvice, fixturePi } from './planViewFixture';
+import { P2_B, RAW, fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
+import type { QuickWin } from '@/engine/pi/planAdvice';
 
 let mockState: PlanAdviceState = { status: 'loading' };
 vi.mock('./usePlanAdvice', () => ({ usePlanAdvice: () => mockState }));
@@ -87,17 +88,37 @@ describe('MakeMorePlan', () => {
     expect(cards[1]).toHaveTextContent(/As-is/);
   });
 
-  it('never says Keep on raw ore: a raw-only colony points at the refinement instead', () => {
+  it('never says Keep on raw ore: a raw-only colony points at the refinement when there is one', () => {
     const [changing, keeping] = fixtureAdvice.colonies;
-    mockState = ready({
-      ...fixtureAdvice,
-      colonies: [changing, { ...keeping, sells: [RAW] }],
-    });
-    renderPlan();
-    const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
-    expect(card).not.toHaveTextContent(/Keep Uttindar II/);
-    expect(card).toHaveTextContent(/sells raw/);
-    expect(card).toHaveTextContent(/Refine it with the quick win above/);
+    const refine = {
+      id: '2:room-factories:1',
+      planetId: 2,
+      detail: {
+        kind: 'spare-room',
+        what: 'factories',
+        productTypeId: P2_B,
+        factories: 2,
+        routedFrom: [],
+        needsRemoval: false,
+      },
+      gainPerDay: 500,
+      minutes: 4,
+      iskPerMinute: 125,
+    } as unknown as QuickWin;
+    const cardFor = (colony: typeof keeping) => {
+      mockState = ready({ ...fixtureAdvice, colonies: [changing, colony] });
+      const { unmount } = renderPlan();
+      const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
+      const text = card.textContent ?? '';
+      unmount();
+      return text;
+    };
+    const plain = cardFor({ ...keeping, sells: [RAW] });
+    expect(plain).not.toMatch(/Keep Uttindar II/);
+    expect(plain).toMatch(/sells raw/);
+    expect(plain).not.toMatch(/Refine it/);
+    const withWin = cardFor({ ...keeping, sells: [RAW], quickWins: [refine] });
+    expect(withWin).toMatch(/Refine it with the quick win above/);
   });
 
   it('opens an alternative in place and says what it trades', async () => {

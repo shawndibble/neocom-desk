@@ -476,7 +476,7 @@ function RebuildSentence({
       return (
         <Sentence
           text={t(
-            card.hasQuickWin ? 'piPlan.make.rebuild.rawQuickWin' : 'piPlan.make.rebuild.raw',
+            card.hasRefineWin ? 'piPlan.make.rebuild.rawQuickWin' : 'piPlan.make.rebuild.raw',
             {
               planet: '{planet}',
               type: '{type}',

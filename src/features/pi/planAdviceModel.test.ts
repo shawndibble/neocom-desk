@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
+import type { QuickWin } from '@/engine/pi/planAdvice';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { piTier } from '@/engine/pi/chain';
 import { rankRecipes } from '@/engine/pi/planRecipes';
@@ -173,6 +174,9 @@ function input(overrides: Partial<PlanAdviceInput> = {}): PlanAdviceInput {
 const temperate = (advice: ReturnType<typeof buildPlanAdvice>) =>
   advice.colonies.find((colony) => colony.planetId === TEMPERATE_ID)!;
 
+const isFactoryWin = (win: QuickWin) =>
+  win.detail.kind === 'spare-room' && win.detail.what === 'factories';
+
 describe('buildPlanAdvice: today', () => {
   it("is the colony's own earnings model, in ISK a day, at its own customs rate", () => {
     const advice = buildPlanAdvice(input());
@@ -193,7 +197,7 @@ describe('buildPlanAdvice: today', () => {
     // 7 days between hauls fills this colony's pad, so only the stalled share differs.
     // The factory suggestion adds a refinement the colony does not run: not part of today's ore.
     const inPlace = colony.quickWins
-      .filter((win) => !win.id.includes('room-factories'))
+      .filter((win) => !isFactoryWin(win))
       .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
     expect(colony.todayPerDay! + inPlace).toBeCloseTo(hourly * 24, 3);
   });
@@ -512,7 +516,7 @@ describe('buildPlanAdvice: more quick wins', () => {
     };
     const colony = temperate(
       buildPlanAdvice(
-        input({
+        leanInput({
           snapshot: snapshot({
             colonies: [{ ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 }],
             details: new Map([[TEMPERATE_ID, oneEcu]]),
@@ -660,7 +664,7 @@ describe('buildPlanAdvice: a raw-only colony (#2715)', () => {
       buyPrices: { ...PRICES.buyPrices, [MICROORGANISMS]: 50 },
     };
     const colony = temperate(buildPlanAdvice(input({ books: hubBooks(rawRich, 5) })));
-    expect(colony.quickWins.some((w) => w.id.includes('room-factories'))).toBe(false);
+    expect(colony.quickWins.some((w) => isFactoryWin(w))).toBe(false);
   });
 
   it('offers no factory win for a colony already refining what it extracts', () => {
@@ -682,7 +686,7 @@ describe('buildPlanAdvice: a raw-only colony (#2715)', () => {
       )
     );
     expect(colony.sells).toEqual([BACTERIA]);
-    expect(colony.quickWins.some((w) => w.id.includes('room-factories'))).toBe(false);
+    expect(colony.quickWins.some((w) => isFactoryWin(w))).toBe(false);
   });
 });
 
