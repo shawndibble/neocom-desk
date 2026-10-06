@@ -1,0 +1,52 @@
+import { useTranslation } from 'react-i18next';
+import { Button, Field, Fields, IskInput, Spinner } from '@/components/ui';
+import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
+import { DefaultsSyncHint } from './settingsFields';
+import { useHydratedStore } from './useHydratedStore';
+
+/**
+ * The pilot's LP Value as one labelled field: the same store (`useLpValue`)
+ * everywhere it is edited — Settings → Market, the LP Store's settings modal
+ * and the Blueprint Acquisition modal — so the three can never disagree.
+ * Blank or 0 means "use each store's market rate".
+ */
+export function LpValueField({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const lpValue = useLpValue((state) => state.value);
+  const setLpValue = useLpValue((state) => state.setValue);
+  const hydrated = useHydratedStore(useLpValue);
+  return (
+    <Field label={t('settings.lpValueLabel')} htmlFor={id} note={t('settings.lpValueHint')}>
+      <div className="flex flex-wrap items-start gap-2">
+        <IskInput
+          id={id}
+          size="sm"
+          className="w-36"
+          disabled={!hydrated}
+          placeholder={String(DEFAULT_LP_VALUE)}
+          value={lpValue === DEFAULT_LP_VALUE ? '' : String(lpValue)}
+          onChange={(next) => void setLpValue(next === '' ? DEFAULT_LP_VALUE : Number(next))}
+        />
+        {lpValue !== DEFAULT_LP_VALUE && (
+          <Button size="sm" onClick={() => void setLpValue(DEFAULT_LP_VALUE)}>
+            {t('settings.lpValueUseMarket')}
+          </Button>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+/** LP Value on its own: Settings → Market, and the LP Store's settings modal. */
+export function LpValueSettingsForm() {
+  const hydrated = useHydratedStore(useLpValue);
+  if (!hydrated) return <Spinner />;
+  return (
+    <div className="space-y-4">
+      <DefaultsSyncHint />
+      <Fields variant="form">
+        <LpValueField id="settings-lp-value" />
+      </Fields>
+    </div>
+  );
+}
