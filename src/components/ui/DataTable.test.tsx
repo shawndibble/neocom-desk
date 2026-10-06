@@ -861,6 +861,87 @@ describe('DataTable opt-in phone features', () => {
     }
   });
 
+  describe('phoneHidden', () => {
+    const phoneColumns = [
+      sortColumns[0]!,
+      { ...sortColumns[1]!, phoneHidden: true },
+    ] as DataTableColumn<(typeof sortRows)[number]>[];
+    const props = {
+      columns: phoneColumns,
+      rows: sortRows,
+      rowKey: (row: (typeof sortRows)[number]) => row.id,
+      label: 'Values',
+    };
+
+    function withPhone(run: () => void) {
+      const original = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        run();
+      } finally {
+        window.matchMedia = original;
+      }
+    }
+
+    it('hides the column below sm on its th and tds in table mode', () => {
+      render(<DataTable {...props} responsive="table" />);
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
+      expect(screen.getByRole('columnheader', { name: /Name/ })).not.toHaveClass('max-sm:hidden');
+      const cells = document.querySelectorAll('tbody tr:first-child td');
+      expect(cells[0]).not.toHaveClass('max-sm:hidden');
+      expect(cells[1]).toHaveClass('max-sm:hidden');
+    });
+
+    it('applies in table mode on a phone, and the column still sorts', async () => {
+      const user = userEvent.setup();
+      withPhone(() => {
+        render(<DataTable {...props} stacked={false} />);
+        expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
+      });
+      await user.click(screen.getByRole('button', { name: /Value/ }));
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+    });
+
+    it('does nothing in the stacked card layout', () => {
+      withPhone(() => {
+        render(<DataTable {...props} />);
+        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+        expect(document.querySelector('.max-sm\\:hidden')).toBeNull();
+      });
+    });
+  });
+
+  describe('mobileSort in table mode', () => {
+    it('renders no sort bar when responsive="table" or stacked is false', () => {
+      for (const extra of [{ responsive: 'table' as const }, { stacked: false }]) {
+        const { container, unmount } = render(
+          <DataTable
+            columns={sortColumns}
+            rows={sortRows}
+            rowKey={(row) => row.id}
+            label="Values"
+            mobileSort
+            stackSummary="4 offers"
+            {...extra}
+          />
+        );
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        expect(container.children).toHaveLength(1);
+        expect(container.firstElementChild?.tagName).toBe('TABLE');
+        unmount();
+      }
+    });
+  });
+
   describe('mobileSort', () => {
     it('renders a sort picker before the table, and keeps className on the table', () => {
       const { container } = render(
