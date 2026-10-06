@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -166,6 +166,20 @@ describe('PlanMap: what if I add a planet', () => {
     ).toBeInTheDocument();
     await user.unhover(planet('Lava'));
     expect(maybeProduct('Felsic Magma')).toBeNull();
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+  });
+
+  it('previews on a mouse pointer, clears on leave, and ignores a touch pointer', () => {
+    renderMap();
+    const lava = planet('Lava');
+    fireEvent.pointerEnter(lava, { pointerType: 'touch' });
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    fireEvent.pointerEnter(lava, { pointerType: 'mouse' });
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+    // A touch leave must not clear a preview a mouse set.
+    fireEvent.pointerLeave(lava, { pointerType: 'touch' });
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+    fireEvent.pointerLeave(lava, { pointerType: 'mouse' });
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
   });
 

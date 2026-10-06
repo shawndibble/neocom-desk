@@ -399,6 +399,7 @@ export function BuildGroupPanel({
         id: 'material',
         header: t('industry.material'),
         primary: true,
+        stickyStart: true,
         sortValue: (material) => nameForType(catalog, material.typeID),
         render: (material) => (
           <span className="truncate">{nameForType(catalog, material.typeID)}</span>
@@ -415,6 +416,7 @@ export function BuildGroupPanel({
       {
         id: 'volume',
         header: t('industry.volume'),
+        phoneHidden: true,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (material) =>
@@ -427,6 +429,7 @@ export function BuildGroupPanel({
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
+        phoneHidden: true,
         align: 'right',
         render: (material) => {
           const owned = ownedStockMap.get(material.typeID);
@@ -867,10 +870,9 @@ export function BuildGroupPanel({
                   rowKey={(material) => material.typeID}
                   label={t('industry.groupMaterials')}
                   density="compact"
-                  // Five figures broke to a 5-line stack at 390px; pair two per line,
-                  // same fix as MaterialsTable's single-plan buy table.
-                  stackColumns={2}
-                  mobileSort
+                  // Figures read across columns: a table that scrolls sideways on a
+                  // phone (name pinned, volume and owned dropped), not cards.
+                  responsive="table"
                 />
               </div>
             ) : null}

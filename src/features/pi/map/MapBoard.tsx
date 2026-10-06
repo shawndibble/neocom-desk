@@ -541,9 +541,12 @@ function PlanetToggle({
           // Landing on a planet the pilot has ends any other planet's preview.
           props.onPreview(previewable ? type : null);
         }}
-        onMouseEnter={() => previewable && props.onPreview(type)}
-        onMouseLeave={() => {
-          if (!previewable) return;
+        onPointerEnter={(event) => {
+          // Touch fires enter on tap with no leave, which would stick the preview.
+          if (event.pointerType === 'mouse' && previewable) props.onPreview(type);
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType !== 'mouse' || !previewable) return;
           // A focused tile this preview unlocked must not vanish under the pointer.
           const active = document.activeElement;
           if (active instanceof HTMLElement && active.dataset.mapKey?.startsWith('p:')) {

@@ -2165,8 +2165,7 @@
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
-      "noBlueprintOptions": "No blueprint options",
-      "modifyBlueprint": "Modify blueprint"
+      "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
     "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
@@ -3717,6 +3716,7 @@
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
     "deletePayeeAction": "Delete",
+    "deletePayeeNamed": "Delete {{name}}",
     "deletePayeeConfirm": "Delete \"{{name}}\"? This can't be undone.",
     "editPayeeTitle": "Edit Payee",
     "addPayeeTitle": "Add a Payee",
@@ -4161,7 +4161,6 @@
     },
     "payment": {
       "autoLinked": "auto-linked",
-      "menuLabel": "Payment actions",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
       "paidLine": "Paid {{amount}} ISK · {{date}}"
@@ -6409,8 +6408,6 @@
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "viewInIndustryAsMaterial": "View in Industry as material",
-      "addMaterialComponents": "Add material components",
-      "buyInsteadOfBuilding": "Buy instead",
       "piPlan": "PI Plan",
       "copyLocation": "Copy location",
       "copyPrice": "Copy price",
@@ -7792,11 +7789,6 @@
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline"
       },
-      "contextMenu": {
-        "copyName": "Copy name",
-        "showInfo": "Show info",
-        "viewInMarket": "View in Market"
-      },
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",
@@ -7840,8 +7832,6 @@
       "you": "You",
       "never": "Never",
       "total": "Members",
-      "mobileSortSummary_one": "{{count}} member",
-      "mobileSortSummary_other": "{{count}} members",
       "dark": "Dark {{days}}d+",
       "darkHint": "Members with no login for {{days}} days or more. A member who joined and has never logged in counts from the day they joined.",
       "joined_one": "{{count}} joined:",
@@ -7858,11 +7848,7 @@
       "shipFilterLabel": "Ship",
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
-      "locationFilterAll": "Any location",
-      "contextMenu": {
-        "showInfo": "Show info",
-        "copyName": "Copy name"
-      }
+      "locationFilterAll": "Any location"
     },
     "wallet": {
       "title": "Corp wallet",
@@ -8708,7 +8694,7 @@
         "disclosureCaret": "Leading caret that rotates: expands in place",
         "pagerCarets": "Paired carets in IconButtons: pages",
         "dialogOpener": "… ending a label: dialog needing input or confirmation",
-        "rowMenu": "⋮: the row's action menu (RowMoreActions)",
+        "rowMenu": "⋮: a row's menu of two or more real actions",
         "selectedRow": "Accent 2px left border: selected row",
         "stateRest": "Rest: variants",
         "stateHoverPressed": "Hover and pressed",
@@ -8723,7 +8709,7 @@
         "textAction": "Actions only. Navigation is a link or a row.",
         "iskAmount": "Hover, focus or tap reveals the exact figure.",
         "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
-        "rowMenu": "Always visible; right-click and touch-and-hold open the same menu.",
+        "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
         "selectedRow": "Click a row. Selected never looks like hover.",
         "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
         "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
@@ -8756,7 +8742,8 @@
         "tableLabel": "Row menu sample",
         "selectableLabel": "Selected row sample",
         "nameHeader": "Ship",
-        "menuItem": "Show info",
+        "menuItem": "Rename",
+        "menuItemDuplicate": "Duplicate",
         "ghost": "Ghost",
         "primary": "Primary",
         "danger": "Danger",
