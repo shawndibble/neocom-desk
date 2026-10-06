@@ -26,15 +26,19 @@ export function verdictGlyph(figure: ProductFigure): '▲' | '≈' | '▼' | nul
   return null;
 }
 
-/** "Better than Proteins, the simplest product on Ice planets", or why there is no comparison. */
-export function comparisonSentence(t: TFunction, figure: ProductFigure): string {
+/**
+ * "Better than Proteins, the simplest product on Ice planets", or why there is
+ * no comparison. `name` stands in for the compared product's name (a `{name}`
+ * token, for a caller that links it).
+ */
+export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: string): string {
   if (figure.kind !== 'ranked') {
     return t(`piMap.unranked.${figure.reason}`);
   }
   const type = planetName(t, figure.useType);
   if (figure.isReference) return t('piMap.cmp.reference', { type });
   if (figure.verdict === null || figure.versus === null) return t('piMap.cmp.none');
-  return t(`piMap.cmp.${figure.verdict}`, { name: figure.versus.name, type });
+  return t(`piMap.cmp.${figure.verdict}`, { name: name ?? figure.versus.name, type });
 }
 
 /**

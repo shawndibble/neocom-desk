@@ -297,11 +297,11 @@ export function InfoTooltip({
       <button
         type="button"
         aria-label={label}
-        className={`group inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent max-md:-my-1 max-md:size-6 touch:-my-1 touch:size-6 ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
+        className={`group/info inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent max-md:-my-1 max-md:size-6 touch:-my-1 touch:size-6 ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
         <span
           aria-hidden="true"
-          className="inline-flex size-4 items-center justify-center rounded-full border border-line group-hover:border-line-bright"
+          className="inline-flex size-4 items-center justify-center rounded-full border border-line group-hover/info:border-line-bright"
         >
           {glyph === 'info' ? 'i' : '?'}
         </span>

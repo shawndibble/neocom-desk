@@ -170,25 +170,15 @@ export function ProductDetail(props: ProductDetailProps) {
       ) : null}
       {view.money.kind !== 'multi-planet' && (
         <p className="mt-2 text-xs text-text">
-          {figure.kind === 'ranked' &&
-          !figure.isReference &&
-          figure.verdict !== null &&
-          figure.versus !== null ? (
-            // The compared product links to its own detail, as the chain's names do.
-            <Sentence
-              text={t(`piMap.cmp.${figure.verdict}`, {
-                name: '{name}',
-                type: planetName(t, figure.useType),
-              })}
-              slots={{
-                name: (
-                  <PiProductLink typeId={figure.versus.typeId}>{figure.versus.name}</PiProductLink>
-                ),
-              }}
-            />
-          ) : (
-            comparisonSentence(t, figure)
-          )}
+          {/* The compared product links to its own detail, as the chain's names do. */}
+          <Sentence
+            text={comparisonSentence(t, figure, '{name}')}
+            slots={{
+              name: figure.kind === 'ranked' && figure.versus !== null && (
+                <PiProductLink typeId={figure.versus.typeId}>{figure.versus.name}</PiProductLink>
+              ),
+            }}
+          />
         </p>
       )}
       {view.money.kind === 'one-planet' && (

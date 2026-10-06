@@ -285,6 +285,7 @@ describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (D
       >
         <div>
           <a href="/planetary-industry/map?product=2389">Plasmoids</a>
+          <input aria-label="Units per day" />
           <span>row body</span>
         </div>
       </RowActionsMenu>
@@ -305,5 +306,13 @@ describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (D
     expect(event.defaultPrevented).toBe(false);
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
+  it('leaves a right-click in a text field to the browser (paste, select)', () => {
+    render(<LinkRow />);
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    screen.getByRole('textbox', { name: 'Units per day' }).dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+
   // Touch-and-hold is checked in the browser: jsdom's pointer events carry no pointerType.
 });

@@ -1,6 +1,6 @@
 import type { PiData } from '@/sde/types';
 import { commodityName } from '../goalPlannerFormat';
-import { PiProductLink } from '../PiProductLink';
+import { PiProductList } from '../PiProductLink';
 import { Sentence } from '../sentence';
 
 /**
@@ -21,12 +21,13 @@ export function ProductSentence({
   const slots = Object.fromEntries(
     Object.entries(products).map(([token, ids]) => [
       token,
-      (typeof ids === 'number' ? [ids] : ids).map((id, i) => (
-        <span key={id}>
-          {i > 0 && ', '}
-          <PiProductLink typeId={id}>{commodityName(id, pi)}</PiProductLink>
-        </span>
-      )),
+      <PiProductList
+        key={token}
+        items={(typeof ids === 'number' ? [ids] : ids).map((typeId) => ({
+          typeId,
+          name: commodityName(typeId, pi),
+        }))}
+      />,
     ])
   );
   return <Sentence text={text} slots={slots} />;
