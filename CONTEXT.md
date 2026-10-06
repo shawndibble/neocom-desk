@@ -915,9 +915,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   restarting a slowing extractor, adding a missing head, hauling before a
   launchpad fills, or repointing an idle factory. It adds to today's income
   without changing what the colony makes, except a storage win, whose figure
-  is a saving that no total adds. A colony's spare room is spent by one Quick
-  win only. The PI Plan tab lists every Quick
-  win before any rebuild and quotes a rebuild's gain on top of them, keeping
+  is a saving that no total adds. A colony's spare room is spent by one kind
+  of Quick win. The PI Plan tab lists the Quick wins before any rebuild and quotes a rebuild's gain on top of them, keeping
   ADR 0012's split between tuning today's extraction and re-planning it.
   Ranked by ISK/day per minute of in-game work.
 - **Sell market**: Where a pilot's PI output is sold, and so what every PI ISK figure is priced at: a trade hub's buy orders (less sales tax), or the pilot's corp buyback at a percentage of the hub's price (no sales tax, collected at home so no route to market). Customs is paid at the colony's own office either way. One sell market is applied to Plan, Map and Colonies together, so they quote identical figures.

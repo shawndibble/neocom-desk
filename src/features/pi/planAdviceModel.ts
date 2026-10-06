@@ -28,8 +28,7 @@
  *   model with the fix applied and taking the difference, so a quick win's
  *   figure is the colony's own earnings model's answer rather than a second
  *   one. A win whose value cannot be priced keeps a `null` gain. A colony's
- *   spare and freed room is spent by one win only (`spendRoomOnce`), and a
- *   storage win's figure is a saving, shown but never added to a total.
+ *   spare and freed room is spent by one win only (`spendRoomOnce`).
  * - **Rebuild**: `colonyStopTierAdvice`, the one-planet scorer, not `planBest`:
  *   `planBest` hosts a multi-planet goal chain, while this question is "what is
  *   the best one planet can make from its own ground". Its candidate list is

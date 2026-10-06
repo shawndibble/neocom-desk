@@ -14,7 +14,8 @@
  * ## Quick wins add to today; a rebuild is quoted on top of them
  *
  * A **Quick win** is in-place tuning of a colony as it stands (ADR 0012's
- * tuning side). Quick wins add up. A rebuild changes what the colony makes, so
+ * tuning side). Quick wins add up, except a storage win's saving (`isSaving`),
+ * and a colony's room is spent by one of them (`spendRoomOnce`). A rebuild changes what the colony makes, so
  * it is measured against *today after quick wins* (`pickRebuild`'s `todayPerDay`
  * argument), never against raw today: the pilot does the quick wins first, and
  * the rebuild's gain is what is left on top. That is the whole defence against
@@ -219,7 +220,7 @@ export function isSaving(detail: QuickWinDetail): boolean {
   return detail.kind === 'storage';
 }
 
-/** The totals count what a win adds; a saving keeps its minutes but not its figure. */
+/** A saving's minutes count; its figure does not. */
 export function totalQuickWins(wins: readonly QuickWin[]): {
   gainPerDay: number;
   minutes: number;
@@ -236,10 +237,8 @@ export function totalQuickWins(wins: readonly QuickWin[]): {
 export type RoomClaim = 'heads' | 'extractors' | 'local-factories' | 'network-factories';
 
 /**
- * The colony room a win spends, or null when it spends none. Heads in place of
- * idle factories, more extractors, local refining and the network plan's
- * factories all draw on the same spare and freed CPU and Powergrid. Each
- * source's own factories are one claim: it already split the room between them.
+ * The colony CPU and Powergrid a win spends, or null. Each source's factories
+ * are one claim: that source already split the room between them.
  */
 export function roomClaim(detail: QuickWinDetail): RoomClaim | null {
   if (detail.kind === 'idle-factories') return detail.headsToAdd === null ? null : 'heads';
@@ -251,7 +250,7 @@ export function roomClaim(detail: QuickWinDetail): RoomClaim | null {
  * One colony's room is spent once. Of the claims on it, the one that adds the
  * most ISK a day stays: a figure beats none, a tie keeps the first. Losing
  * heads fall back to removing the idle factories, unpriced, so those are still
- * named; other losing claims are dropped. Wins that spend no room pass through.
+ * named; other losing claims are dropped.
  */
 export function spendRoomOnce(wins: readonly QuickWin[]): QuickWin[] {
   const byPlanet = new Map<number, Map<RoomClaim, { priced: boolean; gain: number }>>();
@@ -544,7 +543,7 @@ export interface ColonyAdvice {
   /** Why `todayPerDay` is null. */
   unknownReason: string | null;
   quickWins: QuickWin[];
-  /** Sum of the priced quick wins' gains. */
+  /** Sum of the priced quick wins that add; savings excluded. */
   quickWinGainPerDay: number;
   afterQuickWinsPerDay: number | null;
   rebuild: RebuildAdvice;
@@ -606,7 +605,7 @@ export interface PlanTotals {
   rebuildMinutes: number;
   /** Colonies left out of the sums for want of a figure. */
   unknownColonies: number;
-  /** Quick wins counted in `quickWinMinutes` but with no ISK figure. */
+  /** Quick wins that add but have no ISK figure. */
   unpricedQuickWins: number;
 }
 
