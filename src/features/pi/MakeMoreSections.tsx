@@ -415,28 +415,31 @@ export function QuickWinsPanel({
               {win.iconTypeId !== null && (
                 <TypeIcon typeId={win.iconTypeId} size={32} width={24} height={24} />
               )}
-              <p
-                id={sentenceId}
-                className={cx(
-                  'min-w-0 flex-1 text-xs text-text',
-                  ticked && 'text-text-dim line-through'
-                )}
-              >
-                <QuickWinSentence win={win} names={names} />
-              </p>
-              <span className="flex shrink-0 flex-col items-end gap-0.5 text-xs sm:flex-row sm:items-center sm:gap-3">
-                {pricesDown ? null : win.gainPerDay === null ? (
-                  <span className="text-text-dim">{t('piPlan.make.unpriced')}</span>
-                ) : win.gainKind === 'saves' ? (
-                  <span className="tabular-nums text-warning">
-                    {t('piPlan.make.saves')} <IskAmount value={win.gainPerDay} decimals={0} />
-                    {t('piPlan.make.perDay')}
-                  </span>
-                ) : (
-                  <Gain value={win.gainPerDay} />
-                )}
-                <Minutes value={win.minutes} />
-              </span>
+              {/* Below md the gain sits under the sentence, so the sentence keeps the row's width. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 md:flex-row md:items-center md:gap-3">
+                <p
+                  id={sentenceId}
+                  className={cx(
+                    'min-w-0 flex-1 text-xs text-text',
+                    ticked && 'text-text-dim line-through'
+                  )}
+                >
+                  <QuickWinSentence win={win} names={names} />
+                </p>
+                <span className="flex items-center gap-3 text-xs md:shrink-0">
+                  {pricesDown ? null : win.gainPerDay === null ? (
+                    <span className="text-text-dim">{t('piPlan.make.unpriced')}</span>
+                  ) : win.gainKind === 'saves' ? (
+                    <span className="tabular-nums text-warning">
+                      {t('piPlan.make.saves')} <IskAmount value={win.gainPerDay} decimals={0} />
+                      {t('piPlan.make.perDay')}
+                    </span>
+                  ) : (
+                    <Gain value={win.gainPerDay} />
+                  )}
+                  <Minutes value={win.minutes} />
+                </span>
+              </div>
             </li>
           );
         })}

@@ -200,14 +200,17 @@ function HostMark({
   onFind: () => void;
 }) {
   const { t } = useTranslation();
-  const Glyph = state === 'find' ? Icon.Close : Icon.Done;
+  const Glyph = state === 'find' ? Icon.Search : Icon.Done;
   const inner = (
     <>
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {t(`piPlan.find.state.${state}`)}
     </>
   );
-  const className = cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state]);
+  const className = cx(
+    'inline-flex shrink-0 items-center gap-0.5 text-[0.6875rem] whitespace-nowrap',
+    STATE_TEXT[state]
+  );
   if (state !== 'find') return <span className={className}>{inner}</span>;
   // "Find one" is the way in to Show me how, whose step 1 is the planet finder.
   return (

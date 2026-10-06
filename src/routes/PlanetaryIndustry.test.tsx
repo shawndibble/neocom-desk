@@ -544,7 +544,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
-    expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
+    expect(within(panel).getByText('+793,859 units/day')).toBeInTheDocument();
     const region = within(panel).getByRole('region');
     expect(within(region).queryByText('—')).not.toBeInTheDocument();
   });
@@ -1067,7 +1067,7 @@ describe('PlanetaryIndustry', () => {
 
   describe("a product's PI detail is a URL (?product=)", () => {
     const BIOFUELS = 2396;
-    const drawer = () => screen.findByRole('dialog', { name: 'How to make it' });
+    const drawer = () => screen.findByRole('dialog', { name: /^(How to make|Where to get) / });
 
     it('opens the Map with that product drawer open, and a reload reopens it', async () => {
       window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);

@@ -6,6 +6,7 @@ import {
   buildMapGraph,
   canMake,
   detailMode,
+  groupByTier,
   productFigure,
   traceProduct,
   unlockedBy,
@@ -133,6 +134,25 @@ describe('traceProduct', () => {
     const [planet] = trace.planets;
     expect(planet.type).toBe('oceanic');
     expect(planet.made.map((p) => graph.byId.get(p)!.tier)).toEqual([0, 1]);
+  });
+});
+
+describe('groupByTier', () => {
+  it('puts parallel inputs side by side and steps up one tier at a time', () => {
+    const coolant = id('Coolant');
+    const trace = traceProduct(graph, coolant, { owned: set('gas'), ticked: set('gas') });
+    const groups = groupByTier(graph, [...trace.ids]);
+    expect(groups.map((g) => graph.byId.get(g[0])!.tier)).toEqual([0, 1, 2]);
+    expect(groups[1].map((i) => graph.byId.get(i)!.name).sort()).toEqual(
+      ['Electrolytes', 'Water'].sort()
+    );
+    expect(groups.flat().sort()).toEqual([...trace.ids].sort());
+  });
+
+  it('keeps the order it was given inside a tier, and drops empty tiers', () => {
+    const [a, b] = [id('Water'), id('Electrolytes')];
+    expect(groupByTier(graph, [b, a, id('Coolant')])).toEqual([[b, a], [id('Coolant')]]);
+    expect(groupByTier(graph, [])).toEqual([]);
   });
 });
 

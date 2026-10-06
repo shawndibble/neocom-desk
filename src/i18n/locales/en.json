@@ -4588,8 +4588,8 @@
       "bankedColumn": "Banked",
       "bankedValue": "{{amount}} ({{percent}}%)",
       "resetGainColumn": "Reset now",
-      "resetGainValue": "+{{amount}}/day",
-      "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+      "resetGainValue": "+{{amount}} units/day",
+      "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows how many more units a day that brings back."
     },
     "altColonies": {
       "toggleLabel_one": "Show {{count}} alt's colonies",
@@ -4716,7 +4716,8 @@
     },
     "estimateNote": "An estimate: ISK a day for one planet, after customs and sales tax, at your sell market. The same figures as the Plan tab.",
     "detail": {
-      "panelTitle": "How to make it",
+      "panelTitle": "How to make {{name}}",
+      "panelTitle_raw": "Where to get {{name}}",
       "panelTitleEmpty": "Details",
       "empty": "Click a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
       "empty_touch": "Tap a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
@@ -4740,7 +4741,9 @@
       "facility": {
         "extractor": "Extracted with an Extractor Control Unit on {{types}}.",
         "basic": "Made in a Basic Industry Facility, on {{types}}.",
+        "basic_any": "Made in a Basic Industry Facility.",
         "advanced": "Made in an Advanced Industry Facility, on {{types}}.",
+        "advanced_any": "Made in an Advanced Industry Facility.",
         "highTech": "Made in a High-Tech Production Plant, only on {{types}}."
       },
       "madeFrom": "Made from",
@@ -4858,11 +4861,14 @@
     "strip": {
       "home": "Home",
       "colonies": "Colonies",
+      "eveTime": "EVE time",
       "route": "Home route",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
       "lowsecJumps_other": "{{count}} lowsec jumps",
+      "nullsecJumps_one": "{{count}} nullsec jump",
+      "nullsecJumps_other": "{{count}} nullsec jumps",
       "sellAt": "Where do you sell?",
       "nearestHub_one": "Nearest hub: {{hub}}, {{count}} jump",
       "nearestHub_other": "Nearest hub: {{hub}}, {{count}} jumps",
@@ -5074,6 +5080,7 @@
       "slots_nogain_one": "You can run up to {{count}} planet and you're using {{used}}. Each level of {{skill}} adds one more planet.",
       "slots_nogain_other": "You can run up to {{count}} planets and you're using {{used}}. Each level of {{skill}} adds one more planet.",
       "slotsSkill": "Interplanetary Consolidation",
+      "slotsLocked": "Locked",
       "slotsAssumed": "Your skills have not loaded, so this assumes none are trained.",
       "nextPlanet": "What should the next planet be?",
       "quickTitle": "Quick wins · no rebuild",
@@ -5207,6 +5214,7 @@
       "liveUnknown_one": "{{count}} colony could not be measured and is left out.",
       "liveUnknown_other": "{{count}} colonies could not be measured and are left out.",
       "liveQuick": "Quick wins add {{gain}} ISK a day in about {{count}} minutes.",
+      "liveQuickNoGain": "Quick wins take about {{count}} minutes.",
       "liveRebuild_one": "Rebuilding {{count}} planet adds {{gain}} ISK a day on top.",
       "liveRebuild_other": "Rebuilding {{count}} planets adds {{gain}} ISK a day on top.",
       "liveRebuildCost_one": "Rebuilding {{count}} planet costs {{gain}} ISK a day.",
@@ -5371,6 +5379,7 @@
     "colonyCustomsSetIt": "Set it",
     "customsAssumedNote": "ISK figures assume {{percent}}% customs on {{names}}: nothing reports what a player-owned office charges.",
     "customsSetOnPlan": "Set the rate on Plan",
+    "customsSetInPlanner": "Set the rate in “Make a specific product”",
     "coloniesShow": "Show colonies",
     "coloniesHide": "Hide colonies",
     "coloniesListLabel": "Colonies in the plan",
@@ -5453,7 +5462,6 @@
     },
     "statusLabel": "Status",
     "perDay": "/day",
-    "iskPerDay": "ISK/day",
     "unknown": "unknown",
     "noFigure": "no figure",
     "saves": "saves ~",
@@ -5573,7 +5581,7 @@
       "roomExtractorsGain_other": "Room for {{count}} more extractors · +<isk/>{{perDay}}",
       "roomFactories_one": "Room for {{count}} more factory",
       "roomFactories_other": "Room for {{count}} more factories",
-      "stale": "Data {{hours}} h old"
+      "stale": "Updated {{age}}"
     },
     "help": {
       "extractors": "Extractors pull raw material for a few days, then stop. Restarting resets them to full speed, which is why an early restart can pay.",
@@ -5649,15 +5657,18 @@
     "blurb": {
       "restart": {
         "title": "Restart reminders",
-        "body": "Extractors run for a few days, then stop."
+        "body": "Extractors run for a few days, then stop.",
+        "term": "extractors"
       },
       "storage": {
         "title": "Full-storage warnings",
-        "body": "Before your launchpad fills and production stalls."
+        "body": "Before your launchpad fills and production stalls.",
+        "term": "the launchpad"
       },
       "health": {
         "title": "Quick health check",
-        "body": "Idle factories and spare room in your Command Center."
+        "body": "Idle factories and spare room in your Command Center.",
+        "term": "the Command Center"
       }
     }
   },

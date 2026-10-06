@@ -31,12 +31,18 @@ interface Props {
 /** The sentence a screen reader hears when the plan recomputes. */
 function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t']): string {
   const { headline } = view;
-  const parts = [
-    t('piPlan.make.liveQuick', {
-      gain: formatIskCompact(headline.quickWinPerDay),
-      count: headline.quickWinMinutes,
-    }),
-  ];
+  const parts: string[] = [];
+  // Never "add 0 ISK a day": no wins says nothing, wins with no gain (saves, unpriced) give time only.
+  if (view.quickWins.length > 0) {
+    parts.push(
+      headline.quickWinPerDay > 0
+        ? t('piPlan.make.liveQuick', {
+            gain: formatIskCompact(headline.quickWinPerDay),
+            count: headline.quickWinMinutes,
+          })
+        : t('piPlan.make.liveQuickNoGain', { count: headline.quickWinMinutes })
+    );
+  }
   if (headline.rebuildCount > 0) {
     parts.push(
       t(

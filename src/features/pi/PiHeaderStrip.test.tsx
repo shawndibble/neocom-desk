@@ -63,6 +63,22 @@ describe('PiHeaderStrip', () => {
     expect(note.parentElement).toHaveTextContent(/est\.\s*estimated prices/i);
   });
 
+  it('shows EVE time where asked (Colonies), and only there', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T12:00:00Z'));
+    try {
+      const { unmount } = renderStrip({ colonySystemIds: [], estimate: false, eveTime: true });
+      const strip = await screen.findByTestId('pi-header-strip');
+      expect(within(strip).getByText('EVE time')).toBeInTheDocument();
+      expect(within(strip).getByText('Tue 12:00')).toBeInTheDocument();
+      unmount();
+      renderStrip({ colonySystemIds: [], estimate: false });
+      expect(screen.queryByText('EVE time')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows no estimate note on tabs without projections', async () => {
     renderStrip({ colonySystemIds: [], estimate: false });
     await screen.findByTestId('pi-header-strip');

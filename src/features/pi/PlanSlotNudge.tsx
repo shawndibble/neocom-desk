@@ -45,6 +45,10 @@ export function SlotNudge({
   return (
     <div className="space-y-1.5 border-t border-line px-3 py-3 text-xs text-text">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* A status, not an action: type and colour, no box (DESIGN-RULES). */}
+        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('piPlan.make.slotsLocked')}
+        </span>
         <span
           role="img"
           aria-label={t('piPlan.make.slotsLabel', { used: slots.used, count: slots.allowed })}
@@ -61,7 +65,7 @@ export function SlotNudge({
             />
           ))}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 max-md:basis-full">
           <Sentence
             text={text}
             slots={{

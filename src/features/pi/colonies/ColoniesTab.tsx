@@ -140,9 +140,9 @@ function SwitchToButton({ name, onSwitch }: { name: string; onSwitch: () => void
 function NoColonies({ planHref }: { planHref: string }) {
   const { t } = useTranslation();
   const blurbs = [
-    { icon: <Icon.Recent />, key: 'restart' },
-    { icon: <Icon.Container />, key: 'storage' },
-    { icon: <Icon.Industry />, key: 'health' },
+    { icon: <Icon.Recent />, key: 'restart', help: 'piColonies.help.extractors' },
+    { icon: <Icon.Container />, key: 'storage', help: 'piColonies.help.launchpad' },
+    { icon: <Icon.Industry />, key: 'health', help: 'piPlan.explainer.commandCenterBody' },
   ] as const;
   return (
     <Panel
@@ -175,14 +175,18 @@ function NoColonies({ planHref }: { planHref: string }) {
         }
       />
       <ul className="grid divide-line border-t border-line md:grid-cols-3 md:divide-x max-md:divide-y">
-        {blurbs.map(({ icon, key }) => (
+        {blurbs.map(({ icon, key, help }) => (
           <li key={key} className="flex items-start gap-2 p-3 text-xs text-text-dim">
             <span aria-hidden="true" className="mt-0.5 shrink-0">
               {icon}
             </span>
             <span>
               <b className="block text-text">{t(`piColonies.blurb.${key}.title`)}</b>
-              {t(`piColonies.blurb.${key}.body`)}
+              {t(`piColonies.blurb.${key}.body`)}{' '}
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: t(`piColonies.blurb.${key}.term`) })}
+                content={t(help)}
+              />
             </span>
           </li>
         ))}
@@ -549,7 +553,8 @@ export function ColoniesTab({
             </span>
             <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
             {planetsResult && (
-              <span className="inline-flex items-center gap-1">
+              // Hidden with the badge below md, so the label never shows without its time.
+              <span className="hidden items-center gap-1 md:inline-flex">
                 {t('piColonies.cantSee.updated')}
                 <DataAgeBadge date={new Date(planetsResult.fetchedAt)} />
               </span>
@@ -563,7 +568,11 @@ export function ColoniesTab({
             title={t('pi.colonies.panelTitle', {
               count: ownRows.length + (showAltColonies ? roster.colonies.length : 0),
             })}
-            meta={<span className="font-normal normal-case">{t('piColonies.attentionFirst')}</span>}
+            meta={
+              <span className="text-[0.6875rem] font-normal text-text-dim normal-case max-md:hidden">
+                {t('piColonies.attentionFirst')}
+              </span>
+            }
             actions={
               hasOtherCharacters ? (
                 <FilterChip

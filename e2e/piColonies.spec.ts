@@ -261,7 +261,7 @@ test.describe('PI Colonies, the daily check', () => {
     });
     await expect(group.locator('time')).toBeVisible();
     // The read is a day old.
-    await expect(page.getByText(/Data 2\d h old/)).toBeVisible();
+    await expect(page.getByText(/Updated 1d ago/)).toBeVisible();
     // Its own figure, labelled as outside the plan.
     await expect(group.getByText(/Makes ~/)).toBeVisible();
     await expect(group.getByText('not in your plan')).toBeVisible();

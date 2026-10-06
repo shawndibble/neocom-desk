@@ -282,7 +282,7 @@ export function MapBoard(props: MapBoardProps) {
           if (!event.currentTarget.contains(event.relatedTarget)) props.onPreview(null);
         }}
         aria-labelledby={headingId}
-        className="relative mx-auto grid w-max grid-cols-[96px_116px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
+        className="relative mx-auto grid w-max grid-cols-[96px_132px_146px_196px_184px_194px] gap-x-4 py-3 pr-3"
       >
         <h3 id={headingId} className="sr-only">
           {t('piMap.boardLabel')}

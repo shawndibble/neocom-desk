@@ -3,7 +3,7 @@
  * home, and how a route to the sell market is worded. No fetch here; the
  * strip feeds in what it loaded.
  */
-import { shownSecurity } from '@/engine/securityStatus';
+import { securityBand } from '@/engine/securityStatus';
 import type { TradeHub } from '@/market/hubs';
 
 /**
@@ -24,20 +24,24 @@ export function homeSystemId(colonySystemIds: readonly number[]): number | null 
 
 export interface RouteFigures {
   jumps: number;
-  /** Systems flown into that are lowsec or nullsec (below 0.5 as the game shows it). */
+  /** Systems flown into that are lowsec (0.1 to 0.4 as the game shows it). */
   lowsecJumps: number;
+  /** Systems flown into that are nullsec (below 0.1), split out the way Hauling does. */
+  nullsecJumps: number;
 }
 
 /**
  * `path` is the security of every system on the route, origin first. An
- * unknown security (null) is not counted as low: guessing would inflate a
+ * unknown security (null) counts as neither lowsec nor nullsec: guessing would inflate a
  * figure a hauler weighs.
  */
 export function routeFigures(path: readonly (number | null)[]): RouteFigures {
   const entered = path.slice(1);
+  const bands = entered.flatMap((s) => (s === null ? [] : [securityBand(s)]));
   return {
     jumps: entered.length,
-    lowsecJumps: entered.filter((s) => s !== null && shownSecurity(s) < 0.5).length,
+    lowsecJumps: bands.filter((band) => band === 'lowsec').length,
+    nullsecJumps: bands.filter((band) => band === 'nullsec').length,
   };
 }
 
@@ -51,8 +55,8 @@ export type NearestHub = RouteFigures & { hub: TradeHub['id'] };
 
 /**
  * The trade hub fewest gate jumps from home; a tie goes to the route with
- * fewer lowsec jumps (the safer one), then to `current` (so an equally near
- * hub is never suggested over the one already used), then to the earlier
+ * fewer lowsec and nullsec jumps (the safer one), then to `current` (so an
+ * equally near hub is never suggested over the one already used), then to the earlier
  * entry so the answer is stable. Hubs without a known route are skipped; null
  * when none is known.
  */
@@ -60,15 +64,16 @@ export function nearestHub(
   routes: readonly HubRoute[],
   current?: TradeHub['id']
 ): NearestHub | null {
+  const unsafe = (f: RouteFigures) => f.lowsecJumps + f.nullsecJumps;
   let best: NearestHub | null = null;
   for (const { hub, figures } of routes) {
     if (!figures) continue;
     if (
       !best ||
       figures.jumps < best.jumps ||
-      (figures.jumps === best.jumps && figures.lowsecJumps < best.lowsecJumps) ||
+      (figures.jumps === best.jumps && unsafe(figures) < unsafe(best)) ||
       (figures.jumps === best.jumps &&
-        figures.lowsecJumps === best.lowsecJumps &&
+        unsafe(figures) === unsafe(best) &&
         hub === current &&
         best.hub !== current)
     ) {
