@@ -701,7 +701,7 @@ function PiDefaultsPanel() {
   const { t } = useTranslation();
   return (
     <Panel title={t('settings.piDefaultsTitle')}>
-      <PiSettingsForm />
+      <PiSettingsForm showSellAt />
     </Panel>
   );
 }
