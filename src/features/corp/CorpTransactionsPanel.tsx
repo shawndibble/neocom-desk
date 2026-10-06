@@ -16,7 +16,7 @@
  * "what did we buy last Tuesday" is a question worth a control, and the
  * character view answers a much smaller list.
  */
-import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -40,7 +40,6 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
   activeWalletTransactionFilterCount,
@@ -170,19 +169,6 @@ export function CorpTransactionsPanel({
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
 
-  /** Same menu every other item table carries (issue #817). */
-  const rowContextMenu = useCallback(
-    (txn: CorporationWalletTransaction, tr: ReactElement) => {
-      const itemName = nameFor(txn.type_id);
-      return (
-        <ItemContextMenu typeId={txn.type_id} itemName={itemName} blueprintTypeID={null}>
-          {tr}
-        </ItemContextMenu>
-      );
-    },
-    [nameFor]
-  );
-
   // The same six columns Market's character panel draws, and in the same
   // order: the two tables answer the same question about different wallets,
   // and a manager reconciling one against the other should not have to find
@@ -199,8 +185,8 @@ export function CorpTransactionsPanel({
       {
         id: 'item',
         header: t('wallet.item'),
-        /** Titles the card on a phone — the item is what the transaction is. */
-        primary: true,
+        /** Pinned while the figures scroll sideways on a phone. */
+        stickyStart: true,
         render: (txn) => (
           <MarketItemLink typeId={txn.type_id}>{nameFor(txn.type_id)}</MarketItemLink>
         ),
@@ -209,6 +195,7 @@ export function CorpTransactionsPanel({
       {
         id: 'side',
         header: t('wallet.side'),
+        phoneHidden: true,
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
@@ -223,6 +210,7 @@ export function CorpTransactionsPanel({
       {
         id: 'unitPrice',
         header: t('wallet.unitPrice'),
+        phoneHidden: true,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatIsk(txn.unit_price, 2),
@@ -358,9 +346,7 @@ export function CorpTransactionsPanel({
               virtualize="auto"
               sort={sort}
               onSortChange={onSortChange}
-              mobileSort
-              rowContextMenu={rowContextMenu}
-              rowMoreActions
+              responsive="table"
             />
           )}
         </>

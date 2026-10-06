@@ -4161,7 +4161,6 @@
     },
     "payment": {
       "autoLinked": "auto-linked",
-      "menuLabel": "Payment actions",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
       "paidLine": "Paid {{amount}} ISK · {{date}}"
@@ -7781,11 +7780,6 @@
         "moonDecay": "Moon chunk breaks up on its own",
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline"
-      },
-      "contextMenu": {
-        "copyName": "Copy name",
-        "showInfo": "Show info",
-        "viewInMarket": "View in Market"
       },
       "severity": {
         "critical": "Critical",

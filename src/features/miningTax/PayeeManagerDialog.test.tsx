@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import '@/i18n';
@@ -47,8 +47,8 @@ function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
 }
 
 async function openDeleteFor(name: string) {
-  await userEvent.click(screen.getByRole('button', { name: `More actions for ${name}` }));
-  await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+  await userEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 }
 
 async function pickHub(name: string) {
@@ -174,7 +174,11 @@ describe('PayeeManagerDialog delete confirmation (#862: no silent delete)', () =
     renderDialog([stored]);
 
     await openDeleteFor('Hek landlord');
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Delete' })).getByRole('button', {
+        name: 'Cancel',
+      })
+    );
 
     expect(
       screen.queryByText('Delete "Hek landlord"? This can\'t be undone.')
@@ -200,7 +204,11 @@ describe('PayeeManagerDialog delete confirmation (#862: no silent delete)', () =
     renderDialog([stored]);
 
     await openDeleteFor('Hek landlord');
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Delete' })).getByRole('button', {
+        name: 'Delete',
+      })
+    );
 
     await waitFor(() => {
       expect(actionsMock.deletePayee).toHaveBeenCalledWith(stored, undefined);

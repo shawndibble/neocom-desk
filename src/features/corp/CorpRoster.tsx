@@ -12,7 +12,7 @@
  * the bottom. Sorting on the date instead would put the people still playing
  * first, which answers a question nobody opened this page to ask.
  */
-import { Fragment, useMemo, type ReactElement } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -146,10 +146,8 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'member',
         header: t('corp.members.columnMember'),
-        // Also the card title below `sm`. It is already the first column, but
-        // saying so pins it: reordering the columns later must not silently
-        // retitle every card.
-        primary: true,
+        // Pinned while the other columns scroll sideways on a phone.
+        stickyStart: true,
         className: 'truncate',
         // The name truncates, the tag does not: a long name must not ellipsize it away.
         render: (row) => (
@@ -264,13 +262,10 @@ const rosterRowKey = (row: RosterRow) => row.characterId;
 
 export function CorpRosterTable({
   rows,
-  rowContextMenu,
   tableProps,
 }: {
   rows: readonly RosterRow[];
-  /** Row context menu (issue #421): Show Info + Copy Character Name. */
-  rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
-  /** `useTableExport(...).tableProps` — row menus gain "Export table". */
+  /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
   tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();
@@ -308,16 +303,13 @@ export function CorpRosterTable({
       {...tableProps}
       columns={shownColumns}
       rows={rows}
-      rowContextMenu={rowContextMenu}
-      rowMoreActions={rowContextMenu !== undefined}
+      responsive="table"
       rowKey={rosterRowKey}
       highlightRowKey={highlightedMemberId}
       virtualize="auto"
       label={t('corp.members.tableLabel')}
       density="compact"
       {...sortProps}
-      mobileSort
-      stackSummary={t('corp.members.mobileSortSummary', { count: rows.length })}
     />
   );
 }
