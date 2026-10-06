@@ -17,8 +17,11 @@ import {
   useContext,
   useEffect,
   type ComponentProps,
+  type MouseEvent,
+  type PointerEvent,
   type ReactElement,
   type ReactNode,
+  type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -175,11 +178,36 @@ function warnRestraint(name: string, items: ReactNode) {
   );
 }
 
+/** Links and text fields: the browser's own menu (open in new tab, paste) is the one a pilot expects there. */
+const BROWSER_MENU_TARGETS = 'a[href], input, textarea, select, [contenteditable="true"]';
+
+function targetsBrowserMenu(event: SyntheticEvent): boolean {
+  return event.target instanceof Element && event.target.closest(BROWSER_MENU_TARGETS) !== null;
+}
+
+/**
+ * Right-click there stops before Radix's trigger (no `preventDefault`, so the browser menu shows).
+ * A touch/pen press marks only React's event as prevented, in the trigger's own `onPointerDown`,
+ * which Radix runs just before its long-press handler and skips that on a prevented event. The
+ * native default (a tapped field taking focus, the browser's hold menu) still runs.
+ */
+const browserMenuGuard = {
+  onContextMenuCapture(event: MouseEvent) {
+    if (targetsBrowserMenu(event)) event.stopPropagation();
+  },
+  onPointerDown(event: PointerEvent) {
+    if (event.pointerType !== 'mouse' && targetsBrowserMenu(event)) {
+      (event as { defaultPrevented: boolean }).defaultPrevented = true;
+    }
+  },
+};
+
 /**
  * Right-click menu around `trigger`, publishing the same items for
- * `RowMoreActions`. Touch-and-hold anywhere in the row opens it, so the
- * tooltips of the controls inside give that gesture up (`tooltipHold.ts`):
- * a hold inside a row menu never reveals a tooltip.
+ * `RowMoreActions`. Touch-and-hold anywhere in the row opens it (with
+ * `linksKeepBrowserMenu`, anywhere but a link or field), so the tooltips of
+ * the controls inside give that gesture up (`tooltipHold.ts`): a hold inside
+ * a row menu never reveals a tooltip.
  *
  * With `tooltip`, the trigger itself explains itself on hover and focus too
  * (a Fittings Ring tile); its touch-and-hold is the menu's alone, so what the
@@ -190,9 +218,19 @@ export function RowActionsMenu({
   items,
   onOpenChange,
   tooltip,
+  linksKeepBrowserMenu = false,
   children,
-}: RowActions & { tooltip?: string; children: ReactElement }) {
-  const trigger = <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>;
+}: RowActions & {
+  tooltip?: string;
+  /** Right-click or hold on a link or text field stays the browser's (§6c "Entities", guardrail 2). */
+  linksKeepBrowserMenu?: boolean;
+  children: ReactElement;
+}) {
+  const trigger = (
+    <ContextMenuTrigger asChild {...(linksKeepBrowserMenu ? browserMenuGuard : undefined)}>
+      {children}
+    </ContextMenuTrigger>
+  );
   // Anything the surrounding table adds (DataTable's "Export table").
   // `RowMoreActions` appends the same itself, so the context value stays
   // the row's own items and a hand-rolled wrapper gets the extras too.

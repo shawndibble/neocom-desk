@@ -12,7 +12,6 @@ import {
   Button,
   Checkbox,
   CollapsiblePanel,
-  IconButton,
   InfoTooltip,
   Panel,
   RegionSelect,
@@ -25,6 +24,7 @@ import * as Icon from '@/components/ui/icons';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { PiProductLink } from './PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MenuItem, RowMoreActions } from '@/components/ui/RowActions';
 import type { PiCadence } from './cadencePref';
 import { customsRatePercent, customsSourceText } from './customsRate';
 import type { PlannerColonyRow } from './goalPlannerModel';
@@ -169,32 +169,43 @@ export function GoalsSection({
           {shown.map((goal) => {
             const product = byId.get(goal.typeId)!;
             return (
-              <li key={goal.typeId} className="flex items-center gap-2">
-                <TierChip tier={product.tier} />
-                <span className="min-w-0 flex-1 truncate text-sm text-text">
-                  <ItemContextMenu typeId={goal.typeId} itemName={product.name}>
+              // The name is a plain link (the browser's link menu stays on it); the
+              // item menu is the row's, behind the ⋮, with Remove folded in rather
+              // than a × beside it (DESIGN.md §6c "Restraint").
+              <ItemContextMenu
+                key={goal.typeId}
+                typeId={goal.typeId}
+                itemName={product.name}
+                linksKeepBrowserMenu
+                extraItems={
+                  <MenuItem
+                    className="text-danger"
+                    onSelect={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
+                  >
+                    {t('piPlan.goalRemove', { name: product.name })}
+                  </MenuItem>
+                }
+              >
+                <li className="flex items-center gap-2">
+                  <TierChip tier={product.tier} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-text">
                     <PiProductLink typeId={goal.typeId}>{product.name}</PiProductLink>
-                  </ItemContextMenu>
-                </span>
-                <UnitsBox
-                  value={goal.unitsPerDay}
-                  size={size}
-                  label={t('piPlan.goalRateLabel', { name: product.name })}
-                  describedBy={hintId}
-                  onCommit={(unitsPerDay) =>
-                    onGoalsChange(
-                      goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
-                    )
-                  }
-                />
-                <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('piPlan.goalRemove', { name: product.name })}
-                  size="row"
-                  onClick={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
-                />
-              </li>
+                  </span>
+                  <UnitsBox
+                    value={goal.unitsPerDay}
+                    size={size}
+                    label={t('piPlan.goalRateLabel', { name: product.name })}
+                    describedBy={hintId}
+                    onCommit={(unitsPerDay) =>
+                      onGoalsChange(
+                        goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
+                      )
+                    }
+                  />
+                  <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
+                  <RowMoreActions />
+                </li>
+              </ItemContextMenu>
             );
           })}
         </ul>

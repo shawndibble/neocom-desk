@@ -43,6 +43,8 @@ export interface ItemContextMenuProps {
   onViewInIndustryAsMaterial?: () => void;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
+  /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
+  linksKeepBrowserMenu?: boolean;
   children: ReactElement;
 }
 
@@ -231,7 +233,7 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
  * 2.1.1, issue #1497).
  */
 export function ItemContextMenu(props: ItemContextMenuProps) {
-  const { typeId, itemName, children } = props;
+  const { typeId, itemName, linksKeepBrowserMenu, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const items = useItemMenuItems(props, () => setAlertOpen(true));
   const { requestBlueprints } = useItemActions();
@@ -241,6 +243,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <RowActionsMenu
         name={itemName}
         items={items}
+        linksKeepBrowserMenu={linksKeepBrowserMenu}
         onOpenChange={(open) => {
           if (open) requestBlueprints();
         }}

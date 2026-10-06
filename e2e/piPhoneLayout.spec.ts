@@ -80,7 +80,11 @@ test.describe('PI phone layout', () => {
       const i = await box(info);
       const p = await box(planets);
       const r = await box(raw);
-      expect(i.x + i.width).toBeLessThanOrEqual(p.x + p.width);
+      // The visible circle stays in its column; the button's 24px hit area (4px past the
+      // circle) may reach into the gutter, but never the next column.
+      const c = await box(info.locator('span[aria-hidden="true"]'));
+      expect(c.x + c.width).toBeLessThanOrEqual(p.x + p.width);
+      expect(i.x + i.width).toBeLessThanOrEqual(r.x);
       expect(p.x + p.width).toBeLessThanOrEqual(r.x);
 
       const gotIt = page.getByRole('button', { name: 'Got it' });

@@ -192,8 +192,13 @@ export function Flow({
         }}
         density="compact"
         stackColumns={2}
+        rowMoreActions
         rowContextMenu={(line, tr) => (
-          <ItemContextMenu typeId={line.typeId} itemName={commodityName(line.typeId, pi)}>
+          <ItemContextMenu
+            typeId={line.typeId}
+            itemName={commodityName(line.typeId, pi)}
+            linksKeepBrowserMenu
+          >
             {tr}
           </ItemContextMenu>
         )}

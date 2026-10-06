@@ -15,11 +15,10 @@ import { Button, FilterChip, IskAmount, Panel, SegmentedControl, TypeIcon } from
 import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { HintText } from '@/components/ui/HintText';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
-import { formatIsk } from '@/lib/isk';
 import { PiProductLink } from './PiProductLink';
+import { ComparisonText } from './ComparisonText';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
@@ -273,20 +272,12 @@ function Comparison({ card }: { card: RecipeCardView }) {
       : verdict === 'better'
         ? 'text-success'
         : 'text-warning';
-  const text = isReference
-    ? t('piPlan.find.cmpReference', { type: typeName(versus.planetType) })
-    : t(`piPlan.find.cmp.${verdict}`, { item: versus.name, type: typeName(versus.planetType) });
   return (
     <span className={cx('min-w-0 text-xs', tone)}>
-      <HintText
-        content={t('piPlan.find.cmpHint', {
-          item: versus.name,
-          isk: formatIsk(versus.iskPerDay, 0),
-          type: typeName(versus.planetType),
-        })}
-      >
-        {text}
-      </HintText>
+      <ComparisonText
+        comparison={comparison}
+        referenceText={t('piPlan.find.cmpReference', { type: typeName(versus.planetType) })}
+      />
     </span>
   );
 }

@@ -351,6 +351,34 @@ describe('FindBestPlan', () => {
     expect(screen.getAllByText(/needs \d+ planets/).length).toBeGreaterThan(0);
   });
 
+  it('names the compared product as a link to its PI detail, with the figure behind an "i"', async () => {
+    renderPlan();
+    const coolant = cardItems()[1] as HTMLElement;
+    const versus = within(coolant).getByRole('link', { name: 'Silicon' });
+    expect(versus.getAttribute('href')).toBe(`/planetary-industry/map?product=${SILICON}`);
+    expect(
+      within(coolant).getByRole('button', { name: /^What Silicon earns/ })
+    ).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'All products' }));
+    const tiles = screen.getByRole('region', { name: 'Refined' });
+    expect(within(tiles).getAllByRole('link', { name: 'Silicon' }).length).toBeGreaterThan(0);
+  });
+
+  it("links the product in Show me how's run step", async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    const button = screen.getAllByRole('button', { name: /Show me how/ })[0];
+    await user.click(button);
+    const panel = document.getElementById(button.getAttribute('aria-controls')!)!;
+    const collect = within(panel).getByText(/^Collect about/);
+    expect(within(collect).getByRole('link', { name: 'Proteins' })).toHaveAttribute(
+      'href',
+      `/planetary-industry/map?product=${PROTEINS}`
+    );
+  });
+
   it('shows the loading and error states', () => {
     mockState = { status: 'loading' };
     const { rerender } = renderPlan();

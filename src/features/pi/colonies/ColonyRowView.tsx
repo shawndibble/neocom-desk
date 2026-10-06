@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { IskAmount } from '@/components/ui';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { HintText } from '@/components/ui/HintText';
 import { SystemLink } from '@/features/entities';
 import { PiProductLink } from '../PiProductLink';
@@ -400,6 +401,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
   );
 
   const toggleLabel = t('piColonies.toggleColony', { name: planetName });
+  const holdGuard = useLiftAfterHoldGuard();
 
   const menu = (
     <>
@@ -428,19 +430,23 @@ export function ColonyRowView(props: ColonyRowViewProps) {
 
   return (
     <div className="border-b border-line last:border-b-0" data-colony-status={row.status}>
-      <RowActionsMenu name={planetName} items={menu}>
-        <RowTappableContext.Provider value>
-          <div
-            // A pointer convenience: the real controls are the toggle button, the
-            // action and the ⋮ menu. A click on a link or button inside is theirs.
-            onClick={(event) => {
-              const target = event.target as HTMLElement;
-              if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
-                return;
-              props.onToggle();
-            }}
-            className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
-          >
+      <RowActionsMenu name={planetName} items={menu} linksKeepBrowserMenu>
+        <div
+          {...holdGuard.handlers}
+          // A pointer convenience: the real controls are the toggle button, the
+          // action and the ⋮ menu. A click on a link or button inside is theirs,
+          // and a finger lifting off a hold that opened the menu is the menu's.
+          onClick={(event) => {
+            if (holdGuard.swallowClick(event)) return;
+            const target = event.target as HTMLElement;
+            if (target.closest('a, button:not([data-row-toggle]), input, [role="menuitem"]'))
+              return;
+            props.onToggle();
+          }}
+          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
+        >
+          {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
+          <RowTappableContext.Provider value>
             <div className="flex min-w-0 items-start gap-2.5 max-md:pr-11">
               <button
                 type="button"
@@ -566,8 +572,8 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                 <FaultTags tags={row.tags} planetName={planetName} />
               </div>
             )}
-          </div>
-        </RowTappableContext.Provider>
+          </RowTappableContext.Provider>
+        </div>
       </RowActionsMenu>
 
       {expanded && (

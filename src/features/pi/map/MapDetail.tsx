@@ -25,6 +25,7 @@ import { CcLevelTag } from '../CcLevelTag';
 import { chainAssumptions } from '../chainEstimateText';
 import { EstimateBadge } from '../DirectiveRow';
 import { PiProductLink } from '../PiProductLink';
+import { Sentence } from '../sentence';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
@@ -170,7 +171,17 @@ export function ProductDetail(props: ProductDetailProps) {
         </div>
       ) : null}
       {view.money.kind !== 'multi-planet' && (
-        <p className="mt-2 text-xs text-text">{comparisonSentence(t, figure)}</p>
+        <p className="mt-2 text-xs text-text">
+          {/* The compared product links to its own detail, as the chain's names do. */}
+          <Sentence
+            text={comparisonSentence(t, figure, '{name}')}
+            slots={{
+              name: figure.kind === 'ranked' && figure.versus !== null && (
+                <PiProductLink typeId={figure.versus.typeId}>{figure.versus.name}</PiProductLink>
+              ),
+            }}
+          />
+        </p>
       )}
       {view.money.kind === 'one-planet' && (
         <p className="mt-1 text-xs text-text-dim">
@@ -277,13 +288,23 @@ export function ProductDetail(props: ProductDetailProps) {
         )}
       </ol>
       <p className="mt-2 text-xs text-text-dim">
-        {t('piMap.detail.chainText', {
-          planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
-          steps: names(
-            graph,
-            [...trace.ids].sort((a, b) => graph.byId.get(a)!.tier - graph.byId.get(b)!.tier)
-          ).join(' → '),
-        })}
+        <Sentence
+          text={t('piMap.detail.chainText', {
+            planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
+            steps: '{steps}',
+          })}
+          slots={{
+            steps: (
+              <NameChain
+                graph={graph}
+                ids={[...trace.ids].sort(
+                  (a, b) => graph.byId.get(a)!.tier - graph.byId.get(b)!.tier
+                )}
+                open={typeId}
+              />
+            ),
+          }}
+        />
       </p>
 
       {props.colonyNames.size > 0 && (

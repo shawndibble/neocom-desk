@@ -291,12 +291,19 @@ export function InfoTooltip({
 }: InfoTooltipProps) {
   return (
     <Tooltip content={content} openOnTap>
+      {/* A 16px circle in a 24px button (WCAG 2.5.8, §3's floor) whose negative margin keeps the
+          16px footprint. Never a pseudo-element hit area (§6c). */}
       <button
         type="button"
         aria-label={label}
-        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
+        className={`group/info -m-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
-        {glyph === 'info' ? 'i' : '?'}
+        <span
+          aria-hidden="true"
+          className="inline-flex size-4 items-center justify-center rounded-full border border-line group-hover/info:border-line-bright"
+        >
+          {glyph === 'info' ? 'i' : '?'}
+        </span>
       </button>
     </Tooltip>
   );

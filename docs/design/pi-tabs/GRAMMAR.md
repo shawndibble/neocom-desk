@@ -27,8 +27,8 @@ leave out of any "differences from the mockup" list.
 ## Per page
 
 - **Plan:** recipe cards are not rows that navigate, so no `CaretRight`. The product name is the entity link; "Show me how" is an in-place expand (`Disclosure` caret). A red "Find one" host mark on a card is a ghost `Button` that opens that card's Show me how (never closes it). Planet names under planet images are plain text (not entities); system names in the finder are Route Safety links with the security colour plus its number.
-- **Map:** planet toggles are `aria-pressed`; a traced or selected product takes the selected treatment; the detail panel's product name is the Market link; the drawer follows the sheet rules above.
-- **Colonies:** each row is a `Disclosure` (expands in place); "Plan this colony" is a real link with `CaretRight`; the planet / system name is an entity link; the row's actions live in a ⋮ menu (`rowMoreActions`) with the primary action also visible.
+- **Map:** planet toggles are `aria-pressed`; a traced or selected product takes the selected treatment; a product name (tile, phone row, drawer chain) opens that product's PI detail by URL, never Market; Market and Show info are the drawer's "View in Market" and "Show info" buttons; the drawer follows the sheet rules above.
+- **Colonies:** each row is a `Disclosure` (expands in place; a click on the row body expands it too, while the planet and product names inside stay links, a recorded exception: `docs/context/decisions/20261006-093301-colonies-row-click-expands-despite-inner-links.md`); "Plan this colony" is a real link with `CaretRight`; the planet / system name is an entity link; the row's actions live in a ⋮ menu (`rowMoreActions`), which right-click and touch-and-hold on the row also open (on a link, the browser's menu wins), with the primary action also visible.
 
 ## Deliberate differences from the mockups (not §6c)
 

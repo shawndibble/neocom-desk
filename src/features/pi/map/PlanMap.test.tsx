@@ -216,8 +216,17 @@ describe('PlanMap: trace', () => {
     const dialog = screen.getByRole('dialog', { name: 'How to make it' });
     // The chain, planets to product, as text a screen reader can read.
     expect(
-      within(dialog).getByText(/In words: Temperate → .*Carbon Compounds.*→ .*Biofuels/)
+      within(dialog).getByText(
+        (_, el) =>
+          /^In words: Temperate → .*Carbon Compounds.*→ .*Biofuels\.$/.test(
+            el?.textContent ?? ''
+          ) && el?.tagName === 'P'
+      )
     ).toBeInTheDocument();
+    // Every other product named in the words is a link to its own detail.
+    expect(
+      within(dialog).getAllByRole('link', { name: 'Carbon Compounds' }).length
+    ).toBeGreaterThan(1);
     // Its own name is plain text in its own detail; Market is one step away.
     expect(within(dialog).queryByRole('link', { name: 'Biofuels' })).toBeNull();
     expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
@@ -582,6 +591,10 @@ describe('PlanMap: phone', () => {
     expect(screen.queryByRole('group', { name: /^Planet map/ })).toBeNull();
     const switcher = screen.getByRole('group', { name: 'Product tier' });
     await user.click(within(switcher).getByRole('button', { name: 'P1' }));
+    // The row's title carries the accent cue at rest, before any tap (DESIGN.md §6c "Phone cards").
+    expect(
+      within(screen.getByRole('link', { name: /^Biofuels/ })).getByText('Biofuels')
+    ).toHaveClass('text-accent');
     await user.click(screen.getByRole('link', { name: /^Biofuels/ }));
     const sheet = screen.getByRole('dialog', { name: 'How to make it' });
     expect(within(sheet).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();

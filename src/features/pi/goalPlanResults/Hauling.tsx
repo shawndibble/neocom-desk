@@ -252,8 +252,9 @@ export function Hauling({
           rowKey={(row) => row.key}
           density="compact"
           stackColumns={2}
+          rowMoreActions
           rowContextMenu={(row, tr) => (
-            <ItemContextMenu typeId={row.typeId} itemName={row.name}>
+            <ItemContextMenu typeId={row.typeId} itemName={row.name} linksKeepBrowserMenu>
               {tr}
             </ItemContextMenu>
           )}
