@@ -5,7 +5,7 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -82,6 +82,49 @@ export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
     >
       {t('market.contextMenu.viewInMarket')}
     </MenuItem>
+  );
+}
+
+/**
+ * "Build Plan" and "View blueprint in Market" for an item — reused as
+ * `ShowInfoMenuItem` is, by menus that aren't item menus (the Fittings
+ * editor's). Both go off while nothing produces the item; the lazy blueprint
+ * catalog loads when the entries first render, i.e. as the menu opens.
+ */
+export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { blueprintFor, requestBlueprints } = useItemActions();
+  useEffect(() => requestBlueprints(), [requestBlueprints]);
+  const blueprintTypeID = blueprintFor(typeId);
+  const buildPlanLabel =
+    blueprintTypeID === undefined
+      ? t('industry.contextMenu.buildPlanChecking')
+      : blueprintTypeID === null
+        ? t('industry.contextMenu.noBlueprintOptions')
+        : t('industry.contextMenu.buildPlan');
+  return (
+    <>
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+        }}
+      >
+        {buildPlanLabel}
+      </MenuItem>
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (!blueprintTypeID) return;
+          const params = marketLinkParams(blueprintTypeID, location.search);
+          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+        }}
+      >
+        {t('market.contextMenu.viewBlueprintInMarket')}
+      </MenuItem>
+    </>
   );
 }
 

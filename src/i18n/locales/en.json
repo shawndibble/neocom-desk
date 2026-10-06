@@ -438,6 +438,7 @@
       "hiddenByFilters_other": "{{count}} more hidden by filters — show them",
       "missingSkills": "Missing skills",
       "doesntFitHull": "Doesn't fit this hull",
+      "noBayRoom": "No room in drone bay",
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
@@ -6418,6 +6419,7 @@
       "addToCompare": "Add to Compare",
       "compareVariations": "Compare Variations",
       "viewInMarket": "View in Market",
+      "viewBlueprintInMarket": "View blueprint in Market",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "viewInIndustryAsMaterial": "View in Industry as material",

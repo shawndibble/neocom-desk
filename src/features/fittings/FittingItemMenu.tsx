@@ -26,7 +26,11 @@ import {
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import {
+  BuildPlanMenuItems,
+  ShowInfoMenuItem,
+  ViewInMarketMenuItem,
+} from '@/features/market/ItemContextMenu';
 import { ChargePickerMenuItems } from './ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from './fittingItemActions';
 
@@ -276,6 +280,7 @@ export function ModuleMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem onSelect={() => actions.removeAllOfType(typeId)}>
         {t('fittings.item.removeAllOfType')}
@@ -392,6 +397,7 @@ export function WeaponMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={first.typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={first.typeId} />
+      <BuildPlanMenuItems typeId={first.typeId} />
     </>
   );
 }
@@ -466,6 +472,7 @@ export function DroneMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeDrones(typeId)}>
         {t('fittings.ring.menu.remove', { name })}
@@ -539,6 +546,7 @@ export function CargoMenuItems({ typeId }: { typeId: number }) {
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeCargo(typeId)}>
         {t('fittings.ring.menu.remove', { name })}
@@ -605,6 +613,7 @@ export function AddItemMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
     </>
   );
 }

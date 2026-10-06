@@ -63,6 +63,8 @@ interface FittingAddPanelProps {
   dragToRing?: boolean;
   /** The hull takes drones (`showsDrones`) — else there is no Drones tab. */
   showDrones?: boolean;
+  /** How many more of a drone the bay holds; absent before the ship data. */
+  droneRoomFor?: (typeId: number) => number;
 }
 
 const RACK_LABEL_KEY: Record<CandidateRack, string> = {
@@ -163,11 +165,13 @@ interface ItemRowProps {
   rack: CandidateRack;
   check: CandidateCheck | null;
   placeable: boolean;
+  /** A drone the bay has no room left for: the row says so and clicks add nothing. */
+  noBayRoom: boolean;
   draggable: boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
 }
 
-function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowProps) {
+function ItemRow({ entry, rack, check, placeable, noBayRoom, draggable, onAdd }: ItemRowProps) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
   const row = (
@@ -183,7 +187,7 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
     >
       <button
         type="button"
-        disabled={!placeable}
+        disabled={!placeable || noBayRoom}
         onClick={() => onAdd(entry.typeId, rack)}
         className={cx(
           'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
@@ -197,6 +201,10 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
         {check?.fitsHull === false ? (
           <span className="shrink-0 text-[0.6875rem] text-warning">
             {t('fittings.add.doesntFitHull')}
+          </span>
+        ) : noBayRoom ? (
+          <span className="shrink-0 text-[0.6875rem] text-warning">
+            {t('fittings.add.noBayRoom')}
           </span>
         ) : (
           check !== null &&
@@ -243,6 +251,7 @@ export function FittingAddPanel({
   onAddCargo,
   dragToRing = false,
   showDrones = true,
+  droneRoomFor,
 }: FittingAddPanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -399,6 +408,7 @@ export function FittingAddPanel({
         // Not gated on a free slot: a full rack's item still drags into the cargo
         // (or onto a slot, replacing it); a click with no room adds nothing.
         placeable={fitsHull && context !== null}
+        noBayRoom={rack === 'drone' && droneRoomFor?.(entry.typeId) === 0}
         draggable={fitsHull && dragToRing && context !== null}
         onAdd={onAdd}
       />

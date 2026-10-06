@@ -30,7 +30,11 @@ import {
 } from '@/engine/fittings/fighterEdit';
 import { fighterClass, fighterTypeIds, squadronSize } from '@/engine/fittings/fighters';
 import type { Fitting, FittingFighter, FittingStats } from '@/engine/fittings/types';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import {
+  BuildPlanMenuItems,
+  ShowInfoMenuItem,
+  ViewInMarketMenuItem,
+} from '@/features/market/ItemContextMenu';
 import { FittingItemMenu } from './FittingItemMenu';
 import { useFittingItemActions } from './fittingItemActions';
 
@@ -64,6 +68,7 @@ function FighterMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={squadron.typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={squadron.typeId} />
+      <BuildPlanMenuItems typeId={squadron.typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={onRemove}>
         {t('fittings.ring.menu.remove', { name })}

@@ -34,6 +34,7 @@ import {
   addDronesWithinBay,
   addModule,
   cargoGroups,
+  droneRoom,
   droneTotals,
   firstFreeSlotIndex,
   moveModule,
@@ -215,7 +216,7 @@ function FittingsPage() {
   // The page's Item Actions — here only Show info (the Fitting editor's menu
   // has no Add to Quickbar or Build Plan): a List name click or a menu's
   // "Show info" opens the page's Item Detail modal.
-  const pageItemActions = usePageItemActions({ activeCharacterId });
+  const pageItemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
@@ -362,6 +363,7 @@ function FittingsPage() {
       onAddCargo={(typeId, quantity) => edit((f) => addCargo(f, typeId, quantity))}
       dragToRing={isDesktop && !coarsePointer}
       showDrones={dronesShown}
+      droneRoomFor={(typeId) => droneRoom(fitting, typeId, droneBay)}
     />
   );
 

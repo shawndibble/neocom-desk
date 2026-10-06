@@ -34,12 +34,13 @@ const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boos
 
 const catalogue: FittingCatalogue = {
   types: {},
-  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium' },
+  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium', 5: 'drone' },
   marketTypes: [
     { typeId: 1, name: 'Damage Control I', marketGroupId: 10, volume: 1 },
     { typeId: 2, name: 'Damage Control II', marketGroupId: 10, volume: 1 },
     { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20, volume: 1 },
     { typeId: 4, name: 'Anchoring Array', marketGroupId: 30, volume: 1 },
+    { typeId: 5, name: 'Ice Harvesting Drone I', marketGroupId: 30, volume: 50 },
   ],
   groupsById: new Map([
     [10, { id: 10, name: 'Damage Controls', parentId: null, hasTypes: true }],
@@ -615,8 +616,29 @@ describe('FittingAddPanel', () => {
     );
     expect(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /Build Plan|No blueprint options/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View blueprint in Market' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
+  });
+
+  it('greys a drone the bay has no room for and says why', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
+    });
+    const droneRoomFor = vi.fn(() => 0);
+    const { onAdd } = renderPanel({ target: { kind: 'drone' }, droneRoomFor });
+
+    await user.type(screen.getByLabelText('Search items to add'), 'Ice Harvesting');
+    const row = await screen.findByRole('button', { name: /Ice Harvesting Drone I/ });
+    expect(row).toBeDisabled();
+    expect(row).toHaveTextContent('No room in drone bay');
+    await user.click(row);
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it('shows the picked slot as its in-game icon, toggling the fits-this-slot filter', async () => {
