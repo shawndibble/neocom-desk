@@ -867,6 +867,17 @@ describe('PlanetaryIndustry', () => {
     expect(option).toHaveAttribute('aria-current', 'true');
   });
 
+  it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan#customs');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    await user.click(screen.getByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
   it('writes the picked question to ?q= without adding history entries', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/planetary-industry/plan');

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useUrlParam } from '@/lib/useUrlState';
 import { EsiDidntAnswer } from './EsiDidntAnswer';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
@@ -21,7 +22,6 @@ import {
   planQuestionParam,
   type PlanQuestion,
 } from './planQuestion';
-import { useUrlParam } from '@/lib/useUrlState';
 
 interface Props extends GoalPlannerPanelProps {
   /** A `?type=` seed is on its way to becoming a goal. */
@@ -103,17 +103,13 @@ export function PlanPanel(props: Props) {
     };
   }, [characterId, reloadKey]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
-  const { hash, search, pathname, state: locationState } = useLocation();
-  const navigate = useNavigate();
-  const [urlQuestion] = useUrlParam('q', planQuestionParam);
+  const { hash } = useLocation();
+  const [urlQuestion, setUrlQuestion] = useUrlParam('q', planQuestionParam);
   // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
-  // until the pilot picks a question; a pick writes `?q=` and drops the hash.
+  // until the pilot picks a question. A pick always writes `?q=` (the opening question depends
+  // on colonies, so it is no fixed default) and drops the hash.
   const picked = pickedQuestion(urlQuestion, hash);
-  const setPicked = (question: PlanQuestion) => {
-    const params = new URLSearchParams(search);
-    params.set('q', question);
-    navigate({ pathname, search: `?${params}` }, { replace: true, state: locationState });
-  };
+  const setPicked = (question: PlanQuestion) => setUrlQuestion(question, { clearHash: true });
 
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;

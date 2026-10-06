@@ -60,8 +60,8 @@ const PI_URL_PARAMS = {
  * `/planetary-industry/map`); every input each peer tab needs to redraw
  * its answer stays a scoped query param on top of it — Plan's goals and
  * switched-off colonies (`?goals=`, `?off=`; `?type=` seeds a goal and is
- * cleared), the chosen question (`?q=`) and Find best's filter (`?fb.filter=`,
- * `?fb.mode=`), Colonies' opened colony (`?colony=`) — so a plan
+ * cleared), the chosen question (`?q=`, PlanPanel) and Find best's filter
+ * (`?fb.filter=`, `?fb.mode=`, FindBestPlan), Colonies' opened colony (`?colony=`) — so a plan
  * survives a reload and can be deep-linked into later. All fall
  * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
  * unknown value is handled by each param's own default rather than rendering
