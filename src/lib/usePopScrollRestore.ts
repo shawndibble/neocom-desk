@@ -23,11 +23,16 @@ export function usePopScrollRestore(): void {
   const navigationType = useNavigationType();
 
   // Updated at commit, so a scroll the browser fires after the next page
-  // replaced this one (clamping it) is filed under the new entry, not this one.
+  // replaced this one (clamping it) is filed under the new entry, not this
+  // one. The target is read in the same commit, before that clamp's scroll
+  // event can overwrite it with 0.
   const keyRef = useRef(location.key);
+  const targetRef = useRef<number | null>(null);
   useLayoutEffect(() => {
     keyRef.current = location.key;
-  }, [location.key]);
+    const y = navigationType === 'POP' ? savedScroll.get(location.key) : undefined;
+    targetRef.current = y !== undefined && y > 0 ? y : null;
+  }, [location.key, navigationType]);
 
   useEffect(() => {
     const save = () => savedScroll.set(keyRef.current, window.scrollY);
@@ -36,9 +41,8 @@ export function usePopScrollRestore(): void {
   }, []);
 
   useEffect(() => {
-    if (navigationType !== 'POP') return;
-    const target = savedScroll.get(location.key);
-    if (target === undefined || target <= 0) return;
+    const y = targetRef.current;
+    if (y === null) return;
     const startedAt = Date.now();
     let frame = 0;
     const stop = () => {
@@ -47,9 +51,9 @@ export function usePopScrollRestore(): void {
     };
     const tick = () => {
       const room = document.documentElement.scrollHeight - window.innerHeight;
-      if (room >= target) {
+      if (room >= y) {
         stop();
-        window.scrollTo(0, target);
+        window.scrollTo(0, y);
         return;
       }
       if (Date.now() - startedAt > POP_RESTORE_GIVE_UP_MS) {

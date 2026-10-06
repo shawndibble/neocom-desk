@@ -79,6 +79,20 @@ describe('usePopScrollRestore', () => {
     expect(scrollTo).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the target when the browser's clamp to 0 fires before the restore starts", () => {
+    renderHarness();
+    setPageHeight(2000);
+    setScrollY(600);
+    click('push');
+    setPageHeight(800);
+    act(() => screen.getByRole('button', { name: 'back' }).click());
+    // The short page clamps scroll as soon as it commits.
+    setScrollY(0);
+    setPageHeight(2000);
+    act(() => vi.advanceTimersByTime(50));
+    expect(scrollTo).toHaveBeenCalledWith(0, 600);
+  });
+
   it('leaves a forward navigation at the top', () => {
     renderHarness();
     setPageHeight(2000);

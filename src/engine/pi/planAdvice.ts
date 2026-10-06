@@ -332,7 +332,7 @@ export interface RebuildFacts {
 export type BuildStep =
   | { verb: 'upgrade'; fromLevel: number; toLevel: number; minutes: number }
   | { verb: 'remove' | 'place'; pin: PiPinKind; count: number; minutes: number }
-  /** `count` pins of that kind set to `typeId`; a kind's sets add up to the pins the layout has. */
+  /** `count` pins of that kind set to `typeId`: the kind's pins split across its sets, at least one each. */
   | { verb: 'set'; pin: PiPinKind; typeId: number; count: number; minutes: number }
   | { verb: 'route'; count: number; minutes: number };
 

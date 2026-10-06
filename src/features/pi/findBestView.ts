@@ -226,7 +226,8 @@ export function buildAllProducts(
       })
       .sort(
         (a, b) =>
-          (b.perDay ?? -1) - (a.perDay ?? -1) ||
+          // Raws keep name order: a figure is shown, never a ranking of what to extract.
+          (a.tier === 0 ? 0 : (b.perDay ?? -1) - (a.perDay ?? -1)) ||
           (a.planets ?? 99) - (b.planets ?? 99) ||
           a.name.localeCompare(b.name)
       );

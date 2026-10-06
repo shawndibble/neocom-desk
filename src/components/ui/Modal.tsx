@@ -144,8 +144,10 @@ export function Modal({
         trigger instanceof HTMLElement && trigger !== document.body && trigger.isConnected
           ? trigger
           : null;
-      const target = kept ?? fallbackRef.current?.() ?? null;
-      if (target?.isConnected) target.focus();
+      const fallback = kept ? null : (fallbackRef.current?.() ?? null);
+      if (kept) kept.focus();
+      // The fallback may sit off screen (a page heading): moving focus must not scroll there.
+      else if (fallback?.isConnected) fallback.focus({ preventScroll: true });
       else if (trigger instanceof HTMLElement) trigger.focus();
     };
   }, [open, initialFocusRef]);
