@@ -16,12 +16,15 @@ describe('CharacterFilterControl', () => {
     const { container } = render(
       <CharacterFilterControl
         variant="field"
+        triggerLabel="Default characters shown"
         activeCharacterId={1}
         value="current"
         onChange={() => {}}
       />
     );
-    const trigger = screen.getByRole('button', { name: 'This character' });
+    const trigger = screen.getByRole('button', {
+      name: 'Default characters shown: This character',
+    });
     expect(trigger.querySelector('span')).toHaveTextContent('This character');
     expect(trigger.querySelector('span')?.className).not.toMatch(/hidden/);
     expect(trigger.querySelector('svg')).toBeInTheDocument();

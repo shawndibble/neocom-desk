@@ -86,6 +86,8 @@ export interface CharacterFilterControlProps {
    * panel title says what it filters.
    */
   variant?: 'icon' | 'field';
+  /** `variant="field"` only: the setting's name. The button's accessible name becomes "<name>: <value>", since the value alone doesn't say what is being set. */
+  triggerLabel?: string;
 }
 
 /**
@@ -126,6 +128,7 @@ export function CharacterFilterControl({
   onChange,
   size = 'sm',
   variant = 'icon',
+  triggerLabel,
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
@@ -155,7 +158,8 @@ export function CharacterFilterControl({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className={`${fieldBaseClassName} ${fieldSizeClassName.md} ${interactiveClassName} ${focusRingClassName} flex w-full max-w-60 items-center justify-between gap-2 text-left`}
+            aria-label={triggerLabel ? `${triggerLabel}: ${label}` : undefined}
+            className={`${fieldBaseClassName} ${fieldSizeClassName.md} flex w-full max-w-60 items-center justify-between gap-2 text-left`}
           >
             <span className="min-w-0 truncate">{label}</span>
             <Icon.Expanded
