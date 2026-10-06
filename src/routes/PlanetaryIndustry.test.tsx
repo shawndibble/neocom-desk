@@ -544,7 +544,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
-    expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
+    expect(within(panel).getByText('+793,859 units/day')).toBeInTheDocument();
     const region = within(panel).getByRole('region');
     expect(within(region).queryByText('—')).not.toBeInTheDocument();
   });

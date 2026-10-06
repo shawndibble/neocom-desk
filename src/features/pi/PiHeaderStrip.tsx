@@ -19,7 +19,9 @@ import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/contr
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useTicker } from '@/lib/ticker';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { eveClock } from './colonies/coloniesFormat';
 import { EstimateBadge } from './DirectiveRow';
 import {
   homeSystemId,
@@ -40,6 +42,15 @@ interface Props {
   colonyCountUnknown?: boolean;
   /** Plan's prices and figures are projections; the other tabs show no such number. */
   estimate: boolean;
+  /** Show the EVE clock (Colonies, where timers read in EVE time). */
+  eveTime?: boolean;
+}
+
+/** The current EVE (UTC) time, ticking each half minute. */
+function EveTimeChip() {
+  const { t } = useTranslation();
+  const now = useTicker(30_000);
+  return <StatChip label={t('piPlan.strip.eveTime')} value={eveClock(now)} />;
 }
 
 interface Home {
@@ -53,7 +64,12 @@ interface Home {
  * are, how many, the way to the sell market, and which market that is. Only
  * what there is data for today: a field with no source is left out.
  */
-export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }: Props) {
+export function PiHeaderStrip({
+  colonySystemIds,
+  colonyCountUnknown,
+  estimate,
+  eveTime = false,
+}: Props) {
   const { t } = useTranslation();
   const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -136,8 +152,9 @@ export function PiHeaderStrip({ colonySystemIds, colonyCountUnknown, estimate }:
           label={t('piPlan.strip.colonies')}
           value={colonyCountUnknown ? '—' : colonySystemIds.length}
         />
+        {eveTime && <EveTimeChip />}
       </StatChips>
-      <label className="flex items-center gap-2">
+      <label className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:flex-col max-md:items-start">
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('piPlan.strip.sellAt')}
         </span>

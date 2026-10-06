@@ -4588,8 +4588,8 @@
       "bankedColumn": "Banked",
       "bankedValue": "{{amount}} ({{percent}}%)",
       "resetGainColumn": "Reset now",
-      "resetGainValue": "+{{amount}}/day",
-      "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+      "resetGainValue": "+{{amount}} units/day",
+      "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows how many more units a day that brings back."
     },
     "altColonies": {
       "toggleLabel_one": "Show {{count}} alt's colonies",
@@ -4861,6 +4861,7 @@
     "strip": {
       "home": "Home",
       "colonies": "Colonies",
+      "eveTime": "EVE time",
       "route": "Home route",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
@@ -5578,7 +5579,7 @@
       "roomExtractorsGain_other": "Room for {{count}} more extractors · +<isk/>{{perDay}}",
       "roomFactories_one": "Room for {{count}} more factory",
       "roomFactories_other": "Room for {{count}} more factories",
-      "stale": "Data {{hours}} h old"
+      "stale": "Updated {{age}}"
     },
     "help": {
       "extractors": "Extractors pull raw material for a few days, then stop. Restarting resets them to full speed, which is why an early restart can pay.",
@@ -5654,15 +5655,18 @@
     "blurb": {
       "restart": {
         "title": "Restart reminders",
-        "body": "Extractors run for a few days, then stop."
+        "body": "Extractors run for a few days, then stop.",
+        "term": "extractors"
       },
       "storage": {
         "title": "Full-storage warnings",
-        "body": "Before your launchpad fills and production stalls."
+        "body": "Before your launchpad fills and production stalls.",
+        "term": "the launchpad"
       },
       "health": {
         "title": "Quick health check",
-        "body": "Idle factories and spare room in your Command Center."
+        "body": "Idle factories and spare room in your Command Center.",
+        "term": "the Command Center"
       }
     }
   },

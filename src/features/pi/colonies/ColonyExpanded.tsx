@@ -33,7 +33,7 @@ import { Sentence } from '../sentence';
 const MICRO = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 const DAY_MS = 86_400_000;
 
-/** A day's output a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */
+/** Units a day a reinstall would recover right now, from `engine/pi/extraction`'s own curve. */
 function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number {
   const peak = extractorCycleYields(program, 1)[0] ?? 0;
   const current = peak * fractionOfPeak(program, nowMs);

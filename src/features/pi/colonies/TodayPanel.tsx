@@ -126,7 +126,8 @@ function Hero({
                   : 'piColonies.today.bringsBackLead'
               )}{' '}
               <span className="text-isk-pos">
-                +<IskAmount value={gain} decimals={0} /> {t('piColonies.iskPerDay')}
+                +<IskAmount value={gain} decimals={0} />
+                {t('piColonies.perDay')}
               </span>
             </>
           )}
@@ -145,7 +146,7 @@ function CountChips({
   const { counts } = check;
   const tone = (n: number, on: StatChipTone): StatChipTone => (n > 0 ? on : 'default');
   return (
-    <StatChips>
+    <StatChips dense>
       <StatChip
         label={t('piColonies.chip.stopped')}
         value={counts.stopped}

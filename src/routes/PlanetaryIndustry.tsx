@@ -201,6 +201,7 @@ export function PlanetaryIndustry() {
             fetchFailed: data?.planetsFetchFailed,
           })}
           estimate={tab === 'plan' || tab === 'map'}
+          eveTime={tab === 'colonies'}
         />
 
         {tab === 'map' ? (

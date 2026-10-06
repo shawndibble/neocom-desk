@@ -34,6 +34,7 @@ import {
 import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { ColonyExpanded } from './ColonyExpanded';
 import { planColonyHref } from './coloniesText';
+import { formatAge } from '@/lib/age';
 import { PlanetImage } from '../PlanetImage';
 import { StatusWord } from './TodayPanel';
 
@@ -257,7 +258,7 @@ function tagText(
       };
     case 'stale':
       return {
-        text: t('piColonies.tag.stale', { hours: Math.round(tag.hours) }),
+        text: t('piColonies.tag.stale', { age: formatAge(tag.hours * HOUR_MS, t) }),
         tone: 'border-warning/60 text-warning',
         hint: t('piColonies.help.staleTag'),
       };
@@ -443,7 +444,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start"
+          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_14rem_auto]"
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
@@ -470,7 +471,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
-                <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-dim">
+                <p className="flex min-w-0 items-center gap-x-1.5 text-xs text-text-dim">
                   {extractorProductId !== null && (
                     <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
                   )}
@@ -480,7 +481,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                       <TypeIcon typeId={outputId} size={32} width={16} height={16} />
                     </>
                   )}
-                  <span className="min-w-0">
+                  <span className="min-w-0 truncate">
                     {shownProductId !== null && productName !== null ? (
                       <PiProductLink typeId={shownProductId}>{productName}</PiProductLink>
                     ) : (
