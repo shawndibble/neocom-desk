@@ -143,7 +143,18 @@ export function rankRecipes(input: {
   const ranked: RecipeRank[] = [];
   for (const hosts of byRecipe.values()) {
     const mine = hosts.filter((row) => have.has(row.planetType));
-    const used = [...(mine.length > 0 ? mine : hosts)].sort(byFitThenValue)[0];
+    // A host that fits beats one that does not, owned or not; ownership decides within a tier.
+    const fitting = hosts.filter((row) => !row.needsCcLevel);
+    const fittingMine = fitting.filter((row) => have.has(row.planetType));
+    const pool =
+      fittingMine.length > 0
+        ? fittingMine
+        : fitting.length > 0
+          ? fitting
+          : mine.length > 0
+            ? mine
+            : hosts;
+    const used = [...pool].sort(byFitThenValue)[0];
     const reference = bestProcessedOn(used.planetType);
 
     let comparison: RecipeComparison | null = null;

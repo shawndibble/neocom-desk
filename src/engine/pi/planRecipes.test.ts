@@ -192,6 +192,19 @@ describe('rankRecipes', () => {
       expect(recipes[0].needsCcLevel).toBeUndefined();
     });
 
+    it('takes an unowned host that fits over an owned one that needs a higher level', () => {
+      const { recipes } = rankRecipes({
+        rows: [
+          gated(row(10, 'Silicon', 1, 'lava', 500_000), 2),
+          row(10, 'Silicon', 1, 'barren', 90_000),
+        ],
+        haveTypes: ['lava'],
+        filter: 'any',
+      });
+      expect(recipes[0]).toMatchObject({ useType: 'barren' });
+      expect(recipes[0].needsCcLevel).toBeUndefined();
+    });
+
     it('carries the level on a recipe no host fits, and counts only fitting rows as the best anywhere', () => {
       const ranking = rankRecipes({
         rows: [
