@@ -278,6 +278,8 @@ export type ProductFigure =
       verdict: 'better' | 'same' | 'worse' | null;
       isReference: boolean;
       versus: { typeId: number; name: string; planetType: PlanetType; iskPerDay: number } | null;
+      /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
+      needsCcLevel: number | null;
     }
   | { kind: 'unranked'; reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit' };
 
@@ -291,7 +293,7 @@ export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGrap
   const product = graph.byId.get(typeId);
   if (!product || product.tier === 0) return { kind: 'unranked', reason: 'raw' };
   if (product.tier > 2) return { kind: 'unranked', reason: 'tier' };
-  const recipe = advice.recipes.recipes.find((r) => r.typeId === typeId);
+  const recipe = advice.recipesWithTagged.recipes.find((r) => r.typeId === typeId);
   if (!recipe) {
     const onePlanet = graph.planetTypes.some(
       (type) =>
@@ -317,6 +319,7 @@ export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGrap
     verdict: recipe.comparison?.verdict ?? null,
     isReference: recipe.comparison?.isReference ?? false,
     versus: recipe.comparison?.versus ?? null,
+    needsCcLevel: recipe.needsCcLevel ?? null,
   };
 }
 

@@ -8,7 +8,8 @@
  *   should make is one pick), biggest first. A gain is ISK a day against
  *   today after quick wins.
  * - With no colonies built: the best one-planet recipes, the figure being what
- *   one planet earns a day.
+ *   one planet earns a day. A setup a higher Command Center hosts ranks below the
+ *   ones that fit and carries `needsCcLevel`, as in Plan's Find best.
  * - With colonies that already make their best product: nothing to pick.
  *
  * Picks come from the pilot's own colonies and sell market only. A what-if
@@ -29,6 +30,8 @@ export interface PlanPick {
   /** The colonies that should make it; empty for a recipe. */
   planetIds: number[];
   planetTypes: PlanetType[];
+  /** The lowest Command Center level that hosts it, when the pilot's cannot yet. */
+  needsCcLevel?: number;
 }
 
 export interface PlanPicks {
@@ -64,13 +67,14 @@ export function planPicks(advice: PlanAdvice): PlanPicks {
   if (advice.colonies.length > 0) return { kind: 'none', picks: [] };
   return {
     kind: 'recipes',
-    picks: advice.recipes.recipes.slice(0, PLAN_PICK_COUNT).map((recipe) => ({
+    picks: advice.recipesWithTagged.recipes.slice(0, PLAN_PICK_COUNT).map((recipe) => ({
       typeId: recipe.typeId,
       name: recipe.name,
       tier: recipe.tier,
       perDay: recipe.iskPerDay,
       planetIds: [],
       planetTypes: [recipe.useType],
+      ...(recipe.needsCcLevel ? { needsCcLevel: recipe.needsCcLevel } : {}),
     })),
   };
 }

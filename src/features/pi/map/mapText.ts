@@ -44,10 +44,13 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure): string 
  */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
   if (figure.kind !== 'ranked') return null;
-  return t('piMap.figure', {
+  const sentence = t('piMap.figure', {
     isk: formatIsk(figure.iskPerDay, 0),
     type: planetName(t, figure.useType),
   });
+  return figure.needsCcLevel
+    ? `${sentence}. ${t('piMap.needsCc', { level: figure.needsCcLevel })}`
+    : sentence;
 }
 
 /** What a screen reader hears for a product tile: name, tier, comparison, figure, and its marks. */

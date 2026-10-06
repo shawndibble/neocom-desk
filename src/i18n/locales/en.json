@@ -4657,6 +4657,8 @@
     "preferenceHaul": "least hauling",
     "picksNoteRecipes": "a day from one planet · every planet type, before the Plan tab's filters",
     "perDaySuffix": "/day",
+    "needsCc": "Needs a Command Center at level {{level}}",
+    "needsCcShort": "CC {{level}}",
     "clearTrace": "Clear trace",
     "whatIfBlank": "What if I add a ___ planet?",
     "whatIfNoColonies": "No colonies yet, so every planet type is ticked. Untick the types you can't reach.",

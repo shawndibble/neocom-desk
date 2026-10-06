@@ -41,6 +41,7 @@ import { cx } from '@/lib/cx';
 import { clampIskZero, formatIsk, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
+import { CcLevelTag } from '../CcLevelTag';
 import { planPicks } from '../planPicks';
 import {
   hrefWithoutPiPlanet,
@@ -514,44 +515,44 @@ export function PlanMap({
       ) : (
         <>
           {picks.picks.map((pick, i) => (
-            <Tooltip
-              key={pick.typeId}
-              content={t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
-            >
-              <Link
-                to={productHref(pick.typeId)}
-                aria-current={traced?.id === pick.typeId ? 'true' : undefined}
-                onClick={(event) => onPlanLinkClick(() => openProduct(pick.typeId))(event)}
-                className={cx(
-                  'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
-                  interactiveClassName,
-                  focusRingClassName,
-                  traced?.id === pick.typeId
-                    ? selectedRowClassName
-                    : '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2'
-                )}
-              >
-                <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
-                <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
-                <span>{pick.name}</span>
-                <span
+            <span key={pick.typeId} className="inline-flex items-center gap-1.5">
+              <Tooltip content={t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}>
+                <Link
+                  to={productHref(pick.typeId)}
+                  aria-current={traced?.id === pick.typeId ? 'true' : undefined}
+                  onClick={(event) => onPlanLinkClick(() => openProduct(pick.typeId))(event)}
                   className={cx(
-                    clampIskZero(pick.perDay, 0) < 0 ? 'text-isk-neg' : 'text-isk-pos',
-                    'tabular-nums'
+                    'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
+                    interactiveClassName,
+                    focusRingClassName,
+                    traced?.id === pick.typeId
+                      ? selectedRowClassName
+                      : '[@media(hover:hover)]:hover:border-line-bright [@media(hover:hover)]:hover:bg-panel-2'
                   )}
                 >
-                  {picks.kind === 'rebuild'
-                    ? formatIskCompactSigned(pick.perDay)
-                    : formatIskCompact(pick.perDay)}
-                  {t('piMap.perDaySuffix')}
-                  {/* A link cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
-                  <span className="sr-only">
-                    {' '}
-                    {t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
+                  <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
+                  <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
+                  <span>{pick.name}</span>
+                  <span
+                    className={cx(
+                      clampIskZero(pick.perDay, 0) < 0 ? 'text-isk-neg' : 'text-isk-pos',
+                      'tabular-nums'
+                    )}
+                  >
+                    {picks.kind === 'rebuild'
+                      ? formatIskCompactSigned(pick.perDay)
+                      : formatIskCompact(pick.perDay)}
+                    {t('piMap.perDaySuffix')}
+                    {/* A link cannot hold a focusable IskAmount; the tooltip below and this text carry the exact figure. */}
+                    <span className="sr-only">
+                      {' '}
+                      {t('common.iskExact', { amount: formatIsk(pick.perDay, 0) })}
+                    </span>
                   </span>
-                </span>
-              </Link>
-            </Tooltip>
+                </Link>
+              </Tooltip>
+              {pick.needsCcLevel && <CcLevelTag level={pick.needsCcLevel} />}
+            </span>
           ))}
           <span className="text-[11px] text-text-dim">
             {picks.kind === 'rebuild'
