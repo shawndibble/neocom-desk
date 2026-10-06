@@ -77,6 +77,9 @@ function statsFor(set: FittingImplantSet): FittingStats {
       ],
     },
     tank: { burstEffective: 0 },
+    // A Drake mines nothing: the Mining goal is not on this fit.
+    mining: { perHour: 0 },
+    sensor: { strength: 0, type: null },
     navigation: {
       maxVelocity: set.implants.includes(NN) ? 1220 : 1150,
       agility: 0.5,
@@ -195,6 +198,8 @@ describe('ImplantFinder', () => {
     const notOnFit = screen.getByText('Not on this fit').parentElement!;
     expect(within(notOnFit).getByRole('button', { name: /Turrets/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Missiles/ })).toBeInTheDocument();
+    // Mining yield exists as a goal, but a Drake mines nothing.
+    expect(within(notOnFit).getByRole('button', { name: /Mining yield/ })).toBeInTheDocument();
   });
 
   it('prices from the LP Store when it is cheaper and the pilot can redeem it, else says what’s missing', async () => {
