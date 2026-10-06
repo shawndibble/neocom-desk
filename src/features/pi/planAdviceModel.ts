@@ -194,7 +194,7 @@ export interface PlanColonyAdvice extends ColonyAdvice {
    * What the recommended rebuild draws against the Command Center it needs, for
    * the checklist's fit meters. Null unless the recommendation is a change.
    */
-  rebuildFit: { level: number; used: PinLoad; budget: PinLoad } | null;
+  rebuildFit: RecipeFit | null;
   /** The typeIDs the colony sells today: what a Keep card says it stays on. */
   sells: readonly number[];
 }
@@ -951,9 +951,11 @@ function factoryRoom(
 /**
  * Every one-planet recipe on every planet type, valued the way a planet the
  * pilot has not built yet would be: at their own measured extraction rate
- * (else the typed fallback), their Command Center level, and a link cost
- * borrowed from their colonies (else a stated default). `rankingBasis` carries
- * which of those were assumed, so the page can badge the figures as estimates.
+ * (else the typed fallback; per head kept, for a P2 stepped to fewer heads),
+ * their Command Center level, and a link cost borrowed from their colonies
+ * (else a stated default). `rankingBasis` carries which of those were assumed,
+ * so the page can badge the figures as estimates. Each layout carries the fit
+ * it was scored with.
  */
 function rankingFor(args: {
   input: PlanAdviceInput;
@@ -1039,14 +1041,11 @@ function rankingFor(args: {
         },
         pi
       );
-    // A head count must not decide whether a planet can host a P2: ten heads on
-    // each of its two extractors overdraws even a level-5 Command Center's
-    // powergrid, and the heads a pilot runs on a P0 colony are not the ones
-    // they would put on a P2 planet. An assumed count first steps the whole
-    // layout down (by 2, as before) until some P2 block fits; a measured one
-    // keeps P1 at the pilot's own count. Then each P2 that still does not fit
-    // gets the most heads that do, its rate scaled to the heads kept so fewer
-    // heads never earn as much. `skip`: P2s a lower level already hosts.
+    // Heads must not decide whether a planet hosts a P2: a P0 colony's heads
+    // overdraw a P2's two extractors. An assumed count steps the whole layout
+    // down; then each P2 that still does not fit takes the most heads that do,
+    // its rate scaled by heads kept. P1 keeps a measured count. `skip`: P2s a
+    // lower level already hosts.
     const adviceFor = (budget: PinLoad, skip?: ReadonlySet<number>): FittedEntry[] => {
       let base = adviceAt(budget, heads, rate);
       let baseHeads = heads;

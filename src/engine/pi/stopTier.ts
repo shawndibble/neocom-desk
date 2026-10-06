@@ -234,11 +234,7 @@ export interface ScoredStopTier extends CandidateBase {
    * from.
    */
   pins: PinCounts;
-  /**
-   * What `pins` draws, the fit's own figure: launchpad, links per pin and heads
-   * included. Carried so a meter shown for this layout reads the load it was
-   * fitted with rather than re-deriving one under other assumptions.
-   */
+  /** What `pins` draws: launchpad, links and heads included. A meter for this layout reads it. */
   used: PinLoad;
   /** Which of the two ceilings stopped the fit there. */
   limitedBy: ColonyFit['limitedBy'];

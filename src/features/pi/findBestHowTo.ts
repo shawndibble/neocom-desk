@@ -1,10 +1,8 @@
 /**
  * "Show me how" for one recipe, shaped for drawing: the pins to build, the
  * Command Center it needs, and what a week of running it yields. All of it
- * comes from the recommendation model's layout for the recipe, so the steps
- * and the ISK figure are never two answers. The Command Center level and the
- * CPU/Power meter are the ranking's own fit (`RecipeLayout.fit`), the one the
- * "needs CC level N" tag reads too: never re-derived here (issue #2768).
+ * comes from the recommendation model's layout for the recipe, so the steps,
+ * the meter and the ISK figure are never two answers.
  */
 import type { RecipeFit, RecipeRank } from '@/engine/pi/planRecipes';
 import type { PinCounts } from '@/engine/pi/types';
@@ -31,7 +29,6 @@ export interface HowTo {
   /** Heads on each extractor, as the fit assumed; null when the layout does not say. */
   headsPerExtractor: number | null;
   factories: HowToFactoryLine[];
-  /** Null when the ranking could not compute one: the page says so. */
   fit: RecipeFit | null;
   unitsPerWeek: number;
   m3PerWeek: number;

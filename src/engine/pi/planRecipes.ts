@@ -53,11 +53,7 @@ export interface RecipeLayout {
   makes: readonly { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[];
   /** Heads on each Extractor Control Unit the layout was fitted with. */
   headsPerExtractor?: number;
-  /**
-   * What the layout draws against the Command Center it needs, from the fit
-   * that scored it: the tag, Show me how and its meter all read this one.
-   * Absent when the caller could not compute it.
-   */
+  /** The fit that scored the layout: Show me how's level line and meter read it. */
   fit?: RecipeFit;
 }
 
