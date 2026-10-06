@@ -2,7 +2,8 @@
  * The "Make more from my planets" panels, drawn from `PlanView`. No figure is
  * computed here: components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item names are Market links, a checkbox or a box
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`), a checkbox or a box
  * means "tick or click me", the "alternative" disclosure has a rotating leading
  * caret, and static facts are `StatChip`s and type, not boxes.
  */
@@ -24,7 +25,7 @@ import * as Icon from '@/components/ui/icons';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
 import type { PiPinKind } from '@/sde/types';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { LoadMeter, EstimateBadge, VerbTag } from './DirectiveRow';
@@ -54,9 +55,9 @@ export interface Ticks {
 
 function ItemLink({ item }: { item: NamedItem }) {
   return (
-    <MarketItemLink typeId={item.typeId}>
+    <PiProductLink typeId={item.typeId}>
       <b className="font-semibold">{item.name}</b>
-    </MarketItemLink>
+    </PiProductLink>
   );
 }
 
