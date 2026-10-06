@@ -21,15 +21,17 @@ import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 import type { MarketOrder } from '../src/esi/endpoints';
 
-const WIDTHS = [
+const WIDTHS: { width: number; height: number; bracket?: boolean }[] = [
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
-  // This book's tightest table — just over its `cards` width
-  // (`orderBookWidthsRem`, sized by its ten-digit price) — and either side
-  // of where Location narrows before that.
-  { width: 1370, height: 900 },
-  { width: 1400, height: 900 },
-  { width: 1440, height: 900 },
+  // Around the cards/table switch (roughly 1365px here, measured on one
+  // machine; the exact width varies with the font, so nothing below pins
+  // which layout renders). Buy's ⋮ once scrolled out of its card just above
+  // that switch.
+  { width: 1340, height: 900, bracket: true },
+  { width: 1368, height: 900, bracket: true },
+  { width: 1400, height: 900, bracket: true },
+  { width: 1440, height: 900, bracket: true },
   { width: 1500, height: 900 },
   { width: 1560, height: 900 },
 ];
@@ -100,6 +102,17 @@ for (const viewport of WIDTHS) {
     await page.setViewportSize(viewport);
     await openMarketOrders(page);
     await expectNoPageOverflow(page);
+
+    if (viewport.bracket) {
+      // Whichever layout renders, each side's ⋮ is on screen inside its card.
+      for (const name of ['Sell Orders', 'Buy Orders']) {
+        const row = page.locator(`table[aria-label="${name}"] tbody tr`).first();
+        const more = await row.getByRole('button', { name: /^More actions/ }).boundingBox();
+        const card = await page.getByRole('region', { name }).boundingBox();
+        expect(more, name).not.toBeNull();
+        expect(more!.x + more!.width, name).toBeLessThanOrEqual(card!.x + card!.width);
+      }
+    }
 
     // Buy is the wider table (it carries `range` on top of Sell's columns).
     // Since the order book rework it no longer scrolls sideways at all:
