@@ -11,6 +11,7 @@ import { builtAdvice } from './systemPlanetModel';
 import type { PiCadence } from './cadencePref';
 import { plannerColonies, type PlannerSnapshot } from './goalPlannerModel';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
+import { isSaving } from '@/engine/pi/planAdvice';
 import {
   buildPlanAdvice,
   hubBooks,
@@ -244,7 +245,9 @@ describe('buildPlanAdvice: quick wins', () => {
 
   it('adds up: today plus the priced quick wins is the after-quick-wins figure', () => {
     const colony = temperate(buildPlanAdvice(input()));
-    const priced = colony.quickWins.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
+    const priced = colony.quickWins
+      .filter((win) => !isSaving(win.detail))
+      .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
     expect(colony.afterQuickWinsPerDay).toBeCloseTo(colony.todayPerDay! + priced, 6);
   });
 
@@ -253,6 +256,11 @@ describe('buildPlanAdvice: quick wins', () => {
     const storage = week.quickWins.find((win) => win.detail.kind === 'storage');
     expect(storage).toBeDefined();
     expect(storage!.gainPerDay).toBeGreaterThan(0);
+    // What storage saves is shown, but it adds nothing to the colony after its quick wins.
+    const adds = week.quickWins
+      .filter((win) => !isSaving(win.detail))
+      .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
+    expect(week.afterQuickWinsPerDay).toBeCloseTo(week.todayPerDay! + adds, 6);
     // A pilot who hauls daily does not stall, so there is nothing to win and today is the full rate.
     const daily = temperate(buildPlanAdvice(input()));
     expect(daily.quickWins.some((win) => win.detail.kind === 'storage')).toBe(false);
@@ -730,6 +738,76 @@ describe('buildPlanAdvice: more quick wins', () => {
           win.detail.routedFrom.length > 0
       )
     ).toBe(true);
+  });
+
+  it('spends a colony’s room once: idle factories’ heads and a new factory never both count', () => {
+    const AQUEOUS_LIQUIDS = 2268;
+    const WATER_SCHEMATIC = pi.schematics['3645'].schematicId;
+    const factory = (pinId: number, schematic: number): PlanetPin => ({
+      ...pin(pinId, BASIC),
+      factory_details: { schematic_id: schematic },
+    });
+    const links = (ids: number[]) =>
+      ids.map((id) => ({ source_pin_id: 3, destination_pin_id: id, link_level: 0 }));
+    // Uttindar V: five Bacteria factories on one ECU that feeds about four, so one sits idle.
+    // The idle win spends their room on heads; the network plan spends it on a factory.
+    const idleHost: CharacterPlanetDetail = {
+      pins: [
+        ecuPin(1, MICROORGANISMS, 5, 70, 12_000),
+        pin(3, LAUNCHPAD),
+        ...[4, 5, 6, 7, 8].map((id) => factory(id, BACTERIA_SCHEMATIC)),
+      ],
+      links: links([1, 4, 5, 6, 7, 8]),
+      routes: [],
+    };
+    const makesWater: CharacterPlanetDetail = {
+      pins: [
+        ecuPin(1, AQUEOUS_LIQUIDS, 5, 70, 6_000),
+        pin(3, LAUNCHPAD),
+        factory(4, WATER_SCHEMATIC),
+        factory(5, WATER_SCHEMATIC),
+      ],
+      links: links([1, 4, 5]),
+      routes: [],
+    };
+    const adviceWith = (host: CharacterPlanetDetail) =>
+      buildPlanAdvice(
+        input({
+          snapshot: snapshot({
+            colonies: [
+              { ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 },
+              { ...planet(OCEANIC_ID, HIGHSEC_SYSTEM, 'oceanic'), upgrade_level: 5 },
+            ],
+            details: new Map([
+              [TEMPERATE_ID, host],
+              [OCEANIC_ID, makesWater],
+            ]),
+          }),
+        })
+      );
+    // Control: with every factory fed, the network plan does offer the host a factory.
+    const fed = { ...idleHost, pins: idleHost.pins.filter((p) => p.pin_id !== 8) };
+    expect(
+      temperate(adviceWith(fed)).quickWins.some((win) => win.id.includes(':room-factories:'))
+    ).toBe(true);
+    const advice = adviceWith(idleHost);
+    const host = temperate(advice);
+    const claims = host.quickWins.filter(
+      (win) =>
+        (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
+        win.detail.kind === 'spare-room'
+    );
+    // The heads earn more than the factory, so they keep the room.
+    expect(claims.map((win) => win.detail.kind)).toEqual(['idle-factories']);
+    const shown = (wins: typeof host.quickWins) =>
+      wins
+        .filter((win) => !isSaving(win.detail))
+        .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
+    expect(host.quickWinGainPerDay).toBeCloseTo(shown(host.quickWins), 6);
+    expect(advice.totals.afterQuickWinsPerDay! - advice.totals.todayPerDay!).toBeCloseTo(
+      shown(advice.quickWins),
+      6
+    );
   });
 
   it('offers no quick win that needs surplus hauled from another system (#2703)', () => {

@@ -20,14 +20,15 @@
  *   (`plannerColonies`, so overrides and the unknown-rate assumption apply),
  *   not `colonyBaseline`, which is a modelled best P1 rather than measured
  *   income. A colony whose storage fills before the pilot's haul does not earn
- *   its nominal rate: today is the nominal figure less the stalled share, and
- *   the storage quick win gives that share back. So today plus every quick win
- *   is the colony running at full, with nothing counted twice.
+ *   its nominal rate: today is the nominal figure less the stalled share. The
+ *   storage quick win shows that share as a saving and no total adds it
+ *   (decision 20261006-094549).
  * - **Quick wins**: stopped or decayed extractors, idle factories, storage that
  *   fills early, spare room. Each is priced by re-running the same earnings
  *   model with the fix applied and taking the difference, so a quick win's
  *   figure is the colony's own earnings model's answer rather than a second
- *   one. A win whose value cannot be priced keeps a `null` gain.
+ *   one. A win whose value cannot be priced keeps a `null` gain. A colony's
+ *   spare and freed room is spent by one win only (`spendRoomOnce`).
  * - **Rebuild**: `colonyStopTierAdvice`, the one-planet scorer, not `planBest`:
  *   `planBest` hosts a multi-planet goal chain, while this question is "what is
  *   the best one planet can make from its own ground". Its candidate list is
@@ -54,6 +55,7 @@ import {
   quickWin,
   sellBooks,
   slotNudge,
+  spendRoomOnce,
   orderQuickWins,
   type ColonyAdvice,
   type PlanTotals,
@@ -706,6 +708,7 @@ function analyseColony(args: {
           what: 'factories',
           productTypeId,
           factories,
+          source: 'local',
           routedFrom: [],
           needsRemoval: plan.idle !== null,
         },
@@ -723,15 +726,8 @@ function analyseColony(args: {
   const room = plan.headroom.extractorControlUnit ?? 0;
   const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
-  // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
-  // headroom, so when the idle win already buys heads, this one would count it twice.
-  // The same goes for the basic factories above: they take the room first.
-  const headroomSpent = wins.some(
-    (win) =>
-      (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
-      (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
-  );
-  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
+  // Competes for the same room as the heads and factories: `spendRoomOnce` below picks one.
+  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1) {
     const only = colony.extractedPerHour[0];
     const perEcu = only.unitsPerHour / ecus;
     // The same flat falloff the rebuild scorer applies to every ECU after the first.
@@ -767,6 +763,7 @@ function analyseColony(args: {
       )
       .map((win) => ({ ...win, planetId }))
   );
+  const counted = spendRoomOnce(wins);
 
   // Today is what the colony actually delivers: nominal less the stalled share.
   const todayPerDay = nominal === null ? null : nominal * (1 - stall) * HOURS_PER_DAY;
@@ -802,7 +799,7 @@ function analyseColony(args: {
       planetType: row.planetType,
       todayPerDay,
       ...(unknownReason ? { unknownReason } : {}),
-      quickWins: wins,
+      quickWins: counted,
       rebuild,
       preference,
     }),
@@ -936,6 +933,7 @@ function factoryRoom(
           what: 'factories',
           productTypeId: opportunity.typeId,
           factories: opportunity.factories,
+          source: 'network',
           routedFrom: [
             ...new Set(
               opportunity.inputs.flatMap((input) =>
