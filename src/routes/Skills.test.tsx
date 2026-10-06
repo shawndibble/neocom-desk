@@ -611,6 +611,21 @@ describe('Skills', () => {
     ).toBeTruthy();
   });
 
+  it('offers Add to Skill Plan in the inspector, not on the row, and keeps its Undo state per skill', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: /^Frigate/ }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Skill Plan and add' }));
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Gunnery/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Small Hybrid Turret/ }));
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
   it('deselects a skill (closing the inspector) on a second click', async () => {
     render(<App />);
 

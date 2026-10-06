@@ -12,7 +12,6 @@
  * keep their identity across edits that leave their inputs alone.
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type {} from '@/engine/fittings/candidates';
 import {
   addCargo,
   addModule,

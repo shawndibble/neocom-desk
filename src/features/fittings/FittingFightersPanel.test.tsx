@@ -7,8 +7,6 @@ import '@/i18n';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingFightersPanel } from './FittingFightersPanel';
-import {} from './fittingItemActions';
-import {} from './__fixtures__/itemActions';
 
 // Entity names are real links, so every render needs a Router.
 const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });

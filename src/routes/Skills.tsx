@@ -56,7 +56,7 @@ import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -467,6 +467,7 @@ export function Skills() {
                 planAction={
                   selectedSkill && (
                     <SkillPlanAdd
+                      key={selectedSkill.skillTypeID}
                       characterId={activeCharacterId}
                       skillTypeID={selectedSkill.skillTypeID}
                       skillName={selectedSkill.name}
@@ -510,7 +511,7 @@ export function Skills() {
               className="py-8"
             />
           ) : (
-            <TableExportProvider tableExport={skillsExport}>
+            <>
               {groups.map((group) => {
                 if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
                 const expanded = searching || expandedGroups.has(group.groupName);
@@ -614,7 +615,7 @@ export function Skills() {
                   </section>
                 );
               })}
-            </TableExportProvider>
+            </>
           )}
         </>
       )}

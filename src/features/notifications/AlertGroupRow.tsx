@@ -238,6 +238,7 @@ function AlertFireRow({
           entry.subjectId ?? entry.typeId,
           entry.characterId
         )}
+        // Deliberate §6c deviation: no › caret. The dismiss × is the row's one trailing control and the body text is the link.
         // Body text stays dim (a feed of accent sentences would drown the cues that matter); it underlines on hover.
         className={cx(
           'order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',

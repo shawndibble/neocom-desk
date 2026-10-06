@@ -58,9 +58,11 @@ export type BandInfo =
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /**
- * A row's icon-only buttons. `iconButtonClassName` on a bare `<button>`
- * rather than `IconButton`, which wraps each one in a Tooltip — a Radix
- * provider on every row of a long queue. It also never shrinks its glyph: a
+ * A row's icon-only buttons (grip, prereq promote). `iconButtonClassName` on a
+ * bare `<button>` rather than `IconButton`, which wraps each one in a Tooltip —
+ * a Radix provider on every row of a long queue. (The ⋮ is `RowMoreActions`;
+ * its menu content mounts only when opened, so a long queue pays for the
+ * trigger button only.) It also never shrinks its glyph: a
  * text `Button` narrowed to `w-7` kept its `px-2.5` padding and squeezed a
  * 1rem icon into what was left, down to a dot.
  */
@@ -661,7 +663,7 @@ const PrereqRow = memo(function PrereqRow({
     </button>
   );
 
-  // Icon-only with an aria-label, like the entry rows' ⋮ —
+  // Icon-only with an aria-label, like the grip —
   // and deliberately not wrapped in a Tooltip, which would put a Radix
   // provider on every row of a long queue to restate the label.
   const promoteButton = (

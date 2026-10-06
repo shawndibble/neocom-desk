@@ -557,8 +557,9 @@ describe('FittingAddPanel', () => {
       </MemoryRouter>
     );
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
+    const result = await screen.findByRole('button', { name: /Anchoring Array/ });
     expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
-    await user.click(await screen.findByRole('button', { name: /Anchoring Array/ }));
+    await user.click(result);
     expect(onAddCargo).toHaveBeenCalledWith(4, 1);
   });
 
