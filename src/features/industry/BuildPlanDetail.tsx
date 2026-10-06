@@ -104,7 +104,6 @@ import {
   materialTableRows,
   shoppingListMaterials,
   subBuildSeconds as computeSubBuildSeconds,
-  type MaterialTableRow,
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
@@ -1102,25 +1101,6 @@ export function BuildPlanDetail({
   /** The same menu on every other item name the page shows — product heading, revenue and owned-sale rows, the recipe and acquisition modals. */
   const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
 
-  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
-    return itemContextMenu(
-      material.typeID,
-      tr,
-      canBuildHere(material.typeID)
-        ? {
-            onToggle: () => toggleBuildHere(material.typeID),
-            building: material.subBuilds.length > 0,
-          }
-        : undefined,
-      modifyBlueprintFor(material)
-    );
-  }
-
-  /** The blueprint row's own action: the same tier picker its blueprint glyph opens. */
-  function modifyBlueprintFor(material: MaterialTableRow): (() => void) | undefined {
-    return material.acquisitionTier ? () => setAcquisitionPickerTypeId(material.typeID) : undefined;
-  }
-
   /**
    * The visible "More actions" button beside the same menu (WCAG 2.1.1,
    * issue #1498) — every surface `itemContextMenu`/`itemMenuFor` wraps also
@@ -1141,20 +1121,6 @@ export function BuildPlanDetail({
         buildingHere={buildHere?.building}
         onModifyBlueprint={onModifyBlueprint}
       />
-    );
-  }
-
-  /** The materials table's own row — same `buildHere` wiring as `materialContextMenu`. */
-  function materialActionsFor(material: MaterialTableRow): ReactElement {
-    return itemActionsFor(
-      material.typeID,
-      canBuildHere(material.typeID)
-        ? {
-            onToggle: () => toggleBuildHere(material.typeID),
-            building: material.subBuilds.length > 0,
-          }
-        : undefined,
-      modifyBlueprintFor(material)
     );
   }
 
@@ -1856,8 +1822,6 @@ export function BuildPlanDetail({
                 onOwnedStockChange={(changes) => changeSourcing(planSourcingPatches(changes))}
                 ref={materialsTable}
                 detection={detection}
-                rowContextMenu={materialContextMenu}
-                rowActions={materialActionsFor}
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
@@ -2015,8 +1979,6 @@ export function BuildPlanDetail({
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}
-              itemMenuFor={itemMenuFor}
-              itemActionsFor={itemActionsFor}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>

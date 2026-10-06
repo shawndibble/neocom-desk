@@ -1,8 +1,8 @@
 /**
  * Build Plans column-label strip vs. its rows: the strip's trailing spacer
- * used to be a fixed 36px while every row's trailing `IconButton size="sm"`
+ * used to be a fixed 36px while every row's trailing control
  * is `size-9 md:size-7` (28px at `md`+), so every label sat 7px left of its
- * figures at desktop widths. The spacer now follows the same `w-9 md:w-7`.
+ * figures at desktop widths. The spacer follows the same size now (the trailing ⋮, `w-11 md:w-7`).
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';

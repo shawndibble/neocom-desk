@@ -1,5 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { captureException } from '@sentry/react';
@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
-  MenuItem,
   Panel,
   Spinner,
   type DataTableColumn,
@@ -38,7 +37,6 @@ import {
   secondsRemaining,
   summarizeJobs,
   activityI18nKey,
-  contextMenuTypeId,
   canLogProductionFromJob,
   loadAllCharactersIndustryJobs,
   flattenJobsWithCharacter,
@@ -77,7 +75,6 @@ import {
   type JobSlotSkills,
   type JobSlotCharacterInput,
 } from '@/engine/industry/jobSlots';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterLink } from '@/features/entities';
 import {
@@ -826,8 +823,32 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
         },
       },
+      {
+        // The one trailing control: a finished job's primary next step. Rows
+        // that can't be logged (running, corp-owned) render nothing.
+        id: 'logProduction',
+        header: '',
+        align: 'right',
+        cardActions: true,
+        render: (job) =>
+          canLog(job) ? (
+            <Button size="sm" onClick={() => void handleLogProduction(job)}>
+              {t('industry.jobsLogProduction')}
+            </Button>
+          ) : null,
+      },
     ],
-    [t, now, soon, done, jobTone, nameForBlueprint, showCharacterColumn]
+    [
+      t,
+      now,
+      soon,
+      done,
+      jobTone,
+      nameForBlueprint,
+      showCharacterColumn,
+      canLog,
+      handleLogProduction,
+    ]
   );
   const sortProps = useUrlSort(
     'jobs.sort',
@@ -843,27 +864,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     rows: filteredJobs,
     columns: jobsCsv,
   });
-
-  /** Right-click any row for the shared item menu. */
-  const jobContextMenu = (job: JobRow, tr: ReactElement): ReactElement => {
-    const menuTypeId = contextMenuTypeId(job);
-    return (
-      <ItemContextMenu
-        typeId={menuTypeId}
-        itemName={nameForBlueprint(menuTypeId)}
-        blueprintTypeID={job.product_type_id !== undefined ? job.blueprint_type_id : null}
-        extraItems={
-          canLog(job) ? (
-            <MenuItem onSelect={() => void handleLogProduction(job)}>
-              {t('industry.jobsLogProduction')}
-            </MenuItem>
-          ) : undefined
-        }
-      >
-        {tr}
-      </ItemContextMenu>
-    );
-  };
 
   /**
    * Open manufacturing/science/reaction slots for the panel's current
@@ -1146,8 +1146,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 rowClassName={(job) =>
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
                 }
-                rowContextMenu={jobContextMenu}
-                rowMoreActions
               />
             </div>
           )}

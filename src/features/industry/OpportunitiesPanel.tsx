@@ -10,7 +10,7 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CharacterLink } from '@/features/entities';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
@@ -45,7 +45,6 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -485,21 +484,6 @@ export function OpportunitiesPanel({
       render: (row) => <StartPlanButton onStart={() => onStartPlan(row.candidate.catalogEntry)} />,
     },
   ];
-  // A row whose product type is unknown has no item to open a menu for, so it
-  // renders bare (the price-history button is withheld for the same reason).
-  const rowContextMenu = (row: OpportunityRow, tr: ReactElement): ReactElement => {
-    const { productTypeID, productName, blueprintTypeID } = row.candidate.catalogEntry;
-    if (productTypeID === null) return tr;
-    return (
-      <ItemContextMenu
-        typeId={productTypeID}
-        itemName={productName}
-        blueprintTypeID={blueprintTypeID}
-      >
-        {tr}
-      </ItemContextMenu>
-    );
-  };
   const sortProps = useUrlSort(
     OPPORTUNITIES_SORT_KEY,
     OPPORTUNITIES_DEFAULT_SORT,
@@ -636,8 +620,6 @@ export function OpportunitiesPanel({
             rowKey={opportunityRowKey}
             virtualize="auto"
             label={t('industry.opportunitiesTitle')}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions
             {...sortProps}
           />
         </div>

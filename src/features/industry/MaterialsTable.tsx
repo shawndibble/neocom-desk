@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -9,7 +8,6 @@ import {
   useRef,
   useState,
   type FocusEvent,
-  type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
@@ -83,15 +81,6 @@ interface MaterialsTableProps {
   ref?: Ref<MaterialsTableHandle>;
   /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
-  /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
-  rowContextMenu?: (material: MaterialTableRow, tr: ReactElement) => ReactElement;
-  /**
-   * Visible "More actions" button for the row (WCAG 2.1.1, issue #1498) —
-   * the same item menu `rowContextMenu` opens on right-click/long-press,
-   * reachable by keyboard. Rendered in a trailing column; omitted where the
-   * caller has no menu to offer.
-   */
-  rowActions?: (material: MaterialTableRow) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
   /**
@@ -654,8 +643,6 @@ export function MaterialsTable({
   onOwnedStockChange,
   ref,
   detection,
-  rowContextMenu,
-  rowActions,
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
@@ -1149,18 +1136,6 @@ export function MaterialsTable({
           : (materialRowState(material, sourcing, pricesReady).lineCost ?? undefined),
       render: renderTotal,
     },
-    ...(rowActions
-      ? [
-          {
-            id: 'actions',
-            header: '',
-            align: 'right',
-            cardActions: true,
-            headerCellClassName: 'w-11',
-            render: (material: MaterialTableRow) => rowActions(material),
-          } satisfies DataTableColumn<MaterialTableRow>,
-        ]
-      : []),
   ];
 
   // Dropped only where Materials shares its row with Costs & revenue (`xl`
@@ -1289,7 +1264,6 @@ export function MaterialsTable({
             ) : (
               renderTotal(material)
             )}
-            {rowActions?.(material)}
           </span>
         </div>
         {!tier && (
@@ -1328,11 +1302,7 @@ export function MaterialsTable({
         </div>
       </li>
     );
-    return rowContextMenu ? (
-      <Fragment key={material.typeID}>{rowContextMenu(material, item)}</Fragment>
-    ) : (
-      item
-    );
+    return item;
   }
 
   /**
@@ -1528,7 +1498,6 @@ export function MaterialsTable({
                     rowKey={(material) => material.typeID}
                     label={t('industry.errands.tableLabel', { section: sectionLabel(errand) })}
                     density="compact"
-                    rowContextMenu={rowContextMenu}
                   />
                 </div>
               ))}

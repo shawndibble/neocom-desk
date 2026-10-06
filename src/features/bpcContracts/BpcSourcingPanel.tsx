@@ -2039,6 +2039,7 @@ export function BpcSourcingPanel() {
                     itemName={blueprintNames.get(row.typeId)}
                     seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
                     trigger={tr}
+                    omitViewInMarket
                     extraItems={waypointItemFor(row, ownedPlaceIds)}
                   />
                 )}

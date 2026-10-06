@@ -304,9 +304,7 @@ describe('BuildPlanList: build groups (#626)', () => {
     // plan the moment a member is edited. So Fit Import puts the ship in the
     // name and the list never derives it.
     renderGrouped();
-    expect(
-      screen.getByRole('button', { name: "Delete group Loru's Max Hacker — Buzzard" })
-    ).toBeInTheDocument();
+    expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
   });
 
   it('shows the members once expanded', () => {
@@ -388,7 +386,7 @@ describe('BuildPlanList: build groups (#626)', () => {
     fireEvent.contextMenu(nameButton);
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
 
-    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
   });
 });
 
@@ -449,10 +447,11 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     }
   });
 
-  it('keeps only Delete visible per row, moving move-to-group into the row context menu', () => {
+  it('keeps one trailing ⋮ per row and no standalone Delete or Move to group button', () => {
     renderDraggable();
     expect(screen.queryByRole('button', { name: /Move to group/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete Rokh' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for Rokh' })).toBeInTheDocument();
   });
 
   it('opens "Move to group" from the row context menu, reachable via focus + the native menu key', () => {
@@ -554,7 +553,7 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
 
-    expect(screen.getByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
   });
 });
 
@@ -598,10 +597,13 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
     await user.click(
       screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
     );
-    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Rename']);
+    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual([
+      'Rename',
+      'Delete group',
+    ]);
 
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
-    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
   });
 });
 
