@@ -33,11 +33,24 @@ describe('IskFigureGroup', () => {
     expect(figures()[1]).toHaveFocus();
     press(figures()[1], 'End');
     expect(figures()[2]).toHaveFocus();
-    press(figures()[2], 'ArrowRight');
+    expect(fireEvent.keyDown(figures()[2], { key: 'ArrowDown' })).toBe(true); // end: page scrolls
     expect(figures()[2]).toHaveFocus();
     press(figures()[2], 'Home');
     expect(figures()[0]).toHaveFocus();
     expect(screen.getByText('2,000,000.00', { exact: false, selector: '.sr-only' })).toBeTruthy();
+  });
+
+  it('keeps nested groups independent', () => {
+    render(
+      <IskFigureGroup>
+        <IskAmount value={1_000_000} />
+        <IskFigureGroup>
+          <IskAmount value={2_000_000} />
+          <IskAmount value={3_000_000} />
+        </IskFigureGroup>
+      </IskFigureGroup>
+    );
+    expect(figures().map((f) => f.tabIndex)).toEqual([0, 0, -1]);
   });
 
   it('leaves arrow keys alone inside other controls', () => {

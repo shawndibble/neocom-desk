@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, Spinner } from '@/components/ui';
-import { IskFigureGroup } from '@/components/ui/IskFigureGroup';
+import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';

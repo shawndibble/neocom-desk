@@ -977,6 +977,11 @@ is clutter, and clutter hides the actions that matter.
   The B/M/K suffix is the cue that the exact value is one hover or tap away.
   No other compact formatter renders on screen.
 
+  Where a panel holds many `IskAmount`s, wrap them in `IskFigureGroup`: one
+  tab stop per group, arrow keys / Home / End between figures (roving
+  tabindex), the exact value showing on focus. Arrows act only while a figure
+  has focus, so inputs in the panel keep theirs.
+
 ### Touch and hold
 
 | Gesture        | Means                                                                                                                                                                                                                       |
