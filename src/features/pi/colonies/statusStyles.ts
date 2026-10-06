@@ -1,7 +1,7 @@
 import type { CheckStatus } from './coloniesModel';
 
 export const STATUS_TONE_CLASS: Record<CheckStatus, string> = {
-  stopped: 'text-warning',
+  stopped: 'text-danger',
   expiring: 'text-warning',
   'needs-look': 'text-warning',
   unknown: 'text-text-dim',
@@ -9,7 +9,7 @@ export const STATUS_TONE_CLASS: Record<CheckStatus, string> = {
 };
 
 export const STATUS_DOT_CLASS: Record<CheckStatus, string> = {
-  stopped: 'bg-warning',
+  stopped: 'bg-danger',
   expiring: 'bg-warning',
   'needs-look': 'bg-warning',
   unknown: 'bg-text-dim',
