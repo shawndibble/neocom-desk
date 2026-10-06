@@ -23,6 +23,7 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 import { LoadMeter, EstimateBadge, SectionLabel } from './DirectiveRow';
 import { buildHowTo, type HowTo } from './findBestHowTo';
 import { defaultHighsecOnly, needsSkyhookNote } from './findBestView';
+import { withArticle } from './article';
 import { PlanetImage } from './PlanetImage';
 import { usePlanetFinder, type FinderOrigin, type FoundSystem } from './usePlanetFinder';
 
@@ -352,7 +353,7 @@ export function ShowMeHow(props: Props) {
         <SectionLabel>
           {t('piPlan.find.howTitle', {
             item: recipe.name,
-            type: t(`pi.planetType.${recipe.useType}`),
+            aType: withArticle(t(`pi.planetType.${recipe.useType}`)),
           })}
         </SectionLabel>
         <Button size={mdUp ? 'sm' : 'md'} className="ml-auto" onClick={close}>

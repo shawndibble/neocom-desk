@@ -7,6 +7,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
+import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, pi } from './mapFixtures.testutil';
 import { MAP_HINT_KEY } from './mapHintPref';
 import { buildMapGraph, DOCK_MIN_PANEL_WIDTH, productFigure } from './mapModel';
@@ -346,6 +347,8 @@ describe('PlanMap: the detail drawer', () => {
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Add a Lava planet')).toBeInTheDocument();
     expect(within(dialog).getByText(/Unlocks \d+ products/)).toBeInTheDocument();
+    // Assistive tech gets the product names, not only the count.
+    expect(within(dialog).getByText(/^Unlocked products: .*Plasmoids.*\.$/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Best one-planet recipe:/)).toBeInTheDocument();
     expect(
       within(dialog).getByText("You're using 1 of 4 planets: room for 3 more.")
@@ -541,5 +544,25 @@ describe('PlanMap: phone', () => {
       'aria-expanded',
       'true'
     );
+  });
+});
+
+describe('PlanMap: the picks note says what is shared with Plan', () => {
+  afterEach(async () => {
+    await usePlanPreference.getState().setValue('isk');
+  });
+
+  it.each([
+    ['isk', 'ranked by most ISK'],
+    ['haul', 'ranked by least hauling'],
+  ] as const)('names the %s preference', async (preference, text) => {
+    await usePlanPreference.getState().setValue(preference);
+    renderMap();
+    expect(await screen.findByText(new RegExp(text))).toBeInTheDocument();
+  });
+
+  it('says the recipe list is shown before the Plan tab filters', () => {
+    renderMap({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') });
+    expect(screen.getByText(/before the Plan tab's filters/)).toBeInTheDocument();
   });
 });

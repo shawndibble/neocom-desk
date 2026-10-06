@@ -714,6 +714,21 @@ describe('postUniverseNames', () => {
     expect(headers?.get('content-type')).toContain('application/json');
   });
 
+  it('splits more than 1000 ids across multiple requests', async () => {
+    const ids = Array.from({ length: 1500 }, (_, i) => i + 1);
+    const sizes: number[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const body = (await request.json()) as number[];
+        sizes.push(body.length);
+        return HttpResponse.json(body.map((id) => ({ id, name: `n${id}`, category: 'character' })));
+      })
+    );
+    const names = await postUniverseNames(ids);
+    expect(sizes).toEqual([1000, 500]);
+    expect(names).toHaveLength(1500);
+  });
+
   it('returns an empty array without a request when given no ids', async () => {
     let called = false;
     server.use(

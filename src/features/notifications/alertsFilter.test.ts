@@ -40,7 +40,7 @@ describe('filterAlertGroups', () => {
 
   /*
    * Muted types are hidden by default and revealed by a chip, rather than
-   * simply absent: `NotificationContextMenu` calls its own mute "one-way from
+   * simply absent: a feed row's mute is "one-way from
    * here", because the row it was set from is gone the moment it applies. This
    * page is where that becomes reversible, so the rows have to be reachable.
    */

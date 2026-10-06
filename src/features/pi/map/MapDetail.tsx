@@ -13,6 +13,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
+import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
 import { PlanetImage } from './PlanetImage';
 import { comparisonSentence, planetName, tierWithCode } from './mapText';
@@ -228,7 +229,9 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           className="outline-2 outline-offset-1 outline-map-whatif"
         />
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{t('piMap.add.title', { type: name })}</div>
+          <div className="text-sm font-semibold">
+            {t('piMap.add.title', { aType: withArticle(name) })}
+          </div>
           <p className="text-xs text-text-dim">
             <span className="font-semibold text-map-whatif">
               {t('piMap.add.unlocks', { count: props.unlockedIds.length })}
@@ -236,6 +239,13 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
             {props.oneHostCount > 0 &&
               `, ${t('piMap.add.asOnePlanet', { count: props.oneHostCount })}`}
           </p>
+          {props.unlockedIds.length > 0 && (
+            <p className="sr-only">
+              {t('piMap.add.unlockList', {
+                names: names(props.graph, props.unlockedIds).join(', '),
+              })}
+            </p>
+          )}
         </div>
       </div>
 
