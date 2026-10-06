@@ -355,8 +355,9 @@ interface DataTableProps<T> {
   /**
    * How the table behaves below `sm`. `'stack'` (the default) collapses each
    * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
-   * `'table'` keeps real columns, and is only right for a table narrow enough
-   * to fit a 390px screen unaided — roughly two short columns.
+   * `'table'` keeps real columns: right for a read-only display table whose
+   * columns fit a 390px screen unaided (§6c Restraint), wrong for one that
+   * would scroll sideways or squeeze its name column.
    */
   responsive?: 'stack' | 'table';
   /**

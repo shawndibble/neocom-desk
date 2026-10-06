@@ -139,44 +139,40 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
 /**
  * How many real actions `items` holds, or `undefined` when it can't tell (a
  * wrapper component may render any number). Separators and empties count 0; a
- * `MenuSub` counts as one. Drives the dev-time restraint warning (DESIGN.md
- * §6c: a ⋮ is for a menu of at least two real actions).
+ * `MenuSub` counts as 2 (a submenu is a menu's worth of actions, so it never
+ * trips the warning alone); a `MenuRadioGroup` counts its items.
  */
 function countMenuItems(node: ReactNode): number | undefined {
   let count = 0;
   for (const child of Children.toArray(node)) {
     if (!isValidElement<{ children?: ReactNode }>(child)) continue;
-    if (child.type === Fragment) {
+    if (child.type === MenuSeparator) continue;
+    if (child.type === MenuItem || child.type === DisabledMenuItem) count += 1;
+    else if (child.type === MenuSub) count += 2;
+    else if (child.type === Fragment || child.type === MenuRadioGroup) {
       const inner = countMenuItems(child.props.children);
       if (inner === undefined) return undefined;
       count += inner;
-    } else if (child.type === MenuSeparator) {
-      continue;
-    } else if (
-      child.type === MenuItem ||
-      child.type === DisabledMenuItem ||
-      child.type === MenuSub ||
-      child.type === MenuRadioGroup
-    ) {
-      count += child.type === MenuRadioGroup ? 2 : 1;
-    } else {
-      return undefined;
-    }
+    } else if (child.type === MenuRadioItem) count += 1;
+    else return undefined;
   }
   return count;
 }
 
-/** Dev-only: a row menu (⋮ or right-click) over fewer than two real actions is what §6c's restraint rules retire. */
-function useRestraintWarning(name: string, items: ReactNode, shown: boolean) {
-  useEffect(() => {
-    if (!shown || !import.meta.env.DEV) return;
-    const count = countMenuItems(items);
-    if (count !== undefined && count < 2) {
-      console.warn(
-        `RowMoreActions "${name}": the menu holds ${count} real action(s). DESIGN.md §6c: a row menu needs at least two actions not reachable elsewhere; delete the menu (no ⋮, no right-click menu).`
-      );
-    }
-  }, [name, items, shown]);
+const warnedRestraint = new Set<string>();
+
+/**
+ * Dev-only, once per row name: a `RowActionsMenu` over fewer than two real
+ * actions is what DESIGN.md §6c's restraint rules retire.
+ */
+function warnRestraint(name: string, items: ReactNode) {
+  if (!import.meta.env.DEV || warnedRestraint.has(name)) return;
+  const count = countMenuItems(items);
+  if (count === undefined || count >= 2) return;
+  warnedRestraint.add(name);
+  console.warn(
+    `RowActionsMenu "${name}": ${count === 0 ? 'no' : 'one'} real action. DESIGN.md §6c: a row menu needs at least two actions not reachable elsewhere; delete the menu (no ⋮, no right-click menu).`
+  );
 }
 
 /**
@@ -201,7 +197,7 @@ export function RowActionsMenu({
   // `RowMoreActions` appends the same itself, so the context value stays
   // the row's own items and a hand-rolled wrapper gets the extras too.
   const extras = useContext(RowMenuExtrasContext);
-  useRestraintWarning(name, items, true);
+  useEffect(() => warnRestraint(name, items), [name, items]);
   return (
     <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
       <TooltipHoldContext.Provider value={false}>
@@ -237,7 +233,6 @@ export function RowMoreActions({ className }: { className?: string }) {
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const extras = useContext(RowMenuExtrasContext);
-  useRestraintWarning(actions?.name ?? '', actions?.items, !!actions);
   if (!actions) return null;
   return (
     <DropdownMenu onOpenChange={actions.onOpenChange}>
