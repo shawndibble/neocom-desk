@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, hubBooks, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, pi } from './mapFixtures.testutil';
@@ -642,5 +642,17 @@ describe('PlanMap richness drawer', () => {
     renderMap({}, '/planetary-industry/map?planet=123');
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
+  });
+});
+
+describe('PlanMap with hub prices unreadable', () => {
+  it('does not claim the planets already make their best product', () => {
+    const unpriced = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    renderMap({ advice: unpriced, pricesFailed: true });
+    expect(screen.queryByText(/already make their best product/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
   });
 });

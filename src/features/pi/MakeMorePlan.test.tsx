@@ -56,13 +56,46 @@ describe('MakeMorePlan', () => {
     mockState = { status: 'loading' };
     const { rerender } = renderPlan();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
-    mockState = { status: 'prices-failed' };
+    mockState = { status: 'prices-failed', advice: null };
     rerender(
       <MemoryRouter>
         <MakeMorePlan snapshot={snapshot} characterId={1} onFindBest={vi.fn()} />
       </MemoryRouter>
     );
     expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+  });
+
+  it('with prices down keeps the wins that need no price, with no gain and no other figure', () => {
+    const unpriced = {
+      ...fixtureAdvice,
+      colonies: fixtureAdvice.colonies.map((colony) => ({
+        ...colony,
+        quickWins: colony.quickWins.map((win) => ({
+          ...win,
+          gainPerDay: null,
+          iskPerMinute: null,
+        })),
+      })),
+    } as unknown as PlanAdvice;
+    mockState = { status: 'prices-failed', advice: unpriced };
+    const { container } = renderPlan();
+    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    const panel = screen.getByRole('heading', { name: /Quick wins/ }).closest('section')!;
+    expect(within(panel).getAllByRole('checkbox')).toHaveLength(2);
+    expect(panel).not.toHaveTextContent(/ISK/);
+    expect(panel).not.toHaveTextContent('No ISK figure');
+    expect(container.querySelector('[data-isk-figure]')).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Rebuild/ })).not.toBeInTheDocument();
+  });
+
+  it('with prices down and nothing price-free to do, shows only the notice', () => {
+    mockState = {
+      status: 'prices-failed',
+      advice: { ...fixtureAdvice, colonies: [] } as unknown as PlanAdvice,
+    };
+    renderPlan();
+    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Quick wins/ })).not.toBeInTheDocument();
   });
 
   it('puts "What matters more?" on its own row in the body below sm, not in the header', () => {

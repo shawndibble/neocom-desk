@@ -4651,6 +4651,7 @@
     "picksLabel": "Your picks",
     "picksTitle": "Your picks",
     "picksRecipes": "Best one-planet recipes",
+    "picksNoPrices": "Picks need hub prices, which could not be read.",
     "picksNone": "Your planets already make their best product. The Plan tab lists quick wins.",
     "picksNoteRebuild": "vs today · ranked by {{preference}}, as on the Plan tab",
     "preferenceIsk": "most ISK",
@@ -5061,6 +5062,7 @@
       "nextPlanet": "What should the next planet be?",
       "quickTitle": "Quick wins · no rebuild",
       "quickFoot": "Sorted by ISK per minute. Minutes are estimates.",
+      "quickFootNoPrices": "These need no hub prices, so no gain is shown. Minutes are estimates.",
       "unpriced": "No ISK figure",
       "saves": "saves ~",
       "win": {

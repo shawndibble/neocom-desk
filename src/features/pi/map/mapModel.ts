@@ -286,10 +286,16 @@ export type ProductFigure =
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from
  * several planets, so it has no per-planet figure, and a P1 or P2 the hub does
- * not price has none either: unknown, never zero. `advice` must be built with
+ * not price has none either: unknown, never zero (`pricesFailed`: every product is
+ * unpriced, so every unranked one says so). `advice` must be built with
  * `recipeFilter: 'any'`.
  */
-export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGraph): ProductFigure {
+export function productFigure(
+  advice: PlanAdvice,
+  typeId: number,
+  graph: MapGraph,
+  pricesFailed = false
+): ProductFigure {
   const product = graph.byId.get(typeId);
   if (!product || product.tier === 0) return { kind: 'unranked', reason: 'raw' };
   if (product.tier > 2) return { kind: 'unranked', reason: 'tier' };
@@ -302,11 +308,13 @@ export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGrap
     );
     return {
       kind: 'unranked',
-      reason: advice.recipes.unpriced.includes(typeId)
-        ? 'unpriced'
-        : onePlanet
-          ? 'no-fit'
-          : 'not-one-planet',
+      // With the hub unread nothing is priced; "no fit at this level" would be a false reason.
+      reason:
+        pricesFailed || advice.recipes.unpriced.includes(typeId)
+          ? 'unpriced'
+          : onePlanet
+            ? 'no-fit'
+            : 'not-one-planet',
     };
   }
   return {
