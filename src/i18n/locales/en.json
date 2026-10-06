@@ -623,7 +623,6 @@
         "empty": "Nobody has published a fit for this hull on EVE Workbench yet.",
         "unnamed": "Unnamed fit",
         "created": "Created: {{age}}",
-        "load": "Load",
         "loadFailed": "Couldn't load this fit.",
         "priceNote": "Prices: {{hub}}, your default Trade Hub",
         "price": "≈ <isk/> ISK",
