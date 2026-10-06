@@ -14,7 +14,8 @@
  * ## Quick wins add to today; a rebuild is quoted on top of them
  *
  * A **Quick win** is in-place tuning of a colony as it stands (ADR 0012's
- * tuning side). Quick wins add up. A rebuild changes what the colony makes, so
+ * tuning side). Quick wins add up, except a storage win's saving (`isSaving`),
+ * and a colony's room is spent by one of them (`spendRoomOnce`). A rebuild changes what the colony makes, so
  * it is measured against *today after quick wins* (`pickRebuild`'s `todayPerDay`
  * argument), never against raw today: the pilot does the quick wins first, and
  * the rebuild's gain is what is left on top. That is the whole defence against
@@ -111,6 +112,8 @@ export type QuickWinDetail =
       what: 'factories';
       productTypeId: number;
       factories: number;
+      /** `local`: refining the colony's own raw. `network`: the network plan's factories. */
+      source: 'local' | 'network';
       /** Colonies whose surplus the factories draw on, ascending; empty when the host feeds them itself. */
       routedFrom: readonly number[];
       /** The room is held by idle factories the pilot must take out first. */
@@ -208,16 +211,83 @@ export function orderQuickWins(wins: readonly QuickWin[]): QuickWin[] {
   });
 }
 
+/**
+ * A storage win saves income the colony loses to a full launchpad; it adds
+ * nothing to what the colony makes. Its figure is shown as a saving and left
+ * out of every quick-win total.
+ */
+export function isSaving(detail: QuickWinDetail): boolean {
+  return detail.kind === 'storage';
+}
+
+/** A saving's minutes count; its figure does not. */
 export function totalQuickWins(wins: readonly QuickWin[]): {
   gainPerDay: number;
   minutes: number;
   unpriced: number;
 } {
+  const adds = wins.filter((win) => !isSaving(win.detail));
   return {
-    gainPerDay: wins.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0),
+    gainPerDay: adds.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0),
     minutes: wins.reduce((sum, win) => sum + win.minutes, 0),
-    unpriced: wins.filter((win) => win.gainPerDay === null).length,
+    unpriced: adds.filter((win) => win.gainPerDay === null).length,
   };
+}
+
+export type RoomClaim = 'heads' | 'extractors' | 'local-factories' | 'network-factories';
+
+/**
+ * The colony CPU and Powergrid a win spends, or null. Each source's factories
+ * are one claim: that source already split the room between them.
+ */
+export function roomClaim(detail: QuickWinDetail): RoomClaim | null {
+  if (detail.kind === 'idle-factories') return detail.headsToAdd === null ? null : 'heads';
+  if (detail.kind !== 'spare-room') return null;
+  return detail.what === 'extractors' ? 'extractors' : `${detail.source}-factories`;
+}
+
+/**
+ * One colony's room is spent once. Of the claims on it, the one that adds the
+ * most ISK a day stays: a figure beats none, a tie keeps the first. Losing
+ * heads fall back to removing the idle factories, unpriced, so those are still
+ * named; other losing claims are dropped.
+ */
+export function spendRoomOnce(wins: readonly QuickWin[]): QuickWin[] {
+  const byPlanet = new Map<number, Map<RoomClaim, { priced: boolean; gain: number }>>();
+  for (const win of wins) {
+    const claim = roomClaim(win.detail);
+    if (claim === null) continue;
+    const claims = byPlanet.get(win.planetId) ?? new Map();
+    const sum = claims.get(claim) ?? { priced: false, gain: 0 };
+    claims.set(claim, {
+      priced: sum.priced || win.gainPerDay !== null,
+      gain: sum.gain + (win.gainPerDay ?? 0),
+    });
+    byPlanet.set(win.planetId, claims);
+  }
+  const kept = new Map<number, RoomClaim>();
+  for (const [planetId, claims] of byPlanet) {
+    let best: [RoomClaim, { priced: boolean; gain: number }] | null = null;
+    for (const entry of claims) {
+      const [, value] = entry;
+      if (
+        best === null ||
+        (value.priced && !best[1].priced) ||
+        (value.priced === best[1].priced && value.gain > best[1].gain)
+      ) {
+        best = entry;
+      }
+    }
+    if (best) kept.set(planetId, best[0]);
+  }
+  return wins.flatMap((win) => {
+    const claim = roomClaim(win.detail);
+    if (claim === null || kept.get(win.planetId) === claim) return [win];
+    if (win.detail.kind === 'idle-factories') {
+      return [quickWin(win.planetId, { ...win.detail, headsToAdd: null }, null)];
+    }
+    return [];
+  });
 }
 
 // --- Rebuild -----------------------------------------------------------------
@@ -473,7 +543,7 @@ export interface ColonyAdvice {
   /** Why `todayPerDay` is null. */
   unknownReason: string | null;
   quickWins: QuickWin[];
-  /** Sum of the priced quick wins' gains. */
+  /** Sum of the priced quick wins that add; savings excluded. */
   quickWinGainPerDay: number;
   afterQuickWinsPerDay: number | null;
   rebuild: RebuildAdvice;
@@ -535,7 +605,7 @@ export interface PlanTotals {
   rebuildMinutes: number;
   /** Colonies left out of the sums for want of a figure. */
   unknownColonies: number;
-  /** Quick wins counted in `quickWinMinutes` but with no ISK figure. */
+  /** Quick wins that add but have no ISK figure. */
   unpricedQuickWins: number;
 }
 
