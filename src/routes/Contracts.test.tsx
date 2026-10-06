@@ -335,7 +335,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'rifter');
+    await user.type(screen.getByPlaceholderText('Search issuer, receiver or title…'), 'rifter');
 
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
     expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
@@ -349,7 +349,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
     openFilters();
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await user.type(
+      screen.getByPlaceholderText('Search issuer, receiver or title…'),
+      'zzzznomatch'
+    );
 
     expect(await screen.findByText('No contracts match your filters.')).toBeInTheDocument();
     expect(
@@ -365,7 +368,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     const table = await screen.findByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
     expect(within(table).getByText('Courier')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search issuer or title…')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Search issuer, receiver or title…')).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
       'aria-pressed',
       'false'
@@ -383,7 +386,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
 
-    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await user.type(
+      screen.getByPlaceholderText('Search issuer, receiver or title…'),
+      'zzzznomatch'
+    );
     await waitFor(() => expect(window.location.search).toContain('history.q=zzzznomatch'));
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
@@ -416,7 +422,10 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       let sheet = await screen.findByRole('dialog');
       await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
       await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
-      await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+      await user.type(
+        screen.getByPlaceholderText('Search issuer, receiver or title…'),
+        'zzzznomatch'
+      );
 
       await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
       await screen.findAllByText('Rifter fit');
@@ -559,6 +568,41 @@ describe('Contact standing cross-reference', () => {
  * guard assertion in each states that premise out loud so this can never
  * quietly go vacuous if the config's zone ever changes.
  */
+describe('Received by column', () => {
+  const base = contractPage1[0];
+  it('shows the acceptor, the offered-to assignee with a tag, and a dash for the pilot', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([
+          {
+            ...base,
+            contract_id: 11,
+            title: 'Accepted one',
+            status: 'finished',
+            acceptor_id: 600001,
+          },
+          { ...base, contract_id: 12, title: 'Offered one', assignee_id: 700001 },
+          { ...base, contract_id: 13, title: 'Mine one', assignee_id: CHAR_ID },
+        ])
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([
+          { id: 500001, name: 'Some Trader', category: 'character' },
+          { id: 600001, name: 'Buyer Bob', category: 'character' },
+          { id: 700001, name: 'Offered Olga', category: 'character' },
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Accepted one');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).getByRole('link', { name: 'Buyer Bob' })).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'Offered Olga' })).toBeInTheDocument();
+    expect(within(table).getAllByText('(offered)')).toHaveLength(1);
+    expect(within(table).getAllByText('—').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe('Time format preference', () => {
   /** The instant is fixed; only its rendering depends on the zone below. */
   const EXPIRES = new Date(contractPage1[0].date_expired);

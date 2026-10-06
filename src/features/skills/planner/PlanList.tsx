@@ -1,8 +1,4 @@
-import {
-  focusRingInsetClassName,
-  interactiveClassName,
-  selectedRowClassName,
-} from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, selectedRowClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
 import { cx } from '@/lib/cx';
 import { useEffect, useRef, useState } from 'react';
@@ -137,67 +133,52 @@ function PlanRow({
                 </span>
               )}
             </span>
-            <Icon.Descend
-              size={Icon.ICON_SIZE.sm}
-              aria-hidden="true"
-              className={cx(
-                'shrink-0 text-text-faint group-hover:text-accent',
-                interactiveClassName
-              )}
-            />
           </Link>
         </Tooltip>
       )}
-      {/* Rename, Duplicate and Copy live in one menu so the name keeps the row's
-          width (and the finish date under it stays on one line). Delete stays a
-          visible button: it is the destructive one. */}
-      {
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton
-              size="sm"
-              variant="plain"
-              icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-              label={t('plans.moreActions', { name: plan.name })}
-            />
-          </DropdownMenuTrigger>
-          {/* Rename opens its input only once the menu has closed: opened earlier,
+      {/* One trailing ⋮ holds every action (Delete is the danger item), so the
+          name keeps the row's width and the finish date under it stays on one line. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton
+            size="sm"
+            variant="plain"
+            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+            label={t('plans.moreActions', { name: plan.name })}
+          />
+        </DropdownMenuTrigger>
+        {/* Rename opens its input only once the menu has closed: opened earlier,
               the menu's focus handling blurs it and cancels the rename. */}
-          <DropdownMenuContent
-            align="end"
-            onCloseAutoFocus={(e) => {
-              if (renameChosen.current) {
-                e.preventDefault();
-                renameChosen.current = false;
-                setRenaming(true);
-              }
+        <DropdownMenuContent
+          align="end"
+          onCloseAutoFocus={(e) => {
+            if (renameChosen.current) {
+              e.preventDefault();
+              renameChosen.current = false;
+              setRenaming(true);
+            }
+          }}
+        >
+          <DropdownMenuItem
+            onSelect={() => {
+              renameChosen.current = true;
             }}
           >
-            <DropdownMenuItem
-              onSelect={() => {
-                renameChosen.current = true;
-              }}
-            >
-              {t('plans.rename')}
+            {t('plans.rename')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
+            {t('plans.duplicate')}
+          </DropdownMenuItem>
+          {onRequestCopy && (
+            <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
+              {t('plans.copyToCharacter')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
-              {t('plans.duplicate')}
-            </DropdownMenuItem>
-            {onRequestCopy && (
-              <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
-                {t('plans.copyToCharacter')}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      }
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        label={`${t('plans.delete')} ${plan.name}`}
-        tone="danger"
-        onClick={() => onRequestDelete(plan)}
-      />
+          )}
+          <DropdownMenuItem className="text-danger" onSelect={() => onRequestDelete(plan)}>
+            {t('plans.delete')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </li>
   );
 }
