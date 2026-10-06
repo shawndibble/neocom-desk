@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
@@ -51,6 +51,14 @@ export function SlideOver({
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
   useOverlayHistory(open, onClose, closeOnBack);
+  // Radix has no Trigger here, so it cannot return focus on close: remember
+  // what held focus as the panel opened and give it back.
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const active = document.activeElement;
+    opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+  }, [open]);
   return (
     <DialogPrimitive.Root
       open={open}
@@ -63,8 +71,24 @@ export function SlideOver({
         <DialogPrimitive.Content
           onInteractOutside={(event) => event.preventDefault()}
           aria-describedby={undefined}
+          tabIndex={-1}
+          onOpenAutoFocus={(event) => {
+            // Focus the panel, not its first control: the Close button's
+            // tooltip would otherwise open on this programmatic focus and eat
+            // the first Escape. The dialog's title is announced instead.
+            event.preventDefault();
+            (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+          }}
+          onCloseAutoFocus={(event) => {
+            // The opener may be gone (a recycled list row): then leave Radix's default.
+            const target = opener.current;
+            opener.current = null;
+            if (!target?.isConnected) return;
+            event.preventDefault();
+            target.focus({ preventScroll: true });
+          }}
           className={cx(
-            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
+            'outline-none fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
             SIDE_CLASS[side],
             className
           )}

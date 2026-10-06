@@ -275,8 +275,6 @@ function FittingsPage() {
     context,
     catalogue,
     charges,
-    target,
-    dronesShown,
     dragEnabled: isDesktop,
     selectTarget,
     openCargoQuantity: setCargoQuantityFor,

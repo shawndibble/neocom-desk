@@ -163,14 +163,16 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           onFind={setOpenId}
           unpricedCount={best.unpricedCount}
           emptyHint={
-            advice.recipeRows.length === 0
-              ? t('piPlan.find.noneFit', { level: advice.rankingBasis.ccLevel })
-              : filter !== 'any' && best.hasRecipesAtAll
-                ? t('piPlan.find.noneFitFilter', {
-                    tier: t(filter === 'p1' ? 'piPlan.find.makeP1' : 'piPlan.find.makeP2'),
-                    level: advice.rankingBasis.ccLevel,
-                  })
-                : t('piPlan.find.noRecipes')
+            advice.recipes.unpriced.length > 0 && !best.hasRecipesAtAll
+              ? t('piPlan.find.noneFitPrices', { hub: hubName })
+              : advice.recipeRows.length === 0
+                ? t('piPlan.find.noneFit', { level: advice.rankingBasis.ccLevel })
+                : filter !== 'any' && best.hasRecipesAtAll
+                  ? t('piPlan.find.noneFitFilter', {
+                      tier: t(filter === 'p1' ? 'piPlan.find.makeP1' : 'piPlan.find.makeP2'),
+                      level: advice.rankingBasis.ccLevel,
+                    })
+                  : t('piPlan.find.noRecipes')
           }
           banner={
             best.alreadyBest && (

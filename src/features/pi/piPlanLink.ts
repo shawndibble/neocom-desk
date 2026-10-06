@@ -6,6 +6,10 @@
  */
 export const PLAN_PATH = '/planetary-industry/plan';
 
+/** Plan's customs rate editor: opens "Make a specific product" with Colonies expanded. */
+export const PLAN_CUSTOMS_HASH = '#customs';
+export const PLAN_CUSTOMS_HREF = `${PLAN_PATH}${PLAN_CUSTOMS_HASH}`;
+
 export function piPlanHref(typeId: number, pathname: string, search: string): string {
   if (!pathname.startsWith(PLAN_PATH)) return `${PLAN_PATH}?type=${typeId}`;
   const params = new URLSearchParams(search);

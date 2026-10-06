@@ -97,10 +97,7 @@ export function PlanetaryIndustry() {
   const navigate = useNavigate();
   useEffect(() => {
     if (tab === 'map' || parsePiProduct(location.search) === null) return;
-    navigate(hrefWithoutPiProduct(location), {
-      replace: true,
-      state: location.state,
-    });
+    navigate(hrefWithoutPiProduct(location), { replace: true, state: location.state });
   }, [tab, location, navigate]);
 
   // `?type=` from the Industry "PI Plan" link becomes a goal, once, on the
@@ -188,6 +185,7 @@ export function PlanetaryIndustry() {
 
         <PiHeaderStrip
           colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
+          colonyCountUnknown={data?.planetsFetchFailed}
           estimate={tab === 'plan' || tab === 'map'}
         />
 
@@ -214,6 +212,7 @@ export function PlanetaryIndustry() {
             error={error}
             linkedColonyId={linkedColonyId}
             onClearLinkedColony={clearLinkedColony}
+            onRetry={refresh}
           />
         )}
       </div>

@@ -20,6 +20,7 @@
  * linked while docked once the layout narrows, so no stale drawer pops open.
  * The "add a planet" drawer is local state with its own Back entry.
  */
+import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -46,6 +47,7 @@ import {
   productNavigation,
   wasProductPushedHere,
 } from '../piPlanLink';
+import { usePlanPreference } from '../planTicksPref';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
 import { MapBoard } from './MapBoard';
 import { MapHelp } from './MapHelp';
@@ -118,6 +120,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   const picks = useMemo(() => planPicks(advice), [advice]);
+  const preference = usePlanPreference((state) => state.value);
   const pickRanks = useMemo(() => new Map(picks.picks.map((p, i) => [p.typeId, i + 1])), [picks]);
   const pickPlanets = useMemo(() => {
     const map = new Map<PlanetType, number[]>();
@@ -502,7 +505,13 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
             </Tooltip>
           ))}
           <span className="text-[11px] text-text-dim">
-            {picks.kind === 'rebuild' ? t('piMap.picksNoteRebuild') : t('piMap.picksNoteRecipes')}
+            {picks.kind === 'rebuild'
+              ? t('piMap.picksNoteRebuild', {
+                  preference: t(
+                    preference === 'haul' ? 'piMap.preferenceHaul' : 'piMap.preferenceIsk'
+                  ),
+                })
+              : t('piMap.picksNoteRecipes')}
           </span>
         </>
       )}
@@ -542,7 +551,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       <div className={cx(base, 'text-text')} aria-live="polite">
         <PlanetImage type={activeWhatIf} size={28} />
         <span className="text-[11px] font-semibold tracking-widest text-map-whatif uppercase">
-          {t('piMap.whatIfTitle', { type: name })}
+          {t('piMap.whatIfTitle', { aType: withArticle(name) })}
         </span>
         <span>
           {unlock.productIds.length === 0
@@ -650,16 +659,15 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
         {announce}
       </div>
 
+      {/* One drawer for both, so swapping planet for product never closes it
+          (a close hands focus back to the opener). The URL backs the product's. */}
       <PiDrawer
-        open={productShown}
-        onClose={dropProduct}
+        open={drawerShown}
+        onClose={productShown ? dropProduct : closePlanet}
         title={detailTitle}
         phone={phone}
-        closeOnBack={false}
+        closeOnBack={!productShown}
       >
-        {detailBody}
-      </PiDrawer>
-      <PiDrawer open={planetShown} onClose={closePlanet} title={detailTitle} phone={phone}>
         {detailBody}
       </PiDrawer>
       <PiDrawer open={helpOpen} onClose={closeHelp} title={t('piMap.help.title')} phone={phone}>

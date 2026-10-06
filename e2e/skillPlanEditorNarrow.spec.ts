@@ -266,7 +266,8 @@ test("naming a milestone from an entry row shows it as the header's next milesto
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  await page.getByRole('button', { name: 'Add milestone to Spaceship Command I' }).click();
+  await page.getByRole('button', { name: 'More actions for Spaceship Command I' }).click();
+  await page.getByRole('menuitem', { name: 'Add milestone…' }).click();
   const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
   await nameDialog.getByRole('textbox').fill('Fly Loki');
   await nameDialog.getByRole('button', { name: 'Save' }).click();
@@ -297,8 +298,9 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
   await page
-    .getByRole('button', { name: 'Add milestone to Gallente Drone Specialization IV' })
+    .getByRole('button', { name: 'More actions for Gallente Drone Specialization IV' })
     .click();
+  await page.getByRole('menuitem', { name: 'Add milestone…' }).click();
   const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
   await nameDialog.getByRole('textbox').fill(longName);
   await nameDialog.getByRole('button', { name: 'Save' }).click();
@@ -312,7 +314,7 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
   expect(overflow).toBeLessThanOrEqual(0);
 
   const removeButton = page.getByRole('button', {
-    name: 'Remove Gallente Drone Specialization IV',
+    name: 'More actions for Gallente Drone Specialization IV',
   });
   await expect(removeButton).toBeVisible();
   const nameSpan = page
@@ -337,7 +339,7 @@ test('a long skill name still shows its full level numeral at 390px', async ({ p
   await page.setViewportSize(PHONE);
 
   const removeButton = page.getByRole('button', {
-    name: 'Remove Gallente Drone Specialization IV',
+    name: 'More actions for Gallente Drone Specialization IV',
   });
   await expect(removeButton).toBeVisible();
 

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
+import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { PricesUnavailable } from '../PricesUnavailable';
 import { PlanMap } from './PlanMap';
 import { useMapAdvice } from './useMapAdvice';
@@ -14,6 +15,7 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   if (state.status === 'failed') {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
+  if (state.status === 'esi-failed') return <EsiDidntAnswer onRetry={state.retry} />;
   if (state.status === 'prices-failed') return <PricesUnavailable />;
   if (state.status === 'loading') {
     return (

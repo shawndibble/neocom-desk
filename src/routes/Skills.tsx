@@ -15,6 +15,7 @@ import {
   StatChip,
   StatChips,
   IconButton,
+  Tooltip,
 } from '@/components/ui';
 import {
   focusRingInsetClassName,
@@ -29,7 +30,7 @@ import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { SkillInspector } from '@/features/skills/SkillInspector';
-import { SkillRowContextMenu } from '@/features/skills/SkillRowContextMenu';
+import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
@@ -55,7 +56,7 @@ import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -260,8 +261,8 @@ export function Skills() {
     [skillsResult]
   );
 
-  // Every plan this row's own context menu can add into (it targets any of
-  // them, not one "current" plan — see `SkillRowContextMenu`), merged by
+  // Every plan this row's own context menu can add into (the inspector's Add
+  // targets one chosen plan; the mark reflects any of them), merged by
   // skill at the highest level any of them asks. Drives the bar's planned
   // mark: without it a skill already queued in a plan looks identical to one
   // that isn't (issue: no indicator anywhere a skill can be added to a plan).
@@ -284,6 +285,16 @@ export function Skills() {
     }
     return levels;
   }, [skillPlans]);
+
+  const selectedSkill = useMemo(
+    () =>
+      selectedSkillTypeID === null
+        ? null
+        : (groups
+            .flatMap((group) => group.skills)
+            .find((skill) => skill.skillTypeID === selectedSkillTypeID) ?? null),
+    [groups, selectedSkillTypeID]
+  );
 
   const inspector = useMemo(() => {
     if (selectedSkillTypeID === null || !catalog) return null;
@@ -453,6 +464,17 @@ export function Skills() {
                 prereqs={inspector.prereqs}
                 unlocks={inspector.unlocks}
                 onClose={() => setSelectedSkillTypeID(null)}
+                planAction={
+                  selectedSkill && (
+                    <SkillPlanAdd
+                      key={selectedSkill.skillTypeID}
+                      characterId={activeCharacterId}
+                      skillTypeID={selectedSkill.skillTypeID}
+                      skillName={selectedSkill.name}
+                      currentLevel={selectedSkill.level}
+                    />
+                  )
+                }
               />
             </div>
           )}
@@ -489,7 +511,7 @@ export function Skills() {
               className="py-8"
             />
           ) : (
-            <TableExportProvider tableExport={skillsExport}>
+            <>
               {groups.map((group) => {
                 if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
                 const expanded = searching || expandedGroups.has(group.groupName);
@@ -577,15 +599,13 @@ export function Skills() {
                             );
                             return (
                               <li key={skill.skillTypeID}>
-                                <SkillRowContextMenu
-                                  activeCharacterId={activeCharacterId}
-                                  skillTypeID={skill.skillTypeID}
-                                  skillName={skill.name}
-                                  currentLevel={skill.level}
-                                  tooltipContent={skill.description}
-                                >
-                                  {row}
-                                </SkillRowContextMenu>
+                                {skill.description ? (
+                                  <Tooltip content={skill.description} className="w-full">
+                                    {row}
+                                  </Tooltip>
+                                ) : (
+                                  row
+                                )}
                               </li>
                             );
                           })}
@@ -595,7 +615,7 @@ export function Skills() {
                   </section>
                 );
               })}
-            </TableExportProvider>
+            </>
           )}
         </>
       )}

@@ -54,7 +54,6 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { ListChargePicker } from './ListChargePicker';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
 import {
-  CargoMenuItems,
   DroneMenuItems,
   EmptySlotMenuItems,
   FittingItemMenu,
@@ -884,7 +883,7 @@ export function FittingRackList({
 
 /**
  * The cargo hold: how full it is, each item with its count — a charge drags
- * onto the modules that take it, and its menu loads it — and "Add cargo".
+ * onto the modules that take it (or loads from a module's own menu) — and "Add cargo".
  * An Add panel item or charge dropped on it goes in the hold.
  * The List's Cargo section; the Ring shows the same items as tiles.
  */
@@ -917,7 +916,6 @@ export function CargoSection({
         return (
           <SlotCard
             key={item.typeId}
-            menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
             grip={
               draggable && actions
                 ? (() => {

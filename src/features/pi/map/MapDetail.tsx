@@ -23,6 +23,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
+import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
 import { PlanetImage } from './PlanetImage';
 import { comparisonSentence, planetName, tierWithCode } from './mapText';
@@ -32,6 +33,8 @@ import type { ProductDetailView } from './productDetailModel';
 export interface FinderOrigin {
   systemId: number | null;
   name: string | null;
+  /** Home system security, to seed the finder's "Highsec only"; null when unknown. */
+  security: number | null;
 }
 
 export interface ProductDetailProps {
@@ -296,6 +299,7 @@ export function ProductDetail(props: ProductDetailProps) {
             types={missing}
             homeSystemId={props.finder.systemId}
             homeName={props.finder.name}
+            homeSecurity={props.finder.security}
           />
         </div>
       )}
@@ -341,7 +345,9 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           className="outline-2 outline-offset-1 outline-map-whatif"
         />
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{t('piMap.add.title', { type: name })}</div>
+          <div className="text-sm font-semibold">
+            {t('piMap.add.title', { aType: withArticle(name) })}
+          </div>
           <p className="text-xs text-text-dim">
             <span className="font-semibold text-map-whatif">
               {t('piMap.add.unlocks', { count: props.unlockedIds.length })}
@@ -349,6 +355,13 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
             {props.oneHostCount > 0 &&
               `, ${t('piMap.add.asOnePlanet', { count: props.oneHostCount })}`}
           </p>
+          {props.unlockedIds.length > 0 && (
+            <p className="sr-only">
+              {t('piMap.add.unlockList', {
+                names: names(props.graph, props.unlockedIds).join(', '),
+              })}
+            </p>
+          )}
         </div>
       </div>
 
@@ -401,6 +414,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           types={[props.type]}
           homeSystemId={props.finder.systemId}
           homeName={props.finder.name}
+          homeSecurity={props.finder.security}
         />
       </div>
       <p className="mt-4 text-[11px] leading-snug text-text-dim">{t('piMap.estimateNote')}</p>

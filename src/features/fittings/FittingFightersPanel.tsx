@@ -12,9 +12,6 @@ import {
   Checkbox,
   entityLinkClassName,
   IconButton,
-  MenuItem,
-  MenuSeparator,
-  RowMoreActions,
   SearchInput,
   TypeIcon,
 } from '@/components/ui';
@@ -29,48 +26,9 @@ import {
   type FighterLimits,
 } from '@/engine/fittings/fighterEdit';
 import { fighterClass, fighterTypeIds, squadronSize } from '@/engine/fittings/fighters';
-import type { Fitting, FittingFighter, FittingStats } from '@/engine/fittings/types';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
-import { FittingItemMenu } from './FittingItemMenu';
-import { useFittingItemActions } from './fittingItemActions';
+import type { Fitting, FittingStats } from '@/engine/fittings/types';
 
 const MATCHES_SHOWN = 8;
-
-/** A squadron's actions: launch it or move it to the bay, what it is, remove it. */
-function FighterMenuItems({
-  squadron,
-  launchable,
-  onState,
-  onRemove,
-  name,
-}: {
-  squadron: FittingFighter;
-  /** A tube and class room are free for it. */
-  launchable: boolean;
-  onState: (state: FittingFighter['state']) => void;
-  onRemove: () => void;
-  name: string;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      {squadron.state === 'active' ? (
-        <MenuItem onSelect={() => onState('online')}>{t('fittings.item.moveToBay')}</MenuItem>
-      ) : (
-        <MenuItem disabled={!launchable} onSelect={() => onState('active')}>
-          {t('fittings.item.launch')}
-        </MenuItem>
-      )}
-      <MenuSeparator />
-      <ShowInfoMenuItem typeId={squadron.typeId} itemName={name} />
-      <ViewInMarketMenuItem typeId={squadron.typeId} />
-      <MenuSeparator />
-      <MenuItem className="text-danger" onSelect={onRemove}>
-        {t('fittings.ring.menu.remove', { name })}
-      </MenuItem>
-    </>
-  );
-}
 
 export function FittingFightersPanel({
   fitting,
@@ -85,8 +43,6 @@ export function FittingFightersPanel({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  // The editor's item actions: with them each squadron has the item menu.
-  const actions = useFittingItemActions();
   const [query, setQuery] = useState('');
   const squadrons = fitting.fighters ?? [];
   const tubes = stats?.fighters.tubes ?? null;
@@ -136,7 +92,7 @@ export function FittingFightersPanel({
             const kind = fighterClass(squadron.typeId);
             const full = squadronSize(squadron.typeId);
             const launchable = canLaunch(squadrons, squadron.typeId, limits);
-            const row = (
+            return (
               <li
                 key={`${squadron.typeId}-${index}`}
                 className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5"
@@ -193,7 +149,6 @@ export function FittingFightersPanel({
                   />
                   {t('fittings.fighters.launched')}
                 </label>
-                {actions && <RowMoreActions />}
                 <IconButton
                   variant="plain"
                   size="sm"
@@ -203,24 +158,6 @@ export function FittingFightersPanel({
                   onClick={() => onChange((f) => removeSquadron(f, index))}
                 />
               </li>
-            );
-            if (actions === null) return row;
-            return (
-              <FittingItemMenu
-                key={`${squadron.typeId}-${index}`}
-                name={name}
-                items={
-                  <FighterMenuItems
-                    squadron={squadron}
-                    launchable={launchable}
-                    name={name}
-                    onState={(state) => onChange((f) => setSquadron(f, index, { state }))}
-                    onRemove={() => onChange((f) => removeSquadron(f, index))}
-                  />
-                }
-              >
-                {row}
-              </FittingItemMenu>
             );
           })}
         </ul>
