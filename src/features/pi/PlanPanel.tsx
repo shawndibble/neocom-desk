@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { EsiDidntAnswer } from './EsiDidntAnswer';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
@@ -77,6 +78,7 @@ export function PlanPanel(props: Props) {
     snapshot: GoalPlannerSnapshot;
   } | null>(null);
   const [failedFor, setFailedFor] = useState<number | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
     loadGoalPlannerSnapshot(characterId).then(
@@ -92,12 +94,22 @@ export function PlanPanel(props: Props) {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, reloadKey]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
   const [picked, setPicked] = useState<PlanQuestion | null>(null);
 
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
+  }
+  if (snapshot?.fetchFailed) {
+    return (
+      <EsiDidntAnswer
+        onRetry={() => {
+          setLoaded(null);
+          setReloadKey((key) => key + 1);
+        }}
+      />
+    );
   }
   if (!snapshot) {
     return (

@@ -839,6 +839,7 @@ row.
 | Accent 2px left border                               | Selected                                                                                                                                                                                                         |
 | `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                                |
 | A box sized like a field                             | A control (§6)                                                                                                                                                                                                   |
+| Warning box with a `Button` "Retry"                  | A read failed and nothing is cached: the data is unknown, not empty (PI `EsiDidntAnswer`). Retry re-runs the read                                                                                                |
 
 Retired meanings, each with its replacement:
 
