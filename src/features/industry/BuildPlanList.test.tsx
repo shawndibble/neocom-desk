@@ -5,6 +5,7 @@ import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { BuildPlanList } from './BuildPlanList';
+import { rowStateClassName } from './planRowStyles';
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }): BuildPlanRecord {
   return {
@@ -670,6 +671,24 @@ describe('BuildPlanList: the whole row opens it', () => {
     fireEvent.contextMenu(row);
     fireEvent.click(row, { detail: 1 });
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('gives the plan and group names the entity link style', () => {
+    renderRows();
+    for (const name of ['Rokh', 'Buzzard fit']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'text-accent',
+        'underline',
+        'dt-primary'
+      );
+    }
+  });
+
+  it('keeps the row hover fill off a live drop target so the accent fill shows', () => {
+    // Pure class recipe: the drop state is internal to a dnd-kit drag.
+    expect(rowStateClassName(false, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(true, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(false, false)).toContain('hover:bg-panel-2');
   });
 
   it('marks the row as clickable with hover and pressed states', () => {

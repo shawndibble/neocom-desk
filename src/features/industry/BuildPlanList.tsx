@@ -1,7 +1,6 @@
 import {
   focusRingClassName,
   interactiveClassName,
-  rowInteractiveClassName,
   selectedRowClassName,
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
@@ -45,6 +44,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { gripHitAreaClassName } from '@/components/ui/controlStyles';
+import { rowStateClassName } from './planRowStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { formatIsk } from '@/lib/isk';
@@ -240,8 +241,8 @@ function ProfitCell({ profit }: { profit: number | null }) {
   return (
     <span className={`tabular-nums ${iskToneClass(profit)}`}>
       {profit > 0 ? '+' : ''}
-      {/* Tap: this cell is inert — the row's tap belongs to the plan-name
-          button and its context menu beside it. */}
+      {/* Tap: the row is tappable, so the tap opens the plan; the exact figure
+          is on hover/focus. */}
       <IskAmount value={profit} decimals={0} />
     </span>
   );
@@ -273,9 +274,6 @@ const collisionDetection: CollisionDetection = (args) => {
 };
 
 /** A drop that lands the plan *in* a group: accent, the app's "this is the live target" colour. */
-// A selected row keeps its panel-2 fill while pressed (as DataTable's).
-const selectedPressClassName = `hover:bg-panel-2 ${interactiveClassName}`;
-
 const DROP_INTO_CLASS = 'bg-accent/10 outline-2 -outline-offset-2 outline-accent-dim';
 /**
  * A drop that takes the plan *out* of every group. Deliberately not the accent
@@ -473,7 +471,7 @@ function PlanRow({
           if (guard.swallowClick(event) || dragged.current) return;
           if (isRowOwnEvent(event)) onSelect(plan.id);
         }}
-        className={`flex cursor-pointer items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${active ? selectedPressClassName : rowInteractiveClassName} ${
+        className={`flex cursor-pointer items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${rowStateClassName(active, dropKind === 'into')} ${
           indented ? 'pl-6' : 'pl-2'
         } ${active ? selectedRowClassName : ''} ${isDragging ? 'opacity-40' : ''} ${
           dropKind === 'into' ? DROP_INTO_CLASS : dropKind === 'out' ? DROP_OUT_CLASS : ''
@@ -545,7 +543,7 @@ function PlanRow({
                     if (!guard.swallowClick(event)) onSelect(plan.id);
                   }}
                   onDoubleClick={() => setRenaming(true)}
-                  className={`dt-primary min-w-0 truncate rounded-xs text-left ${interactiveClassName} ${focusRingClassName}`}
+                  className={entityLinkClassName('dt-primary min-w-0 truncate text-left')}
                 >
                   {plan.name}
                 </button>
@@ -643,7 +641,7 @@ function GroupHeader({
           if (guard.swallowClick(event)) return;
           if (isRowOwnEvent(event)) onSelect();
         }}
-        className={`flex cursor-pointer items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${active ? selectedPressClassName : rowInteractiveClassName} ${
+        className={`flex cursor-pointer items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${rowStateClassName(active, dropActive)} ${
           active ? selectedRowClassName : ''
         } ${dropActive ? DROP_INTO_CLASS : ''}`}
       >
@@ -689,7 +687,9 @@ function GroupHeader({
                     if (!guard.swallowClick(event)) onSelect();
                   }}
                   onDoubleClick={() => setRenaming(true)}
-                  className={`dt-primary min-w-0 truncate rounded-xs text-left font-semibold ${interactiveClassName} ${focusRingClassName}`}
+                  className={entityLinkClassName(
+                    'dt-primary min-w-0 truncate text-left font-semibold'
+                  )}
                 >
                   {group.name}
                 </button>
