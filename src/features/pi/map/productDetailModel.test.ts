@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanetType } from '@/engine/pi/goalTypes';
+import type { ChainEstimateView } from '../chainEstimateModel';
 import { pi } from './mapFixtures.testutil';
 import { buildMapGraph, traceProduct, type ProductFigure } from './mapModel';
 import { buildProductDetail, type ProductDetailInput } from './productDetailModel';
@@ -74,7 +75,7 @@ describe('buildProductDetail: how to make it', () => {
 
   it('counts one planet when one type can make a P3 alone', () => {
     const view = buildProductDetail(input(ROBOTICS));
-    expect(view.money).toEqual({ kind: 'multi-planet', planets: 1 });
+    expect(view.money).toEqual({ kind: 'multi-planet', planets: 1, estimate: null });
   });
 });
 
@@ -93,6 +94,14 @@ describe('buildProductDetail: why or why not', () => {
   it('marks a P4 as multi-planet with the planet count, never a one-planet figure', () => {
     const view = buildProductDetail(input(BROADCAST_NODE));
     expect(view.money.kind).toBe('multi-planet');
+  });
+
+  it("carries a P4's multi-planet chain estimate, apart from any one-planet figure", () => {
+    const chain = { typeId: BROADCAST_NODE, iskPerDay: 3_000_000 } as ChainEstimateView;
+    const view = buildProductDetail(
+      input(BROADCAST_NODE, { figure: { kind: 'unranked', reason: 'tier', chain } })
+    );
+    expect(view.money).toMatchObject({ kind: 'multi-planet', estimate: chain });
   });
 
   it('marks a P1 or P2 that no one planet makes as multi-planet too', () => {

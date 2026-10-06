@@ -43,6 +43,7 @@ import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from '../PlanetImage';
+import { ChainTileFigure } from './ChainTileFigure';
 import {
   comparisonSentence,
   figureSentence,
@@ -451,6 +452,8 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
+                        ) : figure.kind === 'unranked' && figure.chain ? (
+                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} />
                         ) : (
                           <span aria-hidden="true" />
                         )}

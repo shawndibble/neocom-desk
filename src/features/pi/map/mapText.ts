@@ -7,6 +7,7 @@ import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk } from '@/lib/isk';
 import { withArticle } from '../article';
+import { chainFigureSentence } from '../chainEstimateText';
 import type { MapProduct, MapTier, ProductFigure } from './mapModel';
 
 export const planetName = (t: TFunction, type: PlanetType): string => t(`pi.planetType.${type}`);
@@ -43,7 +44,7 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure): string 
  * this sentence is where their exact figure lives (tooltip, accessible name).
  */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
-  if (figure.kind !== 'ranked') return null;
+  if (figure.kind !== 'ranked') return figure.chain ? chainFigureSentence(t, figure.chain) : null;
   const sentence = t('piMap.figure', {
     isk: formatIsk(figure.iskPerDay, 0),
     type: planetName(t, figure.useType),

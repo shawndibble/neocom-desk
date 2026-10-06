@@ -485,6 +485,25 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.totals.todayPerDay).toBeNull();
   });
 
+  it('hands the chain estimate the ranking’s own assumptions, at the pilot’s sell market', () => {
+    const advice = buildPlanAdvice(
+      input({ market: { kind: 'buyback', pct: 80 }, cadence: { restartDays: 3, haulDays: 3 } })
+    );
+    expect(advice.chainBasis).toMatchObject({
+      ccLevel: advice.rankingBasis.ccLevel,
+      ccAssumed: advice.rankingBasis.ccAssumed,
+      linkCost: advice.rankingBasis.linkCost,
+      rateSource: advice.rankingBasis.rateSource,
+      haulDays: 3,
+    });
+    // A buyback pays 80% of the hub's sale price, with no sales tax.
+    const id = Number(Object.keys(PRICES.buyPrices)[0]);
+    expect(advice.chainBasis.books.revenuePrices[id]).toBeCloseTo(PRICES.buyPrices[id] * 0.8, 6);
+    expect(advice.chainBasis.books.salesTaxPct).toBe(0);
+    // The ranking never takes a P3 or P4: the estimate is its own figure.
+    expect(advice.recipeRows.every((row) => row.tier === 1 || row.tier === 2)).toBe(true);
+  });
+
   it('ranks P2 one-planet recipes for a pilot with no colonies at CCU 5 (Coolant on gas)', () => {
     const COOLANT = 9832;
     const advice = buildPlanAdvice(

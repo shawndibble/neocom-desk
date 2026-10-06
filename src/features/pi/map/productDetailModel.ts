@@ -6,6 +6,7 @@
  * prices nothing.
  */
 import type { PlanetType } from '@/engine/pi/goalTypes';
+import type { ChainEstimateView } from '../chainEstimateModel';
 import { DAYS_PER_WEEK } from '../findBestHowTo';
 import type { NamedItem } from '../planView';
 import type { MapFacility, MapGraph, ProductFigure, Trace } from './mapModel';
@@ -31,8 +32,11 @@ export type ProductMoney =
     }
   /** A raw material: extracted and shipped up a chain, not ranked on its own. */
   | { kind: 'raw' }
-  /** Not a ranked one-planet recipe (a P3 or P4, or no one host): no figure, and why. */
-  | { kind: 'multi-planet'; planets: number }
+  /**
+   * Not a ranked one-planet recipe (a P3 or P4, or no one host): no one-planet
+   * figure. A P3 or P4 carries its multi-planet chain estimate once priced.
+   */
+  | { kind: 'multi-planet'; planets: number; estimate: ChainEstimateView | null }
   /** The sell market has no price: unknown, never zero. */
   | { kind: 'unpriced' }
   /** One planet could make it, but no colony layout fits it. */
@@ -94,5 +98,5 @@ function moneyOf(
   }
   if (figure.reason === 'unpriced') return { kind: 'unpriced' };
   if (figure.reason === 'no-fit') return { kind: 'no-fit' };
-  return { kind: 'multi-planet', planets };
+  return { kind: 'multi-planet', planets, estimate: figure.chain ?? null };
 }

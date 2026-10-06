@@ -22,6 +22,7 @@ import { planetTypesOf } from './productPlanets';
 import { ShowMeHow } from './ShowMeHow';
 import { useFinderOrigin } from './usePlanetFinder';
 import { usePlanAdvice } from './usePlanAdvice';
+import { useChainEstimates } from './useChainEstimates';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 import { colonyCountUnknown } from './colonyStripModel';
@@ -83,6 +84,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   );
 
   const advice = state.status === 'ready' ? state.advice : null;
+  const chainOf = useChainEstimates(advice?.chainBasis ?? null, snapshot.pi);
   const view = useMemo(() => {
     if (!advice) return null;
     const input = {
@@ -163,7 +165,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         }}
       />
       {mode === 'all' ? (
-        <AllProductsPanel tiers={tiers} priceSource={priceSource} estimate />
+        <AllProductsPanel tiers={tiers} priceSource={priceSource} estimate chainOf={chainOf} />
       ) : (
         <RecipeListPanel
           cards={best.cards}

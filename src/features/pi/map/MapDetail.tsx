@@ -22,6 +22,8 @@ import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { CcLevelTag } from '../CcLevelTag';
+import { chainAssumptions } from '../chainEstimateText';
+import { EstimateBadge } from '../DirectiveRow';
 import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
@@ -179,13 +181,25 @@ export function ProductDetail(props: ProductDetailProps) {
             ` ${t('piMap.detail.ccAssumed', { level: view.money.ccLevel })}`}
         </p>
       )}
-      {view.money.kind === 'multi-planet' && (
+      {view.money.kind === 'multi-planet' && view.money.estimate ? (
+        <div className="mt-3">
+          <div className="text-[1.875rem] leading-[1.1] font-semibold text-isk-pos tabular-nums">
+            ≈ <IskAmount value={view.money.estimate.iskPerDay} decimals={0} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+            {t('piShared.chain.perDayAcross', { count: view.money.estimate.planets.length })}
+            <EstimateBadge />
+          </div>
+          <p className="mt-2 text-xs font-semibold text-warning">{t('piShared.chain.label')}</p>
+          <p className="mt-1 text-xs text-text-dim">{chainAssumptions(t, view.money.estimate)}</p>
+        </div>
+      ) : view.money.kind === 'multi-planet' ? (
         <p className="mt-2 text-xs font-semibold text-warning">
           {view.money.planets > 1
             ? t('piMap.detail.multiPlanet', { count: view.money.planets })
             : t('piMap.detail.notRanked')}
         </p>
-      )}
+      ) : null}
 
       <Heading>{t('piMap.detail.needHeading')}</Heading>
       <p className="text-xs text-text-dim">
