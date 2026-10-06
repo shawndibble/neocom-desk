@@ -83,13 +83,27 @@ interface ChainLayout {
   hostTypes: PlanetType[];
 }
 
-function chainLayout(typeId: number, pi: PiData, only?: readonly PlanetType[]): ChainLayout | null {
-  const raws = rawInputsOf(typeId, pi);
+/** Planet types, of `types`, that can host every P2+ factory in a product's chain. */
+export function chainHostTypes(
+  typeId: number,
+  pi: PiData,
+  types: readonly PlanetType[] = planetTypesOf(pi)
+): PlanetType[] {
   const high = madeHighOf([{ typeId, unitsPerDay: 1 }], pi);
-  const types = only ? planetTypesOf(pi).filter((type) => only.includes(type)) : planetTypesOf(pi);
-  const hostTypes = types.filter((type) =>
+  return types.filter((type) =>
     high.every((id) => (pi.schematics[String(id)].planetTypes as readonly string[]).includes(type))
   );
+}
+
+function chainLayout(
+  typeId: number,
+  pi: PiData,
+  allowed?: readonly PlanetType[]
+): ChainLayout | null {
+  const raws = rawInputsOf(typeId, pi);
+  const all = planetTypesOf(pi);
+  const types = allowed ? all.filter((type) => allowed.includes(type)) : all;
+  const hostTypes = chainHostTypes(typeId, pi, types);
   if (raws.length === 0 || hostTypes.length === 0) return null;
   const planets: ChainPlanet[] = [];
   let left = raws;
@@ -152,7 +166,7 @@ function coloniesFor(
 
 /**
  * The estimate for a P3 or P4, or null: another tier, no price, or no layout
- * that makes it. `only` limits the planets to those types (Plan's Bigger
+ * that makes it. `planetTypes` limits the planets to those types (Plan's Bigger
  * chains: the types the pilot already runs), and `maxPlanets` refuses a layout
  * needing more planets than that.
  */
@@ -160,10 +174,10 @@ export function buildChainEstimate(
   typeId: number,
   basis: ChainBasis,
   pi: PiData,
-  options: { only?: readonly PlanetType[]; maxPlanets?: number } = {}
+  options: { planetTypes?: readonly PlanetType[]; maxPlanets?: number } = {}
 ): ChainEstimateView | null {
   if (!pi.schematics[String(typeId)] || piTier(typeId, pi) < 3) return null;
-  const layout = chainLayout(typeId, pi, options.only);
+  const layout = chainLayout(typeId, pi, options.planetTypes);
   if (!layout) return null;
   const { planets: covered, raws, hostTypes } = layout;
   const books = {

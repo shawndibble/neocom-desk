@@ -34,10 +34,13 @@ export interface BiggerChainsEstimateState {
 const SLICE_MS = 30;
 
 let cached: { key: string; results: Map<number, BiggerChainEstimates> } | null = null;
+/** The last jump count, so coming back to Plan neither recounts nor waits. */
+let cachedPairs: { key: string; byPair: Map<string, number | null> } | null = null;
 
-/** Test seam: forget every priced chain. */
+/** Test seam: forget every priced chain and counted jump. */
 export function resetBiggerChains(): void {
   cached = null;
+  cachedPairs = null;
 }
 
 /** The solver reads these fields; `ratePerEcu` is a Map, so it is spelled out. */
@@ -50,9 +53,10 @@ function coloniesKey(colonies: readonly PlannerColony[]): string {
       c.newLinkCost,
       c.headsPerExtractor,
       c.taxRate,
-      [...c.ratePerEcu].map(([id, rate]) => [id, rate.unitsPerHour]),
+      [...c.ratePerEcu].map(([id, rate]) => [id, rate.unitsPerHour, rate.source]),
       c.current.p0TypeIds,
       c.current.productTypeIds,
+      c.current.ecusByP0 ? [...c.current.ecusByP0] : null,
     ])
   );
 }
@@ -69,11 +73,9 @@ function useColonyJumps(systemOf: ReadonlyMap<number, number>): {
   const basis = useJumpBasis();
   const systemKey = [...new Set(systemOf.values())].sort((a, b) => a - b).join(',');
   const wanted = `${basis.key}|${systemKey}`;
-  const [pairs, setPairs] = useState<{ key: string; byPair: Map<string, number | null> } | null>(
-    null
-  );
+  const [pairs, setPairs] = useState(cachedPairs);
   useEffect(() => {
-    if (!basis.hydrated) return;
+    if (!basis.hydrated || pairs?.key === wanted) return;
     let cancelled = false;
     const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
     const pairIds = ids.flatMap((a, i) => ids.slice(i + 1).map((b) => [a, b] as const));
@@ -85,14 +87,17 @@ function useColonyJumps(systemOf: ReadonlyMap<number, number>): {
       )
     ).then((between) => {
       if (cancelled) return;
-      setPairs({
+      cachedPairs = {
         key: wanted,
         byPair: new Map(pairIds.map(([a, b], i) => [`${a}-${b}`, between[i]])),
-      });
+      };
+      setPairs(cachedPairs);
     });
     return () => {
       cancelled = true;
     };
+    // `pairs` is only read to skip a count already made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basis, systemKey, wanted]);
 
   return useMemo(() => {
@@ -122,11 +127,11 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
   );
   const free = advice.slots.free;
   const candidates = useMemo(() => biggerChainCandidates(colonies, pi), [colonies, pi]);
-  const basisKey = chainBasisKey(advice.chainBasis, pi);
+  // Both keys stringify price books and colonies: once per input, not once per slice's re-render.
+  const basisKey = useMemo(() => chainBasisKey(advice.chainBasis, pi), [advice.chainBasis, pi]);
+  const colonyKey = useMemo(() => coloniesKey(colonies), [colonies]);
   const key =
-    jumps.key === null
-      ? null
-      : JSON.stringify([basisKey, coloniesKey(colonies), jumps.key, types, free]);
+    jumps.key === null ? null : JSON.stringify([basisKey, colonyKey, jumps.key, types, free]);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {

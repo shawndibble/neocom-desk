@@ -26,11 +26,11 @@ import type { PiData } from '@/sde/types';
 import { piTier } from '@/engine/pi/chain';
 import { estimateChain } from '@/engine/pi/chainEstimate';
 import { haulingOf } from '@/engine/pi/goalPlanSteps/flows';
-import { madeHighOf } from '@/engine/pi/goalPlanSteps/host';
 import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import { HOURS_PER_DAY } from '@/engine/pi/planAdvice';
 import {
   buildChainEstimate,
+  chainHostTypes,
   chainProductIds,
   type ChainBasis,
   type ChainEstimateView,
@@ -76,15 +76,10 @@ const RAWS_PER_COLONY = 2;
 export function biggerChainCandidates(colonies: readonly PlannerColony[], pi: PiData): number[] {
   if (colonies.length === 0) return [];
   const yielded = new Set(colonies.flatMap((colony) => [...colony.ratePerEcu.keys()]));
-  const types = new Set(colonies.map((colony) => colony.planetType));
+  const types = [...new Set(colonies.map((colony) => colony.planetType))];
   return chainProductIds(pi).filter((typeId) => {
     if (!rawInputsOf(typeId, pi).every((raw) => yielded.has(raw))) return false;
-    const high = madeHighOf([{ typeId, unitsPerDay: 1 }], pi);
-    return [...types].some((type) =>
-      high.every((id) =>
-        (pi.schematics[String(id)].planetTypes as readonly string[]).includes(type)
-      )
-    );
+    return chainHostTypes(typeId, pi, types).length > 0;
   });
 }
 
@@ -152,7 +147,7 @@ export function estimateOnNewPlanets(
   pi: PiData
 ): ChainEstimateView | null {
   if (freeSlots < 2 || piTier(typeId, pi) < 3) return null;
-  return buildChainEstimate(typeId, basis, pi, { only: types, maxPlanets: freeSlots });
+  return buildChainEstimate(typeId, basis, pi, { planetTypes: types, maxPlanets: freeSlots });
 }
 
 // --- The verdict ---------------------------------------------------------------

@@ -85,7 +85,7 @@ describe('BiggerChainsPanel', () => {
     expect(screen.getByText(/Your planet types can't make a P3 or P4/)).toBeInTheDocument();
   });
 
-  it('says when the pilot’s colonies can make no candidate in full, rather than blaming prices', () => {
+  it('says why a candidate has no figure, never that it lost', () => {
     state({ colonies: null, newPlanets: null });
     renderPanel();
     expect(screen.getByText(/your colonies can't make it in full/)).toBeInTheDocument();

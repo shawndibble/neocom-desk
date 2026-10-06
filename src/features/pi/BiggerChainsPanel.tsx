@@ -19,7 +19,7 @@ import { HintText } from '@/components/ui/HintText';
 import type { PiData } from '@/sde/types';
 import { piTier } from '@/engine/pi/chain';
 import { biggerChainsView, type BiggerChainCard } from './biggerChainsModel';
-import { chainAssumptions } from './chainEstimateText';
+import { chainAssumptions, planetTypeList } from './chainEstimateText';
 import { EstimateBadge, TierChip } from './DirectiveRow';
 import { PiProductLink } from './PiProductLink';
 import type { PlanAdvice } from './planAdviceModel';
@@ -64,11 +64,7 @@ function ChainSentence({
       />
     );
   }
-  const counts = new Map<string, number>();
-  for (const type of card.planetTypes) counts.set(type, (counts.get(type) ?? 0) + 1);
-  const types = [...counts]
-    .map(([type, n]) => (n > 1 ? `${n}× ${names.type(type)}` : names.type(type)))
-    .join(', ');
+  const types = planetTypeList(t, card.planetTypes);
   return (
     <Sentence
       text={t('piPlan.chains.onNewPlanets', {
@@ -133,7 +129,7 @@ function Legs({ card, names }: { card: BiggerChainCard; names: Names }) {
             {
               from: names.of(leg.from),
               to: names.of(leg.to),
-              count: leg.jumps ?? 0,
+              jumps: leg.jumps ?? 0,
             }
           )
         )
@@ -234,9 +230,6 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
           return estimate ? chainAssumptions(t, estimate) : onColonies;
         })();
   const priced = view.recommended.length + view.others.length;
-  // No figure at all: say which, since "no price" and "doesn't fit" ask different things of the pilot.
-  const prices = advice.chainBasis.books.revenuePrices;
-  const noPrice = [...state.estimates.keys()].every((id) => prices[id] === undefined);
   const renderCards = (cards: readonly BiggerChainCard[]) => (
     <ul className="divide-y divide-line">
       {cards.map((card) => (
@@ -273,9 +266,7 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
             {state.candidateCount === 0
               ? t('piPlan.chains.noneBuildable')
               : priced === 0
-                ? t(noPrice ? 'piPlan.chains.noneFigure' : 'piPlan.chains.noneFits', {
-                    count: state.candidateCount,
-                  })
+                ? t('piPlan.chains.noneFits', { count: state.candidateCount })
                 : t('piPlan.chains.noneBeat', { count: priced })}
           </p>
         )

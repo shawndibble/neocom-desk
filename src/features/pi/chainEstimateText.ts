@@ -19,13 +19,22 @@ export function chainFigureSentence(t: TFunction, view: ChainEstimateView): stri
   });
 }
 
+/** "2× Gas, Barren": a chain's planets by type. */
+export function planetTypeList(t: TFunction, planets: readonly string[]): string {
+  const counts = new Map<string, number>();
+  for (const type of planets) counts.set(type, (counts.get(type) ?? 0) + 1);
+  return [...counts]
+    .map(([type, n]) =>
+      n > 1
+        ? t('piShared.chain.typeCount', { count: n, type: typeName(t, type) })
+        : typeName(t, type)
+    )
+    .join(', ');
+}
+
 /** Every assumption behind the figure, in words. */
 export function chainAssumptions(t: TFunction, view: ChainEstimateView): string {
-  const counts = new Map<string, number>();
-  for (const type of view.planets) counts.set(type, (counts.get(type) ?? 0) + 1);
-  const types = [...counts]
-    .map(([type, n]) => (n > 1 ? `${n}× ${typeName(t, type)}` : typeName(t, type)))
-    .join(', ');
+  const types = planetTypeList(t, view.planets);
   const rate = Math.round(view.ratePerHour).toLocaleString('en');
   return [
     t('piShared.chain.assumesPlanets', {

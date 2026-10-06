@@ -21,6 +21,8 @@ import {
   withHaulBetweenPlanets,
   type PiBuyTier,
 } from '@/features/pi/piSettings';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ChipRow } from './settingsFields';
 import { useHydratedStore } from './useHydratedStore';
@@ -161,14 +163,14 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
         />
       </Field>
 
-      <Field
-        label={t('piPlan.chains.title')}
-        htmlFor="settings-pi-haul-between"
-        note={t('piPlan.chains.optInHint')}
-      >
-        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-text touch:min-h-11">
+      <Field label={t('piPlan.chains.title')} note={t('piPlan.chains.optInHint')}>
+        <label
+          className={cx(
+            'flex w-fit cursor-pointer items-center gap-2 text-sm text-text',
+            tappableRowClassName
+          )}
+        >
           <Checkbox
-            id="settings-pi-haul-between"
             checked={settings.haulBetweenPlanets === true}
             onChange={(e) => void setSettings(withHaulBetweenPlanets(settings, e.target.checked))}
           />

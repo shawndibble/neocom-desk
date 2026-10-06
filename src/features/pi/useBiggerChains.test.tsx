@@ -100,12 +100,14 @@ describe('useBiggerChains', () => {
     expect(result.current.estimates.size).toBe(result.current.candidateCount);
   });
 
-  it('keeps what it priced for the same assumptions', async () => {
+  it('keeps what it priced and counted for the same assumptions', async () => {
     const first = renderHook(() => useBiggerChains(advice, pi));
     await waitFor(() => expect(first.result.current.pending).toBe(false), { timeout: 5_000 });
     first.unmount();
     const again = renderHook(() => useBiggerChains(advice, pi));
     await waitFor(() => expect(again.result.current.pending).toBe(false));
     expect(again.result.current.estimates.get(CONDENSATES)?.colonies).not.toBeNull();
+    // Nor counts the jumps again.
+    expect(jumpsBetween).toHaveBeenCalledTimes(1);
   });
 });

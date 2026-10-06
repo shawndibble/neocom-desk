@@ -219,7 +219,7 @@ export function YourPlanetsPanel({
         <p className="text-[0.6875rem] text-text-dim">
           {t('piPlan.make.basis', { source: priceSource })}
         </p>
-        <label className="flex w-fit cursor-pointer items-start gap-2 touch:min-h-11">
+        <label className={cx('flex w-fit cursor-pointer items-start gap-2', tappableRowClassName)}>
           <Checkbox
             className="mt-0.5"
             checked={haulBetween}
