@@ -7,8 +7,9 @@
  * calls a system or a route safe, unsafe or anything else — the pilot decides.
  *
  * From, the Stops and the Route Preference live in the URL so a route can be
- * shared. The preference is never persisted
- * (`features/route/routePreferences.ts`). From falls back to the Current
+ * shared. The picker saves the pilot's default Route Preference (the one
+ * Settings → Travel shows) and drops the link's override; a link that names
+ * `pref` still wins until the picker is used. From falls back to the Current
  * System when the link does not name one.
  *
  * Planner layout (issue #2472): a left column with the Route rules panel —
@@ -68,7 +69,11 @@ import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
 import { saveRouteHoleDefault, useRouteHoleQuery } from '@/features/route/routeHoleSettings';
-import { useAvoidedSystemsEnabled, useRouteQuery } from '@/features/route/routeRules';
+import {
+  useAvoidedSystemsEnabled,
+  useDefaultRoutePreference,
+  useRouteQuery,
+} from '@/features/route/routeRules';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -313,7 +318,10 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
           <div className="order-3 xl:order-none">
             <RouteRulesPanel
               preference={routeQuery.rules.preference}
-              onPreferenceChange={(pref) => setParams({ pref })}
+              onPreferenceChange={(pref) => {
+                void useDefaultRoutePreference.getState().setValue(pref);
+                setParams({ pref: null });
+              }}
               holeQuery={holeQuery}
               onHoleChange={(change) => {
                 saveRouteHoleDefault(change);

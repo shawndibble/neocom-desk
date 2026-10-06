@@ -1,7 +1,8 @@
 /**
  * The labelled selects Travel's tabs share (issues #2328, #2330): a generic
  * `OptionField` (sized to its longest option), and the Route Preference built on it. The preference is URL
- * state only — never persisted (`features/route/routePreferences.ts`).
+ * state only — never persisted (`features/route/routePreferences.ts`). Route Safety's
+ * picker is not this field: it saves the default (`RouteRulesPanel.tsx`).
  */
 import { useTranslation } from 'react-i18next';
 import {

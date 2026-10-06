@@ -616,7 +616,7 @@ describe('Travel › Route Safety › Route rules', () => {
     return within(table).findByRole('button', { name: `Avoid ${name}` });
   }
 
-  it('changes the Route Preference in the link only, never the saved default', async () => {
+  it('saves the Route Preference as the pilot default and drops the link override', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
@@ -627,10 +627,29 @@ describe('Travel › Route Safety › Route rules', () => {
     );
     await user.click(within(group).getByRole('button', { name: 'Shorter' }));
 
-    expect(new URLSearchParams(window.location.search).get('pref')).toBe('shortest');
-    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+    await waitFor(() => expect(useDefaultRoutePreference.getState().value).toBe('shortest'));
+    expect(new URLSearchParams(window.location.search).get('pref')).toBeNull();
     // Prefer shorter counts jumps only, so the penalty is off — as in Settings.
     expect(screen.getByRole('spinbutton', { name: 'Security penalty' })).toBeDisabled();
+  });
+
+  it("opens on a link's pref over the saved default, until the picker is used", async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}&pref=shortest`);
+
+    const group = await screen.findByRole('group', { name: 'Route preference' });
+    expect(within(group).getByRole('button', { name: 'Shorter' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+
+    await user.click(within(group).getByRole('button', { name: 'Safer' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('pref')).toBeNull());
+    expect(within(group).getByRole('button', { name: 'Safer' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('edits the same Travel Settings Settings → Travel does', async () => {

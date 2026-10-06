@@ -542,8 +542,8 @@ here — they go one per file in `docs/context/decisions/`.
   engine's `shortest`/`prefer-highsec`/`avoid-highsec`, and ESI's
   `Shorter`/`Safer`/`LessSecure` (mapped in `features/route/esiRoute.ts`). The
   pilot's default lives in **Travel Settings**; a page with its own picker
-  (Courier, Route Safety, Thera, Assets) opens on it and overrides it for that
-  view only.
+  (Courier, Thera, Assets) opens on it and overrides it for that view only.
+  Route Safety's picker is the default itself: choosing there saves it.
 - **Travel Settings**: The in-game autopilot's route options, for planning —
   the default **Route Preference**, the security penalty (0–100, the game's
   slider, default 50), and what to avoid: the **Avoided Systems** (switchable
