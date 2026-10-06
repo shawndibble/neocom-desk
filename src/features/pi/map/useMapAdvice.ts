@@ -2,8 +2,8 @@
  * Everything the Map reads, gathered the way the Plan tab gathers it, and fed
  * to the one recommendation model. The Map never prices anything itself: this
  * hook builds a `PlanAdviceInput` (snapshot, hub books, sell market, cadence,
- * the Plan tab's rebuild preference (`usePlanPreference`), every recipe) and returns `buildPlanAdvice`'s
- * answer. Two tabs reading the same model with the same input show the same
+ * the Plan tab's rebuild preference (`usePlanPreference`), every recipe) and
+ * returns `buildPlanAdvice`'s answer. Two tabs reading the same model with the same input show the same
  * figures.
  *
  * What-if advice (a planet type the pilot does not have, added) is built on
@@ -63,12 +63,14 @@ export function useMapAdvice(
 
   // The Plan tab's Most ISK / Least hauling choice, so both tabs rank alike.
   const preference = usePlanPreference((state) => state.value);
+  const preferenceHydrated = usePlanPreference((state) => state.hydrated);
   const hydratePreference = usePlanPreference((state) => state.hydrate);
   useEffect(() => {
     void hydratePreference();
   }, [hydratePreference]);
   const inputs = usePiAdviceInputs(snapshot, characterId, preference);
-  const input = inputs.status === 'ready' ? inputs.input : null;
+  // Wait for the stored choice: ranking by the default first would flash the wrong picks.
+  const input = inputs.status === 'ready' && preferenceHydrated ? inputs.input : null;
   const pi = snapshot?.pi ?? null;
 
   const graph = useMemo(() => (pi ? buildMapGraph(pi) : null), [pi]);

@@ -376,8 +376,8 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
             {picks.kind === 'rebuild'
               ? t('piMap.picksNoteRebuild', {
                   preference: t(
-                    preference === 'haul' ? 'piPlan.make.leastHauling' : 'piPlan.make.mostIsk'
-                  ).toLowerCase(),
+                    preference === 'haul' ? 'piMap.preferenceHaul' : 'piMap.preferenceIsk'
+                  ),
                 })
               : t('piMap.picksNoteRecipes')}
           </span>

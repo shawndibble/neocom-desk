@@ -4657,6 +4657,8 @@
     "picksRecipes": "Best one-planet recipes",
     "picksNone": "Your planets already make their best product. The Plan tab lists quick wins.",
     "picksNoteRebuild": "vs today · ranked by {{preference}}, as on the Plan tab",
+    "preferenceIsk": "most ISK",
+    "preferenceHaul": "least hauling",
     "picksNoteRecipes": "a day from one planet · every planet type, before the Plan tab's filters",
     "perDaySuffix": "/day",
     "clearTrace": "Clear trace",

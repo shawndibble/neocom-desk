@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import type { GoalPlannerSnapshot } from '../goalPlannerSnapshot';
@@ -33,6 +33,13 @@ const { useMapAdvice } = await import('./useMapAdvice');
 const { usePlanAdvice } = await import('../usePlanAdvice');
 
 describe('useMapAdvice follows the Plan preference', () => {
+  beforeEach(() => {
+    seen.length = 0;
+  });
+  afterEach(async () => {
+    await usePlanPreference.getState().setValue('isk');
+  });
+
   it.each(['isk', 'haul'] as const)('Map picks equal Plan picks under %s', async (preference) => {
     await usePlanPreference.getState().setValue(preference);
     const map = renderHook(() => useMapAdvice(7, (id) => `P${id}`));
