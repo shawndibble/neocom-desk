@@ -91,7 +91,11 @@ const catalog = {
   byProductTypeID: new Map([[200, { blueprintTypeID: 1200, productTypeID: 200 }]]),
 } as unknown as BlueprintCatalog;
 
-function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
+function renderPanel(
+  actions = fakeItemActions(),
+  initialEntries = ['/'],
+  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false)
+) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       {withItemActions(
@@ -101,7 +105,7 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
           catalog={catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
-          onStartPlan={() => Promise.resolve(false)}
+          onStartPlan={onStartPlan}
         />,
         actions
       )}
@@ -110,9 +114,23 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
-  it('links the product name to its Market listing', () => {
+  it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
-    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
+  });
+
+  it('starts the plan on a row click; a row with no catalog entry is inert', () => {
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(fakeItemActions(), ['/'], onStartPlan);
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    const gamma = screen.getByText('Widget Gamma').closest('tr')!;
+    expect(gamma).not.toHaveAttribute('tabindex');
+    fireEvent.click(gamma);
+    expect(onStartPlan).not.toHaveBeenCalled();
+    expect(beta).toHaveAttribute('tabindex', '0');
+    fireEvent.click(screen.getByText('Widget Beta'));
+    expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
   it('has no row menu: Start plan is the row’s one control', () => {
@@ -333,8 +351,8 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
   const productOrder = () =>
     screen
-      .getAllByRole('link')
-      .map((link) => link.textContent)
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
       .filter((name) => name?.startsWith('Widget'));
 
   afterEach(() => {

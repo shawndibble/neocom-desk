@@ -48,10 +48,11 @@ function showItems(items: PublicContractItem[]) {
   loadPublicContractItems.mockResolvedValue({ data: { kind: 'items', items } });
 }
 
-function renderModal() {
+function renderModal(system?: { id: number; name: string } | null) {
   render(
     <MemoryRouter>
       <PublicContractDetailModal
+        system={system}
         title="Large Skill Injector"
         characterId={1}
         contractId={235091192}
@@ -205,5 +206,26 @@ describe('PublicContractDetailModal — item actions', () => {
     fireEvent.contextMenu(within(rows[0]).getByRole('link'));
 
     expect(await screen.findByRole('menu')).toBeInTheDocument();
+  });
+});
+
+describe('PublicContractDetailModal — system row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureClipboard(null);
+    loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+    showItems([item({ record_id: 1 })]);
+  });
+
+  it('links the offer system to Route Safety when it is known', async () => {
+    renderModal({ id: 30000142, name: 'Jita' });
+    const link = await screen.findByRole('link', { name: 'Jita' });
+    expect(link.getAttribute('href')).toContain('30000142');
+  });
+
+  it('has no System row when the system is unknown', async () => {
+    renderModal(null);
+    await screen.findByRole('list');
+    expect(screen.queryByText('System')).not.toBeInTheDocument();
   });
 });

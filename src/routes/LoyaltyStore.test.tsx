@@ -334,7 +334,7 @@ describe('LoyaltyStore filters', () => {
 });
 
 describe('LoyaltyStore selected offer (issue #1490)', () => {
-  it('links the item name to Market and shows the row menu trigger (#2654)', () => {
+  it('keeps the item name plain (row selects) and shows the row menu trigger (#2654)', () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
       corpName: 'Federal Navy Academy',
@@ -349,8 +349,7 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
       toggleUseOwnMaterials: () => {},
     });
     renderStore();
-    const link = screen.getByRole('link', { name: ITEM_ROW.itemName });
-    expect(link.getAttribute('href')).toContain(`/market/browser?`);
+    expect(screen.queryByRole('link', { name: ITEM_ROW.itemName })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /more actions/i }).length).toBeGreaterThan(0);
   });
 

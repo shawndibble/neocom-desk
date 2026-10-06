@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -80,7 +81,6 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { contractSearchCsvColumns } from './contractSearchCsv';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
@@ -90,7 +90,6 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { SystemLink } from '@/features/entities';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -811,11 +810,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           if (location.systemName === null) return <span className="text-text-dim">—</span>;
           return (
             <>
-              {location.systemId === null ? (
-                location.systemName
-              ) : (
-                <SystemLink systemId={location.systemId}>{location.systemName}</SystemLink>
-              )}
+              {/* Plain: the row opens the contract modal, which carries the system link. */}
+              <span className={entityLinkClassName()}>{location.systemName}</span>
               {location.security !== null && (
                 <>
                   {' '}
@@ -870,9 +866,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
         primary: true,
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => (
-          <MarketItemLink typeId={row.typeId}>
+          // Plain: the row opens the contract modal, whose item lines link to Market.
+          <span className={entityLinkClassName()}>
             {typeNames.get(row.typeId) ?? `#${row.typeId}`}
-          </MarketItemLink>
+          </span>
         ),
       },
     ];
@@ -1220,6 +1217,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           characterId={activeCharacterId}
           contractId={selectedRow.contractId}
           locationId={selectedRow.locationId}
+          system={(() => {
+            const loc = offerLocations.get(selectedRow.locationId);
+            return loc?.systemId != null && loc.systemName !== null
+              ? { id: loc.systemId, name: loc.systemName }
+              : null;
+          })()}
           regionName={regionNames.get(selectedRow.regionId) ?? `#${selectedRow.regionId}`}
           dateExpired={selectedRow.dateExpired}
           statChips={statChipsForRow(selectedRow)}
