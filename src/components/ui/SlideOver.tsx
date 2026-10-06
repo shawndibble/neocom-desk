@@ -17,11 +17,7 @@ interface SlideOverProps {
   side?: 'left' | 'right';
   /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
-  /**
-   * Whether it owns a history entry so Back closes it (default). Pass `false`
-   * only for a panel already backed by a URL (the PI Map's `?product=`),
-   * whose own entry would otherwise be pushed twice. Same as `Modal`'s.
-   */
+  /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
 }
 

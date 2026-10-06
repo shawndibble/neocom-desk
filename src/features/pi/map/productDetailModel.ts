@@ -2,8 +2,8 @@
  * What the PI product detail says about one product: how to make it (inputs,
  * the factory, the planet types, whether one planet is enough) and why or why
  * not (the model's one-planet figure, its hauling load, what the pilot's
- * colonies already make). Pure over the Map's graph, trace and figure: nothing
- * here prices anything, so every ISK figure is the one Plan shows.
+ * colonies already make). Pure over the Map's graph, trace and figure; it
+ * prices nothing.
  */
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { DAYS_PER_WEEK } from '../findBestHowTo';
@@ -22,7 +22,7 @@ export interface ProductDetailInput {
 }
 
 export type ProductMoney =
-  /** The model's one-planet figure: an estimate, from one planet of `useType`. */
+  /** A ranked one-planet recipe: the figure's hauling load and the CC level it assumes. */
   | {
       kind: 'one-planet';
       /** m³ a week to haul: the hauling load. */

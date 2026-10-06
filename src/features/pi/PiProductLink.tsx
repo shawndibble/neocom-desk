@@ -11,11 +11,8 @@ interface PiProductLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement
 }
 
 /**
- * A product or item name on the PI tabs (DESIGN.md §6c "Entities",
- * Overrides): opens its PI detail, the Map tab with that product's drawer
- * open (`?product=`), keeping the page's other params. A real link, so new
- * tab and copy link work; the history marker lets the drawer's Close go Back.
- * Market and Show info stay one step away, in the row's ⋮ or the drawer.
+ * A product or item name on the PI tabs: opens its PI Product Detail
+ * (DESIGN.md §6c "Entities", Overrides). Market and Show info sit in the ⋮ or the drawer.
  */
 export function PiProductLink({ typeId, children, className, ...rest }: PiProductLinkProps) {
   const location = useLocation();

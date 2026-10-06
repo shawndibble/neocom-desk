@@ -14,18 +14,11 @@
  * phone. The observed box is the same width docked or not, so docking never
  * changes the number it was decided on.
  *
- * ## The product drawer is a URL
+ * ## The product drawer is the URL's `?product=`
  *
- * `?product=<typeId>` (`piProductHref`) is the product the panel shows: every
- * product and item name on Plan, Map and Colonies links here (DESIGN.md §6c
- * "Entities", Overrides), and a tile click writes it too, docked or not, so
- * the address bar is always shareable. A reload or a pasted
- * link reopens it; an id the map does not know is dropped. Back pops the entry
- * and the drawer closes because the param is gone (the drawer pushes none of
- * its own); Close goes Back when this page pushed the entry
- * (`productNavigation`'s marker), else replaces the URL without it. The "add a
- * planet" drawer stays local state with its own Back entry. A product linked
- * while docked is dropped when the layout narrows, never popped open.
+ * Tile clicks write it too, docked or not. An unknown id is dropped; so is one
+ * linked while docked once the layout narrows, so no stale drawer pops open.
+ * The "add a planet" drawer is local state with its own Back entry.
  */
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -48,6 +41,7 @@ import { planPicks } from '../planPicks';
 import {
   hrefWithoutPiProduct,
   parsePiProduct,
+  PI_PRODUCT_PARAM,
   piProductHref,
   productNavigation,
   wasProductPushedHere,
@@ -100,7 +94,8 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   // The product the URL has open; an id the map does not know is ignored.
   const linkedRaw = parsePiProduct(location.search);
   const linked = linkedRaw !== null && graph.byId.has(linkedRaw) ? linkedRaw : null;
-  const hasProductParam = new URLSearchParams(location.search).has('product');
+  const hasProductParam =
+    linkedRaw !== null || new URLSearchParams(location.search).has(PI_PRODUCT_PARAM);
   useEffect(() => {
     if (!hasProductParam || linked !== null) return;
     navigate(hrefWithoutPiProduct(location), {
@@ -214,11 +209,11 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     setPlanetOpen(false);
     restore();
   }, [restore]);
-  /** Takes `product` off the URL: Back when this page pushed the entry, else a replace. */
   const goingBack = useRef(false);
   useEffect(() => {
     goingBack.current = false;
   }, [linked]);
+  /** Takes `product` off the URL: Back when this page pushed the entry, else a replace. */
   const dropProduct = useCallback(() => {
     // A second Close before Back lands would go Back twice, maybe off the page.
     if (parsePiProduct(location.search) === null || goingBack.current) return;
@@ -266,6 +261,14 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     [advice, graph]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
+  const colonySales = useMemo(
+    () =>
+      advice.colonies.map((c) => ({
+        name: c.name ?? t('pi.planetLabel', { id: c.planetId }),
+        sells: c.sells,
+      })),
+    [advice, t]
+  );
 
   const whatIfAdvice = useMemo(
     () => (whatIf && !isHave(whatIf) ? adviceWithWhatIf(whatIf) : null),
@@ -422,10 +425,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
             typeId: traced.id,
             trace,
             figure: figureOf(traced.id),
-            colonies: advice.colonies.map((c) => ({
-              name: c.name ?? t('pi.planetLabel', { id: c.planetId }),
-              sells: c.sells,
-            })),
+            colonies: colonySales,
             ccLevel: advice.rankingBasis.ccLevel,
           })}
           onClearTrace={clearTrace}

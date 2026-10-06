@@ -322,7 +322,7 @@ export interface AddPlanetDetailProps {
   weakest: { name: string; perDay: number } | null;
   finder: FinderOrigin;
   onTraceRecipe: (typeId: number) => void;
-  /** The recipe's PI detail URL: the button is a real link. */
+  /** The recipe's PI detail URL. */
   productHref: (typeId: number) => string;
   onClose: () => void;
 }

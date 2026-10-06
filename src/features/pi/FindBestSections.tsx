@@ -3,8 +3,8 @@
  * the ranked recipe cards, drawn from `FindBestView`. No figure is computed
  * here; components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item and product names open their PI detail (the Map
- * tab's product drawer, `PiProductLink`; §6c "Entities", Overrides); the planet-type
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`); the planet-type
  * chips toggle with `aria-pressed`; "Show me how" expands in place with a
  * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
  * colour alone.

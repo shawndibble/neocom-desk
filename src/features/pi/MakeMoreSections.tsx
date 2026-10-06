@@ -2,8 +2,8 @@
  * The "Make more from my planets" panels, drawn from `PlanView`. No figure is
  * computed here: components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item and product names open their PI detail (the Map
- * tab's product drawer, `PiProductLink`; §6c "Entities", Overrides), a checkbox or a box
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`), a checkbox or a box
  * means "tick or click me", the "alternative" disclosure has a rotating leading
  * caret, and static facts are `StatChip`s and type, not boxes.
  */

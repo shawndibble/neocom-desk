@@ -4,8 +4,8 @@
  * 3. run it. Every figure comes from the recommendation model's layout
  * (`buildHowTo`), the system list from the SDE planet finder.
  *
- * Cues follow DESIGN.md §6c: item and product names open their PI detail (the Map
- * tab's product drawer, `PiProductLink`; §6c "Entities", Overrides), system names are
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`), system names are
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
