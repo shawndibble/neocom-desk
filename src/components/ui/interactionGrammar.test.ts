@@ -154,24 +154,38 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     expect(tagOffenders((t) => /(^|\s)title=/.test(t.attrs))).toEqual([]);
   });
 
-  it('gives every rowContextMenu a rowMoreActions twin (the ⋮ menu)', () => {
-    // The hold/right-click menu must also be reachable from a visible ⋮ cell.
-    // Exceptions, by file: none.
-    // A file may instead pass the table's own `rowActions` (MaterialsTable's
-    // custom ⋮ column). Exceptions, by file: the menu is handed to a wrapper
-    // table that sets `rowMoreActions` itself.
-    const exceptions = [
-      'src/routes/CorpMembers.tsx', // CorpRosterTable sets rowMoreActions
-      'src/routes/Market.tsx', // MarketOrderBook sets rowMoreActions
+  it('places <RowMoreActions> only in audited files (DESIGN.md §6c restraint)', () => {
+    // A ⋮ needs at least two real actions reachable nowhere else, one trailing
+    // cluster at the row's right edge. Whether a given row meets that is a
+    // judgement, so every file that hand-places a <RowMoreActions> is listed
+    // here after review; a new file fails until someone makes that call. Delete
+    // entries as menus are removed. (`DataTable`'s `rowMoreActions` column lives
+    // in src/components/ui and is not scanned.)
+    const audited = [
+      'src/features/character/assetBrowserRows.tsx',
+      'src/features/corp/CorpBoardRow.tsx',
+      'src/features/fittings/FittingAddPanel.tsx',
+      'src/features/fittings/FittingFightersPanel.tsx',
+      'src/features/fittings/FittingRackList.tsx',
+      'src/features/fittings/FittingStartScreen.tsx',
+      'src/features/fittings/FittingStatsSections.tsx',
+      'src/features/industry/BuildPlanList.tsx',
+      'src/features/market/CompareDrawer.tsx',
+      'src/features/market/ItemContextMenu.tsx',
+      'src/features/market/OpenOrdersList.tsx',
+      'src/features/market/OrderHistoryList.tsx',
+      'src/features/market/QuickbarList.tsx',
+      'src/features/market/TransactionsDayList.tsx',
+      'src/features/market/UsedInSection.tsx',
+      'src/features/skills/SkillRowContextMenu.tsx',
+      'src/routes/FittingCompare.tsx',
+      'src/routes/Mail.tsx',
+      'src/routes/Market.tsx',
     ];
-    expect(
-      offendersOf(
-        (src, f) =>
-          !exceptions.includes(f) &&
-          /\browContextMenu=/.test(src) &&
-          !/\browMoreActions\b|\browActions\b/.test(src)
-      )
-    ).toEqual([]);
+    // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
+    const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
+    const placing = offendersOf((src) => /<RowMoreActions\b/.test(stripComments(src)));
+    expect(placing.filter((f) => !audited.includes(f))).toEqual([]);
   });
 
   it('composes a focus-visible recipe on every raw <button>', () => {

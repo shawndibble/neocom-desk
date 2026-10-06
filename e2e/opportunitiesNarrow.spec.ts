@@ -329,13 +329,15 @@ test.describe('Opportunities — ranked phone list', () => {
     await expect(bar).toHaveCount(0);
   });
 
-  test('the card menu holds price history and the market', async ({ page }) => {
+  test('the card menu holds start plan and price history, not a duplicate market link', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
     await page.getByRole('button', { name: /More actions for Rifter/ }).click();
     await expect(page.getByRole('menuitem', { name: 'Price history' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'View in Market' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'View in Market' })).toHaveCount(0);
   });
 
   test('"Owned blueprints" lists cards, not the stacked table', async ({ page }) => {

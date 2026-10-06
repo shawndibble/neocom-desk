@@ -1,20 +1,16 @@
 /**
- * Build Group detail's buy-materials table at 390px (issue #2215): five
- * columns (material, quantity, volume, owned, still-to-buy) at `DataTable`'s
- * default `stackColumns={1}` gave every card five lines, one field each.
- * Fixed by `stackColumns={2}`, the same pairing `MaterialsTable`'s
- * single-plan buy table already uses for this exact column shape.
+ * Build Group detail's buy-materials table at 390px (issue #2215, reworked by
+ * DESIGN.md §6c restraint): the figures are read across columns, so on a phone
+ * it stays a plain table (`responsive="table"`) with the material name pinned
+ * (`stickyStart`) and the low-value Volume and Owned columns dropped
+ * (`phoneHidden`); the table scrolls inside its own wrapper, never the page.
  *
- * A Rifter Blueprint (typeID 691) member at 20 runs supplies both edge cases
- * the ticket calls out in one row set: Tritanium's quantity (640,000) is six
- * digits, and only Tritanium has a `market/fuzzwork.co.uk` price in the
- * shared mock (`mockEsi.ts`'s `FUZZWORK_AGGREGATES`) — Pyerite, Mexallon and
- * Isogen come back with no orders, so their rows carry the "No price"
- * warning the still-to-buy column shows.
- *
- * Bounding-box assertions, not class names, for the same reason
- * `marketAppraisalNarrow.spec.ts` gives: `.dt-stack-2col`'s grid only exists
- * inside a real `@media (width < 40rem)` block, invisible to jsdom.
+ * A Rifter Blueprint (typeID 691) member at 20 runs supplies both edge cases:
+ * Tritanium's quantity (640,000) is six digits, and only Tritanium has a
+ * `market/fuzzwork.co.uk` price in the shared mock (`mockEsi.ts`'s
+ * `FUZZWORK_AGGREGATES`) — Pyerite, Mexallon and Isogen come back with no
+ * orders, so their rows carry the "No price" warning the still-to-buy column
+ * shows.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -111,61 +107,47 @@ async function readRow(page: Page, typeId: number): Promise<{ display: string; c
   );
 }
 
-function labelLines(cells: CellBox[]): string[][] {
-  const grouped: CellBox[][] = [];
-  for (const cell of [...cells].sort((a, b) => a.top - b.top || a.left - b.left)) {
-    const last = grouped.at(-1);
-    if (last && Math.abs(last[0].top - cell.top) <= 1) last.push(cell);
-    else grouped.push([cell]);
-  }
-  return grouped.map((line) => line.map((cell) => cell.label));
-}
-
 function cellFor(cells: CellBox[], label: string): CellBox {
   const cell = cells.find((c) => c.label === label);
   expect(cell).toBeDefined();
   return cell!;
 }
 
-test.describe('Build Group detail — stacked buy-materials card', () => {
+test.describe('Build Group detail — buy-materials table on a phone', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
     await seedGroupWithPlan(page);
   });
 
-  test('pairs Quantity/Volume and Owned/Still to buy two-per-line at 390px', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await page.goto(`./industry/groups/${GROUP_ID}`);
-
-    const { display, cells } = await readRow(page, TRITANIUM);
-    expect(display).toBe('grid');
-    expect(labelLines(cells)).toEqual([['Material'], ['Qty', 'Volume'], ['Owned', 'Still to buy']]);
-
-    // The six-digit case the ticket calls out: the paired-down Qty cell
-    // still fits its own figure without clipping it.
-    const qty = cellFor(cells, 'Qty');
-    expect(qty.text).toContain('640,000');
-    for (const cell of cells) expect(cell.overflows).toBe(false);
-
-    await expectNoPageOverflow(page);
-  });
-
-  test('shows the unpriced warning on an unpriced material, still paired, at 390px', async ({
+  test('stays a table at 390px: Qty and Still to buy shown, Volume and Owned dropped', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
     await page.goto(`./industry/groups/${GROUP_ID}`);
 
-    const { cells } = await readRow(page, PYERITE);
-    expect(labelLines(cells)).toEqual([['Material'], ['Qty', 'Volume'], ['Owned', 'Still to buy']]);
+    const { display, cells } = await readRow(page, TRITANIUM);
+    expect(display).toBe('table-row');
+    const visible = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
+    expect(visible).toEqual(['Material', 'Qty', 'Still to buy']);
 
+    // The six-digit case: Qty still holds its own figure without clipping it.
+    const qty = cellFor(cells, 'Qty');
+    expect(qty.text).toContain('640,000');
+    expect(qty.overflows).toBe(false);
+
+    await expectNoPageOverflow(page);
+  });
+
+  test('shows the unpriced warning on an unpriced material at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto(`./industry/groups/${GROUP_ID}`);
+
+    const { cells } = await readRow(page, PYERITE);
     const row = page.locator(
       `table[aria-label="${GROUP_MATERIALS_LABEL}"] tr[data-row-key="${PYERITE}"]`
     );
     await expect(row.getByText('No price')).toBeVisible();
 
-    // The paired "Still to buy" cell holds both the figure and the warning
-    // line without clipping either — the compound-cell risk the ticket flags.
     const stillToBuy = cellFor(cells, 'Still to buy');
     expect(stillToBuy.text).toContain('No price');
     expect(stillToBuy.overflows).toBe(false);
@@ -177,6 +159,12 @@ test.describe('Build Group detail — stacked buy-materials card', () => {
 
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('table-row');
-    expect(labelLines(cells)).toEqual([['Material', 'Qty', 'Volume', 'Owned', 'Still to buy']]);
+    expect(cells.map((cell) => cell.label)).toEqual([
+      'Material',
+      'Qty',
+      'Volume',
+      'Owned',
+      'Still to buy',
+    ]);
   });
 });
