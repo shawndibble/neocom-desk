@@ -12,7 +12,7 @@
  * Keyed on `entryChannelTarget` rather than `eventId`: every EVE notification
  * shares the one `eveNotification` event, so grouping on the event alone
  * would fold "structure under attack" into "corp bill due". That is also the
- * key the per-type mute writes against (`NotificationContextMenu`), so a
+ * key the per-type mute writes against (`preferences.ts`), so a
  * group and the control that silences it always name the same thing.
  *
  * Pure: no fetch/DOM/Dexie, no clock. Labels are the view's job — they need a

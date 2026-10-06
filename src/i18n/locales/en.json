@@ -457,8 +457,6 @@
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
-      "cargoAddMenu_one": "Add {{count}} to cargo",
-      "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
@@ -1429,8 +1427,6 @@
       "chargeToCargo": "Put {{name}} in cargo…",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
-      "fitFirstFree": "Fit to first free slot",
-      "addToBay": "Add to drone bay",
       "addCargo": "Add cargo",
       "cargoHold": "{{used}} / {{total}} m³",
       "dragToMove": "Drag {{name}} to another slot",
@@ -1446,8 +1442,7 @@
       "alreadyHeld_one": "{{count}} already held it.",
       "alreadyHeld_other": "{{count}} already held it.",
       "changeCharge": "Change charge",
-      "noCharges": "No other charge fits this",
-      "launch": "Launch"
+      "noCharges": "No other charge fits this"
     },
     "libraryMenu": {
       "open": "Open",
@@ -1772,6 +1767,8 @@
     "csvLevel": "Level",
     "csvSp": "Skill points",
     "inspector": {
+      "addToPlan": "Add to Skill Plan",
+      "maxLevel": "Already at level 5",
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",
       "noPrereqs": "No prerequisites",
@@ -1796,11 +1793,6 @@
       "loadFailedHint": "Something went wrong loading this skill. Try again.",
       "notFoundTitle": "Skill not found",
       "notFoundHint": "This skill isn't in the skill catalog."
-    },
-    "contextMenu": {
-      "addToSkillPlan": "Add to Skill Plan",
-      "noPlans": "No skill plans yet",
-      "maxLevelTitle": "Already at level 5"
     },
     "certificates": {
       "grade": {
@@ -2098,13 +2090,12 @@
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
     "milestone": {
-      "addLabel": "Add milestone to {{name}}",
+      "add": "Add milestone…",
       "addTitle": "Name this milestone",
       "rename": "Rename…",
       "renameTitle": "Rename milestone",
-      "remove": "Remove",
+      "remove": "Remove milestone",
       "removeLabel": "Remove milestone {{name}}",
-      "menuLabel": "Milestone actions for {{name}}",
       "next": "Next milestone",
       "projected": "Projected",
       "reached": "Reached",
@@ -6074,11 +6065,6 @@
       "dismiss": "Not now"
     },
     "groupedTitle": "{{title}} x{{count}}",
-    "contextMenu": {
-      "browserOn": "Turn off device notifications",
-      "browserOff": "Turn on device notifications",
-      "hideInFeed": "Hide in feed"
-    },
     "eveTypeName": {
       "StructureUnderAttack": "Structure Under Attack",
       "StructureLostShields": "Structure Lost Shields",
