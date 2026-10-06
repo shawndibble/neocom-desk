@@ -110,7 +110,15 @@ const RailPage = memo(function RailPage({
   return (
     <div>
       <div className="flex items-center gap-0.5">
-        {shownViews.length > 0 ? (
+        {/* Corp is listed only while visible (`RailNavBody` filters it), and never locked. */}
+        <NavItem
+          to={page.path}
+          label={label}
+          locked={locked}
+          badge={badge}
+          className={cx('flex-1', pageHidden && 'line-through opacity-60')}
+        />
+        {shownViews.length > 0 && (
           <IconButton
             variant="plain"
             size="sm"
@@ -120,24 +128,13 @@ const RailPage = memo(function RailPage({
             label={t('nav.pageViews', { page: label })}
             icon={<Caret expanded={open} />}
           />
-        ) : (
-          // Keeps page names in one column whether or not a page has views to open.
-          <span aria-hidden="true" className="size-7 shrink-0" />
         )}
-        {/* Corp is listed only while visible (`RailNavBody` filters it), and never locked. */}
-        <NavItem
-          to={page.path}
-          label={label}
-          locked={locked}
-          badge={badge}
-          className={cx('flex-1', pageHidden && 'line-through opacity-60')}
-        />
         {editing && canHide(page.path) && (
           <NavHideToggle path={page.path} label={label} hidden={pageHidden} />
         )}
       </div>
       {open && shownViews.length > 0 && (
-        <ul id={listId} aria-label={label} className="mt-0.5 mb-1 ml-8 border-l border-line">
+        <ul id={listId} aria-label={label} className="mt-0.5 mb-1 ml-4 border-l border-line">
           {shownViews.map((view) => {
             const viewHidden = hidden.has(view.path);
             const active = view.path === activeViewPath;

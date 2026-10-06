@@ -902,6 +902,16 @@ describe('PlanetaryIndustry', () => {
     expect(within(strip).getByText('Colonies')).toBeInTheDocument();
   });
 
+  it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('combobox', {
+      name: 'Where do you sell?',
+    });
+    expect(picker).toHaveClass('min-w-40', 'w-auto');
+    expect(picker).not.toHaveClass('w-40');
+  });
+
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {
     await addAlt(92, 'Unread Alt', [PLANETS_SCOPE]);
     await addAlt(93, 'Empty Alt', [PLANETS_SCOPE]);

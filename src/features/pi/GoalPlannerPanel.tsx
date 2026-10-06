@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
@@ -323,18 +322,6 @@ function GoalPlanner({
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot || !pi || !names) return <Loading />;
-  if (snapshot.needsReauth) {
-    return (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterPlanets']}
-        title={t('pi.reauthTitle')}
-        hint={t('pi.reauthHint')}
-        actionLabel={t('pi.reauthAction')}
-      />
-    );
-  }
-
   const systemName = (id: number) =>
     snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
