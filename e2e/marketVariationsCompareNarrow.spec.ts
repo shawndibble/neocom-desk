@@ -26,6 +26,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -200,4 +201,24 @@ test('Variations compare keeps real item columns above sm (1280px)', async ({ pa
   // matrix, not one per table, or scrolling Fitting to column 12 would leave
   // Capacitor on column 1.
   expect(await scrollerCount(drawer)).toBe(1);
+});
+
+test('Compare drawer Prices view is a plain table at 390px, the item pinned and the page still', async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  const drawer = await openCompareDrawer(page);
+  await drawer.getByRole('button', { name: 'Prices', exact: true }).click();
+
+  // A compare table: real columns on a phone (no stacked cards, no sort
+  // picker), scrolling sideways with the Item column pinned.
+  const table = drawer.getByRole('table', { name: 'Compare' });
+  const row = table.locator('tbody tr[data-row-key]').first();
+  await expect(row).toBeVisible();
+  expect(await row.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
+  expect(
+    await row.locator('td[data-label="Item"]').evaluate((td) => getComputedStyle(td).position)
+  ).toBe('sticky');
+  await expect(drawer.getByLabel('Sort by', { exact: true })).toBeHidden();
+  await expectNoPageOverflow(page);
 });

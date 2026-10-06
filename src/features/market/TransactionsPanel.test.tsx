@@ -312,7 +312,7 @@ describe('TransactionsPanel — phone', () => {
     });
   }
 
-  it('stays a plain table with a Sold / Bought / Net strip, shedding date and margin', async () => {
+  it('stays a plain table with a Sold / Bought / Net strip, shedding side and margin (date is the default sort: it stays)', async () => {
     load([
       transaction({ transaction_id: 1, date: '2026-09-20T13:27:00Z' }),
       transaction({
@@ -328,7 +328,8 @@ describe('TransactionsPanel — phone', () => {
     expect(await screen.findAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
     expect(screen.getByRole('table')).toBeInTheDocument();
     const row = screen.getAllByRole('row')[1];
-    expect(row.querySelector('td[data-label="Date"]')).toHaveClass('max-sm:hidden');
+    expect(row.querySelector('td[data-label="Side"]')).toHaveClass('max-sm:hidden');
+    expect(row.querySelector('td[data-label="Date"]')).not.toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Margin"]')).toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Total"]')).not.toHaveClass('max-sm:hidden');
     const summary = screen.getByRole('region', { name: 'Totals for the transactions shown' });

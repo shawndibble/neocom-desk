@@ -205,6 +205,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'side',
         header: t('orders.side'),
+        phoneHidden: true,
         sortValue: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
         render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
       },
@@ -230,7 +231,6 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'issued',
         header: t('orders.issued'),
-        phoneHidden: true,
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (order) => new Date(order.issued).getTime(),
         render: (order) => new Date(order.issued).toLocaleDateString(),

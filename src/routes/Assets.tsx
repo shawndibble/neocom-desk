@@ -1840,7 +1840,7 @@ export function Assets() {
                     )}
                     {deepest && 'kind' in deepest && deepest.kind === 'ship' && (
                       <Button
-                        size="sm"
+                        size="md"
                         className="shrink-0"
                         onClick={() =>
                           void assetShipEditLocation(deepest, nodeLabel(deepest)).then(

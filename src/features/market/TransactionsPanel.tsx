@@ -169,7 +169,6 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       {
         id: 'date',
         header: t('wallet.date'),
-        phoneHidden: true,
         className: 'whitespace-nowrap text-text-dim',
         render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
         sortValue: (txn) => txn.date,
@@ -188,6 +187,8 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       {
         id: 'side',
         header: t('wallet.side'),
+        // The Total's sign and tone already say buy or sell.
+        phoneHidden: true,
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
