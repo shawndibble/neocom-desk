@@ -4703,7 +4703,6 @@
       "panelTitleEmpty": "Details",
       "empty": "Click a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
       "empty_touch": "Tap a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
-      "empty_touch": "Tap a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
       "perPlanet": "ISK/day per {{type}} planet",
       "needHeading": "You need",
       "needOne_one": "One planet is enough: {{types}}.",

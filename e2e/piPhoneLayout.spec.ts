@@ -55,8 +55,7 @@ test.describe('PI phone layout', () => {
     await picker.click();
     await page.getByRole('option', { name: /corp buyback/i }).click();
     const clipped = await picker.evaluate((el) => {
-      const inner = el.querySelector('[data-slot="select-value"]') ?? el.firstElementChild;
-      return !!inner && inner.scrollWidth > inner.clientWidth;
+      return [el, ...el.querySelectorAll('*')].some((n) => n.scrollWidth > n.clientWidth);
     });
     expect(clipped).toBe(false);
   });
