@@ -27,6 +27,7 @@ import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
 import { EsiDidntAnswer } from '../EsiDidntAnswer';
+import { piTypeNames } from './coloniesNames';
 import { useColoniesAdvice } from './useColoniesAdvice';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -244,13 +245,16 @@ export function ColoniesTab({
     () => mergeNames(publicPlanetNames, cachedPlanetNames),
     [publicPlanetNames, cachedPlanetNames]
   );
+  // pi.json's own names win: Plan reads them, and a P0 or a schematic's output
+  // must never fall back to "Type #id" or "Unknown product" here.
+  const piNames = useMemo(() => piTypeNames(pi), [pi]);
   const pinTypeNames = useMemo(
-    () => mergeNames(publicTypeNames, cachedPinTypeNames),
-    [publicTypeNames, cachedPinTypeNames]
+    () => mergeNames(mergeNames(publicTypeNames, cachedPinTypeNames), piNames),
+    [piNames, publicTypeNames, cachedPinTypeNames]
   );
   const productNames = useMemo(
-    () => mergeNames(publicTypeNames, cachedProductNames),
-    [publicTypeNames, cachedProductNames]
+    () => mergeNames(mergeNames(publicTypeNames, cachedProductNames), piNames),
+    [piNames, publicTypeNames, cachedProductNames]
   );
 
   // Resolve any planet/type name the cache-only reads left unresolved through

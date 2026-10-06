@@ -122,7 +122,7 @@ const detailPayload = {
   routes: [],
 };
 
-const PRODUCT_ID = 2288;
+const PRODUCT_ID = 2307; // Felsic Magma in pi.json
 const FACTORY_TYPE_ID = 3001;
 const STORAGE_TYPE_ID = 3002;
 const SCHEMATIC_ID = 131;

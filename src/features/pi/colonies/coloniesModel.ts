@@ -98,8 +98,13 @@ export type FaultTag =
   | { kind: 'storage'; hoursToFull: number; urgent: boolean }
   | { kind: 'idle-factories'; count: number }
   | { kind: 'room-extractors'; count: number; gainPerDay: number | null }
-  | { kind: 'room-factories'; count: number; gainPerDay: number | null }
+  | { kind: 'room-factories'; productTypeId: number; count: number; gainPerDay: number | null }
   | { kind: 'stale'; hours: number };
+
+/** React key for a tag: one per kind, except room-factories, one per product. */
+export function faultTagKey(tag: FaultTag): string {
+  return tag.kind === 'room-factories' ? `${tag.kind}:${tag.productTypeId}` : tag.kind;
+}
 
 export type PrimaryAction =
   | { kind: 'restart'; stopped: boolean; gainPerDay: number | null; minutes: number | null }
@@ -374,7 +379,12 @@ export function colonyCheckRow(input: RowInput): ColonyCheckRow {
     tags.push(
       win.detail.what === 'extractors'
         ? { kind: 'room-extractors', count: win.detail.extraEcus, gainPerDay: win.gainPerDay }
-        : { kind: 'room-factories', count: win.detail.factories, gainPerDay: win.gainPerDay }
+        : {
+            kind: 'room-factories',
+            productTypeId: win.detail.productTypeId,
+            count: win.detail.factories,
+            gainPerDay: win.gainPerDay,
+          }
     );
   }
   const dataAgeHours = input.dataAgeHours ?? null;
