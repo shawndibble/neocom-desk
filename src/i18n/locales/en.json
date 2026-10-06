@@ -4718,6 +4718,7 @@
       "panelTitle": "Where to put a new colony",
       "panelTitleFor": "Where to put a new {{type}} colony",
       "title": "Add a {{type}} planet",
+      "unlockList": "Unlocked products: {{names}}.",
       "unlocks_one": "Unlocks {{count}} product (pink on the map)",
       "unlocks_other": "Unlocks {{count}} products (pink on the map)",
       "asOnePlanet_one": "{{count}} as a one-planet recipe",

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { Tooltip } from './Tooltip';
-import { RowTappableContext } from './tooltipHold';
+import { IskTabStopContext, RowTappableContext } from './tooltipHold';
 
 interface IskAmountProps {
   value: number;
@@ -35,7 +35,7 @@ interface IskAmountProps {
  * naming an element with no role, so many readers drop such a label and,
  * with the shorthand hidden, read an empty cell.
  *
- * It stays a tab stop. The tooltip is the only way a sighted keyboard user
+ * It stays a tab stop (unless `IskTabStopContext` says a dense surface has its own). The tooltip is the only way a sighted keyboard user
  * reaches the exact figure, and `Tooltip` reveals on focus, so a figure that
  * cannot take focus would hide that value from the keyboard entirely.
  *
@@ -49,11 +49,12 @@ export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProp
   const { t } = useTranslation();
   // Inside a clickable row the tap opens the row, whose detail carries the exact figure.
   const rowTappable = useContext(RowTappableContext);
+  const tabStop = useContext(IskTabStopContext);
   const exact = t('common.iskExact', { amount: formatIsk(value, decimals) });
   return (
     <Tooltip content={exact} openOnTap={!rowTappable}>
       <span
-        tabIndex={0}
+        tabIndex={tabStop ? 0 : undefined}
         className={cx(
           'cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
           className

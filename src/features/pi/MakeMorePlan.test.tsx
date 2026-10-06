@@ -35,6 +35,18 @@ beforeEach(async () => {
 });
 
 describe('MakeMorePlan', () => {
+  it('keeps ISK figures out of the tab order, but their exact text stays readable', async () => {
+    const user = userEvent.setup();
+    const { container } = renderPlan();
+    expect(container.querySelectorAll('span[tabindex="0"]').length).toBe(0);
+    expect(container.querySelector('.sr-only')?.textContent).toBeTruthy();
+    // Tab never lands on a bare ISK figure.
+    for (let i = 0; i < 30; i++) {
+      await user.tab();
+      expect(document.activeElement?.tagName).not.toBe('SPAN');
+    }
+  });
+
   it('shows the loading, prices-failed and error states', () => {
     mockState = { status: 'loading' };
     const { rerender } = renderPlan();
