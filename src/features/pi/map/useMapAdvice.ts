@@ -20,6 +20,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { FinderOrigin } from './MapDetail';
 import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
+import { colonyCountUnknown } from '../colonyStripModel';
 
 export type MapAdviceState =
   | { status: 'loading' }
@@ -33,6 +34,8 @@ export type MapAdviceState =
       finder: FinderOrigin;
       /** The colony read failed: the board runs as for a pilot with no colonies, plus this notice. */
       esiFailed: { retry: () => void; retrying: boolean } | null;
+      /** The colony list is unread (ESI silent, or a re-login needed): not "no colonies". */
+      coloniesUnknown: boolean;
       /** Hub prices could not be read: the board runs on empty books, so no product has an ISK figure. */
       pricesFailed: boolean;
     };
@@ -131,6 +134,7 @@ export function useMapAdvice(
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
   if (!built || !graph) return { status: 'loading' };
   const esiFailed = snapshot?.fetchFailed ? { retry, retrying } : null;
+  const coloniesUnknown = colonyCountUnknown(snapshot);
   return {
     status: 'ready',
     graph,
@@ -138,6 +142,7 @@ export function useMapAdvice(
     colonies,
     finder,
     esiFailed,
+    coloniesUnknown,
     pricesFailed: inputs.status === 'prices-failed',
   };
 }

@@ -15,6 +15,7 @@ import { goalsParam, idListParam, seedGoal } from '@/features/pi/goalsParam';
 import { loadPlannableTypeIds } from '@/features/pi/products';
 import type { Goal } from '@/engine/pi/goalTypes';
 import { GrantBanner } from '@/app/GrantNote';
+import { colonyCountUnknown } from '@/features/pi/colonyStripModel';
 import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
@@ -187,7 +188,10 @@ export function PlanetaryIndustry() {
 
         <PiHeaderStrip
           colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-          colonyCountUnknown={data?.planetsFetchFailed}
+          colonyCountUnknown={colonyCountUnknown({
+            needsReauth: data?.planetsNeedsReauth,
+            fetchFailed: data?.planetsFetchFailed,
+          })}
           estimate={tab === 'plan' || tab === 'map'}
         />
 

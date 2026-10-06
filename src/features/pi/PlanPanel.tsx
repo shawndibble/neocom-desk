@@ -12,6 +12,7 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useUrlParam } from '@/lib/useUrlState';
 import { EsiDidntAnswer } from './EsiDidntAnswer';
+import { colonyCountUnknown } from './colonyStripModel';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
@@ -139,6 +140,8 @@ export function PlanPanel(props: Props) {
   // The colony read failed: colonies are unknown, not none. Plan runs as for a pilot with no
   // colonies (Find best opens), and the notice sits in the colony slot, above the answers.
   const esiFailed = snapshot.fetchFailed;
+  // A refused read (re-login needed) is unknown too, but the page banner owns that notice.
+  const unknown = colonyCountUnknown(snapshot);
   const colonyCount = snapshot.colonies.length;
   const opening = openingQuestion({
     goalCount: goals.length + (seedingGoal ? 1 : 0),
@@ -146,7 +149,7 @@ export function PlanPanel(props: Props) {
   });
   const wanted = picked ?? opening.question;
   // The URL may still say make-more; the view shows Find best until the colonies can be read.
-  const question = esiFailed && wanted === 'make-more' ? 'find-best' : wanted;
+  const question = unknown && wanted === 'make-more' ? 'find-best' : wanted;
   const colonyTypes = snapshot.colonies.map((colony) => colony.planet_type);
 
   return (
@@ -170,7 +173,7 @@ export function PlanPanel(props: Props) {
           >
             <Option
               selected={question === 'make-more'}
-              unavailable={esiFailed}
+              unavailable={unknown}
               onSelect={() => setPicked('make-more')}
               art={
                 colonyCount > 0 ? (
@@ -190,7 +193,7 @@ export function PlanPanel(props: Props) {
               }
               title={t('piPlan.picker.makeMore')}
               hint={
-                esiFailed
+                unknown
                   ? t('piPlan.picker.makeMoreUnknown')
                   : colonyCount > 0
                     ? t('piPlan.picker.makeMoreHint', { count: colonyCount })
@@ -227,7 +230,9 @@ export function PlanPanel(props: Props) {
           </div>
           {picked === null && !esiFailed && (
             <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-              {t(`piPlan.picker.opened.${opening.reason}`, { count: colonyCount })}
+              {t(`piPlan.picker.opened.${unknown ? 'unknown' : opening.reason}`, {
+                count: colonyCount,
+              })}
             </p>
           )}
         </Panel>

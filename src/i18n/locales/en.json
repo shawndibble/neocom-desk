@@ -4883,6 +4883,7 @@
       "opened": {
         "colonies_one": "Opened “Make more from my planets” because we found {{count}} colony on your character.",
         "colonies_other": "Opened “Make more from my planets” because we found {{count}} colonies on your character.",
+        "unknown": "Your colonies could not be read, so we opened “Find the best thing to build” with every planet type available.",
         "no-colonies": "You have no colonies yet, so we opened “Find the best thing to build” with every planet type available.",
         "goals": "Opened “Make a specific product” because your link names a product."
       }
@@ -5619,6 +5620,8 @@
       "planHint": "Want more than small fixes? Plan compares what else this {{type}} planet could make."
     },
     "emptyPanel": "Colonies",
+    "unknownTitle": "Colonies not read yet",
+    "unknownHint": "Log in again above to see them. Plan and Map still work without them.",
     "emptyTitle": "No colonies yet",
     "emptyHint": "Once you set up a planet, this tab tells you each day what's stopped, running out or full, and when to log in next.",
     "emptyAction": "Find the best thing to build",

@@ -82,3 +82,21 @@ describe('PlanPanel when ESI does not answer the colony read', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
   });
 });
+
+describe('PlanPanel when a re-login is needed for the colony read', () => {
+  const reauth = {
+    colonies: [],
+    fetchFailed: false,
+    needsReauth: true,
+  } as Partial<GoalPlannerSnapshot>;
+
+  it('reads as unknown, not "no colonies", with no second notice and Find best open', async () => {
+    snapshots = [reauth];
+    renderPlan();
+    expect(await screen.findByText('find best body')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText(/Your colonies could not be read, so we opened/)).toBeInTheDocument();
+    expect(screen.getByText('Needs your colony list')).toBeInTheDocument();
+    expect(screen.queryByText(/no colonies/i)).not.toBeInTheDocument();
+  });
+});

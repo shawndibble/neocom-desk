@@ -72,7 +72,11 @@ describe('AuthFailureNotice', () => {
     // A mail send refused for a scope the grant never held: a plain re-login
     // re-requests the same scopes, comes back identical and fails again.
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID, 'postCharacterMail');
-    render(<AuthFailureNotice />);
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
 
@@ -81,7 +85,11 @@ describe('AuthFailureNotice', () => {
 
   it('asks for no Permission when the failure names no endpoint', async () => {
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
-    render(<AuthFailureNotice />);
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
 
     await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
 
@@ -96,15 +104,47 @@ describe('AuthFailureNotice', () => {
       addedAt: 1,
     });
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
-    render(<AuthFailureNotice />);
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
     expect(await screen.findByText(/Pilot One/)).toBeInTheDocument();
   });
 
   it('falls back to the unnamed hint when the character record is not yet loaded', () => {
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
-    render(<AuthFailureNotice />);
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
     expect(
       screen.getByText("EVE turned down a request for this character's data.", { exact: false })
     ).toBeInTheDocument();
+  });
+});
+
+describe('AuthFailureNotice on a page that owns the banner', () => {
+  function renderAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(() => {
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID, 'getCharacterPlanets');
+  });
+
+  it('stays quiet for the planets refusal on a PI tab', () => {
+    renderAt('/planetary-industry/map');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('still shows for the same refusal elsewhere', () => {
+    renderAt('/mail');
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 });
