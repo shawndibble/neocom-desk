@@ -377,6 +377,16 @@ describe('PlanMap: the detail drawer', () => {
     await waitFor(() => expect(planet('Lava')).toHaveFocus());
   });
 
+  it('writes no dead "find one" text beside a planet you do not have', async () => {
+    const user = userEvent.setup();
+    renderMap({ colonies: [] });
+    await user.click(product('Biofuels'));
+    const dialog = screen.getByRole('dialog', { name: 'How to make it' });
+    expect(within(dialog).getAllByText(/Temperate/).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText(/find one/i)).toBeNull();
+    expect(within(dialog).queryByText(/✕/)).toBeNull();
+  });
+
   it('gives focus back after Clear trace in the drawer', async () => {
     const user = userEvent.setup();
     renderMap();

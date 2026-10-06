@@ -10,6 +10,10 @@ export interface SellHub {
   buyTiers: readonly PiBuyTier[];
   /** Sell on this hub's market. */
   setHub: (id: TradeHub['id']) => void;
+  /** The pilot already picked (or dismissed a suggestion for) a hub. */
+  hubChosen: boolean;
+  /** Keep the current hub and stop suggesting another. */
+  keepHub: () => void;
   /** Sell to a corp buyback at this percent of the hub's price; null returns to the market. */
   setBuyback: (pct: number | null) => void;
 }
@@ -30,7 +34,14 @@ export function useSellHub(): SellHub {
     hub: getTradeHub(settings.hub) ?? DEFAULT_TRADE_HUB,
     buybackPct: settings.buybackPct,
     buyTiers: settings.buyTiers,
-    setHub: (id) => void setSettings({ ...settings, hub: id, buybackPct: null }),
-    setBuyback: (pct) => void setSettings({ ...settings, buybackPct: pct === null ? null : pct }),
+    hubChosen: settings.hubChosen === true,
+    keepHub: () => void setSettings({ ...settings, hubChosen: true }),
+    setHub: (id) => void setSettings({ ...settings, hub: id, buybackPct: null, hubChosen: true }),
+    setBuyback: (pct) =>
+      void setSettings({
+        ...settings,
+        buybackPct: pct === null ? null : pct,
+        ...(pct === null ? {} : { hubChosen: true as const }),
+      }),
   };
 }

@@ -4592,7 +4592,11 @@
       "noColonies": "No colonies: {{names}}.",
       "skipped": "Skipped, no planetary access granted: {{names}}.",
       "summaryStopped": "{{count}} stopped",
-      "summaryNext": "next {{duration}}"
+      "summaryNext": "next {{duration}}",
+      "makes": "Makes ~<isk/>/day",
+      "notInPlan": "not in your plan",
+      "notInPlanLabel": "Why these figures are separate",
+      "notInPlanTooltip": "Estimated from this character's cached colonies with their skills unknown, so priced cautiously. Shown for reference only: they are not counted in Plan's totals or Today's check."
     }
   },
   "piMap": {
@@ -4715,7 +4719,6 @@
       "chainHeading": "How it is made",
       "chainLabel": "Steps to make {{name}}, by planet",
       "have": "you have one{{colonies}}",
-      "findOne": "find one",
       "shipTo": "Bring the goods to one factory planet, then make:",
       "samePlanet": "On the same planet, then make:",
       "chainText": "In words: {{planets}} → {{steps}}.",
@@ -4849,6 +4852,10 @@
       "lowsecJumps_one": "{{count}} lowsec jump",
       "lowsecJumps_other": "{{count}} lowsec jumps",
       "sellAt": "Where do you sell?",
+      "nearestHub_one": "Nearest hub: {{hub}}, {{count}} jump",
+      "nearestHub_other": "Nearest hub: {{hub}}, {{count}} jumps",
+      "useHub": "Sell at {{hub}}",
+      "keepHub": "Keep {{hub}}",
       "corpBuyback": "My corp buyback",
       "buybackRate": "Buyback rate",
       "buybackPct": "{{pct}}% of {{hub}}",
