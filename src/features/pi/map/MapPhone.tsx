@@ -2,7 +2,7 @@
  * The Map on a phone: the planet types as a grid of 44px toggles, then one
  * tier at a time as a list (a tier switcher), then the full map in a container
  * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
- * tapping the traced one again clears the trace.
+ * tapping the one you traced again clears it.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,8 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
-import { clickOnSpace, onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
 import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';

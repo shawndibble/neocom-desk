@@ -315,16 +315,16 @@ describe('PlanMap: trace', () => {
   });
 });
 
-// One owner per concept (PlanMap's header, "Who owns what"): the trace is the
-// URL's `?product=` while it names one, else the pilot's own pick; a ticked
-// planet is planet clicks only. Picking or clearing a product never unticks.
+// Ownership rules: PlanMap's header, "Who owns what".
 describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s', () => {
   function Search() {
-    return <output data-testid="search">{useLocation().search}</output>;
+    const location = useLocation();
+    return <output data-testid="search">{location.pathname + location.search}</output>;
   }
   function renderWithSearch(entry = '/planetary-industry/map') {
     return render(
-      <MemoryRouter initialEntries={[entry]}>
+      // A page before the map: a clear that went Back twice would land there.
+      <MemoryRouter initialEntries={['/planetary-industry/plan', entry]} initialIndex={1}>
         <PlanMap {...props()} />
         <Search />
       </MemoryRouter>
@@ -343,11 +343,11 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
     await waitFor(() => expect(productDialog()).toBeNull());
     // Closing the drawer is not clearing the trace.
     expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
-    expect(search()).toBe('');
+    expect(search()).toBe('/planetary-industry/map');
     await user.click(product('Biofuels'));
     expect(product('Biofuels')).not.toHaveAttribute('aria-current');
     expect(productDialog()).toBeNull();
-    expect(search()).toBe('');
+    expect(search()).toBe('/planetary-industry/map');
     expect(screen.getByText('Trace cleared.')).toBeInTheDocument();
     await user.click(product('Biofuels'));
     expect(product('Biofuels')).toHaveAttribute('aria-current', 'true');
@@ -361,7 +361,7 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
     await user.click(product('Proteins'));
     expect(search()).toMatch(/product=/);
     await user.click(product('Proteins'));
-    await waitFor(() => expect(search()).toBe(''));
+    await waitFor(() => expect(search()).toBe('/planetary-industry/map'));
     expect(product('Proteins')).not.toHaveAttribute('aria-current');
   });
 
@@ -371,7 +371,7 @@ describe('PlanMap: a product click toggles its trace; ticks stay the pilot’s',
     reportWidth(DOCK_MIN_PANEL_WIDTH);
     expect(product('Coolant')).toHaveAttribute('aria-current', 'true');
     await user.click(product('Coolant'));
-    await waitFor(() => expect(search()).toBe(''));
+    await waitFor(() => expect(search()).toBe('/planetary-industry/map'));
     // Lit only for the planets its trace needed: with the trace gone, so is the tile.
     expect(maybeProduct('Coolant')).toBeNull();
     expect(screen.getByText('Trace cleared.')).toBeInTheDocument();

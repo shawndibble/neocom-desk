@@ -35,8 +35,9 @@
  *   (`undefined` follows the first pick, `null` is cleared, else the pilot's
  *   pick). A tile, phone row or pick toggles it: a click on the product the
  *   pilot traced clears it, and the URL with it (Back if this page pushed it).
- * - **The product drawer** is open while the URL names a product. Closing it
- *   (Back, Escape, Close) keeps the trace; only a toggle or "Clear trace" ends it.
+ * - **Closing the product drawer** (Back, Escape, Close) keeps the trace; only
+ *   a toggle or "Clear trace" ends it. With no trace, the docked panel shows
+ *   the what-if planet, if one is ticked.
  */
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
@@ -45,6 +46,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace } from '@/lib/clickOnSpace';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import {
   focusRingClassName,
@@ -393,6 +395,9 @@ export function PlanMap({
     [whatIf, whatIfAdvice, owned]
   );
 
+  /** The detail shows the what-if planet: chosen, or nothing else is traced. */
+  const showWhatIf = whatIf !== null && (detailKind === 'planet' || traced === null);
+
   // --- Actions ---------------------------------------------------------------
   // A product linked while docked stays in the docked panel: narrowing the
   // window must not pop it open as a drawer, so it is dropped from the URL.
@@ -425,7 +430,6 @@ export function PlanMap({
     // original opener as the place focus returns to.
     if (!docked && !drawerShown) remember();
     setUserTraced({ id: typeId, explicit: true });
-    // The panel shows the product; the what-if tick stays the pilot's.
     setDetailKind('product');
     const href = piProductHref(typeId, location.search);
     if (planetShown) {
@@ -447,7 +451,7 @@ export function PlanMap({
       });
       return;
     }
-    // The pilot's own what-if tick: a click unticks it, NEED or not.
+    // Before the NEED branch: a ticked what-if unticks even when the trace needs it.
     if (whatIf === type) {
       setWhatIf(null);
       closePlanet();
@@ -485,20 +489,18 @@ export function PlanMap({
   };
   const clearTrace = () => {
     setUserTraced(null);
-    // Docked, the panel falls back to the planet the pilot still has ticked.
-    if (docked && whatIf !== null) setDetailKind('planet');
     if (linked !== null) dropProduct();
     else restore();
   };
   /**
-   * A tile, phone row or pick: a click on the product the pilot traced clears
-   * it; any other click traces. The first pick traced by default is not the
-   * pilot's choice, so its first click opens it. Docked over the what-if
-   * panel, the click brings the product back into view instead.
+   * The default first pick is not the pilot's choice: its first click opens it.
+   * While the docked panel shows a colony or the what-if, a click brings the
+   * product back instead of clearing it.
    */
   const toggleProduct = (typeId: number) => {
     const ownTrace = traced?.explicit === true && traced.id === typeId;
-    if (ownTrace && !(docked && detailKind === 'planet' && whatIf !== null)) clearTrace();
+    const panelElsewhere = docked && (richnessColony !== null || showWhatIf);
+    if (ownTrace && !panelElsewhere) clearTrace();
     else openProduct(typeId);
   };
 
@@ -509,7 +511,7 @@ export function PlanMap({
           name: tracedProduct.name,
           planets: trace.planets.map((p) => planetName(t, p.type)).join(' + '),
         })
-      : traced === null && userTraced === null
+      : linked === null && userTraced === null
         ? t('piMap.announceTraceCleared')
         : '';
 
@@ -527,7 +529,7 @@ export function PlanMap({
         />
       );
     }
-    if (detailKind === 'planet' && whatIf && whatIfAdvice) {
+    if (showWhatIf && whatIf && whatIfAdvice) {
       const weakest = [...advice.colonies]
         .filter((c) => c.todayPerDay !== null)
         .sort((a, b) => a.todayPerDay! - b.todayPerDay!)[0];
@@ -592,7 +594,7 @@ export function PlanMap({
   })();
   const detailTitle = richnessColony
     ? t('piMap.richness.title', { name: richnessColony.name })
-    : detailKind === 'planet' && whatIf
+    : showWhatIf && whatIf
       ? t('piMap.add.panelTitleFor', { type: planetName(t, whatIf) })
       : traced && tracedProduct
         ? t('piMap.detail.panelTitle', {
@@ -636,6 +638,7 @@ export function PlanMap({
                   to={productHref(pick.typeId)}
                   aria-current={traced?.id === pick.typeId ? 'true' : undefined}
                   onClick={(event) => onPlanLinkClick(() => toggleProduct(pick.typeId))(event)}
+                  onKeyDown={clickOnSpace}
                   className={cx(
                     'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
                     interactiveClassName,

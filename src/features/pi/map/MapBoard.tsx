@@ -11,9 +11,8 @@
  * - **Keyboard.** One tab stop for the whole board (roving `tabIndex`). Up and
  *   Down walk a column, Left and Right hop to the neighbouring column at about
  *   the same height, Home and End jump to a column's ends. Enter or Space on
- *   a product traces it and opens its detail, or clears the trace on the
- *   product already traced; Enter or Space on a planet toggles it or opens
- *   "add a planet".
+ *   a product clicks it (PlanMap traces or clears); on a planet, toggles it
+ *   or opens "add a planet".
  * - **Ghost slots.** What the ticked planets cannot make keeps its place as an
  *   empty, `aria-hidden` slot so the layout never jumps, and it is not a tab
  *   stop.
@@ -40,7 +39,8 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
-import { clickOnSpace, onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
+import { clickOnSpace } from '@/lib/clickOnSpace';
 import { formatIskCompact } from '@/lib/isk';
 import { useTouchContext } from '@/lib/useMediaQuery';
 import { PlanetImage } from '../PlanetImage';
