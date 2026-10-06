@@ -501,6 +501,33 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
   });
 });
 
+test.describe('Mining Tax phone card — tick box clears the card text', () => {
+  // A coarse pointer grows the tick box's label to 44px (`touch:size-11`).
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+  test('tick box sits left of the card text with a visible gap', async ({ page }) => {
+    await signInAndGoto(page);
+    await seedPayeeBalance(page);
+    await page.goto('./mining/tax');
+
+    const box = page.getByLabel('Select this row');
+    await expect(box).toHaveCount(1);
+    const row = page.locator('tr', { has: box });
+    const boxRect = await box.locator('xpath=ancestor::label[1]').boundingBox();
+    const rowCells = row.locator('td:not(.dt-edge)');
+    const textLefts = await rowCells.evaluateAll((cells) =>
+      cells.map((c) => {
+        const range = document.createRange();
+        range.selectNodeContents(c);
+        return range.getBoundingClientRect();
+      })
+    );
+    const textLeft = Math.min(...textLefts.filter((r) => r.width > 0).map((r) => r.left));
+    // Gap between the label's right edge and the first text: not touching.
+    expect(textLeft - (boxRect!.x + boxRect!.width)).toBeGreaterThanOrEqual(4);
+  });
+});
+
 /**
  * Ledger table Payee column — long name overflow (issue #2147): a Payee name
  * long enough to fill the column was pushing Status and the row's edit

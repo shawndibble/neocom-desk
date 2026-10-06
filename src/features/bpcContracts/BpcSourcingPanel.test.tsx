@@ -305,7 +305,6 @@ async function resetSession() {
   localJumpDistances.mockReset();
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
   usePickedSystems.setState({ value: {}, hydrated: false });
-  // Else a store hydrated at 0 by an earlier render ignores a test's own LP Value and fetches market rates for real (~2.5s).
   useLpValue.setState({ value: 0, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -1723,8 +1722,12 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ]),
         requiredItemTypeIds: [],
       });
-      // The pilot's own LP Value, so no market rate is fetched.
+      // The pilot's own LP Value, so no market rate is fetched. Set on the
+      // store too: `beforeAll`'s warm-up render already hydrated it at 0, so the
+      // db row alone is never re-read and the lookup fetched a real market rate
+      // (~2.5s) before pricing the row.
       await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
+      useLpValue.setState({ value: 1_000, hydrated: true });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
       const user = userEvent.setup();
       render(<App />);
