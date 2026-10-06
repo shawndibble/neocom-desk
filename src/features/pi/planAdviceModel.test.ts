@@ -454,6 +454,20 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.totals.todayPerDay).toBeNull();
   });
 
+  it('ranks P2 one-planet recipes for a pilot with no colonies at CCU 5 (Coolant on gas)', () => {
+    const COOLANT = 9832;
+    const advice = buildPlanAdvice(
+      input({
+        snapshot: snapshot({ colonies: [], details: new Map() }),
+        skills: { commandCenterUpgrades: 5, interplanetaryConsolidation: null },
+      })
+    );
+    const coolant = advice.recipes.recipes.find((r) => r.typeId === COOLANT);
+    expect(coolant?.tier).toBe(2);
+    expect(coolant?.hostTypes).toContain('gas');
+    expect(advice.recipes.recipes.filter((r) => r.tier === 2).length).toBeGreaterThan(0);
+  });
+
   it('filters the ranking and marks the planet types the pilot has', () => {
     const p2 = buildPlanAdvice(input({ recipeFilter: 'p2' })).recipes.recipes;
     expect(p2.length).toBeGreaterThan(0);

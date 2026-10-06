@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -22,7 +22,6 @@ import {
   type OwnedStockSaleLine,
 } from '@/engine/industry/ownedStockSale';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
@@ -132,16 +131,6 @@ interface ResultsSummaryProps {
   nameFor: (typeID: number) => string;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
-  /** Wraps the revenue (product) and owned-sale (material) rows in the item context menu; omitted where the caller has none to offer. */
-  itemMenuFor?: ItemMenuFor;
-  /**
-   * Visible "More actions" button for the owned-sale rows (WCAG 2.1.1, issue
-   * #1498) — the same item menu `itemMenuFor` opens on right-click/long-press,
-   * reachable by keyboard. The revenue row has none of its own: the product's
-   * button already sits in the hero's corner. Omitted where the caller has
-   * none to offer.
-   */
-  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /**
@@ -184,8 +173,6 @@ export function ResultsSummary({
   ownedSale,
   nameFor,
   totalVolume,
-  itemMenuFor,
-  itemActionsFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
@@ -195,7 +182,12 @@ export function ResultsSummary({
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
-      { id: 'product', header: t('industry.product'), render: (row) => row.name },
+      {
+        id: 'product',
+        header: t('industry.product'),
+        stickyStart: true,
+        render: (row) => row.name,
+      },
       {
         id: 'quantity',
         header: t('industry.quantity'),
@@ -226,6 +218,7 @@ export function ResultsSummary({
       {
         id: 'material',
         header: t('industry.material'),
+        stickyStart: true,
         sortValue: (row) => nameFor(row.typeID),
         render: (row) => nameFor(row.typeID),
       },
@@ -253,19 +246,8 @@ export function ResultsSummary({
         sortValue: (row) => row.net,
         render: (row) => formatIsk(row.net),
       },
-      ...(itemActionsFor
-        ? [
-            {
-              id: 'actions',
-              header: '',
-              align: 'right',
-              cardActions: true,
-              render: (row) => itemActionsFor(row.typeID),
-            } satisfies DataTableColumn<OwnedStockSaleLine>,
-          ]
-        : []),
     ],
-    [t, nameFor, itemActionsFor]
+    [t, nameFor]
   );
 
   const saleCsvColumns = useMemo(() => ownedSaleCsvColumns(t, nameFor), [t, nameFor]);
@@ -404,13 +386,7 @@ export function ResultsSummary({
                 rowKey={() => 'revenue'}
                 label={t('industry.revenue')}
                 density="compact"
-                rowContextMenu={
-                  itemMenuFor && productTypeID !== null
-                    ? (_row, tr) => itemMenuFor(productTypeID, tr)
-                    : undefined
-                }
-                // No ⋮ here on purpose: the hero above carries this product's, and the
-                // row menu stays right-click/hold (exception to §6c, same item).
+                responsive="table"
               />
             </div>
             <div className="divide-y divide-line rounded-xs border border-line">
@@ -561,9 +537,7 @@ export function ResultsSummary({
                   rowKey={(row) => row.typeID}
                   label={t('industry.useOrSell.perMaterial')}
                   density="compact"
-                  rowContextMenu={itemMenuFor && ((row, tr) => itemMenuFor(row.typeID, tr))}
-                  rowMoreActions={itemMenuFor !== undefined}
-                  mobileSort
+                  responsive="table"
                 />
               </div>
             </Disclosure>

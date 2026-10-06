@@ -131,6 +131,22 @@ describe('BuildPlanContextMenu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Add to Compare' })).not.toBeInTheDocument();
   });
 
+  it('drops View in Market where the row already links the item', async () => {
+    render(
+      <MemoryRouter>
+        <BuildPlanContextMenu
+          typeId={638}
+          omitViewInMarket
+          trigger={<button type="button">Rifter Blueprint</button>}
+        />
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter Blueprint' }));
+
+    expect(await screen.findByRole('menuitem', { name: /Build Plan/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
+  });
+
   it('adds the name-bearing actions once the surface knows what the row is called', async () => {
     renderMenu(638, undefined, 'Rifter Blueprint');
     fireEvent.contextMenu(screen.getByTestId('row'));

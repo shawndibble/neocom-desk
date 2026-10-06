@@ -213,7 +213,6 @@ export function MobileMoreSheet({
                 focusRingClassName
               )}
             >
-              <Caret expanded={showHidden} />
               <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
               <span className="min-w-0 flex-1 truncate">
                 {t('nav.hiddenPages', {
@@ -225,6 +224,7 @@ export function MobileMoreSheet({
               <span aria-hidden="true" className="text-accent">
                 {t(showHidden ? 'nav.hiddenCollapse' : 'nav.hiddenExpand')}
               </span>
+              <Caret expanded={showHidden} />
             </button>
             {showHidden && <div className={TILE_GRID}>{hiddenPages.map(tile)}</div>}
           </div>

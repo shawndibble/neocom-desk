@@ -16,7 +16,6 @@ import { InfoTooltip, IskAmount, TypeIcon, type DataTableSort } from '@/componen
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
-import { ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
@@ -34,8 +33,6 @@ interface MobileMarketWideListProps {
   total: number;
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;
-  /** For the item menu's "Build plan" entry; undefined while the catalog loads. */
-  blueprintTypeIDFor: (productTypeID: number) => number | null | undefined;
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
@@ -98,7 +95,6 @@ export function MobileMarketWideList({
   total,
   sort,
   onSortChange,
-  blueprintTypeIDFor,
   skillGateFor,
   nameForSkill,
   nameForCharacter,
@@ -235,17 +231,10 @@ export function MobileMarketWideList({
                     {fieldLabel[heroId]}
                   </span>
                 </span>
-                <span className="flex items-center">
-                  <StartPlanButton
-                    onStart={() => onStartPlan(row)}
-                    compact={{ name: row.productName }}
-                  />
-                  <ItemMoreActions
-                    typeId={row.productTypeID}
-                    itemName={row.productName}
-                    blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
-                  />
-                </span>
+                <StartPlanButton
+                  onStart={() => onStartPlan(row)}
+                  compact={{ name: row.productName }}
+                />
               </div>
             </li>
           );

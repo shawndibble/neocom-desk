@@ -271,7 +271,7 @@ export type ProductFigure =
       isReference: boolean;
       versus: { typeId: number; name: string; planetType: PlanetType; iskPerDay: number } | null;
     }
-  | { kind: 'unranked'; reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' };
+  | { kind: 'unranked'; reason: 'raw' | 'tier' | 'unpriced' | 'not-one-planet' | 'no-fit' };
 
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from
@@ -285,9 +285,18 @@ export function productFigure(advice: PlanAdvice, typeId: number, graph: MapGrap
   if (product.tier > 2) return { kind: 'unranked', reason: 'tier' };
   const recipe = advice.recipes.recipes.find((r) => r.typeId === typeId);
   if (!recipe) {
+    const onePlanet = graph.planetTypes.some(
+      (type) =>
+        product.hosts.includes(type) &&
+        product.raws.every((raw) => graph.byId.get(raw)!.hosts.includes(type))
+    );
     return {
       kind: 'unranked',
-      reason: advice.recipes.unpriced.includes(typeId) ? 'unpriced' : 'not-one-planet',
+      reason: advice.recipes.unpriced.includes(typeId)
+        ? 'unpriced'
+        : onePlanet
+          ? 'no-fit'
+          : 'not-one-planet',
     };
   }
   return {

@@ -41,25 +41,6 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
-  /**
-   * Switches this material between being bought and being produced in the
-   * Build Plan the row belongs to — the same toggle a Build Plan's own
-   * materials table offers inline for a row something here can manufacture.
-   * Present only from that table, and only on a material with a recipe;
-   * omitted everywhere else the menu appears, and on a row that only exists
-   * because another build already introduced it (one level deep,
-   * docs/context/decisions).
-   */
-  onToggleBuildHere?: () => void;
-  /** Picks the toggle's label. Meaningless without `onToggleBuildHere`. */
-  buildingHere?: boolean;
-  /**
-   * Opens the Build Plan's blueprint tier picker, to swap the blueprint or
-   * change its ME/TE. Present only on a Build Plan's blueprint row, where it
-   * takes the Build Plan entry's place — a blueprint has no blueprint of its
-   * own, so that entry could only ever say "No blueprint options".
-   */
-  onModifyBlueprint?: () => void;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
   children: ReactElement;
@@ -131,9 +112,6 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
     planProductTypeID,
     onCompareVariations,
     onViewInIndustryAsMaterial,
-    onToggleBuildHere,
-    buildingHere,
-    onModifyBlueprint,
     extraItems,
   } = props;
   const { t } = useTranslation();
@@ -180,33 +158,18 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
       <MenuItem onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
       </MenuItem>
-      {onModifyBlueprint ? (
-        <MenuItem onSelect={onModifyBlueprint}>
-          {t('industry.contextMenu.modifyBlueprint')}
-        </MenuItem>
-      ) : (
-        <MenuItem
-          disabled={!blueprintTypeID}
-          onSelect={() => {
-            if (blueprintTypeID)
-              navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
-          }}
-        >
-          {buildPlanLabel}
-        </MenuItem>
-      )}
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (blueprintTypeID)
+            navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
+        }}
+      >
+        {buildPlanLabel}
+      </MenuItem>
       {onViewInIndustryAsMaterial && (
         <MenuItem onSelect={onViewInIndustryAsMaterial}>
           {t('market.contextMenu.viewInIndustryAsMaterial')}
-        </MenuItem>
-      )}
-      {onToggleBuildHere && (
-        <MenuItem onSelect={onToggleBuildHere}>
-          {t(
-            buildingHere
-              ? 'market.contextMenu.buyInsteadOfBuilding'
-              : 'market.contextMenu.addMaterialComponents'
-          )}
         </MenuItem>
       )}
       {piPlannable && (

@@ -313,6 +313,10 @@ function recipeEntries(advice: StopTierAdvice): ScoredStopTier[] {
     .filter((entry) => entry.tier === 1 || entry.tier === 2);
 }
 
+function hostsTier2(advice: StopTierAdvice): boolean {
+  return advice.entries.some((entry) => entry.tier === 2 && entry.status !== 'does-not-fit');
+}
+
 function sellsOf(colony: BuiltColonyAdvice, pi: PiData): number[] {
   const made = currentProductTypeIds(colony, pi);
   return made.length > 0 ? [...new Set(made)] : colony.extractedPerHour.map((e) => e.typeId);
@@ -925,10 +929,10 @@ function rankingFor(args: {
       : input.prefs.fallbackRatePerHour;
 
   const withEcus = withAdvice.filter((a) => (a.pinLoad.counts.extractorControlUnit ?? 0) > 0);
-  const heads =
-    withEcus.length > 0
-      ? Math.round(withEcus.reduce((sum, a) => sum + meanHeadsPerExtractor(a), 0) / withEcus.length)
-      : DEFAULT_PLANNER_HEADS;
+  const headsMeasured = withEcus.length > 0;
+  const heads = headsMeasured
+    ? Math.round(withEcus.reduce((sum, a) => sum + meanHeadsPerExtractor(a), 0) / withEcus.length)
+    : DEFAULT_PLANNER_HEADS;
 
   const borrowed = medianNewLinkLoad(
     withAdvice.flatMap((a) => (a.pinLoad.newLinkLoad ? [a.pinLoad.newLinkLoad] : []))
@@ -952,24 +956,35 @@ function rankingFor(args: {
   const recipeRows: RecipeRow[] = [];
   const unpriced = new Set<number>();
   for (const planetType of planetTypes) {
-    const advice = recommendStopTier(
-      {
-        localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
-        budget: ceiling.budget,
-        infrastructure: pi.infrastructure,
-        overhead: { launchpads: 1, storageFacilities: storage },
-        headsPerExtractor: heads,
-        newLinkCost: borrowed ?? ASSUMED_RANKING_LINK_COST,
-        extractionRatePerHour: rate,
-        prices: books.prices,
-        revenuePrices: books.revenuePrices,
-        taxRate,
-        salesTaxPct: books.salesTaxPct,
-        linkCapacityPerHour: null,
-        bufferHours: haulHours,
-      },
-      pi
-    );
+    const adviceAt = (headsPerExtractor: number) =>
+      recommendStopTier(
+        {
+          localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
+          budget: ceiling.budget,
+          infrastructure: pi.infrastructure,
+          overhead: { launchpads: 1, storageFacilities: storage },
+          headsPerExtractor,
+          newLinkCost: borrowed ?? ASSUMED_RANKING_LINK_COST,
+          extractionRatePerHour: rate,
+          prices: books.prices,
+          revenuePrices: books.revenuePrices,
+          taxRate,
+          salesTaxPct: books.salesTaxPct,
+          linkCapacityPerHour: null,
+          bufferHours: haulHours,
+        },
+        pi
+      );
+    // An assumed head count must not decide what a planet can host: ten heads
+    // on each of a P2's two extractors overdraws even a level-5 Command Center's
+    // powergrid, so a pilot with no colonies would see no P2 at all. Step the
+    // assumption down until a P2 block fits; a measured count is never touched.
+    let advice = adviceAt(heads);
+    if (!headsMeasured) {
+      for (let tryHeads = heads - 2; tryHeads >= 1 && !hostsTier2(advice); tryHeads -= 2) {
+        advice = adviceAt(tryHeads);
+      }
+    }
     for (const entry of advice.entries) {
       if (entry.tier !== 1 && entry.tier !== 2) continue;
       if (entry.status === 'needs-price') unpriced.add(entry.typeId);

@@ -167,7 +167,7 @@ export function YieldDetailModal({
     {
       id: 'type',
       header: t('miningTax.oreColumn'),
-      primary: true,
+      stickyStart: true,
       render: (line) => typeNameCell(line.typeId),
       sortValue: (line) => typeName(line.typeId),
     },
@@ -182,6 +182,7 @@ export function YieldDetailModal({
     {
       id: 'volume',
       header: t('miningTax.overview.detail.m3Column'),
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap text-text-dim tabular-nums',
       render: (line) => {
@@ -244,7 +245,7 @@ export function YieldDetailModal({
     {
       id: 'material',
       header: t('miningTax.overview.detail.materialColumn'),
-      primary: true,
+      stickyStart: true,
       render: (material) => typeNameCell(material.typeId),
       sortValue: (material) => typeName(material.typeId),
     },
@@ -427,11 +428,9 @@ export function YieldDetailModal({
                 rowKey={(line) => line.typeId}
                 label={t('miningTax.overview.detail.oreMinedTitle')}
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
-                // Four short figures a card, same shape as the Price History
-                // day list: one per line would run a multi-ore day twice as
-                // long for no gain in legibility. The neighbouring "refines
-                // into" table has only two and stays at the default.
-                stackColumns={2}
+                // A compare table: raw against refined across the columns, so it
+                // stays a table on a phone and scrolls sideways.
+                responsive="table"
               />
             </div>
           </div>
@@ -464,6 +463,7 @@ export function YieldDetailModal({
                       rows={refinedRows}
                       rowKey={(material) => material.typeId}
                       label={t('miningTax.overview.detail.refinesIntoTitle')}
+                      responsive="table"
                     />
                   </div>
                 )}
