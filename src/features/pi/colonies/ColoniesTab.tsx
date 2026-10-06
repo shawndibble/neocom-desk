@@ -25,6 +25,7 @@ import { extractorProgramsFromPins } from '../adapters';
 import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
+import { PricesUnavailable } from '../PricesUnavailable';
 import { useColoniesAdvice } from './useColoniesAdvice';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
@@ -441,6 +442,7 @@ export function ColoniesTab({
         ))
       ) : (
         <>
+          {planAdvice.pricesFailed && <PricesUnavailable />}
           {ownRows.length > 0 || includeAlts ? (
             <TodayPanel
               rows={todayRows}

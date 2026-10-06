@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
+import { PricesUnavailable } from './PricesUnavailable';
 import { AllProductsPanel } from './AllProductsPanel';
 import { useCadence } from './cadencePref';
 import {
@@ -19,6 +20,7 @@ import { planetTypesOf } from './productPlanets';
 import { ShowMeHow } from './ShowMeHow';
 import { useFinderOrigin } from './usePlanetFinder';
 import { usePlanAdvice } from './usePlanAdvice';
+import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
 
 interface Props {
@@ -89,7 +91,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
   }, [advice, colonyTypes, allTypes, off, whatIf, filter, snapshot.pi]);
 
   if (state.status === 'prices-failed') {
-    return <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />;
+    return <PricesUnavailable />;
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.find.failedTitle')} hint={t('piPlan.find.failedHint')} />;
@@ -104,6 +106,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
 
   const { best, tiers } = view;
   const { hubName } = state;
+  const priceSource = priceSourceLabel(t, hubName, buybackPct);
   const mineFor = (hosts: readonly PlanetType[]) =>
     snapshot.colonies
       .filter(
@@ -125,7 +128,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         colonyCount={snapshot.colonies.length}
         toggles={best.toggles}
         chips={best.chips}
-        hubName={hubName}
+        priceSource={priceSource}
         onToggle={(type) => {
           setOff((current) => toggled(current, type));
           setOpenId(null);
@@ -148,14 +151,16 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         }}
       />
       {mode === 'all' ? (
-        <AllProductsPanel tiers={tiers} hubName={hubName} estimate />
+        <AllProductsPanel tiers={tiers} priceSource={priceSource} estimate />
       ) : (
         <RecipeListPanel
           cards={best.cards}
           hubName={hubName}
+          priceSource={priceSource}
           estimate
           openId={openId}
           onToggle={(typeId) => setOpenId((current) => (current === typeId ? null : typeId))}
+          onFind={setOpenId}
           unpricedCount={best.unpricedCount}
           emptyHint={
             advice.recipeRows.length === 0

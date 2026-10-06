@@ -9,14 +9,15 @@ import { MakeMorePlan } from './MakeMorePlan';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
+import { DEFAULT_PI_SETTINGS, usePiSettings } from './piSettings';
 
 let mockState: PlanAdviceState = { status: 'loading' };
 vi.mock('./usePlanAdvice', () => ({ usePlanAdvice: () => mockState }));
 
 const snapshot = { pi: fixturePi, colonies: [] } as unknown as GoalPlannerSnapshot;
 
-function ready(advice: PlanAdvice = fixtureAdvice): PlanAdviceState {
-  return { status: 'ready', advice, pricesFetchedAt: new Date(), hubName: 'Jita' };
+function ready(advice: PlanAdvice = fixtureAdvice, hubName = 'Jita'): PlanAdviceState {
+  return { status: 'ready', advice, pricesFetchedAt: new Date(), hubName };
 }
 
 function renderPlan(path = '/', onFindBest = vi.fn()) {
@@ -30,6 +31,7 @@ function renderPlan(path = '/', onFindBest = vi.fn()) {
 beforeEach(async () => {
   mockState = ready();
   Element.prototype.scrollIntoView = vi.fn();
+  usePiSettings.setState({ value: DEFAULT_PI_SETTINGS, hydrated: true });
   await usePlanTicks.getState().setValue([]);
   await usePlanPreference.getState().setValue('isk');
 });
@@ -166,5 +168,29 @@ describe('MakeMorePlan', () => {
     expect(haul).toHaveTextContent('Collected at home');
     expect(haul).toHaveTextContent(/Fits in one trip with an industrial hauler/);
     expect(haul).toHaveTextContent('Frigate cargo ~400 m³');
+  });
+
+  it('labels the hauling route as the worst colony, not the home route', () => {
+    renderPlan();
+    const hauling = screen.getByRole('heading', { name: /Hauling and upkeep/ }).closest('section')!;
+    expect(within(hauling).getByText('Worst colony')).toBeInTheDocument();
+    expect(within(hauling).queryByText('Route')).not.toBeInTheDocument();
+  });
+
+  it('prices at the chosen hub, never a hardcoded Jita', () => {
+    mockState = ready(fixtureAdvice, 'Amarr');
+    renderPlan();
+    expect(screen.getByText(/at Amarr prices\. Estimates\./)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/Jita/);
+  });
+
+  it('prices at the corp buyback once that is the market, with no hub named', () => {
+    usePiSettings.setState({
+      value: { ...DEFAULT_PI_SETTINGS, buybackPct: 85 },
+      hydrated: true,
+    });
+    renderPlan();
+    expect(screen.getByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/Jita/);
   });
 });
