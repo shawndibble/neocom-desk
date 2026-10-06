@@ -10,8 +10,23 @@ vi.mock('./PlanMap', () => ({ PlanMap: () => <p>map board</p> }));
 
 const { PiMapTab } = await import('./PiMapTab');
 
-const ready = (esiFailed: { retry: () => void; retrying: boolean } | null) =>
-  ({ status: 'ready', colonies: [], esiFailed }) as unknown as MapAdviceState;
+const ready = (esiFailed: { retry: () => void; retrying: boolean } | null, pricesFailed = false) =>
+  ({ status: 'ready', colonies: [], esiFailed, pricesFailed }) as unknown as MapAdviceState;
+
+describe('PiMapTab when hub prices could not be read', () => {
+  it('keeps the board and adds the notice', () => {
+    state = ready(null, true);
+    render(<PiMapTab characterId={7} />);
+    expect(screen.getByText('Hub prices could not be fetched')).toBeInTheDocument();
+    expect(screen.getByText('map board')).toBeInTheDocument();
+  });
+
+  it('shows no price notice when prices loaded', () => {
+    state = ready(null);
+    render(<PiMapTab characterId={7} />);
+    expect(screen.queryByText('Hub prices could not be fetched')).not.toBeInTheDocument();
+  });
+});
 
 describe('PiMapTab when ESI does not answer the colony read', () => {
   it('draws the board for a pilot with no colonies, plus the notice', () => {

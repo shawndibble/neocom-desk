@@ -18,6 +18,7 @@ vi.mock('@/features/contractSearch/routeExposure', () => ({
 }));
 
 const { usePiAdviceInputs } = await import('./usePiAdviceInputs');
+const { hubBooks } = await import('./planAdviceModel');
 
 const snapshot = {
   pi: {},
@@ -44,6 +45,16 @@ describe('usePiAdviceInputs', () => {
     pricesRead = async () => prices(true);
     const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
     await waitFor(() => expect(result.current.status).toBe('prices-failed'));
+  });
+
+  it('prices-failed still carries an input, on empty books, so what needs no price survives', async () => {
+    pricesRead = async () => prices(true);
+    const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
+    await waitFor(() => {
+      if (result.current.status !== 'prices-failed' || !result.current.input)
+        throw new Error('wait');
+    });
+    expect(hubBooks).toHaveBeenLastCalledWith({ prices: {}, buyPrices: {} }, 0);
   });
 
   it('reports prices-failed when the loader throws a 503', async () => {

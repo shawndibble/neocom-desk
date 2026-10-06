@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, hubBooks, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, pi } from './mapFixtures.testutil';
@@ -381,6 +381,23 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
   });
 
+  it('keeps a traced product on screen when you hover or click a planet it needs', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    // Felsic Magma is a Lava product; the pilot has no Lava colony. It only
+    // shows on the map while Lava is a what-if, and tracing it ends that.
+    await user.click(planet('Lava'));
+    await user.click(product('Felsic Magma'));
+    expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.hover(planet('Lava'));
+    // No what-if preview: the trace already shows the chain, pink wires would bury it.
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    await user.click(planet('Lava'));
+    expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Where to put a new Lava colony' })).toBeNull();
+  });
+
   it('tracing the best recipe from the add-planet drawer keeps the opener and clears the what-if', async () => {
     const user = userEvent.setup();
     renderMap();
@@ -625,5 +642,17 @@ describe('PlanMap richness drawer', () => {
     renderMap({}, '/planetary-industry/map?planet=123');
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
+  });
+});
+
+describe('PlanMap with hub prices unreadable', () => {
+  it('does not claim the planets already make their best product', () => {
+    const unpriced = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    renderMap({ advice: unpriced, pricesFailed: true });
+    expect(screen.queryByText(/already make their best product/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
   });
 });

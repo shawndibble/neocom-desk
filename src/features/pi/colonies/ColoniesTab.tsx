@@ -500,7 +500,9 @@ export function ColoniesTab({
       {!hasAnyColoniesSurface ? (
         !error &&
         !data?.planetsFetchFailed &&
-        (planetsResult && !planetsResult.fromCache ? (
+        (data?.planetsNeedsReauth ? (
+          <EmptyState title={t('piColonies.unknownTitle')} hint={t('piColonies.unknownHint')} />
+        ) : planetsResult && !planetsResult.fromCache ? (
           <NoColonies planHref={PLAN_HREF} />
         ) : (
           <CachedEmptyState
@@ -521,6 +523,7 @@ export function ColoniesTab({
               nameOf={nameOf}
               characterNameOf={characterNameOf}
               activeCharacterId={characterId}
+              pricesFailed={planAdvice.pricesFailed}
               todayPerDay={advice?.totals.todayPerDay ?? null}
               fixCount={advice?.quickWins.length ?? 0}
               fixGainPerDay={wins?.gainPerDay ?? 0}

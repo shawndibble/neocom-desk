@@ -15,8 +15,8 @@ import { useSellHub } from './sellHub';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
-  /** The hub's prices could not be read. The one place `{failed:true}` is consumed. */
-  | { status: 'prices-failed' }
+  /** Prices unreadable. `input` runs on empty books (null until skills load): only price-free wins survive, ISK figures null. */
+  | { status: 'prices-failed'; input: PlanAdviceInput | null }
   | { status: 'ready'; input: PlanAdviceInput; prices: PlanPrices; hubName: string };
 
 interface Skills {
@@ -148,30 +148,30 @@ export function usePiAdviceInputs(
 
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
-    if (pricesFailed) return { status: 'prices-failed' };
-    if (!prices || !skills || !richness) return { status: 'loading' };
-    return {
-      status: 'ready',
-      prices,
-      hubName: hub.systemName,
-      input: {
-        snapshot,
-        prefs: {
-          restartHours: cadence.restartDays * 24,
-          fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
-          customsOverrides: snapshot.customsOverrides,
-          richness,
-        },
-        books: hubBooks(prices, snapshot.accountingLevel),
-        market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
-        cadence,
-        preference,
-        recipeFilter: 'any',
-        skills,
-        ...(routes ? { routesBySystem: routes } : {}),
-        planetNames: snapshot.planetNames,
+    const usable = pricesFailed ? null : prices;
+    if (!skills || !richness) {
+      return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
+    }
+    if (!pricesFailed && !usable) return { status: 'loading' };
+    const input: PlanAdviceInput = {
+      snapshot,
+      prefs: {
+        restartHours: cadence.restartDays * 24,
+        fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
+        customsOverrides: snapshot.customsOverrides,
+        richness,
       },
+      books: hubBooks(usable ?? { prices: {}, buyPrices: {} }, snapshot.accountingLevel),
+      market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
+      cadence,
+      preference,
+      recipeFilter: 'any',
+      skills,
+      ...(routes ? { routesBySystem: routes } : {}),
+      planetNames: snapshot.planetNames,
     };
+    if (!usable) return { status: 'prices-failed', input };
+    return { status: 'ready', prices: usable, hubName: hub.systemName, input };
   }, [
     snapshot,
     prices,

@@ -21,7 +21,6 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   if (state.status === 'failed') {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
-  if (state.status === 'prices-failed') return <PricesUnavailable />;
   if (state.status === 'loading') {
     return (
       <div className="flex justify-center py-16">
@@ -31,6 +30,7 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   }
   return (
     <div className="space-y-4">
+      {state.pricesFailed && <PricesUnavailable />}
       {esi && (
         <EsiDidntAnswer
           retrying={esi.retrying}
@@ -47,7 +47,8 @@ export function PiMapTab({ characterId }: { characterId: number }) {
           adviceWithWhatIf={state.adviceWithWhatIf}
           colonies={state.colonies}
           finder={state.finder}
-          coloniesUnknown={esi !== null}
+          coloniesUnknown={state.coloniesUnknown}
+          pricesFailed={state.pricesFailed}
         />
       </div>
     </div>
