@@ -176,7 +176,10 @@ export function buildAllProducts(
     (hasColonies ? input.colonyTypes : allTypes).filter((type) => !input.off.has(type))
   );
   const have = new Set<PlanetType>([...base, ...input.whatIf]);
-  const rows = hasColonies ? input.rows : input.rows.filter((row) => have.has(row.planetType));
+  // A tile's figure is one the pilot's Command Center can host; a setup that
+  // needs a higher level is Best picks' to show, tagged.
+  const fits = input.rows.filter((row) => !row.needsCcLevel);
+  const rows = hasColonies ? fits : fits.filter((row) => have.has(row.planetType));
   const ranked = new Map(
     rankRecipes({ rows, haveTypes: [...have], filter: 'any' }).recipes.map((r) => [r.typeId, r])
   );
