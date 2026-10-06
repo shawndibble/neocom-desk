@@ -2,8 +2,6 @@
 
 _Recorded 2026-10-06._
 
-- **<Decision>.** <Why, and what it rules out.>
-
 - **New synced setting, "Ore Form": Compressed (default) or Raw.** Extends the
   2026-09-06 decision (price compressed ore at Jita buy), which hard-wired
   Compressed. It lives in Settings → Mining tax beside "Edit ore values
