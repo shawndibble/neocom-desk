@@ -4899,6 +4899,7 @@
       "setupHighTech_other": "{{count}} high-tech factories",
       "youNeed_one": "You need",
       "youNeed_other": "You need one of",
+      "findOneFor": "Find one: {{planet}}",
       "state": {
         "have": "You have",
         "whatif": "If added",
