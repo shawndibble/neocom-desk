@@ -186,15 +186,24 @@ describe('OpportunitiesPanel', () => {
       return { row: name.closest('tr')!, actions };
     }
 
-    it('links the product name to its Market listing when the product type is known', async () => {
+    it('renders the product name as plain text, not a link: the row click is Start plan', async () => {
       const { row } = await renderWithRow(1000);
-      expect(within(row).getByRole('link', { name: 'Widget Alpha' })).toBeInTheDocument();
-    });
-
-    it('renders the product name as plain text, not a link, when the product type is unknown', async () => {
-      const { row } = await renderWithRow(null);
       expect(within(row).queryByRole('link', { name: 'Widget Alpha' })).not.toBeInTheDocument();
       expect(within(row).getByText('Widget Alpha')).toBeInTheDocument();
+    });
+
+    it('clicking the product name starts the plan, like the Plan button', async () => {
+      const onStartPlan = vi.fn(() => Promise.resolve(false));
+      const { row } = await renderWithRow(1000, { onStartPlan });
+      fireEvent.click(within(row).getByText('Widget Alpha'));
+      expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));
+    });
+
+    it('the row checkbox does not start a plan', async () => {
+      const onStartPlan = vi.fn(() => Promise.resolve(false));
+      const { row } = await renderWithRow(1000, { onStartPlan });
+      fireEvent.click(within(row).getByRole('checkbox'));
+      expect(onStartPlan).not.toHaveBeenCalled();
     });
 
     it('has no row menu or More-actions button: Plan is the row’s one control', async () => {

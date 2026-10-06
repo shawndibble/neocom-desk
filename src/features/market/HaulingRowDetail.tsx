@@ -29,6 +29,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { maxBuyPrice } from '@/engine/market/haulingPlan';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
+import { SystemLink } from '@/features/entities';
 import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
@@ -146,10 +147,19 @@ export function HaulingRowDetail({ row, loadNote }: HaulingRowDetailProps) {
 /** The item in the Market Browser at the destination hub — its full order book and price history. */
 function MarketLink({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
+  // The row's click expands this detail, so the row's hub and item names are
+  // plain text there (DESIGN.md §6c); their links live here.
   return (
-    <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
-      {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
-    </MarketItemLink>
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
+        {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
+      </MarketItemLink>
+      {[row.fromHub, row.toHub].map((hub) => (
+        <SystemLink key={hub.id} systemId={hub.systemId} className={inlineLinkClassName}>
+          {t('market.hauling.detail.routeSafety', { hub: hub.systemName })}
+        </SystemLink>
+      ))}
+    </p>
   );
 }
 

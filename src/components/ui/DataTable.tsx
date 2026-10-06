@@ -323,6 +323,12 @@ interface DataTableProps<T> {
    */
   onRowClick?: (row: T) => void;
   /**
+   * Per-row opt-out of `onRowClick`: a row it returns false for is inert (no
+   * pointer cursor, no tab stop, no Enter/Space) so it never looks clickable
+   * while doing nothing. Omit when every row opens something.
+   */
+  rowClickable?: (row: T) => boolean;
+  /**
    * Adds a per-row disclosure: clicking a row opens `renderDetail`'s content
    * in a full-width row beneath it. Independent of `onRowClick` — both fire
    * on the same click when both are given, though no caller currently
@@ -845,6 +851,7 @@ export function DataTable<T>({
   rowContextMenu,
   rowMoreActions = false,
   onRowClick,
+  rowClickable,
   expandableRow,
   responsive = 'stack',
   stackColumns = 1,
@@ -1167,8 +1174,8 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
-  const clickable = Boolean(onRowClick) || expandable;
-  const focusable = Boolean(rowContextMenu) || clickable;
+  const rowIsClickable = (row: T) =>
+    expandable || (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
 
   // Rows get one stable activator rather than `onRowClick` itself, which
   // callers pass inline — only ever called from a click or key handler, so
@@ -1231,9 +1238,9 @@ export function DataTable<T>({
         hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
         leadingExpandIcon={expandableRow?.leadingIcon ?? false}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
-        clickable={clickable}
-        tapOpensRow={Boolean(onRowClick)}
-        focusable={focusable}
+        clickable={rowIsClickable(row)}
+        tapOpensRow={Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true)}
+        focusable={Boolean(rowContextMenu) || rowIsClickable(row)}
         onActivate={activateRow}
         rowClassName={rowClassName}
         rowContextMenu={rowContextMenu}
