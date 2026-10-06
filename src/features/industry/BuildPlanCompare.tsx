@@ -113,6 +113,7 @@ export function BuildPlanCompare({
       id: 'plan',
       header: t('industry.comparePlanColumn'),
       primary: true,
+      stickyStart: true,
       sortValue: (row) => row.planName,
       render: (row) => {
         const reason = row.loading ? null : unresolvedReason(row, t);
@@ -245,6 +246,9 @@ export function BuildPlanCompare({
           rows={rows}
           rowKey={(row) => row.planId}
           label={t('industry.compareTableLabel')}
+          // A comparison table: read across its columns, so it scrolls sideways
+          // on a phone with the plan name pinned rather than stacking into cards.
+          responsive="table"
           defaultSort={{ columnId: 'plan', direction: 'asc' }}
         />
       </div>

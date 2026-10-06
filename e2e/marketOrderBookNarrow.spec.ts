@@ -189,6 +189,31 @@ function labelLines(cells: CellBox[], tolerance = 1): string[][] {
   return lines(cells, tolerance).map((line) => line.map((cell) => cell.label));
 }
 
+/** A phone card: the pinned ⋮ is a 44px target centred on the card, with no › beside or under it, clear of line two. */
+async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
+  const row = page.locator(`table[aria-label="${tableLabel}"] tr[data-row-key="${orderId}"]`);
+  const more = await row.getByRole('button', { name: /^More actions/ }).boundingBox();
+  const card = await row.boundingBox();
+  const meta = await row.locator('td.dt-meta').last().boundingBox();
+  expect(more!.width).toBeGreaterThanOrEqual(44);
+  expect(more!.height).toBeGreaterThanOrEqual(44);
+  await expect(row.locator('td.dt-disclosure svg')).toBeHidden();
+  const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
+  expect(dy, `⋮ centre-y vs card centre-y (${tableLabel})`).toBeLessThanOrEqual(1);
+  // No overlap: line two ends before the button's box, wider font or not.
+  expect(meta!.x + meta!.width, `line two vs ⋮ (${tableLabel})`).toBeLessThanOrEqual(more!.x);
+  expect(card!.height, tableLabel).toBeLessThanOrEqual(64);
+  // One line two: every meta cell shares the first one's top.
+  const tops = await row
+    .locator('td.dt-meta')
+    .evaluateAll((tds) =>
+      tds
+        .filter((td) => td.getBoundingClientRect().width > 0)
+        .map((td) => Math.round(td.getBoundingClientRect().top))
+    );
+  expect(new Set(tops).size, `line two is one line (${tableLabel})`).toBe(1);
+}
+
 test.describe('Market Browser — order book stacked cards', () => {
   test.beforeEach(async ({ page }) => {
     await seedOrderBook(page);
@@ -219,6 +244,7 @@ test.describe('Market Browser — order book stacked cards', () => {
     await openTritanium(page);
 
     await expectTwoLineCards(page);
+    await expectCardMenu(page, 'Sell Orders', SELL_ORDER.order_id);
     await expect(page.getByRole('table', { name: 'Buy Orders' })).toBeHidden();
 
     await page.getByRole('button', { name: /^Buy · 1/ }).click();
@@ -228,6 +254,7 @@ test.describe('Market Browser — order book stacked cards', () => {
       ['Location', 'Price'],
       ['Qty', 'Jumps', 'Sec', 'Expires', 'Range'],
     ]);
+    await expectCardMenu(page, 'Buy Orders', BUY_ORDER.order_id);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -271,11 +298,14 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect((await readRow(page, 'Sell Orders', SELL_ORDER.order_id)).display).toBe('flex');
 
     // Fewer columns need less width (`orderBookWidthsRem`): this book fits them as a table.
+    // Two, not one: the budget counts the ⋮ column, so Sec alone no longer
+    // clears the 8-figure quantity at this width.
     await page
       .getByRole('region', { name: 'Sell Orders' })
       .getByRole('button', { name: 'Columns' })
       .click();
     await page.getByRole('menuitemcheckbox', { name: 'Sec' }).click();
+    await page.getByRole('menuitemcheckbox', { name: 'Jumps' }).click();
     await page.keyboard.press('Escape');
     const table = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(table.display).toBe('table-row');
@@ -313,7 +343,9 @@ test.describe('Market Browser — order book stacked cards', () => {
 
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(buy.cells.find((c) => c.label === 'Min. Volume')?.text).toContain('500,000');
-    for (const cell of buy.cells.filter((c) => c.label !== 'Location')) {
+    // Range may ellipsize on a wider font (it is the cell that gives way
+    // before text could meet the ⋮).
+    for (const cell of buy.cells.filter((c) => c.label !== 'Location' && c.label !== 'Range')) {
       expect(cell.clipped, cell.label).toBe(false);
     }
   });
