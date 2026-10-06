@@ -5,7 +5,6 @@ import {
   FilterChip,
   IconButton,
   NativeSelect,
-  RowMoreActions,
   SearchInput,
   Tabs,
   TextInput,
@@ -36,7 +35,6 @@ import { ChargePickerControls, ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS, type ChargePickerSettings } from './chargePickerSettings';
 import { useChargeChoices } from './useChargeChoices';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
-import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { useFittingItemActions } from './fittingItemActions';
 import type { FittingContext } from './fittingContext';
 import { useHullFit } from './useHullFit';
@@ -169,8 +167,7 @@ interface ItemRowProps {
 
 function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowProps) {
   const { t } = useTranslation();
-  const actions = useFittingItemActions();
-  const row = (
+  return (
     <li
       draggable={draggable}
       onDragStart={
@@ -207,18 +204,7 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
           )
         )}
       </button>
-      {actions && <RowMoreActions />}
     </li>
-  );
-  return actions ? (
-    <FittingItemMenu
-      name={entry.name}
-      items={<AddItemMenuItems typeId={entry.typeId} rack={rack} />}
-    >
-      {row}
-    </FittingItemMenu>
-  ) : (
-    row
   );
 }
 
@@ -448,7 +434,7 @@ export function FittingAddPanel({
           dragToFit={dragToRing}
         />
       ) : tab === 'cargo' && onAddCargo ? (
-        <CargoTab catalogue={catalogue} cargo={fitting.cargo} onAddCargo={onAddCargo} />
+        <CargoTab catalogue={catalogue} onAddCargo={onAddCargo} />
       ) : (
         <>
           <SearchInput
@@ -592,10 +578,10 @@ function ChargesTab({
 
   const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 
-  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it, right-click menu. */
+  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it. */
   const wrapRow = (chargeTypeId: number, row: ReactNode) => {
     const draggable = dragToFit && actions !== null;
-    const inner = (
+    return (
       <div
         className="flex items-center"
         draggable={draggable}
@@ -613,15 +599,7 @@ function ChargesTab({
         onDragEnd={draggable ? endFittingDrag : undefined}
       >
         <div className="min-w-0 flex-1">{row}</div>
-        {actions && <RowMoreActions />}
       </div>
-    );
-    return actions ? (
-      <FittingItemMenu name={name(chargeTypeId)} items={<AddItemMenuItems typeId={chargeTypeId} />}>
-        {inner}
-      </FittingItemMenu>
-    ) : (
-      inner
     );
   };
 
@@ -754,17 +732,12 @@ function ChargesTab({
  */
 function CargoTab({
   catalogue,
-  cargo,
   onAddCargo,
 }: {
   catalogue: FittingCatalogue | null;
-  /** What the hold already carries: those results get the List cargo row's menu. */
-  cargo: Fitting['cargo'];
   onAddCargo: (typeId: number, quantity: number) => void;
 }) {
   const { t } = useTranslation();
-  const actions = useFittingItemActions();
-  const inHold = useMemo(() => new Set(cargo.map((item) => item.typeId)), [cargo]);
   const [query, setQuery] = useState('');
   const [quantity, setQuantity] = useState('1');
   const trimmed = query.trim().toLowerCase();
@@ -805,7 +778,7 @@ function CargoTab({
       ) : (
         <ul>
           {results.map((entry) => {
-            const row = (
+            return (
               <li key={entry.typeId} className="flex items-center">
                 <button
                   type="button"
@@ -824,26 +797,7 @@ function CargoTab({
                     {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
                   </span>
                 </button>
-                {actions && <RowMoreActions />}
               </li>
-            );
-            return actions ? (
-              <FittingItemMenu
-                key={entry.typeId}
-                name={entry.name}
-                items={
-                  <AddCargoMenuItems
-                    typeId={entry.typeId}
-                    count={valid ? count : 0}
-                    inHold={inHold.has(entry.typeId)}
-                    onAddCargo={onAddCargo}
-                  />
-                }
-              >
-                {row}
-              </FittingItemMenu>
-            ) : (
-              row
             );
           })}
         </ul>

@@ -13,14 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CharacterLink } from '@/features/entities';
 import { HintText } from '@/components/ui/HintText';
-import {
-  Caret,
-  IconButton,
-  InfoTooltip,
-  RowCaret,
-  SEVERITY_LABEL,
-  SeverityIcon,
-} from '@/components/ui';
+import { Caret, IconButton, InfoTooltip, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -245,15 +238,15 @@ function AlertFireRow({
           entry.subjectId ?? entry.typeId,
           entry.characterId
         )}
-        // Body text stays dim (a feed of accent sentences would drown the cues that matter); the trailing caret is the at-rest navigating cue.
+        // Deliberate §6c deviation: no › caret. The dismiss × is the row's one trailing control and the body text is the link.
+        // Body text stays dim (a feed of accent sentences would drown the cues that matter); it underlines on hover.
         className={cx(
-          'group order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',
+          'order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',
           interactiveClassName,
           focusRingInsetClassName
         )}
       >
         <span className="min-w-0 flex-1 sm:truncate">{body}</span>
-        <RowCaret />
       </Link>
       <IconButton
         ref={dismissRef}

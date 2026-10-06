@@ -178,6 +178,7 @@ function ActivityLogPanel() {
       {
         id: 'character',
         header: t('activityLog.columnCharacter'),
+        phoneHidden: true,
         sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
         render: (entry) => (
           <CharacterNameCell
@@ -241,7 +242,7 @@ function ActivityLogPanel() {
             rowKey={(entry) => entry.id}
             label={t('activityLog.title')}
             density="compact"
-            mobileSort
+            responsive="table"
           />
         )}
       </div>
@@ -348,7 +349,7 @@ function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
-            mobileSort
+            responsive="table"
           />
         )}
       </div>
