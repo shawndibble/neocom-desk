@@ -1,7 +1,8 @@
 /**
  * "See all products": every planetary product by tier, with what one planet
- * earns where the model has a one-planet figure and "needs N planets" where it
- * does not. Faded tiles need a planet type the toggles leave out; the fade is
+ * earns where the model has a one-planet figure, a multi-planet chain
+ * estimate for a P3 or P4 once it is priced, and "needs N planets" where there
+ * is neither. Faded tiles need a planet type the toggles leave out; the fade is
  * backed by text, never colour alone.
  */
 import { useTranslation } from 'react-i18next';
@@ -11,11 +12,14 @@ import { PiProductLink } from './PiProductLink';
 import { ComparisonText } from './ComparisonText';
 import { cx } from '@/lib/cx';
 import { EstimateBadge, TierChip } from './DirectiveRow';
+import type { ChainEstimateView } from './chainEstimateModel';
+import { chainAssumptions } from './chainEstimateText';
 import type { ProductTile, TierColumn } from './findBestView';
+import type { ChainEstimateOf } from './useChainEstimates';
 
 const TIER_KEY = ['raw', 'processed', 'refined', 'specialized', 'advanced'] as const;
 
-function Tile({ tile }: { tile: ProductTile }) {
+function Tile({ tile, chain }: { tile: ProductTile; chain: ChainEstimateView | null }) {
   const { t } = useTranslation();
   const { comparison } = tile;
   const tone =
@@ -40,10 +44,22 @@ function Tile({ tile }: { tile: ProductTile }) {
               {t('piPlan.make.perDay')} ·{' '}
             </>
           )}
-          {tile.planets !== null &&
+          {chain ? (
+            <>
+              <b className="font-semibold text-text">
+                <IskAmount value={chain.iskPerDay} decimals={0} />
+              </b>
+              {t('piPlan.make.perDay')} ·{' '}
+              <HintText content={chainAssumptions(t, chain)}>
+                {t('piShared.chain.tileLabel', { count: chain.planets.length })}
+              </HintText>
+            </>
+          ) : (
+            tile.planets !== null &&
             (tile.planets <= 1
               ? t('piPlan.find.allOnePlanet')
-              : t('piPlan.find.allNeedsPlanets', { count: tile.planets }))}
+              : t('piPlan.find.allNeedsPlanets', { count: tile.planets }))
+          )}
           {tile.isNew && (
             <>
               {' · '}
@@ -75,10 +91,13 @@ export function AllProductsPanel({
   tiers,
   priceSource,
   estimate,
+  chainOf,
 }: {
   tiers: readonly TierColumn[];
   priceSource: string;
   estimate: boolean;
+  /** P3/P4 multi-planet chain estimates; a tile still being priced reads "needs N planets". */
+  chainOf?: ChainEstimateOf;
 }) {
   const { t } = useTranslation();
   return (
@@ -110,7 +129,11 @@ export function AllProductsPanel({
             </div>
             <ul className="divide-y divide-line">
               {column.items.map((tile) => (
-                <Tile key={tile.typeId} tile={tile} />
+                <Tile
+                  key={tile.typeId}
+                  tile={tile}
+                  chain={tile.perDay === null ? (chainOf?.(tile.typeId) ?? null) : null}
+                />
               ))}
             </ul>
           </section>

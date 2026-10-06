@@ -3,8 +3,8 @@
  * the board) and the detail panel beside or over it.
  *
  * Presentational over a `PlanAdvice`: it reads every figure from it (picks via
- * `planPicks`, per-product figures via `productFigure`) and never prices
- * anything. `useMapAdvice` builds the advice; tests hand one in.
+ * `planPicks`, per-product figures via `productFigure`), plus P3/P4 chain
+ * estimates via `chainOf`, and never prices anything. `useMapAdvice` builds the advice; tests hand one in.
  *
  * ## Where the detail panel goes
  *
@@ -41,6 +41,7 @@ import { cx } from '@/lib/cx';
 import { clampIskZero, formatIsk, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
+import type { ChainEstimateOf } from '../useChainEstimates';
 import { CcLevelTag } from '../CcLevelTag';
 import { planPicks } from '../planPicks';
 import {
@@ -95,7 +96,11 @@ export interface PlanMapProps {
   adviceWithWhatIf: (type: PlanetType) => PlanAdvice;
   colonies: readonly MapColony[];
   finder: FinderOrigin;
+  /** P3/P4 multi-planet chain estimates (`useChainEstimates`); none when left out. */
+  chainOf?: ChainEstimateOf;
 }
+
+const NO_CHAINS: ChainEstimateOf = () => null;
 
 type DetailKind = 'product' | 'planet';
 
@@ -107,6 +112,7 @@ export function PlanMap({
   finder,
   coloniesUnknown = false,
   pricesFailed = false,
+  chainOf = NO_CHAINS,
 }: PlanMapProps) {
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
@@ -310,9 +316,13 @@ export function PlanMap({
   const figures = useMemo(
     () =>
       new Map<number, ProductFigure>(
-        [...graph.byId.keys()].map((id) => [id, productFigure(advice, id, graph, pricesFailed)])
+        [...graph.byId.keys()].map((id) => {
+          const figure = productFigure(advice, id, graph, pricesFailed);
+          const chain = figure.kind === 'unranked' && figure.reason === 'tier' ? chainOf(id) : null;
+          return [id, chain ? { ...figure, chain } : figure];
+        })
       ),
-    [advice, graph, pricesFailed]
+    [advice, graph, pricesFailed, chainOf]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
   const colonySales = useMemo(

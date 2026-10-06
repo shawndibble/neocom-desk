@@ -21,6 +21,7 @@ import type { FinderOrigin } from './MapDetail';
 import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
 import { colonyCountUnknown } from '../colonyStripModel';
+import { useChainEstimates, type ChainEstimateOf } from '../useChainEstimates';
 
 export type MapAdviceState =
   | { status: 'loading' }
@@ -38,6 +39,8 @@ export type MapAdviceState =
       coloniesUnknown: boolean;
       /** Hub prices could not be read: the board runs on empty books, so no product has an ISK figure. */
       pricesFailed: boolean;
+      /** P3/P4 multi-planet chain estimates, priced in slices after the board draws. */
+      chainOf: ChainEstimateOf;
     };
 
 export function useMapAdvice(
@@ -131,6 +134,11 @@ export function useMapAdvice(
     };
   }, [snapshot]);
 
+  const chainOf = useChainEstimates(
+    built && built !== 'error' && inputs.status === 'ready' ? built.advice.chainBasis : null,
+    pi
+  );
+
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
   if (!built || !graph) return { status: 'loading' };
   const esiFailed = snapshot?.fetchFailed ? { retry, retrying } : null;
@@ -144,5 +152,6 @@ export function useMapAdvice(
     esiFailed,
     coloniesUnknown,
     pricesFailed: inputs.status === 'prices-failed',
+    chainOf,
   };
 }
