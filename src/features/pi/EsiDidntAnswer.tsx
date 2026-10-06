@@ -7,7 +7,13 @@ import { Button } from '@/components/ui';
  * colonies" and not a login problem (`needsReauth` has its own banner), so a
  * tab shows this with a Retry instead of an empty state.
  */
-export function EsiDidntAnswer({ onRetry }: { onRetry: () => void }) {
+export function EsiDidntAnswer({
+  onRetry,
+  retrying = false,
+}: {
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <div
@@ -18,7 +24,7 @@ export function EsiDidntAnswer({ onRetry }: { onRetry: () => void }) {
         <p className="font-semibold text-warning">{t('piPlan.esiFailedTitle')}</p>
         <p className="mt-1 text-xs text-text-dim">{t('piPlan.esiFailedHint')}</p>
       </div>
-      <Button size="md" className="shrink-0" onClick={onRetry}>
+      <Button size="md" className="shrink-0" loading={retrying} onClick={onRetry}>
         {t('piPlan.esiRetry')}
       </Button>
     </div>

@@ -52,11 +52,26 @@ for (const [label, viewport] of VIEWPORTS) {
       await expect(page.getByText(/Reconnect/)).toHaveCount(0);
       const box = await alert.boundingBox();
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      // The notice owns the colony slot only: Plan keeps Find best, Map keeps its board (#2760).
+      if (tab === 'plan') {
+        await expect(page.getByRole('group', { name: 'What do you want to do?' })).toBeVisible();
+      }
+      if (tab === 'map') {
+        await expect(
+          page.getByRole('group', { name: /^Planet map|^Planets$/ }).first()
+        ).toBeVisible();
+      }
       await shot(page, `esi-error-${tab}-${label}`);
 
       state.down = false;
       await alert.getByRole('button', { name: 'Retry' }).click();
       await expect(alert).toHaveCount(0, { timeout: 30_000 });
+      if (tab !== 'colonies') {
+        // Focus lands on the result, never on <body>.
+        await expect
+          .poll(() => page.evaluate(() => document.activeElement?.tagName))
+          .not.toBe('BODY');
+      }
       await shot(page, `esi-retry-${tab}-${label}`);
     });
   }

@@ -84,6 +84,8 @@ export interface MapColony {
 }
 
 export interface PlanMapProps {
+  /** The colony read failed: `colonies` is empty because it is unknown, not because there are none. */
+  coloniesUnknown?: boolean;
   graph: MapGraph;
   advice: PlanAdvice;
   /** The same advice with this planet type added as a what-if: priced for it, never for the picks. */
@@ -94,7 +96,14 @@ export interface PlanMapProps {
 
 type DetailKind = 'product' | 'planet';
 
-export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: PlanMapProps) {
+export function PlanMap({
+  graph,
+  advice,
+  adviceWithWhatIf,
+  colonies,
+  finder,
+  coloniesUnknown = false,
+}: PlanMapProps) {
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
   const context = useTouchContext();
@@ -575,7 +584,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           </span>
           <span>
             {noColonies
-              ? t('piMap.whatIfNoColonies')
+              ? t(coloniesUnknown ? 'piMap.whatIfUnknownColonies' : 'piMap.whatIfNoColonies')
               : missingTypes.length > 0
                 ? t('piMap.whatIfHint', {
                     types: missingTypes.map((type) => planetName(t, type)).join(', '),

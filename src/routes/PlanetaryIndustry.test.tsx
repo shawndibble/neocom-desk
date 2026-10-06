@@ -973,6 +973,9 @@ describe('PlanetaryIndustry', () => {
         expect(screen.queryByText('No colonies yet')).toBeNull();
         expect(screen.queryByText(/no colonies yet/i)).toBeNull();
         expect(screen.queryByText(/Reconnect/)).toBeNull();
+        if (_tab === 'map') {
+          expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+        }
 
         server.resetHandlers();
         await user.click(screen.getByRole('button', { name: 'Retry' }));
