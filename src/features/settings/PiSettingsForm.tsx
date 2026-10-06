@@ -68,8 +68,12 @@ export function PiSettingsForm() {
             onValueChange={(value) =>
               void setSettings(
                 value === BUYBACK
-                  ? { ...settings, buybackPct: settings.buybackPct ?? DEFAULT_BUYBACK_PCT }
-                  : { ...settings, hub: value as TradeHub['id'], buybackPct: null }
+                  ? {
+                      ...settings,
+                      buybackPct: settings.buybackPct ?? DEFAULT_BUYBACK_PCT,
+                      hubChosen: true,
+                    }
+                  : { ...settings, hub: value as TradeHub['id'], buybackPct: null, hubChosen: true }
               )
             }
           >

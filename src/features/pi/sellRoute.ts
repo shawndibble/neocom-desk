@@ -4,6 +4,7 @@
  * strip feeds in what it loaded.
  */
 import { shownSecurity } from '@/engine/securityStatus';
+import type { TradeHub } from '@/market/hubs';
 
 /**
  * The system holding the most colonies. There is no "home system" setting to
@@ -38,4 +39,32 @@ export function routeFigures(path: readonly (number | null)[]): RouteFigures {
     jumps: entered.length,
     lowsecJumps: entered.filter((s) => s !== null && shownSecurity(s) < 0.5).length,
   };
+}
+
+export interface HubRoute {
+  hub: TradeHub['id'];
+  /** Null when the route is unknown or does not exist. */
+  figures: RouteFigures | null;
+}
+
+/**
+ * The trade hub fewest gate jumps from home; a tie goes to the route with
+ * fewer lowsec jumps (the safer one), then to the earlier entry so the answer
+ * is stable. Hubs without a known route are skipped; null when none is known.
+ */
+export function nearestHub(
+  routes: readonly HubRoute[]
+): (RouteFigures & { hub: TradeHub['id'] }) | null {
+  let best: (RouteFigures & { hub: TradeHub['id'] }) | null = null;
+  for (const { hub, figures } of routes) {
+    if (!figures) continue;
+    if (
+      !best ||
+      figures.jumps < best.jumps ||
+      (figures.jumps === best.jumps && figures.lowsecJumps < best.lowsecJumps)
+    ) {
+      best = { hub, ...figures };
+    }
+  }
+  return best;
 }

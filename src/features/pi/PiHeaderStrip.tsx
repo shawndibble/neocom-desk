@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   Select,
   SelectContent,
   SelectItem,
@@ -14,9 +15,9 @@ import { routeExposure } from '@/features/contractSearch/routeExposure';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { useMediaQuery } from '@/lib/useMediaQuery';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { EstimateBadge } from './DirectiveRow';
-import { homeSystemId, routeFigures, type RouteFigures } from './sellRoute';
+import { homeSystemId, nearestHub, routeFigures, type RouteFigures } from './sellRoute';
 import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
 
@@ -42,7 +43,7 @@ interface Home {
  */
 export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
   const { t } = useTranslation();
-  const { hub, buybackPct, setHub, setBuyback } = useSellHub();
+  const { hub, buybackPct, hubChosen, setHub, setBuyback, keepHub } = useSellHub();
   const mdUp = useMediaQuery('(min-width: 48rem)');
   const basis = useJumpBasis();
   const homeId = homeSystemId(colonySystemIds);
@@ -80,6 +81,35 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
       cancelled = true;
     };
   }, [homeId, hub.systemId, basis, routeKey, buybackPct]);
+
+  // Until the pilot picks a hub, find the nearest one by gate route (#2705).
+  const suggestKey = `${basis.key}|${homeId}`;
+  const [suggest, setSuggest] = useState<{
+    key: string;
+    nearest: ReturnType<typeof nearestHub>;
+  } | null>(null);
+  useEffect(() => {
+    if (homeId === null || !basis.hydrated || hubChosen) return;
+    let cancelled = false;
+    void Promise.all(
+      TRADE_HUBS.map((h) =>
+        routeExposure(homeId, h.systemId, basis.rules, basis.network)
+          .catch(() => ({ kind: 'unknown' as const }))
+          .then((result) => ({
+            hub: h.id,
+            figures:
+              result.kind === 'known' ? routeFigures(result.path.map((x) => x.security)) : null,
+          }))
+      )
+    ).then((routes) => {
+      if (!cancelled) setSuggest({ key: suggestKey, nearest: nearestHub(routes) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [homeId, basis, suggestKey, hubChosen]);
+  const nearest = !hubChosen && suggest?.key === suggestKey ? suggest.nearest : null;
+  const nearestOption = nearest && nearest.hub !== hub.id ? getTradeHub(nearest.hub) : null;
 
   const shownHome = home?.systemId === homeId ? home : null;
   const figures = buybackPct === null && route?.key === routeKey ? route.figures : null;
@@ -154,6 +184,22 @@ export function PiHeaderStrip({ colonySystemIds, estimate }: Props) {
           </Select>
         )}
       </label>
+      {nearest && nearestOption && buybackPct === null && (
+        <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="pi-nearest-hub">
+          <span className="text-text-dim">
+            {t('piPlan.strip.nearestHub', {
+              count: nearest.jumps,
+              hub: nearestOption.systemName,
+            })}
+          </span>
+          <Button size="sm" onClick={() => setHub(nearestOption.id)}>
+            {t('piPlan.strip.useHub', { hub: nearestOption.systemName })}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={keepHub}>
+            {t('piPlan.strip.keepHub', { hub: hub.systemName })}
+          </Button>
+        </div>
+      )}
       {buybackPct !== null && homeId !== null && (
         <StatChips>
           <StatChip label={t('piPlan.strip.route')} value={t('piPlan.strip.dropOff')} />
