@@ -1,21 +1,19 @@
 /**
- * Corp Members on a phone (issue #2190): the roster's `DataTable` is fully
- * sortable, but below `sm` the stacked cards hide the header row and every
- * sort button with it. `mobileSort` adds the phone-only "Sort by" picker
- * above the cards, the same fix already shipped on five other tables (see
- * `e2e/contactsNarrow.spec.ts`, the closest sibling this spec follows).
+ * Corp Members on a phone: the roster is a table read across columns (last
+ * seen, ship, location, joined), so it stays a plain table below `sm`
+ * (`responsive="table"`) with the member column pinned, and its sort buttons
+ * stay in the header row. No stacked cards, no "Sort by" picker.
  *
  * `/corp/members` is Director-only (`canReadMembers` in
  * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response
  * (which parks every other spec's fixture pilot at `useCorpAccess === 'none'`)
  * is overridden here to `['Director']`, and the JWT carries the `corp` scope
- * group on top of the base fixture grant — the same shape
- * `e2e/corpBoardNarrow.spec.ts` needed, but built through `signInAndGoto`'s
- * own `scopes` param instead of a second SSO token route.
+ * group on top of the base fixture grant.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
+import { expectNoPageOverflow } from './support/overflow';
 import { scopesForGroup } from '../src/esi/scopes';
 
 const PHONE = { width: 390, height: 844 };
@@ -51,7 +49,7 @@ const TRACKING = [
   },
 ];
 
-test.describe('Corp Members sort picker', () => {
+test.describe('Corp Members narrow table', () => {
   test.beforeEach(async ({ page }) => {
     // Granting the whole `corp` scope group (needed for the Director-only
     // `/corp/members` read) also opens every other corp capability, and
@@ -76,14 +74,21 @@ test.describe('Corp Members sort picker', () => {
     await signInAndGoto(page, './corp/members', [...SCOPES, ...scopesForGroup('corp')]);
   });
 
-  test('roster has a phone sort picker at 390px', async ({ page }) => {
+  test('roster stays a plain sortable table at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/members');
 
-    const sortBy = page.getByLabel('Sort by', { exact: true });
-    await expect(sortBy).toBeAttached();
-    await sortBy.selectOption({ label: 'Ship ↑' });
-    await expect(sortBy.locator('option:checked')).toHaveText('Ship ↑');
+    const header = page.getByRole('columnheader', { name: /Ship/ });
+    await expect(header).toBeVisible();
+    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+    // Still a table, not cards.
+    const rowDisplay = await page
+      .locator('table tbody tr:not(.dt-spacer)')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display);
+    expect(rowDisplay).toBe('table-row');
+    await expectNoPageOverflow(page);
+    await header.getByRole('button').click();
     expect(new URL(page.url()).search).toContain('sort');
   });
 

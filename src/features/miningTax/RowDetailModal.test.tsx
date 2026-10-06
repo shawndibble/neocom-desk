@@ -215,8 +215,7 @@ describe('RowDetailModal payment', () => {
       label: '100 ISK · 2026-09-10 — Player donation',
     };
     renderPaid({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Unlink this transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Unlink this transaction' }));
     expect(onUnlink).toHaveBeenCalledWith(transaction);
   });
 
@@ -226,8 +225,7 @@ describe('RowDetailModal payment', () => {
       assignment: { ...paidAssignment, payment: undefined },
       onLinkTransaction: onLink,
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link a transaction…' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 

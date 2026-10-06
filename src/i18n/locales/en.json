@@ -3716,6 +3716,7 @@
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
     "deletePayeeAction": "Delete",
+    "deletePayeeNamed": "Delete {{name}}",
     "deletePayeeConfirm": "Delete \"{{name}}\"? This can't be undone.",
     "editPayeeTitle": "Edit Payee",
     "addPayeeTitle": "Add a Payee",
@@ -4160,7 +4161,6 @@
     },
     "payment": {
       "autoLinked": "auto-linked",
-      "menuLabel": "Payment actions",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
       "paidLine": "Paid {{amount}} ISK · {{date}}"
@@ -7779,11 +7779,6 @@
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline"
       },
-      "contextMenu": {
-        "copyName": "Copy name",
-        "showInfo": "Show info",
-        "viewInMarket": "View in Market"
-      },
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",
@@ -7827,8 +7822,6 @@
       "you": "You",
       "never": "Never",
       "total": "Members",
-      "mobileSortSummary_one": "{{count}} member",
-      "mobileSortSummary_other": "{{count}} members",
       "dark": "Dark {{days}}d+",
       "darkHint": "Members with no login for {{days}} days or more. A member who joined and has never logged in counts from the day they joined.",
       "joined_one": "{{count}} joined:",
@@ -7845,11 +7838,7 @@
       "shipFilterLabel": "Ship",
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
-      "locationFilterAll": "Any location",
-      "contextMenu": {
-        "showInfo": "Show info",
-        "copyName": "Copy name"
-      }
+      "locationFilterAll": "Any location"
     },
     "wallet": {
       "title": "Corp wallet",

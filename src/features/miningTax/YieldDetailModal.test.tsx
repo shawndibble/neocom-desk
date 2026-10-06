@@ -115,15 +115,13 @@ describe('YieldDetailModal', () => {
     expect(within(gas).getAllByText('—')).toHaveLength(2);
   });
 
-  it('pairs the ore table’s four figures per stacked card, and leaves the refined list alone', () => {
+  it('keeps both tables plain tables on a phone (compare across columns)', () => {
     renderModal();
-    // The `.dt-stack-2col` grid itself lives in stylesheet rules (`.dt-stacked`)
-    // jsdom never loads, so this pins the prop reaching the table;
-    // `e2e/miningTaxYieldDetailNarrow.spec.ts` measures the real layout.
-    expect(screen.getByRole('table', { name: 'Ore mined' })).toHaveClass('dt-stack-2col');
-    // Two non-primary columns is already a short card — pairing it buys
-    // nothing, so this table deliberately stays at the default.
-    expect(screen.getByRole('table', { name: 'Refines into' })).not.toHaveClass('dt-stack-2col');
+    // The stacked-card layout lives in stylesheet rules jsdom never loads, so
+    // this pins that neither table opts into it; the e2e spec measures the
+    // real layout.
+    expect(screen.getByRole('table', { name: 'Ore mined' })).not.toHaveClass('dt-stack');
+    expect(screen.getByRole('table', { name: 'Refines into' })).not.toHaveClass('dt-stack');
   });
 
   it('links each ore and refined-material name to its Market listing (#1462)', () => {
