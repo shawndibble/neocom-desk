@@ -347,6 +347,12 @@ export function PlanMap({
     () => (activeWhatIf ? unlockedBy(graph, activeWhatIf, ticked) : null),
     [graph, activeWhatIf, ticked]
   );
+  // Sizing only: the box reserves the height of a full preview (see `whatIfLine`).
+  const sizingType = graph.planetTypes.find((type) => !isHave(type)) ?? null;
+  const sizingUnlock = useMemo(
+    () => (sizingType ? unlockedBy(graph, sizingType, ticked) : null),
+    [graph, sizingType, ticked]
+  );
   const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
   const figures = useMemo(
     () =>
@@ -661,11 +667,58 @@ export function PlanMap({
 
   const missingTypes = graph.planetTypes.filter((type) => !isHave(type));
   const whatIfLine = (() => {
-    const base =
-      'flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-3 py-1.5 text-xs text-text-dim min-h-10';
-    if (!activeWhatIf || !unlock) {
+    // Placeholder and active states share one grid cell, so the box is as tall as the taller of the
+    // two and hovering never shifts the page (#2796). The idle one stays laid out but invisible.
+    const layer =
+      'col-start-1 row-start-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3 py-1.5 min-h-10';
+    const active = activeWhatIf && unlock ? activeWhatIf : null;
+    // `ghost` sizes the box without a second copy of the text in the DOM: the strings come from CSS.
+    const preview = (
+      type: PlanetType,
+      un: NonNullable<typeof unlock>,
+      bestText: string,
+      ghost = false
+    ) => {
+      const text = (s: string, cls?: string) =>
+        ghost ? (
+          <span data-text={s} className={cx(cls, 'after:content-[attr(data-text)]')} />
+        ) : (
+          <span className={cls}>{s}</span>
+        );
       return (
-        <div className={base} aria-live="polite">
+        <div
+          className={cx(layer, 'text-text', ghost && 'invisible')}
+          aria-hidden={ghost || undefined}
+        >
+          <PlanetImage type={type} size={28} />
+          {text(
+            t('piMap.whatIfTitle', { aType: withArticle(planetName(t, type)) }),
+            'text-[11px] font-semibold tracking-widest text-map-whatif uppercase'
+          )}
+          {text(
+            (un.productIds.length === 0
+              ? t('piMap.whatIfNothing')
+              : t('piMap.whatIfUnlocks', { count: un.productIds.length })) + bestText
+          )}
+          <span aria-hidden="true" className="flex flex-wrap gap-0.5">
+            {un.productIds.slice(0, 12).map((id) => (
+              <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
+            ))}
+          </span>
+        </div>
+      );
+    };
+    const best = whatIfRecipe ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}` : '';
+    return (
+      <div
+        className="grid border-b border-line text-xs text-text-dim"
+        aria-live="polite"
+        data-testid="map-whatif"
+      >
+        <div
+          className={cx(layer, active !== null && 'invisible')}
+          aria-hidden={active ? true : undefined}
+        >
           <span className="text-[11px] font-semibold tracking-widest uppercase">
             {t('piMap.whatIfBlank')}
           </span>
@@ -680,28 +733,8 @@ export function PlanMap({
                 : t('piMap.whatIfAll')}
           </span>
         </div>
-      );
-    }
-    const name = planetName(t, activeWhatIf);
-    return (
-      <div className={cx(base, 'text-text')} aria-live="polite">
-        <PlanetImage type={activeWhatIf} size={28} />
-        <span className="text-[11px] font-semibold tracking-widest text-map-whatif uppercase">
-          {t('piMap.whatIfTitle', { aType: withArticle(name) })}
-        </span>
-        <span>
-          {unlock.productIds.length === 0
-            ? t('piMap.whatIfNothing')
-            : t('piMap.whatIfUnlocks', { count: unlock.productIds.length })}
-          {whatIf === activeWhatIf && whatIfRecipe
-            ? ` ${t('piMap.whatIfBest', { name: whatIfRecipe.name })}`
-            : ''}
-        </span>
-        <span aria-hidden="true" className="flex flex-wrap gap-0.5">
-          {unlock.productIds.slice(0, 12).map((id) => (
-            <TypeIcon key={id} typeId={id} size={32} width={22} height={22} />
-          ))}
-        </span>
+        {active && unlock ? preview(active, unlock, whatIf === active ? best : '') : null}
+        {sizingType && sizingUnlock ? preview(sizingType, sizingUnlock, best, true) : null}
       </div>
     );
   })();
