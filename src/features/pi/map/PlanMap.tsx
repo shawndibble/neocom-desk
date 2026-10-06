@@ -26,8 +26,7 @@ import {
 } from '@/components/ui/controlStyles';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
-import { iskToneClass } from '@/features/character/format';
-import { formatIsk, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
+import { clampIskZero, formatIsk, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
@@ -358,7 +357,12 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
                 <span className="text-[11px] font-bold text-warning">#{i + 1}</span>
                 <TypeIcon typeId={pick.typeId} size={64} width={20} height={20} />
                 <span>{pick.name}</span>
-                <span className={cx(iskToneClass(pick.perDay), 'tabular-nums')}>
+                <span
+                  className={cx(
+                    clampIskZero(pick.perDay, 0) < 0 ? 'text-isk-neg' : 'text-isk-pos',
+                    'tabular-nums'
+                  )}
+                >
                   {picks.kind === 'rebuild'
                     ? formatIskCompactSigned(pick.perDay)
                     : formatIskCompact(pick.perDay)}

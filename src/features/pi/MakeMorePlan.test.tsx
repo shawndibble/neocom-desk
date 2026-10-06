@@ -64,6 +64,28 @@ describe('MakeMorePlan', () => {
     expect(live).toHaveTextContent(/Rebuilding 1 planet adds/);
   });
 
+  it.each([
+    [-756_000, /Rebuilding 1 planet costs 756K ISK a day\./],
+    [-0.3, /^((?!costs).)*$/s],
+  ])('words a rebuild of %d ISK a day as a cost, never "adds -"', (gain, pattern) => {
+    const [changing, ...rest] = fixtureAdvice.colonies;
+    const advice = {
+      ...fixtureAdvice,
+      colonies: [
+        {
+          ...changing,
+          rebuild: { ...changing.rebuild, gainPerDay: gain },
+        },
+        ...rest,
+      ],
+    } as unknown as PlanAdvice;
+    mockState = ready(advice);
+    renderPlan();
+    const live = screen.getByRole('status');
+    expect(live.textContent).toMatch(pattern);
+    expect(live.textContent).not.toMatch(/adds -/);
+  });
+
   it('lists quick wins in the model order, each tickable, and remembers the tick', async () => {
     const user = userEvent.setup();
     renderPlan();

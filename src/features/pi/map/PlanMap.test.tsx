@@ -256,6 +256,22 @@ describe('PlanMap: the same numbers as Plan', () => {
     });
   });
 
+  it('prints a losing rebuild pick with one minus and the loss tone, never "+-"', () => {
+    const losing = {
+      ...advice,
+      colonies: advice.colonies.map((c) =>
+        c.rebuild.status === 'change'
+          ? { ...c, rebuild: { ...c.rebuild, gainPerDay: -756_000 } }
+          : c
+      ),
+    } as PlanAdvice;
+    renderMap({ advice: losing });
+    const strip = screen.getByRole('group', { name: 'Your picks' });
+    expect(strip.textContent).not.toContain('+-');
+    expect(strip.textContent).toMatch(/-[\d.]+[KM]\/day/);
+    expect(strip.querySelector('.text-isk-neg')).not.toBeNull();
+  });
+
   it('lists the best one-planet recipes when there are no colonies', () => {
     renderMap({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') });
     const picks = planPicks(adviceNone);

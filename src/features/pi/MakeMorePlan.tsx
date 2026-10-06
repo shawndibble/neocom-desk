@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
-import { formatIskCompact } from '@/lib/isk';
+import { clampIskZero, formatIskCompact } from '@/lib/isk';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
@@ -38,7 +38,9 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
   if (headline.rebuildCount > 0) {
     parts.push(
       t(
-        headline.rebuildGainPerDay < 0 ? 'piPlan.make.liveRebuildCost' : 'piPlan.make.liveRebuild',
+        clampIskZero(headline.rebuildGainPerDay, 0) < 0
+          ? 'piPlan.make.liveRebuildCost'
+          : 'piPlan.make.liveRebuild',
         {
           gain: formatIskCompact(Math.abs(headline.rebuildGainPerDay)),
           count: headline.rebuildCount,
