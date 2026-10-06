@@ -633,6 +633,25 @@ describe('Travel › Route Safety › Route rules', () => {
     expect(screen.getByRole('spinbutton', { name: 'Security penalty' })).toBeDisabled();
   });
 
+  it("opens on a link's pref over the saved default, until the picker is used", async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}&pref=shortest`);
+
+    const group = await screen.findByRole('group', { name: 'Route preference' });
+    expect(within(group).getByRole('button', { name: 'Shorter' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+
+    await user.click(within(group).getByRole('button', { name: 'Safer' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('pref')).toBeNull());
+    expect(within(group).getByRole('button', { name: 'Safer' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('edits the same Travel Settings Settings → Travel does', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&to=${UEDAMA}`);
