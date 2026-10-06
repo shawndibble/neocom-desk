@@ -7,8 +7,8 @@ import { writeToClipboard } from '@/lib/clipboard';
 /**
  * The contract ID exists to be pasted — into an in-game search, a chat channel,
  * a note — and selecting a number out of a definition list by hand is the one
- * thing a reader should not have to do with it. The results table already
- * offers the same action per row under the same wording.
+ * thing a reader should not have to do with it. Shared by both contract detail
+ * modals (the character's and the public one), where the ID is read.
  */
 export function CopyContractIdButton({ contractId }: { contractId: number }) {
   const { t } = useTranslation();

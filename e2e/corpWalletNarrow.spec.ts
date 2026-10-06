@@ -32,7 +32,7 @@ const JOURNAL = [
     date: '2026-09-01T00:00:00Z',
     ref_type: 'corporate_reward_payout',
     description: 'Older huge payout',
-    // 15 digits: the long-value case must still fit the stacked card.
+    // 15 digits: the long-value case must still fit the table cell.
     amount: 123456789012345,
     balance: 123456789013245,
   },
@@ -124,7 +124,6 @@ test.describe('Corp Wallet narrow tables', () => {
       await amountHeader.click();
     }
     await expect(firstAmount).toContainText('123,456,789,012,345');
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
     await expectNoPageOverflow(page);
   });
 
@@ -151,17 +150,15 @@ test.describe('Corp Wallet narrow tables', () => {
       .first()
       .evaluate((el) => getComputedStyle(el).display);
     expect(rowDisplay).toBe('table-row');
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
     await table.getByRole('columnheader', { name: /Total/ }).getByRole('button').click();
     await expect(page).toHaveURL(/sort=/);
     await expectNoPageOverflow(page);
   });
 
-  test('no picker at 1280px', async ({ page }) => {
+  test('journal shows its sort header at 1280px', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./corp/wallet');
     await expect(page.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
   });
 });
 

@@ -30,6 +30,7 @@ import {
 import { useLiftAfterHoldGuard } from './liftAfterHold';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
+import { Caret } from './Disclosure';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
 import { RowTappableContext } from './tooltipHold';
@@ -241,6 +242,13 @@ export interface DataTableExpandableRow<T> {
    * disclosure already).
    */
   hideIcon?: boolean;
+  /**
+   * Draws the §6c expand-in-place cue instead: a leading rotating caret in
+   * the first cell, hidden in the stacked card layout (the card is the tap
+   * target). Implies `hideIcon`'s trailing chevron being dropped, so a row
+   * with a ⋮ keeps one trailing control.
+   */
+  leadingIcon?: boolean;
 }
 
 /**
@@ -493,6 +501,7 @@ interface DataTableRowProps<T> {
   expandable: boolean;
   expanded: boolean;
   hideExpandIcon: boolean;
+  leadingExpandIcon: boolean;
   /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
   renderDetail: ((row: T) => ReactNode) | undefined;
   clickable: boolean;
@@ -545,6 +554,7 @@ function DataTableRowImpl<T>({
   expandable,
   expanded,
   hideExpandIcon,
+  leadingExpandIcon,
   renderDetail,
   clickable,
   tapOpensRow,
@@ -676,7 +686,16 @@ function DataTableRowImpl<T>({
             {/* Only the body cell is "inside a tappable row": the detail row, header,
                 footer and group headers sit outside this provider. */}
             <RowTappableContext.Provider value={tapOpensRow}>
-              {column.render(row)}
+              {i === 0 && leadingExpandIcon ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="dt-lead-caret inline-flex">
+                    <Caret expanded={expanded} />
+                  </span>
+                  {column.render(row)}
+                </span>
+              ) : (
+                column.render(row)
+              )}
             </RowTappableContext.Provider>
           </td>
         );
@@ -1249,7 +1268,8 @@ export function DataTable<T>({
         selected={selectedRowKey !== null && key === selectedRowKey}
         expandable={expandable}
         expanded={expanded}
-        hideExpandIcon={expandableRow?.hideIcon ?? false}
+        hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
+        leadingExpandIcon={expandableRow?.leadingIcon ?? false}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
         clickable={clickable}
         tapOpensRow={Boolean(onRowClick)}

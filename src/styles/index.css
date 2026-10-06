@@ -549,6 +549,12 @@
     align-self: center;
   }
 
+  /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
+     a card is itself the tap target. */
+  .dt-stacked .dt-lead-caret {
+    display: none;
+  }
+
   /* Opt-in (`dt-actions-pinned-only` on the table, Market order book): the
      actions button pinned to the card's right edge and centred across both
      lines, the way a `start` edge control is on the left. In flow on line

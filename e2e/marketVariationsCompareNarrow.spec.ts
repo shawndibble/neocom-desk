@@ -219,6 +219,5 @@ test('Compare drawer Prices view is a plain table at 390px, the item pinned and 
   expect(
     await row.locator('td[data-label="Item"]').evaluate((td) => getComputedStyle(td).position)
   ).toBe('sticky');
-  await expect(drawer.getByLabel('Sort by', { exact: true })).toBeHidden();
   await expectNoPageOverflow(page);
 });

@@ -6759,14 +6759,17 @@
       "identicalHidden_other": "{{count}} identical hidden",
       "rowCount_one": "{{count}} row",
       "rowCount_other": "{{count}} rows",
-      "noDifferences": "Every attribute is the same across the compared items."
+      "noDifferences": "Every attribute is the same across the compared items.",
+      "addItem": "Add {{name}} to Compare",
+      "removeItem": "Remove {{name}} from Compare"
     },
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}"
+      "reorderItem": "Reorder {{name}}",
+      "addItem": "Add {{name}} to Quickbar"
     },
     "priceAlert": {
       "button": "Set price alert for {{name}}",

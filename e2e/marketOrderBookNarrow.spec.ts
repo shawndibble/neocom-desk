@@ -198,6 +198,7 @@ async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   expect(more!.width).toBeGreaterThanOrEqual(44);
   expect(more!.height).toBeGreaterThanOrEqual(44);
   await expect(row.locator('td.dt-disclosure svg')).toBeHidden();
+  await expect(row.locator('.dt-lead-caret')).toBeHidden();
   const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
   expect(dy, `⋮ centre-y vs card centre-y (${tableLabel})`).toBeLessThanOrEqual(1);
   // No overlap: line two ends before the button's box, wider font or not.
@@ -362,10 +363,12 @@ test.describe('Market Browser — order book stacked cards', () => {
     expect(buy.display).toBe('table-row');
     expect(lines(buy.cells)).toHaveLength(1);
 
-    // One trailing control: the ⋮, with no expand chevron beside it.
+    // One trailing control: the ⋮, with no trailing chevron beside it; the
+    // §6c leading caret in the first cell is the expand cue.
     const row = page.locator(
       `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"]`
     );
+    await expect(row.locator('td').first().locator('.dt-lead-caret svg')).toBeVisible();
     await expect(row.getByRole('button', { name: /^More actions/ })).toBeVisible();
     await expect(row.locator('td.dt-disclosure svg')).toHaveCount(0);
   });

@@ -1206,6 +1206,23 @@ describe('Market Browser tree leaf (issue #6)', () => {
   });
 });
 
+describe('Compare toggle in the item header', () => {
+  it('adds the selected item to the Compare Set and removes it again', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    await user.click(await screen.findByRole('button', { name: 'Add Rifter to Compare' }));
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
+    const remove = await screen.findByRole('button', { name: 'Remove Rifter from Compare' });
+    expect(remove).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(remove);
+    expect(useCompareSet.getState().items).toEqual([]);
+  });
+});
+
 describe('Quickbar unavailable with no active character (issue #7)', () => {
   it('disables the header price alert bell with a tap-reachable explanation (issue #2162)', async () => {
     // Ambient state from the outer beforeEach: no active character.
@@ -1214,6 +1231,10 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
+    expect(await screen.findByRole('button', { name: 'Add Rifter to Quickbar' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
     const bell = await screen.findByRole('button', { name: 'Set price alert for Rifter' });
     // `aria-disabled`, not the native attribute: a natively disabled button
     // takes no tap, which would leave the reason unreachable on touch (#2162).
@@ -1257,6 +1278,23 @@ describe('Quickbar (issue #7)', () => {
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
   });
 
+  it('pins and unpins from the item header toggle, no target price needed', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    await user.click(await screen.findByRole('button', { name: 'Add Rifter to Quickbar' }));
+    const quickbar = await screen.findByTestId('quickbar');
+    expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
+
+    const toggle = await screen.findAllByRole('button', { name: 'Remove Rifter from Quickbar' });
+    // The Quickbar row's × and the header toggle share the label: the header's is pressed.
+    const header = toggle.find((b) => b.getAttribute('aria-pressed') === 'true')!;
+    await user.click(header);
+    expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
+  });
+
   it('has no More actions button on a Quickbar row: its bell and × are the controls', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1273,9 +1311,13 @@ describe('Quickbar (issue #7)', () => {
     const user = userEvent.setup();
     render(<App />);
     await pinRifterFromHeaderBell(user);
-    await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
+    await within(await screen.findByTestId('quickbar')).findByText('Rifter');
 
-    await user.click(screen.getByRole('button', { name: 'Remove Rifter from Quickbar' }));
+    await user.click(
+      within(screen.getByTestId('quickbar')).getByRole('button', {
+        name: 'Remove Rifter from Quickbar',
+      })
+    );
 
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
   });
@@ -1304,7 +1346,7 @@ describe('Quickbar (issue #7)', () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
     await pinRifterFromHeaderBell(user);
-    await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
+    await within(await screen.findByTestId('quickbar')).findByText('Rifter');
     unmount();
 
     render(<App />);

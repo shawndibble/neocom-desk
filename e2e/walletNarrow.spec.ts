@@ -70,7 +70,7 @@ test('Journal "Transactions →" link rests in the accent colour at 1440px', asy
 /**
  * Journal on a phone: a ledger read across columns, so a plain table
  * (DESIGN.md §6c Restraint) with Description and Balance shed (`phoneHidden`)
- * and the header sort buttons still on screen. No "Sort by" picker.
+ * and the header sort buttons still on screen.
  */
 test.describe('Journal phone table', () => {
   const JOURNAL = [
@@ -87,7 +87,7 @@ test.describe('Journal phone table', () => {
       date: '2026-09-02T00:00:00Z',
       ref_type: 'player_donation',
       description: 'Middle huge payout',
-      // 15 digits: the long-value case must still fit the stacked card.
+      // 15 digits: the long-value case must still fit the table cell.
       amount: 123456789012345,
       balance: 123456789013245,
     },
@@ -126,7 +126,6 @@ test.describe('Journal phone table', () => {
     const firstRow = table.locator('tbody tr:not(.dt-spacer)').first();
     await expect(firstRow).toBeVisible();
     expect(await firstRow.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
 
     // Description and Balance are shed; Date, Type and Amount stay.
     await expect(table.getByRole('columnheader', { name: /Description/ })).toBeHidden();
@@ -143,10 +142,11 @@ test.describe('Journal phone table', () => {
     await expectNoPageOverflow(page);
   });
 
-  test('no journal picker at 1280px, with every column shown', async ({ page }) => {
+  test('journal at 1280px shows every column', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./wallet/journal');
     await expect(page.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
-    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+    await expect(page.getByRole('columnheader', { name: /Description/ })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Balance/ })).toBeVisible();
   });
 });

@@ -317,6 +317,8 @@ export function Market() {
   }
 
   const compareCount = useCompareSet((state) => state.items.length);
+  const addToCompare = useCompareSet((state) => state.add);
+  const removeFromCompare = useCompareSet((state) => state.remove);
 
   // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
   // as [] rather than requiring an active character — Market Browser itself
@@ -435,6 +437,10 @@ export function Market() {
   // separate param rather than folded into the key.
   const itemHeadingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
+  const selectedInCompare = useCompareSet((state) =>
+    state.items.some((item) => item.typeId === selectedTypeId)
+  );
+  const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
   // The finder Panel's own root, so Back can look up the tree button the
   // item was opened from without a global `document.querySelector` risking a
@@ -983,6 +989,44 @@ export function Market() {
                 selectedItem &&
                 selectedTypeId !== null && (
                   <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
+                      label={t(
+                        selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
+                        {
+                          name: selectedItem.name,
+                        }
+                      )}
+                      tooltip={
+                        activeCharacterId === null
+                          ? t('market.contextMenu.quickbarNoCharacter')
+                          : undefined
+                      }
+                      pressed={selectedPinned}
+                      aria-disabled={activeCharacterId === null || undefined}
+                      openOnTap={activeCharacterId === null}
+                      className="aria-disabled:cursor-default aria-disabled:opacity-40"
+                      onClick={() => {
+                        if (activeCharacterId === null) return;
+                        if (selectedPinned) handleRemoveFromQuickbar(selectedTypeId);
+                        else itemActions.actions.addToQuickbar(selectedTypeId, selectedItem.name);
+                      }}
+                    />
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Compare />}
+                      label={t(
+                        selectedInCompare ? 'market.compare.removeItem' : 'market.compare.addItem',
+                        { name: selectedItem.name }
+                      )}
+                      pressed={selectedInCompare}
+                      onClick={() =>
+                        selectedInCompare
+                          ? removeFromCompare(selectedTypeId)
+                          : addToCompare({ typeId: selectedTypeId, itemName: selectedItem.name })
+                      }
+                    />
                     <ItemPriceAlertBell
                       typeId={selectedTypeId}
                       name={selectedItem.name}
