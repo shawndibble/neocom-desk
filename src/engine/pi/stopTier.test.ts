@@ -116,6 +116,9 @@ describe('recommendStopTier', () => {
     expect(cultures.limitedBy).toEqual(['powergrid']);
     // One block is one P2 factory: 5 Test Cultures an hour.
     expect(cultures.unitsPerHour).toBe(5);
+    // What the fitted colony draws, Launchpad included: the meter "Show me
+    // how" draws reads this, so it is never re-derived with other inputs.
+    expect(cultures.used).toEqual({ cpu: 3_600 + 2_580, powergrid: 700 + 11_900 });
 
     // Per Test Cultures unit: 1,200 of each P0 (8 P1 units at 150 P0 each),
     //   sourced 2,400 * 5             = 12,000 ISK

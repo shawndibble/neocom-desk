@@ -17,7 +17,7 @@ export interface ProductDetailInput {
   figure: ProductFigure;
   /** The pilot's colonies and what each sells today. */
   colonies: readonly { name: string; sells: readonly number[] }[];
-  /** The Command Center level the one-planet figures assume. */
+  /** The Command Center level the one-planet figures assume, unless the figure is tagged higher. */
   ccLevel: number | null;
 }
 
@@ -88,7 +88,8 @@ function moneyOf(
     return {
       kind: 'one-planet',
       m3PerWeek: figure.m3PerDay * DAYS_PER_WEEK,
-      ccLevel,
+      // A tagged setup's figure is scored at the level its tag names.
+      ccLevel: figure.needsCcLevel ?? ccLevel,
     };
   }
   if (figure.reason === 'unpriced') return { kind: 'unpriced' };

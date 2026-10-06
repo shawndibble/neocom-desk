@@ -84,6 +84,12 @@ describe('buildProductDetail: why or why not', () => {
     expect(view.money).toEqual({ kind: 'one-planet', m3PerWeek: 182.4 * 7, ccLevel: 4 });
   });
 
+  it('names the level a tagged setup needs, the same one its tag shows, not the pilot level', () => {
+    const tagged: ProductFigure = { ...ranked, needsCcLevel: 5 };
+    const view = buildProductDetail(input(BIOFUELS, { figure: tagged, ccLevel: 4 }));
+    expect(view.money).toMatchObject({ kind: 'one-planet', ccLevel: 5 });
+  });
+
   it('marks a P4 as multi-planet with the planet count, never a one-planet figure', () => {
     const view = buildProductDetail(input(BROADCAST_NODE));
     expect(view.money.kind).toBe('multi-planet');

@@ -39,7 +39,7 @@
 
 import { NET_TOLERANCE } from './planBest';
 import type { PlanetType } from './goalTypes';
-import type { PiTier, PinCounts } from './types';
+import type { PiTier, PinCounts, PinLoad } from './types';
 
 export type { PlanetType };
 
@@ -51,6 +51,22 @@ export interface RecipeLayout {
   /** The P0s it extracts, and the factories in the order they are set (inputs first). */
   extracts: readonly number[];
   makes: readonly { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[];
+  /** Heads on each Extractor Control Unit the layout was fitted with. */
+  headsPerExtractor?: number;
+  /**
+   * What the layout draws against the Command Center it needs, from the fit
+   * that scored it: the tag, Show me how and its meter all read this one.
+   * Absent when the caller could not compute it.
+   */
+  fit?: RecipeFit;
+}
+
+export interface RecipeFit {
+  /** The lowest Command Center upgrade level that hosts the layout. */
+  level: number;
+  used: PinLoad;
+  /** That level's CPU/Powergrid. */
+  budget: PinLoad;
 }
 
 /** One recipe valued on one planet type. */
