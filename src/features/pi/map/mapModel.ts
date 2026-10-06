@@ -3,7 +3,8 @@
  * output. Nothing here prices anything: every one-planet ISK figure the Map
  * shows is read off `PlanAdvice` (`productFigure`, `unlockedRecipe`) so it is
  * the number Plan shows for the same product; a P3/P4's chain estimate comes
- * from `useChainEstimates`, the same as All products. This module only decides what is
+ * from `useChainEstimates`, the same as All products, or, for a ticked what-if
+ * planet, `useWhatIfChains`. This module only decides what is
  * reachable, what a chain looks like, and how the panels sit.
  */
 import { piTier } from '@/engine/pi/chain';
@@ -308,7 +309,19 @@ export type ProductFigure =
        * never a ranked one-planet recipe (`chainEstimateModel.ts`).
        */
       chain?: ChainEstimateView;
+      /**
+       * The Bigger chain the ticked what-if planet makes possible, when the
+       * pilot hauls between planets: a multi-planet estimate with that planet
+       * added, never a pick (`biggerChainsModel.ts`).
+       */
+      whatIf?: { type: PlanetType; iskPerDay: number; planets: number };
     };
+
+/** The multi-planet figure a P3/P4 tile shows: the what-if planet's Bigger chain first, else its chain estimate. */
+export function tileChainIsk(figure: ProductFigure): number | null {
+  if (figure.kind !== 'unranked') return null;
+  return (figure.whatIf ?? figure.chain)?.iskPerDay ?? null;
+}
 
 /**
  * Only one-planet P1 and P2 recipes are ranked. A P3 or P4 needs goods from

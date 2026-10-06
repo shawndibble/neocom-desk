@@ -50,6 +50,7 @@ export function PiMapTab({ characterId }: { characterId: number }) {
           coloniesUnknown={state.coloniesUnknown}
           pricesFailed={state.pricesFailed}
           chainOf={state.chainOf}
+          pi={state.pi}
         />
       </div>
     </div>

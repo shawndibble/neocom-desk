@@ -4,14 +4,28 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BiggerChainsPanel } from './BiggerChainsPanel';
-import type { BiggerChainsEstimateState } from './useBiggerChains';
-import type { BiggerChainEstimates, ColonyChainEstimate } from './biggerChainsModel';
+import type { BiggerChainsEstimateState, WhatIfChainsState } from './useBiggerChains';
+import {
+  WHAT_IF_PLANET_ID,
+  type BiggerChainEstimates,
+  type ColonyChainEstimate,
+} from './biggerChainsModel';
+import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { ChainEstimateView } from './chainEstimateModel';
 import type { PlanAdvice } from './planAdviceModel';
 import { fixtureAdvice, fixturePi } from './planViewFixture';
 
 let mockState: BiggerChainsEstimateState;
-vi.mock('./useBiggerChains', () => ({ useBiggerChains: () => mockState }));
+let mockWhatIf: WhatIfChainsState;
+const askedFor = vi.fn();
+vi.mock('./useBiggerChains', () => ({
+  NO_TYPES: [],
+  useBiggerChains: () => mockState,
+  useWhatIfChains: (_advice: unknown, _pi: unknown, wanted: readonly PlanetType[]) => {
+    askedFor([...wanted]);
+    return mockWhatIf;
+  },
+}));
 
 const CONDENSATES = 2344;
 
@@ -69,7 +83,11 @@ function renderPanel() {
   );
 }
 
-beforeEach(() => state(null));
+beforeEach(() => {
+  state(null);
+  mockWhatIf = { byType: new Map(), pending: false };
+  askedFor.mockClear();
+});
 
 describe('BiggerChainsPanel', () => {
   it('says so while the chains are still being priced', () => {
@@ -116,5 +134,77 @@ describe('BiggerChainsPanel', () => {
     expect(card).toHaveTextContent(/not known yet: the planets are new/);
     expect(card).toHaveTextContent(/more than your best one-planet pick on 2 free slots/);
     expect(within(card).getByText('Est.')).toBeInTheDocument();
+  });
+});
+
+describe('BiggerChainsPanel: what if I add a planet?', () => {
+  const CAMERA_DRONES = 2345;
+  // The fixture's colonies are Barren; the chains a Lava planet adds.
+  const onBarren = {
+    ...advice,
+    chainColonies: [{ planetId: 1, planetType: 'barren', ratePerEcu: new Map() }],
+  } as unknown as PlanAdvice;
+  const withLava: ColonyChainEstimate = {
+    typeId: CAMERA_DRONES,
+    iskPerDay: 50_000,
+    unitsPerDay: 10,
+    planetIds: [WHAT_IF_PLANET_ID, 1],
+    hostId: 1,
+    m3PerWeek: 900,
+    legs: [{ from: WHAT_IF_PLANET_ID, to: 1, jumps: null }],
+  };
+
+  function renderWith(a: PlanAdvice) {
+    return render(
+      <MemoryRouter>
+        <BiggerChainsPanel advice={a} pi={fixturePi} />
+      </MemoryRouter>
+    );
+  }
+
+  it('lists, per planet type, the Bigger chains it makes possible: planets, haul and an unknown distance', async () => {
+    const user = userEvent.setup();
+    mockWhatIf = {
+      byType: new Map([
+        ['lava', new Map([[CAMERA_DRONES, { colonies: withLava, newPlanets: null }]])],
+      ]),
+      pending: false,
+    };
+    renderWith(onBarren);
+    expect(askedFor).toHaveBeenLastCalledWith(expect.arrayContaining(['lava', 'gas']));
+    expect(askedFor.mock.lastCall![0]).not.toContain('barren');
+    await user.click(
+      screen.getByRole('button', {
+        name: /If you add a Lava planet, this Bigger chain becomes possible/,
+      })
+    );
+    const card = screen.getByRole('link', { name: 'Camera Drones' }).closest('li')!;
+    expect(card).toHaveTextContent(/on Hek VI and a new Lava planet/);
+    expect(card).toHaveTextContent(/a new Lava planet → Hek VI: not known yet/);
+    expect(card).toHaveTextContent(/Haul900 m³\/wk/);
+    // Hek VI after its rebuild, plus a free slot at the best one-planet recipe for the new planet.
+    expect(card).toHaveTextContent(
+      /more than these 2 planets earn on their best one-planet picks \(5.9K 5,900 ISK\/day\)/
+    );
+    expect(within(card).getByText('Est.')).toBeInTheDocument();
+  });
+
+  it('waits for the pilot’s own chains before pricing any what-if', () => {
+    state(null, { pending: true, candidateCount: 3 });
+    renderWith(onBarren);
+    expect(askedFor).toHaveBeenLastCalledWith([]);
+    expect(screen.getByText(/Pricing what another planet type would add/)).toBeInTheDocument();
+  });
+
+  it('prices nothing without a free planet slot, and says why', () => {
+    renderWith({ ...onBarren, slots: { ...onBarren.slots, free: 0 } } as PlanAdvice);
+    expect(askedFor).toHaveBeenLastCalledWith([]);
+    expect(screen.getByText(/no free planet slot/)).toBeInTheDocument();
+  });
+
+  it('says so when no planet type would make a Bigger chain possible', () => {
+    mockWhatIf = { byType: new Map([['lava', new Map()]]), pending: false };
+    renderWith(onBarren);
+    expect(screen.getByText(/No planet type you don't run would make/)).toBeInTheDocument();
   });
 });

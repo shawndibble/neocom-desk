@@ -54,7 +54,13 @@ import {
   tierName,
   verdictGlyph,
 } from './mapText';
-import type { MapGraph, MapTier, ProductFigure, Trace } from './mapModel';
+import {
+  tileChainIsk,
+  type MapGraph,
+  type MapTier,
+  type ProductFigure,
+  type Trace,
+} from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -385,13 +391,18 @@ export function MapBoard(props: MapBoardProps) {
                       })
                     : comparisonSentence(t, figure),
                   figureSentence(t, figure),
-                  figure.kind === 'unranked' && figure.chain
-                    ? chainAssumptions(t, figure.chain)
-                    : null,
+                  figure.kind !== 'unranked'
+                    ? null
+                    : figure.whatIf
+                      ? t('piMap.add.chainsTip')
+                      : figure.chain
+                        ? chainAssumptions(t, figure.chain)
+                        : null,
                 ]
                   .filter(Boolean)
                   .join('\n');
                 const unlockedBy = isNew ? props.whatIfType : null;
+                const chainIsk = tileChainIsk(figure);
                 return (
                   <li key={product.typeId} className="relative flex-none">
                     <Tooltip content={tip}>
@@ -457,8 +468,8 @@ export function MapBoard(props: MapBoardProps) {
                               </span>
                             )}
                           </span>
-                        ) : figure.kind === 'unranked' && figure.chain ? (
-                          <ChainTileFigure iskPerDay={figure.chain.iskPerDay} stacked />
+                        ) : chainIsk !== null ? (
+                          <ChainTileFigure iskPerDay={chainIsk} stacked />
                         ) : (
                           <span aria-hidden="true" />
                         )}

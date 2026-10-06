@@ -1,25 +1,34 @@
 /**
- * Plan's Bigger chains, priced off the main render. Mounted only while the
- * pilot has opted in to hauling between planets, so nothing here runs (no
- * route counting, no solver) for anyone else.
+ * Bigger chains (Plan) and what-if chains (Plan, the Map), priced off the main
+ * render. Mounted only while the pilot hauls between planets, so nothing here
+ * runs (no route counting, no solver) for anyone else.
  *
  * Each candidate runs the Goal Planner's solver a few dozen times, so they
- * are worked through one layout at a time between frames, the way
- * `useChainEstimates` does, and kept for the last set of assumptions: leaving
+ * are worked through one layout at a time between frames (`runSliced`, as
+ * `useChainEstimates` does), and kept for the last set of assumptions: leaving
  * Plan and coming back does not price them again.
+ *
+ * `useWhatIfChains` prices the same chains with one planet type added, for
+ * the types asked for (Plan: every type the pilot does not run; the Map: the
+ * ticked what-if planet). Cached by inputs: a tab with the same inputs as the
+ * other reuses its figures.
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { JumpsFn, PlannerColony } from '@/engine/pi/goalTypes';
+import type { JumpsFn, PlannerColony, PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData } from '@/sde/types';
 import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
 import {
   biggerChainCandidates,
   estimateOnColonies,
+  estimateOnColoniesWith,
   estimateOnNewPlanets,
+  estimateOnNewPlanetsWith,
+  whatIfChainCandidates,
   type BiggerChainEstimates,
 } from './biggerChainsModel';
 import { chainBasisKey } from './useChainEstimates';
 import type { PlanAdvice } from './planAdviceModel';
+import { runSliced } from './runSliced';
 
 export interface BiggerChainsEstimateState {
   /** Every candidate priced so far, by typeId. */
@@ -30,16 +39,29 @@ export interface BiggerChainsEstimateState {
   pending: boolean;
 }
 
-/** Longest a slice runs before yielding to the browser, in ms. */
-const SLICE_MS = 30;
-
 let cached: { key: string; results: Map<number, BiggerChainEstimates> } | null = null;
+/** What-if chains by planet type added, per set of inputs: Plan's and the Map's may differ. */
+const whatIfCache = new Map<string, Map<PlanetType, Map<number, BiggerChainEstimates>>>();
+const WHAT_IF_CACHE_SIZE = 4;
+
+function whatIfResultsFor(key: string): Map<PlanetType, Map<number, BiggerChainEstimates>> {
+  let byType = whatIfCache.get(key);
+  if (!byType) {
+    byType = new Map();
+    whatIfCache.set(key, byType);
+    while (whatIfCache.size > WHAT_IF_CACHE_SIZE) {
+      whatIfCache.delete(whatIfCache.keys().next().value!);
+    }
+  }
+  return byType;
+}
 /** The last jump count, so coming back to Plan neither recounts nor waits. */
 let cachedPairs: { key: string; byPair: Map<string, number | null> } | null = null;
 
 /** Test seam: forget every priced chain and counted jump. */
 export function resetBiggerChains(): void {
   cached = null;
+  whatIfCache.clear();
   cachedPairs = null;
 }
 
@@ -66,16 +88,21 @@ function coloniesKey(colonies: readonly PlannerColony[]): string {
  * the Goal Planner counts them. `undefined` while counting; a function once
  * known (a pair with no route answers null, never zero).
  */
-function useColonyJumps(systemOf: ReadonlyMap<number, number>): {
+function useColonyJumps(
+  systemOf: ReadonlyMap<number, number>,
+  enabled: boolean
+): {
   fn: JumpsFn | undefined;
   key: string | null;
 } {
   const basis = useJumpBasis();
   const systemKey = [...new Set(systemOf.values())].sort((a, b) => a - b).join(',');
   const wanted = `${basis.key}|${systemKey}`;
-  const [pairs, setPairs] = useState(cachedPairs);
+  const [own, setPairs] = useState(cachedPairs);
+  // Another hook on the page may have counted them since this one mounted.
+  const pairs = own?.key === wanted ? own : cachedPairs?.key === wanted ? cachedPairs : own;
   useEffect(() => {
-    if (!basis.hydrated || pairs?.key === wanted) return;
+    if (!enabled || !basis.hydrated || pairs?.key === wanted) return;
     let cancelled = false;
     const ids = systemKey === '' ? [] : systemKey.split(',').map(Number);
     const pairIds = ids.flatMap((a, i) => ids.slice(i + 1).map((b) => [a, b] as const));
@@ -98,10 +125,10 @@ function useColonyJumps(systemOf: ReadonlyMap<number, number>): {
     };
     // `pairs` is only read to skip a count already made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basis, systemKey, wanted]);
+  }, [basis, systemKey, wanted, enabled]);
 
   return useMemo(() => {
-    if (pairs?.key !== wanted) return { fn: undefined, key: null };
+    if (!enabled || pairs?.key !== wanted) return { fn: undefined, key: null };
     const fn: JumpsFn = (from, to) => {
       if (to === 'hub') return null;
       const a = systemOf.get(from);
@@ -111,27 +138,48 @@ function useColonyJumps(systemOf: ReadonlyMap<number, number>): {
       return pairs.byPair.get(a < b ? `${a}-${b}` : `${b}-${a}`) ?? null;
     };
     return { fn, key: wanted };
-  }, [pairs, wanted, systemOf]);
+  }, [pairs, wanted, systemOf, enabled]);
 }
 
-export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEstimateState {
+interface ChainInputs {
+  colonies: readonly PlannerColony[];
+  /** The pilot's planet types, sorted. */
+  types: PlanetType[];
+  free: number;
+  jumps: JumpsFn | undefined;
+  /** The colonies, the assumptions, the jumps, the types and the free slots; null while counting jumps, or off. */
+  key: string | null;
+}
+
+/** What both hooks price from, keyed once per input. Nothing is counted or keyed while `enabled` is off. */
+function useChainInputs(advice: PlanAdvice, pi: PiData | null, enabled: boolean): ChainInputs {
   const colonies = advice.chainColonies;
   const systemOf = useMemo(
     () => new Map(advice.colonies.map((colony) => [colony.planetId, colony.systemId])),
     [advice.colonies]
   );
-  const jumps = useColonyJumps(systemOf);
+  const jumps = useColonyJumps(systemOf, enabled);
   const types = useMemo(
     () => [...new Set(colonies.map((colony) => colony.planetType))].sort(),
     [colonies]
   );
   const free = advice.slots.free;
-  const candidates = useMemo(() => biggerChainCandidates(colonies, pi), [colonies, pi]);
   // Both keys stringify price books and colonies: once per input, not once per slice's re-render.
-  const basisKey = useMemo(() => chainBasisKey(advice.chainBasis, pi), [advice.chainBasis, pi]);
-  const colonyKey = useMemo(() => coloniesKey(colonies), [colonies]);
+  const basisKey = useMemo(
+    () => (enabled && pi ? chainBasisKey(advice.chainBasis, pi) : null),
+    [enabled, advice.chainBasis, pi]
+  );
+  const colonyKey = useMemo(() => (enabled ? coloniesKey(colonies) : null), [enabled, colonies]);
   const key =
-    jumps.key === null ? null : JSON.stringify([basisKey, colonyKey, jumps.key, types, free]);
+    jumps.key === null || basisKey === null
+      ? null
+      : JSON.stringify([basisKey, colonyKey, jumps.key, types, free]);
+  return { colonies, types, free, jumps: jumps.fn, key };
+}
+
+export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEstimateState {
+  const { colonies, types, free, jumps, key } = useChainInputs(advice, pi, true);
+  const candidates = useMemo(() => biggerChainCandidates(colonies, pi), [colonies, pi]);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -148,27 +196,22 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
       ]);
     if (todo.length === 0) return;
     const partial = new Map<number, BiggerChainEstimates>();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const slice = () => {
-      const start = performance.now();
-      while (todo.length > 0 && performance.now() - start < SLICE_MS) {
-        const { typeId, layout } = todo.shift()!;
+    return runSliced(
+      todo,
+      ({ typeId, layout }) => {
         const entry = partial.get(typeId) ?? { colonies: null, newPlanets: null };
         if (layout === 'new') {
           entry.newPlanets = estimateOnNewPlanets(typeId, types, free, advice.chainBasis, pi);
           partial.set(typeId, entry);
         } else {
-          entry.colonies = estimateOnColonies(typeId, colonies, advice.chainBasis, jumps.fn, pi);
+          entry.colonies = estimateOnColonies(typeId, colonies, advice.chainBasis, jumps, pi);
           partial.delete(typeId);
           results.set(typeId, entry);
         }
-      }
-      setVersion((v) => v + 1);
-      if (todo.length > 0) timer = setTimeout(slice, 0);
-    };
-    timer = setTimeout(slice, 0);
-    return () => clearTimeout(timer);
-    // `key` stands for the colonies, the assumptions, the jumps, the types and the free slots.
+      },
+      () => setVersion((v) => v + 1)
+    );
+    // `key` stands for the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -187,4 +230,107 @@ export function useBiggerChains(advice: PlanAdvice, pi: PiData): BiggerChainsEst
       pending: key === null || estimates.size < candidates.length,
     };
   }, [key, version, candidates]);
+}
+
+export interface WhatIfChainsState {
+  /** Each asked-for type priced so far: its chains by typeId (empty when it makes none possible). */
+  byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>;
+  /** A type asked for is still being priced (or jumps are still being counted). */
+  pending: boolean;
+}
+
+/** Nothing asked for, nothing priced. */
+export const NO_WHAT_IF_CHAINS: WhatIfChainsState = { byType: new Map(), pending: false };
+
+type WhatIfUnit =
+  | { type: PlanetType; typeId: number; layout: 'new' | 'colonies' }
+  | { type: PlanetType; layout: 'done' };
+
+export const NO_TYPES: readonly PlanetType[] = [];
+
+/**
+ * The Bigger chains each of `wanted` would make possible, one planet type at a
+ * time. Nothing runs (no route counting, no solver) while `wanted` is empty, so
+ * a caller turns it off by asking for no type. A type lands whole, never one
+ * chain at a time, so its line does not grow while it is priced.
+ */
+export function useWhatIfChains(
+  advice: PlanAdvice,
+  pi: PiData | null,
+  wanted: readonly PlanetType[] = NO_TYPES
+): WhatIfChainsState {
+  const enabled = wanted.length > 0 && pi !== null;
+  const { colonies, types, free, jumps, key } = useChainInputs(advice, pi, enabled);
+  const wantedKey = wanted.join(',');
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    if (key === null || !pi) return;
+    const byType = whatIfResultsFor(key);
+    const todo: WhatIfUnit[] = wanted
+      .filter((type) => !byType.has(type))
+      .flatMap((type) => [
+        ...whatIfChainCandidates(colonies, type, pi).flatMap((typeId) => [
+          { type, typeId, layout: 'new' as const },
+          { type, typeId, layout: 'colonies' as const },
+        ]),
+        { type, layout: 'done' as const },
+      ]);
+    if (todo.length === 0) return;
+    const partial = new Map<PlanetType, Map<number, BiggerChainEstimates>>();
+    return runSliced(
+      todo,
+      (unit) => {
+        const chains = partial.get(unit.type) ?? new Map<number, BiggerChainEstimates>();
+        partial.set(unit.type, chains);
+        if (unit.layout === 'done') {
+          byType.set(unit.type, chains);
+          // Another set of inputs may have evicted this one mid-run: put it back.
+          if (whatIfCache.get(key) !== byType) whatIfCache.set(key, byType);
+          return true;
+        }
+        const entry = chains.get(unit.typeId) ?? { colonies: null, newPlanets: null };
+        if (unit.layout === 'new') {
+          entry.newPlanets = estimateOnNewPlanetsWith(
+            unit.typeId,
+            unit.type,
+            types,
+            free,
+            advice.chainBasis,
+            pi
+          );
+        } else {
+          entry.colonies = estimateOnColoniesWith(
+            unit.typeId,
+            unit.type,
+            colonies,
+            free,
+            advice.chainBasis,
+            jumps,
+            pi
+          );
+        }
+        chains.set(unit.typeId, entry);
+        return false;
+      },
+      (landed) => {
+        if (landed) setVersion((v) => v + 1);
+      }
+    );
+    // `key` stands for the inputs, `wantedKey` for the types asked for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, wantedKey]);
+
+  return useMemo(() => {
+    void version;
+    const results = key !== null ? whatIfCache.get(key) : undefined;
+    const asked = wantedKey === '' ? [] : (wantedKey.split(',') as PlanetType[]);
+    const byType = new Map(
+      asked.flatMap((type) => {
+        const chains = results?.get(type);
+        return chains ? [[type, chains] as const] : [];
+      })
+    );
+    return { byType, pending: enabled && byType.size < asked.length };
+  }, [key, version, wantedKey, enabled]);
 }

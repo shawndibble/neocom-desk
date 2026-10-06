@@ -11,6 +11,11 @@ import {
   biggerChainsView,
   estimateOnColonies,
   estimateOnNewPlanets,
+  estimateOnColoniesWith,
+  estimateOnNewPlanetsWith,
+  whatIfChainCandidates,
+  whatIfChainsView,
+  WHAT_IF_PLANET_ID,
   type ColonyChainEstimate,
 } from './biggerChainsModel';
 
@@ -31,6 +36,7 @@ const PLASMA = 2308;
 // Products.
 const CONDENSATES = 2344; // P3: Ionic, Aqueous, Reactive Gas, Noble Gas — all on Gas.
 const ROBOTICS = 9848; // P3: Non-CS Crystals, Heavy, Noble and Base Metals — none on Gas.
+const CAMERA_DRONES = 2345; // P3: Gas raws plus two a Lava planet yields.
 
 const GAS_RAWS = [AQUEOUS, IONIC, NOBLE_GAS, REACTIVE_GAS];
 const LAVA_RAWS = [BASE_METALS, FELSIC, HEAVY_METALS, NON_CS, PLASMA];
@@ -303,5 +309,125 @@ describe('biggerChainsView', () => {
       haulDays: 7,
     });
     expect(view).toEqual({ recommended: [], others: [] });
+  });
+});
+
+// --- What if I add a planet? ------------------------------------------------------
+
+describe('whatIfChainCandidates', () => {
+  it('offers the chains a planet type would make possible, never one the pilot can already make', () => {
+    const added = whatIfChainCandidates(TWO_GAS, 'plasma', pi);
+    // Every metal Robotics needs comes off a Plasma planet.
+    expect(added).toContain(ROBOTICS);
+    expect(whatIfChainCandidates(TWO_GAS, 'lava', pi)).toContain(CAMERA_DRONES);
+    // Condensates are already a Bigger chain on Gas alone: nothing new.
+    expect(added).not.toContain(CONDENSATES);
+    expect(added.some((id) => biggerChainCandidates(TWO_GAS, pi).includes(id))).toBe(false);
+  });
+
+  it('offers nothing for a type the pilot already runs, or with no colonies', () => {
+    expect(whatIfChainCandidates(TWO_GAS, 'gas', pi)).toEqual([]);
+    expect(whatIfChainCandidates([], 'plasma', pi)).toEqual([]);
+  });
+});
+
+describe('estimateOnColoniesWith', () => {
+  it('runs the chain on the pilot’s colonies plus one new planet of the type, whose distance is unknown', () => {
+    const jumps = (from: number, to: number | 'hub') => (to === 'hub' ? 9 : from === to ? 0 : 2);
+    const result = estimateOnColoniesWith(CAMERA_DRONES, 'lava', TWO_GAS, 1, basis(), jumps, pi);
+    if (!result) throw new Error('expected an estimate');
+    expect(result.planetIds).toEqual([WHAT_IF_PLANET_ID, 1, 2]);
+    expect(result.iskPerDay).toBeGreaterThan(0);
+    expect(result.legs.some((leg) => leg.from === WHAT_IF_PLANET_ID)).toBe(true);
+    for (const leg of result.legs) {
+      if (leg.from === WHAT_IF_PLANET_ID || leg.to === WHAT_IF_PLANET_ID) {
+        expect(leg.jumps).toBeNull();
+      }
+    }
+  });
+
+  it('gives none without a free planet slot for the new planet', () => {
+    expect(
+      estimateOnColoniesWith(CAMERA_DRONES, 'lava', TWO_GAS, 0, basis(), undefined, pi)
+    ).toBeNull();
+  });
+});
+
+describe('estimateOnNewPlanetsWith', () => {
+  it('lays the chain on new planets of the pilot’s types and the added one, within their free slots', () => {
+    const view = estimateOnNewPlanetsWith(ROBOTICS, 'plasma', ['gas'], 6, basis(), pi);
+    if (!view) throw new Error('expected an estimate');
+    expect(view.planets).toContain('plasma');
+    expect(view.planets.every((type) => type === 'gas' || type === 'plasma')).toBe(true);
+  });
+
+  it('gives none when the layout never uses the added type', () => {
+    expect(estimateOnNewPlanetsWith(CONDENSATES, 'plasma', ['gas'], 6, basis(), pi)).toBeNull();
+  });
+
+  it('gives none when the chain needs more planets than are free', () => {
+    expect(estimateOnNewPlanetsWith(ROBOTICS, 'plasma', ['gas'], 0, basis(), pi)).toBeNull();
+  });
+});
+
+describe('whatIfChainsView', () => {
+  const withNew = onColonies({
+    typeId: ROBOTICS,
+    iskPerDay: 3_000_000,
+    planetIds: [WHAT_IF_PLANET_ID, 1, 2],
+    hostId: 1,
+  });
+
+  it('compares the new planet with a free slot at the best one-planet recipe', () => {
+    const rows = whatIfChainsView({
+      byType: new Map([['plasma', new Map([[ROBOTICS, { colonies: withNew, newPlanets: null }]])]]),
+      afterRebuildPerDay: new Map([
+        [1, 500_000],
+        [2, 500_000],
+      ]),
+      slots: { free: 1, gainPerPlanetPerDay: 800_000 },
+      haulDays: 7,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].type).toBe('plasma');
+    const card = rows[0].cards[0];
+    expect(card.versusPerDay).toBe(1_800_000);
+    expect(card.gainPerDay).toBe(1_200_000);
+    expect(card.verdict).toBe('beats');
+  });
+
+  it('keeps every chain with a figure, beaten or not, and leaves out a type with none', () => {
+    const rows = whatIfChainsView({
+      byType: new Map([
+        ['plasma', new Map([[ROBOTICS, { colonies: withNew, newPlanets: null }]])],
+        ['ice', new Map([[ROBOTICS, { colonies: null, newPlanets: null }]])],
+        ['lava', new Map()],
+      ]),
+      afterRebuildPerDay: new Map([
+        [1, 5_000_000],
+        [2, 5_000_000],
+      ]),
+      slots: { free: 1, gainPerPlanetPerDay: 800_000 },
+      haulDays: 7,
+    });
+    expect(rows.map((row) => row.type)).toEqual(['plasma']);
+    expect(rows[0].cards[0].verdict).toBe('short');
+  });
+
+  it('puts the type whose best chain gains most first', () => {
+    const small = onColonies({ ...withNew, iskPerDay: 1_000_000 });
+    const rows = whatIfChainsView({
+      byType: new Map([
+        ['lava', new Map([[ROBOTICS, { colonies: small, newPlanets: null }]])],
+        ['plasma', new Map([[ROBOTICS, { colonies: withNew, newPlanets: null }]])],
+      ]),
+      afterRebuildPerDay: new Map([
+        [1, 0],
+        [2, 0],
+      ]),
+      slots: { free: 1, gainPerPlanetPerDay: 0 },
+      haulDays: 7,
+    });
+    expect(rows.map((row) => row.type)).toEqual(['plasma', 'lava']);
   });
 });

@@ -23,7 +23,7 @@ import * as Icon from '@/components/ui/icons';
 import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, figureSentence, planetName, tierName, verdictGlyph } from './mapText';
 import { ChainTileFigure } from './ChainTileFigure';
-import type { MapGraph, MapTier, ProductFigure } from './mapModel';
+import { tileChainIsk, type MapGraph, type MapTier, type ProductFigure } from './mapModel';
 
 const TIERS: readonly MapTier[] = [0, 1, 2, 3, 4];
 
@@ -130,6 +130,7 @@ export function MapPhone(props: MapPhoneProps) {
         <ul className="mt-1.5 divide-y divide-line border-y border-line">
           {shown.map((product) => {
             const figure = props.figureOf(product.typeId);
+            const chainIsk = tileChainIsk(figure);
             const glyph = verdictGlyph(figure);
             const rank = props.pickRanks.get(product.typeId);
             const traced = props.tracedId === product.typeId;
@@ -174,11 +175,8 @@ export function MapPhone(props: MapPhoneProps) {
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
-                  {figure.kind === 'unranked' && figure.chain && (
-                    <ChainTileFigure
-                      iskPerDay={figure.chain.iskPerDay}
-                      className="shrink-0 text-xs"
-                    />
+                  {chainIsk !== null && (
+                    <ChainTileFigure iskPerDay={chainIsk} className="shrink-0 text-xs" />
                   )}
                   {glyph && figure.kind === 'ranked' && (
                     <span

@@ -17,12 +17,11 @@ import {
   type ChainBasis,
   type ChainEstimateView,
 } from './chainEstimateModel';
+import { runSliced } from './runSliced';
 
 /** `undefined` while still being priced; null when there is no figure. */
 export type ChainEstimateOf = (typeId: number) => ChainEstimateView | null | undefined;
 
-/** Longest a slice runs before yielding to the browser, in ms. */
-const SLICE_MS = 30;
 /** Assumption sets kept; a pref change or a buyback toggle makes a new one. */
 const CACHE_SIZE = 4;
 
@@ -86,24 +85,20 @@ export function useChainEstimates(basis: ChainBasis | null, pi: PiData | null): 
     const results = resultsFor(key);
     const todo = chainProductIds(pi).filter((typeId) => !results.has(typeId));
     if (todo.length === 0) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const slice = () => {
-      const start = performance.now();
-      let landed = false;
-      while (todo.length > 0 && performance.now() - start < SLICE_MS) {
-        const typeId = todo.shift()!;
+    return runSliced(
+      todo,
+      (typeId) => {
         const view = buildChainEstimate(typeId, basis, pi);
         results.set(typeId, view);
-        landed ||= view !== null;
+        return view !== null;
+      },
+      (landed, done) => {
+        // Another assumption set may have evicted this one mid-run: put it back before rendering from it.
+        if (cache.get(key) !== results) cache.set(key, results);
+        // Re-render only for something to show, and once at the end so "pending" settles.
+        if (landed || done) setVersion((v) => v + 1);
       }
-      // Another assumption set may have evicted this one mid-run: put it back before rendering from it.
-      if (cache.get(key) !== results) cache.set(key, results);
-      // Re-render only for something to show, and once at the end so "pending" settles.
-      if (landed || todo.length === 0) setVersion((v) => v + 1);
-      if (todo.length > 0) timer = setTimeout(slice, 0);
-    };
-    timer = setTimeout(slice, 0);
-    return () => clearTimeout(timer);
+    );
     // `key` stands for `basis`: a new object with the same assumptions is the same work.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, pi]);

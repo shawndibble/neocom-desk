@@ -151,6 +151,32 @@ export function chainPlanets(typeId: number, pi: PiData): ChainPlanet[] | null {
   return chainLayout(typeId, pi)?.planets ?? null;
 }
 
+/**
+ * A planet the pilot would add, at the ranking's assumptions: `raws` at
+ * `ratePerHour` each, nothing built on it yet.
+ */
+export function newPlanetColony(
+  planetId: number,
+  type: PlanetType,
+  raws: readonly number[],
+  basis: ChainBasis,
+  heads = basis.headsPerExtractor,
+  ratePerHour = basis.ratePerHour
+): PlannerColony {
+  return {
+    planetId,
+    planetType: type,
+    budget: basis.budget,
+    newLinkCost: basis.newLinkCost,
+    headsPerExtractor: heads,
+    taxRate: basis.taxRate,
+    ratePerEcu: new Map(
+      raws.map((raw) => [raw, { unitsPerHour: ratePerHour, source: 'assumed' as const }])
+    ),
+    current: { p0TypeIds: [], productTypeIds: [] },
+  };
+}
+
 function coloniesFor(
   planets: readonly ChainPlanet[],
   raws: readonly number[],
@@ -159,21 +185,17 @@ function coloniesFor(
   ratePerHour: number,
   pi: PiData
 ): PlannerColony[] {
-  return planets.map((planet, i) => ({
-    planetId: i + 1,
-    planetType: planet.type,
-    budget: basis.budget,
-    newLinkCost: basis.newLinkCost,
-    headsPerExtractor: heads,
-    taxRate: basis.taxRate,
-    // Every chain raw its type yields, so the planner may balance them.
-    ratePerEcu: new Map(
-      raws
-        .filter((raw) => yields(planet.type, raw, pi))
-        .map((raw) => [raw, { unitsPerHour: ratePerHour, source: 'assumed' as const }])
-    ),
-    current: { p0TypeIds: [], productTypeIds: [] },
-  }));
+  // Every chain raw its type yields, so the planner may balance them.
+  return planets.map((planet, i) =>
+    newPlanetColony(
+      i + 1,
+      planet.type,
+      raws.filter((raw) => yields(planet.type, raw, pi)),
+      basis,
+      heads,
+      ratePerHour
+    )
+  );
 }
 
 /**
