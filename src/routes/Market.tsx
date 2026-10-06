@@ -22,7 +22,6 @@ import {
   Tabs,
   Toast,
   TypeIcon,
-  RowMoreActions,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -39,7 +38,6 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useFocusHeading } from '@/lib/useFocusHeading';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
@@ -171,31 +169,25 @@ function MarketGroupTree({
   function renderItem(item: MarketTypeEntry, itemDepth: number) {
     return (
       <li key={item.typeId}>
-        <ItemContextMenu typeId={item.typeId} itemName={item.name}>
-          {/* The trigger holds the More actions button beside the
-                  item button (buttons don't nest), so both sit inside
-                  the menu. */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => onSelect(item.typeId)}
-              style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
-              // Read back on Back-to-finder (issue #1485), to return focus
-              // to the row that opened the item panel — `data-` rather
-              // than an id/ref, since the tree fully unmounts/remounts
-              // whenever a search collapses or re-expands a group.
-              data-tree-item-id={item.typeId}
-              aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-              className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
-                selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-              }`}
-            >
-              <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.name}</span>
-            </button>
-            <RowMoreActions />
-          </div>
-        </ItemContextMenu>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => onSelect(item.typeId)}
+            style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
+            // Read back on Back-to-finder (issue #1485), to return focus
+            // to the row that opened the item panel — `data-` rather
+            // than an id/ref, since the tree fully unmounts/remounts
+            // whenever a search collapses or re-expands a group.
+            data-tree-item-id={item.typeId}
+            aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
+            className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
+              selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
+            }`}
+          >
+            <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.name}</span>
+          </button>
+        </div>
       </li>
     );
   }

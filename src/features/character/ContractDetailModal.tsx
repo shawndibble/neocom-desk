@@ -30,6 +30,7 @@ import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
+import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import {
   CONTRACT_AVAILABILITY_KEY,
   CONTRACT_STATUS_KEY,
@@ -210,6 +211,12 @@ export function ContractDetailModal({
 
             <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>
             <dd>{t(CONTRACT_AVAILABILITY_KEY[contract.availability])}</dd>
+
+            <dt className="text-text-dim uppercase">{t('contractDetail.contractIdLabel')}</dt>
+            <dd className="flex items-center gap-1 tabular-nums">
+              {contract.contract_id}
+              <CopyContractIdButton contractId={contract.contract_id} />
+            </dd>
 
             {contract.start_location_id && (
               <>

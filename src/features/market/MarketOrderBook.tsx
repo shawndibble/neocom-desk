@@ -341,7 +341,8 @@ export function OrderSideCard({
               rowContextMenu={rowContextMenu}
               rowMoreActions
               rowClassName={rowClassName}
-              expandableRow={{ renderDetail }}
+              // Row click expands; no chevron, so the ⋮ is the one trailing control.
+              expandableRow={{ renderDetail, hideIcon: true }}
             />
           </div>
           {onShowAll && (

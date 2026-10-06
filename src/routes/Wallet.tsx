@@ -10,7 +10,6 @@ import {
   EmptyState,
   IconButton,
   InfoTooltip,
-  MenuItem,
   PageHeader,
   Panel,
   Spinner,
@@ -35,7 +34,6 @@ import {
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -374,7 +372,7 @@ export function Wallet() {
       {
         id: 'character',
         header: t('wallet.balanceCharacterColumn'),
-        primary: true,
+        stickyStart: true,
         sortValue: (row) => row.characterName,
         render: (row) => row.characterName,
       },
@@ -604,6 +602,7 @@ export function Wallet() {
                       rowKey={(row) => row.characterId}
                       sort={balanceSortProps.sort}
                       onSortChange={balanceSortProps.onSortChange}
+                      responsive="table"
                     />
                   )}
                 </>
@@ -733,22 +732,6 @@ export function Wallet() {
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
                 onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
-                rowMoreActions
-                rowContextMenu={(entry, tr) => (
-                  <CorpHistoryContextMenu
-                    corporationId={entry.corporation_id}
-                    name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-                    leadingItems={
-                      <MenuItem
-                        onSelect={() => navigate(`/market/lp-store/${entry.corporation_id}`)}
-                      >
-                        {t('loyalty.openStore')}
-                      </MenuItem>
-                    }
-                  >
-                    {tr}
-                  </CorpHistoryContextMenu>
-                )}
               />
             )}
           </Panel>

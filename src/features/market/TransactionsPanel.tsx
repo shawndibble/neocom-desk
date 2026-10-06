@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,8 +16,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
-import { ItemContextMenu } from './ItemContextMenu';
-import { TransactionsDayList } from './TransactionsDayList';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
 import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
 import {
@@ -148,12 +146,10 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
     () => filterWalletTransactions(transactions, rowsFilter, nameFor),
     [transactions, rowsFilter, nameFor]
   );
-  // The phone has no filter bar, so it lists and exports everything.
-  const exportedTransactions = isPhone ? transactions : filteredTransactions;
   const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
   const transactionsExport = useTableExport({
     surface: 'wallet-transactions',
-    rows: exportedTransactions,
+    rows: filteredTransactions,
     columns: csvColumns,
     truncated: transactionsTruncated,
   });
@@ -173,6 +169,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       {
         id: 'date',
         header: t('wallet.date'),
+        phoneHidden: true,
         className: 'whitespace-nowrap text-text-dim',
         render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
         sortValue: (txn) => txn.date,
@@ -180,8 +177,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       {
         id: 'item',
         header: t('wallet.item'),
-        /** Titles the card on a phone — the item is what the transaction is. */
-        primary: true,
+        stickyStart: true,
         render: (txn) => (
           <MarketItemLink typeId={txn.type_id}>
             {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
@@ -223,6 +219,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       {
         id: 'margin',
         header: t('wallet.margin'),
+        phoneHidden: true,
         headerTooltip: t('wallet.marginTooltip'),
         align: 'right',
         className: 'tabular-nums',
@@ -249,20 +246,6 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       },
     ],
     [t, typeNames, timeZone, nameFor, margins]
-  );
-
-  /** Same menu the Appraisal ledger carries — a transaction row names an item like any other. */
-  // Stable, so the table's memoized rows skip re-rendering on every panel render.
-  const rowContextMenu = useCallback(
-    (txn: WalletTransaction, tr: ReactElement) => {
-      const itemName = typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`;
-      return (
-        <ItemContextMenu typeId={txn.type_id} itemName={itemName}>
-          {tr}
-        </ItemContextMenu>
-      );
-    },
-    [typeNames]
   );
 
   if (!hydrated) {
@@ -343,31 +326,23 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
               {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
             </p>
           )}
-          {isPhone ? (
-            <TransactionsDayList
-              transactions={transactions}
-              nameFor={nameFor}
-              label={t('wallet.transactionsTab')}
-              highlightId={highlightId}
-              rowContextMenu={rowContextMenu}
-            />
-          ) : (
-            <>
-              <TransactionsFilterBar filter={filter} onChange={setFilter} />
-              {filteredTransactions.length === 0 ? (
-                <EmptyState
-                  title={t('wallet.transactionsNoFilterMatches')}
-                  hint={t('wallet.transactionsNoFilterMatchesHint')}
-                  className="py-8"
-                  action={
-                    <Button size="sm" onClick={() => setFilter(EMPTY_WALLET_TRANSACTION_FILTER)}>
-                      {t('common.resetFilters')}
-                    </Button>
-                  }
-                />
-              ) : (
-                <>
-                  <TransactionsSummaryStrip transactions={filteredTransactions} className="mb-3" />
+          <>
+            <TransactionsFilterBar filter={filter} onChange={setFilter} />
+            {filteredTransactions.length === 0 ? (
+              <EmptyState
+                title={t('wallet.transactionsNoFilterMatches')}
+                hint={t('wallet.transactionsNoFilterMatchesHint')}
+                className="py-8"
+                action={
+                  <Button size="sm" onClick={() => setFilter(EMPTY_WALLET_TRANSACTION_FILTER)}>
+                    {t('common.resetFilters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                <TransactionsSummaryStrip transactions={filteredTransactions} className="mb-3" />
+                <div className="overflow-x-auto">
                   <DataTable
                     {...transactionsExport.tableProps}
                     label={t('wallet.transactionsTab')}
@@ -376,16 +351,15 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
                     rowKey={transactionRowKey}
                     highlightRowKey={highlightId}
                     virtualize="auto"
-                    rowContextMenu={rowContextMenu}
-                    rowMoreActions
+                    responsive="table"
                     // `transactions` already arrives newest-first (the `sort` above) —
                     // matches that so a header click is the first thing that reorders it.
                     defaultSort={{ columnId: 'date', direction: 'desc' }}
                   />
-                </>
-              )}
-            </>
-          )}
+                </div>
+              </>
+            )}
+          </>
         </>
       )}
     </Panel>

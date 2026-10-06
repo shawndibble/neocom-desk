@@ -27,7 +27,6 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
-import { TEXT_DEBOUNCE_MS } from '@/lib/urlState';
 import * as routeChunks from '@/app/routeChunks';
 import type {
   MarketGroupNode,
@@ -1146,46 +1145,36 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
   });
 });
 
-describe('Market Browser item context menu (issue #6)', () => {
+/**
+ * Selects Rifter from the tree, then pins it through the item header's price
+ * alert bell (the tree leaf has no menu; the bell's Save pins and sets the
+ * target in one step).
+ */
+async function pinRifterFromHeaderBell(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByRole('searchbox'), 'rift');
+  await user.click(await screen.findByText('Rifter'));
+  await user.click(await screen.findByRole('button', { name: 'Set price alert for Rifter' }));
+  await user.type(await screen.findByLabelText('Target price (ISK)'), '1000000');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+}
+
+describe('Market Browser tree leaf (issue #6)', () => {
   beforeEach(async () => {
-    // Ordinary usage always has an active character; Add to Quickbar is
-    // enabled in that state (see the "Quickbar (issue #7)" describe block
-    // below for the no-active-character edge case).
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
   });
-  afterEach(() => configureClipboard(null));
 
-  it('opens on right-click with all five actions, one disabled until its target ships', async () => {
+  it('has no custom right-click menu and no More actions button: the row click opens the item', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
     const item = await screen.findByText('Rifter');
-    item.focus();
     fireEvent.contextMenu(item);
 
-    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).not.toHaveAttribute(
-      'data-disabled'
-    );
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).not.toHaveAttribute(
-      'data-disabled'
-    );
-    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).not.toHaveAttribute(
-      'data-disabled'
-    );
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).not.toHaveAttribute(
-      'data-disabled'
-    );
-
-    // Build Plan starts unresolved (blueprint catalog not requested until the
-    // menu opens) then flips to enabled once it resolves — Rifter has one.
-    expect(
-      await screen.findByRole('menuitem', { name: 'Build Plan' }, { timeout: 2000 })
-    ).not.toHaveAttribute('data-disabled');
-
-    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
-  it('opens the Item Detail modal from Show info (issue #9), reading live ESI attributes', async () => {
+  it('opens the Item Detail modal from the item header Info button (issue #9), reading live ESI attributes', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/587`, () =>
         HttpResponse.json({
@@ -1203,11 +1192,9 @@ describe('Market Browser item context menu (issue #6)', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
+    await user.click(await screen.findByText('Rifter'));
 
-    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+    await user.click(await screen.findByRole('button', { name: 'Show info' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
     expect(within(dialog).getByText('A rugged little frigate.')).toBeInTheDocument();
@@ -1217,104 +1204,26 @@ describe('Market Browser item context menu (issue #6)', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
-
-  it('adds the item to the Compare Set (issue #8), showing the drawer handle', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Compare' }));
-
-    expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
-    expect(screen.getByRole('button', { name: 'Compare (1)' })).toBeInTheDocument();
-  });
-
-  it('shows "No blueprint options" disabled for an item no blueprint produces', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'trit');
-    const item = await screen.findByText('Tritanium');
-    item.focus();
-    fireEvent.contextMenu(item);
-
-    expect(
-      await screen.findByRole('menuitem', { name: 'No blueprint options' }, { timeout: 2000 })
-    ).toHaveAttribute('data-disabled');
-  });
-
-  it('copies the item name to the clipboard', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    configureClipboard(writeText);
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-
-    await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-    expect(writeText).toHaveBeenCalledWith('Rifter');
-  });
-
-  it('View in Market sets the type param, preserving an existing hub param (issue #83)', async () => {
-    window.history.pushState({}, '', '/market/browser?hub=jita');
-    server.use(
-      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
-        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
-      )
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-
-    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-
-    // The navigation lands after the menu's close handler, not inside the click.
-    await waitFor(() =>
-      expect(new URLSearchParams(window.location.search).get('type')).toBe('587')
-    );
-    // The search box's 300ms debounced write was still pending when the menu
-    // navigated; it must not overwrite the new location with its stale params
-    // (the CI flake: `type` came back null once the timer fired under load).
-    await new Promise((resolve) => setTimeout(resolve, TEXT_DEBOUNCE_MS + 100));
-    expect(new URLSearchParams(window.location.search).get('type')).toBe('587');
-    expect(window.location.pathname).toBe('/market/browser');
-    expect(new URLSearchParams(window.location.search).get('hub')).toBe('jita');
-  });
 });
 
 describe('Quickbar unavailable with no active character (issue #7)', () => {
-  it('disables Add to Quickbar with a tap-reachable explanation (issue #2162)', async () => {
+  it('disables the header price alert bell with a tap-reachable explanation (issue #2162)', async () => {
     // Ambient state from the outer beforeEach: no active character.
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
+    await user.click(await screen.findByText('Rifter'));
 
-    // Radix's menu positions itself post-mount (Popper), a step that settles
-    // async — every other contextMenu test in this file awaits something
-    // afterward (a menu click, a findBy*) that gives it room; this one must
-    // too, or that settling lands outside `act`.
-    const menuItem = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
-    // `aria-disabled`, not the native attribute a `title=` alone would pair
-    // with: a natively disabled item takes no tap, which would leave the
-    // reason below unreachable on a touch device (#2162).
-    expect(menuItem).toHaveAttribute('aria-disabled', 'true');
-    expect(menuItem).not.toHaveAttribute('title');
+    const bell = await screen.findByRole('button', { name: 'Set price alert for Rifter' });
+    // `aria-disabled`, not the native attribute: a natively disabled button
+    // takes no tap, which would leave the reason unreachable on touch (#2162).
+    expect(bell).toHaveAttribute('aria-disabled', 'true');
 
-    fireEvent.touchStart(menuItem, {
+    fireEvent.touchStart(bell, {
       touches: [{ clientX: 0, clientY: 0 }],
       changedTouches: [{ clientX: 0, clientY: 0 }],
     });
-    fireEvent.touchEnd(menuItem);
+    fireEvent.touchEnd(bell);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Select a character to use the Quickbar'
     );
@@ -1333,31 +1242,37 @@ describe('Quickbar (issue #7)', () => {
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
   });
 
-  it('adds an item from its context menu, and a re-add does not duplicate it', async () => {
+  it('pins an item from the header price alert bell, and a re-save does not duplicate it', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await pinRifterFromHeaderBell(user);
 
     const quickbar = await screen.findByTestId('quickbar');
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
 
-    fireEvent.contextMenu(item);
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    // Two bells now (the Quickbar row's, then the item header's): use the header's.
+    const bells = await screen.findAllByRole('button', { name: 'Set price alert for Rifter' });
+    await user.click(bells[bells.length - 1]);
+    await user.click(await screen.findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
+  });
+
+  it('has no More actions button on a Quickbar row: its bell and × are the controls', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await pinRifterFromHeaderBell(user);
+
+    const quickbar = await screen.findByTestId('quickbar');
+    await within(quickbar).findByText('Rifter');
+    expect(within(quickbar).queryByRole('button', { name: /^More actions/ })).toBeNull();
+    fireEvent.contextMenu(within(quickbar).getByText('Rifter'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('removes an item, restoring the empty hint', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await pinRifterFromHeaderBell(user);
     await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
 
     await user.click(screen.getByRole('button', { name: 'Remove Rifter from Quickbar' }));
@@ -1369,30 +1284,26 @@ describe('Quickbar (issue #7)', () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup();
     render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await pinRifterFromHeaderBell(user);
+    const quickbar = await screen.findByTestId('quickbar');
+    await within(quickbar).findByText('Rifter');
 
-    // Clear the search so the tree's own collapsed "Rifter" row is gone,
-    // leaving the Quickbar's row as the only "Rifter" button.
+    // Move the selection elsewhere, then come back through the Quickbar row.
     await user.clear(screen.getByRole('searchbox'));
-    await waitFor(() => expect(screen.getAllByText('Rifter')).toHaveLength(1));
+    await user.type(screen.getByRole('searchbox'), 'trit');
+    await user.click(await screen.findByText('Tritanium'));
+    await screen.findByRole('heading', { name: 'Tritanium' });
 
-    await user.click(screen.getByRole('button', { name: 'Rifter' }));
+    await user.click(within(quickbar).getByRole('button', { name: /^Rifter/ }));
 
+    await screen.findByRole('heading', { name: 'Rifter' });
     await screen.findByRole('table', { name: 'Sell Orders' });
   });
 
   it('survives a reload from local storage alone (Firebase sync is not configured in tests)', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
-    await user.type(await screen.findByRole('searchbox'), 'rift');
-    const item = await screen.findByText('Rifter');
-    item.focus();
-    fireEvent.contextMenu(item);
-    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await pinRifterFromHeaderBell(user);
     await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
     unmount();
 

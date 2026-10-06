@@ -1,9 +1,10 @@
 /**
- * Corp Wallet on a phone (issue #2521): the Journal and Transactions tables
- * are both sortable, but below `sm` the stacked cards hide the header row and
- * every sort button with it. `mobileSort` adds the phone-only "Sort by"
- * picker above the cards, as `e2e/corpMembersNarrow.spec.ts` checks for the
- * roster.
+ * Corp Wallet on a phone (issue #2521): the Transactions table is sortable,
+ * but below `sm` its stacked cards hide the header row and every sort button
+ * with it, so `mobileSort` adds the phone-only "Sort by" picker above the
+ * cards, as `e2e/corpMembersNarrow.spec.ts` checks for the roster. The Journal
+ * is a plain table on a phone instead (DESIGN.md §6c Restraint): its header
+ * sort buttons stay.
  *
  * `/corp/wallet` needs a wallet-reading role (`canReadWallet` in
  * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response is
@@ -101,22 +102,31 @@ test.describe('Corp Wallet sort pickers', () => {
     await expect(page.getByText(CORPORATION_NAME).first()).toBeVisible();
   });
 
-  test('journal has a phone sort picker at 390px that reorders the cards', async ({ page }) => {
+  test('journal is a plain table at 390px (no sort picker), sorted from its header', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet');
 
     // One division: nothing to fold, so no caret.
     await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeHidden();
-    const firstCard = page
-      .getByRole('table', { name: 'Journal' })
+    // The shared journal table (also `/wallet`): Description and Balance are
+    // shed below `sm`, the header sort buttons stay.
+    const table = page.getByRole('table', { name: 'Journal' });
+    const firstAmount = table
       .locator('tbody tr:not(.dt-spacer)')
-      .first();
-    await expect(firstCard).toContainText('Newest small payout');
+      .first()
+      .locator('td[data-label="Amount"]');
+    await expect(firstAmount).toContainText('900');
+    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeHidden();
 
-    const sortBy = page.getByLabel('Sort by', { exact: true });
-    await sortBy.selectOption({ label: 'Amount ↓' });
-    await expect(sortBy.locator('option:checked')).toHaveText('Amount ↓');
-    await expect(firstCard).toContainText('Older huge payout');
+    const amountHeader = table.getByRole('button', { name: /Amount/ });
+    await amountHeader.click();
+    if (!(await firstAmount.textContent())?.includes('123,456,789,012,345')) {
+      await amountHeader.click();
+    }
+    await expect(firstAmount).toContainText('123,456,789,012,345');
+    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
     await expectNoPageOverflow(page);
   });
 

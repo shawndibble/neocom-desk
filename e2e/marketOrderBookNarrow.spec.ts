@@ -361,5 +361,12 @@ test.describe('Market Browser — order book stacked cards', () => {
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(buy.display).toBe('table-row');
     expect(lines(buy.cells)).toHaveLength(1);
+
+    // One trailing control: the ⋮, with no expand chevron beside it.
+    const row = page.locator(
+      `table[aria-label="Sell Orders"] tr[data-row-key="${SELL_ORDER.order_id}"]`
+    );
+    await expect(row.getByRole('button', { name: /^More actions/ })).toBeVisible();
+    await expect(row.locator('td.dt-disclosure svg')).toHaveCount(0);
   });
 });

@@ -148,13 +148,14 @@ describe('Wallet', () => {
     expect(await screen.findByRole('button', { name: /LP Store corporation/ })).toBeInTheDocument();
   });
 
-  it('opens a Copy Name / Show Info menu on a loyalty row right-click', async () => {
+  it('has no row menu or More actions button on a loyalty row: the name links to Show Info, the trailing link opens the store', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
     const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Caldari Navy' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
-    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
   });
 
   it('explains EverMarks with an info tooltip beside the label', async () => {

@@ -9,7 +9,6 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
-import { configureClipboard } from '@/lib/clipboard';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
 import * as download from '@/lib/download';
@@ -427,63 +426,6 @@ describe('Contacts', () => {
       expect(table.getAllByRole('img', { name: 'Terrible standing (-10)' }).length).toBe(2);
     });
 
-    it('offers the same row menu as the This-Character tab, resolved against the row', async () => {
-      const user = userEvent.setup();
-      const copied: string[] = [];
-      configureClipboard(async (text) => {
-        copied.push(text);
-      });
-      try {
-        await addSecondCharacter();
-        await cacheSecondCharacterContacts([contactsPayload[0]]);
-        render(<App />);
-        await screen.findByText('Good Friend');
-        await showAllCharacters();
-        const table = within(await screen.findByRole('table', { name: /across/i }));
-
-        const row = table.getByText('Good Friend').closest('tr');
-        if (!row) throw new Error('expected a Good Friend row');
-        fireEvent.contextMenu(row);
-        await user.click(screen.getByRole('menuitem', { name: 'Copy contact ID' }));
-        fireEvent.contextMenu(row);
-        await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-
-        expect(copied).toEqual(['1001', 'Good Friend']);
-      } finally {
-        configureClipboard(null);
-      }
-    });
-
-    it('opens the shared Public Info Modal from the row menu', async () => {
-      const user = userEvent.setup();
-      server.use(
-        http.get(`${ESI}/characters/1001`, () =>
-          HttpResponse.json({
-            name: 'Good Friend',
-            birthday: '2020-01-01T00:00:00Z',
-            bloodline_id: 1,
-            gender: 'male',
-            race_id: 1,
-            security_status: 1.5,
-          })
-        )
-      );
-      await addSecondCharacter();
-      await cacheSecondCharacterContacts([contactsPayload[0]]);
-      render(<App />);
-      await screen.findByText('Good Friend');
-      await showAllCharacters();
-      const table = within(await screen.findByRole('table', { name: /across/i }));
-
-      const row = table.getByText('Good Friend').closest('tr');
-      if (!row) throw new Error('expected a Good Friend row');
-      fireEvent.contextMenu(row);
-      await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-
-      const dialog = await screen.findByRole('dialog');
-      expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
-    });
-
     it('says the comparison is built from what each character last cached', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
@@ -528,48 +470,6 @@ describe('Contacts', () => {
   });
 });
 
-describe('Contacts row context menu (issue #403)', () => {
-  /** Right-clicks a contact row by its resolved name and returns the row. */
-  async function openContactMenu(name: string) {
-    const row = (await screen.findByText(name)).closest('tr');
-    if (!row) throw new Error(`expected a ${name} contact row`);
-    row.focus();
-    fireEvent.contextMenu(row);
-    return row;
-  }
-
-  it('offers Copy Name, Copy contact ID, and Show info', async () => {
-    render(<App />);
-    await openContactMenu('Good Friend');
-
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy contact ID' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-  });
-
-  it('Show info opens the shared Public Info Modal, tabbed to the contact type', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`${ESI}/characters/1001`, () =>
-        HttpResponse.json({
-          name: 'Good Friend',
-          birthday: '2020-01-01T00:00:00Z',
-          bloodline_id: 1,
-          gender: 'male',
-          race_id: 1,
-          security_status: 1.5,
-        })
-      )
-    );
-    render(<App />);
-    await openContactMenu('Good Friend');
-    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
-  });
-});
-
 describe('Contacts row click', () => {
   it('opens the shared Public Info Modal on the clicked contact', async () => {
     const user = userEvent.setup();
@@ -593,14 +493,16 @@ describe('Contacts row click', () => {
     expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
   });
 
-  it("does not open it from the row's own More actions button", async () => {
-    const user = userEvent.setup();
+  it('has no More actions button or custom row menu: the row click is the one way in', async () => {
     render(<App />);
     const row = (await screen.findByText('Good Friend')).closest('tr');
     if (!row) throw new Error('expected a Good Friend row');
-    await user.click(within(row).getByRole('button', { name: /More actions/ }));
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
 
-    expect(usePublicInfoModalStore.getState().request).toBeNull();
+    // Right-click may still offer the table's own Export; never Copy / Show info.
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Copy contact ID' })).not.toBeInTheDocument();
   });
 });
 

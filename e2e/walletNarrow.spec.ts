@@ -5,7 +5,7 @@
  * `inline-flex min-h-11 min-w-11 ... md:min-h-0 md:min-w-0`, the same
  * precedent as #1070 / #1077 / #1126.
  *
- * Also the journal's phone "Sort by" picker (issue #2521), below.
+ * Also the journal as a plain phone table (was #2521's "Sort by" picker), below.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -68,11 +68,11 @@ test('Journal "Transactions →" link rests in the accent colour at 1440px', asy
 });
 
 /**
- * Journal sort picker (issue #2521): the journal is sortable, but below `sm`
- * the stacked cards hide the header row and its sort buttons. `mobileSort`
- * adds the phone-only "Sort by" picker above the cards.
+ * Journal on a phone: a ledger read across columns, so a plain table
+ * (DESIGN.md §6c Restraint) with Description and Balance shed (`phoneHidden`)
+ * and the header sort buttons still on screen. No "Sort by" picker.
  */
-test.describe('Journal sort picker', () => {
+test.describe('Journal phone table', () => {
   const JOURNAL = [
     {
       id: 3,
@@ -116,24 +116,34 @@ test.describe('Journal sort picker', () => {
     await signInAndGoto(page);
   });
 
-  test('journal has a phone sort picker at 390px that reorders the cards', async ({ page }) => {
+  test('journal is a plain table at 390px, sorted from its header, without the sort picker', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./wallet/journal');
 
-    const firstCard = page
-      .getByRole('table', { name: 'Journal' })
-      .locator('tbody tr:not(.dt-spacer)')
-      .first();
-    await expect(firstCard).toContainText('Newest small gift');
+    const table = page.getByRole('table', { name: 'Journal' });
+    const firstRow = table.locator('tbody tr:not(.dt-spacer)').first();
+    await expect(firstRow).toBeVisible();
+    expect(await firstRow.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
+    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
 
-    const sortBy = page.getByLabel('Sort by', { exact: true });
-    await sortBy.selectOption({ label: 'Amount ↓' });
-    await expect(sortBy.locator('option:checked')).toHaveText('Amount ↓');
-    await expect(firstCard).toContainText('Middle huge payout');
+    // Description and Balance are shed; Date, Type and Amount stay.
+    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeHidden();
+    await expect(table.getByRole('columnheader', { name: /Balance/ })).toBeHidden();
+    await expect(table.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
+
+    const amounts = () =>
+      table.locator('tbody tr:not(.dt-spacer) td[data-label="Amount"]').allTextContents();
+    const before = await amounts();
+    expect(before).toHaveLength(3);
+    // Newest first by default: the 100 ISK gift leads. Sorting by Amount moves it.
+    await table.getByRole('button', { name: /Amount/ }).click();
+    await expect.poll(async () => (await amounts())[0]).not.toBe(before[0]);
     await expectNoPageOverflow(page);
   });
 
-  test('no journal picker at 1280px', async ({ page }) => {
+  test('no journal picker at 1280px, with every column shown', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./wallet/journal');
     await expect(page.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
