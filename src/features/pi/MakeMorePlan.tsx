@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
-import { formatIskCompact } from '@/lib/isk';
+import { clampIskZero, formatIskCompact } from '@/lib/isk';
 import { AssumedCustomsNote } from './AssumedCustomsNote';
 import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
@@ -39,10 +39,15 @@ function headlineText(view: PlanView, t: ReturnType<typeof useTranslation>['t'])
   ];
   if (headline.rebuildCount > 0) {
     parts.push(
-      t('piPlan.make.liveRebuild', {
-        gain: formatIskCompact(headline.rebuildGainPerDay),
-        count: headline.rebuildCount,
-      })
+      t(
+        clampIskZero(headline.rebuildGainPerDay, 0) < 0
+          ? 'piPlan.make.liveRebuildCost'
+          : 'piPlan.make.liveRebuild',
+        {
+          gain: formatIskCompact(Math.abs(headline.rebuildGainPerDay)),
+          count: headline.rebuildCount,
+        }
+      )
     );
   }
   if (view.stats.unknownColonies > 0) {
