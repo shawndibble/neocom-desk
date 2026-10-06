@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -65,6 +65,16 @@ function stubPhone(phone: boolean) {
     ({
       media,
       matches: phone && media.includes('max-width'),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+}
+
+function stubCoarse() {
+  window.matchMedia = ((media: string) =>
+    ({
+      media,
+      matches: media.includes('pointer: coarse'),
       addEventListener: () => {},
       removeEventListener: () => {},
     }) as unknown as MediaQueryList) as typeof window.matchMedia;
@@ -156,6 +166,20 @@ describe('PlanMap: what if I add a planet', () => {
     ).toBeInTheDocument();
     await user.unhover(planet('Lava'));
     expect(maybeProduct('Felsic Magma')).toBeNull();
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+  });
+
+  it('previews on a mouse pointer, clears on leave, and ignores a touch pointer', () => {
+    renderMap();
+    const lava = planet('Lava');
+    fireEvent.pointerEnter(lava, { pointerType: 'touch' });
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    fireEvent.pointerEnter(lava, { pointerType: 'mouse' });
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+    // A touch leave must not clear a preview a mouse set.
+    fireEvent.pointerLeave(lava, { pointerType: 'touch' });
+    expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
+    fireEvent.pointerLeave(lava, { pointerType: 'mouse' });
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
   });
 
@@ -472,6 +496,21 @@ describe('PlanMap: first-visit hint', () => {
     first.unmount();
     renderMap();
     expect(screen.queryByText(/Click a planet type to filter/)).toBeNull();
+  });
+
+  it('keeps "Got it" on one line', () => {
+    renderMap();
+    expect(screen.getByRole('button', { name: 'Got it' })).toHaveClass('whitespace-nowrap');
+  });
+
+  it('says Tap, not Click or Hover, on a coarse pointer', () => {
+    stubCoarse();
+    renderMap();
+    expect(
+      screen.getByText('Tap a planet type to filter, or a product to trace it.')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Tap a planet type you don't have \(/)).toBeInTheDocument();
+    expect(screen.queryByText(/Hover|Click/)).toBeNull();
   });
 
   it('still shows when storage is blocked', () => {

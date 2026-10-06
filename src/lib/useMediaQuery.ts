@@ -26,3 +26,8 @@ export function useMediaQuery(query: string): boolean {
  * layout-only breakpoints stay on width.
  */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
+
+/** i18next `context` for copy with a `_touch` variant ("Tap" for "Click"/"Hover or focus"). */
+export function useTouchContext(): 'touch' | undefined {
+  return useMediaQuery(COARSE_POINTER_QUERY) ? 'touch' : undefined;
+}

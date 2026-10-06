@@ -1,7 +1,7 @@
 /**
  * Right-click menu on an Employment History row (issue #729): the only entry
  * point into the shared Public Info Modal for a past employer, on the
- * `ContactContextMenu`/`MemberContextMenu` precedent — never a second click
+ * `ContactContextMenu` precedent — never a second click
  * target on the row itself (CONTEXT.md round 49). Always `'corporation'`.
  */
 import type { ReactElement, ReactNode } from 'react';

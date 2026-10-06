@@ -572,12 +572,51 @@
     padding-right: 3rem;
   }
 
-  /* `-only` clears the button on line one alone (the headline figure's
-     right margin: button spans 0.25-3rem from the edge, row pads 0.75rem).
-     Line two keeps the full card width so a buy's five meta cells fit one
-     line on a phone. */
+  /* `-only`: the button flush to the card's edge, a 44px gutter of its own
+     (the row's right padding) the card's text never enters: both lines live
+     in the width left of it. Line one's figure keeps a hair of air. Line two
+     (a buy's five cells and an 8-figure quantity nearly fill it) can never
+     overlap the button or wrap on a wider font: the Range cell, the last
+     one, takes what is left (`flex-basis: 0`, so it never forces the wrap
+     itself) and ellipsizes only in that worst case; it needs room for a few
+     characters (`min-width`) before it wraps instead. The row, Range
+     included, stays in the expanded detail's reach via the column picker. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
+    right: 0;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
+    padding-right: 2.75rem;
+    padding-left: 0.5rem;
+    column-gap: 0.1875rem;
+  }
+
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
-    margin-right: 2.25rem;
+    margin-right: 0.25rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-meta[data-label='Range'] {
+    flex: 1 1 0;
+    min-width: 2.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* No expand chevron on the card: line two runs the card's full width (a
+     buy's five meta cells, an 8-figure quantity reach the button's edge), so
+     a chevron beside the pinned button either rides line one, off the
+     button's axis, or lands on the meta text. The whole card is the tap
+     target (§6c phone cards) and the ⋮ is the one visible control. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-disclosure {
+    display: none;
+  }
+
+  /* The row menu's ⋮ in the text colour, not the shared plain button's dim
+     one: this table's only visible way into the row menu. `!important`
+     because the button's own `text-text-dim` utility sits in a later layer. */
+  .dt-actions-pinned-only td.dt-actions button {
+    color: var(--color-text) !important;
   }
 
   /* The headline figure (`cardCorner`) pinned beside it, centred across both

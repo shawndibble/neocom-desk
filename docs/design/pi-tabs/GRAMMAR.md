@@ -28,4 +28,14 @@ leave out of any "differences from the mockup" list.
 - **Map:** planet toggles are `aria-pressed`; a traced or selected product takes the selected treatment; the detail panel's product name is the Market link; the drawer follows the sheet rules above.
 - **Colonies:** each row is a `Disclosure` (expands in place); "Plan this colony" is a real link with `CaretRight`; the planet / system name is an entity link; the row's actions live in a ⋮ menu (`rowMoreActions`) with the primary action also visible.
 
+## Deliberate differences from the mockups (not §6c)
+
+Beyond the cues above, five departures are product decisions, recorded in
+[the 2717 decision](../../context/decisions/20261005-210436-pi-design-refs-deliberate-differences-not-built.md). Leave them out of any
+"differences from the mockup" list; do not build them.
+
+- **Plan / Find best:** no "What matters more" switch (Make more keeps it); "Show me how" has no planet diagram.
+- **Map:** phone shows a tier list, not "Your best moves" / the trace; the "have" tag stays boxed.
+- **All tabs:** "New to PI?" opens the explainer drawer directly, with no popover or link to it.
+
 Source of truth: `docs/DESIGN.md` §6c. If this file and §6c ever disagree, §6c wins.

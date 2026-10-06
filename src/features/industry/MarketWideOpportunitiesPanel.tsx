@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -49,7 +49,6 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
@@ -273,8 +272,6 @@ export function MarketWideOpportunitiesPanel({
     const entry = catalog?.byProductTypeID.get(row.productTypeID);
     return entry ? onStartPlan(entry) : Promise.resolve(false);
   };
-  const blueprintTypeIDFor = (productTypeID: number) =>
-    catalog ? (catalog.byProductTypeID.get(productTypeID)?.blueprintTypeID ?? null) : undefined;
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
@@ -378,15 +375,6 @@ export function MarketWideOpportunitiesPanel({
       render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
     },
   ];
-  const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
-    <ItemContextMenu
-      typeId={row.productTypeID}
-      itemName={row.productName}
-      blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
-    >
-      {tr}
-    </ItemContextMenu>
-  );
   const { sort, onSortChange } = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
@@ -577,8 +565,6 @@ export function MarketWideOpportunitiesPanel({
                 columns={columns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />
@@ -588,7 +574,6 @@ export function MarketWideOpportunitiesPanel({
               rows={shownRows}
               total={visibleRows.length}
               {...sortProps}
-              blueprintTypeIDFor={blueprintTypeIDFor}
               skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
               nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
               nameForCharacter={(id) => characterNames.get(id) ?? unknownName}

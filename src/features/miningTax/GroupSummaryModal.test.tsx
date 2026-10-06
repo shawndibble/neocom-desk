@@ -78,8 +78,7 @@ describe('GroupSummaryModal payment', () => {
   it('offers Link a transaction once every member is paid', async () => {
     const onLink = vi.fn();
     renderGroup({ onLinkTransaction: onLink });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link a transaction…' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
@@ -128,8 +127,7 @@ describe('GroupSummaryModal payment', () => {
       label: '100 ISK · 2026-09-10 — Player donation',
     };
     renderGroup({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Unlink this transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Unlink this transaction' }));
     expect(onUnlink).toHaveBeenCalledWith(transaction);
   });
 });

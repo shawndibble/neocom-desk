@@ -2165,8 +2165,7 @@
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
-      "noBlueprintOptions": "No blueprint options",
-      "modifyBlueprint": "Modify blueprint"
+      "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
     "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
@@ -3717,6 +3716,7 @@
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
     "deletePayeeAction": "Delete",
+    "deletePayeeNamed": "Delete {{name}}",
     "deletePayeeConfirm": "Delete \"{{name}}\"? This can't be undone.",
     "editPayeeTitle": "Edit Payee",
     "addPayeeTitle": "Add a Payee",
@@ -4161,7 +4161,6 @@
     },
     "payment": {
       "autoLinked": "auto-linked",
-      "menuLabel": "Payment actions",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in the cached wallet journal",
       "paidLine": "Paid {{amount}} ISK · {{date}}"
@@ -4609,11 +4608,13 @@
     "title": "Planet map",
     "helpButton": "How to use the map",
     "hint": "Click a planet type to filter, or a product to trace it.",
+    "hint_touch": "Tap a planet type to filter, or a product to trace it.",
     "hintDismiss": "Got it",
     "boardLabel": "Planet map: planet types, then raw, processed, refined, specialized and advanced products",
     "planetsTitle": "Planets",
     "planetsSub": "Tick yours",
     "planetsInfo": "A colony sits on one planet, and each planet type has its own raw resources. Ticked means you have one (read from your colonies). Click a type you have to hide or show it; click one you don't have to see what it would unlock and where to find one.",
+    "planetsInfo_touch": "A colony sits on one planet, and each planet type has its own raw resources. Ticked means you have one (read from your colonies). Tap a type you have to hide or show it; tap one you don't have to see what it would unlock and where to find one.",
     "infoLabel": "What is {{name}}?",
     "tier": {
       "0": {
@@ -4655,6 +4656,7 @@
     "whatIfBlank": "What if I add a ___ planet?",
     "whatIfNoColonies": "No colonies yet, so every planet type is ticked. Untick the types you can't reach.",
     "whatIfHint": "Hover or focus a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark. Click it to see where to find one.",
+    "whatIfHint_touch": "Tap a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark, and where to find one.",
     "whatIfAll": "You have every planet type.",
     "whatIfTitle": "What if I add a {{type}} planet?",
     "whatIfNothing": "Nothing new: every raw it yields already comes from your planets.",
@@ -4667,8 +4669,11 @@
     "planetToggle": "{{name}} planet. Toggle it to show or hide it on the map.",
     "planetMissing": "{{name}} planet, you don't have one. Opens what adding one would unlock and where to find it.",
     "planetTipOn": "{{name}}: shown on the map. Click to hide.",
+    "planetTipOn_touch": "{{name}}: shown on the map. Tap to hide.",
     "planetTipOff": "{{name}}: hidden. Click to show.",
+    "planetTipOff_touch": "{{name}}: hidden. Tap to show.",
     "planetTipMissing": "{{name}}: you don't have one. Click to see what it would unlock.",
+    "planetTipMissing_touch": "{{name}}: you don't have one. Tap to see what it would unlock.",
     "tagHave": "have",
     "tagNeed": "need",
     "tagWhatIf": "what if",
@@ -4689,13 +4694,15 @@
       "raw": "A raw resource: sold as is, or refined on the way up",
       "tier": "Needs goods from several planets, so there is no per-planet figure",
       "unpriced": "The market has no price for it, so there is no figure",
-      "not-one-planet": "No single planet type makes it, so there is no per-planet figure"
+      "not-one-planet": "No single planet type makes it, so there is no per-planet figure",
+      "no-fit": "One planet type can make it, but not at the Command Center level assumed here, so there is no figure"
     },
     "estimateNote": "An estimate: ISK a day for one planet, after customs and sales tax, at your sell market. The same figures as the Plan tab.",
     "detail": {
       "panelTitle": "How to make it",
       "panelTitleEmpty": "Details",
       "empty": "Click a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
+      "empty_touch": "Tap a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
       "perPlanet": "ISK/day per {{type}} planet",
       "needHeading": "You need",
       "needOne_one": "One planet is enough: {{types}}.",
@@ -4771,7 +4778,8 @@
       "steps": {
         "tick": {
           "title": "Tick your planets.",
-          "body": "The planet column starts with your colonies' types. Click a type to hide or show it; what the ticked planets can't make leaves an empty slot."
+          "body": "The planet column starts with your colonies' types. Click a type to hide or show it; what the ticked planets can't make leaves an empty slot.",
+          "body_touch": "The planet column starts with your colonies' types. Tap a type to hide or show it; what the ticked planets can't make leaves an empty slot."
         },
         "read": {
           "title": "Read each product.",
@@ -4779,11 +4787,13 @@
         },
         "trace": {
           "title": "Click a product",
+          "title_touch": "Tap a product",
           "body": "to light its chain back to the planets it needs, with the steps in words and nearby planets to find."
         },
         "try": {
           "title": "Try a planet.",
-          "body": "Hover or focus a planet type you don't have: pink and a + mark show what it would unlock. Click it to see where to find one."
+          "body": "Hover or focus a planet type you don't have: pink and a + mark show what it would unlock. Click it to see where to find one.",
+          "body_touch": "Tap a planet type you don't have: pink and a + mark show what it would unlock, and where to find one."
         }
       },
       "legendHeading": "Legend",
@@ -6400,8 +6410,6 @@
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "viewInIndustryAsMaterial": "View in Industry as material",
-      "addMaterialComponents": "Add material components",
-      "buyInsteadOfBuilding": "Buy instead",
       "piPlan": "PI Plan",
       "copyLocation": "Copy location",
       "copyPrice": "Copy price",
@@ -7783,11 +7791,6 @@
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline"
       },
-      "contextMenu": {
-        "copyName": "Copy name",
-        "showInfo": "Show info",
-        "viewInMarket": "View in Market"
-      },
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",
@@ -7831,8 +7834,6 @@
       "you": "You",
       "never": "Never",
       "total": "Members",
-      "mobileSortSummary_one": "{{count}} member",
-      "mobileSortSummary_other": "{{count}} members",
       "dark": "Dark {{days}}d+",
       "darkHint": "Members with no login for {{days}} days or more. A member who joined and has never logged in counts from the day they joined.",
       "joined_one": "{{count}} joined:",
@@ -7849,11 +7850,7 @@
       "shipFilterLabel": "Ship",
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
-      "locationFilterAll": "Any location",
-      "contextMenu": {
-        "showInfo": "Show info",
-        "copyName": "Copy name"
-      }
+      "locationFilterAll": "Any location"
     },
     "wallet": {
       "title": "Corp wallet",
@@ -8699,7 +8696,7 @@
         "disclosureCaret": "Leading caret that rotates: expands in place",
         "pagerCarets": "Paired carets in IconButtons: pages",
         "dialogOpener": "… ending a label: dialog needing input or confirmation",
-        "rowMenu": "⋮: the row's action menu (RowMoreActions)",
+        "rowMenu": "⋮: a row's menu of two or more real actions",
         "selectedRow": "Accent 2px left border: selected row",
         "stateRest": "Rest: variants",
         "stateHoverPressed": "Hover and pressed",
@@ -8714,7 +8711,7 @@
         "textAction": "Actions only. Navigation is a link or a row.",
         "iskAmount": "Hover, focus or tap reveals the exact figure.",
         "dialogOpener": "Ellipsis on the first. A button that only shows a window has none.",
-        "rowMenu": "Always visible; right-click and touch-and-hold open the same menu.",
+        "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
         "selectedRow": "Click a row. Selected never looks like hover.",
         "states": "Hover, pressed and focus can't be forced on real components. Try them on the samples below.",
         "hoverPressed": "Hover with a pointer: one step brighter. Press and hold: a step darker.",
@@ -8747,7 +8744,8 @@
         "tableLabel": "Row menu sample",
         "selectableLabel": "Selected row sample",
         "nameHeader": "Ship",
-        "menuItem": "Show info",
+        "menuItem": "Rename",
+        "menuItemDuplicate": "Duplicate",
         "ghost": "Ghost",
         "primary": "Primary",
         "danger": "Danger",
