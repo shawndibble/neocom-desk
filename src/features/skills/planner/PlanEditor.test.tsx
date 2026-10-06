@@ -1778,8 +1778,9 @@ describe('removing an entry requires confirmation (#408)', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: /remove skill a/i }));
-    // Clicking Remove on the row only opens the Modal — the entry survives
+    await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
+    // Choosing Remove on the row only opens the Modal — the entry survives
     // until the Modal's own Remove button is clicked.
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.getByText(/remove "skill a i+v?" from this plan/i)).toBeInTheDocument();
@@ -1795,7 +1796,8 @@ describe('removing an entry requires confirmation (#408)', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: /remove skill a/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onUpdate).not.toHaveBeenCalled();
@@ -2056,7 +2058,8 @@ describe('Plan Milestones (CONTEXT.md)', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: /add milestone to skill a i/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone…' }));
     const dialog = screen.getByRole('dialog', { name: 'Name this milestone' });
     await user.type(within(dialog).getByRole('textbox'), 'Fly Loki');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
@@ -2078,7 +2081,7 @@ describe('Plan Milestones (CONTEXT.md)', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: /milestone actions for skill a i/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename…' }));
     const dialog = screen.getByRole('dialog', { name: 'Rename milestone' });
     const input = within(dialog).getByRole('textbox');
@@ -2101,8 +2104,8 @@ describe('Plan Milestones (CONTEXT.md)', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: /milestone actions for skill a i/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove milestone' }));
 
     expect(onUpdate).toHaveBeenCalledWith({ milestones: [] });
   });
@@ -2116,7 +2119,8 @@ describe('Plan Milestones (CONTEXT.md)', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: /remove skill a i/i }));
+    await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a i/i }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }));
 
     expect(onUpdate).toHaveBeenCalledWith(

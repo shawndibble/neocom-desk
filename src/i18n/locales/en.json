@@ -2088,13 +2088,12 @@
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
     "milestone": {
-      "addLabel": "Add milestone to {{name}}",
+      "add": "Add milestone…",
       "addTitle": "Name this milestone",
       "rename": "Rename…",
       "renameTitle": "Rename milestone",
-      "remove": "Remove",
+      "remove": "Remove milestone",
       "removeLabel": "Remove milestone {{name}}",
-      "menuLabel": "Milestone actions for {{name}}",
       "next": "Next milestone",
       "projected": "Projected",
       "reached": "Reached",
