@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner, TypeIcon } from '@/components/ui';
 import {
+  disabledClassName,
   focusRingInsetClassName,
   rowInteractiveClassName,
   selectedRowClassName,
@@ -54,7 +55,7 @@ function Option({
       aria-disabled={unavailable || undefined}
       onClick={unavailable ? undefined : onSelect}
       className={cx(
-        unavailable && 'cursor-not-allowed opacity-60',
+        unavailable && disabledClassName,
         'flex min-h-16 min-w-0 items-center gap-3 border-l-2 px-3 py-3 text-left',
         rowInteractiveClassName,
         focusRingInsetClassName,
@@ -121,7 +122,8 @@ export function PlanPanel(props: Props) {
   const setPicked = (question: PlanQuestion) => setUrlQuestion(question, { clearHash: true });
 
   const [resultRef, armRetryFocus] = useRetryFocus(
-    !snapshot || retrying ? 'busy' : snapshot.fetchFailed ? 'failed' : 'ok'
+    !snapshot || retrying ? 'busy' : snapshot.fetchFailed ? 'failed' : 'ok',
+    characterId
   );
 
   if (failedFor === characterId) {
@@ -143,6 +145,7 @@ export function PlanPanel(props: Props) {
     colonyCount,
   });
   const wanted = picked ?? opening.question;
+  // The URL may still say make-more; the view shows Find best until the colonies can be read.
   const question = esiFailed && wanted === 'make-more' ? 'find-best' : wanted;
   const colonyTypes = snapshot.colonies.map((colony) => colony.planet_type);
 
@@ -152,7 +155,6 @@ export function PlanPanel(props: Props) {
         <EsiDidntAnswer
           retrying={retrying}
           onRetry={() => {
-            if (retrying) return;
             armRetryFocus();
             setRetrying(true);
             setReloadKey((key) => key + 1);

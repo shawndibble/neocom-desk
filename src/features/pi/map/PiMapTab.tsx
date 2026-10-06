@@ -14,7 +14,8 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   const state = useMapAdvice(characterId, planetLabel);
   const esi = state.status === 'ready' ? state.esiFailed : null;
   const [resultRef, armRetryFocus] = useRetryFocus(
-    state.status !== 'ready' ? 'busy' : esi ? (esi.retrying ? 'busy' : 'failed') : 'ok'
+    state.status !== 'ready' ? 'busy' : esi ? (esi.retrying ? 'busy' : 'failed') : 'ok',
+    characterId
   );
 
   if (state.status === 'failed') {
@@ -30,12 +31,12 @@ export function PiMapTab({ characterId }: { characterId: number }) {
   }
   return (
     <div className="space-y-4">
-      {state.esiFailed && (
+      {esi && (
         <EsiDidntAnswer
-          retrying={state.esiFailed.retrying}
+          retrying={esi.retrying}
           onRetry={() => {
             armRetryFocus();
-            state.esiFailed?.retry();
+            esi.retry();
           }}
         />
       )}
@@ -46,7 +47,7 @@ export function PiMapTab({ characterId }: { characterId: number }) {
           adviceWithWhatIf={state.adviceWithWhatIf}
           colonies={state.colonies}
           finder={state.finder}
-          coloniesUnknown={state.esiFailed !== null}
+          coloniesUnknown={esi !== null}
         />
       </div>
     </div>
