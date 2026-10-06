@@ -14,6 +14,12 @@
  *   assumes a shop within reach, and the pilot this was built with is thirty
  *   minutes from one. The Advisor reads "any tier" as "buying on".
  *
+ * - `haulBetweenPlanets`: the pilot will haul goods from one of their planets
+ *   to another, so Plan may recommend a Bigger chain (a P3 or P4 made across
+ *   several planets) in its own section. Stored only when on; off is the
+ *   default because frequent hauls are never assumed: pilots live everywhere,
+ *   nullsec included.
+ *
  * The restart and haul cadence are the separate `cadencePref` record: they
  * answer how often the pilot logs in, not where they trade, and their stored
  * values are kept as they were.
@@ -51,6 +57,8 @@ export interface PiSettings {
    * hub other than the default counts as chosen (that was a pick).
    */
   hubChosen?: true;
+  /** The pilot opted in to hauling between their planets. Absent when off. */
+  haulBetweenPlanets?: true;
 }
 
 export const DEFAULT_PI_SETTINGS: PiSettings = {
@@ -58,6 +66,14 @@ export const DEFAULT_PI_SETTINGS: PiSettings = {
   buybackPct: null,
   buyTiers: [],
 };
+
+/** The settings with the haul-between-planets opt-in on or off; off stores no key. */
+export function withHaulBetweenPlanets(settings: PiSettings, on: boolean): PiSettings {
+  const next: PiSettings = { ...settings };
+  if (on) next.haulBetweenPlanets = true;
+  else delete next.haulBetweenPlanets;
+  return next;
+}
 
 const isHubId = (value: unknown): value is TradeHub['id'] =>
   TRADE_HUBS.some((hub) => hub.id === value);
@@ -79,6 +95,7 @@ export function parsePiSettings(raw: unknown): PiSettings | null {
     buybackPct,
     buyTiers: PI_BUY_TIERS.filter((tier) => tiers.includes(tier)),
     ...(value.hubChosen === true ? { hubChosen: true as const } : chosenFlag(hub, buybackPct)),
+    ...(value.haulBetweenPlanets === true ? { haulBetweenPlanets: true as const } : {}),
   };
 }
 

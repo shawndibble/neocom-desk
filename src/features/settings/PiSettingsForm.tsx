@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  Checkbox,
   Field,
   Fields,
   FilterChip,
@@ -17,6 +18,7 @@ import {
   PI_BUYBACK_PCT_OPTIONS,
   PI_BUY_TIERS,
   usePiSettings,
+  withHaulBetweenPlanets,
   type PiBuyTier,
 } from '@/features/pi/piSettings';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -157,6 +159,21 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
           labelFor={cadenceDays}
           onChange={(haulDays) => void setCadence({ ...cadence, haulDays })}
         />
+      </Field>
+
+      <Field
+        label={t('piPlan.chains.title')}
+        htmlFor="settings-pi-haul-between"
+        note={t('piPlan.chains.optInHint')}
+      >
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-text touch:min-h-11">
+          <Checkbox
+            id="settings-pi-haul-between"
+            checked={settings.haulBetweenPlanets === true}
+            onChange={(e) => void setSettings(withHaulBetweenPlanets(settings, e.target.checked))}
+          />
+          {t('piPlan.chains.optIn')}
+        </label>
       </Field>
 
       <ChipRow

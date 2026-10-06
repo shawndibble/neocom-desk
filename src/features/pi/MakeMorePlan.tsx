@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
 import { clampIskZero, formatIskCompact } from '@/lib/isk';
 import { AssumedCustomsNote } from './AssumedCustomsNote';
+import { BiggerChainsPanel } from './BiggerChainsPanel';
 import { assumedCustomsNames } from './colonyCustoms';
 import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
@@ -16,6 +17,7 @@ import {
   type Ticks,
 } from './MakeMoreSections';
 import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
+import { usePiSettings, withHaulBetweenPlanets } from './piSettings';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
@@ -84,6 +86,9 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
 
   const state = usePlanAdvice(snapshot, characterId, preference);
   const { buybackPct } = useSellHub();
+  const piSettings = usePiSettings((s) => s.value);
+  const setPiSettings = usePiSettings((s) => s.setValue);
+  const haulBetween = piSettings.haulBetweenPlanets === true;
   const view = useMemo(
     () =>
       (state.status === 'ready' || state.status === 'prices-failed') && state.advice
@@ -171,6 +176,8 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
           onPreference={(value) => void setPreference(value)}
           onFindBest={onFindBest}
           priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
+          haulBetween={haulBetween}
+          onHaulBetween={(on) => void setPiSettings(withHaulBetweenPlanets(piSettings, on))}
         />
       </IskFigureGroup>
       {view.quickWins.length > 0 && (
@@ -181,6 +188,12 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
       <IskFigureGroup>
         <RebuildPanel view={view} />
       </IskFigureGroup>
+      {/* Its own section, opted in: nothing in it enters a pick, a quick win or a total above. */}
+      {haulBetween && (
+        <IskFigureGroup>
+          <BiggerChainsPanel advice={state.advice} pi={snapshot.pi} />
+        </IskFigureGroup>
+      )}
       <IskFigureGroup>
         <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
       </IskFigureGroup>

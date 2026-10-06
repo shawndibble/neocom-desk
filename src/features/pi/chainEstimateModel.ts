@@ -83,10 +83,10 @@ interface ChainLayout {
   hostTypes: PlanetType[];
 }
 
-function chainLayout(typeId: number, pi: PiData): ChainLayout | null {
+function chainLayout(typeId: number, pi: PiData, only?: readonly PlanetType[]): ChainLayout | null {
   const raws = rawInputsOf(typeId, pi);
   const high = madeHighOf([{ typeId, unitsPerDay: 1 }], pi);
-  const types = planetTypesOf(pi);
+  const types = only ? planetTypesOf(pi).filter((type) => only.includes(type)) : planetTypesOf(pi);
   const hostTypes = types.filter((type) =>
     high.every((id) => (pi.schematics[String(id)].planetTypes as readonly string[]).includes(type))
   );
@@ -150,14 +150,20 @@ function coloniesFor(
   }));
 }
 
-/** The estimate for a P3 or P4, or null: another tier, no price, or no layout that makes it. */
+/**
+ * The estimate for a P3 or P4, or null: another tier, no price, or no layout
+ * that makes it. `only` limits the planets to those types (Plan's Bigger
+ * chains: the types the pilot already runs), and `maxPlanets` refuses a layout
+ * needing more planets than that.
+ */
 export function buildChainEstimate(
   typeId: number,
   basis: ChainBasis,
-  pi: PiData
+  pi: PiData,
+  options: { only?: readonly PlanetType[]; maxPlanets?: number } = {}
 ): ChainEstimateView | null {
   if (!pi.schematics[String(typeId)] || piTier(typeId, pi) < 3) return null;
-  const layout = chainLayout(typeId, pi);
+  const layout = chainLayout(typeId, pi, options.only);
   if (!layout) return null;
   const { planets: covered, raws, hostTypes } = layout;
   const books = {
@@ -174,6 +180,7 @@ export function buildChainEstimate(
   for (let h = basis.headsPerExtractor; h >= 1; h -= 2) heads.push(h);
 
   for (const planets of layouts) {
+    if (options.maxPlanets !== undefined && planets.length > options.maxPlanets) continue;
     for (const headsPerExtractor of heads) {
       const ratePerHour = (basis.ratePerHour * headsPerExtractor) / basis.headsPerExtractor;
       const colonies = coloniesFor(planets, raws, basis, headsPerExtractor, ratePerHour, pi);

@@ -19,7 +19,7 @@
  * Pure: colonies, policy, prices and `PiData` are parameters.
  */
 import type { PiData } from '@/sde/types';
-import type { GoalPlan, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
+import type { GoalPlan, JumpsFn, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
 import { planBest, type BestPlan } from './planBest';
 
 export interface ChainEstimateInput {
@@ -27,6 +27,12 @@ export interface ChainEstimateInput {
   colonies: readonly PlannerColony[];
   policy: PlannerPolicy;
   books: PriceBooks;
+  /**
+   * Jumps between real colonies, when the caller knows them: the planner then
+   * prefers the nearer host and every leg carries its distance. Hypothetical
+   * planets have none.
+   */
+  jumps?: JumpsFn;
 }
 
 export type ChainEstimate =
@@ -72,6 +78,7 @@ export function estimateChain(input: ChainEstimateInput, pi: PiData): ChainEstim
         colonies: input.colonies,
         policy,
         books: input.books,
+        ...(input.jumps ? { jumps: input.jumps } : {}),
       },
       pi
     );
