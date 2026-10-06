@@ -1143,6 +1143,7 @@ export function BpcSourcingPanel() {
   }, [market.booksByType, market.locations, marketRegionId, marketHubStationId, nonTypeFilter]);
 
   const lpValue = useLpValue((state) => state.value);
+  const lpValueHydrated = useLpValue((state) => state.hydrated);
   const hydrateLpValue = useLpValue((state) => state.hydrate);
   useEffect(() => {
     void hydrateLpValue();
@@ -1150,7 +1151,8 @@ export function BpcSourcingPanel() {
   const blueprintTypeIds = useMemo(() => [...blueprintNames.keys()], [blueprintNames]);
   const lpOffers = useLpBlueprintOffers({
     characterId: activeCharacterId,
-    enabled: sources.has('lp'),
+    // Wait for the pilot's LP Value, or the offers price at the market rate and then reload.
+    enabled: sources.has('lp') && lpValueHydrated,
     blueprintTypeIds,
     hub: marketHub,
     lpValue,

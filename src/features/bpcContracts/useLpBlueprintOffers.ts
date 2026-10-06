@@ -68,13 +68,16 @@ export function useLpBlueprintOffers({
             (corp) => lpRate(lpValue, marketValues.get(corp) ?? null),
             turnIns
           )
-            .filter((row) => row.pickable)
-            .map((row) =>
+            .flatMap((row) => {
+              const typeId = typeIdByOffer.get(`${row.corporationId}:${row.offerId}`);
+              return row.pickable && typeId !== undefined ? [{ row, typeId }] : [];
+            })
+            .map(({ row, typeId }) =>
               lpOfferToSearchRow({
                 corporationId: row.corporationId,
                 offerId: row.offerId,
                 corpName: row.corpName,
-                typeId: typeIdByOffer.get(`${row.corporationId}:${row.offerId}`) ?? 0,
+                typeId,
                 quantity: row.quantity,
                 price: row.price,
                 iskCost: row.iskCost,

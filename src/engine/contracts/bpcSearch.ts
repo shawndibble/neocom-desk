@@ -266,6 +266,7 @@ export interface LpOfferInput {
   lpPriced: boolean;
 }
 
+/** An LP offer is a copy with unknown ME/TE/runs (ESI gives none) and no location. */
 export function lpOfferToSearchRow(offer: LpOfferInput): BpcSearchRow {
   return {
     source: 'lp',
