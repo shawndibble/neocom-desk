@@ -827,6 +827,13 @@ rows, `opacity-50` for a disabled
 `Checkbox`/`Radio`), §6c is the target. The rollout PR that changes a primitive also updates its §4
 row.
 
+**Bulk selection.** A list where one action applies to many rows (Settings ›
+Permissions: grant several at once) puts a leading checkbox only on rows the
+action can still apply to, with Select all / Select none above the list and a
+count-labelled button ("Grant selected (3)") that appears once a row is ticked.
+The per-row action stays. Ticks belong to the context they were made in and
+clear when it changes (a different Character).
+
 ### Cue vocabulary
 
 | Cue                                                  | Means only                                                                                                                                                                                                       |

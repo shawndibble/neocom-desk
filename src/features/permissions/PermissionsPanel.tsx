@@ -51,7 +51,21 @@ export function PermissionsPanel() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const corp = useCorpAccess();
-  const [picked, setPicked] = useState<ReadonlySet<ScopeGroup>>(new Set());
+  // Tagged with its Character so a switch drops the ticks instead of carrying them over.
+  const [selection, setSelection] = useState<{
+    characterId: number | null;
+    groups: ReadonlySet<ScopeGroup>;
+  }>({ characterId: null, groups: new Set() });
+  const picked: ReadonlySet<ScopeGroup> =
+    selection.characterId === activeCharacterId ? selection.groups : new Set();
+
+  function setPicked(next: ReadonlySet<ScopeGroup>) {
+    setSelection({ characterId: activeCharacterId, groups: next });
+  }
+
+  function grant(groups: ScopeGroup[]) {
+    void beginEveLogin({ characterId: activeCharacterId ?? undefined, groups });
+  }
 
   function statusOf(group: ScopeGroup): RowStatus {
     if (group === 'corp') return CORP_STATUS[corp.state];
@@ -74,10 +88,12 @@ export function PermissionsPanel() {
   const chosen = missing.filter((group) => picked.has(group));
 
   function toggle(group: ScopeGroup) {
-    const next = new Set(picked);
-    if (next.has(group)) next.delete(group);
-    else next.add(group);
-    setPicked(next);
+    setSelection((prev) => {
+      const next = new Set(prev.characterId === activeCharacterId ? prev.groups : []);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return { characterId: activeCharacterId, groups: next };
+    });
   }
 
   return (
@@ -102,21 +118,21 @@ export function PermissionsPanel() {
                 <Button size="sm" onClick={() => setPicked(new Set(missing))}>
                   {t('settings.permissions.selectAll')}
                 </Button>
-                <Button size="sm" onClick={() => setPicked(new Set())}>
+                <Button
+                  size="sm"
+                  disabled={chosen.length === 0}
+                  onClick={() => setPicked(new Set())}
+                >
                   {t('settings.permissions.selectNone')}
                 </Button>
                 {chosen.length > 0 && (
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      void beginEveLogin({ characterId: activeCharacterId, groups: chosen })
-                    }
-                  >
+                  <Button size="sm" onClick={() => grant(chosen)}>
                     {t('settings.permissions.grantSelected', { count: chosen.length })}
                   </Button>
                 )}
               </div>
             )}
+            {/* Two columns from `xl`: one full-width list put each status a screen away from its name. */}
             <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">
               {groups.map((group) => {
                 const label = t(PERMISSIONS[group].labelKey);
@@ -127,7 +143,7 @@ export function PermissionsPanel() {
                     key={group}
                     className="flex items-center justify-between gap-4 border-t border-line py-2"
                   >
-                    {status === 'missing' && (
+                    {status === 'missing' ? (
                       <label className={touchCheckboxLabelClassName}>
                         <Checkbox
                           checked={picked.has(group)}
@@ -135,6 +151,11 @@ export function PermissionsPanel() {
                           aria-label={t('settings.permissions.selectAria', { permission: label })}
                         />
                       </label>
+                    ) : (
+                      // Keeps labels aligned with the rows that have a checkbox.
+                      missing.length > 0 && (
+                        <span aria-hidden className="size-4 shrink-0 touch:size-11" />
+                      )
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="text-text">{label}</div>
@@ -150,19 +171,14 @@ export function PermissionsPanel() {
                         <>
                           <span className="text-text-dim">{t('settings.permissions.missing')}</span>
                           {/*
-                          `ghost`, not `primary`: /settings already spends its
-                          one primary on the notifications panel's Enable
-                          (docs/DESIGN.md §6, "One `primary` button per view").
-                        */}
+                            `ghost`, not `primary`: /settings already spends its
+                            one primary on the notifications panel's Enable
+                            (docs/DESIGN.md §6, "One `primary` button per view").
+                          */}
                           <Button
                             size="sm"
                             aria-label={t('settings.permissions.grantAria', { permission: label })}
-                            onClick={() =>
-                              void beginEveLogin({
-                                characterId: activeCharacterId,
-                                groups: [group],
-                              })
-                            }
+                            onClick={() => grant([group])}
                           >
                             {t('settings.permissions.grant')}
                           </Button>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { StatusResult } from '@/esi/cache';
@@ -146,6 +146,17 @@ describe('PermissionsPanel — granting several at once', () => {
     const mail = screen.getByRole('checkbox', { name: 'Select Mail' });
     await userEvent.click(mail);
     await userEvent.click(mail);
+    expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
+  });
+
+  it('drops the ticks when the active Character changes', async () => {
+    const { rerender } = render(<PermissionsPanel />);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Mail' }));
+    expect(screen.getByRole('button', { name: 'Grant selected (1)' })).toBeInTheDocument();
+
+    act(() => useActiveCharacter.setState({ activeCharacterId: 43 }));
+    rerender(<PermissionsPanel />);
+
     expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
   });
 
