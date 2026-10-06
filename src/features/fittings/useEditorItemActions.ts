@@ -12,12 +12,15 @@
  * keep their identity across edits that leave their inputs alone.
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
   addCargo,
+  addDronesWithinBay,
   addModule,
   cargoVolumeUsed,
   copyToAllOfType,
   droneGroups,
+  droneRoom,
   fillRack,
   firstFreeSlotIndex,
   launchDrones,
@@ -63,6 +66,10 @@ interface EditorItemActionsInput {
   context: FittingContext | null;
   catalogue: FittingCatalogue | null;
   charges: ChargeLoading;
+  /** The Add panel's chosen slot — an Add panel item always has room there. */
+  target: AddTarget | null;
+  /** The Drones rack is shown: a drone has somewhere to go. */
+  dronesShown: boolean;
   /** Drag is pointer-only: without one, every drop is off. */
   dragEnabled: boolean;
   /** Stable (a `useCallback` over a state setter), as the next one is. */
@@ -104,6 +111,8 @@ export function useEditorItemActions({
   context,
   catalogue,
   charges,
+  target,
+  dronesShown,
   dragEnabled,
   selectTarget,
   openCargoQuantity,
@@ -186,6 +195,19 @@ export function useEditorItemActions({
       });
     },
     [edit, slotCounts, noteRecent, defaultCharges]
+  );
+
+  const canPlace = useCallback(
+    (rack: CandidateRack, typeId: number): boolean => {
+      if (rack === 'drone') {
+        // Room for one more of this drone beside what the bay already holds.
+        return dronesShown && fitting !== null && droneRoom(fitting, typeId, droneBay) >= 1;
+      }
+      if (fitting === null || slotCounts === null) return false;
+      if (target?.kind === 'slot' && target.slot === rack) return true;
+      return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
+    },
+    [dronesShown, fitting, droneBay, slotCounts, target]
   );
 
   /**
@@ -329,6 +351,14 @@ export function useEditorItemActions({
             openAddCargo: () => selectTarget({ kind: 'cargo' }),
             changeCargoQuantity: openCargoQuantity,
             removeCargo: (typeId) => edit((f) => setCargoQuantity(f, typeId, 0)),
+            canFitFirstFree: (typeId, rack) => canPlace(rack, typeId),
+            fitFirstFree: (typeId, rack) => {
+              if (rack === 'drone') {
+                edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
+                return;
+              }
+              fitAt(rack, 'firstFree', typeId);
+            },
             // Drag is pointer-only: a touch screen has the menus instead.
             dropHandlers: dragEnabled
               ? {
@@ -358,6 +388,8 @@ export function useEditorItemActions({
       cargoCapacity,
       cargoUsed,
       openCargoQuantity,
+      canPlace,
+      droneBay,
       dragEnabled,
       drop,
     ]

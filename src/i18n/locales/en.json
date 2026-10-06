@@ -438,6 +438,10 @@
       "hiddenByFilters_other": "{{count}} more hidden by filters — show them",
       "missingSkills": "Missing skills",
       "doesntFitHull": "Doesn't fit this hull",
+      "noBayRoom": "No room in drone bay",
+      "noSlotRoom": "No free {{rack}} left",
+      "noResources": "Too much CPU, powergrid or calibration for this hull",
+      "cantAdd": "Can't add: {{reasons}}",
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
@@ -458,7 +462,9 @@
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
       "cargoAddCount_one": "+{{count}}",
-      "cargoAddCount_other": "+{{count}}"
+      "cargoAddCount_other": "+{{count}}",
+      "cargoAddMenu_one": "Add {{count}} to cargo",
+      "cargoAddMenu_other": "Add {{count}} to cargo"
     },
     "crystalGuide": {
       "pickHint": "Pick the family for your ore, then the type.",
@@ -1426,6 +1432,8 @@
       "chargeToCargo": "Put {{name}} in cargo…",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
+      "fitFirstFree": "Fit to first free slot",
+      "addToBay": "Add to drone bay",
       "addCargo": "Add cargo",
       "cargoHold": "{{used}} / {{total}} m³",
       "dragToMove": "Drag {{name}} to another slot",
@@ -6451,6 +6459,7 @@
       "addToCompare": "Add to Compare",
       "compareVariations": "Compare Variations",
       "viewInMarket": "View in Market",
+      "viewBlueprintInMarket": "View blueprint in Market",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "viewInIndustryAsMaterial": "View in Industry as material",

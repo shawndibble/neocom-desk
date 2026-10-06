@@ -92,6 +92,10 @@ export interface FittingItemActions {
   changeCargoQuantity: (typeId: number) => void;
   removeCargo: (typeId: number) => void;
 
+  /** An Add panel item into its rack's first free slot (a drone: into the bay); false when there is none. */
+  canFitFirstFree: (typeId: number, rack: CandidateRack) => boolean;
+  fitFirstFree: (typeId: number, rack: CandidateRack) => void;
+
   /** The drops this surface takes; everything off without a fine pointer. */
   dropHandlers: FittingDropHandlers;
   /** A drop the List handles (the Ring has its own props for modules). `alt`: load only that module. */
