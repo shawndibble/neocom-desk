@@ -18,6 +18,7 @@ import {
 import { App } from '@/app/App';
 import { piTier } from '@/engine/pi/chain';
 import * as routeChunks from '@/app/routeChunks';
+import { loadPlanPrices } from '@/features/pi/planPrices';
 import type { PiData } from '@/sde/types';
 
 /** A P1 a temperate colony makes from its own Aqueous Liquids. */
@@ -877,6 +878,42 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByText('Skyhook (nullsec only)')).toBeInTheDocument();
   });
 
+  describe('with hub prices unavailable', () => {
+    const NOTICE = 'Hub prices could not be fetched';
+    beforeEach(() => {
+      vi.mocked(loadPlanPrices).mockResolvedValueOnce({
+        prices: {},
+        buyPrices: {},
+        unpriced: [],
+        failed: true,
+        fetchedAt: new Date(),
+      });
+    });
+
+    it('says so on Plan, with no zero figures', async () => {
+      window.history.pushState({}, '', '/planetary-industry/plan');
+      render(<App />);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+      expect(screen.queryByText(/\+0 ISK/)).toBeNull();
+      expect(screen.queryByText(/Haul 0/)).toBeNull();
+      expect(screen.queryByText(/can't measure this colony/)).toBeNull();
+    });
+
+    it('says so on Map instead of drawing without it', async () => {
+      window.history.pushState({}, '', '/planetary-industry/map');
+      render(<App />);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+    });
+
+    it('says so on Colonies, keeps the status rows, and shows no ISK/day', async () => {
+      render(<App />);
+      const panel = await colonyPanelFor(/Jita IV/);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+      expect(panel).toHaveAttribute('data-colony-status', 'stopped');
+      expect(screen.queryByText(/0\.00 ISK/)).toBeNull();
+    });
+  });
+
   it('draws the planet map on the Map tab', async () => {
     window.history.pushState({}, '', '/planetary-industry/map');
     render(<App />);
@@ -900,6 +937,16 @@ describe('PlanetaryIndustry', () => {
     const strip = screen.getByTestId('pi-header-strip');
     expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
     expect(within(strip).getByText('Colonies')).toBeInTheDocument();
+  });
+
+  it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('combobox', {
+      name: 'Where do you sell?',
+    });
+    expect(picker).toHaveClass('min-w-40', 'w-auto');
+    expect(picker).not.toHaveClass('w-40');
   });
 
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {

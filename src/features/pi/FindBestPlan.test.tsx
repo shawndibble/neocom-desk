@@ -177,6 +177,23 @@ describe('FindBestPlan', () => {
     expect(document.getElementById(panel.id)).toBeNull();
   });
 
+  it('opens Show me how at step 1 from the Find one control, and keeps it open on a second press', async () => {
+    const user = userEvent.setup();
+    renderPlan();
+    const card = cardItems()[0];
+    const findOne = within(card as HTMLElement).getAllByRole('button', { name: /^Find one: / })[0];
+    await user.click(findOne);
+    const how = within(card as HTMLElement).getByRole('button', { name: /Hide steps/ });
+    expect(how).toHaveAttribute('aria-expanded', 'true');
+    const panel = document.getElementById(how.getAttribute('aria-controls')!)!;
+    expect(panel).toHaveFocus();
+    expect(within(panel).getByRole('heading', { level: 3, name: /^1 ·/ })).toBeInTheDocument();
+    (document.activeElement as HTMLElement).blur();
+    await user.click(findOne);
+    expect(how).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toHaveFocus();
+  });
+
   it('puts focus back on the card button when Show me how closes', async () => {
     const user = userEvent.setup();
     renderPlan();

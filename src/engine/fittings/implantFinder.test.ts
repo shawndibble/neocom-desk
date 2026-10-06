@@ -411,9 +411,42 @@ describe('weapon goals', () => {
 
   it('files every goal under one group of the goal list', () => {
     expect(new Set(IMPLANT_GOALS.map((g) => g.group))).toEqual(
-      new Set(['fitting', 'weapons', 'tank', 'navigation'])
+      new Set(['fitting', 'weapons', 'mining', 'tank', 'navigation'])
     );
     expect(goalById('missileDps').group).toBe('weapons');
+    expect(goalById('miningYield').group).toBe('mining');
+  });
+});
+
+describe('mining and utility goals', () => {
+  const mining = (perHour: number) => stats({ mining: { rows: [], perHour } } as never);
+
+  it('reads mining yield a hour, and an implant that lifts it gains by the relative rise', () => {
+    const goal = goalById('miningYield');
+    expect(goal.kind).toBe('more');
+    expect(displayValue(goal, mining(25_933))).toBe(25_933);
+    // A Highwall MX-1005 / Michi's Excavation Augmentor style bonus: +5%.
+    expect(goalGain(goal, mining(20_000), mining(21_000))).toBeCloseTo(0.05);
+  });
+
+  it('is 0 on a fit with nothing mining, so the goal is listed under "not on this fit"', () => {
+    expect(goalById('miningYield').read(mining(0), {})).toBe(0);
+  });
+
+  it('reads warp speed in AU/s, and a warp-speed hardwiring or Mobility booster raises it', () => {
+    const warp = (warpSpeed: number) =>
+      stats({ navigation: { maxVelocity: 0, agility: 0, mass: 0, warpSpeed } });
+    const goal = goalById('warpSpeed');
+    expect(goal.group).toBe('navigation');
+    expect(displayValue(goal, warp(3.5))).toBe(3.5);
+    expect(goalGain(goal, warp(3), warp(3.6))).toBeCloseTo(0.2);
+  });
+
+  it('reads sensor strength, raised by a sensor implant or Electronics booster', () => {
+    const sensor = (strength: number) => stats({ sensor: { strength, type: 'radar' } });
+    const goal = goalById('sensorStrength');
+    expect(goal.group).toBe('tank');
+    expect(goalGain(goal, sensor(10), sensor(12))).toBeCloseTo(0.2);
   });
 });
 

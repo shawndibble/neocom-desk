@@ -26,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
@@ -35,6 +34,7 @@ import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
 import { PI_MAP_HREF } from './piPlanLink';
 import { useSellHub } from './sellHub';
@@ -323,18 +323,6 @@ function GoalPlanner({
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot || !pi || !names) return <Loading />;
-  if (snapshot.needsReauth) {
-    return (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterPlanets']}
-        title={t('pi.reauthTitle')}
-        hint={t('pi.reauthHint')}
-        actionLabel={t('pi.reauthAction')}
-      />
-    );
-  }
-
   const systemName = (id: number) =>
     snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
@@ -361,9 +349,7 @@ function GoalPlanner({
   } else if (!prices || !result) {
     results = <Loading />;
   } else if (prices.failed) {
-    results = (
-      <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />
-    );
+    results = <PricesUnavailable />;
   } else if ('error' in result) {
     results = <EmptyState title={t('piPlan.planFailedTitle')} hint={t('piPlan.planFailedHint')} />;
   } else {

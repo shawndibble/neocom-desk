@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
+import { PricesUnavailable } from './PricesUnavailable';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import {
   ChecklistPanel,
@@ -105,7 +106,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
-    return <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />;
+    return <PricesUnavailable />;
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.make.failedTitle')} hint={t('piPlan.make.failedHint')} />;
