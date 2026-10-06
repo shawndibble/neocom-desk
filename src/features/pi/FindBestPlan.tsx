@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PricesUnavailable } from './PricesUnavailable';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
+import { PricesUnavailable } from './PricesUnavailable';
 import { AllProductsPanel } from './AllProductsPanel';
 import { useCadence } from './cadencePref';
 import {

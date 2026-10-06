@@ -56,33 +56,31 @@ export function usePiAdviceInputs(
   }, [hydrateCadence, hydrateGoalPrefs]);
 
   const pi = snapshot?.pi ?? null;
-  const [priced, setPriced] = useState<{
-    hubId: string;
-    pi: unknown;
-    prices: PlanPrices | null;
-  } | null>(null);
+  // Keyed by hub only: a refresh of the colonies keeps the last prices on
+  // screen instead of blanking every figure while they are read again.
+  const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices | null } | null>(null);
   useEffect(() => {
     if (!pi) return;
     let cancelled = false;
     loadGoalPlannerPrices(hub, pi).then(
       (prices) => {
-        if (!cancelled) setPriced({ hubId: hub.id, pi, prices });
+        if (!cancelled) setPriced({ hubId: hub.id, prices });
       },
       () => {
-        if (!cancelled) setPriced({ hubId: hub.id, pi, prices: null });
+        if (!cancelled) setPriced({ hubId: hub.id, prices: null });
       }
     );
     return () => {
       cancelled = true;
     };
   }, [pi, hub, reloadKey]);
-  const pricedNow = priced?.hubId === hub.id && priced.pi === pi ? priced : null;
+  const pricedNow = priced?.hubId === hub.id ? priced : null;
   const prices = pricedNow?.prices ?? null;
   const pricesFailed = pricedNow !== null && (prices === null || prices.failed);
 
   const nowMs = snapshot?.nowMs ?? null;
-  const skillsKey = `${characterId}|${nowMs}`;
-  const [skillsFor, setSkillsFor] = useState<{ key: string; skills: Skills } | null>(null);
+  // Keyed by character: a re-read of the colonies keeps the last skills too.
+  const [skillsFor, setSkillsFor] = useState<{ characterId: number; skills: Skills } | null>(null);
   useEffect(() => {
     if (characterId === null || nowMs === null) return;
     let cancelled = false;
@@ -92,7 +90,7 @@ export function usePiAdviceInputs(
     ]).then(([commandCenterUpgrades, interplanetaryConsolidation]) => {
       if (!cancelled) {
         setSkillsFor({
-          key: skillsKey,
+          characterId,
           skills: { commandCenterUpgrades, interplanetaryConsolidation },
         });
       }
@@ -100,8 +98,8 @@ export function usePiAdviceInputs(
     return () => {
       cancelled = true;
     };
-  }, [characterId, nowMs, skillsKey]);
-  const skills = skillsFor?.key === skillsKey ? skillsFor.skills : null;
+  }, [characterId, nowMs]);
+  const skills = skillsFor?.characterId === characterId ? skillsFor.skills : null;
 
   const basis = useJumpBasis();
   const colonies = snapshot?.colonies;

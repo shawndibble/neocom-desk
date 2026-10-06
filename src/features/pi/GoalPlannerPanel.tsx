@@ -21,7 +21,6 @@
  * would send keyboard and screen-reader users through a different sequence
  * than the one on screen (WCAG 2.4.3).
  */
-import { PricesUnavailable } from './PricesUnavailable';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -36,6 +35,7 @@ import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
 import { PI_MAP_HREF } from './piPlanLink';
 import { useSellHub } from './sellHub';
