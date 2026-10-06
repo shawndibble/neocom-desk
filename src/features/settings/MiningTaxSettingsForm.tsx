@@ -47,10 +47,8 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
             />
           </label>
         </Field>
-      </Fields>
-      {/* Device-local (`continueSessionPref.ts`): outside the block the sync
-          hint heads, and its note says so. */}
-      <Fields variant="form">
+        {/* Device-local (`continueSessionPref.ts`); its note says so. Same grid as
+            the row above so both checkboxes share one column. */}
         <Field
           label={t('settings.miningTaxAutoContinueLabel')}
           htmlFor="settings-mining-tax-auto-continue"
