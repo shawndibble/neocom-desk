@@ -23,7 +23,7 @@
  *
  * ## Why this spec stubs one module
  *
- * Same trade `contractSearchCourierNarrow.spec.ts` documents: BPC Sourcing's
+ * Same trade `contractSearchCourierNarrow.dev.spec.ts` documents: BPC Sourcing's
  * contract rows come from a shared, sync-gated Public Contract Offers
  * snapshot (`syncedContracts.ts`), gated on `isSyncConfigured()` — shut for
  * every E2E spec since Firebase env vars are blanked on purpose (see
@@ -139,7 +139,7 @@ async function stubSyncConfigured(page: Page): Promise<void> {
   });
 }
 
-/** Firebase now reads as configured — refused so the snapshot loader falls through to the Dexie row seeded above, same trade `contractSearchCourierNarrow.spec.ts` makes. */
+/** Firebase now reads as configured — refused so the snapshot loader falls through to the Dexie row seeded above, same trade `contractSearchCourierNarrow.dev.spec.ts` makes. */
 async function refuseSyncBackend(page: Page): Promise<void> {
   const SYNC_HOSTS = [
     'https://*.googleapis.com/**',
