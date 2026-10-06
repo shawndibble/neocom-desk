@@ -178,6 +178,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
       ) : (
         <RecipeListPanel
           cards={best.cards}
+          addDividerBefore={best.addDividerBefore}
           hubName={hubName}
           priceSource={priceSource}
           estimate

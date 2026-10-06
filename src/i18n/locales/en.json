@@ -5000,6 +5000,7 @@
       "alreadyBest": "You're already making the best thing for your planets.",
       "alreadyBestHint": "Here's what a new planet could add: try a + planet above.",
       "newWithPlanet": "New with this planet",
+      "addToUnlock": "Add a planet to unlock these",
       "setup": "one-planet setup · {{parts}}",
       "setupExtractors_one": "{{count}} extractor",
       "setupExtractors_other": "{{count}} extractors",
