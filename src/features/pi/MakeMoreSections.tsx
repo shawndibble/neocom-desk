@@ -2,7 +2,8 @@
  * The "Make more from my planets" panels, drawn from `PlanView`. No figure is
  * computed here: components format and translate what the view model hands them.
  *
- * Cues follow DESIGN.md §6c: item names are Market links, a checkbox or a box
+ * Cues follow DESIGN.md §6c: item names open their PI Product Detail
+ * (`PiProductLink`), a checkbox or a box
  * means "tick or click me", the "alternative" disclosure has a rotating leading
  * caret, and static facts are `StatChip`s and type, not boxes.
  */
@@ -24,7 +25,7 @@ import * as Icon from '@/components/ui/icons';
 import type { RebuildPreference } from '@/engine/pi/planAdvice';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
 import type { PiPinKind } from '@/sde/types';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { LoadMeter, EstimateBadge, VerbTag } from './DirectiveRow';
@@ -54,9 +55,9 @@ export interface Ticks {
 
 function ItemLink({ item }: { item: NamedItem }) {
   return (
-    <MarketItemLink typeId={item.typeId}>
+    <PiProductLink typeId={item.typeId}>
       <b className="font-semibold">{item.name}</b>
-    </MarketItemLink>
+    </PiProductLink>
   );
 }
 
@@ -219,7 +220,7 @@ export function YourPlanetsPanel({
             key={strip.planetId}
             className="flex min-w-0 items-center gap-2.5 border-b border-line p-3 md:border-r"
           >
-            <PlanetImage type={strip.planetType} px={36} />
+            <PlanetImage type={strip.planetType} size={36} />
             <div className="min-w-0 text-[0.6875rem]">
               <div className="truncate text-xs font-semibold text-text">{strip.name}</div>
               {strip.quickWinGainPerDay !== null && (
@@ -367,7 +368,16 @@ function QuickWinSentence({ win, names }: { win: QuickWinRow; names: Map<number,
   }
 }
 
-export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
+export function QuickWinsPanel({
+  view,
+  ticks,
+  pricesDown = false,
+}: {
+  view: PlanView;
+  ticks: Ticks;
+  /** Hub prices unreadable: the wins shown need none, so no gain is drawn, not even "No ISK figure". */
+  pricesDown?: boolean;
+}) {
   const { t } = useTranslation();
   const baseId = useId();
   const names = new Map(view.strips.map((strip) => [strip.planetId, strip.name]));
@@ -378,8 +388,12 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('piPlan.make.minutesTotal', { count: headline.quickWinMinutes })}
-          {' · '}
-          <Gain value={headline.quickWinPerDay} />
+          {!pricesDown && (
+            <>
+              {' · '}
+              <Gain value={headline.quickWinPerDay} />
+            </>
+          )}
         </span>
       }
       padded={false}
@@ -397,7 +411,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
                   aria-labelledby={sentenceId}
                 />
               </label>
-              <PlanetImage type={win.planetType} px={36} badge={ACTION_BADGE[win.action]} />
+              <PlanetImage type={win.planetType} size={36} badge={ACTION_BADGE[win.action]} />
               {win.iconTypeId !== null && (
                 <TypeIcon typeId={win.iconTypeId} size={32} width={24} height={24} />
               )}
@@ -411,7 +425,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
                 <QuickWinSentence win={win} names={names} />
               </p>
               <span className="flex shrink-0 flex-col items-end gap-0.5 text-xs sm:flex-row sm:items-center sm:gap-3">
-                {win.gainPerDay === null ? (
+                {pricesDown ? null : win.gainPerDay === null ? (
                   <span className="text-text-dim">{t('piPlan.make.unpriced')}</span>
                 ) : win.gainKind === 'saves' ? (
                   <span className="tabular-nums text-warning">
@@ -428,7 +442,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
         })}
       </ul>
       <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-        {t('piPlan.make.quickFoot')}
+        {t(pricesDown ? 'piPlan.make.quickFootNoPrices' : 'piPlan.make.quickFoot')}
       </p>
     </Panel>
   );
@@ -480,6 +494,22 @@ function RebuildSentence({
   }
   if (card.status === 'keep') {
     const reason = card.keepReason ?? 'already-best';
+    // Never "keep on" raw ore: the recommendation ends at P1 or above.
+    if (card.sellsRaw) {
+      return (
+        <Sentence
+          text={t(
+            card.hasRefineWin ? 'piPlan.make.rebuild.rawQuickWin' : 'piPlan.make.rebuild.raw',
+            {
+              planet: '{planet}',
+              type: '{type}',
+              items: '{items}',
+            }
+          )}
+          slots={{ planet, type, items: <ItemList items={card.sells} /> }}
+        />
+      );
+    }
     return (
       <Sentence
         text={t(
@@ -566,7 +596,7 @@ function RebuildCard({
   return (
     <li id={card.anchor} tabIndex={-1} className="scroll-mt-4 px-3 py-3 outline-none">
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
-        <PlanetImage type={card.planetType} px={44} />
+        <PlanetImage type={card.planetType} size={44} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-text">
             <RebuildSentence card={card} haulDays={haulDays} upgradeFrom={upgradeFrom} />
@@ -853,7 +883,7 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
       className="flex min-w-0 flex-col border-line md:border-r md:last:border-r-0"
     >
       <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
-        <PlanetImage type={column.planetType} px={36} />
+        <PlanetImage type={column.planetType} size={36} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-xs font-semibold text-text">
             {column.index}. {column.name}
@@ -914,6 +944,7 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
             {fit.upgradeFromLevel !== null
               ? t('piPlan.make.fitNeedsUpgrade', {
                   level: fit.level,
+                  count: fit.level - fit.upgradeFromLevel,
                   steps: fit.level - fit.upgradeFromLevel,
                 })
               : t('piPlan.make.fitsCc', { level: fit.level })}

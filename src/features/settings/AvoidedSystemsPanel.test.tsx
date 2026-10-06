@@ -42,7 +42,7 @@ describe('AvoidedSystemsPanel', () => {
     const user = userEvent.setup();
     render(<AvoidedSystemsPanel />);
 
-    await user.click(await screen.findByRole('button', { name: 'Add system' }));
+    await user.click(await screen.findByRole('button', { name: 'Add an avoided system' }));
     await user.type(screen.getByRole('combobox'), 'ued');
     const option = await screen.findByRole('option', { name: /Uedama/ });
     expect(option).toHaveTextContent('0.5');
@@ -58,7 +58,7 @@ describe('AvoidedSystemsPanel', () => {
     const user = userEvent.setup();
     render(<AvoidedSystemsPanel />);
 
-    await user.click(await screen.findByRole('button', { name: 'Add system' }));
+    await user.click(await screen.findByRole('button', { name: 'Add an avoided system' }));
     await user.type(screen.getByRole('combobox'), 'a');
     await screen.findByRole('option', { name: /Tama/ });
     expect(screen.queryByRole('option', { name: /Uedama/ })).not.toBeInTheDocument();

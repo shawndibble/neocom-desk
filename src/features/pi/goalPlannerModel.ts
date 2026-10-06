@@ -52,7 +52,7 @@ import type { PinLoad, PiTier } from '@/engine/pi/types';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR } from '@/engine/pi/stopTier';
 import { salesTaxPct } from '@/engine/industry/fees';
-import { builtAdvice, localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
+import { builtAdvice, localResourcesFor, type BuiltColonyAdvice } from './systemPlanetModel';
 import { extractorProgramsFromPins } from './adapters';
 import { currentProductTypeIds, meanHeadsPerExtractor } from './stopTierModel';
 import { medianNewLinkLoad } from './unbuiltPlanModel';
@@ -64,6 +64,7 @@ import {
 import { type CustomsRateSource } from './customsRate';
 import { type CustomsOverrides } from './customsOverride';
 import { resolveColonyCustoms } from './colonyCustoms';
+import { effectiveLocalResources, type RichnessByPlanet } from './richnessOverride';
 
 /** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
@@ -89,6 +90,8 @@ export interface PlannerPrefs {
   customsOverrides: CustomsOverrides;
   /** Planet ids the pilot switched off. */
   disabled: ReadonlySet<number>;
+  /** The pilot's saved richness picks, by planet (`richnessOverride.ts`). */
+  richness?: RichnessByPlanet;
 }
 
 export type ExcludedReason = 'no-detail' | 'no-planet-type' | 'no-link-cost';
@@ -200,11 +203,17 @@ export function plannerColonies(
     });
 
     if (!own) return excluded('no-detail');
-    const local = localResourcesFor(planet.planet_type, pi);
-    if (local.length === 0) return excluded('no-planet-type');
+    if (localResourcesFor(planet.planet_type, pi).length === 0) return excluded('no-planet-type');
     const newLinkCost: PinLoad | null = own.pinLoad.newLinkLoad ?? borrowedLink;
     if (!newLinkCost) return excluded('no-link-cost');
 
+    // What the colony runs today stays rated whatever was picked: the capacity
+    // model refuses a layout whose P0 has no rate.
+    const running = own.extractors.flatMap((e) =>
+      e.productTypeId === null ? [] : [e.productTypeId]
+    );
+    const picked = prefs.richness?.get(planetId);
+    const local = effectiveLocalResources(planet.planet_type, pi, picked, running);
     const ownMeasured = measured.get(planetId) ?? new Map<number, number[]>();
     const ratePerEcu = new Map<number, EcuRate>();
     for (const resource of local) {

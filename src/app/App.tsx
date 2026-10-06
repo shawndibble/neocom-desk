@@ -39,6 +39,7 @@ import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
+import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
@@ -376,6 +377,7 @@ export function App() {
         <EntityInfoRoute />
         <PublicInfoModal />
         <SkillDetailModal />
+        <ItemInfoModal />
         <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>

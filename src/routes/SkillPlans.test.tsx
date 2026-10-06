@@ -306,7 +306,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
@@ -323,7 +324,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
@@ -1033,12 +1035,15 @@ describe('SkillPlans editor: optimize remaps', () => {
     // Remove enough entries to shrink the scheduled queue below the stale
     // segment's startIndex — must not throw, and must drop the stale panel
     // rather than render against the old (now out-of-range) schedule.
-    // Icon-only remove button (#112): accessible name is "Remove {skill}
-    // {level}", not visible text. The level is part of the name because a
+    // The row's ⋮ menu holds Remove (#112): the item's accessible name is "Remove {skill}
+    // {level}". The level is part of the name because a
     // plan holds one row per level, so "Gunnery III" alone would match three
     // buttons. Removing opens a confirm Modal (#408) rather than removing
     // immediately.
-    await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery III' }));
+    await user.click(
+      within(entriesPanel).getByRole('button', { name: 'More actions for Gunnery III' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Gunnery III' }));
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());

@@ -9,6 +9,7 @@
  * they never compute.
  */
 
+import { isP0 } from '@/engine/pi/chain';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import {
   isSaving,
@@ -82,6 +83,10 @@ export interface RebuildCardView {
   status: 'change' | 'keep' | 'unknown';
   /** What the colony sells today. */
   sells: NamedItem[];
+  /** Everything it sells is raw P0: a keep card must not endorse that (scope decision 20261005-114103). */
+  sellsRaw: boolean;
+  /** A basic-factory quick win refines what it sells. */
+  hasRefineWin: boolean;
   /** The recommended product; for a keep, the model's best. */
   target: NamedItem | null;
   /** Today after its quick wins, the figure the rebuild is measured against. */
@@ -319,7 +324,11 @@ export function buildPlanView(
       planetType: colony.planetType,
       anchor: colony.anchor,
       sells: colony.sells.map(named),
+      sellsRaw: colony.sells.length > 0 && colony.sells.every((typeId) => isP0(typeId, pi)),
       hasQuickWin: colony.quickWins.length > 0,
+      hasRefineWin: colony.quickWins.some(
+        (win) => win.detail.kind === 'spare-room' && win.detail.what === 'factories'
+      ),
     };
     const { rebuild } = colony;
     if (rebuild.status === 'change') {

@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { buildPlanAdvice } from './planAdviceModel';
 import { planPicks } from './planPicks';
-import { adviceInput } from './map/mapFixtures.testutil';
+import { adviceInput, pi } from './map/mapFixtures.testutil';
+import { buildFindBestView } from './findBestView';
+import { planetTypesOf } from './productPlanets';
+import { buildMapGraph, productFigure } from './map/mapModel';
 
 describe('planPicks', () => {
   it('lists each distinct rebuild once, biggest total gain first, at most three', () => {
@@ -57,5 +60,45 @@ describe('planPicks', () => {
     const base = planPicks(buildPlanAdvice(adviceInput('lean')));
     const whatIf = planPicks(buildPlanAdvice(adviceInput('lean', { whatIfTypes: ['lava'] })));
     expect(whatIf).toEqual(base);
+  });
+
+  describe('untrained Command Center (level 0), no colonies', () => {
+    const advice = buildPlanAdvice(
+      adviceInput('none', {
+        skills: { commandCenterUpgrades: 0, interplanetaryConsolidation: null },
+      })
+    );
+    const plan = buildFindBestView({
+      rows: advice.recipeRows,
+      unpriced: advice.recipes.unpriced,
+      colonyTypes: [],
+      allTypes: planetTypesOf(pi),
+      off: new Set(),
+      whatIf: new Set(),
+      filter: 'any',
+      madeTypeIds: new Set(),
+    }).cards.slice(0, 3);
+
+    it("picks the same recipes as Plan's Find best, CC tags included", () => {
+      const picks = planPicks(advice);
+      expect(picks.kind).toBe('recipes');
+      expect(plan.length).toBeGreaterThan(0);
+      expect(picks.picks.map((p) => [p.typeId, p.needsCcLevel ?? null])).toEqual(
+        plan.map((c) => [c.recipe.typeId, c.recipe.needsCcLevel ?? null])
+      );
+      expect(picks.picks.some((p) => p.needsCcLevel)).toBe(true);
+    });
+
+    it('gives each pick a tile figure carrying the same tag', () => {
+      const graph = buildMapGraph(pi);
+      for (const card of plan) {
+        const figure = productFigure(advice, card.recipe.typeId, graph);
+        expect(figure).toMatchObject({
+          kind: 'ranked',
+          iskPerDay: card.recipe.iskPerDay,
+          needsCcLevel: card.recipe.needsCcLevel ?? null,
+        });
+      }
+    });
   });
 });

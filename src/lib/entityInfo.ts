@@ -1,14 +1,14 @@
 /**
  * The `info` search param: which entity's Show Info (or Skill) modal a URL
  * has open — `?info=character-<id>`, `corporation-<id>`, `alliance-<id>` or
- * `skill-<typeId>`. It rides on the *current* location, so a link to an
+ * `skill-<typeId>` or `type-<typeId>` (an item's Item Detail). It rides on the *current* location, so a link to an
  * entity is a real, shareable `<a href>` that opens the modal over whatever
  * page the pilot is on (DESIGN.md §6c "Entities").
  *
  * Pure: no router, DOM or store imports.
  */
 
-export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill';
+export type EntityInfoKind = 'character' | 'corporation' | 'alliance' | 'skill' | 'type';
 
 export interface EntityInfoTarget {
   kind: EntityInfoKind;
@@ -17,7 +17,7 @@ export interface EntityInfoTarget {
 
 export const ENTITY_INFO_PARAM = 'info';
 
-const INFO_PATTERN = /^(character|corporation|alliance|skill)-(\d+)$/;
+const INFO_PATTERN = /^(character|corporation|alliance|skill|type)-(\d+)$/;
 
 export function formatEntityInfo({ kind, id }: EntityInfoTarget): string {
   return `${kind}-${id}`;

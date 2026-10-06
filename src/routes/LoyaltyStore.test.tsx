@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -201,6 +201,22 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   requiredItemsCost: 0,
 };
 
+describe('LoyaltyStore LP Value cog', () => {
+  it('opens the LP Value setting in a modal', async () => {
+    const user = userEvent.setup();
+    renderStore();
+    await user.click(screen.getByRole('button', { name: /LP Store settings/i }));
+    const dialog = screen.getByRole('dialog');
+    expect(
+      await within(dialog).findByRole('textbox', { name: /Your LP value/ })
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'All settings' })).toHaveAttribute(
+      'href',
+      '/settings/market'
+    );
+  });
+});
+
 describe('LoyaltyStore filters', () => {
   it('shows the filters inline on a pointer viewport', () => {
     renderStore();
@@ -318,7 +334,7 @@ describe('LoyaltyStore filters', () => {
 });
 
 describe('LoyaltyStore selected offer (issue #1490)', () => {
-  it('links the item name to Market and shows the row menu trigger (#2654)', () => {
+  it('keeps the item name plain (row selects) and shows the row menu trigger (#2654)', () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
       corpName: 'Federal Navy Academy',
@@ -333,8 +349,7 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
       toggleUseOwnMaterials: () => {},
     });
     renderStore();
-    const link = screen.getByRole('link', { name: ITEM_ROW.itemName });
-    expect(link.getAttribute('href')).toContain(`/market/browser?`);
+    expect(screen.queryByRole('link', { name: ITEM_ROW.itemName })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /more actions/i }).length).toBeGreaterThan(0);
   });
 
@@ -694,6 +709,13 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     expect(
       screen.getByRole('button', { name: 'picker: Federal Navy Academy' })
     ).toBeInTheDocument();
+  });
+
+  it("offers the corporation's Show Info from the header", () => {
+    renderAt('/loyalty/1000168');
+    expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
+      'info=corporation-1000168'
+    );
   });
 
   it('opens the picked store from the URL', () => {

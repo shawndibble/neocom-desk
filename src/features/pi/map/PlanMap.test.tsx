@@ -5,8 +5,9 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, hubBooks, type PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
+import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, pi } from './mapFixtures.testutil';
 import { MAP_HINT_KEY } from './mapHintPref';
 import { buildMapGraph, DOCK_MIN_PANEL_WIDTH, productFigure } from './mapModel';
@@ -36,15 +37,15 @@ function props(overrides: Partial<PlanMapProps> = {}): PlanMapProps {
     graph,
     advice,
     adviceWithWhatIf: withWhatIf('lean'),
-    colonies: [{ type: 'temperate', name: 'Hek VIII' }],
-    finder: { systemId: 30000142, name: 'Jita' },
+    colonies: [{ planetId: 40000001, type: 'temperate', name: 'Hek VIII' }],
+    finder: { systemId: 30000142, name: 'Jita', security: 0.9 },
     ...overrides,
   };
 }
 
-function renderMap(overrides: Partial<PlanMapProps> = {}) {
+function renderMap(overrides: Partial<PlanMapProps> = {}, entry = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <PlanMap {...props(overrides)} />
     </MemoryRouter>
   );
@@ -101,9 +102,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const product = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}\\. `) });
+// A product tile is a link to its PI detail (`?product=`), not a button.
+const product = (name: string) => screen.getByRole('link', { name: new RegExp(`^${name}\\. `) });
 const maybeProduct = (name: string) =>
-  screen.queryByRole('button', { name: new RegExp(`^${name}\\. `) });
+  screen.queryByRole('link', { name: new RegExp(`^${name}\\. `) });
 const planet = (name: string) =>
   screen.getByRole('button', { name: new RegExp(`^${name} planet`) });
 
@@ -162,7 +164,7 @@ describe('PlanMap: what if I add a planet', () => {
     expect(screen.getByText(/Unlocks \d+ products? on the map/)).toBeInTheDocument();
     // The mark is in the tile's accessible name, not only a colour.
     expect(
-      screen.getByRole('button', { name: /^Felsic Magma\. .*Unlocked by adding a Lava planet/ })
+      screen.getByRole('link', { name: /^Felsic Magma\. .*Unlocked by adding a Lava planet/ })
     ).toBeInTheDocument();
     await user.unhover(planet('Lava'));
     expect(maybeProduct('Felsic Magma')).toBeNull();
@@ -216,10 +218,13 @@ describe('PlanMap: trace', () => {
     expect(
       within(dialog).getByText(/In words: Temperate → .*Carbon Compounds.*→ .*Biofuels/)
     ).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: 'Biofuels' })).toHaveAttribute(
+    // Its own name is plain text in its own detail; Market is one step away.
+    expect(within(dialog).queryByRole('link', { name: 'Biofuels' })).toBeNull();
+    expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       expect.stringContaining('/market/browser')
     );
+    expect(product('Biofuels')).toHaveAttribute('href', expect.stringContaining('product=2396'));
     // Moving the trace moves `aria-current`.
     await user.click(product('Proteins'));
     expect(product('Proteins')).toHaveAttribute('aria-current', 'true');
@@ -246,7 +251,7 @@ describe('PlanMap: the same numbers as Plan', () => {
     expect(picks.picks.length).toBeGreaterThan(0);
     const strip = screen.getByRole('group', { name: 'Your picks' });
     const buttons = within(strip)
-      .getAllByRole('button')
+      .getAllByRole('link')
       .filter((b) => /^#\d/.test(b.textContent ?? ''));
     expect(buttons).toHaveLength(picks.picks.length);
     picks.picks.forEach((pick, i) => {
@@ -254,6 +259,22 @@ describe('PlanMap: the same numbers as Plan', () => {
       expect(buttons[i]).toHaveTextContent(pick.name);
       expect(buttons[i]).toHaveTextContent(`+${formatIskCompact(pick.perDay)}/day`);
     });
+  });
+
+  it('prints a losing rebuild pick with one minus and the loss tone, never "+-"', () => {
+    const losing = {
+      ...advice,
+      colonies: advice.colonies.map((c) =>
+        c.rebuild.status === 'change'
+          ? { ...c, rebuild: { ...c.rebuild, gainPerDay: -756_000 } }
+          : c
+      ),
+    } as PlanAdvice;
+    renderMap({ advice: losing });
+    const strip = screen.getByRole('group', { name: 'Your picks' });
+    expect(strip.textContent).not.toContain('+-');
+    expect(strip.textContent).toMatch(/-[\d.]+[KM]\/day/);
+    expect(strip.querySelector('.text-isk-neg')).not.toBeNull();
   });
 
   it('lists the best one-planet recipes when there are no colonies', () => {
@@ -346,6 +367,8 @@ describe('PlanMap: the detail drawer', () => {
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
     expect(within(dialog).getByText('Add a Lava planet')).toBeInTheDocument();
     expect(within(dialog).getByText(/Unlocks \d+ products/)).toBeInTheDocument();
+    // Assistive tech gets the product names, not only the count.
+    expect(within(dialog).getByText(/^Unlocked products: .*Plasmoids.*\.$/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Best one-planet recipe:/)).toBeInTheDocument();
     expect(
       within(dialog).getByText("You're using 1 of 4 planets: room for 3 more.")
@@ -358,16 +381,43 @@ describe('PlanMap: the detail drawer', () => {
     expect(screen.getByText('What if I add a Lava planet?')).toBeInTheDocument();
   });
 
+  it('keeps a traced product on screen when you hover or click a planet it needs', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    // Felsic Magma is a Lava product; the pilot has no Lava colony. It only
+    // shows on the map while Lava is a what-if, and tracing it ends that.
+    await user.click(planet('Lava'));
+    await user.click(product('Felsic Magma'));
+    expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.hover(planet('Lava'));
+    // No what-if preview: the trace already shows the chain, pink wires would bury it.
+    expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
+    await user.click(planet('Lava'));
+    expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Where to put a new Lava colony' })).toBeNull();
+  });
+
   it('tracing the best recipe from the add-planet drawer keeps the opener and clears the what-if', async () => {
     const user = userEvent.setup();
     renderMap();
     await user.click(planet('Lava'));
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
-    await user.click(within(dialog).getByRole('button', { name: /Best one-planet recipe:/ }));
+    await user.click(within(dialog).getByRole('link', { name: /Best one-planet recipe:/ }));
     expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(planet('Lava')).toHaveFocus());
+  });
+
+  it('writes no dead "find one" text beside a planet you do not have', async () => {
+    const user = userEvent.setup();
+    renderMap({ colonies: [] });
+    await user.click(product('Biofuels'));
+    const dialog = screen.getByRole('dialog', { name: 'How to make it' });
+    expect(within(dialog).getAllByText(/Temperate/).length).toBeGreaterThan(0);
+    expect(within(dialog).queryByText(/find one/i)).toBeNull();
+    expect(within(dialog).queryByText(/✕/)).toBeNull();
   });
 
   it('gives focus back after Clear trace in the drawer', async () => {
@@ -431,7 +481,8 @@ describe("PlanMap: docked or drawer, by the map panel's own width", () => {
     await user.click(product('Proteins'));
     expect(screen.queryByRole('dialog')).toBeNull();
     const aside = screen.getByRole('complementary', { name: 'How to make it' });
-    expect(within(aside).getByRole('link', { name: 'Proteins' })).toBeInTheDocument();
+    expect(within(aside).getByText('Proteins', { selector: 'div' })).toBeInTheDocument();
+    expect(within(aside).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
 
     // And back, without a stale panel.
     reportWidth(1200);
@@ -531,9 +582,9 @@ describe('PlanMap: phone', () => {
     expect(screen.queryByRole('group', { name: /^Planet map/ })).toBeNull();
     const switcher = screen.getByRole('group', { name: 'Product tier' });
     await user.click(within(switcher).getByRole('button', { name: 'P1' }));
-    await user.click(screen.getByRole('button', { name: /^Biofuels/ }));
+    await user.click(screen.getByRole('link', { name: /^Biofuels/ }));
     const sheet = screen.getByRole('dialog', { name: 'How to make it' });
-    expect(within(sheet).getByRole('link', { name: 'Biofuels' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
     await user.click(within(sheet).getByRole('button', { name: 'Close' }));
     await user.click(screen.getByRole('button', { name: 'Show full map' }));
     expect(screen.getByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
@@ -541,5 +592,67 @@ describe('PlanMap: phone', () => {
       'aria-expanded',
       'true'
     );
+  });
+});
+
+describe('PlanMap: the picks note says what is shared with Plan', () => {
+  afterEach(async () => {
+    await usePlanPreference.getState().setValue('isk');
+  });
+
+  it.each([
+    ['isk', 'ranked by most ISK'],
+    ['haul', 'ranked by least hauling'],
+  ] as const)('names the %s preference', async (preference, text) => {
+    await usePlanPreference.getState().setValue(preference);
+    renderMap();
+    expect(await screen.findByText(new RegExp(text))).toBeInTheDocument();
+  });
+
+  it('says the recipe list is shown before the Plan tab filters', () => {
+    renderMap({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') });
+    expect(screen.getByText(/before the Plan tab's filters/)).toBeInTheDocument();
+  });
+});
+
+// A colony's richness override is the URL's `?planet=`, in the same drawer as a product.
+describe('PlanMap richness drawer', () => {
+  it("opens a colony's richness chips from ?planet= on a phone", async () => {
+    stubPhone(true);
+    renderMap({}, '/planetary-industry/map?planet=40000001');
+    expect(
+      await screen.findByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    expect(screen.getByText('Optional')).toBeVisible();
+  });
+
+  it('shows it in the docked panel too, with a way back', async () => {
+    renderMap({}, '/planetary-industry/map?planet=40000001');
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    const aside = await screen.findByRole('complementary', { name: 'Resources on Hek VIII' });
+    expect(
+      within(aside).getByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(aside).getByRole('button', { name: 'Back to the map' })).toBeVisible();
+  });
+
+  it('ignores a planet the pilot has no colony on', async () => {
+    stubPhone(true);
+    renderMap({}, '/planetary-industry/map?planet=123');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
+  });
+});
+
+describe('PlanMap with hub prices unreadable', () => {
+  it('does not claim the planets already make their best product', () => {
+    const unpriced = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    renderMap({ advice: unpriced, pricesFailed: true });
+    expect(screen.queryByText(/already make their best product/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Picks need hub prices/)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /^Planet map|^Planets$/ })).toBeInTheDocument();
   });
 });

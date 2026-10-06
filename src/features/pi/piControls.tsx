@@ -80,7 +80,7 @@ export function CadenceRow({
         <SelectContent>
           {PI_CADENCE_DAYS.map((days) => (
             <SelectItem key={days} value={String(days)}>
-              {t('piAdvisor.cadenceDays', { count: days })}
+              {t('piShared.cadenceDays', { count: days })}
             </SelectItem>
           ))}
         </SelectContent>

@@ -8,6 +8,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
+import { pageOwnsReauth } from './pageOwnsReauth';
 
 /**
  * Total auth failure → /login, once, centrally. Covers what `ScopeGate` cannot:
@@ -64,7 +65,11 @@ export function AuthFailureNotice() {
     [activeCharacterId]
   );
 
+  const { pathname } = useLocation();
+
   if (failure?.kind !== 'request' || failure.characterId !== activeCharacterId) return null;
+  // The page shows its own banner for this refusal; two login buttons would stack.
+  if (pageOwnsReauth(pathname, failure.endpointId)) return null;
 
   return (
     <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">

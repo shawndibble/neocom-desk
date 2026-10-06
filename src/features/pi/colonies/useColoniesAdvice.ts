@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from '../goalPlannerSnapshot';
-import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, type PlanAdvice, type PlanAdviceInput } from '../planAdviceModel';
 import { usePiAdviceInputs } from '../usePiAdviceInputs';
 
 export interface ColoniesAdviceState {
@@ -21,6 +21,8 @@ export interface ColoniesAdviceState {
   snapshot: GoalPlannerSnapshot | null;
   /** Null until prices and skills are in, or when the model could not price this pilot. */
   advice: PlanAdvice | null;
+  /** What `advice` was built from: another Character's colonies are priced on the same books. */
+  input: PlanAdviceInput | null;
   /** The snapshot read failed outright. */
   failed: boolean;
   /** Hub prices could not be read: status still shows, money does not. */
@@ -73,6 +75,7 @@ export function useColoniesAdvice(
   return {
     snapshot,
     advice,
+    input: inputs.status === 'ready' ? inputs.input : null,
     failed: failedFor === characterId && characterId !== null,
     pricesFailed: inputs.status === 'prices-failed',
   };

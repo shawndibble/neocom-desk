@@ -333,7 +333,7 @@ describe('FittingRackList with the editor’s item actions', () => {
     );
   }
 
-  it("links a fitted item's name to Market, with Show info in its menu", () => {
+  it("links a fitted item's name to Show info", () => {
     const actions = fakeItemActions({ names });
     render(
       <MemoryRouter>
@@ -345,7 +345,7 @@ describe('FittingRackList with the editor’s item actions', () => {
       </MemoryRouter>
     );
     const link = screen.getByRole('link', { name: '#10' });
-    expect(link.getAttribute('href')).toBe('/market/browser?type=10');
+    expect(link.getAttribute('href')).toContain('info=type-10');
   });
 
   it('offers no charge entries on a module that takes no charge, and keeps them on one that does', async () => {

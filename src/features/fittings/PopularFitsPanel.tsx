@@ -2,6 +2,7 @@ import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, IskAmount, Spinner, Tabs } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
@@ -13,7 +14,6 @@ import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
 import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
-import { workbenchFitUrl } from './workbenchFits';
 import {
   useWorkbenchHullRows,
   workbenchHullSources,
@@ -219,9 +219,14 @@ function WorkbenchFits({
             <>
               <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <ExternalLink href={workbenchFitUrl(fit.id)} className="truncate">
+                  <button
+                    type="button"
+                    disabled={busy || tab.loading}
+                    onClick={() => void tab.load(fit, onOpen)}
+                    className={entityLinkClassName('truncate text-left disabled:opacity-40')}
+                  >
                     {fit.name || t('fittings.popular.workbench.unnamed')}
-                  </ExternalLink>
+                  </button>
                   <WorkbenchFitPrice price={price} />
                 </p>
                 <p className="text-xs text-text-dim">
@@ -242,13 +247,6 @@ function WorkbenchFits({
                   </p>
                 )}
               </div>
-              <Button
-                size="sm"
-                disabled={busy || tab.loading}
-                onClick={() => void tab.load(fit, onOpen)}
-              >
-                {t('fittings.popular.workbench.load')}
-              </Button>
             </>
           )}
         />

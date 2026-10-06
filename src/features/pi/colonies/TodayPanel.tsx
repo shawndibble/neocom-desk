@@ -18,7 +18,7 @@ import { PI_CADENCE_DAYS, type PiCadence, type PiCadenceDays } from '../cadenceP
 import { EstimateBadge } from '../DirectiveRow';
 import { HOUR_MS, type CheckStatus, type ColonyCheckRow, type TodayCheck } from './coloniesModel';
 import { eveClock, hoursLabel, initials } from './coloniesFormat';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { STATUS_DOT_CLASS, STATUS_TONE_CLASS } from './statusStyles';
 
 /** A status word with a dot: the word carries it, the colour only reinforces. */
@@ -47,6 +47,8 @@ interface TodayPanelProps {
   activeCharacterId: number;
   /** The first row's ISK a day, summed from Plan's own model; null without prices. */
   todayPerDay: number | null;
+  /** Hub prices could not be read: the price notice says so, so the "still loading" line stays out. */
+  pricesFailed: boolean;
   fixCount: number;
   fixGainPerDay: number;
   /** Colonies in the figures above that belong to the active Character. */
@@ -340,7 +342,9 @@ export function TodayPanel(props: TodayPanelProps) {
           </ul>
           <p className="text-xs text-text-dim">
             {props.todayPerDay === null ? (
-              <span>{t('piColonies.today.noFigures')}</span>
+              props.pricesFailed ? null : (
+                <span>{t('piColonies.today.noFigures')}</span>
+              )
             ) : (
               <Trans
                 i18nKey="piColonies.today.summary"

@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -32,10 +32,11 @@ import {
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
-import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { CharacterLink } from '@/features/entities';
+import { ContractReceiverLink } from '@/features/character/ContractReceiverLink';
+import { contractReceiver } from '@/features/character/contractCounterparty';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
@@ -169,11 +170,17 @@ async function loadContractsSnapshot(
     await loadContracts(characterId);
   const contractsTruncated = contractsResult?.truncated ?? false;
   // Already superseded: skip the name/standing lookups, their results would be discarded.
-  const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
+  const contracts = signal.cancelled ? [] : (contractsResult?.data ?? []);
+  const issuerIds = contracts.map((c) => c.issuer_id);
+  // Receivers share the name map; only character receivers have affiliations.
+  const receivers = contracts.flatMap((c) => contractReceiver(c, characterId) ?? []);
   const [issuerNames, contactsStatus, issuerAffiliations] = await Promise.all([
-    resolveNames(issuerIds),
+    resolveNames([...issuerIds, ...receivers.map((r) => r.id)]),
     signal.cancelled ? Promise.resolve(null) : loadContacts(characterId),
-    resolveAffiliations(issuerIds),
+    resolveAffiliations([
+      ...issuerIds,
+      ...receivers.filter((r) => r.kind === 'character').map((r) => r.id),
+    ]),
   ]);
   const standingIndex = buildContactStandingIndex(contactsStatus?.cached?.data ?? []);
   return {
@@ -260,10 +267,6 @@ function ContractsFilterBar({
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const contractRowKey = (contract: Contract) => contract.contract_id;
-
-function contractRowContextMenu(contract: Contract, tr: ReactElement) {
-  return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
-}
 
 const CONTRACT_STATUSES = Object.keys(CONTRACT_STATUS_KEY) as Contract['status'][];
 const CONTRACT_TYPES = Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][];
@@ -382,6 +385,11 @@ export function Contracts() {
   // The identity column (never hidden — it opens the detail modal) plus the
   // optional columns the picker controls, in table order —
   // `CONTRACTS_HISTORY_COLUMN_IDS`' own order.
+  const receiverFor = useCallback(
+    (contract: Contract) =>
+      activeCharacterId === null ? null : contractReceiver(contract, activeCharacterId),
+    [activeCharacterId]
+  );
   const optionalHistoryColumns = useMemo<
     Record<ContractsHistoryColumnId, DataTableColumn<Contract>>
   >(
@@ -408,6 +416,28 @@ export function Contracts() {
             />
           </span>
         ),
+      },
+      receiver: {
+        id: 'receiver',
+        header: t('contracts.receiver'),
+        sortValue: (contract) => {
+          const receiver = receiverFor(contract);
+          return receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : '';
+        },
+        render: (contract) => {
+          const receiver = receiverFor(contract);
+          return (
+            <ContractReceiverLink
+              receiver={receiver}
+              name={receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : ''}
+              standing={
+                receiver?.kind === 'character'
+                  ? characterStanding(standingIndex, receiver.id, issuerAffiliations)
+                  : null
+              }
+            />
+          );
+        },
       },
       price: {
         id: 'price',
@@ -447,7 +477,7 @@ export function Contracts() {
         },
       },
     }),
-    [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
+    [t, issuerNames, timeZone, standingIndex, issuerAffiliations, receiverFor]
   );
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
@@ -491,12 +521,17 @@ export function Contracts() {
   const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
   const typeOptions = useMemo(() => contractTypeOptions(contracts), [contracts]);
   const filteredContracts = useMemo(
-    () => filterContracts(contracts, rowsFilter, issuerNames),
-    [contracts, rowsFilter, issuerNames]
+    () => filterContracts(contracts, rowsFilter, issuerNames, activeCharacterId ?? undefined),
+    [contracts, rowsFilter, issuerNames, activeCharacterId]
   );
   const historyCsvColumns = useMemo(
-    () => contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
-    [t, issuerNames]
+    () =>
+      contractsCsvColumns(
+        t,
+        (id) => issuerNames.get(id) ?? `#${id}`,
+        activeCharacterId ?? undefined
+      ),
+    [t, issuerNames, activeCharacterId]
   );
   const historyExport = useTableExport({
     surface: 'contracts',
@@ -513,6 +548,10 @@ export function Contracts() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
+  const modalReceiver = selectedContract ? receiverFor(selectedContract) : null;
+  const modalReceiverName = modalReceiver
+    ? (issuerNames.get(modalReceiver.id) ?? `#${modalReceiver.id}`)
+    : '';
 
   return (
     <div className="mx-auto max-w-6xl space-y-2 sm:space-y-4">
@@ -645,8 +684,6 @@ export function Contracts() {
               rowKey={contractRowKey}
               virtualize="auto"
               highlightRowKey={highlightedContractId}
-              rowContextMenu={contractRowContextMenu}
-              rowMoreActions
               {...historySortProps}
             />
           )}
@@ -665,6 +702,13 @@ export function Contracts() {
             selectedContract.issuer_id,
             issuerAffiliations
           )}
+          receiver={modalReceiver}
+          receiverName={modalReceiverName}
+          receiverStanding={
+            modalReceiver?.kind === 'character'
+              ? characterStanding(standingIndex, modalReceiver.id, issuerAffiliations)
+              : null
+          }
           onClose={() => setSelectedContract(null)}
         />
       )}

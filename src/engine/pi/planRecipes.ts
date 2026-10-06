@@ -27,12 +27,19 @@
  * A recipe the hub does not price has no figure; it is dropped from the ranking
  * and listed in `unpriced`, never ranked at zero.
  *
+ * ## A Command Center the pilot has not trained
+ *
+ * A row the pilot's Command Center cannot host still ranks, tagged
+ * `needsCcLevel` with the lowest level that hosts it: below every setup that
+ * fits, lowest level first. A recipe takes a host that fits over a richer one
+ * that does not. Only fitting rows count toward `bestAnywherePerDay`.
+ *
  * Pure: rows are parameters.
  */
 
 import { NET_TOLERANCE } from './planBest';
 import type { PlanetType } from './goalTypes';
-import type { PiTier, PinCounts } from './types';
+import type { PiTier, PinCounts, PinLoad } from './types';
 
 export type { PlanetType };
 
@@ -44,6 +51,18 @@ export interface RecipeLayout {
   /** The P0s it extracts, and the factories in the order they are set (inputs first). */
   extracts: readonly number[];
   makes: readonly { typeId: number; facility: 'basic' | 'advanced' | 'highTech' }[];
+  /** Heads on each Extractor Control Unit the layout was fitted with. */
+  headsPerExtractor?: number;
+  /** The fit that scored the layout: Show me how's level line and meter read it. */
+  fit?: RecipeFit;
+}
+
+export interface RecipeFit {
+  /** The lowest Command Center upgrade level that hosts the layout. */
+  level: number;
+  used: PinLoad;
+  /** That level's CPU/Powergrid. */
+  budget: PinLoad;
 }
 
 /** One recipe valued on one planet type. */
@@ -58,6 +77,11 @@ export interface RecipeRow {
   /** m3 a day that planet ships. */
   m3PerDay: number;
   layout?: RecipeLayout;
+  /**
+   * The lowest Command Center Upgrades level that hosts the layout, set only
+   * when that is above what the pilot has. Absent: it fits their Command Center.
+   */
+  needsCcLevel?: number;
 }
 
 export type RecipeFilter = 'any' | 'p1' | 'p2';
@@ -85,11 +109,13 @@ export interface RecipeRank {
   comparison: RecipeComparison | null;
   /** The layout for `useType`, when the caller supplied one. */
   layout?: RecipeLayout;
+  /** Set when no host the ranking picked fits the pilot's Command Center: the level it needs. */
+  needsCcLevel?: number;
 }
 
 export interface RecipeRanking {
   recipes: RecipeRank[];
-  /** The best any one-planet recipe earns on any planet type. Null when nothing ranks. */
+  /** The best any one-planet recipe that fits earns on any planet type. Null when nothing fits. */
   bestAnywherePerDay: number | null;
   /** Recipes the hub has no price for, passed through from the caller. */
   unpriced: number[];
@@ -97,6 +123,11 @@ export interface RecipeRanking {
 
 const byValue = (a: RecipeRow, b: RecipeRow) =>
   b.iskPerDay - a.iskPerDay || a.tier - b.tier || a.typeId - b.typeId;
+
+const levelOf = (row: { needsCcLevel?: number }) => row.needsCcLevel ?? 0;
+
+/** Fits first, then the lowest level it needs, then the usual value order. */
+const byFitThenValue = (a: RecipeRow, b: RecipeRow) => levelOf(a) - levelOf(b) || byValue(a, b);
 
 function isRankable(row: RecipeRow): boolean {
   return (row.tier === 1 || row.tier === 2) && Number.isFinite(row.iskPerDay) && row.iskPerDay > 0;
@@ -124,7 +155,18 @@ export function rankRecipes(input: {
   const ranked: RecipeRank[] = [];
   for (const hosts of byRecipe.values()) {
     const mine = hosts.filter((row) => have.has(row.planetType));
-    const used = [...(mine.length > 0 ? mine : hosts)].sort(byValue)[0];
+    // A host that fits beats one that does not, owned or not; ownership decides within a tier.
+    const fitting = hosts.filter((row) => !row.needsCcLevel);
+    const fittingMine = fitting.filter((row) => have.has(row.planetType));
+    const pool =
+      fittingMine.length > 0
+        ? fittingMine
+        : fitting.length > 0
+          ? fitting
+          : mine.length > 0
+            ? mine
+            : hosts;
+    const used = [...pool].sort(byFitThenValue)[0];
     const reference = bestProcessedOn(used.planetType);
 
     let comparison: RecipeComparison | null = null;
@@ -161,6 +203,7 @@ export function rankRecipes(input: {
       haveTypes: hostTypes.filter((type) => have.has(type)),
       comparison,
       ...(used.layout ? { layout: used.layout } : {}),
+      ...(used.needsCcLevel ? { needsCcLevel: used.needsCcLevel } : {}),
     });
   }
 
@@ -168,11 +211,19 @@ export function rankRecipes(input: {
     input.filter === 'any' || (input.filter === 'p1' ? recipe.tier === 1 : recipe.tier === 2);
   const recipes = ranked
     .filter(keep)
-    .sort((a, b) => b.iskPerDay - a.iskPerDay || a.tier - b.tier || a.typeId - b.typeId);
+    .sort(
+      (a, b) =>
+        levelOf(a) - levelOf(b) ||
+        b.iskPerDay - a.iskPerDay ||
+        a.tier - b.tier ||
+        a.typeId - b.typeId
+    );
 
+  const fitting = rows.filter((row) => !row.needsCcLevel);
   return {
     recipes,
-    bestAnywherePerDay: rows.length === 0 ? null : Math.max(...rows.map((row) => row.iskPerDay)),
+    bestAnywherePerDay:
+      fitting.length === 0 ? null : Math.max(...fitting.map((row) => row.iskPerDay)),
     unpriced: [...(input.unpriced ?? [])],
   };
 }

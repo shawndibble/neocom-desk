@@ -6,6 +6,7 @@
 import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { formatIsk } from '@/lib/isk';
+import { withArticle } from '../article';
 import type { MapProduct, MapTier, ProductFigure } from './mapModel';
 
 export const planetName = (t: TFunction, type: PlanetType): string => t(`pi.planetType.${type}`);
@@ -43,10 +44,13 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure): string 
  */
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
   if (figure.kind !== 'ranked') return null;
-  return t('piMap.figure', {
+  const sentence = t('piMap.figure', {
     isk: formatIsk(figure.iskPerDay, 0),
     type: planetName(t, figure.useType),
   });
+  return figure.needsCcLevel
+    ? `${sentence}. ${t('piMap.needsCc', { level: figure.needsCcLevel })}`
+    : sentence;
 }
 
 /** What a screen reader hears for a product tile: name, tier, comparison, figure, and its marks. */
@@ -68,7 +72,7 @@ export function productAccessibleName(
   }
   if (marks.rank !== null) parts.push(t('piMap.pickMark', { rank: marks.rank }));
   if (marks.unlockedBy) {
-    parts.push(t('piMap.unlockedMark', { type: planetName(t, marks.unlockedBy) }));
+    parts.push(t('piMap.unlockedMark', { aType: withArticle(planetName(t, marks.unlockedBy)) }));
   }
   if (marks.traced) parts.push(t('piMap.tracedMark'));
   return parts.join('. ');

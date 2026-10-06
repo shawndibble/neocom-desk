@@ -162,6 +162,24 @@ describe('plannerColonies', () => {
     expect([...temperate.ratePerEcu.keys()].sort((a, b) => a - b)).toEqual(local);
   });
 
+  it('narrows ratePerEcu to the picked P0s, and ignores an override with none usable', () => {
+    const picked = (richness: ReadonlyMap<number, readonly number[]>) =>
+      plannerColonies(snapshot(), { ...PREFS, richness }).find(
+        (row) => row.planetId === TEMPERATE_ID
+      )!.colony!.ratePerEcu;
+    expect([...picked(new Map([[TEMPERATE_ID, [MICROORGANISMS]]])).keys()]).toEqual([
+      MICROORGANISMS,
+    ]);
+    const full = plannerColonies(snapshot(), PREFS).find((row) => row.planetId === TEMPERATE_ID)!
+      .colony!.ratePerEcu;
+    // The P0 the colony runs today stays rated, so its current layout still scores.
+    expect(
+      [...picked(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]])).keys()].sort((a, b) => a - b)
+    ).toEqual([MICROORGANISMS, AQUEOUS_LIQUIDS].sort((a, b) => a - b));
+    expect(picked(new Map([[TEMPERATE_ID, [999_999]]])).size).toBe(full.size);
+    expect(picked(new Map([[OCEANIC_ID, [AQUEOUS_LIQUIDS]]])).size).toBe(full.size);
+  });
+
   it('rates a P0 the colony extracts at its own program re-projected at the restart cadence', () => {
     const temperate = plannerColonies(snapshot(), PREFS).find(
       (row) => row.planetId === TEMPERATE_ID

@@ -30,17 +30,20 @@ import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
+import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import {
   CONTRACT_AVAILABILITY_KEY,
   CONTRACT_STATUS_KEY,
   CONTRACT_TYPE_KEY,
 } from './contractLabels';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink } from '@/features/entities';
 import { StandingTag } from './StandingTag';
+import { ContractReceiverLink } from './ContractReceiverLink';
+import type { ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -54,6 +57,10 @@ export interface ContractDetailModalProps {
   issuerName: string;
   /** Omitted (not just null) by a caller that hasn't computed one — same as null, no tag renders. */
   issuerStanding?: EffectiveStanding | null;
+  /** Who received it (see `contractReceiver`); omitted or null hides the row. */
+  receiver?: ContractReceiver | null;
+  receiverName?: string;
+  receiverStanding?: EffectiveStanding | null;
   onClose: () => void;
 }
 
@@ -79,6 +86,9 @@ export function ContractDetailModal({
   contract,
   issuerName,
   issuerStanding = null,
+  receiver = null,
+  receiverName = '',
+  receiverStanding = null,
   onClose,
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
@@ -167,7 +177,7 @@ export function ContractDetailModal({
       header: t('contracts.detailItemName'),
       sortValue: (item) => items.typeNames.get(item.type_id) ?? `#${item.type_id}`,
       render: (item) => (
-        <MarketItemLink typeId={item.type_id}>
+        <ItemInfoLink typeId={item.type_id}>
           <span className="flex items-center gap-1.5">
             <TypeIcon
               typeId={item.type_id}
@@ -178,7 +188,7 @@ export function ContractDetailModal({
             />
             {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
           </span>
-        </MarketItemLink>
+        </ItemInfoLink>
       ),
     },
     {
@@ -208,8 +218,27 @@ export function ContractDetailModal({
               <StandingTag standing={issuerStanding} />
             </dd>
 
+            {receiver && (
+              <>
+                <dt className="text-text-dim uppercase">{t('contracts.detailReceivedBy')}</dt>
+                <dd>
+                  <ContractReceiverLink
+                    receiver={receiver}
+                    name={receiverName}
+                    standing={receiverStanding}
+                  />
+                </dd>
+              </>
+            )}
+
             <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>
             <dd>{t(CONTRACT_AVAILABILITY_KEY[contract.availability])}</dd>
+
+            <dt className="text-text-dim uppercase">{t('contractDetail.contractIdLabel')}</dt>
+            <dd className="flex items-center gap-1 tabular-nums">
+              {contract.contract_id}
+              <CopyContractIdButton contractId={contract.contract_id} />
+            </dd>
 
             {contract.start_location_id && (
               <>

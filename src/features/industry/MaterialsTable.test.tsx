@@ -751,7 +751,7 @@ describe('MaterialsTable', () => {
     expect(within(rows[1]).getByText('Mechanical Parts')).toBeInTheDocument();
   });
 
-  it('links the material name to its Market listing', () => {
+  it('links the material name to its Show info', () => {
     renderTable();
     const rows = screen.getAllByRole('row').slice(1);
     expect(within(rows[0]).getByRole('link', { name: 'Tritanium' })).toBeInTheDocument();

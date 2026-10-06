@@ -111,9 +111,14 @@ describe('PriceHistoryChart', () => {
     expect(screen.getByRole('table')).not.toHaveClass('sr-only');
   });
 
-  it('pairs the day figures two to a row in its stacked cards', () => {
+  it('stays a plain table on a phone, shedding the price range and order count', () => {
     render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
-    expect(screen.getByRole('table')).toHaveClass('dt-stack-2col');
+    const table = screen.getByRole('table');
+    expect(table).not.toHaveClass('dt-stack');
+    const row = within(table).getAllByRole('row')[1];
+    expect(row.querySelector('td[data-label="Daily range"]')).toHaveClass('max-sm:hidden');
+    expect(row.querySelector('td[data-label="Orders"]')).toHaveClass('max-sm:hidden');
+    expect(row.querySelector('td[data-label="Average Price"]')).not.toHaveClass('max-sm:hidden');
   });
 
   it('still names every series in the legend on a phone, where an axis no longer does', () => {

@@ -56,6 +56,12 @@ const row = (
     pins: { extractorControlUnit: 1, basic: 2, launchpad: 1 },
     extracts: [rawId('Felsic Magma')],
     makes: [{ typeId, facility: tier === 1 ? 'basic' : 'advanced' }],
+    headsPerExtractor: 6,
+    fit: {
+      level: 2,
+      used: { cpu: 5_000, powergrid: 8_000 },
+      budget: { cpu: 12_136, powergrid: 12_000 },
+    },
   },
 });
 
@@ -88,9 +94,9 @@ function snapshot(types: string[] = []): GoalPlannerSnapshot {
   } as unknown as GoalPlannerSnapshot;
 }
 
-function renderPlan(snap = snapshot()) {
+function renderPlan(snap = snapshot(), url = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <FindBestPlan snapshot={snap} characterId={1} />
     </MemoryRouter>
   );
@@ -139,6 +145,51 @@ describe('FindBestPlan', () => {
     expect(screen.getByText(/No Factory goods \(P2\) setup fits one planet/)).toBeInTheDocument();
   });
 
+  it('lists a setup that needs a higher Command Center below the ones that fit, tagged with a skill link', () => {
+    mockState = {
+      status: 'ready',
+      advice: advice({
+        recipeRows: [{ ...ROWS[2], needsCcLevel: 3 }, ROWS[0]],
+      }),
+      pricesFetchedAt: new Date(),
+      hubName: 'Jita',
+    };
+    renderPlan();
+    const cards = cardItems();
+    expect(cards[0]).toHaveTextContent('Silicon');
+    expect(cards[0]).not.toHaveTextContent('needs CC level');
+    expect(cards[1]).toHaveTextContent('Proteins');
+    expect(cards[1]).toHaveTextContent('needs CC level 3');
+    expect(within(cards[1] as HTMLElement).getByText('CC level 3')).toBeInTheDocument();
+  });
+
+  it('shows the tagged setups, not an empty state, when none fit', () => {
+    mockState = {
+      status: 'ready',
+      advice: advice({ recipeRows: ROWS.map((r) => ({ ...r, needsCcLevel: 2 })) }),
+      pricesFetchedAt: new Date(),
+      hubName: 'Jita',
+    };
+    renderPlan();
+    expect(cardItems()).toHaveLength(3);
+    expect(screen.queryByText(/No one-planet setup fits/)).not.toBeInTheDocument();
+  });
+
+  it('does not blame the Command Center when prices are missing', () => {
+    mockState = {
+      status: 'ready',
+      advice: advice({
+        recipeRows: [],
+        recipes: { recipes: [], bestAnywherePerDay: null, unpriced: [SILICON] },
+      }),
+      pricesFetchedAt: new Date(),
+      hubName: 'Jita',
+    };
+    renderPlan();
+    expect(screen.getByText(/Nothing could be priced at Jita/)).toBeInTheDocument();
+    expect(screen.queryByText(/Command Center/)).not.toBeInTheDocument();
+  });
+
   it('hides recipes only a switched-off planet type could host', async () => {
     const user = userEvent.setup();
     renderPlan();
@@ -174,6 +225,9 @@ describe('FindBestPlan', () => {
     expect(panel.closest('li')).toBe(button.closest('li'));
     expect(within(panel).getByRole('link', { name: 'Perimeter' })).toBeInTheDocument();
     expect(panel).toHaveTextContent('Command Center');
+    // The ranking's fit: its level, its meter and the heads it assumed.
+    expect(panel).toHaveTextContent('Needs a Command Center at upgrade level 2 or higher');
+    expect(panel).toHaveTextContent('Extractor with 6 heads:');
     expect(panel).toHaveTextContent('Reset the extractors every');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
     expect(document.getElementById(panel.id)).toBeNull();
@@ -275,6 +329,16 @@ describe('FindBestPlan', () => {
     };
     renderPlan(snapshot(['oceanic']));
     expect(screen.getByText(/already making the best thing/)).toBeInTheDocument();
+  });
+
+  it('restores All products from ?fb.mode=all, and ignores a junk value', () => {
+    renderPlan(snapshot(), '/?fb.mode=all');
+    expect(screen.getByRole('region', { name: 'Raw' })).toBeInTheDocument();
+  });
+
+  it('reads a junk ?fb.mode= as the default Picks view', () => {
+    renderPlan(snapshot(), '/?fb.mode=zzz');
+    expect(screen.queryByRole('region', { name: 'Raw' })).not.toBeInTheDocument();
   });
 
   it('lists every product by tier under All products', async () => {

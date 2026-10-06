@@ -13,6 +13,7 @@ describe('migrateLegacyPiSettings', () => {
       hub: 'amarr',
       buybackPct: null,
       buyTiers: [1],
+      hubChosen: true,
     });
   });
 
@@ -21,6 +22,7 @@ describe('migrateLegacyPiSettings', () => {
       hub: 'rens',
       buybackPct: null,
       buyTiers: [],
+      hubChosen: true,
     });
   });
 
@@ -38,7 +40,15 @@ describe('parsePiSettings', () => {
       hub: 'hek',
       buybackPct: 90,
       buyTiers: [1, 3],
+      hubChosen: true,
     });
+  });
+
+  it('leaves a default-hub row unchosen, so the strip may suggest a nearer hub', () => {
+    expect(
+      parsePiSettings({ hub: 'jita', buybackPct: null, buyTiers: [] })?.hubChosen
+    ).toBeUndefined();
+    expect(parsePiSettings({ hub: 'jita', hubChosen: true })?.hubChosen).toBe(true);
   });
 
   it('repairs each bad field and refuses a non-object', () => {
@@ -62,6 +72,7 @@ describe('usePiSettings', () => {
       hub: 'dodixie',
       buybackPct: null,
       buyTiers: [1],
+      hubChosen: true,
     });
     await usePiSettings.getState().setValue({ ...usePiSettings.getState().value, buyTiers: [2] });
     expect((await db.settings.get('piSettings'))?.value).toMatchObject({ buyTiers: [2] });

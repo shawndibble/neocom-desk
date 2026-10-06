@@ -23,7 +23,7 @@ describe('dailyVolumePoints', () => {
     const typeVolumes = new Map([[1, 10]]);
     const result = dailyVolumePoints(rows, ['2026-09-01', '2026-09-02'], typeVolumes);
     expect(result).toEqual([
-      { date: '2026-09-01', value: 1000 / 24 },
+      { date: '2026-09-01', value: 1000 },
       { date: '2026-09-02', value: 0 },
     ]);
   });
@@ -37,7 +37,7 @@ describe('dailyVolumePoints', () => {
     ];
     const typeVolumes = new Map([[1, 10]]);
     const result = dailyVolumePoints(rows, ['2026-09-01'], typeVolumes);
-    expect(result).toEqual([{ date: '2026-09-01', value: 1000 / 24 }]);
+    expect(result).toEqual([{ date: '2026-09-01', value: 1000 }]);
   });
 
   it('reads as a true zero, not a hidden bar, when nothing mined that day has known volume', () => {
@@ -58,7 +58,7 @@ describe('dailyCountPoints', () => {
     ];
     const result = dailyCountPoints(rows, ['2026-09-01', '2026-09-02']);
     expect(result).toEqual([
-      { date: '2026-09-01', value: 150 / 24 },
+      { date: '2026-09-01', value: 150 },
       { date: '2026-09-02', value: 0 },
     ]);
   });

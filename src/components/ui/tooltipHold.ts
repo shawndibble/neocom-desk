@@ -18,6 +18,12 @@ export const TooltipHoldContext = createContext(true);
  */
 export const RowTappableContext = createContext(false);
 
+/**
+ * True inside an `IskFigureGroup`: the figure joins the group's roving tabindex
+ * (one tab stop for the whole group) instead of being its own tab stop.
+ */
+export const IskFigureGroupContext = createContext(false);
+
 /** Touch-and-hold duration, matching Radix's context menu long-press, so the two can never disagree. */
 export const HOLD_MS = 700;
 /** Finger drift that turns a hold into a drag or scroll. */

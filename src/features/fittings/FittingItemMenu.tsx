@@ -1,6 +1,6 @@
 /**
- * The Fitting editor's one item menu: every fitted module, empty slot, drone,
- * cargo item and Add panel item offers its actions through it, on the Ring
+ * The Fitting editor's one item menu: every fitted module, empty slot, drone
+ * and Ring cargo tile offers its actions through it, on the Ring
  * and the List alike. Built on the app's `RowActionsMenu`, so each gets the
  * right-click menu, Radix's own touch-and-hold for it, and — where the row
  * has room — a visible "More actions" (⋮) button a keyboard or touch user
@@ -26,7 +26,11 @@ import {
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import {
+  BuildPlanMenuItems,
+  ShowInfoMenuItem,
+  ViewInMarketMenuItem,
+} from '@/features/market/ItemContextMenu';
 import { ChargePickerMenuItems } from './ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from './fittingItemActions';
 
@@ -605,6 +609,7 @@ export function AddItemMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
     </>
   );
 }

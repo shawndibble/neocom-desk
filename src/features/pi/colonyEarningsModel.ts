@@ -38,7 +38,7 @@
  * It is exactly wrong for the case this module has to rule out: a colony whose
  * extractor pins exist (`colony.extractors.length > 0`) but whose programs
  * could not be projected at all (`colony.extractedPerHour.length === 0`,
- * `advisorModel`'s own "unmeasured" convention). There, every local factory
+ * `systemPlanetModel`'s own "unmeasured" convention). There, every local factory
  * line reads as `inputs-not-local` for want of a number this colony's own
  * ground should have supplied, and crediting the built rate would manufacture
  * a full ISK figure out of zero measurement — precisely the "no measured
@@ -58,7 +58,7 @@
 
 import type { PiData } from '@/sde/types';
 import { colonyEarnings, type ColonyEarnings } from '@/engine/pi/colonyEarnings';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import {
   colonyFactoryBalance,
   colonyLocalDrawPerHour,
