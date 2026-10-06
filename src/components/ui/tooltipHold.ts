@@ -19,12 +19,10 @@ export const TooltipHoldContext = createContext(true);
 export const RowTappableContext = createContext(false);
 
 /**
- * Whether an `IskAmount` is its own tab stop. A dense surface that already has
- * one stop per row (the PI Plan) sets it false so ~20 figures don't precede the
- * first action; the exact figure stays in visually hidden text for a screen
- * reader, and hover and tap still show the bubble.
+ * True inside an `IskFigureGroup`: the figure joins the group's roving tabindex
+ * (one tab stop for the whole group) instead of being its own tab stop.
  */
-export const IskTabStopContext = createContext(true);
+export const IskFigureGroupContext = createContext(false);
 
 /** Touch-and-hold duration, matching Radix's context menu long-press, so the two can never disagree. */
 export const HOLD_MS = 700;

@@ -9,13 +9,19 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useUrlParam } from '@/lib/useUrlState';
 import { EsiDidntAnswer } from './EsiDidntAnswer';
 import { FindBestPlan } from './FindBestPlan';
 import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { PlanetImage } from './PlanetImage';
-import { openingQuestion, pickedQuestion, type PlanQuestion } from './planQuestion';
+import {
+  openingQuestion,
+  pickedQuestion,
+  planQuestionParam,
+  type PlanQuestion,
+} from './planQuestion';
 
 interface Props extends GoalPlannerPanelProps {
   /** A `?type=` seed is on its way to becoming a goal. */
@@ -97,12 +103,13 @@ export function PlanPanel(props: Props) {
     };
   }, [characterId, reloadKey]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
-  const { hash, key: locationKey } = useLocation();
+  const { hash } = useLocation();
+  const [urlQuestion, setUrlQuestion] = useUrlParam('q', planQuestionParam);
   // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
-  // until the pilot picks a question on that same visit.
-  const [pick, setPickState] = useState<{ question: PlanQuestion; key: string } | null>(null);
-  const picked = pickedQuestion(pick, hash, locationKey);
-  const setPicked = (question: PlanQuestion) => setPickState({ question, key: locationKey });
+  // until the pilot picks a question. A pick always writes `?q=` (the opening question depends
+  // on colonies, so it is no fixed default) and drops the hash.
+  const picked = pickedQuestion(urlQuestion, hash);
+  const setPicked = (question: PlanQuestion) => setUrlQuestion(question, { clearHash: true });
 
   if (failedFor === characterId) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;

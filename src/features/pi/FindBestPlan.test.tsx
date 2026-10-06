@@ -88,9 +88,9 @@ function snapshot(types: string[] = []): GoalPlannerSnapshot {
   } as unknown as GoalPlannerSnapshot;
 }
 
-function renderPlan(snap = snapshot()) {
+function renderPlan(snap = snapshot(), url = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <FindBestPlan snapshot={snap} characterId={1} />
     </MemoryRouter>
   );
@@ -320,6 +320,16 @@ describe('FindBestPlan', () => {
     };
     renderPlan(snapshot(['oceanic']));
     expect(screen.getByText(/already making the best thing/)).toBeInTheDocument();
+  });
+
+  it('restores All products from ?fb.mode=all, and ignores a junk value', () => {
+    renderPlan(snapshot(), '/?fb.mode=all');
+    expect(screen.getByRole('region', { name: 'Raw' })).toBeInTheDocument();
+  });
+
+  it('reads a junk ?fb.mode= as the default Picks view', () => {
+    renderPlan(snapshot(), '/?fb.mode=zzz');
+    expect(screen.queryByRole('region', { name: 'Raw' })).not.toBeInTheDocument();
   });
 
   it('lists every product by tier under All products', async () => {

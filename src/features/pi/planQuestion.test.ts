@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { openingQuestion, pickedQuestion } from './planQuestion';
+import { openingQuestion, pickedQuestion, PLAN_QUESTIONS, planQuestionParam } from './planQuestion';
 
 describe('openingQuestion', () => {
   it('opens on the first question when the pilot has colonies', () => {
@@ -21,16 +21,31 @@ describe('openingQuestion', () => {
 });
 
 describe('pickedQuestion', () => {
-  const pick = { question: 'make-more' as const, key: 'k1' };
-  it('keeps a pick when there is no hash, whatever the key', () => {
-    expect(pickedQuestion(pick, '', 'k2')).toBe('make-more');
-    expect(pickedQuestion(null, '', 'k1')).toBeNull();
+  it('is the URL question when there is no hash', () => {
+    expect(pickedQuestion('make-more', '')).toBe('make-more');
+    expect(pickedQuestion(null, '')).toBeNull();
   });
-  it('#customs opens the Goal Planner', () => {
-    expect(pickedQuestion(null, '#customs', 'k1')).toBe('product');
+  it('#customs opens the Goal Planner over any URL question', () => {
+    expect(pickedQuestion(null, '#customs')).toBe('product');
+    expect(pickedQuestion('make-more', '#customs')).toBe('product');
   });
-  it('a pick made on this #customs visit wins; one from an earlier visit does not', () => {
-    expect(pickedQuestion(pick, '#customs', 'k1')).toBe('make-more');
-    expect(pickedQuestion(pick, '#customs', 'k2')).toBe('product');
+});
+
+describe('planQuestionParam (?q=)', () => {
+  it('round-trips every question', () => {
+    for (const question of PLAN_QUESTIONS) {
+      const raw = planQuestionParam.serialize(question);
+      expect(raw).toBe(question);
+      expect(planQuestionParam.parse(raw)).toBe(question);
+    }
+  });
+  it('absent means no pick; the opening question applies', () => {
+    expect(planQuestionParam.parse(null)).toBeNull();
+    expect(planQuestionParam.serialize(null)).toBeNull();
+  });
+  it('reads junk as no pick', () => {
+    expect(planQuestionParam.parse('nope')).toBeNull();
+    expect(planQuestionParam.parse('')).toBeNull();
+    expect(planQuestionParam.parse('MAKE-MORE')).toBeNull();
   });
 });

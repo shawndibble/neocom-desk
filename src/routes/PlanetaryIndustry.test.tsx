@@ -853,6 +853,41 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
   });
 
+  it('restores the question from ?q= on load', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ignores a junk ?q= and opens on the default question', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=bogus');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan#customs');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    await user.click(screen.getByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('writes the picked question to ?q= without adding history entries', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    const before = window.history.length;
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.history.length).toBe(before);
+  });
+
   it('keeps the Goal Planner behind a ?goals= link, with no picker choice needed', async () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);

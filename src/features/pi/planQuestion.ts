@@ -1,3 +1,4 @@
+import { optionalEnumParam } from '@/lib/urlState';
 import { PLAN_CUSTOMS_HASH } from './piPlanLink';
 
 /** The three questions the Plan tab opens on. */
@@ -24,16 +25,24 @@ export function openingQuestion(input: {
   return { question: 'find-best', reason: 'no-colonies' };
 }
 
+/** Every question, as `?q=` spells it. */
+export const PLAN_QUESTIONS = [
+  'make-more',
+  'find-best',
+  'product',
+] as const satisfies readonly PlanQuestion[];
+
+/** `?q=`: the question the pilot picked (ADR 0015). Absent or unreadable: the opening question applies. */
+export const planQuestionParam = optionalEnumParam<PlanQuestion>(PLAN_QUESTIONS);
+
 /**
- * The question the pilot picked, or the one a `#customs` link forces. A pick
- * made on an earlier visit to the same `#customs` URL (another `location.key`)
- * no longer overrides it; with no hash, a pick always stands.
+ * The question to show over the opening one: a `#customs` link forces the Goal
+ * Planner (where the rate is edited); otherwise the URL's `?q=`. Picking a
+ * question drops the hash, so a pick always stands.
  */
 export function pickedQuestion(
-  pick: { question: PlanQuestion; key: string } | null,
-  hash: string,
-  locationKey: string
+  urlQuestion: PlanQuestion | null,
+  hash: string
 ): PlanQuestion | null {
-  if (hash !== PLAN_CUSTOMS_HASH) return pick?.question ?? null;
-  return pick?.key === locationKey ? pick.question : 'product';
+  return hash === PLAN_CUSTOMS_HASH ? 'product' : urlQuestion;
 }
