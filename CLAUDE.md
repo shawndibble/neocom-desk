@@ -26,7 +26,9 @@ dev`) — Shawn frequently has another agent working there at the same
   the `src/components/ui` primitives to compose, and §6c's interaction
   grammar (how a link, tooltip, menu, row or gesture looks, and what it
   does). Use the cue §6c assigns to the intent; if §6c has none, add it there
-  in the same PR. Decisions: `docs/adr/`.
+  in the same PR. §6c's restraint rules apply before adding any control: if the
+  row click, a link or the detail view already carries the action, add nothing.
+  Decisions: `docs/adr/`.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
   math): failing test first, then code.
 - Pure engines stay pure: no fetch/DOM/Dexie imports in `src/engine`.

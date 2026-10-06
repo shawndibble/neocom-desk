@@ -12,7 +12,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import * as corpJobsModule from './corpJobs';
-import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -460,7 +460,7 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
   });
 });
 
-describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
+describe('ActiveJobsPanel: filters (#409)', () => {
   function manufacturingJob(overrides: Record<string, unknown> = {}) {
     return {
       job_id: 1,
@@ -477,69 +477,8 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     };
   }
 
-  it('offers Add to Quickbar, View in Market, and Build Plan on a job row, keyed off its product', async () => {
+  it('has no row menu or More-actions button on a job row', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
-    const actions = fakeItemActions();
-
-    render(
-      <MemoryRouter>
-        <FakeItemActions actions={actions}>
-          <ActiveJobsPanel characterId={CHAR_ID} />
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-
-    await expandJobs();
-
-    // The row itself still shows the blueprint's name (unchanged); the context
-    // menu it opens targets the job's product typeID.
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-
-    const quickbarItem = await screen.findByText('Add to Quickbar');
-    expect(screen.getByText('View in Market')).toBeInTheDocument();
-
-    fireEvent.click(quickbarItem);
-    // The job's product (200 -> Widget Beta), not its blueprint (100 -> Widget Alpha).
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-  });
-
-  it('gives a job row a visible "More actions" button with the same items as the right-click menu (issue #1498)', async () => {
-    server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter>
-        <FakeItemActions>
-          <ActiveJobsPanel characterId={CHAR_ID} />
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-
-    await expandJobs(user);
-
-    // menuTypeId resolves to the job's product (200 -> Widget Beta), same as
-    // the row's right-click menu.
-    const moreActionsButton = screen.getByRole('button', { name: 'More actions for Widget Beta' });
-    await user.click(moreActionsButton);
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
-  });
-
-  it('disables the Build Plan action for a job with no product (research/copying/invention)', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([manufacturingJob({ activity_id: 5, product_type_id: undefined })])
-      )
-    );
 
     render(
       <MemoryRouter>
@@ -553,7 +492,8 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     const row = screen.getByText('Widget Alpha').closest('tr')!;
     fireEvent.contextMenu(row);
 
-    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
   });
 
   it('filters jobs by activity-type chip', async () => {
@@ -908,15 +848,13 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   });
 
-  it('offers "Log production…" for a done manufacturing job with a product', async () => {
+  it('shows a "Log production…" button for a done manufacturing job with a product', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
 
-    expect(await screen.findByText('Log production…')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log production…' })).toBeInTheDocument();
   });
 
   it('omits "Log production…" for a still-running job', async () => {
@@ -930,11 +868,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
+    await screen.findByText('Widget Alpha');
 
-    await screen.findByText('Add to Quickbar');
-    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
   });
 
   it('omits "Log production…" for a done job with no product (research/copying/invention)', async () => {
@@ -946,11 +882,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
+    await screen.findByText('Widget Alpha');
 
-    await screen.findByText('Add to Quickbar');
-    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
   });
 
   it('navigates straight to the single matching plan, seeded with the job’s runs and cost', async () => {
@@ -963,9 +897,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-1'));
     expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
@@ -979,9 +911,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     expect(await screen.findByText('No build plan for Widget Beta')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
@@ -1006,9 +936,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     expect(await screen.findByText('Log production against which plan?')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Plan B'));
@@ -1068,9 +996,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
     // Flush every pending React update (including router transitions): with

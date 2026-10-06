@@ -1,10 +1,8 @@
 /**
- * Corp Wallet on a phone (issue #2521): the Transactions table is sortable,
- * but below `sm` its stacked cards hide the header row and every sort button
- * with it, so `mobileSort` adds the phone-only "Sort by" picker above the
- * cards, as `e2e/corpMembersNarrow.spec.ts` checks for the roster. The Journal
- * is a plain table on a phone instead (DESIGN.md §6c Restraint): its header
- * sort buttons stay.
+ * Corp Wallet on a phone (issue #2521): the Journal (shared with `/wallet`)
+ * and the Transactions ledger are both compare tables, so both stay plain
+ * tables with their sort buttons in the header and low-value columns hidden
+ * (Journal: Description, Balance; Transactions: Side, Unit price).
  *
  * `/corp/wallet` needs a wallet-reading role (`canReadWallet` in
  * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response is
@@ -65,7 +63,7 @@ const TRANSACTIONS = [
   },
 ];
 
-test.describe('Corp Wallet sort pickers', () => {
+test.describe('Corp Wallet narrow tables', () => {
   test.beforeEach(async ({ page }) => {
     // The `corp` scope group opens every corp capability, and
     // `app/prefetch.ts` warms all of them at boot; anything this spec doesn't
@@ -130,14 +128,31 @@ test.describe('Corp Wallet sort pickers', () => {
     await expectNoPageOverflow(page);
   });
 
-  test('transactions has a phone sort picker at 390px', async ({ page }) => {
+  test('transactions stays a plain table at 390px, sortable by header', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./corp/wallet?view=transactions');
 
-    await expect(page.getByRole('table', { name: 'Transactions' })).toBeVisible();
-    const sortBy = page.getByLabel('Sort by', { exact: true });
-    await sortBy.selectOption({ label: 'Total ↑' });
-    await expect(sortBy.locator('option:checked')).toHaveText('Total ↑');
+    const table = page.getByRole('table', { name: 'Transactions' });
+    await expect(table).toBeVisible();
+    // A table, not cards: the header row and its sort buttons stay, and the
+    // low-value Side / Unit price columns drop out.
+    await expect(table.getByRole('columnheader', { name: /Total/ })).toBeVisible();
+    const headers = await table.evaluate((el) =>
+      [...el.querySelectorAll('thead th')]
+        .filter((th) => getComputedStyle(th).display !== 'none')
+        .map((th) => (th.textContent ?? '').trim())
+    );
+    expect(headers.some((h) => h.startsWith('Item'))).toBe(true);
+    expect(headers.some((h) => h.startsWith('Total'))).toBe(true);
+    expect(headers.some((h) => h.startsWith('Unit price'))).toBe(false);
+    expect(headers.some((h) => h.startsWith('Side'))).toBe(false);
+    const rowDisplay = await table
+      .locator('tbody tr:not(.dt-spacer)')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display);
+    expect(rowDisplay).toBe('table-row');
+    await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+    await table.getByRole('columnheader', { name: /Total/ }).getByRole('button').click();
     await expect(page).toHaveURL(/sort=/);
     await expectNoPageOverflow(page);
   });
