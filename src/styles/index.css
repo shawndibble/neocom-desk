@@ -664,6 +664,15 @@
     padding-left: 2.5rem;
   }
 
+  /* A coarse pointer grows the tick box's label to 44px (`touch:size-11`):
+     0.75rem + 2.75rem of box needs more than the 2.5rem above to leave a gap
+     before the text. */
+  @media (pointer: coarse) {
+    .dt-stacked.dt-stack-dense:not(.dt-dense-tight) tr:has(> td.dt-edge-start) {
+      padding-left: 4rem;
+    }
+  }
+
   /* `end` (a quantity box): closes the meta line, pushed to its right end.
      Not pinned across both lines like `start`: a box that wide would take
      its width from the title line too, and the title needs it more.

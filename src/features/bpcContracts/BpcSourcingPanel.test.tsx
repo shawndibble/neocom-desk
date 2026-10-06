@@ -17,6 +17,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
+import { useLpValue } from '@/features/loyalty/lpValue';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
@@ -304,6 +305,7 @@ async function resetSession() {
   localJumpDistances.mockReset();
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
   usePickedSystems.setState({ value: {}, hydrated: false });
+  useLpValue.setState({ value: 0, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
@@ -1720,8 +1722,12 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ]),
         requiredItemTypeIds: [],
       });
-      // The pilot's own LP Value, so no market rate is fetched.
+      // The pilot's own LP Value, so no market rate is fetched. Set on the
+      // store too: `beforeAll`'s warm-up render already hydrated it at 0, so the
+      // db row alone is never re-read and the lookup fetched a real market rate
+      // (~2.5s) before pricing the row.
       await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
+      useLpValue.setState({ value: 1_000, hydrated: true });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
       const user = userEvent.setup();
       render(<App />);
