@@ -443,6 +443,9 @@ export function QuickWinsPanel({
       </ul>
       <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
         {t(pricesDown ? 'piPlan.make.quickFootNoPrices' : 'piPlan.make.quickFoot')}
+        {!pricesDown &&
+          view.quickWins.some((win) => win.gainKind === 'saves') &&
+          ` ${t('piPlan.make.quickFootSaves')}`}
       </p>
     </Panel>
   );

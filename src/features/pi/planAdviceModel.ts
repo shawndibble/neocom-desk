@@ -702,6 +702,7 @@ function analyseColony(args: {
           what: 'factories',
           productTypeId,
           factories,
+          source: 'local',
           routedFrom: [],
           needsRemoval: plan.idle !== null,
         },
@@ -719,15 +720,8 @@ function analyseColony(args: {
   const room = plan.headroom.extractorControlUnit ?? 0;
   const maxEcus = plannerPolicy({ maxP0Types: 1, buyTiers: [] }).maxEcusPerColony;
   const extraEcus = Math.min(room, Math.max(0, maxEcus - ecus));
-  // Extra heads for idle factories and extra ECUs draw on the same CPU/Powergrid
-  // headroom. The idle win and the basic factories above go first, so idle factories
-  // still get named for removal; `spendRoomOnce` below settles the rest.
-  const headroomSpent = wins.some(
-    (win) =>
-      (win.detail.kind === 'idle-factories' && win.detail.headsToAdd !== null) ||
-      (win.detail.kind === 'spare-room' && win.detail.what === 'factories')
-  );
-  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1 && !headroomSpent) {
+  // Competes for the same room as the heads and factories: `spendRoomOnce` below picks one.
+  if (extraEcus > 0 && ecus > 0 && colony.extractedPerHour.length === 1) {
     const only = colony.extractedPerHour[0];
     const perEcu = only.unitsPerHour / ecus;
     // The same flat falloff the rebuild scorer applies to every ECU after the first.
@@ -933,6 +927,7 @@ function factoryRoom(
           what: 'factories',
           productTypeId: opportunity.typeId,
           factories: opportunity.factories,
+          source: 'network',
           routedFrom: [
             ...new Set(
               opportunity.inputs.flatMap((input) =>

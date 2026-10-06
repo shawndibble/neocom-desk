@@ -11,6 +11,7 @@ import { builtAdvice } from './systemPlanetModel';
 import type { PiCadence } from './cadencePref';
 import { plannerColonies, type PlannerSnapshot } from './goalPlannerModel';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
+import { isSaving } from '@/engine/pi/planAdvice';
 import {
   buildPlanAdvice,
   hubBooks,
@@ -245,7 +246,7 @@ describe('buildPlanAdvice: quick wins', () => {
   it('adds up: today plus the priced quick wins is the after-quick-wins figure', () => {
     const colony = temperate(buildPlanAdvice(input()));
     const priced = colony.quickWins
-      .filter((win) => win.detail.kind !== 'storage')
+      .filter((win) => !isSaving(win.detail))
       .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
     expect(colony.afterQuickWinsPerDay).toBeCloseTo(colony.todayPerDay! + priced, 6);
   });
@@ -257,7 +258,7 @@ describe('buildPlanAdvice: quick wins', () => {
     expect(storage!.gainPerDay).toBeGreaterThan(0);
     // What storage saves is shown, but it adds nothing to the colony after its quick wins.
     const adds = week.quickWins
-      .filter((win) => win.detail.kind !== 'storage')
+      .filter((win) => !isSaving(win.detail))
       .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
     expect(week.afterQuickWinsPerDay).toBeCloseTo(week.todayPerDay! + adds, 6);
     // A pilot who hauls daily does not stall, so there is nothing to win and today is the full rate.
@@ -750,20 +751,27 @@ describe('buildPlanAdvice: more quick wins', () => {
       links: links([1, 4, 5]),
       routes: [],
     };
-    const advice = buildPlanAdvice(
-      input({
-        snapshot: snapshot({
-          colonies: [
-            { ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 },
-            { ...planet(OCEANIC_ID, HIGHSEC_SYSTEM, 'oceanic'), upgrade_level: 5 },
-          ],
-          details: new Map([
-            [TEMPERATE_ID, idleHost],
-            [OCEANIC_ID, makesWater],
-          ]),
-        }),
-      })
-    );
+    const adviceWith = (host: CharacterPlanetDetail) =>
+      buildPlanAdvice(
+        input({
+          snapshot: snapshot({
+            colonies: [
+              { ...planet(TEMPERATE_ID, HIGHSEC_SYSTEM, 'temperate'), upgrade_level: 5 },
+              { ...planet(OCEANIC_ID, HIGHSEC_SYSTEM, 'oceanic'), upgrade_level: 5 },
+            ],
+            details: new Map([
+              [TEMPERATE_ID, host],
+              [OCEANIC_ID, makesWater],
+            ]),
+          }),
+        })
+      );
+    // Control: with every factory fed, the network plan does offer the host a factory.
+    const fed = { ...idleHost, pins: idleHost.pins.filter((p) => p.pin_id !== 8) };
+    expect(
+      temperate(adviceWith(fed)).quickWins.some((win) => win.id.includes(':room-factories:'))
+    ).toBe(true);
+    const advice = adviceWith(idleHost);
     const host = temperate(advice);
     const claims = host.quickWins.filter(
       (win) =>
@@ -772,8 +780,15 @@ describe('buildPlanAdvice: more quick wins', () => {
     );
     // The heads earn more than the factory, so they keep the room.
     expect(claims.map((win) => win.detail.kind)).toEqual(['idle-factories']);
-    const shown = host.quickWins.reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
-    expect(host.quickWinGainPerDay).toBeCloseTo(shown, 6);
+    const shown = (wins: typeof host.quickWins) =>
+      wins
+        .filter((win) => !isSaving(win.detail))
+        .reduce((sum, win) => sum + (win.gainPerDay ?? 0), 0);
+    expect(host.quickWinGainPerDay).toBeCloseTo(shown(host.quickWins), 6);
+    expect(advice.totals.afterQuickWinsPerDay! - advice.totals.todayPerDay!).toBeCloseTo(
+      shown(advice.quickWins),
+      6
+    );
   });
 
   it('offers no quick win that needs surplus hauled from another system (#2703)', () => {

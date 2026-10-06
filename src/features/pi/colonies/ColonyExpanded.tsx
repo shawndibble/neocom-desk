@@ -367,6 +367,7 @@ export function ColonyExpanded({
           <ul className="divide-y divide-line">
             {row.quickWins.map((win) => {
               const line = quickWinLine(win, typeNames, t);
+              const saving = isSaving(win.detail);
               return (
                 <li key={win.id} className="flex flex-wrap items-center gap-2 py-1.5 text-xs">
                   <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-accent/45 bg-accent/10 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
@@ -374,11 +375,11 @@ export function ColonyExpanded({
                   </span>
                   <span className="min-w-0 flex-1">{line.text}</span>
                   <span
-                    className={`shrink-0 tabular-nums ${isSaving(win.detail) ? 'text-warning' : 'text-isk-pos'}`}
+                    className={`shrink-0 tabular-nums ${saving ? 'text-warning' : 'text-isk-pos'}`}
                   >
                     {win.gainPerDay === null ? (
                       t('piColonies.noFigure')
-                    ) : isSaving(win.detail) ? (
+                    ) : saving ? (
                       <>
                         {t('piColonies.saves')}
                         <IskAmount value={win.gainPerDay} decimals={0} />

@@ -179,6 +179,7 @@ describe('MakeMorePlan', () => {
         what: 'factories',
         productTypeId: P2_B,
         factories: 2,
+        source: 'local',
         routedFrom: [],
         needsRemoval: false,
       },

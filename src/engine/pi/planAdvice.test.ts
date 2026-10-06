@@ -65,6 +65,7 @@ describe('quick wins', () => {
           what: 'factories',
           productTypeId: 99,
           factories: 1,
+          source: 'network',
           routedFrom: [],
           needsRemoval: false,
         },
@@ -148,7 +149,7 @@ describe('spendRoomOnce', () => {
       },
       gain
     );
-  const factory = (productTypeId: number, gain: number | null) =>
+  const factory = (productTypeId: number, gain: number | null, source: 'local' | 'network') =>
     quickWin(
       PLANET,
       {
@@ -156,7 +157,8 @@ describe('spendRoomOnce', () => {
         what: 'factories',
         productTypeId,
         factories: 1,
-        routedFrom: [8],
+        source,
+        routedFrom: source === 'network' ? [8] : [],
         needsRemoval: true,
       },
       gain
@@ -172,39 +174,68 @@ describe('spendRoomOnce', () => {
     { kind: 'restart', reason: 'stopped', extractors: 1, resourceTypeIds: [1] },
     50_000
   );
-  const kinds = (wins: readonly { id: string }[]) => wins.map((win) => win.id);
+  const ids = (wins: readonly { id: string }[]) => wins.map((win) => win.id);
 
   it('keeps one claim on the freed room, the one that earns more (Uttindar V)', () => {
-    const kept = spendRoomOnce([heads(2_040_000), factory(2319, 935_000)]);
-    expect(kinds(kept)).toEqual([`${PLANET}:idle`]);
+    const kept = spendRoomOnce([heads(2_040_000), factory(2319, 935_000, 'network')]);
+    expect(ids(kept)).toEqual([`${PLANET}:idle`]);
     expect(totalQuickWins(kept).gainPerDay).toBe(2_040_000);
-    expect(kinds(spendRoomOnce([heads(500_000), factory(2319, 935_000)]))).toEqual([
-      `${PLANET}:room-factories:2319`,
-    ]);
   });
 
-  it('counts the network plan’s factories on one host together, since it split the room between them', () => {
-    const kept = spendRoomOnce([heads(1_000_000), factory(2319, 600_000), factory(2312, 600_000)]);
-    expect(kinds(kept)).toEqual([`${PLANET}:room-factories:2319`, `${PLANET}:room-factories:2312`]);
+  it('still names idle factories for removal when their heads lose the room', () => {
+    const kept = spendRoomOnce([heads(500_000), factory(2319, 935_000, 'network')]);
+    expect(ids(kept)).toEqual([`${PLANET}:idle`, `${PLANET}:room-factories:2319`]);
+    expect(kept[0].detail).toMatchObject({ kind: 'idle-factories', headsToAdd: null });
+    expect(kept[0].gainPerDay).toBeNull();
+    expect(totalQuickWins(kept).gainPerDay).toBe(935_000);
+  });
+
+  it('counts one source’s factories together, since it split the room between them', () => {
+    const kept = spendRoomOnce([
+      heads(1_000_000),
+      factory(2319, 600_000, 'network'),
+      factory(2312, 600_000, 'network'),
+    ]);
+    expect(totalQuickWins(kept).gainPerDay).toBe(1_200_000);
+  });
+
+  it('never counts local refining and the network plan’s factories on the same room', () => {
+    const kept = spendRoomOnce([
+      factory(2393, 400_000, 'local'),
+      factory(2319, 900_000, 'network'),
+    ]);
+    expect(ids(kept)).toEqual([`${PLANET}:room-factories:2319`]);
   });
 
   it('spends plain headroom once too: more extractors or a new factory, not both', () => {
-    expect(kinds(spendRoomOnce([extractors(300_000), factory(2319, 200_000)]))).toEqual([
+    expect(ids(spendRoomOnce([extractors(300_000), factory(2319, 200_000, 'local')]))).toEqual([
       `${PLANET}:room-extractors`,
     ]);
   });
 
   it('prefers a claim with a figure over one without', () => {
-    expect(kinds(spendRoomOnce([heads(null), factory(2319, 10)]))).toEqual([
-      `${PLANET}:room-factories:2319`,
-    ]);
+    const kept = spendRoomOnce([heads(null), factory(2319, 10, 'network')]);
+    expect(totalQuickWins(kept)).toMatchObject({ gainPerDay: 10, unpriced: 1 });
+    expect(kept[0].detail).toMatchObject({ headsToAdd: null });
   });
 
   it('leaves alone what spends no room: a restart, storage, factories removed without heads', () => {
     const removeOnly = heads(null, null);
     const storage = quickWin(PLANET, { kind: 'storage', hoursToFull: 5, haulHours: 24 }, 1);
-    const wins = [restart, storage, removeOnly, factory(2319, 935_000)];
+    const wins = [restart, storage, removeOnly, factory(2319, 935_000, 'network')];
     expect(spendRoomOnce(wins)).toEqual(wins);
+  });
+
+  it('settles each colony on its own', () => {
+    const other = quickWin(
+      9,
+      { kind: 'spare-room', what: 'extractors', extraEcus: 1, resourceTypeId: 1 },
+      5
+    );
+    expect(ids(spendRoomOnce([heads(2_000_000), other]))).toEqual([
+      `${PLANET}:idle`,
+      '9:room-extractors',
+    ]);
   });
 });
 

@@ -111,6 +111,8 @@ export type QuickWinDetail =
       what: 'factories';
       productTypeId: number;
       factories: number;
+      /** `local`: refining the colony's own raw. `network`: the network plan's factories. */
+      source: 'local' | 'network';
       /** Colonies whose surplus the factories draw on, ascending; empty when the host feeds them itself. */
       routedFrom: readonly number[];
       /** The room is held by idle factories the pilot must take out first. */
@@ -231,52 +233,61 @@ export function totalQuickWins(wins: readonly QuickWin[]): {
   };
 }
 
+export type RoomClaim = 'heads' | 'extractors' | 'local-factories' | 'network-factories';
+
 /**
- * Which share of a colony's CPU and Powergrid a win spends, or null when it
- * spends none. Heads in place of idle factories, more extractors and new
- * factories all draw on the same spare and freed room. The network plan's
- * factories on one host are one claim: it already split the room between them.
+ * The colony room a win spends, or null when it spends none. Heads in place of
+ * idle factories, more extractors, local refining and the network plan's
+ * factories all draw on the same spare and freed CPU and Powergrid. Each
+ * source's own factories are one claim: it already split the room between them.
  */
-function roomClaim(detail: QuickWinDetail): 'heads' | 'extractors' | 'factories' | null {
+export function roomClaim(detail: QuickWinDetail): RoomClaim | null {
   if (detail.kind === 'idle-factories') return detail.headsToAdd === null ? null : 'heads';
-  if (detail.kind === 'spare-room') return detail.what;
-  return null;
+  if (detail.kind !== 'spare-room') return null;
+  return detail.what === 'extractors' ? 'extractors' : `${detail.source}-factories`;
 }
 
 /**
- * One colony's room is spent once. Of the wins that claim it, the claim that
- * adds the most ISK a day stays and the rest are dropped: a claim with a figure
- * beats one without, and a tie keeps the first. Wins that spend no room pass
- * through untouched, in order.
+ * One colony's room is spent once. Of the claims on it, the one that adds the
+ * most ISK a day stays: a figure beats none, a tie keeps the first. Losing
+ * heads fall back to removing the idle factories, unpriced, so those are still
+ * named; other losing claims are dropped. Wins that spend no room pass through.
  */
 export function spendRoomOnce(wins: readonly QuickWin[]): QuickWin[] {
-  const claims = new Map<string, { priced: boolean; gain: number }>();
+  const byPlanet = new Map<number, Map<RoomClaim, { priced: boolean; gain: number }>>();
   for (const win of wins) {
     const claim = roomClaim(win.detail);
     if (claim === null) continue;
-    const key = `${win.planetId}:${claim}`;
-    const sum = claims.get(key) ?? { priced: false, gain: 0 };
-    claims.set(key, {
+    const claims = byPlanet.get(win.planetId) ?? new Map();
+    const sum = claims.get(claim) ?? { priced: false, gain: 0 };
+    claims.set(claim, {
       priced: sum.priced || win.gainPerDay !== null,
       gain: sum.gain + (win.gainPerDay ?? 0),
     });
+    byPlanet.set(win.planetId, claims);
   }
-  const kept = new Map<number, string>();
-  for (const [key, value] of claims) {
-    const planetId = Number.parseInt(key, 10);
-    const held = kept.get(planetId);
-    const best = held === undefined ? undefined : claims.get(held)!;
-    if (
-      best === undefined ||
-      (value.priced && !best.priced) ||
-      (value.priced === best.priced && value.gain > best.gain)
-    ) {
-      kept.set(planetId, key);
+  const kept = new Map<number, RoomClaim>();
+  for (const [planetId, claims] of byPlanet) {
+    let best: [RoomClaim, { priced: boolean; gain: number }] | null = null;
+    for (const entry of claims) {
+      const [, value] = entry;
+      if (
+        best === null ||
+        (value.priced && !best[1].priced) ||
+        (value.priced === best[1].priced && value.gain > best[1].gain)
+      ) {
+        best = entry;
+      }
     }
+    if (best) kept.set(planetId, best[0]);
   }
-  return wins.filter((win) => {
+  return wins.flatMap((win) => {
     const claim = roomClaim(win.detail);
-    return claim === null || kept.get(win.planetId) === `${win.planetId}:${claim}`;
+    if (claim === null || kept.get(win.planetId) === claim) return [win];
+    if (win.detail.kind === 'idle-factories') {
+      return [quickWin(win.planetId, { ...win.detail, headsToAdd: null }, null)];
+    }
+    return [];
   });
 }
 

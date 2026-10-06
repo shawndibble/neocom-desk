@@ -914,7 +914,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Quick win**: An in-place fix to a PI colony the pilot already runs, such as
   restarting a slowing extractor, adding a missing head, hauling before a
   launchpad fills, or repointing an idle factory. It adds to today's income
-  without changing what the colony makes. The PI Plan tab lists every Quick
+  without changing what the colony makes, except a storage win, whose figure
+  is a saving that no total adds. A colony's spare room is spent by one Quick
+  win only. The PI Plan tab lists every Quick
   win before any rebuild and quotes a rebuild's gain on top of them, keeping
   ADR 0012's split between tuning today's extraction and re-planning it.
   Ranked by ISK/day per minute of in-game work.
