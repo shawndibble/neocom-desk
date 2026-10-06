@@ -109,7 +109,7 @@ function Hero({
           {t(next.kind === 'haul' ? 'piColonies.today.haulName' : 'piColonies.today.restartName', {
             name,
           })}{' '}
-          <span className="text-warning">
+          <span className={now ? 'text-danger' : 'text-warning'}>
             {now
               ? t('piColonies.today.now')
               : t('piColonies.today.in', { in: hoursLabel(hoursAway) })}
@@ -150,7 +150,7 @@ function CountChips({
       <StatChip
         label={t('piColonies.chip.stopped')}
         value={counts.stopped}
-        tone={tone(counts.stopped, 'warning')}
+        tone={tone(counts.stopped, 'danger')}
       />
       <StatChip
         label={t('piColonies.chip.expiringToday')}
@@ -218,7 +218,9 @@ function LoginNext({
       ) : (
         <>
           <p className="mt-1 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold tabular-nums text-warning">
+            <span
+              className={`text-3xl font-semibold tabular-nums ${now ? 'text-danger' : 'text-warning'}`}
+            >
               {now
                 ? t('piColonies.today.nowCap')
                 : t('piColonies.today.in', { in: hoursLabel(hoursAway) })}

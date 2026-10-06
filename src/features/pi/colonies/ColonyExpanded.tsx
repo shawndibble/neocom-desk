@@ -186,7 +186,7 @@ export function ColonyExpanded({
                     <dt className={MICRO}>
                       {stopped ? t('piColonies.expanded.stopped') : t('piColonies.expanded.stops')}
                     </dt>
-                    <dd className={`tabular-nums ${stopped ? 'text-warning' : ''}`}>
+                    <dd className={`tabular-nums ${stopped ? 'text-danger' : ''}`}>
                       {expiryMs === null
                         ? '—'
                         : stopped

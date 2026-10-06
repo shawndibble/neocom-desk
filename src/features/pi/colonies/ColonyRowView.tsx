@@ -308,7 +308,7 @@ export interface ColonyRowViewProps {
 }
 
 const BUTTON_VARIANT: Record<CheckStatus, 'danger' | 'accent' | 'ghost'> = {
-  stopped: 'accent',
+  stopped: 'danger',
   expiring: 'accent',
   'needs-look': 'accent',
   unknown: 'ghost',
@@ -358,7 +358,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
     }
     return t('piColonies.stopsAt', { clock: eveClock(extractor.expiryMs) });
   })();
-  const extractorTone = row.status === 'expiring' ? 'warning' : 'success';
+  const extractorTone = stopped ? 'danger' : row.status === 'expiring' ? 'warning' : 'success';
 
   const storageRight =
     storage.hoursToFull === null
@@ -509,12 +509,12 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                   />
                 </span>
                 <span
-                  className={`text-xs font-semibold tabular-nums ${stopped || row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
+                  className={`text-xs font-semibold tabular-nums ${stopped ? 'text-danger' : row.status === 'expiring' ? 'text-warning' : 'text-text'}`}
                 >
                   {extractorRight}
                 </span>
               </div>
-              <Meter fraction={stopped ? 0 : extractor.remainingFraction} tone={extractorTone} />
+              <Meter fraction={stopped ? 1 : extractor.remainingFraction} tone={extractorTone} />
               {extractorNote && <p className="text-[0.6875rem] text-text-dim">{extractorNote}</p>}
             </div>
 
