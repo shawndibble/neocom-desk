@@ -42,8 +42,6 @@ function setup(stats: FittingStats | null, currentStats: FittingStats | null) {
       context: {} as FittingContext,
       catalogue: { variations: { types: {}, metaGroups: {} } } as unknown as FittingCatalogue,
       charges,
-      target: null,
-      dronesShown: true,
       dragEnabled: false,
       selectTarget: () => {},
       openCargoQuantity: () => {},

@@ -486,7 +486,7 @@ const price = id => B[id].sell * mf();
 const raws = id => [...PI.rawLeaves(id)];
 const oneTypes = id => ALL.filter(t => raws(id).every(p => B[p].planets.includes(t)));
 const rateOne = id => B[id].tier===0 ? CAP : CAP / PI.p0PerUnit(id);
-const volWeek = id => rateOne(id)*B[id].vol*168;
+const volDay = id => rateOne(id)*B[id].vol*24;
 function coverPlanets(id){
   let left = raws(id), n = 0;
   while(left.length){ let best=null, bc=[];
@@ -748,7 +748,7 @@ const HELP = () => `<div class="card help"><h3>Steps</h3><ol>
 const iconImg = (id, cls = '') => `<img class="${cls}" src="${ic(id)}" alt="${B[id].name}" data-tip="${id}">`;
 const pImg = t => `<img src="${planetIcon(t)}" alt="${cap(t)}">`;
 function effortChips(id, planets, between) {
-  return `<div class="stats effort"><span class="st"><span class="l">Planets</span><span class="v">${planets}</span></span><span class="st"><span class="l">Haul between</span><span class="v">${between ? '1×/week' : 'none'}</span></span><span class="st"><span class="l">Market</span><span class="v">1 trip/wk · ${Math.round(volWeek(id) * planets).toLocaleString()} m³</span></span><span class="st"><span class="l">Reset</span><span class="v">every 3 days</span></span></div><div class="est">${routeText()}</div>`;
+  return `<div class="stats effort"><span class="st"><span class="l">Planets</span><span class="v">${planets}</span></span><span class="st"><span class="l">Haul between</span><span class="v">${between ? '1×/day' : 'none'}</span></span><span class="st"><span class="l">Market</span><span class="v">1 trip/day · ${Math.round(volDay(id) * planets).toLocaleString()} m³</span></span><span class="st"><span class="l">Restart</span><span class="v">every day</span></span></div><div class="est">${routeText()}</div>`;
 }
 function heroQ1() {
   if (!cols().length) return `<div class="card hero"><h3>Best use of your planets</h3><div style="font-size:13px">No colonies yet. Switch to <button class="textact" data-q="best">What's the best thing to make?</button> to pick a first planet, or click any product on the map.</div></div>`;
@@ -777,7 +777,7 @@ function checklist() {
     st += `<li>Extract ${need.map(p => iconImg(p) + B[p].name).join(' + ')}${need.length > 1 ? ' <span class="dim">(2 extractors)</span>' : ''}${need.includes(old0) ? ' <span class="dim">(keep the existing one)</span>' : ''}</li>`;
     if (it.tier === 1) st += `<li>Basic factories → ${iconImg(r.id)}<b>${it.name}</b></li>`;
     else st += `<li>Basic factories → ${it.inputs.map(q => iconImg(q.id) + B[q.id].name).join(' + ')}</li><li>Advanced factory → ${iconImg(r.id)}<b>${it.name}</b></li>`;
-    st += `<li>Launchpad → sell at ${marketLabel()} once a week</li>`;
+    st += `<li>Launchpad → sell at ${marketLabel()} every day</li>`;
     return `<div class="pc"><img src="${planetIcon(x.c.type)}" alt=""><div><div class="h">${x.c.name} <small>· ${cap(x.c.type)} · <span class="pos">${sg(x.d)}/day</span></small></div><ol>${st}</ol></div></div>`;
   }).join('');
   const used = r.rows.map(x => x.c);

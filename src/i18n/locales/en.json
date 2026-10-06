@@ -457,8 +457,6 @@
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
-      "cargoAddMenu_one": "Add {{count}} to cargo",
-      "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
@@ -1429,8 +1427,6 @@
       "chargeToCargo": "Put {{name}} in cargo…",
       "quantityTitle": "Quantity of {{name}}",
       "quantityConfirm": "Set quantity",
-      "fitFirstFree": "Fit to first free slot",
-      "addToBay": "Add to drone bay",
       "addCargo": "Add cargo",
       "cargoHold": "{{used}} / {{total}} m³",
       "dragToMove": "Drag {{name}} to another slot",
@@ -1446,8 +1442,7 @@
       "alreadyHeld_one": "{{count}} already held it.",
       "alreadyHeld_other": "{{count}} already held it.",
       "changeCharge": "Change charge",
-      "noCharges": "No other charge fits this",
-      "launch": "Launch"
+      "noCharges": "No other charge fits this"
     },
     "libraryMenu": {
       "open": "Open",
@@ -1772,6 +1767,8 @@
     "csvLevel": "Level",
     "csvSp": "Skill points",
     "inspector": {
+      "addToPlan": "Add to Skill Plan",
+      "maxLevel": "Already at level 5",
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",
       "noPrereqs": "No prerequisites",
@@ -1796,11 +1793,6 @@
       "loadFailedHint": "Something went wrong loading this skill. Try again.",
       "notFoundTitle": "Skill not found",
       "notFoundHint": "This skill isn't in the skill catalog."
-    },
-    "contextMenu": {
-      "addToSkillPlan": "Add to Skill Plan",
-      "noPlans": "No skill plans yet",
-      "maxLevelTitle": "Already at level 5"
     },
     "certificates": {
       "grade": {
@@ -2098,13 +2090,12 @@
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
     "milestone": {
-      "addLabel": "Add milestone to {{name}}",
+      "add": "Add milestone…",
       "addTitle": "Name this milestone",
       "rename": "Rename…",
       "renameTitle": "Rename milestone",
-      "remove": "Remove",
+      "remove": "Remove milestone",
       "removeLabel": "Remove milestone {{name}}",
-      "menuLabel": "Milestone actions for {{name}}",
       "next": "Next milestone",
       "projected": "Projected",
       "reached": "Reached",
@@ -4815,6 +4806,10 @@
     }
   },
   "piPlan": {
+    "priceSource": {
+      "market": "{{hub}} prices",
+      "buyback": "your corp buyback rate"
+    },
     "tabsLabel": "Planetary Industry views",
     "coloniesTab": "Colonies",
     "planTab": "Plan",
@@ -4822,7 +4817,7 @@
     "strip": {
       "home": "Home",
       "colonies": "Colonies",
-      "route": "Route",
+      "route": "Home route",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
@@ -4863,7 +4858,7 @@
       "whatIfChip_nothing": "+ {{type}} · nothing new",
       "guideColonies": "Pre-marked from your colonies. Tap one to switch it off; tap a + planet to see what it unlocks.",
       "guideNone": "You have no colonies yet, so every type is in play. Tap one you can't reach to hide it.",
-      "guideRanked": "Ranked by ISK/day per planet at {{hub}}, after customs. New to PI?",
+      "guideRanked": "Ranked by ISK/day per planet at {{source}}, after customs. New to PI?",
       "euGuide": "EVE University guide",
       "modeLabel": "View",
       "modePicks": "Best picks",
@@ -4874,7 +4869,7 @@
       "makeP2": "Factory goods (P2)",
       "makeHint": "e.g. if your corp buyback asks for P2",
       "picksTitle": "Best picks for you",
-      "picksMeta": "ISK/day per planet · {{hub}}",
+      "picksMeta": "ISK/day per planet · {{source}}",
       "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}. Training Command Center Upgrades raises it.",
       "noneFitFilter": "No {{tier}} setup fits one planet at Command Center level {{level}}: it needs more power than that level has. Try Anything, or train Command Center Upgrades.",
       "noRecipes": "Nothing to rank with these planet types. Switch one back on, or add a what-if planet.",
@@ -4894,6 +4889,7 @@
       "setupHighTech_other": "{{count}} high-tech factories",
       "youNeed_one": "You need",
       "youNeed_other": "You need one of",
+      "findOneFor": "Find one: {{planet}}",
       "state": {
         "have": "You have",
         "whatif": "If added",
@@ -5006,7 +5002,7 @@
       "statHaul": "Haul",
       "m3PerWeek": "{{value}} m³/wk",
       "m3PerTrip": "{{value}} m³/trip",
-      "basis": "ISK a day after customs tax, at {{hub}} prices. Estimates.",
+      "basis": "ISK a day after customs tax, at {{source}}. Estimates.",
       "stripQuickWin": "quick win",
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
@@ -5080,7 +5076,7 @@
       "todayChip": "Today",
       "tripsChip": "Trips",
       "tripsPerWeek": "{{value}} / week",
-      "routeChip": "Route",
+      "routeChip": "Worst colony",
       "routeLocal": "Collected at home",
       "routeUnknown": "Not resolved",
       "lowsecChip": "Lowsec",
@@ -6043,11 +6039,6 @@
       "dismiss": "Not now"
     },
     "groupedTitle": "{{title}} x{{count}}",
-    "contextMenu": {
-      "browserOn": "Turn off device notifications",
-      "browserOff": "Turn on device notifications",
-      "hideInFeed": "Hide in feed"
-    },
     "eveTypeName": {
       "StructureUnderAttack": "Structure Under Attack",
       "StructureLostShields": "Structure Lost Shields",

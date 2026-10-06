@@ -42,6 +42,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
     {
       id: 'name',
       header: t('fittings.appraisal.item'),
+      className: 'min-w-32 break-words',
       render: (row) => (
         <MarketItemLink typeId={row.typeId} className={entityLinkClassName()}>
           {row.name}
@@ -94,6 +95,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           rowKey={(row) => row.typeId}
           label={t('fittings.appraisal.tableLabel')}
           density="compact"
+          responsive="table"
         />
         <div className="flex justify-between gap-2 border-t border-line pt-2 text-sm font-semibold">
           <span>{t('fittings.appraisal.total')}</span>
