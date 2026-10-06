@@ -121,3 +121,14 @@ export function colonyFillTimeDisplay(
   if (fillsBeforeHaul(hoursToFull, haulHours)) return { kind: 'soon', hoursToFull };
   return { kind: 'none' };
 }
+
+/**
+ * The colony list could not be read, so the count is unknown, not zero: a
+ * re-login is needed (403) or ESI did not answer with nothing cached. Every PI
+ * surface words "no colonies" only when this is false.
+ */
+export function colonyCountUnknown(
+  read: { needsReauth?: boolean; fetchFailed?: boolean } | null | undefined
+): boolean {
+  return read?.needsReauth === true || read?.fetchFailed === true;
+}

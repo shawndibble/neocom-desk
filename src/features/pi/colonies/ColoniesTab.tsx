@@ -500,7 +500,9 @@ export function ColoniesTab({
       {!hasAnyColoniesSurface ? (
         !error &&
         !data?.planetsFetchFailed &&
-        (planetsResult && !planetsResult.fromCache ? (
+        (data?.planetsNeedsReauth ? (
+          <EmptyState title={t('piColonies.unknownTitle')} hint={t('piColonies.unknownHint')} />
+        ) : planetsResult && !planetsResult.fromCache ? (
           <NoColonies planHref={PLAN_HREF} />
         ) : (
           <CachedEmptyState

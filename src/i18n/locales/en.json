@@ -629,7 +629,6 @@
         "empty": "Nobody has published a fit for this hull on EVE Workbench yet.",
         "unnamed": "Unnamed fit",
         "created": "Created: {{age}}",
-        "load": "Load",
         "loadFailed": "Couldn't load this fit.",
         "priceNote": "Prices: {{hub}}, your default Trade Hub",
         "price": "≈ <isk/> ISK",
@@ -4781,7 +4780,7 @@
       "title": "Find {{types}} planet near {{home}}",
       "or": "or",
       "homeFallback": "home",
-      "noHome": "Nearby planets are measured from where your colonies are. With no colony yet there is no starting point.",
+      "noHome": "Nearby planets are measured from where your colonies are. With no colony location known there is no starting point.",
       "highsecOnly": "Highsec only",
       "loading": "Looking for nearby systems…",
       "failed": "The map data didn't load. Try again later.",
@@ -4891,6 +4890,7 @@
       "opened": {
         "colonies_one": "Opened “Make more from my planets” because we found {{count}} colony on your character.",
         "colonies_other": "Opened “Make more from my planets” because we found {{count}} colonies on your character.",
+        "unknown": "Your colonies could not be read, so we opened “Find the best thing to build” with every planet type available.",
         "no-colonies": "You have no colonies yet, so we opened “Find the best thing to build” with every planet type available.",
         "goals": "Opened “Make a specific product” because your link names a product."
       }
@@ -4979,7 +4979,7 @@
         "lowsec": "lowsec",
         "nullsec": "nullsec"
       },
-      "noOrigin": "We can't tell where you are: you have no colonies and your location isn't available. Check which planet types a system has in the Map.",
+      "noOrigin": "We can't tell where you are: no colony location or current location is available. Check which planet types a system has in the Map.",
       "failed": "The system data didn't load. Try again in a moment.",
       "noneHighsec": "No highsec system with this planet type within 12 jumps. Untick “Highsec only”.",
       "none": "No system with this planet type within 12 jumps.",
@@ -5343,6 +5343,9 @@
     "sourceHeldBackTooltip": "Only this share is made: a scarcer input elsewhere in the chain holds it back.",
     "noColoniesTitle": "No colonies to plan with",
     "noColoniesHint": "The planner plans over your own colonies, and this character has none. Find planets on the Map.",
+    "noColoniesUnknownTitle": "Colonies not read yet",
+    "noColoniesUnknownHint": "The planner plans over your own colonies, and they could not be read. Log in again above, or find planets on the Map.",
+    "noColoniesUnknownBuying": "Colonies not read: goals at a tier you buy are bought outright. Anything else needs a colony to host the factories.",
     "noColoniesBuying": "No colonies: goals at a tier you buy are bought outright. Anything else needs a colony to host the factories.",
     "esiFailedTitle": "ESI didn't answer",
     "esiFailedHint": "Your colonies could not be read, so this is not a sign you have none. Nothing is cached yet.",
@@ -5627,6 +5630,8 @@
       "planHint": "Want more than small fixes? Plan compares what else this {{type}} planet could make."
     },
     "emptyPanel": "Colonies",
+    "unknownTitle": "Colonies not read yet",
+    "unknownHint": "Log in again above to see them. Plan and Map still work without them.",
     "emptyTitle": "No colonies yet",
     "emptyHint": "Once you set up a planet, this tab tells you each day what's stopped, running out or full, and when to log in next.",
     "emptyAction": "Find the best thing to build",

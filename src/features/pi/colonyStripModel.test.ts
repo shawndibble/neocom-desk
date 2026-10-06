@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  colonyCountUnknown,
   colonyStripRows,
   colonyFillTimeDisplay,
   fillsBeforeHaul,
@@ -138,5 +139,17 @@ describe('colonyFillTimeDisplay', () => {
 
   it('does not flag a rare hauler on a long cadence for an ordinary fill time', () => {
     expect(colonyFillTimeDisplay(200, 168)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('colonyCountUnknown', () => {
+  it('is unknown when a re-login is needed or ESI did not answer', () => {
+    expect(colonyCountUnknown({ needsReauth: true, fetchFailed: false })).toBe(true);
+    expect(colonyCountUnknown({ needsReauth: false, fetchFailed: true })).toBe(true);
+  });
+
+  it('is known otherwise, including a cached empty list', () => {
+    expect(colonyCountUnknown({ needsReauth: false, fetchFailed: false })).toBe(false);
+    expect(colonyCountUnknown(null)).toBe(false);
   });
 });

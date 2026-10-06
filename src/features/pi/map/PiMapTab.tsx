@@ -47,7 +47,7 @@ export function PiMapTab({ characterId }: { characterId: number }) {
           adviceWithWhatIf={state.adviceWithWhatIf}
           colonies={state.colonies}
           finder={state.finder}
-          coloniesUnknown={esi !== null}
+          coloniesUnknown={state.coloniesUnknown}
           pricesFailed={state.pricesFailed}
         />
       </div>

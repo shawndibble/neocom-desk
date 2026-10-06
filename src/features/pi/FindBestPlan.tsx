@@ -24,6 +24,7 @@ import { useFinderOrigin } from './usePlanetFinder';
 import { usePlanAdvice } from './usePlanAdvice';
 import { priceSourceLabel } from './priceSource';
 import { useSellHub } from './sellHub';
+import { colonyCountUnknown } from './colonyStripModel';
 
 /** The recipe filter and the picks/all switch ride in the URL, scoped to Find best (ADR 0015). */
 const FIND_BEST_PARAMS = {
@@ -135,7 +136,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
     <div className="space-y-4">
       <PlanetTypesPanel
         hasColonies={best.hasColonies}
-        coloniesUnknown={snapshot.fetchFailed}
+        coloniesUnknown={colonyCountUnknown(snapshot)}
         colonyCount={snapshot.colonies.length}
         toggles={best.toggles}
         chips={best.chips}
