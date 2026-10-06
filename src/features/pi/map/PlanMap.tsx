@@ -86,6 +86,8 @@ export interface MapColony {
 export interface PlanMapProps {
   /** The colony read failed: `colonies` is empty because it is unknown, not because there are none. */
   coloniesUnknown?: boolean;
+  /** Hub prices could not be read: `advice` is unpriced, so "your planets already make their best" cannot be said. */
+  pricesFailed?: boolean;
   graph: MapGraph;
   advice: PlanAdvice;
   /** The same advice with this planet type added as a what-if: priced for it, never for the picks. */
@@ -103,6 +105,7 @@ export function PlanMap({
   colonies,
   finder,
   coloniesUnknown = false,
+  pricesFailed = false,
 }: PlanMapProps) {
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
@@ -287,9 +290,9 @@ export function PlanMap({
   const figures = useMemo(
     () =>
       new Map<number, ProductFigure>(
-        [...graph.byId.keys()].map((id) => [id, productFigure(advice, id, graph)])
+        [...graph.byId.keys()].map((id) => [id, productFigure(advice, id, graph, pricesFailed)])
       ),
-    [advice, graph]
+    [advice, graph, pricesFailed]
   );
   const figureOf = useCallback((typeId: number) => figures.get(typeId)!, [figures]);
   const colonySales = useMemo(
@@ -510,7 +513,9 @@ export function PlanMap({
         {picks.kind === 'recipes' ? t('piMap.picksRecipes') : t('piMap.picksTitle')}
       </span>
       {picks.kind === 'none' ? (
-        <span className="text-text-dim">{t('piMap.picksNone')}</span>
+        <span className="text-text-dim">
+          {t(pricesFailed ? 'piMap.picksNoPrices' : 'piMap.picksNone')}
+        </span>
       ) : (
         <>
           {picks.picks.map((pick, i) => (

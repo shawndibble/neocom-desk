@@ -15,8 +15,14 @@ import { useSellHub } from './sellHub';
 
 export type PiAdviceInputsState =
   | { status: 'loading' }
-  /** The hub's prices could not be read. The one place `{failed:true}` is consumed. */
-  | { status: 'prices-failed' }
+  /**
+   * The hub's prices could not be read. The one place `{failed:true}` is consumed.
+   * `input` is the same input with empty books (null until skills and richness
+   * are in): the model prices nothing from it, so only what needs no price
+   * survives (a stopped extractor's restart, the Map board), every ISK figure
+   * unknown, never zero.
+   */
+  | { status: 'prices-failed'; input: PlanAdviceInput | null }
   | { status: 'ready'; input: PlanAdviceInput; prices: PlanPrices; hubName: string };
 
 interface Skills {
@@ -148,30 +154,31 @@ export function usePiAdviceInputs(
 
   return useMemo((): PiAdviceInputsState => {
     if (!snapshot) return { status: 'loading' };
-    if (pricesFailed) return { status: 'prices-failed' };
-    if (!prices || !skills || !richness) return { status: 'loading' };
-    return {
-      status: 'ready',
-      prices,
-      hubName: hub.systemName,
-      input: {
-        snapshot,
-        prefs: {
-          restartHours: cadence.restartDays * 24,
-          fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
-          customsOverrides: snapshot.customsOverrides,
-          richness,
-        },
-        books: hubBooks(prices, snapshot.accountingLevel),
-        market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
-        cadence,
-        preference,
-        recipeFilter: 'any',
-        skills,
-        ...(routes ? { routesBySystem: routes } : {}),
-        planetNames: snapshot.planetNames,
+    if (!skills || !richness)
+      return pricesFailed ? { status: 'prices-failed', input: null } : { status: 'loading' };
+    if (!pricesFailed && !prices) return { status: 'loading' };
+    const input: PlanAdviceInput = {
+      snapshot,
+      prefs: {
+        restartHours: cadence.restartDays * 24,
+        fallbackRatePerHour: goalPrefs.fallbackRatePerHour,
+        customsOverrides: snapshot.customsOverrides,
+        richness,
       },
+      books: hubBooks(
+        pricesFailed || !prices ? { prices: {}, buyPrices: {} } : prices,
+        snapshot.accountingLevel
+      ),
+      market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
+      cadence,
+      preference,
+      recipeFilter: 'any',
+      skills,
+      ...(routes ? { routesBySystem: routes } : {}),
+      planetNames: snapshot.planetNames,
     };
+    if (pricesFailed || !prices) return { status: 'prices-failed', input };
+    return { status: 'ready', prices, hubName: hub.systemName, input };
   }, [
     snapshot,
     prices,

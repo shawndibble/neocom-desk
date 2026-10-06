@@ -6,7 +6,8 @@ import { usePiAdviceInputs } from './usePiAdviceInputs';
 
 export type PlanAdviceState =
   | { status: 'loading' }
-  | { status: 'prices-failed' }
+  /** `advice` is built on empty books: only what needs no price survives, every ISK figure null. */
+  | { status: 'prices-failed'; advice: PlanAdvice | null }
   | { status: 'error' }
   | { status: 'ready'; advice: PlanAdvice; pricesFetchedAt: Date; hubName: string };
 
@@ -18,7 +19,17 @@ export function usePlanAdvice(
 ): PlanAdviceState {
   const inputs = usePiAdviceInputs(snapshot, characterId, preference);
   return useMemo((): PlanAdviceState => {
-    if (inputs.status !== 'ready') return inputs;
+    if (inputs.status === 'loading') return inputs;
+    if (inputs.status === 'prices-failed') {
+      try {
+        return {
+          status: 'prices-failed',
+          advice: inputs.input ? buildPlanAdvice(inputs.input) : null,
+        };
+      } catch {
+        return { status: 'prices-failed', advice: null };
+      }
+    }
     try {
       return {
         status: 'ready',

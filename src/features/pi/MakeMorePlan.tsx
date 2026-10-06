@@ -80,7 +80,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   const { buybackPct } = useSellHub();
   const view = useMemo(
     () =>
-      state.status === 'ready'
+      (state.status === 'ready' || state.status === 'prices-failed') && state.advice
         ? buildPlanView(state.advice, snapshot.pi, (id) => t('pi.planetLabel', { id }))
         : null,
     [state, snapshot.pi, t]
@@ -88,10 +88,11 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
 
   // A row that is gone takes its tick with it.
   useEffect(() => {
-    if (!view || !ticksHydrated) return;
+    // With prices down the list is shorter: pruning now would drop ticks on wins that return.
+    if (!view || !ticksHydrated || state.status !== 'ready') return;
     const kept = pruneTicks(ticked, tickableIds(view), coveredPlanets(view));
     if (kept.length !== ticked.length) void setTicked(kept);
-  }, [view, ticked, ticksHydrated, setTicked]);
+  }, [view, ticked, ticksHydrated, setTicked, state.status]);
 
   const ticks = useMemo<Ticks>(() => {
     const set = new Set(ticked);
@@ -116,7 +117,15 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [scrollTarget, scrollOnce, location.key]);
 
   if (state.status === 'prices-failed') {
-    return <PricesUnavailable />;
+    // A win that needs no price (restart a stopped extractor) still stands; every figure is hidden.
+    return (
+      <div className="space-y-4">
+        <PricesUnavailable />
+        {view && view.quickWins.length > 0 && (
+          <QuickWinsPanel view={view} ticks={ticks} pricesDown />
+        )}
+      </div>
+    );
   }
   if (state.status === 'error') {
     return <EmptyState title={t('piPlan.make.failedTitle')} hint={t('piPlan.make.failedHint')} />;

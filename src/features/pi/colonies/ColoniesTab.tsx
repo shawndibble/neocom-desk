@@ -521,6 +521,7 @@ export function ColoniesTab({
               nameOf={nameOf}
               characterNameOf={characterNameOf}
               activeCharacterId={characterId}
+              pricesFailed={planAdvice.pricesFailed}
               todayPerDay={advice?.totals.todayPerDay ?? null}
               fixCount={advice?.quickWins.length ?? 0}
               fixGainPerDay={wins?.gainPerDay ?? 0}

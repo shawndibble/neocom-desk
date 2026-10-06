@@ -8,6 +8,7 @@ import { usePlanPreference } from '../planTicksPref';
 import { adviceInput, snapshot } from './mapFixtures.testutil';
 
 const seen: RebuildPreference[] = [];
+let pricesDown = false;
 vi.mock('../goalPlannerSnapshot', () => ({
   loadGoalPlannerSnapshot: async () => ({
     ...snapshot('lean'),
@@ -20,12 +21,10 @@ vi.mock('../goalPlannerSnapshot', () => ({
 vi.mock('../usePiAdviceInputs', () => ({
   usePiAdviceInputs: (_s: unknown, _c: number, preference: RebuildPreference) => {
     seen.push(preference);
-    return {
-      status: 'ready',
-      prices: {},
-      hubName: 'Jita',
-      input: adviceInput('lean', { preference }),
-    };
+    const input = adviceInput('lean', { preference });
+    return pricesDown
+      ? { status: 'prices-failed', input }
+      : { status: 'ready', prices: {}, hubName: 'Jita', input };
   },
 }));
 
@@ -53,5 +52,19 @@ describe('useMapAdvice follows the Plan preference', () => {
     }
     expect(planPicks(map.result.current.advice)).toEqual(planPicks(plan.result.current.advice));
     expect(map.result.current.advice).toEqual(buildPlanAdvice(adviceInput('lean', { preference })));
+  });
+});
+
+describe('useMapAdvice when hub prices could not be read (#2761)', () => {
+  afterEach(() => {
+    pricesDown = false;
+  });
+
+  it('still gives the board, flagged, instead of a failed state', async () => {
+    pricesDown = true;
+    const map = renderHook(() => useMapAdvice(7, (id) => `P${id}`));
+    await waitFor(() => expect(map.result.current.status).toBe('ready'));
+    if (map.result.current.status !== 'ready') throw new Error('ready');
+    expect(map.result.current.pricesFailed).toBe(true);
   });
 });

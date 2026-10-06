@@ -821,3 +821,31 @@ describe('customs parity across Plan, Colonies and Map', () => {
     expect(temperate(advice).taxAssumed).toBe(false);
   });
 });
+
+describe('buildPlanAdvice: hub prices unreadable (#2761)', () => {
+  const NO_PRICES = hubBooks({ prices: {}, buyPrices: {} }, 5);
+
+  it('keeps the restart of a stopped extractor, with no gain, and no figure anywhere is zero', () => {
+    const advice = buildPlanAdvice(
+      input({
+        books: NO_PRICES,
+        snapshot: snapshot({ details: new Map([[TEMPERATE_ID, temperateDetail(-10)]]) }),
+      })
+    );
+    const restart = temperate(advice).quickWins.find(
+      (win) => win.id === `${TEMPERATE_ID}:restart-stopped`
+    );
+    expect(restart?.detail).toMatchObject({ kind: 'restart', reason: 'stopped' });
+    expect(restart?.gainPerDay).toBeNull();
+    expect(advice.quickWins.every((win) => win.gainPerDay === null)).toBe(true);
+    expect(advice.recipes.recipes).toEqual([]);
+  });
+
+  it('drops a win that only exists because of a price', () => {
+    const priced = buildPlanAdvice(input());
+    const unpriced = buildPlanAdvice(input({ books: NO_PRICES }));
+    const pricedKinds = priced.quickWins.filter((w) => w.detail.kind === 'spare-room');
+    expect(pricedKinds.length).toBeGreaterThan(0);
+    expect(unpriced.quickWins.filter((w) => w.detail.kind === 'spare-room')).toEqual([]);
+  });
+});

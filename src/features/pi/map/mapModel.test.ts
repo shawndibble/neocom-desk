@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PlanetType } from '@/engine/pi/goalTypes';
-import { buildPlanAdvice } from '../planAdviceModel';
+import { buildPlanAdvice, hubBooks } from '../planAdviceModel';
 import { adviceInput, pi } from './mapFixtures.testutil';
 import {
   buildMapGraph,
@@ -220,5 +220,18 @@ describe('detailMode', () => {
     expect(detailMode({ panelWidth: DOCK_MIN_PANEL_WIDTH, phone: false })).toBe('docked');
     expect(detailMode({ panelWidth: DOCK_MIN_PANEL_WIDTH - 1, phone: false })).toBe('drawer');
     expect(detailMode({ panelWidth: 2400, phone: true })).toBe('sheet');
+  });
+});
+
+describe('productFigure: hub prices unreadable (#2761)', () => {
+  it('says unpriced for a one-planet product, never "no fit at this Command Center level"', () => {
+    const advice = buildPlanAdvice(
+      adviceInput('lean', { books: hubBooks({ prices: {}, buyPrices: {} }, 5) })
+    );
+    const water = id('Water');
+    expect(productFigure(advice, water, graph, true)).toEqual({
+      kind: 'unranked',
+      reason: 'unpriced',
+    });
   });
 });

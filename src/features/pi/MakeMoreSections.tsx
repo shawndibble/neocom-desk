@@ -368,7 +368,16 @@ function QuickWinSentence({ win, names }: { win: QuickWinRow; names: Map<number,
   }
 }
 
-export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }) {
+export function QuickWinsPanel({
+  view,
+  ticks,
+  pricesDown = false,
+}: {
+  view: PlanView;
+  ticks: Ticks;
+  /** Hub prices unreadable: the wins shown need none, so no gain is drawn, not even "No ISK figure". */
+  pricesDown?: boolean;
+}) {
   const { t } = useTranslation();
   const baseId = useId();
   const names = new Map(view.strips.map((strip) => [strip.planetId, strip.name]));
@@ -379,8 +388,12 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('piPlan.make.minutesTotal', { count: headline.quickWinMinutes })}
-          {' · '}
-          <Gain value={headline.quickWinPerDay} />
+          {!pricesDown && (
+            <>
+              {' · '}
+              <Gain value={headline.quickWinPerDay} />
+            </>
+          )}
         </span>
       }
       padded={false}
@@ -412,7 +425,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
                 <QuickWinSentence win={win} names={names} />
               </p>
               <span className="flex shrink-0 flex-col items-end gap-0.5 text-xs sm:flex-row sm:items-center sm:gap-3">
-                {win.gainPerDay === null ? (
+                {pricesDown ? null : win.gainPerDay === null ? (
                   <span className="text-text-dim">{t('piPlan.make.unpriced')}</span>
                 ) : win.gainKind === 'saves' ? (
                   <span className="tabular-nums text-warning">
@@ -428,7 +441,7 @@ export function QuickWinsPanel({ view, ticks }: { view: PlanView; ticks: Ticks }
         })}
       </ul>
       <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-        {t('piPlan.make.quickFoot')}
+        {t(pricesDown ? 'piPlan.make.quickFootNoPrices' : 'piPlan.make.quickFoot')}
       </p>
     </Panel>
   );
