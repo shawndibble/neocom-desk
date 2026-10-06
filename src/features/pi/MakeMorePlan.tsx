@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { EmptyState, Spinner } from '@/components/ui';
-import { IskTabStopContext } from '@/components/ui/tooltipHold';
+import { EmptyState, IskFigureGroup, Spinner } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import { AssumedCustomsNote } from './AssumedCustomsNote';
 import { assumedCustomsNames } from './colonyCustoms';
@@ -136,14 +135,14 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }
 
   return (
-    <IskTabStopContext.Provider value={false}>
-      <div className="space-y-4">
-        <div role="status" aria-live="polite" className="sr-only">
-          {headlineText(view, t)}
-        </div>
-        <AssumedCustomsNote
-          names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
-        />
+    <div className="space-y-4">
+      <div role="status" aria-live="polite" className="sr-only">
+        {headlineText(view, t)}
+      </div>
+      <AssumedCustomsNote
+        names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
+      />
+      <IskFigureGroup>
         <YourPlanetsPanel
           view={view}
           preference={preference}
@@ -151,11 +150,21 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
           onFindBest={onFindBest}
           priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
         />
-        {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
+      </IskFigureGroup>
+      {view.quickWins.length > 0 && (
+        <IskFigureGroup>
+          <QuickWinsPanel view={view} ticks={ticks} />
+        </IskFigureGroup>
+      )}
+      <IskFigureGroup>
         <RebuildPanel view={view} />
+      </IskFigureGroup>
+      <IskFigureGroup>
         <HaulingPanel hauling={view.hauling} hubName={state.hubName} />
+      </IskFigureGroup>
+      <IskFigureGroup>
         <ChecklistPanel view={view} ticks={ticks} />
-      </div>
-    </IskTabStopContext.Provider>
+      </IskFigureGroup>
+    </div>
   );
 }

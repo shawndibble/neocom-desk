@@ -49,6 +49,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => piData),
   loadPiPlanetRadius: vi.fn(async () => ({ [String(40000001)]: 5_000 })),
+  // The product drawer's planet finder: no systems needed for these tests.
+  loadPiSystemPlanets: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
@@ -853,6 +855,41 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
   });
 
+  it('restores the question from ?q= on load', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ignores a junk ?q= and opens on the default question', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=bogus');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan#customs');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    await user.click(screen.getByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('writes the picked question to ?q= without adding history entries', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    const before = window.history.length;
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.history.length).toBe(before);
+  });
+
   it('keeps the Goal Planner behind a ?goals= link, with no picker choice needed', async () => {
     window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
     render(<App />);
@@ -1019,6 +1056,34 @@ describe('PlanetaryIndustry', () => {
       render(<App />);
       expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
       await waitFor(() => expect(window.location.search).not.toContain('product'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it("keeps Plan's ?q= beside ?product=: a name on Plan opens the drawer, Back returns to the question", async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+      render(<App />);
+      const link = await waitFor(() => {
+        const found = document.querySelector<HTMLAnchorElement>('main a[href*="product="]');
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      expect(link.getAttribute('href')).toMatch(
+        /^\/planetary-industry\/map\?q=find-best&product=\d+$/
+      );
+      await user.click(link);
+      await drawer();
+      expect(window.location.search).toMatch(/^\?q=find-best&product=\d+$/);
+      window.history.back();
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/plan'));
+      expect(window.location.search).toBe('?q=find-best');
+    });
+
+    it('ignores a junk product id beside ?q=, keeping ?q=', async () => {
+      window.history.pushState({}, '', '/planetary-industry/map?q=find-best&product=abc');
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).toBe('?q=find-best'));
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
