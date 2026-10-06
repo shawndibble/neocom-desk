@@ -44,7 +44,6 @@ function renderList(
           total={812}
           sort={{ columnId: 'iskPerHour', direction: 'desc' }}
           onSortChange={onSortChange}
-          blueprintTypeIDFor={() => null}
           skillGateFor={() => undefined}
           nameForSkill={String}
           nameForCharacter={String}
@@ -103,10 +102,10 @@ describe('MobileMarketWideList', () => {
     expect(onSortChange).toHaveBeenCalledWith({ columnId: 'buildCost', direction: 'asc' });
   });
 
-  it('gives every card its item menu and a Start-a-plan button', () => {
+  it('gives every card one trailing control: Start a plan, no item menu', () => {
     renderList();
     const beta = within(card('Widget Beta'));
-    expect(beta.getByRole('button', { name: 'More actions for Widget Beta' })).toBeInTheDocument();
+    expect(beta.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     expect(beta.getByRole('button', { name: /Start a plan/ })).toBeInTheDocument();
   });
 });

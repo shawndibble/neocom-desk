@@ -2165,8 +2165,7 @@
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
-      "noBlueprintOptions": "No blueprint options",
-      "modifyBlueprint": "Modify blueprint"
+      "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
     "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
@@ -6399,8 +6398,6 @@
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "viewInIndustryAsMaterial": "View in Industry as material",
-      "addMaterialComponents": "Add material components",
-      "buyInsteadOfBuilding": "Buy instead",
       "piPlan": "PI Plan",
       "copyLocation": "Copy location",
       "copyPrice": "Copy price",
