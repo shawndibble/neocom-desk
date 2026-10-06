@@ -181,6 +181,13 @@ describe('one fit source: tag, Show me how and the meter agree', () => {
     expect(advice.recipesWithTagged.recipes.some((r) => r.tier === 2)).toBe(true);
   });
 
+  it('a pilot with no colonies at CCU 4 is offered every P2 without a tag', () => {
+    const advice = advise({ colonies: false, ccu: 4, haulDays: 1 });
+    const p2 = advice.recipesWithTagged.recipes.filter((r) => r.tier === 2);
+    expect(p2.length).toBeGreaterThan(10);
+    expect(p2.filter((r) => r.needsCcLevel !== undefined).map((r) => r.name)).toEqual([]);
+  });
+
   it('a new pilot: the tag and Show me how name the same level for Plasmoids', () => {
     const PLASMOIDS = 2389;
     const advice = advise({ colonies: false, ccu: 0, haulDays: 1 });
