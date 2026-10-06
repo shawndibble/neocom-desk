@@ -552,13 +552,6 @@ export function ColoniesTab({
               {t('piColonies.cantSee.body')}
             </span>
             <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
-            {planetsResult && (
-              // Hidden with the badge below md, so the label never shows without its time.
-              <span className="hidden items-center gap-1 md:inline-flex">
-                {t('piColonies.cantSee.updated')}
-                <DataAgeBadge date={new Date(planetsResult.fetchedAt)} />
-              </span>
-            )}
           </p>
           {planetsResult?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>

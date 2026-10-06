@@ -5603,8 +5603,7 @@
     },
     "cantSee": {
       "lead": "What we can't see:",
-      "body": "the game only updates a colony's storage and extractors when you open it in the PI window, so these numbers can be a few hours old.",
-      "updated": "last updated"
+      "body": "the game only updates a colony's storage and extractors when you open it in the PI window, so these numbers can be a few hours old."
     },
     "action": {
       "restart": "Restart",
