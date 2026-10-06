@@ -5,8 +5,9 @@ import { SlideOver } from '@/components/ui/SlideOver';
 /**
  * The PI tabs' drawer: a right-hand slide-over beside a pointer, a bottom sheet
  * (grabber, swipe down, scrim, Back, Escape) on a phone. Both close on Escape
- * and Back and move focus in on open; a slide-over has no trigger of its own to
- * hand focus back to, so the caller restores it (see `useReturnFocus`).
+ * and Back, move focus in on open, and hand it back to what held it then.
+ * `returnFocusFallback` is for a drawer a link on another tab opened: that
+ * link is gone, so focus goes there instead of to the page body.
  *
  * `closeOnBack={false}` for a drawer the URL already backs (the product
  * drawer's `?product=`): Back pops that entry, and the drawer closes because
@@ -18,6 +19,7 @@ export function PiDrawer(props: {
   title: string;
   phone: boolean;
   closeOnBack?: boolean;
+  returnFocusFallback?: () => HTMLElement | null;
   children: ReactNode;
 }) {
   if (props.phone) {
@@ -28,6 +30,7 @@ export function PiDrawer(props: {
         title={props.title}
         placement="sheet"
         closeOnBack={props.closeOnBack}
+        returnFocusFallback={props.returnFocusFallback}
       >
         {props.children}
       </Modal>
@@ -39,6 +42,7 @@ export function PiDrawer(props: {
       onClose={props.onClose}
       title={props.title}
       closeOnBack={props.closeOnBack}
+      returnFocusFallback={props.returnFocusFallback}
     >
       {props.children}
     </SlideOver>

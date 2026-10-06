@@ -47,6 +47,11 @@ interface ModalProps {
    * param), whose own history entry would otherwise be pushed twice.
    */
   closeOnBack?: boolean;
+  /**
+   * Where focus goes on close when nothing on the page held it as the modal
+   * opened (a sheet a URL opened), or that element is gone.
+   */
+  returnFocusFallback?: () => HTMLElement | null;
 }
 
 /**
@@ -88,6 +93,7 @@ export function Modal({
   placement = 'center',
   initialFocusRef,
   closeOnBack = true,
+  returnFocusFallback,
 }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -98,6 +104,11 @@ export function Modal({
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+  // Read at close, so a new callback each render never reopens the dialog.
+  const fallbackRef = useRef(returnFocusFallback);
+  useEffect(() => {
+    fallbackRef.current = returnFocusFallback;
+  });
   // `showModal()` focuses the first focusable element — the header's close
   // `IconButton` — and its Radix tooltip arms on focus: a stray "Close"
   // bubble floated over every freshly opened dialog, and the first Escape
@@ -129,7 +140,13 @@ export function Modal({
 
     return () => {
       if (dialog.open) dialog.close();
-      if (trigger instanceof HTMLElement) trigger.focus();
+      const kept =
+        trigger instanceof HTMLElement && trigger !== document.body && trigger.isConnected
+          ? trigger
+          : null;
+      const target = kept ?? fallbackRef.current?.() ?? null;
+      if (target?.isConnected) target.focus();
+      else if (trigger instanceof HTMLElement) trigger.focus();
     };
   }, [open, initialFocusRef]);
 

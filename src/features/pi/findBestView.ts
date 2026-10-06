@@ -23,6 +23,7 @@ import {
   type RecipeRow,
 } from '@/engine/pi/planRecipes';
 import type { PiData } from '@/sde/types';
+import type { RawRow } from './planAdviceModel';
 import { canMakeWith, planetsNeeded, planetTypesOf } from './productPlanets';
 
 export type TypeState = 'have' | 'whatif' | 'find';
@@ -149,8 +150,10 @@ export interface ProductTile {
   typeId: number;
   name: string;
   tier: 0 | 1 | 2 | 3 | 4;
-  /** ISK a day from one planet. Null where the model has no one-planet figure. */
+  /** ISK a day from one planet; for a raw, selling it as extracted. Null where the model has no one-planet figure. */
   perDay: number | null;
+  /** A raw the sell market quotes no price for, so it has no figure. */
+  noPrice: boolean;
   /** Planets it takes between them; 1 for a raw. */
   planets: number | null;
   /** The planet-type toggles cover it. */
@@ -167,7 +170,11 @@ export interface TierColumn {
 }
 
 export function buildAllProducts(
-  input: Pick<FindBestInput, 'rows' | 'colonyTypes' | 'off' | 'whatIf'>,
+  input: Pick<FindBestInput, 'rows' | 'colonyTypes' | 'off' | 'whatIf'> & {
+    /** Raw P0 sell figures per planet type (`PlanAdvice.rawRows`): shown, never ranked. */
+    rawRows?: readonly RawRow[];
+    rawUnpriced?: readonly number[];
+  },
   pi: PiData
 ): TierColumn[] {
   const allTypes = planetTypesOf(pi);
@@ -183,6 +190,13 @@ export function buildAllProducts(
   const ranked = new Map(
     rankRecipes({ rows, haveTypes: [...have], filter: 'any' }).recipes.map((r) => [r.typeId, r])
   );
+  // A raw's best figure on a planet type the toggles keep.
+  const rawBest = new Map<number, number>();
+  for (const raw of input.rawRows ?? []) {
+    if (!have.has(raw.planetType)) continue;
+    rawBest.set(raw.typeId, Math.max(rawBest.get(raw.typeId) ?? -Infinity, raw.iskPerDay));
+  }
+  const rawUnpriced = new Set(input.rawUnpriced ?? []);
 
   const entries: { typeId: number; name: string; tier: ProductTile['tier'] }[] = [
     ...pi.raw.map((raw) => ({ typeId: raw.typeID, name: raw.name, tier: 0 as const })),
@@ -199,9 +213,11 @@ export function buildAllProducts(
       .map((entry): ProductTile => {
         const recipe = ranked.get(entry.typeId);
         const reachable = canMakeWith(entry.typeId, pi, have);
+        const raw = entry.tier === 0;
         return {
           ...entry,
-          perDay: recipe?.iskPerDay ?? null,
+          perDay: raw ? (rawBest.get(entry.typeId) ?? null) : (recipe?.iskPerDay ?? null),
+          noPrice: raw && rawUnpriced.has(entry.typeId),
           planets: planetsNeeded(entry.typeId, pi),
           reachable,
           isNew: input.whatIf.size > 0 && reachable && !canMakeWith(entry.typeId, pi, base),

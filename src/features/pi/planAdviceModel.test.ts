@@ -512,6 +512,18 @@ describe('buildPlanAdvice: hauling, slots, ranking', () => {
     expect(advice.recipeRows.every((row) => row.tier === 1 || row.tier === 2)).toBe(true);
   });
 
+  it('prices raw P0 apart from the ranking, so All products can show it and nothing recommends it', () => {
+    const advice = buildPlanAdvice(
+      input({ snapshot: snapshot({ colonies: [], details: new Map() }) })
+    );
+    const rawIds = new Set(pi.raw.map((raw) => raw.typeID));
+    expect(advice.rawRows.length + advice.rawUnpriced.length).toBeGreaterThan(0);
+    expect(advice.rawRows.every((row) => rawIds.has(row.typeId) && row.iskPerDay > 0)).toBe(true);
+    expect(advice.rawUnpriced.every((id) => rawIds.has(id))).toBe(true);
+    expect(advice.recipes.recipes.some((r) => rawIds.has(r.typeId))).toBe(false);
+    expect(advice.recipeRows.some((r) => rawIds.has(r.typeId))).toBe(false);
+  });
+
   it('ranks P2 one-planet recipes for a pilot with no colonies at CCU 5 (Coolant on gas)', () => {
     const COOLANT = 9832;
     const advice = buildPlanAdvice(

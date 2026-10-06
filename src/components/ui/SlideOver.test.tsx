@@ -114,4 +114,32 @@ describe('SlideOver focus', () => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
+
+  it('hands focus to the fallback when what opened it is gone (the page under it changed)', async () => {
+    const user = userEvent.setup();
+    function Gone() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" id="fallback">
+            Fallback
+          </button>
+          <SlideOver
+            open={open}
+            onClose={() => setOpen(false)}
+            title="Panel"
+            returnFocusFallback={() => document.getElementById('fallback')}
+          >
+            <p>Body</p>
+          </SlideOver>
+        </>
+      );
+    }
+    // Opened by a URL, with nothing focused: no opener to return to.
+    render(<Gone />);
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fallback' })).toHaveFocus());
+  });
 });

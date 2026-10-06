@@ -270,6 +270,22 @@ export function PlanMap({
       });
     }
   }, [location, navigate]);
+  // A drawer a link on Plan or Colonies opened has no opener left on this
+  // tab: focus goes to that product on the map (a tile, or a phone row), else
+  // the page heading, never the page body.
+  const lastLinked = useRef<number | null>(null);
+  useEffect(() => {
+    if (linked !== null) lastLinked.current = linked;
+    else if (richnessColony !== null) lastLinked.current = null;
+  }, [linked, richnessColony]);
+  const productFocusFallback = useCallback((): HTMLElement | null => {
+    const id = lastLinked.current;
+    const item =
+      id === null
+        ? null
+        : (layoutRef.current?.querySelector<HTMLElement>(`[data-map-key="p:${id}"]`) ?? null);
+    return item ?? document.querySelector<HTMLElement>('h1[tabindex]');
+  }, []);
   const closeHelp = useCallback(() => {
     setHelpOpen(false);
     restore();
@@ -772,6 +788,7 @@ export function PlanMap({
         title={detailTitle}
         phone={phone}
         closeOnBack={!productShown && !richnessShown}
+        returnFocusFallback={productFocusFallback}
       >
         {detailBody}
       </PiDrawer>

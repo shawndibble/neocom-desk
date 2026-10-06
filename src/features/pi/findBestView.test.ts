@@ -190,6 +190,36 @@ describe('buildAllProducts', () => {
     expect(p4.planets).toBeGreaterThan(1);
   });
 
+  it('gives a raw its best sell figure on a planet type it has, and never a comparison', () => {
+    const MICRO = 2073; // barren, ice, oceanic, temperate
+    const BASE_METALS = 2267; // no ice
+    const tiers = buildAllProducts(
+      {
+        ...base,
+        colonyTypes: ['ice'] as PlanetType[],
+        rawRows: [
+          { typeId: MICRO, planetType: 'ice', iskPerDay: 40_000 },
+          { typeId: MICRO, planetType: 'barren', iskPerDay: 90_000 },
+          { typeId: BASE_METALS, planetType: 'lava', iskPerDay: 70_000 },
+        ],
+      },
+      pi
+    );
+    const raw = (id: number) => tiers[0].items.find((i) => i.typeId === id);
+    expect(raw(MICRO)).toMatchObject({ perDay: 40_000, noPrice: false, comparison: null });
+    expect(raw(BASE_METALS)).toMatchObject({ perDay: null, noPrice: false });
+  });
+
+  it('says a raw the market does not price has no price, rather than nothing', () => {
+    const MICRO = 2073;
+    const tiers = buildAllProducts({ ...base, rawRows: [], rawUnpriced: [MICRO] }, pi);
+    expect(tiers[0].items.find((i) => i.typeId === MICRO)).toMatchObject({
+      perDay: null,
+      noPrice: true,
+    });
+    expect(tiers[1].items.every((i) => !i.noPrice)).toBe(true);
+  });
+
   it('fades what the planet types cannot reach and marks what a what-if unlocks', () => {
     const colonies = { ...base, colonyTypes: ['gas'] as PlanetType[] };
     const without = buildAllProducts(colonies, pi);

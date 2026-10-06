@@ -136,6 +136,10 @@ export function PlanetaryIndustry() {
   const clearLinkedColony = useCallback(() => setPiParams({ colony: null }), [setPiParams]);
 
   const planetsResult = data?.planetsResult ?? null;
+  const countUnknown = colonyCountUnknown({
+    needsReauth: data?.planetsNeedsReauth,
+    fetchFailed: data?.planetsFetchFailed,
+  });
   // Another reader (a poll, a prefetch) can be refused after this snapshot loaded; the shell
   // notice stays quiet on this page for that refusal, so the page banner must show it.
   const failure = useAuthFailure((state) => state.failure);
@@ -202,10 +206,12 @@ export function PlanetaryIndustry() {
 
         <PiHeaderStrip
           colonySystemIds={(planetsResult?.data ?? []).map((planet) => planet.solar_system_id)}
-          colonyCountUnknown={colonyCountUnknown({
-            needsReauth: data?.planetsNeedsReauth,
-            fetchFailed: data?.planetsFetchFailed,
-          })}
+          colonyCountUnknown={countUnknown}
+          locationCharacterId={
+            planetsResult !== null && !countUnknown && planetsResult.data.length === 0
+              ? activeCharacterId
+              : null
+          }
           estimate={tab === 'plan' || tab === 'map'}
           eveTime={tab === 'colonies'}
         />

@@ -1,6 +1,6 @@
 /**
  * "See all products": every planetary product by tier, with what one planet
- * earns where the model has a one-planet figure, a multi-planet chain
+ * earns where the model has a one-planet figure (a raw: selling it as extracted), a multi-planet chain
  * estimate for a P3 or P4 once it is priced, and "needs N planets" where there
  * is neither. Faded tiles need a planet type the toggles leave out; the fade is
  * backed by text, never colour alone.
@@ -44,6 +44,7 @@ function Tile({ tile, chain }: { tile: ProductTile; chain: ChainEstimateView | n
               {t('piPlan.make.perDay')} ·{' '}
             </>
           )}
+          {tile.noPrice && <>{t('piPlan.find.rawNoPrice')} · </>}
           {chain ? (
             <>
               <b className="font-semibold text-text">

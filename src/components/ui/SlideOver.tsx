@@ -19,6 +19,11 @@ interface SlideOverProps {
   className?: string;
   /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
+  /**
+   * Where focus goes on close when what held it at open is gone: a panel a
+   * link on another tab opened (the PI product drawer) has no opener left.
+   */
+  returnFocusFallback?: () => HTMLElement | null;
 }
 
 const SIDE_CLASS = {
@@ -47,6 +52,7 @@ export function SlideOver({
   side = 'right',
   className,
   closeOnBack = true,
+  returnFocusFallback,
 }: SlideOverProps) {
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
@@ -80,9 +86,11 @@ export function SlideOver({
             (event.currentTarget as HTMLElement).focus({ preventScroll: true });
           }}
           onCloseAutoFocus={(event) => {
-            // The opener may be gone (a recycled list row): then leave Radix's default.
-            const target = opener.current;
+            // The opener may be gone (a recycled list row, a page that changed
+            // under it): then the fallback, else Radix's default.
+            const kept = opener.current;
             opener.current = null;
+            const target = kept?.isConnected ? kept : (returnFocusFallback?.() ?? null);
             if (!target?.isConnected) return;
             event.preventDefault();
             target.focus({ preventScroll: true });

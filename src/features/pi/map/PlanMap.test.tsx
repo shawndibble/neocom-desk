@@ -206,6 +206,44 @@ describe('PlanMap: what if I add a planet', () => {
   });
 });
 
+// A product link on Plan or Colonies opens the drawer by URL: the link is gone
+// with its tab, so focus goes to the product on the map, never the page body.
+describe('PlanMap: focus after a drawer another tab opened', () => {
+  const COOLANT = 9832;
+
+  it('lands on the product tile on Escape', async () => {
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`)
+    );
+  });
+
+  it('lands on the product tile on Close', async () => {
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    const dialog = await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`)
+    );
+  });
+
+  it("lands on the product's row in a phone's sheet", async () => {
+    stubPhone(true);
+    const user = userEvent.setup();
+    renderMap({}, `/planetary-industry/map?product=${COOLANT}`);
+    await screen.findByRole('dialog', { name: 'How to make Coolant' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toHaveAttribute('data-map-key', `p:${COOLANT}`);
+  });
+});
+
 describe('PlanMap: trace', () => {
   it('joins parallel inputs with commas, and an arrow only steps up a tier', () => {
     // Coolant (P2) from Electrolytes and Water, opened by URL.

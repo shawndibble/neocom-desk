@@ -103,7 +103,10 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
     };
     return {
       best: buildFindBestView(input),
-      tiers: buildAllProducts(input, snapshot.pi),
+      tiers: buildAllProducts(
+        { ...input, rawRows: advice.rawRows, rawUnpriced: advice.rawUnpriced },
+        snapshot.pi
+      ),
     };
   }, [advice, colonyTypes, allTypes, off, whatIf, filter, snapshot.pi]);
 
