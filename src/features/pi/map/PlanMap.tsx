@@ -243,10 +243,17 @@ export function PlanMap({
     const active = document.activeElement;
     returnFocus.current = active instanceof HTMLElement && active !== document.body ? active : null;
   }, []);
+  // Set until the frame that focuses it: the drawer's own close may run first or second.
+  const restoring = useRef<HTMLElement | null>(null);
   const restore = useCallback(() => {
     const el = returnFocus.current;
     returnFocus.current = null;
-    if (el && el.isConnected) requestAnimationFrame(() => el.focus());
+    if (!el || !el.isConnected) return;
+    restoring.current = el;
+    requestAnimationFrame(() => {
+      restoring.current = null;
+      el.focus();
+    });
   }, []);
   const closePlanet = useCallback(() => {
     setPlanetOpen(false);
@@ -278,6 +285,16 @@ export function PlanMap({
     else if (richnessColony !== null) lastLinked.current = null;
   }, [linked, richnessColony]);
   const productFocusFallback = useCallback((): HTMLElement | null => {
+    // An opener this page remembered wins, whether its frame has run yet or not.
+    if (restoring.current?.isConnected) return restoring.current;
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !active.closest('dialog, [role="dialog"]')
+    ) {
+      return active;
+    }
     const id = lastLinked.current;
     const item =
       id === null
