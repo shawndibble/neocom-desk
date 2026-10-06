@@ -7,7 +7,7 @@ import type { PlanAdviceState } from './usePlanAdvice';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
-import { fixtureAdvice, fixturePi } from './planViewFixture';
+import { RAW, fixtureAdvice, fixturePi } from './planViewFixture';
 import type { PlanAdvice } from './planAdviceModel';
 
 let mockState: PlanAdviceState = { status: 'loading' };
@@ -85,6 +85,19 @@ describe('MakeMorePlan', () => {
     expect(cards[1]).toHaveTextContent(/Keep Uttindar II \(Barren\) on/);
     expect(cards[1]).toHaveTextContent(/already the best earner/);
     expect(cards[1]).toHaveTextContent(/As-is/);
+  });
+
+  it('never says Keep on raw ore: a raw-only colony points at the refinement instead', () => {
+    const [changing, keeping] = fixtureAdvice.colonies;
+    mockState = ready({
+      ...fixtureAdvice,
+      colonies: [changing, { ...keeping, sells: [RAW] }],
+    });
+    renderPlan();
+    const card = screen.getAllByRole('listitem').filter((li) => li.id.startsWith('plan-'))[1];
+    expect(card).not.toHaveTextContent(/Keep Uttindar II/);
+    expect(card).toHaveTextContent(/sells raw/);
+    expect(card).toHaveTextContent(/Refine it with the quick win above/);
   });
 
   it('opens an alternative in place and says what it trades', async () => {

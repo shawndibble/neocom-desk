@@ -471,6 +471,22 @@ function RebuildSentence({
   }
   if (card.status === 'keep') {
     const reason = card.keepReason ?? 'already-best';
+    // Never "keep on" raw ore: the recommendation ends at P1 or above.
+    if (card.sellsRaw) {
+      return (
+        <Sentence
+          text={t(
+            card.hasQuickWin ? 'piPlan.make.rebuild.rawQuickWin' : 'piPlan.make.rebuild.raw',
+            {
+              planet: '{planet}',
+              type: '{type}',
+              items: '{items}',
+            }
+          )}
+          slots={{ planet, type, items: <ItemList items={card.sells} /> }}
+        />
+      );
+    }
     return (
       <Sentence
         text={t(

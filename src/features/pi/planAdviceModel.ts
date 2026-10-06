@@ -649,6 +649,60 @@ function analyseColony(args: {
     }
   }
 
+  // Raw P0 sold as it comes out of the ground: basic factories refine it to P1.
+  // Priced against what the raw earns today (never against zero), so a refinement
+  // that would pay less than the ore is not offered, and a colony is never
+  // steered towards selling raw.
+  let basicRoom = plan.headroom.basic ?? 0;
+  let refined = colony;
+  let refinedEarnings = nominal;
+  const rawsByRate = [...colony.extractedPerHour].sort(
+    (a, b) => b.unitsPerHour - a.unitsPerHour || a.typeId - b.typeId
+  );
+  for (const raw of rawsByRate) {
+    if (basicRoom <= 0 || refinedEarnings === null) break;
+    const entry = Object.entries(pi.schematics).find(
+      ([, s]) =>
+        s.facility === 'basic' && s.inputs.length === 1 && s.inputs[0].typeID === raw.typeId
+    );
+    if (!entry || entry[1].cycleTime <= 0) continue;
+    const productTypeId = Number(entry[0]);
+    const schematic = entry[1];
+    const running = new Set(refined.production.map((group) => group.schematicId));
+    const refinesItAlready = Object.values(pi.schematics).some(
+      (s) => running.has(s.schematicId) && s.inputs.some((i) => i.typeID === raw.typeId)
+    );
+    if (refinesItAlready) continue;
+    const drawPerFactory = (schematic.inputs[0].quantity * 3600) / schematic.cycleTime;
+    const factories = Math.min(basicRoom, Math.ceil(raw.unitsPerHour / drawPerFactory));
+    if (factories <= 0) continue;
+    const candidate: BuiltColonyAdvice = {
+      ...refined,
+      production: [...refined.production, { schematicId: schematic.schematicId, count: factories }],
+    };
+    const after = earningsOf(candidate);
+    if (after.unpriced.length > 0 || after.iskPerHour === null) continue;
+    const gain = gainPerDay(after.iskPerHour, refinedEarnings);
+    if (gain === null || !(gain > 0)) continue;
+    wins.push(
+      quickWin(
+        planetId,
+        {
+          kind: 'spare-room',
+          what: 'factories',
+          productTypeId,
+          factories,
+          routedFrom: [],
+          needsRemoval: false,
+        },
+        gain
+      )
+    );
+    basicRoom -= factories;
+    refined = candidate;
+    refinedEarnings = after.iskPerHour;
+  }
+
   wins.push(...args.factoryWins.map((win) => ({ ...win, planetId })));
 
   // Today is what the colony actually delivers: nominal less the stalled share.

@@ -5040,6 +5040,8 @@
         "upgradeFirst": "Upgrade its Command Center first.",
         "keep": "Keep {{planet}} {{type}} on {{items}}. {{reason}}",
         "keepAsIs": "Keep {{planet}} {{type}} as it is. {{reason}}",
+        "raw": "{{planet}} {{type}} sells raw {{items}}. No refined product beats it there yet.",
+        "rawQuickWin": "{{planet}} {{type}} sells raw {{items}}. Refine it with the quick win above rather than selling it raw.",
         "keepReason": {
           "already-best": "It's already the best earner there.",
           "gain-too-small": "A rebuild would add too little to be worth it.",
