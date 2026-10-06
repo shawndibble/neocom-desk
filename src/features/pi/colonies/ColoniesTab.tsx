@@ -12,7 +12,6 @@ import {
   buttonClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { GrantBanner } from '@/app/GrantNote';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -223,7 +222,6 @@ export function ColoniesTab({
   }, [linkedColonyId, data, characterId]);
 
   const planetsResult = data?.planetsResult ?? null;
-  const planetsNeedsReauth = data?.planetsNeedsReauth ?? false;
   const details = data?.details ?? NO_DETAILS;
   const cachedPlanetNames = data?.planetNames ?? NO_NAMES;
   const cachedPinTypeNames = data?.pinTypeNames ?? NO_NAMES;
@@ -426,21 +424,11 @@ export function ColoniesTab({
 
   return (
     <>
-      {planetsNeedsReauth && (
-        <GrantBanner
-          characterId={characterId}
-          endpoints={['getCharacterPlanets']}
-          title={t('pi.reauthTitle')}
-          hint={t('pi.reauthHint')}
-          actionLabel={t('pi.reauthAction')}
-        />
-      )}
-      {!planetsNeedsReauth && !!error && (
+      {!!error && (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       )}
 
       {!hasAnyColoniesSurface ? (
-        !planetsNeedsReauth &&
         !error &&
         (planetsResult && !planetsResult.fromCache ? (
           <NoColonies planHref={PLAN_HREF} />

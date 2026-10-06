@@ -24,7 +24,6 @@ export type MapAdviceState =
   | { status: 'loading' }
   | { status: 'failed' }
   | { status: 'prices-failed' }
-  | { status: 'reauth' }
   | {
       status: 'ready';
       graph: MapGraph;
@@ -100,7 +99,6 @@ export function useMapAdvice(
   }, [snapshot]);
 
   if (failedFor === characterId || built === 'error') return { status: 'failed' };
-  if (snapshot?.needsReauth) return { status: 'reauth' };
   if (inputs.status === 'prices-failed') return { status: 'prices-failed' };
   if (!built || !graph) return { status: 'loading' };
   return { status: 'ready', graph, ...built, colonies, finder };

@@ -87,7 +87,6 @@ describe('gated routes', () => {
       '/market/lp-store',
       '/market/lp-store/:corporationId',
       '/mining',
-      '/planetary-industry',
     ]);
   });
 
