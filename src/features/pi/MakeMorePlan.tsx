@@ -15,6 +15,8 @@ import {
 } from './MakeMoreSections';
 import { buildPlanView, coveredPlanets, pruneTicks, tickableIds, type PlanView } from './planView';
 import { usePlanPreference, usePlanTicks } from './planTicksPref';
+import { priceSourceLabel } from './priceSource';
+import { useSellHub } from './sellHub';
 import { usePlanAdvice } from './usePlanAdvice';
 
 interface Props {
@@ -68,6 +70,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
   }, [hydratePreference, hydrateTicks]);
 
   const state = usePlanAdvice(snapshot, characterId, preference);
+  const { buybackPct } = useSellHub();
   const view = useMemo(
     () =>
       state.status === 'ready'
@@ -139,7 +142,7 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         preference={preference}
         onPreference={(value) => void setPreference(value)}
         onFindBest={onFindBest}
-        hubName={state.hubName}
+        priceSource={priceSourceLabel(t, state.hubName, buybackPct)}
       />
       {view.quickWins.length > 0 && <QuickWinsPanel view={view} ticks={ticks} />}
       <RebuildPanel view={view} />

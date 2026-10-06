@@ -4820,6 +4820,10 @@
     }
   },
   "piPlan": {
+    "priceSource": {
+      "market": "{{hub}} prices",
+      "buyback": "your corp buyback rate"
+    },
     "tabsLabel": "Planetary Industry views",
     "coloniesTab": "Colonies",
     "planTab": "Plan",
@@ -4827,7 +4831,7 @@
     "strip": {
       "home": "Home",
       "colonies": "Colonies",
-      "route": "Route",
+      "route": "Home route",
       "jumps_one": "{{count}} jump to {{hub}}",
       "jumps_other": "{{count}} jumps to {{hub}}",
       "lowsecJumps_one": "{{count}} lowsec jump",
@@ -4868,7 +4872,7 @@
       "whatIfChip_nothing": "+ {{type}} · nothing new",
       "guideColonies": "Pre-marked from your colonies. Tap one to switch it off; tap a + planet to see what it unlocks.",
       "guideNone": "You have no colonies yet, so every type is in play. Tap one you can't reach to hide it.",
-      "guideRanked": "Ranked by ISK/day per planet at {{hub}}, after customs. New to PI?",
+      "guideRanked": "Ranked by ISK/day per planet at {{source}}, after customs. New to PI?",
       "euGuide": "EVE University guide",
       "modeLabel": "View",
       "modePicks": "Best picks",
@@ -4879,7 +4883,7 @@
       "makeP2": "Factory goods (P2)",
       "makeHint": "e.g. if your corp buyback asks for P2",
       "picksTitle": "Best picks for you",
-      "picksMeta": "ISK/day per planet · {{hub}}",
+      "picksMeta": "ISK/day per planet · {{source}}",
       "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}. Training Command Center Upgrades raises it.",
       "noneFitFilter": "No {{tier}} setup fits one planet at Command Center level {{level}}: it needs more power than that level has. Try Anything, or train Command Center Upgrades.",
       "noRecipes": "Nothing to rank with these planet types. Switch one back on, or add a what-if planet.",
@@ -5012,7 +5016,7 @@
       "statHaul": "Haul",
       "m3PerWeek": "{{value}} m³/wk",
       "m3PerTrip": "{{value}} m³/trip",
-      "basis": "ISK a day after customs tax, at {{hub}} prices. Estimates.",
+      "basis": "ISK a day after customs tax, at {{source}}. Estimates.",
       "stripQuickWin": "quick win",
       "stripRebuild": "Rebuild",
       "stripKeep": "Keep",
@@ -5086,7 +5090,7 @@
       "todayChip": "Today",
       "tripsChip": "Trips",
       "tripsPerWeek": "{{value}} / week",
-      "routeChip": "Route",
+      "routeChip": "Worst colony",
       "routeLocal": "Collected at home",
       "routeUnknown": "Not resolved",
       "lowsecChip": "Lowsec",
