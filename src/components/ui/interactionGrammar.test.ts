@@ -163,6 +163,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // in src/components/ui and is not scanned.)
     const audited = [
       'src/features/character/assetBrowserRows.tsx',
+      'src/features/fittings/FittingAddPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
       'src/features/fittings/FittingStartScreen.tsx',
       'src/features/fittings/FittingStatsSections.tsx',

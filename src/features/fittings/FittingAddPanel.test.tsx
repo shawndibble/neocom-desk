@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -34,12 +34,13 @@ const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boos
 
 const catalogue: FittingCatalogue = {
   types: {},
-  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium' },
+  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium', 5: 'drone' },
   marketTypes: [
     { typeId: 1, name: 'Damage Control I', marketGroupId: 10, volume: 1 },
     { typeId: 2, name: 'Damage Control II', marketGroupId: 10, volume: 1 },
     { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20, volume: 1 },
     { typeId: 4, name: 'Anchoring Array', marketGroupId: 30, volume: 1 },
+    { typeId: 5, name: 'Ice Harvesting Drone I', marketGroupId: 30, volume: 50 },
   ],
   groupsById: new Map([
     [10, { id: 10, name: 'Damage Controls', parentId: null, hasTypes: true }],
@@ -113,7 +114,9 @@ describe('FittingAddPanel', () => {
     expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
     // Damage Control I doesn't fit the hull.
     expect(screen.queryByText('Damage Control I')).toBeNull();
-    expect(dc2).toHaveTextContent('Missing skills');
+    expect(
+      within(dc2.closest('li')!).getByRole('button', { name: "Can't add: Missing skills" })
+    ).toBeInTheDocument();
 
     await user.click(dc2);
     expect(onAdd).toHaveBeenCalledWith(2, 'low');
@@ -200,7 +203,11 @@ describe('FittingAddPanel', () => {
     // Shown with the Hull filter off, but never addable — the hull refuses it outright.
     const anchoringArray = screen.getByRole('button', { name: /Anchoring Array/ });
     expect(anchoringArray).toBeDisabled();
-    expect(anchoringArray).toHaveTextContent("Doesn't fit this hull");
+    expect(
+      within(anchoringArray.closest('li')!).getByRole('button', {
+        name: "Can't add: Doesn't fit this hull",
+      })
+    ).toBeInTheDocument();
   });
 
   it('loads a charge into every fitted module that takes it, from the Charges tab', async () => {
@@ -537,15 +544,17 @@ describe('FittingAddPanel', () => {
     expect(onAddCargo).toHaveBeenCalledWith(4, 3);
   });
 
-  it('adds a Cargo tab result on click and gives it no row menu', async () => {
+  it('gives each Cargo tab result the List cargo row’s menu once it is in the hold', async () => {
     const user = userEvent.setup();
     const onAddCargo = vi.fn();
+    const actions = fakeItemActions({ names: { 4: 'Anchoring Array', 3: '1MN Afterburner II' } });
+    const holding: Fitting = { ...fitting, cargo: [{ typeId: 4, quantity: 2 }] };
     render(
       <MemoryRouter>
         <FakeItemActions>
-          <FittingItemActionsProvider value={fakeItemActions({ names: { 4: 'Anchoring Array' } })}>
+          <FittingItemActionsProvider value={actions}>
             <FittingAddPanel
-              fitting={fitting}
+              fitting={holding}
               catalogue={catalogue}
               target={{ kind: 'cargo' }}
               context={fakeFittingContext(catalogue, { engine, profile })}
@@ -557,10 +566,106 @@ describe('FittingAddPanel', () => {
       </MemoryRouter>
     );
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
-    const result = await screen.findByRole('button', { name: /Anchoring Array/ });
-    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
-    await user.click(result);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' }));
     expect(onAddCargo).toHaveBeenCalledWith(4, 1);
+
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity…' }));
+    expect(actions.changeCargoQuantity).toHaveBeenCalledWith(4);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Anchoring Array' }));
+    expect(actions.removeCargo).toHaveBeenCalledWith(4);
+  });
+
+  it('offers no quantity change or removal for a result not in the hold yet', async () => {
+    const user = userEvent.setup();
+    const actions = fakeItemActions({ names: { 3: '1MN Afterburner II' } });
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingAddPanel
+              fitting={fitting}
+              catalogue={catalogue}
+              target={{ kind: 'cargo' }}
+              context={fakeFittingContext(catalogue, { engine, profile })}
+              onAdd={vi.fn()}
+              onAddCargo={vi.fn()}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Afterburner');
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for 1MN Afterburner II' }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /Build Plan|No blueprint options/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View blueprint in Market' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
+  });
+
+  it('greys a drone the bay has no room for and says why', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
+    });
+    const droneRoomFor = vi.fn(() => 0);
+    const { onAdd } = renderPanel({ target: { kind: 'drone' }, droneRoomFor });
+
+    await user.type(screen.getByLabelText('Search items to add'), 'Ice Harvesting');
+    const row = await screen.findByRole('button', { name: /Ice Harvesting Drone I/ });
+    expect(row).toBeDisabled();
+    expect(
+      within(row.closest('li')!).getByRole('button', {
+        name: "Can't add: No room in drone bay",
+      })
+    ).toBeInTheDocument();
+    await user.click(row);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('flags a module whose rack is full, with a triangle saying so', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
+    });
+    renderPanel({ target: null, slotFreeFor: () => false });
+
+    await user.type(screen.getByLabelText('Search items to add'), 'Afterburner');
+    const row = await screen.findByRole('button', { name: /1MN Afterburner II/ });
+    expect(row).toBeDisabled();
+    expect(
+      within(row.closest('li')!).getByRole('button', {
+        name: "Can't add: No free mid slot left",
+      })
+    ).toBeInTheDocument();
   });
 
   it('shows the picked slot as its in-game icon, toggling the fits-this-slot filter', async () => {

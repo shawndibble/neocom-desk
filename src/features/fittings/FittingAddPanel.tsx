@@ -5,6 +5,7 @@ import {
   FilterChip,
   IconButton,
   NativeSelect,
+  RowMoreActions,
   SearchInput,
   Tabs,
   TextInput,
@@ -18,7 +19,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { chargeRowClassName } from './chargeRowStyle';
-import { Close } from '@/components/ui/icons';
+import { Close, Warn } from '@/components/ui/icons';
 import {
   browserTree,
   type BrowserNode,
@@ -34,6 +35,7 @@ import { MiningCrystalGuide } from './MiningCrystalGuide';
 import { ChargePickerControls, ChargePickerGroup } from './ChargePicker';
 import { DEFAULT_PICKER_SETTINGS, type ChargePickerSettings } from './chargePickerSettings';
 import { useChargeChoices } from './useChargeChoices';
+import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import { useFittingItemActions } from './fittingItemActions';
 import type { FittingContext } from './fittingContext';
@@ -61,6 +63,10 @@ interface FittingAddPanelProps {
   dragToRing?: boolean;
   /** The hull takes drones (`showsDrones`) — else there is no Drones tab. */
   showDrones?: boolean;
+  /** How many more of a drone the bay holds; absent before the ship data. */
+  droneRoomFor?: (typeId: number) => number;
+  /** Whether the rack has a slot a click would fill (a chosen slot counts); absent before the ship data. */
+  slotFreeFor?: (rack: FittingSlotKind) => boolean;
 }
 
 const RACK_LABEL_KEY: Record<CandidateRack, string> = {
@@ -161,13 +167,18 @@ interface ItemRowProps {
   rack: CandidateRack;
   check: CandidateCheck | null;
   placeable: boolean;
+  /** Why this can't go on the ship, in plain words — a yellow triangle beside the row tells them. */
+  problems: string[];
+  /** A click would add nothing (no bay room, no free slot): the row is greyed. */
+  blocked: boolean;
   draggable: boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
 }
 
-function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowProps) {
+function ItemRow({ entry, rack, placeable, problems, blocked, draggable, onAdd }: ItemRowProps) {
   const { t } = useTranslation();
-  return (
+  const actions = useFittingItemActions();
+  const row = (
     <li
       draggable={draggable}
       onDragStart={
@@ -180,7 +191,7 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
     >
       <button
         type="button"
-        disabled={!placeable}
+        disabled={!placeable || blocked}
         onClick={() => onAdd(entry.typeId, rack)}
         className={cx(
           'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
@@ -191,20 +202,29 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
       >
         <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-        {check?.fitsHull === false ? (
-          <span className="shrink-0 text-[0.6875rem] text-warning">
-            {t('fittings.add.doesntFitHull')}
-          </span>
-        ) : (
-          check !== null &&
-          !check.canFly && (
-            <span className="shrink-0 text-[0.6875rem] text-warning">
-              {t('fittings.add.missingSkills')}
-            </span>
-          )
-        )}
       </button>
+      {problems.length > 0 && (
+        <IconButton
+          variant="plain"
+          size="row"
+          tone="warning"
+          openOnTap
+          icon={<Warn />}
+          label={t('fittings.add.cantAdd', { reasons: problems.join('; ') })}
+        />
+      )}
+      {actions && <RowMoreActions />}
     </li>
+  );
+  return actions ? (
+    <FittingItemMenu
+      name={entry.name}
+      items={<AddItemMenuItems typeId={entry.typeId} rack={rack} />}
+    >
+      {row}
+    </FittingItemMenu>
+  ) : (
+    row
   );
 }
 
@@ -229,6 +249,8 @@ export function FittingAddPanel({
   onAddCargo,
   dragToRing = false,
   showDrones = true,
+  droneRoomFor,
+  slotFreeFor,
 }: FittingAddPanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -376,6 +398,20 @@ export function FittingAddPanel({
     // The Hull filter can be off, so a row the hull refuses outright can be
     // on screen — it stays visible (asked for, in that case) but never addable.
     const fitsHull = check?.fitsHull !== false;
+    const noRoom =
+      rack === 'drone'
+        ? droneRoomFor?.(entry.typeId) === 0
+        : slotFreeFor?.(rack as FittingSlotKind) === false;
+    const problems: string[] = [];
+    if (!fitsHull) problems.push(t('fittings.add.doesntFitHull'));
+    else if (check?.fitsResources === false) problems.push(t('fittings.add.noResources'));
+    if (check?.canFly === false) problems.push(t('fittings.add.missingSkills'));
+    if (noRoom)
+      problems.push(
+        rack === 'drone'
+          ? t('fittings.add.noBayRoom')
+          : t('fittings.add.noSlotRoom', { rack: t(`fittings.add.rack.${rack}`) })
+      );
     return (
       <ItemRow
         key={entry.typeId}
@@ -385,6 +421,8 @@ export function FittingAddPanel({
         // Not gated on a free slot: a full rack's item still drags into the cargo
         // (or onto a slot, replacing it); a click with no room adds nothing.
         placeable={fitsHull && context !== null}
+        problems={problems}
+        blocked={noRoom}
         draggable={fitsHull && dragToRing && context !== null}
         onAdd={onAdd}
       />
@@ -434,7 +472,7 @@ export function FittingAddPanel({
           dragToFit={dragToRing}
         />
       ) : tab === 'cargo' && onAddCargo ? (
-        <CargoTab catalogue={catalogue} onAddCargo={onAddCargo} />
+        <CargoTab catalogue={catalogue} cargo={fitting.cargo} onAddCargo={onAddCargo} />
       ) : (
         <>
           <SearchInput
@@ -578,10 +616,10 @@ function ChargesTab({
 
   const name = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 
-  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it. */
+  /** The Add panel's own row behaviour around any loadable charge: drag onto the modules that take it, right-click menu. */
   const wrapRow = (chargeTypeId: number, row: ReactNode) => {
     const draggable = dragToFit && actions !== null;
-    return (
+    const inner = (
       <div
         className="flex items-center"
         draggable={draggable}
@@ -599,7 +637,15 @@ function ChargesTab({
         onDragEnd={draggable ? endFittingDrag : undefined}
       >
         <div className="min-w-0 flex-1">{row}</div>
+        {actions && <RowMoreActions />}
       </div>
+    );
+    return actions ? (
+      <FittingItemMenu name={name(chargeTypeId)} items={<AddItemMenuItems typeId={chargeTypeId} />}>
+        {inner}
+      </FittingItemMenu>
+    ) : (
+      inner
     );
   };
 
@@ -732,12 +778,17 @@ function ChargesTab({
  */
 function CargoTab({
   catalogue,
+  cargo,
   onAddCargo,
 }: {
   catalogue: FittingCatalogue | null;
+  /** What the hold already carries: those results get the List cargo row's menu. */
+  cargo: Fitting['cargo'];
   onAddCargo: (typeId: number, quantity: number) => void;
 }) {
   const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const inHold = useMemo(() => new Set(cargo.map((item) => item.typeId)), [cargo]);
   const [query, setQuery] = useState('');
   const [quantity, setQuantity] = useState('1');
   const trimmed = query.trim().toLowerCase();
@@ -778,7 +829,7 @@ function CargoTab({
       ) : (
         <ul>
           {results.map((entry) => {
-            return (
+            const row = (
               <li key={entry.typeId} className="flex items-center">
                 <button
                   type="button"
@@ -797,7 +848,26 @@ function CargoTab({
                     {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
                   </span>
                 </button>
+                {actions && <RowMoreActions />}
               </li>
+            );
+            return actions ? (
+              <FittingItemMenu
+                key={entry.typeId}
+                name={entry.name}
+                items={
+                  <AddCargoMenuItems
+                    typeId={entry.typeId}
+                    count={valid ? count : 0}
+                    inHold={inHold.has(entry.typeId)}
+                    onAddCargo={onAddCargo}
+                  />
+                }
+              >
+                {row}
+              </FittingItemMenu>
+            ) : (
+              row
             );
           })}
         </ul>
