@@ -43,6 +43,7 @@ import {
 } from '@/engine/route/routeSafety';
 import { BridgeStepLine, type BridgeStep } from './BridgeStepLine';
 import { HoleStepLine, type HoleStep } from './HoleStepLine';
+import { shipKillHeatColor } from '@/engine/route/killHeat';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { routeSystemName } from './routeSystemName';
@@ -110,9 +111,27 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
     );
   }
   const figures = [
-    { key: 'ships', value: row.shipKills, unit: t('travel.lastHour.ships') },
-    { key: 'pods', value: row.podKills, unit: t('travel.lastHour.pods') },
-    { key: 'jumps', value: row.jumps, unit: t('travel.lastHour.jumps') },
+    {
+      key: 'ships',
+      value: row.shipKills,
+      unit: t('travel.lastHour.ships'),
+      color: shipKillHeatColor(row.shipKills ?? 0) ?? undefined,
+      className: undefined,
+    },
+    {
+      key: 'pods',
+      value: row.podKills,
+      unit: t('travel.lastHour.pods'),
+      color: undefined,
+      className: (row.podKills ?? 0) > 0 ? 'text-danger' : undefined,
+    },
+    {
+      key: 'jumps',
+      value: row.jumps,
+      unit: t('travel.lastHour.jumps'),
+      color: undefined,
+      className: undefined,
+    },
   ].filter((figure) => !isPhone || figure.key === 'jumps' || figure.value !== 0);
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
@@ -123,7 +142,12 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
               ·
             </span>
           )}
-          <span>{count(figure.value)}</span>
+          <span
+            className={figure.className}
+            style={figure.color ? { color: figure.color } : undefined}
+          >
+            {count(figure.value)}
+          </span>
           {/* Spoken at every width; written out on a phone card, which has no header. */}
           <span className="sm:sr-only">{figure.unit}</span>
         </span>

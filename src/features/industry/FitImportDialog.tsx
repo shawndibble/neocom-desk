@@ -82,6 +82,9 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
             setText(e.target.value);
             setPreview(null);
           }}
+          onSubmitChord={() => {
+            if (text.trim() !== '') parse();
+          }}
           rows={10}
           mono
           className="text-xs"

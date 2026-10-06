@@ -212,6 +212,9 @@ export function AnsiblexGatesDialog({
             autoFocus={mode === 'paste'}
             value={pasted}
             onChange={(event) => setPasted(event.target.value)}
+            onSubmitChord={() => {
+              if (pasted.trim() !== '' && lookup !== null) void addPasted();
+            }}
           />
           <Button
             size="sm"

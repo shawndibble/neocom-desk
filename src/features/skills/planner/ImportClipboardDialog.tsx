@@ -153,6 +153,9 @@ export function ImportClipboardDialog({
                 setText(e.target.value);
                 setPreview(null);
               }}
+              onSubmitChord={() => {
+                if (!parsing && text.trim() !== '') void handleParse();
+              }}
               rows={8}
               className="text-xs"
             />
