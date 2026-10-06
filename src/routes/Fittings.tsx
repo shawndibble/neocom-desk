@@ -364,6 +364,13 @@ function FittingsPage() {
       dragToRing={isDesktop && !coarsePointer}
       showDrones={dronesShown}
       droneRoomFor={(typeId) => droneRoom(fitting, typeId, droneBay)}
+      slotFreeFor={
+        slotCounts === null
+          ? undefined
+          : (rack) =>
+              (target?.kind === 'slot' && target.slot === rack) ||
+              firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null
+      }
     />
   );
 

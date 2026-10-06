@@ -439,6 +439,9 @@
       "missingSkills": "Missing skills",
       "doesntFitHull": "Doesn't fit this hull",
       "noBayRoom": "No room in drone bay",
+      "noSlotRoom": "No free {{rack}} left",
+      "noResources": "Too much CPU, powergrid or calibration for this hull",
+      "cantAdd": "Can't add: {{reasons}}",
       "openButton": "Add module",
       "tab": {
         "modules": "Modules",
