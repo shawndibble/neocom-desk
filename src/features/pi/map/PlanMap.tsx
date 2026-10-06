@@ -27,7 +27,7 @@ import {
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
@@ -70,6 +70,7 @@ type DetailKind = 'product' | 'planet';
 export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: PlanMapProps) {
   const { t } = useTranslation();
   const phone = useMediaQuery(PHONE_QUERY);
+  const context = useTouchContext();
 
   const owned = useMemo(() => new Set(colonies.map((c) => c.type)), [colonies]);
   const colonyNames = useMemo(() => {
@@ -300,7 +301,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
         />
       );
     }
-    return <p className="text-xs text-text-dim">{t('piMap.detail.empty')}</p>;
+    return <p className="text-xs text-text-dim">{t('piMap.detail.empty', { context })}</p>;
   })();
   const detailTitle =
     detailKind === 'planet' && whatIf
@@ -311,8 +312,12 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
 
   const hint = !hintDismissed && (
     <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5 text-xs text-text-dim">
-      <span>{t('piMap.hint')}</span>
-      <Button size={phone ? 'md' : 'sm'} onClick={dismissHint}>
+      <span>{t('piMap.hint', { context })}</span>
+      <Button
+        size={phone ? 'md' : 'sm'}
+        className="shrink-0 whitespace-nowrap"
+        onClick={dismissHint}
+      >
         {t('piMap.hintDismiss')}
       </Button>
     </div>
@@ -394,6 +399,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
               : missingTypes.length > 0
                 ? t('piMap.whatIfHint', {
                     types: missingTypes.map((type) => planetName(t, type)).join(', '),
+                    context,
                   })
                 : t('piMap.whatIfAll')}
           </span>

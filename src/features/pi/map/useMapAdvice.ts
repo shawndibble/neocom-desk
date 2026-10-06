@@ -11,24 +11,10 @@
  * builds and a re-render never repeats one.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { loadInterplanetaryConsolidation } from '../planetSlots';
-import { loadCommandCenterUpgrades } from '../colonyBudget';
-import { useCadence } from '../cadencePref';
-import { useGoalPlannerPrefs } from '../goalPlannerPrefs';
-import {
-  loadGoalPlannerPrices,
-  loadGoalPlannerSnapshot,
-  type GoalPlannerSnapshot,
-} from '../goalPlannerSnapshot';
-import {
-  buildPlanAdvice,
-  hubBooks,
-  type PlanAdvice,
-  type PlanAdviceInput,
-} from '../planAdviceModel';
-import type { PlanPrices } from '../planPrices';
+import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from '../goalPlannerSnapshot';
+import { buildPlanAdvice, type PlanAdvice } from '../planAdviceModel';
 import { homeSystemId } from '../sellRoute';
-import { useSellHub } from '../sellHub';
+import { usePiAdviceInputs } from '../usePiAdviceInputs';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { FinderOrigin } from './MapDetail';
 import type { MapColony } from './PlanMap';
@@ -37,7 +23,7 @@ import { buildMapGraph, type MapGraph } from './mapModel';
 export type MapAdviceState =
   | { status: 'loading' }
   | { status: 'failed' }
-  | { status: 'reauth' }
+  | { status: 'prices-failed' }
   | {
       status: 'ready';
       graph: MapGraph;
@@ -46,11 +32,6 @@ export type MapAdviceState =
       colonies: MapColony[];
       finder: FinderOrigin;
     };
-
-interface Skills {
-  commandCenterUpgrades: number | null;
-  interplanetaryConsolidation: number | null;
-}
 
 export function useMapAdvice(
   characterId: number,
@@ -61,8 +42,6 @@ export function useMapAdvice(
     snapshot: GoalPlannerSnapshot;
   } | null>(null);
   const [failedFor, setFailedFor] = useState<number | null>(null);
-  const [skills, setSkills] = useState<{ characterId: number; skills: Skills } | null>(null);
-
   useEffect(() => {
     let cancelled = false;
     loadGoalPlannerSnapshot(characterId).then(
@@ -70,17 +49,6 @@ export function useMapAdvice(
         if (cancelled) return;
         setFailedFor(null);
         setLoaded({ characterId, snapshot });
-        void Promise.all([
-          loadCommandCenterUpgrades(characterId, snapshot.nowMs).catch(() => null),
-          loadInterplanetaryConsolidation(characterId, snapshot.nowMs).catch(() => null),
-        ]).then(([commandCenterUpgrades, interplanetaryConsolidation]) => {
-          if (!cancelled) {
-            setSkills({
-              characterId,
-              skills: { commandCenterUpgrades, interplanetaryConsolidation },
-            });
-          }
-        });
       },
       () => {
         if (!cancelled) setFailedFor(characterId);
@@ -91,68 +59,20 @@ export function useMapAdvice(
     };
   }, [characterId]);
   const snapshot = loaded?.characterId === characterId ? loaded.snapshot : null;
-  const loadedSkills = skills?.characterId === characterId ? skills.skills : null;
 
-  const prefs = useGoalPlannerPrefs((state) => state.value);
-  const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
-  const cadence = useCadence((state) => state.value);
-  const hydrateCadence = useCadence((state) => state.hydrate);
-  useEffect(() => {
-    void hydratePrefs();
-    void hydrateCadence();
-  }, [hydratePrefs, hydrateCadence]);
-
-  const { hub, buybackPct } = useSellHub();
-  // Keyed by hub AND the snapshot's `pi` (one per character load), so a switch of
-  // either never shows the other's prices.
-  const [priced, setPriced] = useState<{
-    hubId: string;
-    pi: unknown;
-    prices: PlanPrices | null;
-  } | null>(null);
+  const inputs = usePiAdviceInputs(snapshot, characterId, 'isk');
+  const input = inputs.status === 'ready' ? inputs.input : null;
   const pi = snapshot?.pi ?? null;
-  useEffect(() => {
-    if (!pi) return;
-    let cancelled = false;
-    loadGoalPlannerPrices(hub, pi).then(
-      (prices) => {
-        if (!cancelled) setPriced({ hubId: hub.id, pi, prices });
-      },
-      () => {
-        if (!cancelled) setPriced({ hubId: hub.id, pi, prices: null });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [pi, hub]);
-  const pricedNow = priced && priced.hubId === hub.id && priced.pi === pi ? priced : null;
-  const prices = pricedNow?.prices ?? null;
-  const pricesFailed = pricedNow !== null && pricedNow.prices === null;
-
-  const input = useMemo((): PlanAdviceInput | null => {
-    if (!snapshot || !prices || !loadedSkills) return null;
-    return {
-      snapshot,
-      prefs: {
-        restartHours: cadence.restartDays * 24,
-        fallbackRatePerHour: prefs.fallbackRatePerHour,
-        customsOverrides: snapshot.customsOverrides,
-      },
-      books: hubBooks(prices, snapshot.accountingLevel),
-      market: buybackPct === null ? { kind: 'hub' } : { kind: 'buyback', pct: buybackPct },
-      cadence,
-      preference: 'isk',
-      recipeFilter: 'any',
-      skills: loadedSkills,
-      planetNames: snapshot.planetNames,
-    };
-  }, [snapshot, prices, loadedSkills, cadence, prefs.fallbackRatePerHour, buybackPct]);
 
   const graph = useMemo(() => (pi ? buildMapGraph(pi) : null), [pi]);
   const built = useMemo(() => {
     if (!input) return null;
-    const advice = buildPlanAdvice(input);
+    let advice: PlanAdvice;
+    try {
+      advice = buildPlanAdvice(input);
+    } catch {
+      return 'error' as const;
+    }
     const cache = new Map<PlanetType, PlanAdvice>();
     const adviceWithWhatIf = (type: PlanetType): PlanAdvice => {
       let hit = cache.get(type);
@@ -178,8 +98,8 @@ export function useMapAdvice(
     return { systemId: id, name: id === null ? null : (snapshot?.systemNames.get(id) ?? null) };
   }, [snapshot]);
 
-  if (failedFor === characterId || pricesFailed) return { status: 'failed' };
-  if (snapshot?.needsReauth) return { status: 'reauth' };
+  if (failedFor === characterId || built === 'error') return { status: 'failed' };
+  if (inputs.status === 'prices-failed') return { status: 'prices-failed' };
   if (!built || !graph) return { status: 'loading' };
   return { status: 'ready', graph, ...built, colonies, finder };
 }
