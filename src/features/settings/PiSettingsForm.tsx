@@ -54,7 +54,7 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
         each === tier ? !settings.buyTiers.includes(tier) : settings.buyTiers.includes(each)
       ),
     });
-  const cadenceDays = (days: PiCadenceDays) => t('piAdvisor.cadenceDays', { count: days });
+  const cadenceDays = (days: PiCadenceDays) => t('piShared.cadenceDays', { count: days });
 
   return (
     <Fields variant="form">

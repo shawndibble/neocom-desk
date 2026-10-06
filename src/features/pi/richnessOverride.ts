@@ -13,7 +13,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type PlanetRichnessRecord } from '@/db';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { PiData, PiRawResource } from '@/sde/types';
-import { localResourcesFor } from './advisorModel';
+import { localResourcesFor } from './systemPlanetModel';
 
 /** Saved picks by planet id, each richest-first or in tick order (only membership matters). */
 export type RichnessByPlanet = ReadonlyMap<number, readonly number[]>;

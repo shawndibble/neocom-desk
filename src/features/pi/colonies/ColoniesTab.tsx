@@ -43,7 +43,7 @@ import {
   type ColonyCheckRow,
 } from './coloniesModel';
 import { ColonyRowView } from './ColonyRowView';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
 
 const PLAN_HREF = '/planetary-industry/plan';

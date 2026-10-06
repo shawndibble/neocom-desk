@@ -7,7 +7,7 @@ import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/en
 import { piTier } from '@/engine/pi/chain';
 import { rankRecipes } from '@/engine/pi/planRecipes';
 import { builtColonyEarnings } from './colonyEarningsModel';
-import { builtAdvice } from './advisorModel';
+import { builtAdvice } from './systemPlanetModel';
 import type { PiCadence } from './cadencePref';
 import { plannerColonies, type PlannerSnapshot } from './goalPlannerModel';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';

@@ -106,7 +106,7 @@ function SystemRow({
       <span className="flex basis-full flex-wrap items-center gap-x-2 text-text-dim">
         {(Object.entries(system.planetCounts) as [PlanetType, number][]).map(([type, count]) => (
           <span key={type} className="inline-flex items-center gap-1">
-            <PlanetImage type={type} px={16} />
+            <PlanetImage type={type} size={16} />
             {typeName(type)} ×{count}
           </span>
         ))}

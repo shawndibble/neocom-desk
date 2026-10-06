@@ -31,7 +31,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'fittings',
   'market',
   'settings',
-  'piAdvisor',
+  'piShared',
   'miningTax',
   'plans',
   'contractSearch',
@@ -107,7 +107,7 @@ export function referencedLeaves(
   const found = new Set<string>();
   if (sections.length === 0) return found;
   // Longest name first and a boundary after it: with `pi` listed before
-  // `piAdvisor`, a plain alternation would stop at `pi` inside `'piAdvisor.x'`.
+  // `piShared`, a plain alternation would stop at `pi` inside `'piShared.x'`.
   const names = [...sections].sort((x, y) => y.length - x.length).map(escape);
   const path = new RegExp(
     `['"\`]((?:${names.join('|')})(?![\\w-])(?:\\.[\\w-]+)*)(\\.)?(\\$\\{)?`,

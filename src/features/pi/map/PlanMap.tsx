@@ -60,7 +60,7 @@ import { MapHelp } from './MapHelp';
 import { MapPhone } from './MapPhone';
 import { ColonyRichness } from './ColonyRichness';
 import { PiDrawer } from './PiDrawer';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 import { readMapHintDismissed, writeMapHintDismissed } from './mapHintPref';
 import {
   canMake,

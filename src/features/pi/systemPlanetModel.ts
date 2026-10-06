@@ -1,5 +1,5 @@
 /**
- * One card per planet in a system, built or not — the Advisor tab's model.
+ * One card per planet in a system, built or not — the per-planet model behind the Map and Colonies tabs.
  *
  * ## Measured beats estimated, and the two never blur
  *

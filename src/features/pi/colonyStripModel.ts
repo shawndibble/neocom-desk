@@ -37,8 +37,8 @@ import { FAULT_VERBS, type Worklist } from './worklistModel';
  */
 export function span(hours: number, t: TFunction): string {
   return hours < 48
-    ? t('piAdvisor.hoursShort', { count: Math.round(hours) })
-    : t('piAdvisor.daysShort', { count: Math.round(hours / 24) });
+    ? t('piShared.hoursShort', { count: Math.round(hours) })
+    : t('piShared.daysShort', { count: Math.round(hours / 24) });
 }
 
 export interface ColonyStripColony {

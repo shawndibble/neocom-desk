@@ -63,7 +63,7 @@ function SlotLine({
         <span className="inline-flex items-center gap-1">
           <EstimateBadge />
           <InfoTooltip
-            label={t('common.aboutLabel', { label: t('piAdvisor.estimateBadge') })}
+            label={t('common.aboutLabel', { label: t('piShared.estimateBadge') })}
             content={estimateText(estimate, ecusToday, t)}
           />
         </span>
@@ -163,7 +163,7 @@ export function ColonyFit({
                     .map((kind) =>
                       t('piPlan.pinCount', {
                         count: assignment.factories[kind],
-                        pin: t(`piAdvisor.pinKind.${kind}`),
+                        pin: t(`piShared.pinKind.${kind}`),
                       })
                     )
                     .join(', ')}

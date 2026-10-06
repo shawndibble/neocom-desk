@@ -16,7 +16,7 @@ import { db } from '@/db';
 import { clearPlanetRichness, setPlanetRichness } from '@/sync';
 import type { PlanetType } from '@/engine/pi/goalTypes';
 import { planetName } from './mapText';
-import { PlanetImage } from './PlanetImage';
+import { PlanetImage } from '../PlanetImage';
 
 export interface RichnessResource {
   typeId: number;

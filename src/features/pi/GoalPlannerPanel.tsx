@@ -321,7 +321,7 @@ function GoalPlanner({
   }
   if (!snapshot || !pi || !names) return <Loading />;
   const systemName = (id: number) =>
-    snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
+    snapshot.systemNames.get(id) ?? t('piShared.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
 
   let results: React.ReactNode;
