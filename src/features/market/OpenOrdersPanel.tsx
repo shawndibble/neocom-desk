@@ -1,4 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import {
   Fragment,
@@ -65,7 +66,6 @@ import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
-import { MarketItemLink } from './MarketItemLink';
 import { OpenOrdersList } from './OpenOrdersList';
 import { isOffHubStation } from './hubStation';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
@@ -427,7 +427,7 @@ export function OpenOrdersPanel() {
               sortValue: (row) => row.typeName,
               render: (row) => (
                 <span className="flex flex-wrap items-center gap-1">
-                  <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+                  <span className={entityLinkClassName()}>{row.typeName}</span>
                   {showCharacterStrip && <CharacterBadge characterName={row.characterName} />}
                 </span>
               ),
@@ -509,15 +509,6 @@ export function OpenOrdersPanel() {
                 row.expiry
                   ? new Date(row.expiry.expiresAt).toLocaleDateString()
                   : t('common.unknown'),
-            },
-            {
-              id: 'details',
-              header: t('market.orders.details'),
-              render: (row) => (
-                <Button size="sm" onClick={() => setDetailOrderId(row.orderId)}>
-                  {t('market.orders.details')}
-                </Button>
-              ),
             },
           ],
     [isPhone, t, showCharacterStrip]
@@ -634,9 +625,7 @@ export function OpenOrdersPanel() {
   const visibleColumns = columns.filter(
     (column) =>
       (column.id !== 'floor' || hasFloorData) &&
-      (column.id === 'item' ||
-        column.id === 'details' ||
-        isColumnVisible(column.id as OpenOrderColumnId))
+      (column.id === 'item' || isColumnVisible(column.id as OpenOrderColumnId))
   );
   // Only for `ColumnPickerMenu`'s labels — built from the same definitions
   // `columns` already carries, not a second copy of them. Empty on a phone
@@ -1100,6 +1089,7 @@ export function OpenOrdersPanel() {
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
                       rowMoreActions
+                      onRowClick={(row) => setDetailOrderId(row.orderId)}
                       label={`${groupTitle} · ${group.rows.length}`}
                       highlightRowKey={highlightId}
                     />

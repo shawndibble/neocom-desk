@@ -32,17 +32,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  EmptyState,
-  IconButton,
-  Modal,
-  Spinner,
-  StatChip,
-  StatChips,
-  TypeIcon,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
-import { writeToClipboard } from '@/lib/clipboard';
+import { EmptyState, Modal, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
@@ -55,6 +45,7 @@ import {
   loadPublicContractItems,
   type PublicContractItemsOutcome,
 } from '@/features/bpcContracts/publicContractItems';
+import { SystemLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { loadPlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
@@ -62,6 +53,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractMarketValueRow } from './ContractMarketValueRow';
+import { CopyContractIdButton } from './CopyContractIdButton';
 import {
   mergeContractItemLines,
   planSeedForLine,
@@ -85,6 +77,8 @@ export interface PublicContractDetailModalProps {
   contractId: number;
   locationId: number;
   regionName: string;
+  /** The offer's solar system, when known; shown as the Route Safety link (rows list it as plain text). */
+  system?: { id: number; name: string } | null;
   /** Epoch ms. */
   dateExpired: number;
   /** Header figures the caller already knows how to word — price, ME/TE, a haul's reward. */
@@ -109,6 +103,7 @@ export function PublicContractDetailModal({
   contractId,
   locationId,
   regionName,
+  system,
   dateExpired,
   statChips,
   onClose,
@@ -226,6 +221,14 @@ export function PublicContractDetailModal({
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-text-dim">{t('contractDetail.regionLabel')}</dt>
           <dd className="truncate">{regionName}</dd>
+          {system && (
+            <>
+              <dt className="text-text-dim">{t('contractDetail.systemLabel')}</dt>
+              <dd className="truncate">
+                <SystemLink systemId={system.id}>{system.name}</SystemLink>
+              </dd>
+            </>
+          )}
           <dt className="text-text-dim">{t('contractDetail.locationLabel')}</dt>
           <dd className="truncate">
             {location === undefined ? (
@@ -372,42 +375,6 @@ function ContractItemRow({ line, name }: { line: ContractItemLine; name: string 
           <span className="shrink-0 tabular-nums">×{line.quantity.toLocaleString()}</span>
         </li>
       }
-    />
-  );
-}
-
-/**
- * The contract ID exists to be pasted — into an in-game search, a chat channel,
- * a note — and selecting a number out of a definition list by hand is the one
- * thing a reader should not have to do with it. The results table already
- * offers the same action per row under the same wording.
- */
-function CopyContractIdButton({ contractId }: { contractId: number }) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  return (
-    <IconButton
-      variant="plain"
-      size="sm"
-      label={t('contracts.contextMenu.copyContractId')}
-      icon={
-        copied ? (
-          <Icon.Done size={Icon.ICON_SIZE.sm} />
-        ) : (
-          <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
-        )
-      }
-      onClick={() => {
-        void writeToClipboard(String(contractId));
-        setCopied(true);
-      }}
     />
   );
 }

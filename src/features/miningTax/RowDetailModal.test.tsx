@@ -95,6 +95,14 @@ describe('RowDetailModal item names', () => {
   });
 });
 
+describe('RowDetailModal system link', () => {
+  it('links the system to Route Safety, where the ledger row keeps it plain', () => {
+    renderModal('unassigned', null);
+    const link = screen.getByRole('link', { name: 'Jita' });
+    expect(link.getAttribute('href')).toContain(String(row.entry.solarSystemId));
+  });
+});
+
 describe('RowDetailModal split', () => {
   it('offers Split on a needs-review row', async () => {
     const onSplit = vi.fn();

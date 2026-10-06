@@ -19,7 +19,7 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { CharacterLink } from '@/features/entities';
+import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -219,6 +219,8 @@ export function RowDetailModal({
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
           <span>
             <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>
+            {' · '}
+            <SystemLink systemId={row.entry.solarSystemId}>{systemName}</SystemLink>
             {assigned && assignment && (
               <>
                 {' · '}

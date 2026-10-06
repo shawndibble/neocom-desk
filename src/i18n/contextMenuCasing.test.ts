@@ -33,7 +33,9 @@ describe('context-menu label casing', () => {
   collectContextMenuStrings(en, false, 'en', entries);
 
   it('finds the context-menu strings', () => {
-    expect(entries.length).toBeGreaterThan(20);
+    // A sanity floor: the collector must still find the surviving menus (many were deleted
+    // by the §6c restraint rules, so this is a floor, not a count).
+    expect(entries.length).toBeGreaterThan(10);
   });
 
   it.each(entries)('%s ("%s") is sentence case', (_path, label) => {

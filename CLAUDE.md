@@ -62,6 +62,18 @@ dev`) — Shawn frequently has another agent working there at the same
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
   ticket loop calls it automatically. `/code-review` sub-agents are
   read-only diff review and must never run tests, lint, typecheck, or build.
+- **Parallel agents stay light.** Every commit already runs a full
+  `typecheck` through the pre-commit hook, so a dozen agents at once push the
+  machine's load past 70 and make tests time out (they flake under load, they
+  don't fail for real). Run **at most three agents at once**. Each agent runs
+  only the test files it touched (`npx vitest run <file>`), never a whole
+  directory like `src/routes` or `src/features`. Run an e2e spec locally only
+  when you are changing that spec or the geometry it asserts, one file at a
+  time (`E2E_SKIP_BUILT=1 npx playwright test e2e/<file> --project=chromium`).
+  CI's fonts differ from a Mac's, so assert invariants (no overlap, no
+  overflow, one line) rather than pixel-exact thresholds. Screenshot and
+  review passes are one-offs, not part of a PR's checks. Everything else is
+  CI's job.
 - **A flaky CI test blocking your PR gets fixed, not reran or ignored — even
   when it's unrelated to your change.** Rerunning the job (or, worse, merging
   past a known-flaky check) hides the flake instead of closing it, and it

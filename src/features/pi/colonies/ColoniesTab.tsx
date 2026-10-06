@@ -27,6 +27,8 @@ import { colonyStatus } from '@/engine/pi/colonyStatus';
 import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
+import { EsiDidntAnswer } from '../EsiDidntAnswer';
+import { piTypeNames } from './coloniesNames';
 import { useColoniesAdvice } from './useColoniesAdvice';
 import { buildAltAdvice } from './altAdvice';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
@@ -55,6 +57,8 @@ interface ColoniesTabProps {
   /** `?colony=`: a colony to open and focus. */
   linkedColonyId: number | null;
   onClearLinkedColony: () => void;
+  /** Re-run the route's load: the Retry on the ESI-did-not-answer notice. */
+  onRetry: () => void;
 }
 
 function characterNames(characters: readonly RosterCharacter[]): string {
@@ -193,6 +197,7 @@ export function ColoniesTab({
   error,
   linkedColonyId,
   onClearLinkedColony,
+  onRetry,
 }: ColoniesTabProps) {
   const { t } = useTranslation();
   const expiringWindowMs = useExpiringWindowMs();
@@ -260,13 +265,16 @@ export function ColoniesTab({
     () => mergeNames(publicPlanetNames, cachedPlanetNames),
     [publicPlanetNames, cachedPlanetNames]
   );
+  // pi.json's own names win: Plan reads them, and a P0 or a schematic's output
+  // must never fall back to "Type #id" or "Unknown product" here.
+  const piNames = useMemo(() => piTypeNames(pi), [pi]);
   const pinTypeNames = useMemo(
-    () => mergeNames(publicTypeNames, cachedPinTypeNames),
-    [publicTypeNames, cachedPinTypeNames]
+    () => mergeNames(mergeNames(publicTypeNames, cachedPinTypeNames), piNames),
+    [piNames, publicTypeNames, cachedPinTypeNames]
   );
   const productNames = useMemo(
-    () => mergeNames(publicTypeNames, cachedProductNames),
-    [publicTypeNames, cachedProductNames]
+    () => mergeNames(mergeNames(publicTypeNames, cachedProductNames), piNames),
+    [piNames, publicTypeNames, cachedProductNames]
   );
 
   // Resolve any planet/type name the cache-only reads left unresolved through
@@ -457,8 +465,11 @@ export function ColoniesTab({
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       )}
 
+      {data?.planetsFetchFailed && <EsiDidntAnswer onRetry={onRetry} />}
+
       {!hasAnyColoniesSurface ? (
         !error &&
+        !data?.planetsFetchFailed &&
         (planetsResult && !planetsResult.fromCache ? (
           <NoColonies planHref={PLAN_HREF} />
         ) : (

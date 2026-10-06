@@ -23,8 +23,7 @@ import {
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { Goal } from '@/engine/pi/goalTypes';
-import type { TradeHub } from '@/market/hubs';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import type { PiCadence } from './cadencePref';
 import { customsRatePercent, customsSourceText } from './customsRate';
@@ -139,13 +138,11 @@ export function GoalsSection({
   goals,
   products,
   onGoalsChange,
-  hubId,
   size,
 }: {
   goals: readonly Goal[];
   products: readonly ProductOption[];
   onGoalsChange: (goals: Goal[]) => void;
-  hubId: TradeHub['id'];
   size: ControlSize;
 }) {
   const { t } = useTranslation();
@@ -176,9 +173,7 @@ export function GoalsSection({
                 <TierChip tier={product.tier} />
                 <span className="min-w-0 flex-1 truncate text-sm text-text">
                   <ItemContextMenu typeId={goal.typeId} itemName={product.name}>
-                    <MarketItemLink typeId={goal.typeId} hubId={hubId}>
-                      {product.name}
-                    </MarketItemLink>
+                    <PiProductLink typeId={goal.typeId}>{product.name}</PiProductLink>
                   </ItemContextMenu>
                 </span>
                 <UnitsBox
@@ -230,6 +225,7 @@ function ColonyRow({
   name,
   systemName,
   size,
+  focusCustoms,
   onToggle,
   onCustomsChange,
 }: {
@@ -237,6 +233,7 @@ function ColonyRow({
   name: string;
   systemName: string;
   size: ControlSize;
+  focusCustoms: boolean;
   onToggle: (enabled: boolean) => void;
   onCustomsChange: (percent: number | null) => void;
 }) {
@@ -282,6 +279,7 @@ function ColonyRow({
             </label>
             <PercentInput
               id={inputId}
+              autoFocus={focusCustoms}
               commitOn="blur"
               size={size}
               value={row.taxAssumed ? null : customsRatePercent(row.taxRate)}
@@ -333,6 +331,7 @@ export function ColoniesSection({
   planetName,
   systemName,
   size,
+  focusCustoms = false,
   expanded,
   onToggleExpanded,
   onToggle,
@@ -342,6 +341,8 @@ export function ColoniesSection({
   planetName: (planetId: number) => string;
   systemName: (systemId: number) => string;
   size: ControlSize;
+  /** Focus the first colony's customs rate on mount (the `#customs` deep link). */
+  focusCustoms?: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggle: (planetId: number, enabled: boolean) => void;
@@ -349,6 +350,7 @@ export function ColoniesSection({
 }) {
   const { t } = useTranslation();
   const enabled = rows.filter((row) => row.enabled).length;
+  const firstRateRow = focusCustoms ? rows.find((row) => row.excluded === null) : undefined;
   return (
     <CollapsiblePanel
       title={t('piPlan.coloniesTitle')}
@@ -373,6 +375,7 @@ export function ColoniesSection({
           {rows.map((row) => (
             <ColonyRow
               key={row.planetId}
+              focusCustoms={focusCustoms && row.planetId === firstRateRow?.planetId}
               row={row}
               name={planetName(row.planetId)}
               systemName={systemName(row.systemId)}
