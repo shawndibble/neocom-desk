@@ -206,7 +206,10 @@ test.describe('PI Colonies, the daily check', () => {
             characterId: id,
             key: `planet:${planetId}`,
             value: {
-              links: [],
+              links: [
+                { source_pin_id: 3, destination_pin_id: 1, link_level: 0 },
+                { source_pin_id: 3, destination_pin_id: 4, link_level: 0 },
+              ],
               routes: [],
               pins: [
                 {
@@ -214,15 +217,21 @@ test.describe('PI Colonies, the daily check', () => {
                   type_id: 2848,
                   latitude: 0,
                   longitude: 0,
-                  install_time: new Date(fetchedAt - 72 * 3_600_000).toISOString(),
-                  expiry_time: new Date(fetchedAt - 4 * 3_600_000).toISOString(),
+                  install_time: new Date(fetchedAt - 30 * 3_600_000).toISOString(),
+                  expiry_time: new Date(fetchedAt + 42 * 3_600_000).toISOString(),
                   extractor_details: {
-                    heads: [{ head_id: 1, latitude: 0, longitude: 0 }],
+                    heads: Array.from({ length: 6 }, (_, i) => ({
+                      head_id: i,
+                      latitude: 0,
+                      longitude: 0,
+                    })),
                     product_type_id: 2267,
                     qty_per_cycle: 6000,
                     cycle_time: 1800,
                   },
                 },
+                { pin_id: 3, type_id: 2256, latitude: 0.9, longitude: 0.5 },
+                { pin_id: 4, type_id: 2469, latitude: 1.2, longitude: 0.5 },
               ],
             },
             fetchedAt,
@@ -249,9 +258,15 @@ test.describe('PI Colonies, the daily check', () => {
       has: page.getByRole('button', { name: 'Switch to Vela Arrano' }),
     });
     await expect(group.locator('time')).toBeVisible();
-    // Its colony stopped four hours before the cache was read, and the read is a day old.
+    // The read is a day old.
     await expect(page.getByText(/Data 2\d h old/)).toBeVisible();
+    // Its own figure, labelled as outside the plan.
+    await expect(group.getByText(/Makes ~/)).toBeVisible();
+    await expect(group.getByText('not in your plan')).toBeVisible();
     await shot(page, 'colonies-alts-desk');
+    await page.setViewportSize(PHONE);
+    await assertNoOverflow(page);
+    await shot(page, 'colonies-alts-phone');
   });
 
   test('says what the tab is for when there are no colonies, and points at Plan', async ({

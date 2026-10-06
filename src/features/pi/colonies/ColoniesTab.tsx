@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
   CachedEmptyState,
@@ -8,6 +8,7 @@ import {
   EmptyState,
   FilterChip,
   InfoTooltip,
+  IskAmount,
   Panel,
   buttonClassName,
 } from '@/components/ui';
@@ -27,6 +28,7 @@ import { useShowAltColonies } from '../showAltColoniesPref';
 import type { RosterCharacter } from '../roster';
 import { PricesUnavailable } from '../PricesUnavailable';
 import { useColoniesAdvice } from './useColoniesAdvice';
+import { buildAltAdvice } from './altAdvice';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
 import { EMPTY_ROSTER, NO_DETAILS, NO_NAMES, mergeNames, type Snapshot } from './coloniesSnapshot';
@@ -68,23 +70,41 @@ function characterNames(characters: readonly RosterCharacter[]): string {
 function CharacterGroupHeader({
   name,
   summary,
+  makesPerDay,
   fetchedAt,
   onSwitch,
 }: {
   name: string;
   summary?: string;
+  /** An alt's own ISK a day: shown, but never part of the plan. */
+  makesPerDay?: number | null;
   fetchedAt?: Date;
   onSwitch?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-character-group-header
-      className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
     >
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span className="truncate">{name}</span>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="max-w-full truncate">{name}</span>
         {summary && (
           <span className="shrink-0 font-normal tracking-normal normal-case">{summary}</span>
+        )}
+        {makesPerDay != null && (
+          <span className="font-normal tracking-normal normal-case">
+            <Trans
+              i18nKey="pi.altColonies.makes"
+              components={{ isk: <IskAmount value={makesPerDay} decimals={0} /> }}
+            />
+            <span className="ml-1">{t('pi.altColonies.notInPlan')}</span>
+            <InfoTooltip
+              className="ml-1 align-middle"
+              label={t('pi.altColonies.notInPlanLabel')}
+              content={t('pi.altColonies.notInPlanTooltip')}
+            />
+          </span>
         )}
       </div>
       {(fetchedAt || onSwitch) && (
@@ -340,8 +360,16 @@ export function ColoniesTab({
   );
 
   // Alt colonies grouped by character, each sorted worst-first like the active
-  // Character's own. They have no advice (no prices, skills or customs behind a
-  // cache-only read), so their rows carry status and meters but no ISK figure.
+  // Character's own. Their figures come from `buildAltAdvice` (unknown skills,
+  // priced conservatively) and are display-only: Plan and the Today figures
+  // above read the active Character's advice alone.
+  const altAdvice = useMemo(
+    () =>
+      planAdvice.input && showAltColonies
+        ? buildAltAdvice(planAdvice.input, roster.colonies)
+        : null,
+    [planAdvice.input, roster.colonies, showAltColonies]
+  );
   const altGroups = useMemo(() => {
     const byCharacter = new Map<
       number,
@@ -365,7 +393,7 @@ export function ColoniesTab({
         nowMs,
         windowMs: expiringWindowMs,
         haulHours,
-        advice: null,
+        advice: altAdvice?.get(colony.characterId)?.byPlanetId.get(colony.planet.planet_id) ?? null,
         dataAgeHours: Math.max(0, (nowMs - colony.oldestFetchedAt.getTime()) / HOUR_MS),
       });
       const group = byCharacter.get(colony.characterId);
@@ -385,6 +413,7 @@ export function ColoniesTab({
         characterId: altId,
         characterName: group.characterName,
         fetchedAt: group.fetchedAt,
+        makesPerDay: altAdvice?.get(altId)?.makesPerDay ?? null,
         colonies: sorted.map((row) => ({ ...byKey.get(row.key)!, row })),
         summary: altGroupSummary(
           group.colonies.map((entry) =>
@@ -393,7 +422,7 @@ export function ColoniesTab({
         ),
       };
     });
-  }, [roster, pi, planAdvice.snapshot, nowMs, expiringWindowMs, haulHours]);
+  }, [roster, pi, planAdvice.snapshot, altAdvice, nowMs, expiringWindowMs, haulHours]);
 
   const otherCharacterCount =
     altGroups.length + roster.skipped.length + roster.notLoaded.length + roster.noColonies.length;
@@ -559,6 +588,7 @@ export function ColoniesTab({
                     <CharacterGroupHeader
                       name={group.characterName}
                       summary={summaryParts.length > 0 ? summaryParts.join(' · ') : undefined}
+                      makesPerDay={group.makesPerDay}
                       fetchedAt={group.fetchedAt}
                       onSwitch={() => void setActiveCharacter(group.characterId)}
                     />
