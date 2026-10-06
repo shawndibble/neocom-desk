@@ -90,9 +90,9 @@ function CharacterGroupHeader({
   return (
     <div
       data-character-group-header
-      className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      className="flex items-center justify-between gap-x-2 gap-y-1 border-b max-md:flex-wrap border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
     >
-      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <div className="flex min-w-0 items-baseline gap-x-2 gap-y-0.5 max-md:flex-wrap">
         <span className="max-w-full truncate">{name}</span>
         {summary && (
           <span className="shrink-0 font-normal tracking-normal normal-case">{summary}</span>
