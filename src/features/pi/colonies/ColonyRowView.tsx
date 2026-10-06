@@ -444,7 +444,7 @@ export function ColonyRowView(props: ColonyRowViewProps) {
               return;
             props.onToggle();
           }}
-          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start xl:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_16rem_auto]"
+          className="relative grid cursor-pointer gap-x-4 gap-y-2 px-3 py-3 hover:bg-panel-2 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_11rem_auto] md:items-start xl:grid-cols-[minmax(0,17rem)_minmax(0,1fr)_minmax(0,1fr)_8.5rem_15rem_auto]"
         >
           {/* Inside the trigger's div: the trigger needs a DOM child, and the menu's portal stays out of the tap context. */}
           <RowTappableContext.Provider value>
@@ -471,25 +471,28 @@ export function ColonyRowView(props: ColonyRowViewProps) {
                     <StatusWord status={row.status} />
                   </span>
                 </h3>
-                <p className="flex min-w-0 items-center gap-x-1.5 text-xs text-text-dim">
-                  {extractorProductId !== null && (
-                    <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
+                {/* Inline text, not flex: a long name wraps by word and the type stays on its last line. */}
+                <p className="min-w-0 text-xs text-text-dim">
+                  {(extractorProductId !== null || outputId !== null) && (
+                    <span className="mr-1.5 inline-flex items-center gap-x-1.5 align-middle">
+                      {extractorProductId !== null && (
+                        <TypeIcon typeId={extractorProductId} size={32} width={16} height={16} />
+                      )}
+                      {outputId !== null && (
+                        <>
+                          <span aria-hidden="true">→</span>
+                          <TypeIcon typeId={outputId} size={32} width={16} height={16} />
+                        </>
+                      )}
+                    </span>
                   )}
-                  {outputId !== null && (
-                    <>
-                      <span aria-hidden="true">→</span>
-                      <TypeIcon typeId={outputId} size={32} width={16} height={16} />
-                    </>
+                  {shownProductId !== null && productName !== null ? (
+                    <PiProductLink typeId={shownProductId}>{productName}</PiProductLink>
+                  ) : (
+                    t('piColonies.nothingMade')
                   )}
-                  <span className="min-w-0 truncate">
-                    {shownProductId !== null && productName !== null ? (
-                      <PiProductLink typeId={shownProductId}>{productName}</PiProductLink>
-                    ) : (
-                      t('piColonies.nothingMade')
-                    )}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap">
-                    {'· '}
+                  <span className="whitespace-nowrap">
+                    {'\u00a0· '}
                     {t(`pi.planetType.${row.planetType}`)}
                   </span>
                 </p>

@@ -19,7 +19,7 @@ import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/contr
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { useMediaQuery } from '@/lib/useMediaQuery';
-import { useTicker } from '@/lib/ticker';
+import { useNow } from '@/lib/useNow';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
 import { EstimateBadge } from './DirectiveRow';
@@ -46,10 +46,10 @@ interface Props {
   eveTime?: boolean;
 }
 
-/** The current EVE (UTC) time, ticking each half minute. */
+/** The current EVE (UTC) time. */
 function EveTimeChip() {
   const { t } = useTranslation();
-  const now = useTicker(30_000);
+  const now = useNow();
   return <StatChip label={t('piPlan.strip.eveTime')} value={eveClock(now)} />;
 }
 
@@ -61,7 +61,8 @@ interface Home {
 
 /**
  * The strip under the PI tabs, shared by all three: where the pilot's colonies
- * are, how many, the way to the sell market, and which market that is. Only
+ * are, how many, the way to the sell market, which market that is, and (on
+ * Colonies) EVE time. Only
  * what there is data for today: a field with no source is left out.
  */
 export function PiHeaderStrip({

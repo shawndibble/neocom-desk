@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { PLAN_CUSTOMS_HREF } from './piPlanLink';
+import { PLAN_CUSTOMS_HREF, PLAN_PATH } from './piPlanLink';
 import { customsRatePercent } from './customsRate';
 import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 
@@ -12,15 +12,14 @@ import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
  */
 export function AssumedCustomsNote({
   names,
-  onPlan = false,
   className,
 }: {
   names: readonly string[];
-  /** Already on Plan: name the question the link opens, not the tab. */
-  onPlan?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
+  // Already on Plan: name the question the link opens, not the tab.
+  const onPlan = useLocation().pathname.startsWith(PLAN_PATH);
   if (names.length === 0) return null;
   return (
     <p

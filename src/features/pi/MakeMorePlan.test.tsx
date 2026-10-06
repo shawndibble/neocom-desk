@@ -364,7 +364,7 @@ describe('MakeMorePlan', () => {
       ...fixtureAdvice,
       colonies: fixtureAdvice.colonies.map((c, i) => (i === 0 ? { ...c, taxAssumed: true } : c)),
     });
-    renderPlan();
+    renderPlan('/planetary-industry/plan');
     expect(screen.getByText(/assume 10% customs on/)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Set the rate in “Make a specific product”' })

@@ -2,7 +2,8 @@
  * Old paths of views that moved to a page a pilot would guess (scope decision
  * `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Each old
  * prefix maps to its new one; whatever followed the prefix — a corporation id —
- * and the query and hash ride along, so no bookmark or shared link breaks.
+ * and the query (less any retired params a move lists) and hash ride along, so
+ * no bookmark or shared link breaks.
  */
 const MOVES: readonly (readonly [from: string, to: string, dropParams?: readonly string[]])[] = [
   ['/wallet/loyalty', '/market/lp-store'],

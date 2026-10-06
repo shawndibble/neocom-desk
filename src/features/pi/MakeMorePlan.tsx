@@ -162,7 +162,6 @@ export function MakeMorePlan({ snapshot, characterId, onFindBest }: Props) {
         {headlineText(view, t)}
       </div>
       <AssumedCustomsNote
-        onPlan
         names={assumedCustomsNames(state.advice.colonies, (id) => t('pi.planetLabel', { id }))}
       />
       <IskFigureGroup>

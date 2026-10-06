@@ -32,7 +32,7 @@ export interface RouteFigures {
 
 /**
  * `path` is the security of every system on the route, origin first. An
- * unknown security (null) is not counted as low: guessing would inflate a
+ * unknown security (null) counts as neither lowsec nor nullsec: guessing would inflate a
  * figure a hauler weighs.
  */
 export function routeFigures(path: readonly (number | null)[]): RouteFigures {
@@ -55,8 +55,8 @@ export type NearestHub = RouteFigures & { hub: TradeHub['id'] };
 
 /**
  * The trade hub fewest gate jumps from home; a tie goes to the route with
- * fewer lowsec and nullsec jumps (the safer one), then to `current` (so an equally near
- * hub is never suggested over the one already used), then to the earlier
+ * fewer lowsec and nullsec jumps (the safer one), then to `current` (so an
+ * equally near hub is never suggested over the one already used), then to the earlier
  * entry so the answer is stable. Hubs without a known route are skipped; null
  * when none is known.
  */
