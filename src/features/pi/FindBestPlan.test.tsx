@@ -216,7 +216,7 @@ describe('FindBestPlan', () => {
       ],
     };
     renderPlan();
-    const button = screen.getAllByRole('button', { name: /Show me how/ })[0];
+    const button = screen.getAllByRole('button', { name: /^Show me/ })[0];
     expect(button).toHaveAttribute('aria-expanded', 'false');
     await user.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');
@@ -253,7 +253,7 @@ describe('FindBestPlan', () => {
   it('puts focus back on the card button when Show me how closes', async () => {
     const user = userEvent.setup();
     renderPlan();
-    const button = screen.getAllByRole('button', { name: /Show me how/ })[0];
+    const button = screen.getAllByRole('button', { name: /^Show me/ })[0];
     await user.click(button);
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(button).toHaveFocus();
@@ -262,7 +262,7 @@ describe('FindBestPlan', () => {
   it('does not reopen a card that left the list when it comes back', async () => {
     const user = userEvent.setup();
     renderPlan();
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[0]);
     await user.click(screen.getByRole('button', { name: 'Factory goods (P2)' }));
     await user.click(screen.getByRole('button', { name: 'Anything' }));
     expect(document.querySelector('section[id^="find-how-"]')).toBeNull();
@@ -271,16 +271,16 @@ describe('FindBestPlan', () => {
   it('remembers the Highsec only choice across cards', async () => {
     const user = userEvent.setup();
     renderPlan();
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[0]);
     await user.click(screen.getByRole('checkbox', { name: 'Highsec only' }));
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[1]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[1]);
     expect(screen.getByRole('checkbox', { name: 'Highsec only' })).not.toBeChecked();
   });
 
   it('turns Highsec only on for a highsec home and off for nullsec, with the skyhook note', async () => {
     const user = userEvent.setup();
     renderPlan();
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[0]);
     expect(finderArgs?.highsecOnly).toBe(true);
     expect(screen.getByRole('checkbox', { name: 'Highsec only' })).toBeChecked();
     expect(screen.queryByText(/Skyhook/)).not.toBeInTheDocument();
@@ -290,7 +290,7 @@ describe('FindBestPlan', () => {
     mockOrigin = { ...mockOrigin, name: 'X-7OMU', security: -0.4 };
     const user = userEvent.setup();
     renderPlan();
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[0]);
     expect(screen.getByRole('checkbox', { name: 'Highsec only' })).not.toBeChecked();
     expect(screen.getByText(/Skyhook/)).toBeInTheDocument();
     mockOrigin = { ...mockOrigin, name: 'Hek', security: 0.9 };
@@ -300,7 +300,7 @@ describe('FindBestPlan', () => {
     mockOrigin = { status: 'unknown', systemId: null, name: null, security: null, source: null };
     const user = userEvent.setup();
     renderPlan();
-    await user.click(screen.getAllByRole('button', { name: /Show me how/ })[0]);
+    await user.click(screen.getAllByRole('button', { name: /^Show me/ })[0]);
     expect(screen.getByText(/We can't tell where you are/)).toBeInTheDocument();
     mockOrigin = { ...mockOrigin, status: 'known', systemId: 30000142, name: 'Hek', security: 0.9 };
   });
@@ -369,7 +369,7 @@ describe('FindBestPlan', () => {
   it("links the product in Show me how's run step", async () => {
     const user = userEvent.setup();
     renderPlan();
-    const button = screen.getAllByRole('button', { name: /Show me how/ })[0];
+    const button = screen.getAllByRole('button', { name: /^Show me/ })[0];
     await user.click(button);
     const panel = document.getElementById(button.getAttribute('aria-controls')!)!;
     const collect = within(panel).getByText(/^Collect about/);

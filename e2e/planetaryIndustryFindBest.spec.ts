@@ -99,7 +99,7 @@ for (const [label, viewport] of [
       await assertNoOverflow(page);
       await shot(page, `${label}-no-colonies`);
 
-      const how = page.getByRole('button', { name: /Show me how/ }).first();
+      const how = page.getByRole('button', { name: /^Show me/ }).first();
       if (label === 'phone') {
         expect((await how.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
