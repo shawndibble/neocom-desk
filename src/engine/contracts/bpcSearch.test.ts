@@ -11,6 +11,7 @@ import {
   effectivePrice,
   iskPerRun,
   listedBlueprintTypeOptions,
+  lpOfferToSearchRow,
   marketBpoToSearchRow,
   type BpcContractRow,
   type MarketBpoInput,
@@ -281,6 +282,60 @@ describe('marketBpoToSearchRow (issue #1241)', () => {
       space: 'highsec',
       systemId: 30000142,
     });
+  });
+});
+
+describe('lpOfferToSearchRow', () => {
+  const lp = (overrides = {}) =>
+    lpOfferToSearchRow({
+      corporationId: 1000125,
+      offerId: 4321,
+      corpName: 'Sisters of EVE',
+      typeId: 33078,
+      quantity: 1,
+      price: 3_000_000,
+      iskCost: 1_000_000,
+      lpCost: 400,
+      lpPriced: true,
+      ...overrides,
+    });
+
+  it('is an unresearched copy with no known runs and no location', () => {
+    expect(lp()).toEqual({
+      source: 'lp',
+      typeId: 33078,
+      me: 0,
+      te: 0,
+      runs: null,
+      quantity: 1,
+      corporationId: 1000125,
+      offerId: 4321,
+      corpName: 'Sisters of EVE',
+      price: 3_000_000,
+      iskCost: 1_000_000,
+      lpCost: 400,
+      lpPriced: true,
+      regionId: null,
+      locationName: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('judges maxPrice on its priced cost; a minRuns floor never excludes it (runs unknown)', () => {
+    const rows = [lp({ offerId: 1, price: 10 }), lp({ offerId: 2, price: 100 })];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      maxPrice: 50,
+      minRuns: 5,
+    });
+    expect(filtered.map((r) => (r.source === 'lp' ? r.offerId : null))).toEqual([1]);
+  });
+
+  it('drops out once a Region filter is set — an LP store has no region here', () => {
+    expect(filterBpcSearchRows([lp()], { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000002 })).toEqual(
+      []
+    );
   });
 });
 
