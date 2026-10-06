@@ -531,7 +531,10 @@ export function PlanMap({
     : detailKind === 'planet' && whatIf
       ? t('piMap.add.panelTitleFor', { type: planetName(t, whatIf) })
       : traced && tracedProduct
-        ? t('piMap.detail.panelTitle')
+        ? t('piMap.detail.panelTitle', {
+            name: tracedProduct.name,
+            context: tracedProduct.tier === 0 ? 'raw' : undefined,
+          })
         : t('piMap.detail.panelTitleEmpty');
 
   const hint = !hintDismissed && (

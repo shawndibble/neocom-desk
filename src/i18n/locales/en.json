@@ -4716,7 +4716,8 @@
     },
     "estimateNote": "An estimate: ISK a day for one planet, after customs and sales tax, at your sell market. The same figures as the Plan tab.",
     "detail": {
-      "panelTitle": "How to make it",
+      "panelTitle": "How to make {{name}}",
+      "panelTitle_raw": "Where to get {{name}}",
       "panelTitleEmpty": "Details",
       "empty": "Click a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
       "empty_touch": "Tap a product to trace its chain back to the planets it needs, or a planet type you don't have to see where to find one.",
@@ -4740,7 +4741,9 @@
       "facility": {
         "extractor": "Extracted with an Extractor Control Unit on {{types}}.",
         "basic": "Made in a Basic Industry Facility, on {{types}}.",
+        "basic_any": "Made in a Basic Industry Facility.",
         "advanced": "Made in an Advanced Industry Facility, on {{types}}.",
+        "advanced_any": "Made in an Advanced Industry Facility.",
         "highTech": "Made in a High-Tech Production Plant, only on {{types}}."
       },
       "madeFrom": "Made from",

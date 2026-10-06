@@ -31,7 +31,7 @@ import { withArticle } from '../article';
 import { PlanetFinder } from './PlanetFinder';
 import { PlanetImage } from '../PlanetImage';
 import { comparisonSentence, planetName, tierWithCode } from './mapText';
-import type { MapGraph, ProductFigure, Trace } from './mapModel';
+import { groupByTier, type MapGraph, type ProductFigure, type Trace } from './mapModel';
 import type { ProductDetailView } from './productDetailModel';
 
 export interface FinderOrigin {
@@ -60,7 +60,11 @@ export interface ProductDetailProps {
 const names = (graph: MapGraph, ids: readonly number[]) =>
   ids.map((id) => graph.byId.get(id)!.name);
 
-/** A chain of product names, each a link to its own PI detail but the one already open. */
+/**
+ * A chain of product names, each a link to its own PI detail but the one
+ * already open. Names in one tier are parallel inputs, joined with commas;
+ * an arrow only marks the step up a tier.
+ */
 function NameChain({
   graph,
   ids,
@@ -72,15 +76,20 @@ function NameChain({
 }) {
   return (
     <>
-      {ids.map((id, i) => {
-        const name = graph.byId.get(id)!.name;
-        return (
-          <span key={id}>
-            {i > 0 && ' → '}
-            {id === open ? name : <PiProductLink typeId={id}>{name}</PiProductLink>}
-          </span>
-        );
-      })}
+      {groupByTier(graph, ids).map((group, g) => (
+        <span key={group[0]}>
+          {g > 0 && ' → '}
+          {group.map((id, i) => {
+            const name = graph.byId.get(id)!.name;
+            return (
+              <span key={id}>
+                {i > 0 && ', '}
+                {id === open ? name : <PiProductLink typeId={id}>{name}</PiProductLink>}
+              </span>
+            );
+          })}
+        </span>
+      ))}
     </>
   );
 }
@@ -98,10 +107,11 @@ export function ProductDetail(props: ProductDetailProps) {
   const { t } = useTranslation();
   const itemActions = useOptionalItemActions();
   const product = graph.byId.get(typeId)!;
-  const hostTypes =
-    view.hosts.length === graph.planetTypes.length
-      ? t('piMap.detail.anyPlanet')
-      : view.hosts.map((type) => planetName(t, type)).join(', ');
+  // Every type can host it: say only the facility, and leave the planets to "You need".
+  const anyHost = view.hosts.length === graph.planetTypes.length;
+  const hostTypes = anyHost
+    ? t('piMap.detail.anyPlanet')
+    : view.hosts.map((type) => planetName(t, type)).join(', ');
   const colonyItems = (items: ProductDetailView['ownInputs']) =>
     items.map((item, i) => (
       <span key={item.typeId}>
@@ -141,7 +151,10 @@ export function ProductDetail(props: ProductDetailProps) {
       </div>
 
       <p className="mt-3 text-xs text-text">
-        {t(`piMap.detail.facility.${view.facility}`, { types: hostTypes })}
+        {t(`piMap.detail.facility.${view.facility}`, {
+          types: hostTypes,
+          context: anyHost ? 'any' : undefined,
+        })}
       </p>
       {view.inputs.length > 0 && (
         <p className="mt-1 text-xs text-text-dim">
@@ -297,9 +310,7 @@ export function ProductDetail(props: ProductDetailProps) {
             steps: (
               <NameChain
                 graph={graph}
-                ids={[...trace.ids].sort(
-                  (a, b) => graph.byId.get(a)!.tier - graph.byId.get(b)!.tier
-                )}
+                ids={[...view.inputs.map((input) => input.typeId), typeId]}
                 open={typeId}
               />
             ),
@@ -393,13 +404,15 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
           <div className="text-sm font-semibold">
             {t('piMap.add.title', { aType: withArticle(name) })}
           </div>
-          <p className="text-xs text-text-dim">
-            <span className="font-semibold text-map-whatif">
-              {t('piMap.add.unlocks', { count: props.unlockedIds.length })}
-            </span>
-            {props.oneHostCount > 0 &&
-              `, ${t('piMap.add.asOnePlanet', { count: props.oneHostCount })}`}
-          </p>
+          {props.unlockedIds.length > 0 && (
+            <p className="text-xs text-text-dim">
+              <span className="font-semibold text-map-whatif">
+                {t('piMap.add.unlocks', { count: props.unlockedIds.length })}
+              </span>
+              {props.oneHostCount > 0 &&
+                `, ${t('piMap.add.asOnePlanet', { count: props.oneHostCount })}`}
+            </p>
+          )}
           {props.unlockedIds.length > 0 && (
             <p className="sr-only">
               {t('piMap.add.unlockList', {

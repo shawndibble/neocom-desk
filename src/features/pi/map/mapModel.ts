@@ -163,6 +163,20 @@ export interface Trace {
   rest: number[];
 }
 
+/**
+ * Ids split into one group per tier, lowest first, keeping the given order
+ * inside a tier: parallel inputs sit side by side, and only a step up a tier
+ * reads as "then".
+ */
+export function groupByTier(graph: MapGraph, ids: Iterable<number>): number[][] {
+  const byTier = new Map<MapTier, number[]>();
+  for (const id of ids) {
+    const tier = graph.byId.get(id)!.tier;
+    byTier.set(tier, [...(byTier.get(tier) ?? []), id]);
+  }
+  return [...byTier.entries()].sort(([a], [b]) => a - b).map(([, group]) => group);
+}
+
 /** The chain behind a product, back to the planet types that supply it, preferring the pilot's. */
 export function traceProduct(
   graph: MapGraph,
