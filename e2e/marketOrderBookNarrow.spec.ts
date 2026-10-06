@@ -200,9 +200,18 @@ async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   await expect(row.locator('td.dt-disclosure svg')).toBeHidden();
   const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
   expect(dy, `⋮ centre-y vs card centre-y (${tableLabel})`).toBeLessThanOrEqual(1);
-  // Headroom, so a font a little wider than ours can't run text under the button.
-  const gap = more!.x - (meta!.x + meta!.width);
-  expect(gap, `line two to ⋮ (${tableLabel})`).toBeGreaterThanOrEqual(8);
+  // No overlap: line two ends before the button's box, wider font or not.
+  expect(meta!.x + meta!.width, `line two vs ⋮ (${tableLabel})`).toBeLessThanOrEqual(more!.x);
+  expect(card!.height, tableLabel).toBeLessThanOrEqual(64);
+  // One line two: every meta cell shares the first one's top.
+  const tops = await row
+    .locator('td.dt-meta')
+    .evaluateAll((tds) =>
+      tds
+        .filter((td) => td.getBoundingClientRect().width > 0)
+        .map((td) => Math.round(td.getBoundingClientRect().top))
+    );
+  expect(new Set(tops).size, `line two is one line (${tableLabel})`).toBe(1);
 }
 
 test.describe('Market Browser — order book stacked cards', () => {
@@ -334,7 +343,9 @@ test.describe('Market Browser — order book stacked cards', () => {
 
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(buy.cells.find((c) => c.label === 'Min. Volume')?.text).toContain('500,000');
-    for (const cell of buy.cells.filter((c) => c.label !== 'Location')) {
+    // Range may ellipsize on a wider font (it is the cell that gives way
+    // before text could meet the ⋮).
+    for (const cell of buy.cells.filter((c) => c.label !== 'Location' && c.label !== 'Range')) {
       expect(cell.clipped, cell.label).toBe(false);
     }
   });

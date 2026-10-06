@@ -464,7 +464,7 @@ exactly the markup above.
   button the same way but keeps the figure in flow on line one, hides the
   expand chevron (line two runs the card's full width, so a chevron beside
   the button would sit off its axis or on the text; the whole card is the
-  tap target), and draws the ⋮ in the text colour (Market order book). A table with
+  tap target), draws the ⋮ in the text colour, and gives it a 44px gutter of its own: the Range cell ellipsizes before text could meet the button (Market order book). A table with
   a tick box, a chevron and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line

@@ -572,26 +572,35 @@
     padding-right: 3rem;
   }
 
-  /* `-only`: the button flush to the card's edge, its 44px box overhanging
-     the row's right padding, so line two (a buy's five cells and an
-     8-figure quantity nearly fill it) keeps headroom before the box, and a
-     font a little wider than ours can't run text under it. Row padding and
-     the cell gap are a touch tighter for the same reason. */
+  /* `-only`: the button flush to the card's edge, a 44px gutter of its own
+     (the row's right padding) the card's text never enters: both lines live
+     in the width left of it. Line one's figure keeps a hair of air. Line two
+     (a buy's five cells and an 8-figure quantity nearly fill it) can never
+     overlap the button or wrap on a wider font: the Range cell, the last
+     one, takes what is left (`flex-basis: 0`, so it never forces the wrap
+     itself) and ellipsizes only in that worst case; it needs room for a few
+     characters (`min-width`) before it wraps instead. The row, Range
+     included, stays in the expanded detail's reach via the column picker. */
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
     right: 0;
   }
 
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
-    padding-left: 0.375rem;
-    column-gap: 0.0625rem;
+    padding-right: 2.75rem;
+    padding-left: 0.5rem;
+    column-gap: 0.1875rem;
   }
 
-  /* `-only` clears the button on line one alone (the headline figure's
-     right margin: button spans 0-2.75rem from the edge, row pads 0.75rem).
-     Line two keeps the full card width so a buy's five meta cells fit one
-     line on a phone. */
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
-    margin-right: 2.25rem;
+    margin-right: 0.25rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-meta[data-label='Range'] {
+    flex: 1 1 0;
+    min-width: 2.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* No expand chevron on the card: line two runs the card's full width (a
