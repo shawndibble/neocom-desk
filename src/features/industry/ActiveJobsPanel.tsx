@@ -719,7 +719,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           }),
         render: (job) => (
           <span className="flex flex-wrap items-center gap-1.5">
-            <MarketItemLink typeId={job.blueprint_type_id}>
+            <MarketItemLink typeId={job.product_type_id ?? job.blueprint_type_id}>
               {nameForBlueprint(job.blueprint_type_id)}
             </MarketItemLink>
             {soon(job) && (

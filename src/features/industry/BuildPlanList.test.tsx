@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
@@ -76,6 +76,16 @@ const NOOP_GROUP_PROPS = {
   statsByPlanId: new Map(),
   statsByGroupId: new Map(),
 };
+
+/** The rename field must survive the menu closing: its focus hand-back would otherwise blur (and commit) it. */
+async function expectRenameFieldHeld(name: string) {
+  const field = await screen.findByRole('textbox', { name });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  expect(screen.getByRole('textbox', { name })).toBe(field);
+  expect(field).toHaveFocus();
+}
 
 describe('BuildPlanList', () => {
   const PLANS = [
@@ -386,7 +396,7 @@ describe('BuildPlanList: build groups (#626)', () => {
     fireEvent.contextMenu(nameButton);
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
 
-    expect(await screen.findByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename group');
   });
 });
 
@@ -546,6 +556,16 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
   });
 
+  it('renames the plan from the right-click menu and keeps the field focused', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rokh' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    await expectRenameFieldHeld('Rename');
+  });
+
   it('renames the plan from the "More actions" button', async () => {
     const user = userEvent.setup();
     renderWithGroups();
@@ -553,7 +573,7 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
 
-    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename');
   });
 });
 
@@ -603,7 +623,7 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
     ]);
 
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
-    expect(await screen.findByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename group');
   });
 });
 

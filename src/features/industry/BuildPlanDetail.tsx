@@ -1078,27 +1078,19 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function itemContextMenu(
-    typeId: number,
-    trigger: ReactElement,
-    buildHere?: { onToggle: () => void; building: boolean },
-    onModifyBlueprint?: () => void
-  ) {
+  function itemContextMenu(typeId: number, trigger: ReactElement) {
     return (
       <ItemContextMenu
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onToggleBuildHere={buildHere?.onToggle}
-        buildingHere={buildHere?.building}
-        onModifyBlueprint={onModifyBlueprint}
       >
         {trigger}
       </ItemContextMenu>
     );
   }
 
-  /** The same menu on every other item name the page shows — product heading, revenue and owned-sale rows, the recipe and acquisition modals. */
+  /** The same menu on every other item name the page shows — product heading, the recipe and acquisition modals. */
   const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
 
   /**
@@ -1107,19 +1099,12 @@ export function BuildPlanDetail({
    * renders one of these, built from the identical props so the right-click
    * menu and the button can never list different actions.
    */
-  function itemActionsFor(
-    typeId: number,
-    buildHere?: { onToggle: () => void; building: boolean },
-    onModifyBlueprint?: () => void
-  ): ReactElement {
+  function itemActionsFor(typeId: number): ReactElement {
     return (
       <ItemMoreActions
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onToggleBuildHere={buildHere?.onToggle}
-        buildingHere={buildHere?.building}
-        onModifyBlueprint={onModifyBlueprint}
       />
     );
   }
