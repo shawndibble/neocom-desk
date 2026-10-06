@@ -9,6 +9,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useAuthFailure } from '@/stores/authFailure';
 import { DEFAULT_PI_CADENCE, PI_CADENCE_KEY, useCadence } from '@/features/pi/cadencePref';
 import {
   useShowAltColonies,
@@ -309,6 +310,7 @@ beforeAll(async () => {
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
+  useAuthFailure.setState({ failure: null });
   // The haul cadence persists like any setting: a test that changes it must not set the next one's window.
   await db.settings.delete(PI_CADENCE_KEY);
   useCadence.setState({ value: DEFAULT_PI_CADENCE, hydrated: false });
@@ -715,6 +717,13 @@ describe('PlanetaryIndustry', () => {
     // The trap this guards: a live 403 on an alt raises the app-wide re-auth
     // banner, naming a character the player never asked about.
     expect(screen.queryByText('Log in again to see your colonies')).not.toBeInTheDocument();
+  });
+
+  it('shows the page banner for a planets refusal another reader recorded', async () => {
+    useAuthFailure.getState().reportRequestFailure(CHAR_ID, 'getCharacterPlanets');
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
   });
 
   it('keeps the colony view on the default tab, with no URL param needed', async () => {

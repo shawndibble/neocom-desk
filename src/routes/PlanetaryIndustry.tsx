@@ -20,6 +20,7 @@ import { PiHeaderStrip } from '@/features/pi/PiHeaderStrip';
 import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
 import { PiMapTab } from '@/features/pi/map/PiMapTab';
+import { useAuthFailure } from '@/stores/authFailure';
 import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
@@ -129,6 +130,13 @@ export function PlanetaryIndustry() {
   const clearLinkedColony = useCallback(() => setPiParams({ colony: null }), [setPiParams]);
 
   const planetsResult = data?.planetsResult ?? null;
+  // Another reader (a poll, a prefetch) can be refused after this snapshot loaded; the shell
+  // notice stays quiet on this page for that refusal, so the page banner must show it.
+  const failure = useAuthFailure((state) => state.failure);
+  const planetsRefused =
+    failure?.kind === 'request' &&
+    failure.characterId === activeCharacterId &&
+    failure.endpointId === 'getCharacterPlanets';
 
   if (!hydrated) {
     return (
@@ -165,7 +173,7 @@ export function PlanetaryIndustry() {
 
         <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
-        {data?.planetsNeedsReauth && (
+        {(data?.planetsNeedsReauth || planetsRefused) && (
           <GrantBanner
             characterId={activeCharacterId}
             endpoints={['getCharacterPlanets']}

@@ -70,6 +70,7 @@ import {
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
+import { colonyCountUnknown } from './colonyStripModel';
 import {
   Changes,
   ColonyFit,
@@ -323,18 +324,19 @@ function GoalPlanner({
   const systemName = (id: number) =>
     snapshot.systemNames.get(id) ?? t('piShared.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
+  const unknown = noColonies && colonyCountUnknown(snapshot);
 
   let results: React.ReactNode;
   if (noColonies && !buysAnything) {
     results = (
       <EmptyState
-        title={t('piPlan.noColoniesTitle')}
+        title={t(unknown ? 'piPlan.noColoniesUnknownTitle' : 'piPlan.noColoniesTitle')}
         hint={
           // Buying P1 covers P1 goals only; a P2+ goal needs a colony to host it.
           plannedGoals.length > 0 &&
           plannedGoals.every((goal) => products.find((p) => p.typeId === goal.typeId)?.tier === 1)
             ? `${t('piPlan.noColoniesHint')} ${t('piPlan.noColoniesBuyHint')}`
-            : t('piPlan.noColoniesHint')
+            : t(unknown ? 'piPlan.noColoniesUnknownHint' : 'piPlan.noColoniesHint')
         }
         action={
           <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
@@ -370,7 +372,11 @@ function GoalPlanner({
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
     results = (
       <div className="space-y-4">
-        {noColonies && <p className="text-xs text-text-dim">{t('piPlan.noColoniesBuying')}</p>}
+        {noColonies && (
+          <p className="text-xs text-text-dim">
+            {t(unknown ? 'piPlan.noColoniesUnknownBuying' : 'piPlan.noColoniesBuying')}
+          </p>
+        )}
         <Headline
           best={best}
           earnings={earnings}
