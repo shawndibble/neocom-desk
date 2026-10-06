@@ -127,12 +127,9 @@ beforeAll(async () => {
   await Promise.all([routeChunks.loadLayout(), routeChunks.loadContacts()]);
   await seed();
   const { unmount } = render(<App />);
-  await waitFor(
-    () => expect(document.querySelector('main')?.textContent?.length).toBeGreaterThan(0),
-    {
-      timeout: 25_000,
-    }
-  );
+  // Wait for real content, not just the shell: the first data load (Dexie, MSW,
+  // the ESI cache) is part of the cold cost too.
+  await screen.findByText('Good Friend', {}, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
 }, 30_000);
