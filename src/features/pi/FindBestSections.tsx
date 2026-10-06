@@ -336,7 +336,7 @@ function RecipeCard({
               </span>
             )}
             {recipe.needsCcLevel && (
-              <span className="inline-flex h-[1.125rem] items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold text-warning">
+              <span className="inline-flex h-[1.125rem] items-center gap-1 rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold whitespace-nowrap text-warning">
                 <Sentence
                   text={t('piPlan.find.needsCc', { level: recipe.needsCcLevel, skill: '{skill}' })}
                   slots={{
