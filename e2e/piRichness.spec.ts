@@ -47,7 +47,24 @@ for (const [label, size] of [
     await expect(first).toHaveAttribute('aria-pressed', 'true');
     await shot(page, `richness-${label}`);
 
-    // Saved: still ticked after a reload.
+    // Saved: the write lands, and the pick survives a reload.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            new Promise<number>((resolve) => {
+              const open = indexedDB.open('neocom');
+              open.onsuccess = () => {
+                const req = open.result
+                  .transaction('planetRichness')
+                  .objectStore('planetRichness')
+                  .count();
+                req.onsuccess = () => resolve(req.result);
+              };
+            })
+        )
+      )
+      .toBeGreaterThan(0);
     await page.reload();
     await expect(
       page.getByRole('group', { name: 'Resources you would pull here' }).getByRole('button').first()
