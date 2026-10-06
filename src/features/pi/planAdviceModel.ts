@@ -87,7 +87,7 @@ import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import type { PinLoad } from '@/engine/pi/types';
 import type { NetworkOpportunity } from '@/engine/pi/network';
 import { colonyNetwork } from './networkModel';
-import { dropSharedSurplus } from './factoryRoomDedupe';
+import { dropOtherSystemSurplus, dropSharedSurplus } from './factoryRoomDedupe';
 import { salesTaxPct } from '@/engine/industry/fees';
 import { colonyPlan } from './colonyPlan';
 import { colonyBudget } from './colonyBudget';
@@ -841,8 +841,9 @@ function rebuildFacts(args: {
  * The plan only offers a P2 no single colony already makes both inputs for
  * (that one is the rebuild scorer's question), so an opportunity usually draws
  * on another colony's surplus: `routedFrom` names those colonies so the page can
- * say what to move. Market sourcing is off, so nothing here is a purchase. The
- * network plan needs two measurable colonies.
+ * say what to move. A win routed from another system is dropped: a quick win
+ * is doable within one system. Market sourcing is off, so nothing here is a
+ * purchase. The network plan needs two measurable colonies.
  */
 function factoryRoom(
   built: readonly (PlannerColonyRow & { advice: BuiltColonyAdvice })[],
@@ -878,7 +879,10 @@ function factoryRoom(
     group.push(opportunity);
     byHost.set(opportunity.hostPlanetId, group);
   }
-  const opportunities = [...byHost.values()].flatMap((group) => dropSharedSurplus(group));
+  const systemOf = new Map(built.map((row) => [row.planetId, row.systemId]));
+  const opportunities = [...byHost.values()].flatMap((group) =>
+    dropSharedSurplus(dropOtherSystemSurplus(group, systemOf))
+  );
   for (const opportunity of opportunities) {
     const gain = opportunity.marginPerHour * HOURS_PER_DAY;
     if (!(gain > 0)) continue;
