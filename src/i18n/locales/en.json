@@ -4592,7 +4592,11 @@
       "noColonies": "No colonies: {{names}}.",
       "skipped": "Skipped, no planetary access granted: {{names}}.",
       "summaryStopped": "{{count}} stopped",
-      "summaryNext": "next {{duration}}"
+      "summaryNext": "next {{duration}}",
+      "makes": "Makes ~<isk/>/day",
+      "notInPlan": "not in your plan",
+      "notInPlanLabel": "Why these figures are separate",
+      "notInPlanTooltip": "Estimated from this character's cached colonies with their skills unknown, so priced cautiously. Shown for reference only: they are not counted in Plan's totals or Today's check."
     }
   },
   "piMap": {
