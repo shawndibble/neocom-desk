@@ -31,7 +31,9 @@ export function ComparisonText({
           text={t(`piPlan.find.cmp.${verdict}`, { item: '{item}', type })}
           slots={{ item: <PiProductLink typeId={versus.typeId}>{versus.name}</PiProductLink> }}
         />
-      )}{' '}
+      )}
+      {/* A no-break space: the "i" never wraps onto a line of its own. */}
+      {'\u00a0'}
       <InfoTooltip
         glyph="info"
         className="align-middle"
