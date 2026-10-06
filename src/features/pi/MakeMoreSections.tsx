@@ -913,6 +913,7 @@ function ChecklistColumnView({ column, ticks }: { column: ChecklistColumn; ticks
             {fit.upgradeFromLevel !== null
               ? t('piPlan.make.fitNeedsUpgrade', {
                   level: fit.level,
+                  count: fit.level - fit.upgradeFromLevel,
                   steps: fit.level - fit.upgradeFromLevel,
                 })
               : t('piPlan.make.fitsCc', { level: fit.level })}
