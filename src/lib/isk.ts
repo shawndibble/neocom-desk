@@ -90,6 +90,12 @@ export function formatIskCompact(value: number): string {
   return formatCompactNumber(clampIskZero(value, 0));
 }
 
+/** Compact ISK with an explicit sign: "+756K", "-756K", "0". Exactly one sign. */
+export function formatIskCompactSigned(value: number): string {
+  const text = formatIskCompact(value);
+  return text === '0' || text.startsWith('-') ? text : `+${text}`;
+}
+
 const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
   b: 1_000_000_000,
   m: 1_000_000,

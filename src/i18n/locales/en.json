@@ -5157,6 +5157,8 @@
       "liveQuick": "Quick wins add {{gain}} ISK a day in about {{count}} minutes.",
       "liveRebuild_one": "Rebuilding {{count}} planet adds {{gain}} ISK a day on top.",
       "liveRebuild_other": "Rebuilding {{count}} planets adds {{gain}} ISK a day on top.",
+      "liveRebuildCost_one": "Rebuilding {{count}} planet costs {{gain}} ISK a day.",
+      "liveRebuildCost_other": "Rebuilding {{count}} planets costs {{gain}} ISK a day.",
       "emptyTitle": "Your colonies can't be measured yet",
       "emptyHint": "None of your colonies has an income figure yet. Refresh, or open a colony in game so its details load.",
       "emptyExcludedHint": "Their details have not loaded. Refresh to try again."
