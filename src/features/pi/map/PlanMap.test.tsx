@@ -582,6 +582,10 @@ describe('PlanMap: phone', () => {
     expect(screen.queryByRole('group', { name: /^Planet map/ })).toBeNull();
     const switcher = screen.getByRole('group', { name: 'Product tier' });
     await user.click(within(switcher).getByRole('button', { name: 'P1' }));
+    // The row's title carries the accent cue at rest, before any tap (DESIGN.md §6c "Phone cards").
+    expect(
+      within(screen.getByRole('link', { name: /^Biofuels/ })).getByText('Biofuels')
+    ).toHaveClass('text-accent');
     await user.click(screen.getByRole('link', { name: /^Biofuels/ }));
     const sheet = screen.getByRole('dialog', { name: 'How to make it' });
     expect(within(sheet).getByRole('link', { name: 'View in Market' })).toBeInTheDocument();

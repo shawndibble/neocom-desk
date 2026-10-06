@@ -155,7 +155,8 @@ export function MapPhone(props: MapPhoneProps) {
                 >
                   <TypeIcon typeId={product.typeId} size={64} width={28} height={28} />
                   <span className="min-w-0 flex-1">
-                    <span className={cx('block', traced && 'text-accent')}>
+                    {/* The card's title carries the accent cue at rest (DESIGN.md §6c "Phone cards"). */}
+                    <span className="block">
                       {rank !== undefined && (
                         <span className="mr-1.5 text-[11px] font-bold text-warning">#{rank}</span>
                       )}
@@ -164,7 +165,7 @@ export function MapPhone(props: MapPhoneProps) {
                           +<span className="sr-only">{t('piMap.phone.newSr')}</span>
                         </span>
                       )}
-                      {product.name}
+                      <span className="text-accent">{product.name}</span>
                     </span>
                     <span className="block text-xs text-text-dim">{sentence.join(' · ')}</span>
                   </span>
