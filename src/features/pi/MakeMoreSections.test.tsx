@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { RebuildPanel } from './MakeMoreSections';
+import { ChecklistPanel, RebuildPanel } from './MakeMoreSections';
 import { buildPlanView } from './planView';
 import { colony, fixtureAdvice, fixturePi } from './planViewFixture';
 
@@ -41,5 +41,17 @@ describe('RebuildPanel, a colony with no rebuild advice', () => {
     renderRebuilds('needs-measured-extraction');
     expect(screen.getByText(/we can't measure this colony/)).toBeInTheDocument();
     expect(screen.queryByText('As-is')).toBeNull();
+  });
+});
+
+describe('ChecklistPanel', () => {
+  it('says how many factories each SET covers, as PLACE does', () => {
+    const view = buildPlanView(fixtureAdvice, fixturePi, (id) => `Planet ${id}`);
+    render(
+      <MemoryRouter>
+        <ChecklistPanel view={view} ticks={{ has: () => false, toggle: () => {} }} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/^1 × Advanced factory →/)).toBeInTheDocument();
   });
 });

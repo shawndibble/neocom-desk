@@ -43,6 +43,37 @@ describe('Tooltip', () => {
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
+  // The PI settings gear: its modal handed focus back and took it again in one
+  // tick (a dev remount), Radix ignored the close against the stale `open`,
+  // and the bubble stayed over the modal, eating its first Escape.
+  it('ends closed when focus arrives and leaves in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.focus(trigger);
+      fireEvent.blur(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('closes on the click that opens a dialog, even if hover opened it in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.pointerMove(trigger);
+      fireEvent.click(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('reveals the tooltip on keyboard focus too, with no hover delay', () => {
     render(
       <Tooltip content="One-line explanation.">

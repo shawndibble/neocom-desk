@@ -5209,8 +5209,7 @@
         "remove": "{{count}} × {{pin}}",
         "place": "{{count}} × {{pin}}",
         "placeExtractor": "{{count}} × {{pin}} (scan for a bright spot)",
-        "set_one": "{{pin}} → {{item}}",
-        "set_other": "{{count}} × {{pin}} → {{item}}",
+        "set": "{{count}} × {{pin}} → {{item}}",
         "route": "Send {{item}} to the launchpad"
       },
       "fitsCc": "Fits your Command Center (upgrade level {{level}})",
