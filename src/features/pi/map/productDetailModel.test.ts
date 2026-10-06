@@ -45,7 +45,6 @@ function input(
 describe('buildProductDetail: how to make it', () => {
   it('names the direct inputs, the factory and the planet types that carry it', () => {
     const view = buildProductDetail(input(COOLANT));
-    expect(view.tier).toBe(2);
     expect(view.facility).toBe('advanced');
     expect(view.inputs.map((i) => i.name)).toEqual(['Electrolytes', 'Water']);
     expect(view.hosts).toHaveLength(8);
@@ -60,41 +59,33 @@ describe('buildProductDetail: how to make it', () => {
 
   it('says a raw material is extracted, from which planet types, with no inputs', () => {
     const view = buildProductDetail(input(CARBON_COMPOUNDS));
-    expect(view.tier).toBe(0);
     expect(view.facility).toBe('extractor');
     expect(view.inputs).toEqual([]);
     expect(view.hosts).toEqual(['barren', 'oceanic', 'temperate']);
     expect(view.money).toEqual({ kind: 'raw' });
   });
 
-  it('says one planet is enough when one type yields every raw and hosts the factory', () => {
-    const view = buildProductDetail(input(BIOFUELS));
-    expect(view.onePlanet).toBe(true);
-    expect(view.planets).toBe(1);
-  });
-
   it('counts the planets a P4 needs between them', () => {
     const node = buildProductDetail(input(BROADCAST_NODE));
-    expect(node.onePlanet).toBe(false);
-    expect(node.planets).toBeGreaterThan(1);
+    expect(node.money).toMatchObject({ kind: 'multi-planet' });
+    expect(node.money.kind === 'multi-planet' && node.money.planets).toBeGreaterThan(1);
+  });
+
+  it('counts one planet when one type can make a P3 alone', () => {
+    const view = buildProductDetail(input(ROBOTICS));
+    expect(view.money).toEqual({ kind: 'multi-planet', planets: 1 });
   });
 });
 
 describe('buildProductDetail: why or why not', () => {
   it("passes the model's one-planet figure through, with its hauling load and the CC level it assumes", () => {
     const view = buildProductDetail(input(BIOFUELS, { figure: ranked, ccLevel: 4 }));
-    expect(view.money).toEqual({
-      kind: 'one-planet',
-      iskPerDay: 717_234,
-      useType: 'temperate',
-      m3PerDay: 182.4,
-      ccLevel: 4,
-    });
+    expect(view.money).toEqual({ kind: 'one-planet', m3PerWeek: 182.4 * 7, ccLevel: 4 });
   });
 
-  it('marks a P3 or P4 as multi-planet with the planet count, never a one-planet figure', () => {
-    const view = buildProductDetail(input(ROBOTICS));
-    expect(view.money).toEqual({ kind: 'multi-planet', planets: view.planets });
+  it('marks a P4 as multi-planet with the planet count, never a one-planet figure', () => {
+    const view = buildProductDetail(input(BROADCAST_NODE));
+    expect(view.money.kind).toBe('multi-planet');
   });
 
   it('marks a P1 or P2 that no one planet makes as multi-planet too', () => {

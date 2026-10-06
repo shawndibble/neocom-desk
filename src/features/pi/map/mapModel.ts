@@ -28,6 +28,9 @@ const PLANET_ORDER: readonly PlanetType[] = [
   'temperate',
 ];
 
+/** An extractor pulls a raw material; anything made runs in the factory its schematic names. */
+export type MapFacility = 'extractor' | PiFactoryKind;
+
 export interface MapProduct {
   typeId: number;
   name: string;
@@ -38,8 +41,7 @@ export interface MapProduct {
   raws: number[];
   /** Planet types that yield it (raw) or carry a factory for it (made). */
   hosts: PlanetType[];
-  /** An extractor pulls it (raw), else the factory that runs its schematic. */
-  facility: 'extractor' | PiFactoryKind;
+  facility: MapFacility;
 }
 
 export interface MapGraph {

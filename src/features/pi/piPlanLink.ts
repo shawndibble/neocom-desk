@@ -56,6 +56,15 @@ export function withoutPiProduct(search: string): string {
   return rest === '' ? '' : `?${rest}`;
 }
 
+/** The same location without `product`. */
+export function hrefWithoutPiProduct(location: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): string {
+  return `${location.pathname}${withoutPiProduct(location.search)}${location.hash}`;
+}
+
 /** History state a product link or tile click carries, so Close can go Back instead of replacing. */
 export const PI_PRODUCT_PUSHED_STATE = { piProduct: true } as const;
 

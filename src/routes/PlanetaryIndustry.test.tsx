@@ -929,11 +929,11 @@ describe('PlanetaryIndustry', () => {
     it('opens the Map with that product drawer open, and a reload reopens it', async () => {
       window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
       const first = render(<App />);
-      expect(within(await drawer()).getByText('Biofuels')).toBeInTheDocument();
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
       first.unmount();
       render(<App />);
-      expect(within(await drawer()).getByText('Biofuels')).toBeInTheDocument();
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
     });
 
     it('carries View in Market and Show info, the destinations the name link displaced', async () => {

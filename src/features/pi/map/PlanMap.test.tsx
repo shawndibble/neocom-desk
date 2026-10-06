@@ -367,7 +367,7 @@ describe('PlanMap: the detail drawer', () => {
     renderMap();
     await user.click(planet('Lava'));
     const dialog = screen.getByRole('dialog', { name: 'Where to put a new Lava colony' });
-    await user.click(within(dialog).getByRole('button', { name: /Best one-planet recipe:/ }));
+    await user.click(within(dialog).getByRole('link', { name: /Best one-planet recipe:/ }));
     expect(screen.getByRole('dialog', { name: 'How to make it' })).toBeInTheDocument();
     expect(screen.queryByText('What if I add a Lava planet?')).toBeNull();
     await user.keyboard('{Escape}');

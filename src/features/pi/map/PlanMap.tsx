@@ -18,17 +18,18 @@
  *
  * `?product=<typeId>` (`piProductHref`) is the product the panel shows: every
  * product and item name on Plan, Map and Colonies links here (DESIGN.md §6c
- * "Entities", Overrides), and a tile click writes it too (docked, where the
- * panel never closes, a click only traces). A reload or a pasted
+ * "Entities", Overrides), and a tile click writes it too, docked or not, so
+ * the address bar is always shareable. A reload or a pasted
  * link reopens it; an id the map does not know is dropped. Back pops the entry
  * and the drawer closes because the param is gone (the drawer pushes none of
  * its own); Close goes Back when this page pushed the entry
  * (`productNavigation`'s marker), else replaces the URL without it. The "add a
- * planet" drawer stays local state with its own Back entry.
+ * planet" drawer stays local state with its own Back entry. A product linked
+ * while docked is dropped when the layout narrows, never popped open.
  */
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
@@ -45,11 +46,11 @@ import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
 import {
+  hrefWithoutPiProduct,
   parsePiProduct,
   piProductHref,
   productNavigation,
   wasProductPushedHere,
-  withoutPiProduct,
 } from '../piPlanLink';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
 import { MapBoard } from './MapBoard';
@@ -102,7 +103,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   const hasProductParam = new URLSearchParams(location.search).has('product');
   useEffect(() => {
     if (!hasProductParam || linked !== null) return;
-    navigate(`${location.pathname}${withoutPiProduct(location.search)}${location.hash}`, {
+    navigate(hrefWithoutPiProduct(location), {
       replace: true,
       state: location.state,
     });
@@ -177,6 +178,14 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   // --- Detail panel mode, by the layout box's own width -----------------------
   const layoutRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setPanelWidth] = useState(0);
+  // No drawer until the width is known: a linked product on a wide screen
+  // would otherwise mount a drawer for one frame before the panel docks.
+  const [measured, setMeasured] = useState(false);
+  useLayoutEffect(() => {
+    const width = layoutRef.current?.getBoundingClientRect().width ?? 0;
+    if (width > 0) setPanelWidth(width);
+    setMeasured(true);
+  }, []);
   useEffect(() => {
     const el = layoutRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -206,11 +215,18 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     restore();
   }, [restore]);
   /** Takes `product` off the URL: Back when this page pushed the entry, else a replace. */
+  const goingBack = useRef(false);
+  useEffect(() => {
+    goingBack.current = false;
+  }, [linked]);
   const dropProduct = useCallback(() => {
-    if (parsePiProduct(location.search) === null) return;
-    if (wasProductPushedHere(location.state)) navigate(-1);
-    else {
-      navigate(`${location.pathname}${withoutPiProduct(location.search)}${location.hash}`, {
+    // A second Close before Back lands would go Back twice, maybe off the page.
+    if (parsePiProduct(location.search) === null || goingBack.current) return;
+    if (wasProductPushedHere(location.state)) {
+      goingBack.current = true;
+      navigate(-1);
+    } else {
+      navigate(hrefWithoutPiProduct(location), {
         replace: true,
       });
     }
@@ -261,16 +277,26 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   // --- Actions ---------------------------------------------------------------
-  const productShown = !docked && linked !== null && detailKind === 'product';
+  // A product linked while docked stays in the docked panel: narrowing the
+  // window must not pop it open as a drawer, so it is dropped from the URL.
+  const [dockedLinked, setDockedLinked] = useState<number | null>(null);
+  if (docked && linked !== null && dockedLinked !== linked) setDockedLinked(linked);
+  if (linked === null && dockedLinked !== null) setDockedLinked(null);
+  const staleOnNarrow = !docked && linked !== null && linked === dockedLinked;
+  useEffect(() => {
+    if (staleOnNarrow) navigate(hrefWithoutPiProduct(location), { replace: true });
+  }, [staleOnNarrow, location, navigate]);
+  const productShown =
+    measured && !docked && linked !== null && !staleOnNarrow && detailKind === 'product';
   const planetShown = !docked && planetOpen;
   const drawerShown = productShown || planetShown;
   // Back (or Close) took the product off the URL: focus goes back to the opener,
   // unless another drawer is taking over.
   const wasProductShown = useRef(productShown);
   useEffect(() => {
-    if (wasProductShown.current && !productShown && !planetOpen && !helpOpen) restore();
+    if (wasProductShown.current && !productShown && !docked && !planetOpen && !helpOpen) restore();
     wasProductShown.current = productShown;
-  }, [productShown, planetOpen, helpOpen, restore]);
+  }, [productShown, docked, planetOpen, helpOpen, restore]);
 
   const productHref = useCallback(
     (typeId: number) => piProductHref(typeId, location.search),
@@ -290,18 +316,6 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
       // what is under it may not be this page's, so Close replaces, never goes Back.
       setPlanetOpen(false);
       navigate(href, { replace: true });
-      return;
-    }
-    // Docked, the panel is always on screen and the trace is enough: a URL set
-    // now would pop a stale drawer open when the layout narrows. A linked
-    // product gives way to the one just picked.
-    if (docked) {
-      if (linked !== null) {
-        navigate(`${location.pathname}${withoutPiProduct(location.search)}${location.hash}`, {
-          replace: true,
-          state: location.state,
-        });
-      }
       return;
     }
     navigate(href, productNavigation(location));
@@ -327,7 +341,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
     if (docked) return;
     // One drawer at a time: the product's entry goes, the planet's own comes.
     if (linked !== null) {
-      navigate(`${location.pathname}${withoutPiProduct(location.search)}${location.hash}`, {
+      navigate(hrefWithoutPiProduct(location), {
         replace: true,
       });
     }
@@ -380,6 +394,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
           }
           finder={finder}
           onTraceRecipe={openProduct}
+          productHref={productHref}
           onClose={() => {
             setWhatIf(null);
             closePlanet();

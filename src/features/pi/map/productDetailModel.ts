@@ -6,8 +6,9 @@
  * here prices anything, so every ISK figure is the one Plan shows.
  */
 import type { PlanetType } from '@/engine/pi/goalTypes';
-import type { PiFactoryKind } from '@/sde/types';
-import type { MapGraph, MapTier, ProductFigure, Trace } from './mapModel';
+import { DAYS_PER_WEEK } from '../findBestHowTo';
+import type { NamedItem } from '../planView';
+import type { MapFacility, MapGraph, ProductFigure, Trace } from './mapModel';
 
 export interface ProductDetailInput {
   graph: MapGraph;
@@ -20,23 +21,17 @@ export interface ProductDetailInput {
   ccLevel: number | null;
 }
 
-export interface NamedId {
-  typeId: number;
-  name: string;
-}
-
 export type ProductMoney =
   /** The model's one-planet figure: an estimate, from one planet of `useType`. */
   | {
       kind: 'one-planet';
-      iskPerDay: number;
-      useType: PlanetType;
-      m3PerDay: number;
+      /** m³ a week to haul: the hauling load. */
+      m3PerWeek: number;
       ccLevel: number | null;
     }
   /** A raw material: extracted and shipped up a chain, not ranked on its own. */
   | { kind: 'raw' }
-  /** Needs goods from several planets: no one-planet figure. */
+  /** Not a ranked one-planet recipe (a P3 or P4, or no one host): no figure, and why. */
   | { kind: 'multi-planet'; planets: number }
   /** The sell market has no price: unknown, never zero. */
   | { kind: 'unpriced' }
@@ -44,19 +39,14 @@ export type ProductMoney =
   | { kind: 'no-fit' };
 
 export interface ProductDetailView {
-  tier: MapTier;
-  /** An extractor pulls a raw material; anything else runs in this factory. */
-  facility: 'extractor' | PiFactoryKind;
+  facility: MapFacility;
   /** Direct inputs, none for a raw material. */
-  inputs: NamedId[];
+  inputs: NamedItem[];
   /** Planet types that yield it (raw) or carry its factory (made). */
   hosts: PlanetType[];
-  /** Planets it takes between them. */
-  planets: number;
-  onePlanet: boolean;
   money: ProductMoney;
   /** Items anywhere under it that a colony already sells, tier then name. */
-  ownInputs: (NamedId & { colonies: string[] })[];
+  ownInputs: (NamedItem & { colonies: string[] })[];
   /** Colonies that already sell the product itself. */
   makingIt: string[];
 }
@@ -66,7 +56,7 @@ export function buildProductDetail(input: ProductDetailInput): ProductDetailView
   const product = graph.byId.get(typeId)!;
   const onePlanet = product.tier === 0 || trace.alternatives.length > 0;
   const planets = onePlanet ? 1 : trace.planets.length;
-  const named = (id: number): NamedId => ({ typeId: id, name: graph.byId.get(id)!.name });
+  const named = (id: number): NamedItem => ({ typeId: id, name: graph.byId.get(id)!.name });
 
   const sellers = (id: number) =>
     input.colonies.filter((colony) => colony.sells.includes(id)).map((colony) => colony.name);
@@ -78,12 +68,9 @@ export function buildProductDetail(input: ProductDetailInput): ProductDetailView
     .filter((item) => item.colonies.length > 0);
 
   return {
-    tier: product.tier,
     facility: product.facility,
     inputs: product.inputs.map(named),
     hosts: product.hosts,
-    planets,
-    onePlanet,
     money: moneyOf(product.tier, figure, planets, input.ccLevel),
     ownInputs,
     makingIt: sellers(typeId),
@@ -91,7 +78,7 @@ export function buildProductDetail(input: ProductDetailInput): ProductDetailView
 }
 
 function moneyOf(
-  tier: MapTier,
+  tier: number,
   figure: ProductFigure,
   planets: number,
   ccLevel: number | null
@@ -100,9 +87,7 @@ function moneyOf(
   if (figure.kind === 'ranked') {
     return {
       kind: 'one-planet',
-      iskPerDay: figure.iskPerDay,
-      useType: figure.useType,
-      m3PerDay: figure.m3PerDay,
+      m3PerWeek: figure.m3PerDay * DAYS_PER_WEEK,
       ccLevel,
     };
   }

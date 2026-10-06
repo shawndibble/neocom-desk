@@ -11,6 +11,8 @@
  */
 import { interactiveClassName, focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { Link } from 'react-router-dom';
+import { onPlanLinkClick } from '@/features/industry/planLinkClick';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, TypeIcon } from '@/components/ui';
 import { buttonClassName } from '@/components/ui/buttonClassName';
@@ -19,7 +21,6 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
-import { DAYS_PER_WEEK } from '../findBestHowTo';
 import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { PlanetFinder } from './PlanetFinder';
@@ -51,6 +52,31 @@ export interface ProductDetailProps {
 
 const names = (graph: MapGraph, ids: readonly number[]) =>
   ids.map((id) => graph.byId.get(id)!.name);
+
+/** A chain of product names, each a link to its own PI detail but the one already open. */
+function NameChain({
+  graph,
+  ids,
+  open,
+}: {
+  graph: MapGraph;
+  ids: readonly number[];
+  open: number;
+}) {
+  return (
+    <>
+      {ids.map((id, i) => {
+        const name = graph.byId.get(id)!.name;
+        return (
+          <span key={id}>
+            {i > 0 && ' → '}
+            {id === open ? name : <PiProductLink typeId={id}>{name}</PiProductLink>}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
@@ -138,7 +164,7 @@ export function ProductDetail(props: ProductDetailProps) {
       {view.money.kind === 'one-planet' && (
         <p className="mt-1 text-xs text-text-dim">
           {t('piMap.detail.haul', {
-            m3: Math.round(view.money.m3PerDay * DAYS_PER_WEEK).toLocaleString('en'),
+            m3: Math.round(view.money.m3PerWeek).toLocaleString('en'),
           })}
           {view.money.ccLevel !== null &&
             ` ${t('piMap.detail.ccAssumed', { level: view.money.ccLevel })}`}
@@ -146,7 +172,9 @@ export function ProductDetail(props: ProductDetailProps) {
       )}
       {view.money.kind === 'multi-planet' && (
         <p className="mt-2 text-xs font-semibold text-warning">
-          {t('piMap.detail.multiPlanet', { count: view.money.planets })}
+          {view.money.planets > 1
+            ? t('piMap.detail.multiPlanet', { count: view.money.planets })
+            : t('piMap.detail.notRanked')}
         </p>
       )}
 
@@ -198,7 +226,9 @@ export function ProductDetail(props: ProductDetailProps) {
                     )}
                   </span>
                 </div>
-                <div className="text-text-dim">{names(graph, planet.made).join(' → ')}</div>
+                <div className="text-text-dim">
+                  <NameChain graph={graph} ids={planet.made} open={typeId} />
+                </div>
               </div>
             </li>
           );
@@ -215,7 +245,9 @@ export function ProductDetail(props: ProductDetailProps) {
               <div className="text-text-dim">
                 {trace.planets.length > 1 ? t('piMap.detail.shipTo') : t('piMap.detail.samePlanet')}
               </div>
-              <div>{names(graph, trace.rest).join(' → ')}</div>
+              <div>
+                <NameChain graph={graph} ids={trace.rest} open={typeId} />
+              </div>
             </div>
           </li>
         )}
@@ -290,6 +322,8 @@ export interface AddPlanetDetailProps {
   weakest: { name: string; perDay: number } | null;
   finder: FinderOrigin;
   onTraceRecipe: (typeId: number) => void;
+  /** The recipe's PI detail URL: the button is a real link. */
+  productHref: (typeId: number) => string;
   onClose: () => void;
 }
 
@@ -320,9 +354,9 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
 
       {recipe ? (
         <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => props.onTraceRecipe(recipe.typeId)}
+          <Link
+            to={props.productHref(recipe.typeId)}
+            onClick={onPlanLinkClick(() => props.onTraceRecipe(recipe.typeId))}
             className={cx(
               'flex min-h-11 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left [@media(hover:hover)]:hover:bg-panel-2',
               interactiveClassName,
@@ -334,7 +368,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
               {t('piMap.add.bestRecipe')} <b>{recipe.name}</b>
             </span>
             <Icon.Descend aria-hidden="true" className="ml-auto shrink-0 text-text-dim" />
-          </button>
+          </Link>
           <p className="mt-1 text-xs text-isk-pos">
             +<IskAmount value={recipe.iskPerDay} decimals={0} />
             {t('piMap.add.perDaySuffix')}

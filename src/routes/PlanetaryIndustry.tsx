@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
-import { parsePiProduct, withoutPiProduct } from '@/features/pi/piPlanLink';
+import { hrefWithoutPiProduct, parsePiProduct } from '@/features/pi/piPlanLink';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { Button, DataAgeBadge, IconButton, PageHeader, Spinner, Tabs } from '@/components/ui';
@@ -97,7 +97,7 @@ export function PlanetaryIndustry() {
   const navigate = useNavigate();
   useEffect(() => {
     if (tab === 'map' || parsePiProduct(location.search) === null) return;
-    navigate(`${location.pathname}${withoutPiProduct(location.search)}${location.hash}`, {
+    navigate(hrefWithoutPiProduct(location), {
       replace: true,
       state: location.state,
     });
