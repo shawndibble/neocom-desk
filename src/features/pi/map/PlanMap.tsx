@@ -26,7 +26,15 @@
 import { withArticle } from '../article';
 import { AssumedCustomsNote } from '../AssumedCustomsNote';
 import { assumedCustomsNames } from '../colonyCustoms';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onPlanLinkClick } from '@/features/industry/planLinkClick';
@@ -347,11 +355,13 @@ export function PlanMap({
     () => (activeWhatIf ? unlockedBy(graph, activeWhatIf, ticked) : null),
     [graph, activeWhatIf, ticked]
   );
-  // Sizing only: the box reserves the height of a full preview (see `whatIfLine`).
-  const sizingType = graph.planetTypes.find((type) => !isHave(type)) ?? null;
-  const sizingUnlock = useMemo(
-    () => (sizingType ? unlockedBy(graph, sizingType, ticked) : null),
-    [graph, sizingType, ticked]
+  // Sizing only: every missing type's preview is laid out invisibly so the box fits the tallest.
+  const sizingUnlocks = useMemo(
+    () =>
+      graph.planetTypes
+        .filter((type) => !isHave(type))
+        .map((type) => ({ type, unlock: unlockedBy(graph, type, ticked) })),
+    [graph, isHave, ticked]
   );
   const newIds = useMemo(() => unlock?.highlight ?? new Set<number>(), [unlock]);
   const figures = useMemo(
@@ -734,7 +744,9 @@ export function PlanMap({
           </span>
         </div>
         {active && unlock ? preview(active, unlock, whatIf === active ? best : '') : null}
-        {sizingType && sizingUnlock ? preview(sizingType, sizingUnlock, best, true) : null}
+        {sizingUnlocks.map((g) => (
+          <Fragment key={g.type}>{preview(g.type, g.unlock, best, true)}</Fragment>
+        ))}
       </div>
     );
   })();

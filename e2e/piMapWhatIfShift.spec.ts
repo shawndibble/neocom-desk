@@ -45,6 +45,8 @@ for (const [label, viewport] of [
     const missing = scope.getByRole('button', { name: /^Lava planet, you don't have one/ });
     await expect(missing).toBeVisible();
 
+    // Let late images and prices settle so only the hover's own shift is counted.
+    await page.waitForTimeout(1000);
     const rest = await measure(page);
     await page.evaluate(() => {
       const w = window as unknown as { __cls: number };
