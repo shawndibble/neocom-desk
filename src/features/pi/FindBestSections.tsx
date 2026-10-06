@@ -11,11 +11,6 @@
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, IskAmount, Panel, SegmentedControl, TypeIcon } from '@/components/ui';
-import {
-  focusRingClassName,
-  interactiveClassName,
-  tappableRowClassName,
-} from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -187,8 +182,15 @@ const STATE_TEXT: Record<TypeState, string> = {
   find: 'text-danger',
 };
 
-/** "Find one" is the way in to Show me how, whose step 1 is the planet finder. */
-function HostMark({ state, onFind }: { state: TypeState; onFind: () => void }) {
+function HostMark({
+  state,
+  planet,
+  onFind,
+}: {
+  state: TypeState;
+  planet: string;
+  onFind: () => void;
+}) {
   const { t } = useTranslation();
   const Glyph = state === 'find' ? Icon.Close : Icon.Done;
   const inner = (
@@ -199,20 +201,16 @@ function HostMark({ state, onFind }: { state: TypeState; onFind: () => void }) {
   );
   const className = cx('inline-flex items-center gap-0.5 text-[0.6875rem]', STATE_TEXT[state]);
   if (state !== 'find') return <span className={className}>{inner}</span>;
+  // "Find one" is the way in to Show me how, whose step 1 is the planet finder.
   return (
-    <button
-      type="button"
-      className={cx(
-        className,
-        'rounded-xs font-medium underline decoration-1 underline-offset-2 hover:decoration-2',
-        tappableRowClassName,
-        interactiveClassName,
-        focusRingClassName
-      )}
+    <Button
+      size="sm"
+      aria-label={t('piPlan.find.findOneFor', { planet })}
+      className={className}
       onClick={onFind}
     >
       {inner}
-    </button>
+    </Button>
   );
 }
 
@@ -351,7 +349,7 @@ function RecipeCard({
             <li key={host.type} className="flex items-center gap-1.5 text-xs">
               <PlanetImage type={host.type} px={20} />
               <b className="font-semibold">{typeName(host.type)}</b>
-              <HostMark state={host.state} onFind={onFind} />
+              <HostMark state={host.state} planet={typeName(host.type)} onFind={onFind} />
             </li>
           ))}
         </ul>
