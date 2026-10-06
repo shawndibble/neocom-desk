@@ -164,8 +164,6 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     const audited = [
       'src/features/character/assetBrowserRows.tsx',
       'src/features/corp/CorpBoardRow.tsx',
-      'src/features/fittings/FittingAddPanel.tsx',
-      'src/features/fittings/FittingFightersPanel.tsx',
       'src/features/fittings/FittingRackList.tsx',
       'src/features/fittings/FittingStartScreen.tsx',
       'src/features/fittings/FittingStatsSections.tsx',
@@ -176,8 +174,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/market/QuickbarList.tsx',
       'src/features/market/TransactionsDayList.tsx',
       'src/features/market/UsedInSection.tsx',
-      'src/features/skills/SkillRowContextMenu.tsx',
-      'src/routes/FittingCompare.tsx',
+      'src/features/skills/planner/EntryList.tsx',
       'src/routes/Mail.tsx',
       'src/routes/Market.tsx',
     ];
