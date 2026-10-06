@@ -120,3 +120,4 @@ export { TextArea } from './TextArea';
 export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';
 export { IskAmount } from './IskAmount';
+export { IskFigureGroup } from './IskFigureGroup';
