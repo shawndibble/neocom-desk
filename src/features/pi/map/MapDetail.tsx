@@ -21,6 +21,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRank } from '@/engine/pi/planRecipes';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useOptionalItemActions } from '@/features/market/itemActions';
+import { CcLevelTag } from '../CcLevelTag';
 import { PiProductLink } from '../PiProductLink';
 import type { SlotNudge } from '@/engine/pi/planAdvice';
 import { withArticle } from '../article';
@@ -159,6 +160,11 @@ export function ProductDetail(props: ProductDetailProps) {
           <div className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
             {t('piMap.detail.perPlanet', { type: planetName(t, figure.useType) })}
           </div>
+          {figure.needsCcLevel && (
+            <div className="mt-1.5">
+              <CcLevelTag level={figure.needsCcLevel} />
+            </div>
+          )}
         </div>
       ) : null}
       {view.money.kind !== 'multi-planet' && (

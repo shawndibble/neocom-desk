@@ -23,6 +23,7 @@ const ranked: ProductFigure = {
   verdict: 'better',
   isReference: false,
   versus: null,
+  needsCcLevel: null,
 };
 
 function input(

@@ -186,7 +186,12 @@ describe('productFigure: no colonies at Command Center Upgrades V', () => {
   });
 
   it('never calls a one-planet P2 that is unscored "not one planet"', () => {
-    const empty = { ...advice, recipes: { ...advice.recipes, recipes: [], unpriced: [] } };
+    const none = { recipes: [], unpriced: [] };
+    const empty = {
+      ...advice,
+      recipes: { ...advice.recipes, ...none },
+      recipesWithTagged: { ...advice.recipesWithTagged, ...none },
+    };
     expect(productFigure(empty, coolant.typeId, graph)).toEqual({
       kind: 'unranked',
       reason: 'no-fit',

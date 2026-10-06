@@ -184,6 +184,11 @@ export function MapPhone(props: MapPhoneProps) {
                         {glyph}
                       </span>
                       {formatIskCompact(figure.iskPerDay)}
+                      {figure.needsCcLevel && (
+                        <span className="rounded-xs border border-warning/60 px-1 text-[10px] leading-[14px] font-semibold text-warning">
+                          {t('piMap.needsCcShort', { level: figure.needsCcLevel })}
+                        </span>
+                      )}
                     </span>
                   )}
                 </Link>
