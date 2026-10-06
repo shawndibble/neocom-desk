@@ -48,7 +48,7 @@ function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
 
 async function openDeleteFor(name: string) {
   await userEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
-  await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await userEvent.click(await screen.findByRole('button', { name: `Delete ${name}` }));
 }
 
 async function pickHub(name: string) {

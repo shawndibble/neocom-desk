@@ -13,6 +13,7 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
+import { expectNoPageOverflow } from './support/overflow';
 import { scopesForGroup } from '../src/esi/scopes';
 
 const PHONE = { width: 390, height: 844 };
@@ -80,6 +81,13 @@ test.describe('Corp Members narrow table', () => {
     const header = page.getByRole('columnheader', { name: /Ship/ });
     await expect(header).toBeVisible();
     await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+    // Still a table, not cards.
+    const rowDisplay = await page
+      .locator('table tbody tr:not(.dt-spacer)')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display);
+    expect(rowDisplay).toBe('table-row');
+    await expectNoPageOverflow(page);
     await header.getByRole('button').click();
     expect(new URL(page.url()).search).toContain('sort');
   });

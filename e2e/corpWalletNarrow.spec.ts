@@ -128,7 +128,20 @@ test.describe('Corp Wallet narrow tables', () => {
     // A table, not cards: the header row and its sort buttons stay, and the
     // low-value Side / Unit price columns drop out.
     await expect(table.getByRole('columnheader', { name: /Total/ })).toBeVisible();
-    await expect(table.getByRole('columnheader', { name: /Unit price/ })).toBeHidden();
+    const headers = await table.evaluate((el) =>
+      [...el.querySelectorAll('thead th')]
+        .filter((th) => getComputedStyle(th).display !== 'none')
+        .map((th) => (th.textContent ?? '').trim())
+    );
+    expect(headers.some((h) => h.startsWith('Item'))).toBe(true);
+    expect(headers.some((h) => h.startsWith('Total'))).toBe(true);
+    expect(headers.some((h) => h.startsWith('Unit price'))).toBe(false);
+    expect(headers.some((h) => h.startsWith('Side'))).toBe(false);
+    const rowDisplay = await table
+      .locator('tbody tr:not(.dt-spacer)')
+      .first()
+      .evaluate((el) => getComputedStyle(el).display);
+    expect(rowDisplay).toBe('table-row');
     await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
     await table.getByRole('columnheader', { name: /Total/ }).getByRole('button').click();
     await expect(page).toHaveURL(/sort=/);

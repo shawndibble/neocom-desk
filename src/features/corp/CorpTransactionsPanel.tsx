@@ -337,17 +337,19 @@ export function CorpTransactionsPanel({
               }
             />
           ) : (
-            <DataTable
-              {...tableExport.tableProps}
-              label={t('wallet.transactionsTab')}
-              columns={shownColumns}
-              rows={filteredTransactions}
-              rowKey={corpTransactionRowKey}
-              virtualize="auto"
-              sort={sort}
-              onSortChange={onSortChange}
-              responsive="table"
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                {...tableExport.tableProps}
+                label={t('wallet.transactionsTab')}
+                columns={shownColumns}
+                rows={filteredTransactions}
+                rowKey={corpTransactionRowKey}
+                virtualize="auto"
+                sort={sort}
+                onSortChange={onSortChange}
+                responsive="table"
+              />
+            </div>
           )}
         </>
       )}

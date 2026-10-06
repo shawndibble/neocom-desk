@@ -371,6 +371,7 @@ export function PayeeManagerDialog({
                   variant="danger"
                   size="sm"
                   className="mr-auto"
+                  aria-label={t('miningTax.deletePayeeNamed', { name: draft.name || draft.id })}
                   onClick={() => {
                     const target = payees.find((p) => p.id === draft.id);
                     if (target) openDelete(target);

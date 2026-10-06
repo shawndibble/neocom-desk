@@ -14,7 +14,7 @@
  */
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CharacterLink } from '@/features/entities';
+import { CharacterLink, SystemLink } from '@/features/entities';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
@@ -135,6 +135,9 @@ function rolesText(roles: readonly string[] | null): string | null {
     .join(', ');
 }
 
+/** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */
+const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
+
 /** Longest silence first — the view's whole point (see the module note). */
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
@@ -202,7 +205,16 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         id: 'location',
         header: t('corp.members.columnLocation'),
         className: 'truncate',
-        render: (row) => label(row.locationName, row.locationId),
+        // A solar system links to Route Safety / Travel, where waypoints are
+        // set; a station or structure id is not a system, so stays text.
+        render: (row) =>
+          row.locationId !== null &&
+          row.locationName !== null &&
+          isSolarSystemId(row.locationId) ? (
+            <SystemLink systemId={row.locationId}>{row.locationName}</SystemLink>
+          ) : (
+            label(row.locationName, row.locationId)
+          ),
         sortValue: (row) => row.locationName ?? undefined,
       },
       {
@@ -299,17 +311,19 @@ export function CorpRosterTable({
   }
 
   return (
-    <DataTable
-      {...tableProps}
-      columns={shownColumns}
-      rows={rows}
-      responsive="table"
-      rowKey={rosterRowKey}
-      highlightRowKey={highlightedMemberId}
-      virtualize="auto"
-      label={t('corp.members.tableLabel')}
-      density="compact"
-      {...sortProps}
-    />
+    <div className="overflow-x-auto">
+      <DataTable
+        {...tableProps}
+        columns={shownColumns}
+        rows={rows}
+        responsive="table"
+        rowKey={rosterRowKey}
+        highlightRowKey={highlightedMemberId}
+        virtualize="auto"
+        label={t('corp.members.tableLabel')}
+        density="compact"
+        {...sortProps}
+      />
+    </div>
   );
 }
