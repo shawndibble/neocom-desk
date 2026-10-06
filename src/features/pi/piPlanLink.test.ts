@@ -3,6 +3,9 @@ import {
   parsePiProduct,
   piColonyHref,
   piPlanHref,
+  hrefWithoutPiPlanet,
+  parsePiPlanet,
+  piPlanetHref,
   piProductHref,
   productNavigation,
   withoutPiProduct,
@@ -39,9 +42,9 @@ describe('piProductHref', () => {
   });
 
   it('replaces an open product and drops a goal seed, an open colony and Show info', () => {
-    expect(piProductHref(2393, '?product=9832&type=9848&colony=4&info=character-1&q=x')).toBe(
-      '/planetary-industry/map?q=x&product=2393'
-    );
+    expect(
+      piProductHref(2393, '?product=9832&type=9848&colony=4&info=character-1&planet=7&q=x')
+    ).toBe('/planetary-industry/map?q=x&product=2393');
   });
 });
 
@@ -84,5 +87,32 @@ describe('productNavigation', () => {
     expect(
       productNavigation({ pathname: MAP, search: '?product=2393', state: PI_PRODUCT_PUSHED_STATE })
     ).toEqual({ replace: true, state: PI_PRODUCT_PUSHED_STATE });
+  });
+});
+
+describe('planet drawer addressing', () => {
+  it('links the Map with the colony open', () => {
+    expect(piPlanetHref(40000001)).toBe('/planetary-industry/map?planet=40000001');
+  });
+
+  it('parses a positive whole id and nothing else', () => {
+    expect(parsePiPlanet('?planet=40000001')).toBe(40000001);
+    expect(parsePiPlanet('')).toBeNull();
+    expect(parsePiPlanet('?planet=abc')).toBeNull();
+    expect(parsePiPlanet('?planet=0')).toBeNull();
+    expect(parsePiPlanet('?planet=-4')).toBeNull();
+  });
+
+  it('drops only planet from a location', () => {
+    expect(
+      hrefWithoutPiPlanet({
+        pathname: '/planetary-industry/map',
+        search: '?planet=4&off=2',
+        hash: '#x',
+      })
+    ).toBe('/planetary-industry/map?off=2#x');
+    expect(
+      hrefWithoutPiPlanet({ pathname: '/planetary-industry/map', search: '?planet=4', hash: '' })
+    ).toBe('/planetary-industry/map');
   });
 });

@@ -153,7 +153,10 @@ export function hubBooks(prices: HubPrices, accountingLevel: number | null): Sel
 
 export interface PlanAdviceInput {
   snapshot: PlannerSnapshot;
-  prefs: Pick<PlannerPrefs, 'restartHours' | 'fallbackRatePerHour' | 'customsOverrides'>;
+  prefs: Pick<
+    PlannerPrefs,
+    'restartHours' | 'fallbackRatePerHour' | 'customsOverrides' | 'richness'
+  >;
   /** The hub's books; `market` decides whether a buyback replaces them. */
   books: SellBooks;
   market: SellMarket;
@@ -379,6 +382,7 @@ export function buildPlanAdvice(input: PlanAdviceInput): PlanAdvice {
       haulHours,
       preference,
       ccSkill: input.skills.commandCenterUpgrades,
+      picked: input.prefs.richness?.get(row.planetId),
       factoryWins: factoryOpportunities.get(row.planetId) ?? [],
     });
     work.set(row.planetId, result);
@@ -456,6 +460,8 @@ function analyseColony(args: {
   haulHours: number;
   preference: RebuildPreference;
   ccSkill: number | null;
+  /** The pilot's saved richness pick for this planet (`richnessOverride.ts`). */
+  picked: readonly number[] | undefined;
   factoryWins: readonly QuickWin[];
 }): ColonyWork {
   const { row, pins, books, pi, nowMs, restartHours, haulHours, preference } = args;
@@ -755,6 +761,7 @@ function analyseColony(args: {
     books,
     haulHours,
     ccSkill: args.ccSkill,
+    picked: args.picked,
     todayM3PerDay,
   });
 
@@ -781,6 +788,8 @@ function rebuildFacts(args: {
   books: SellBooks;
   haulHours: number;
   ccSkill: number | null;
+  /** The pilot's saved richness pick for this planet (`richnessOverride.ts`). */
+  picked: readonly number[] | undefined;
   todayM3PerDay: number | null;
 }): RebuildFacts | { refused: string } {
   const { row, colony, pi, books, haulHours } = args;
@@ -794,6 +803,7 @@ function rebuildFacts(args: {
       taxRate: row.taxRate,
       salesTaxPct: books.salesTaxPct,
       bufferHours: haulHours,
+      ...(args.picked ? { picked: args.picked } : {}),
       ...(budgetOverride ? { budgetOverride } : {}),
     });
 

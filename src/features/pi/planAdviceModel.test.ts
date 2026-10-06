@@ -23,6 +23,7 @@ const pi = JSON.parse(
 ) as PiData;
 
 const MICROORGANISMS = 2073;
+const AQUEOUS_LIQUIDS = 2268;
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30004759;
 const NOW = Date.parse('2026-10-01T00:00:00Z');
@@ -305,6 +306,36 @@ describe('buildPlanAdvice: rebuild', () => {
     );
     expect(colony.afterRebuildPerDay).toBeCloseTo(colony.rebuild.pick.iskPerDay, 6);
     expect(colony.rebuild.steps.some((step) => step.verb === 'set')).toBe(true);
+  });
+
+  it("builds a rebuild only from the resources the pilot picked for that planet, and leaves others' alone", () => {
+    const rebuildOf = (richness?: ReadonlyMap<number, readonly number[]>) =>
+      temperate(
+        buildPlanAdvice(
+          leanInput({
+            snapshot: leanSnapshot(),
+            prefs: {
+              restartHours: 72,
+              fallbackRatePerHour: 12_000,
+              customsOverrides: {},
+              richness,
+            },
+          })
+        )
+      ).rebuild;
+    const picked = rebuildOf(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]]));
+    if (picked.status !== 'change') throw new Error('expected a change');
+    for (const option of [picked.pick, picked.alternative]) {
+      if (option) expect(option.recipe.extracts).toEqual([AQUEOUS_LIQUIDS]);
+    }
+    // The unrestricted pick works another resource, so the override is what narrowed it.
+    const open = rebuildOf();
+    if (open.status !== 'change') throw new Error('expected a change');
+    expect(open.alternative?.recipe.extracts).not.toEqual([AQUEOUS_LIQUIDS]);
+    // Absent, empty, or on another planet: the same answer as no override at all.
+    expect(rebuildOf(new Map())).toEqual(rebuildOf());
+    expect(rebuildOf(new Map([[TEMPERATE_ID, []]]))).toEqual(rebuildOf());
+    expect(rebuildOf(new Map([[OCEANIC_ID, [MICROORGANISMS]]]))).toEqual(rebuildOf());
   });
 
   it('carries the rebuild layout draw against the Command Center it needs, for the fit meters', () => {

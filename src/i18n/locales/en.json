@@ -4596,6 +4596,14 @@
     }
   },
   "piMap": {
+    "richness": {
+      "title": "Resources on {{name}}",
+      "optional": "Optional",
+      "explain": "Scanned this planet? Pick the resources you would pull and Plan, Map and Colonies advise on those only. Skip it and every resource counts.",
+      "pickLabel": "Resources you would pull here",
+      "clear": "Clear picks",
+      "done": "Back to the map"
+    },
     "title": "Planet map",
     "helpButton": "How to use the map",
     "hint": "Click a planet type to filter, or a product to trace it.",
@@ -5590,6 +5598,7 @@
       "lastUpdateValue": "{{local}} · {{eve}} EVE",
       "fixes": "Small fixes here",
       "sameAsPlan": "Same as Plan → Quick wins",
+      "richness": "Which resources do you pull here?",
       "planThis": "Plan this colony: rebuild ideas",
       "planHint": "Want more than small fixes? Plan compares what else this {{type}} planet could make."
     },

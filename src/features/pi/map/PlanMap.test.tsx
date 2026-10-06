@@ -37,15 +37,15 @@ function props(overrides: Partial<PlanMapProps> = {}): PlanMapProps {
     graph,
     advice,
     adviceWithWhatIf: withWhatIf('lean'),
-    colonies: [{ type: 'temperate', name: 'Hek VIII' }],
+    colonies: [{ planetId: 40000001, type: 'temperate', name: 'Hek VIII' }],
     finder: { systemId: 30000142, name: 'Jita', security: 0.9 },
     ...overrides,
   };
 }
 
-function renderMap(overrides: Partial<PlanMapProps> = {}) {
+function renderMap(overrides: Partial<PlanMapProps> = {}, entry = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <PlanMap {...props(overrides)} />
     </MemoryRouter>
   );
@@ -569,5 +569,35 @@ describe('PlanMap: the picks note says what is shared with Plan', () => {
   it('says the recipe list is shown before the Plan tab filters', () => {
     renderMap({ advice: adviceNone, colonies: [], adviceWithWhatIf: withWhatIf('none') });
     expect(screen.getByText(/before the Plan tab's filters/)).toBeInTheDocument();
+  });
+});
+
+// A colony's richness override is the URL's `?planet=`, in the same drawer as a product.
+describe('PlanMap richness drawer', () => {
+  it("opens a colony's richness chips from ?planet= on a phone", async () => {
+    stubPhone(true);
+    renderMap({}, '/planetary-industry/map?planet=40000001');
+    expect(
+      await screen.findByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    expect(screen.getByText('Optional')).toBeVisible();
+  });
+
+  it('shows it in the docked panel too, with a way back', async () => {
+    renderMap({}, '/planetary-industry/map?planet=40000001');
+    reportWidth(DOCK_MIN_PANEL_WIDTH);
+    const aside = await screen.findByRole('complementary', { name: 'Resources on Hek VIII' });
+    expect(
+      within(aside).getByRole('group', { name: 'Resources you would pull here' })
+    ).toBeVisible();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(aside).getByRole('button', { name: 'Back to the map' })).toBeVisible();
+  });
+
+  it('ignores a planet the pilot has no colony on', async () => {
+    stubPhone(true);
+    renderMap({}, '/planetary-industry/map?planet=123');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole('group', { name: 'Resources you would pull here' })).toBeNull();
   });
 });
