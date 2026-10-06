@@ -100,5 +100,11 @@ export function DataAgeBadge({
     </time>
   );
 
-  return tooltip ? <Tooltip content={content}>{badge}</Tooltip> : badge;
+  return tooltip ? (
+    <Tooltip content={content} openOnTap>
+      {badge}
+    </Tooltip>
+  ) : (
+    badge
+  );
 }
