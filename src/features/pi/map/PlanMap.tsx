@@ -30,6 +30,7 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useMediaQuery, useTouchContext } from '@/lib/useMediaQuery';
 import type { PlanAdvice } from '../planAdviceModel';
 import { planPicks } from '../planPicks';
+import { usePlanPreference } from '../planTicksPref';
 import { AddPlanetDetail, ProductDetail, type FinderOrigin } from './MapDetail';
 import { MapBoard } from './MapBoard';
 import { MapHelp } from './MapHelp';
@@ -86,6 +87,7 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
   );
 
   const picks = useMemo(() => planPicks(advice), [advice]);
+  const preference = usePlanPreference((state) => state.value);
   const pickRanks = useMemo(() => new Map(picks.picks.map((p, i) => [p.typeId, i + 1])), [picks]);
   const pickPlanets = useMemo(() => {
     const map = new Map<PlanetType, number[]>();
@@ -371,7 +373,13 @@ export function PlanMap({ graph, advice, adviceWithWhatIf, colonies, finder }: P
             </Tooltip>
           ))}
           <span className="text-[11px] text-text-dim">
-            {picks.kind === 'rebuild' ? t('piMap.picksNoteRebuild') : t('piMap.picksNoteRecipes')}
+            {picks.kind === 'rebuild'
+              ? t('piMap.picksNoteRebuild', {
+                  preference: t(
+                    preference === 'haul' ? 'piPlan.make.leastHauling' : 'piPlan.make.mostIsk'
+                  ).toLowerCase(),
+                })
+              : t('piMap.picksNoteRecipes')}
           </span>
         </>
       )}
