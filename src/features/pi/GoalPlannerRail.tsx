@@ -355,7 +355,7 @@ export function ColoniesSection({
 }) {
   const { t } = useTranslation();
   const enabled = rows.filter((row) => row.enabled).length;
-  const firstRateRow = rows.find((row) => excludedText(row, t) === null);
+  const firstRateRow = focusCustoms ? rows.find((row) => row.excluded === null) : undefined;
   return (
     <CollapsiblePanel
       title={t('piPlan.coloniesTitle')}

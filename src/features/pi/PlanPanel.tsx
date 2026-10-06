@@ -14,8 +14,7 @@ import { GoalPlannerPanel, type GoalPlannerPanelProps } from './GoalPlannerPanel
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { MakeMorePlan } from './MakeMorePlan';
 import { PlanetImage } from './PlanetImage';
-import { PLAN_CUSTOMS_HASH } from './piPlanLink';
-import { openingQuestion, type PlanQuestion } from './planQuestion';
+import { openingQuestion, pickedQuestion, type PlanQuestion } from './planQuestion';
 
 interface Props extends GoalPlannerPanelProps {
   /** A `?type=` seed is on its way to becoming a goal. */
@@ -100,12 +99,7 @@ export function PlanPanel(props: Props) {
   // `#customs` (the "Set the rate" links) opens the Goal Planner, where the rate is edited,
   // until the pilot picks a question on that same visit.
   const [pick, setPickState] = useState<{ question: PlanQuestion; key: string } | null>(null);
-  const picked =
-    pick !== null && (hash !== PLAN_CUSTOMS_HASH || pick.key === locationKey)
-      ? pick.question
-      : hash === PLAN_CUSTOMS_HASH
-        ? ('product' as const)
-        : null;
+  const picked = pickedQuestion(pick, hash, locationKey);
   const setPicked = (question: PlanQuestion) => setPickState({ question, key: locationKey });
 
   if (failedFor === characterId) {

@@ -128,7 +128,7 @@ function GoalPlanner({
   // Folded on a phone, open beside a pointer, until the pilot says otherwise.
   // `#customs` lands on the customs rate fields: Colonies open, first rate focused.
   const { hash } = useLocation();
-  const [toCustoms] = useState(hash === PLAN_CUSTOMS_HASH);
+  const [toCustoms, setToCustoms] = useState(hash === PLAN_CUSTOMS_HASH);
   const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(toCustoms ? true : null);
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
@@ -451,7 +451,10 @@ function GoalPlanner({
           size={size}
           focusCustoms={toCustoms}
           expanded={coloniesOpen ?? mdUp}
-          onToggleExpanded={() => setColoniesOpen(!(coloniesOpen ?? mdUp))}
+          onToggleExpanded={() => {
+            setToCustoms(false); // the deep link's focus is one-shot
+            setColoniesOpen(!(coloniesOpen ?? mdUp));
+          }}
           onToggle={(planetId, enabled) =>
             onDisabledChange(
               enabled ? disabled.filter((id) => id !== planetId) : [...disabled, planetId]
