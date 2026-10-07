@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
+import { markStoresStale } from '@/app/staleStoresReload';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
 import {
@@ -562,9 +563,10 @@ function ResetViewPreferences() {
     setTimeout(() => setConfirmed(false), 2000);
     // Every one of these is read through a `createLocalSetting` store that has
     // already hydrated, so the rows are gone but the stores still hold the old
-    // values. A reload is the honest way to show the result rather than
-    // reaching into fifteen stores from here.
-    window.location.reload();
+    // values. Settings shows none of them, so the reload that re-hydrates them
+    // waits for the next route out of Settings (`StaleStoresReloader`) — a
+    // reload here would wipe the confirmation before it could be read.
+    markStoresStale();
   }
 
   return (
