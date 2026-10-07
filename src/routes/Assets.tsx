@@ -16,6 +16,10 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
   IskAmount,
   PageHeader,
@@ -49,8 +53,9 @@ import {
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { MyShipsPanel } from '@/features/character/MyShipsPanel';
 import { useUrlParams } from '@/lib/useUrlState';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -136,6 +141,8 @@ const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
+/** `?view=ships` opens My ships, a slide-in from the Tools menu. */
+const VIEW_PARAM = optionalEnumParam(['ships'] as const);
 
 /**
  * A drill-down href that keeps the page's whole query string: its filters
@@ -675,6 +682,7 @@ export function Assets() {
       q: SEARCH_PARAM,
       all: ALL_ITEMS_PARAM,
       min: MIN_VALUE_PARAM,
+      view: VIEW_PARAM,
       chars: characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
     }),
     [defaultCharacterFilter]
@@ -756,6 +764,21 @@ export function Assets() {
         : [...resolvedCrossCharacterFilter];
     return ids.filter((id) => id !== activeCharacterId);
   }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
+
+  // My ships follows the same Character filter, the active Character included.
+  const shipCharacterIds = useMemo(() => {
+    const ids =
+      resolvedCrossCharacterFilter === 'all'
+        ? crossCharacterCandidates.map((c) => c.characterId)
+        : [...resolvedCrossCharacterFilter];
+    return ids.length === 0 && activeCharacterId !== null ? [activeCharacterId] : ids;
+  }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
+  const shipsFilterIsAll =
+    resolvedCrossCharacterFilter === 'all' ||
+    (crossCharacterCandidates.length > 0 &&
+      crossCharacterCandidates.every((c) => shipCharacterIds.includes(c.characterId)));
+  const myShipsOpen = view.view === 'ships';
+  const closeMyShips = () => setView({ view: null });
 
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
@@ -1643,6 +1666,20 @@ export function Assets() {
                   pressed={selectMode}
                   onClick={toggleSelectMode}
                 />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton
+                      icon={<Icon.Settings />}
+                      label={t('assets.tools.label')}
+                      size="md"
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
+                      {t('assets.myShips.title')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
                 <IconButton
                   icon={<Icon.Refresh />}
@@ -1653,6 +1690,26 @@ export function Assets() {
               </div>
             </>
           }
+        />
+
+        <MyShipsPanel
+          open={myShipsOpen}
+          onClose={closeMyShips}
+          characterIds={shipCharacterIds}
+          activeCharacterId={activeCharacterId}
+          filterControl={crossCharacterFilterMeta}
+          onShowAllCharacters={
+            !shipsFilterIsAll && crossCharacterCandidates.length > 1
+              ? () => setView({ chars: 'all' })
+              : undefined
+          }
+          hrefFor={(locationId) => {
+            const params = new URLSearchParams(query);
+            params.delete('view');
+            const rest = params.toString();
+            return assetPathHref(locationId, []) + (rest ? `?${rest}` : '');
+          }}
+          route={assetsRoute}
         />
 
         {assetsResult && !assetsNeedsReauth && (

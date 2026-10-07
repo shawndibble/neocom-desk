@@ -29,6 +29,7 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '650': { name: 'Drake', groupID: 27, volume: 92150 },
+  '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '691': { name: 'Rifter Blueprint', groupID: 105, volume: 0.01 },
 };
 
@@ -43,6 +44,8 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
+  // Group 25 (Frigate) is in category 6, Ship.
+  loadGroupCategories: vi.fn(async () => ({ '25': 6 })),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
@@ -1263,6 +1266,99 @@ describe('cross-character search (issue #85)', () => {
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  describe('My ships', () => {
+    const ship = (itemId: number, locationId: number) => ({
+      item_id: itemId,
+      type_id: 587,
+      quantity: 1,
+      location_id: locationId,
+      location_type: 'station' as const,
+      location_flag: 'Hangar',
+      is_singleton: true,
+    });
+
+    beforeEach(() => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json([...assetPage1, ship(300, 60003760)], { headers: { 'X-Pages': '1' } })
+        ),
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+          HttpResponse.json([ship(301, 60003762)], { headers: { 'X-Pages': '1' } })
+        ),
+        http.get('https://esi.evetech.net/universe/systems/30002187', () =>
+          HttpResponse.json({ system_id: 30002187, name: 'Amamake', security_status: 0.9 })
+        )
+      );
+    });
+
+    async function openMyShips(user: ReturnType<typeof userEvent.setup>) {
+      await screen.findByText(JITA);
+      await user.click(screen.getByRole('button', { name: 'Tools' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'My ships' }));
+      return screen.findByRole('dialog', { name: 'My ships' });
+    }
+
+    it('opens from the Tools menu, backed by ?view=ships, and lists only the filtered characters’ ships', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      expect(window.location.search).toContain('view=ships');
+      expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
+      expect(
+        within(panel)
+          .getAllByRole('row')
+          .filter((r) => r.tagName === 'A')
+      ).toHaveLength(1);
+      expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
+    });
+
+    it('widens to every character from the panel’s own filter', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+      await within(panel).findByText('Rifter');
+
+      await user.click(within(panel).getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+
+      await waitFor(() =>
+        expect(
+          within(panel)
+            .getAllByRole('row')
+            .filter((r) => r.tagName === 'A')
+        ).toHaveLength(2)
+      );
+      expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+    });
+
+    it('a row is one link into the ship’s location', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      const row = (await within(panel).findAllByRole('row')).find((r) => r.tagName === 'A');
+      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/60003760'));
+      expect(row).not.toHaveAttribute('href', expect.stringContaining('view=ships'));
+      expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
+    });
+
+    it('offers “Show all characters” when this character owns no ship', async () => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json(assetPage1, { headers: { 'X-Pages': '1' } })
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      await user.click(await within(panel).findByRole('button', { name: 'Show all characters' }));
+      expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
+      expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+    });
   });
 
   it('returns to single-character search once switched back to "This character"', async () => {
