@@ -820,6 +820,8 @@ Material, Windows).
 
 **Deep links that name a field.** A link whose job is "set this value" (the PI "Set the rate on Plan" link, `#customs`) opens the view with the section expanded and the first field focused, so the pilot lands on the control, not a page that merely mentions it.
 
+**Wire focus (PI Map).** Hover or focus on a planet or product tile thickens its own wires and dots their two ends; every other wire steps back. A wire that jumps a tier is dashed. All wires show at rest, so this only reinforces (touch gets it on tap focus).
+
 Some primitives named here are still being built during the rollout. Until
 one exists, follow the rule it encodes. Where §3 or a §4 component row describes
 older behaviour (the touch tier keyed on width alone, hold-to-reveal inside
