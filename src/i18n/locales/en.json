@@ -3220,7 +3220,8 @@
     },
     "filter": {
       "thisCharacter": "This character",
-      "allCharacters": "All characters"
+      "allCharacters": "All characters",
+      "unreadFor": "{{name}} · {{count}} unread"
     }
   },
   "characters": {
@@ -4381,6 +4382,7 @@
   "mail": {
     "title": "Mail",
     "refresh": "Refresh",
+    "readingFor": "For {{name}}",
     "emptyTitle": "No mail cached",
     "emptyHint": "Couldn't load this character's mail yet. Try again shortly.",
     "emptyFetchedTitle": "No mail",
