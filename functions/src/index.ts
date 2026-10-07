@@ -665,6 +665,11 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
     return;
   }
   const body: unknown = await response.json().catch(() => null);
+  // A changed or broken body is not "nothing lawless": write nothing, let the doc age.
+  if (!Array.isArray(body)) {
+    logWarn('lawless systems body was not a list');
+    return;
+  }
   const systemIds = parseLawlessSystemIds(body);
   await getFirestore()
     .collection(SYSTEM_CONDITIONS_COLLECTION)

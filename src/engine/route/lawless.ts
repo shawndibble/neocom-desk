@@ -6,6 +6,8 @@
  */
 
 export const LAWLESS_STALE_AFTER_MS = 60 * 60 * 1000;
+/** A client clock this far behind the function's still reads a just-written list. */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 const NONE: ReadonlySet<number> = new Set();
 
@@ -15,6 +17,6 @@ export function freshLawlessSystems(doc: unknown, now: number): ReadonlySet<numb
   const { systemIds, updatedAt } = doc as { systemIds?: unknown; updatedAt?: unknown };
   if (!Array.isArray(systemIds) || typeof updatedAt !== 'number') return NONE;
   const age = now - updatedAt;
-  if (age < 0 || age > LAWLESS_STALE_AFTER_MS) return NONE;
+  if (age < -CLOCK_SKEW_MS || age > LAWLESS_STALE_AFTER_MS) return NONE;
   return new Set(systemIds.filter((id): id is number => Number.isInteger(id)));
 }

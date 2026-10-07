@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { loadLawlessSystems } from './lawlessSystems';
+import { LAWLESS_POLL_MS, loadLawlessSystems } from './lawlessSystems';
 
 const NONE: ReadonlySet<number> = new Set();
 
@@ -14,11 +14,16 @@ export function useLawlessSystems(): ReadonlySet<number> {
   useEffect(() => {
     if (characterId === null) return;
     let cancelled = false;
-    void loadLawlessSystems(characterId).then((next) => {
-      if (!cancelled) setLawless(next.size === 0 ? NONE : next);
-    });
+    const load = () =>
+      void loadLawlessSystems(characterId).then((next) => {
+        if (!cancelled) setLawless(next.size === 0 ? NONE : next);
+      });
+    load();
+    // A page left open must neither keep a stale list nor miss a new one.
+    const timer = setInterval(load, LAWLESS_POLL_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [characterId]);
   return characterId === null ? NONE : lawless;

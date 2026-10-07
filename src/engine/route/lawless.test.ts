@@ -35,8 +35,13 @@ describe('freshLawlessSystems', () => {
     expect(freshLawlessSystems(doc, NOW)).toEqual(new Set([1, 3]));
   });
 
-  it('shows nothing for a snapshot dated in the future', () => {
-    const doc = { systemIds: [1], updatedAt: NOW + 60_000 };
+  it('reads a snapshot a little ahead of a slow client clock', () => {
+    const doc = { systemIds: [1], updatedAt: NOW + 30_000 };
+    expect(freshLawlessSystems(doc, NOW)).toEqual(new Set([1]));
+  });
+
+  it('shows nothing for a snapshot dated far in the future', () => {
+    const doc = { systemIds: [1], updatedAt: NOW + 60 * 60_000 };
     expect(freshLawlessSystems(doc, NOW).size).toBe(0);
   });
 });
