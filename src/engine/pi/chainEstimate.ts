@@ -14,8 +14,8 @@
  * less customs and anything bought), never a Lift over a Baseline: for
  * hypothetical colonies what they "would earn anyway" means nothing. A caller
  * on real colonies reads the plan's `perColony` for the ones the chain uses.
- * Nothing is bought: the policy's `buyTiers` is cleared, since a chain that
- * buys its inputs is a trade spread, not a planet chain.
+ * Nothing is bought unless `allowBuy`: the policy's `buyTiers` is cleared, since
+ * a chain that buys its inputs is a trade spread, not a planet chain.
  *
  * Pure: colonies, policy, prices and `PiData` are parameters.
  */
@@ -34,6 +34,13 @@ export interface ChainEstimateInput {
    * planets have none.
    */
   jumps?: JumpsFn;
+  /**
+   * Keep the policy's `buyTiers`, so the plan may buy inputs at the hub. Off by
+   * default: a chain that buys its inputs is a trade spread, so the All
+   * products and Map figures never buy. The whole-account plan turns it on
+   * when the pilot has said which tiers they will buy.
+   */
+  allowBuy?: boolean;
 }
 
 export type ChainEstimate =
@@ -71,7 +78,7 @@ export function reachesInFull(plan: GoalPlan): boolean {
 }
 
 export function estimateChain(input: ChainEstimateInput, pi: PiData): ChainEstimate {
-  const policy: PlannerPolicy = { ...input.policy, buyTiers: [] };
+  const policy: PlannerPolicy = input.allowBuy ? input.policy : { ...input.policy, buyTiers: [] };
   const at = (unitsPerDay: number): BestPlan | null => {
     const best = planBest(
       {
