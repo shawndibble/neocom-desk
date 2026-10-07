@@ -1,6 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { Contract } from '@/esi/endpoints';
-import { contractReceiver } from './contractCounterparty';
+import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { contractAmount } from './contractAmount';
 
 /**
@@ -18,7 +18,7 @@ export function contractsCsvColumns(
   return [
     { header: t('contracts.type'), value: (contract) => contract.title || contract.type },
     { header: t('contracts.status'), value: (contract) => contract.status },
-    { header: t('contracts.issuer'), value: (contract) => nameFor(contract.issuer_id) },
+    { header: t('contracts.issuer'), value: (contract) => nameFor(contractIssuer(contract).id) },
     {
       header: t('contracts.receiver'),
       value: (contract) => {
