@@ -4305,6 +4305,26 @@
       "clear": "Clear search"
     },
     "allItemsToggle": "All items",
+    "tools": {
+      "label": "Tools"
+    },
+    "myShips": {
+      "title": "My ships",
+      "loading": "Loading ships…",
+      "error": "Could not read your ships.",
+      "emptyTitle": "No ships found",
+      "emptyHint": "No ships in the assets of the chosen characters.",
+      "showAllCharacters": "Show all characters",
+      "inCargo": "In cargo",
+      "unknownType": "Type #{{id}}",
+      "columns": {
+        "ship": "Ship",
+        "character": "Character",
+        "location": "Location",
+        "security": "Sec",
+        "jumps": "Jumps"
+      }
+    },
     "minValue": {
       "label": "Minimum value",
       "placeholder": "Min value"
