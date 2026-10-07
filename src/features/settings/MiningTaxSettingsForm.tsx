@@ -2,6 +2,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Spinner } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
+import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
 import { DefaultsSyncHint } from './settingsFields';
 import { useHydratedStore } from './useHydratedStore';
@@ -22,17 +23,27 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
   const { t } = useTranslation();
   const oreValueMode = useMiningTaxOreValueMode((state) => state.value);
   const setOreValueMode = useMiningTaxOreValueMode((state) => state.setValue);
+  const compressedOre = useMiningTaxCompressedOre((state) => state.value);
+  const setCompressedOre = useMiningTaxCompressedOre((state) => state.setValue);
   const autoContinue = useAutoContinueSessions((state) => state.value);
   const setAutoContinue = useAutoContinueSessions((state) => state.setValue);
 
   const oreValueModeHydrated = useHydratedStore(useMiningTaxOreValueMode);
+  const compressedOreHydrated = useHydratedStore(useMiningTaxCompressedOre);
   const autoContinueHydrated = useHydratedStore(useAutoContinueSessions);
-  if (!oreValueModeHydrated || !autoContinueHydrated) return <Spinner />;
+  if (!oreValueModeHydrated || !compressedOreHydrated || !autoContinueHydrated) return <Spinner />;
 
   return (
     <div className="space-y-4">
       <DefaultsSyncHint />
       <div className="divide-y divide-line">
+        <CheckboxRow
+          id="settings-mining-tax-compressed-ore"
+          label={t('settings.miningTaxCompressedOreLabel')}
+          hint={t('settings.miningTaxCompressedOreHint')}
+          checked={compressedOre}
+          onChange={() => void setCompressedOre(!compressedOre)}
+        />
         <CheckboxRow
           id="settings-mining-tax-ore-value-mode"
           label={t('settings.miningTaxOreValueModeLabel')}

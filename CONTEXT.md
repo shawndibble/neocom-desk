@@ -720,6 +720,10 @@ here — they go one per file in `docs/context/decisions/`.
   `expiringOrStale`, `outbid`, `healthy`, in that precedence. Each order is
   filed under exactly one — its worst — for grouping, while filters match
   against every problem an order has, since those can overlap.
+- **Ore Form**: Whether mining ore, moon ore and ice are valued and named as
+  their Compressed or Raw type. A synced setting, Compressed by default. A
+  type with no Compressed counterpart is always Raw. Applies to Unassigned
+  and Outstanding rows only; Paid rows keep the ISK they were paid at.
 - **Reprocessing Yield**: What one type breaks down into when refined, baked
   from the SDE into `public/data/reprocessing.json` (issue #537). Quantities
   are per portion size, not per unit, so a part portion refines into

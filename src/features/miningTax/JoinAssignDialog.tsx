@@ -1,4 +1,5 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { OreIcon, OreLink } from './OreIcon';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,11 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
-  TypeIcon,
   Checkbox,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { combine, type JoinMemberInput } from './ledgerActions';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -203,9 +202,9 @@ export function JoinAssignDialog({
                         : candidate.row.unassignedOreLines
                       ).map((line, index, lines) => (
                         <span key={line.typeId}>
-                          <MarketItemLink typeId={line.typeId}>
+                          <OreLink typeId={line.typeId}>
                             {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                          </MarketItemLink>
+                          </OreLink>
                           {index < lines.length - 1 ? ', ' : ''}
                         </span>
                       ))}
@@ -237,11 +236,11 @@ export function JoinAssignDialog({
                     key={`${candidate.row.entry.date}:${line.typeId}`}
                     className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                   >
-                    <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                    <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <span className="w-40 shrink-0 truncate">
-                      <MarketItemLink typeId={line.typeId}>
+                      <OreLink typeId={line.typeId}>
                         {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                      </MarketItemLink>
+                      </OreLink>
                     </span>
                     <span className="w-24 shrink-0 tabular-nums text-text-dim">
                       {line.quantity.toLocaleString()}

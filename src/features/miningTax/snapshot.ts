@@ -9,6 +9,8 @@ import { recordLedgerArrivals } from './oreArrivalLog';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
+import { readCompressedOre } from './oreForm';
+import { repriceForOreForm } from './oreFormReprice';
 import { coalesceAssignments } from './coalesce';
 import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -62,6 +64,8 @@ export interface MoonMiningTaxSnapshot {
 }
 
 export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot> {
+  // Hydrates the Ore Form setting before anything below prices or re-prices.
+  await readCompressedOre();
   const ledgers = await loadAllCharacterLedgers();
   // Settle up's "Ore still arriving" line reads growth between loads.
   await recordLedgerArrivals(ledgers);
@@ -81,6 +85,9 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
       .filter((ledger) => ledger.entries.length > 0)
       .map((ledger) => reconcileAssignments(ledger.characterId, ledger.entries))
   );
+
+  // Not gated on a non-empty ledger: it works from stored Assignments alone.
+  await Promise.all(ledgers.map((ledger) => repriceForOreForm(ledger.characterId)));
 
   const rows: MoonMiningTaxRow[] = [];
   const characters: TrackedCharacter[] = ledgers.map((ledger) => ({

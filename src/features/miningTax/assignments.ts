@@ -31,6 +31,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { normalizePaymentInfo } from './paymentLinks';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
+import { currentCompressedOre, withOreFormMarker } from './oreForm';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -109,6 +110,11 @@ export interface AssignInput {
   markPaid: boolean;
 }
 
+/** The `rawOrePriced` marker for a value snapshotted under the Ore Form setting as it stands now. */
+function oreFormMarker(): { rawOrePriced?: true } {
+  return currentCompressedOre() ? {} : { rawOrePriced: true };
+}
+
 /** Creates one Assignment, snapshotting the (possibly pilot-corrected) value and tax right now. */
 export async function createAssignment(input: AssignInput): Promise<MiningTaxAssignmentRecord> {
   const now = Date.now();
@@ -124,6 +130,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     taxOwed: input.taxOwed,
     status: input.markPaid ? 'paid' : 'outstanding',
     ...(input.markPaid ? { paidAt: now } : {}),
+    ...oreFormMarker(),
     updatedAt: now,
   };
   // Check and write in one transaction so two tabs cannot both pass the check
@@ -309,6 +316,7 @@ export async function joinAssignments(
   const groupId =
     members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
   const now = Date.now();
+  const marker = oreFormMarker();
   const records: MiningTaxAssignmentRecord[] = members.map((m) => {
     if (m.assignment) return { ...m.assignment, groupId, updatedAt: now };
     const oreLines = m.oreLines ?? [];
@@ -325,6 +333,7 @@ export async function joinAssignments(
       taxOwed,
       status: 'outstanding',
       groupId,
+      ...marker,
       updatedAt: now,
     };
   });
@@ -561,6 +570,7 @@ export async function splitAssignment(
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
 
   const now = Date.now();
+  const marker = oreFormMarker();
   const keptValue = computeAssignmentValue(keptLines, prices.kept, original.taxPct);
   const kept: MiningTaxAssignmentRecord = {
     ...original,
@@ -578,6 +588,8 @@ export async function splitAssignment(
   // survive that same way.
   delete kept.oreLineValues;
   delete kept.collectsGrowth;
+  delete kept.rawOrePriced;
+  Object.assign(kept, marker);
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {
     // Splitting is how the growth gets settled, so the kept side re-opens
@@ -600,6 +612,7 @@ export async function splitAssignment(
     taxOwed: createdValue.taxOwed,
     status: 'outstanding',
     ...(input.collector === 'new' ? { collectsGrowth: true } : {}),
+    ...marker,
     updatedAt: now,
   };
 
@@ -669,25 +682,30 @@ export async function planNeedsReviewResolution(
     assignment.payeeId === undefined
       ? undefined
       : (await loadPayees(assignment.characterId)).find((p) => p.id === assignment.payeeId);
+  const compressed = currentCompressedOre();
   const { prices } = await loadUnitPricesOnDate(
     assignment.characterId,
     relevantFresh.map((line) => line.typeId),
     hubForPayee(payee?.hubId),
-    assignment.date
+    assignment.date,
+    compressed
   );
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,
     prices,
     assignment.taxPct
   );
-  const updated: MiningTaxAssignmentRecord = {
-    ...assignment,
-    oreLines: relevantFresh,
-    estimatedValue,
-    taxOwed,
-    status: 'outstanding',
-    updatedAt: Date.now(),
-  };
+  const updated: MiningTaxAssignmentRecord = withOreFormMarker(
+    {
+      ...assignment,
+      oreLines: relevantFresh,
+      estimatedValue,
+      taxOwed,
+      status: 'outstanding',
+      updatedAt: Date.now(),
+    },
+    compressed
+  );
   delete updated.reviewDiff;
   delete updated.paidAt;
   // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds

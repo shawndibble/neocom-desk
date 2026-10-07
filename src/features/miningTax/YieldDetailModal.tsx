@@ -13,6 +13,7 @@
  * Everything here is read-only. A Mining Yield row records what ESI reported;
  * there is nothing about it for a pilot to edit.
  */
+import { OreIcon, OreLink } from './OreIcon';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
@@ -22,7 +23,6 @@ import {
   Modal,
   StatChip,
   StatChips,
-  TypeIcon,
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
@@ -30,7 +30,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
@@ -99,9 +98,9 @@ export function YieldDetailModal({
 
   const typeNameCell = (typeId: number) => (
     <span className="flex items-center gap-1.5">
-      <TypeIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
+      <OreIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
       <span className="truncate">
-        <MarketItemLink typeId={typeId}>{typeName(typeId)}</MarketItemLink>
+        <OreLink typeId={typeId}>{typeName(typeId)}</OreLink>
       </span>
     </span>
   );
