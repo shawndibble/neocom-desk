@@ -104,6 +104,18 @@ Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent w
 - Keyboard: focus moves to search input on open; Arrow/Home/End move highlight (`aria-activedescendant`); Enter or click opens `/market/lp-store/:corporationId`; Escape closes and returns focus to trigger. Hand-built ARIA.
 - Reads cached LP via `loadCharacterLoyaltyPoints`.
 
+## Proving a payment to someone else (e.g. a corp)
+
+| Step | Where | Notes |
+|---|---|---|
+| Find the line | Wallet > Journal | Filter Ref type (`player_donation`, `contract_price` ...), date range, search description/reason. Active Character only |
+| Copy the facts | Journal CSV / Excel / copy-for-Sheets | Filtered rows; includes Date (ISO), Type, Amount, Reason, Context ID, First/Second party ID. No per-row "copy proof" action |
+| Contract payment | Contracts page; contract id in Mining Settle up record | Contract id is the reference the receiver can search in game |
+| See the app's link | Mining > Tax row > payment links card; Journal "Mining tax →" | Shows which Assignment a journal line or contract is linked to |
+| Corp side | `/corp/wallet` journal (needs `canReadWallet`) | Same table; only for members with the wallet role |
+
+Gaps: no share link or screenshot-friendly view of one journal row; journal lags ESI; a donation carries only the reason text the sender typed.
+
 ## Journal tab (`/wallet/journal`)
 
 Panel "Journal". Panel actions: link "Transactions →" (to `/market/history/transactions`), `TableActionsMenu` (surface `wallet-journal`), `DataAgeBadge` of the journal fetch.
