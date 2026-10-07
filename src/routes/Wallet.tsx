@@ -23,6 +23,8 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
+import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
+import { linkedRefIds } from '@/features/miningTax/paymentLinks';
 import {
   loadWalletBalanceWithStatus,
   loadWalletJournal,
@@ -400,10 +402,35 @@ export function Wallet() {
     [personalTransactions]
   );
   const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
+  // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
+  // to the tax row they settled. Every character's Assignments, since the
+  // journal can show any of them.
+  const taxLinks = useLiveQuery(
+    async () => linkedRefIds(await db.miningTaxAssignments.toArray()),
+    [],
+    undefined
+  );
+  const miningTaxHrefFor = useCallback(
+    (entry: WalletJournalEntry) => {
+      if (!taxLinks) return undefined;
+      if (taxLinks.journal.has(entry.id)) {
+        return miningTaxPaymentHref({ kind: 'journal', id: entry.id });
+      }
+      if (
+        entry.context_id_type === 'contract_id' &&
+        entry.context_id !== undefined &&
+        taxLinks.contract.has(entry.context_id)
+      ) {
+        return miningTaxPaymentHref({ kind: 'contract', id: entry.context_id });
+      }
+      return undefined;
+    },
+    [taxLinks]
+  );
   const buildJournalColumns = useJournalColumnsBuilder();
   const journalColumns = useMemo(
-    () => buildJournalColumns(personalLinkFor, personalNameFor),
-    [buildJournalColumns, personalLinkFor, personalNameFor]
+    () => buildJournalColumns(personalLinkFor, personalNameFor, miningTaxHrefFor),
+    [buildJournalColumns, personalLinkFor, personalNameFor, miningTaxHrefFor]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place

@@ -31,12 +31,15 @@ interface JournalDescriptionCellProps {
   entry: WalletJournalEntry;
   transaction: WalletTransactionCommon | undefined;
   itemName: string;
+  /** Where the Moon Mining Tax row this line paid is, when a pilot linked it there. Built by the route, so this feature never imports `miningTax`. */
+  miningTaxHref?: string;
 }
 
 export function JournalDescriptionCell({
   entry,
   transaction,
   itemName,
+  miningTaxHref,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
@@ -53,7 +56,9 @@ export function JournalDescriptionCell({
       </HintText>
     );
   }
-  if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
+  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref) {
+    return <>{entry.description}</>;
+  }
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
         quantity: transaction.quantity.toLocaleString(),
@@ -75,6 +80,11 @@ export function JournalDescriptionCell({
           className={inlineLinkClassName}
         >
           {t('wallet.journalContractLink')}
+        </Link>
+      )}
+      {miningTaxHref && (
+        <Link to={miningTaxHref} className={inlineLinkClassName}>
+          {t('wallet.journalMiningTaxLink')}
         </Link>
       )}
       {transaction && fill && (

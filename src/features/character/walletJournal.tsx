@@ -49,14 +49,16 @@ export function useJournalFilterResult(
  */
 export function useJournalColumnsBuilder(): (
   linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
-  nameFor: (typeId: number) => string
+  nameFor: (typeId: number) => string,
+  miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined
 ) => DataTableColumn<WalletJournalEntry>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   return useCallback(
     (
       linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
-      nameFor: (typeId: number) => string
+      nameFor: (typeId: number) => string,
+      miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined
     ): DataTableColumn<WalletJournalEntry>[] => [
       {
         id: 'date',
@@ -83,6 +85,7 @@ export function useJournalColumnsBuilder(): (
               entry={entry}
               transaction={transaction}
               itemName={transaction ? nameFor(transaction.type_id) : ''}
+              miningTaxHref={miningTaxHrefFor?.(entry)}
             />
           );
         },

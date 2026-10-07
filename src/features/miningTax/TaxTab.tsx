@@ -4,6 +4,12 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
+import {
+  findRowForPaymentRef,
+  PAYMENT_REF_PARAM,
+  parsePaymentRefParam,
+} from '@/features/miningTax/paymentDeepLink';
 import {
   Button,
   Caret,
@@ -446,6 +452,35 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const characters = data?.characters ?? [];
 
   const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
+
+  // The wallet journal's "Mining tax →" link (`paymentDeepLink.ts`): opens the
+  // detail of the row that transaction paid. Latched on mount and spent at
+  // once, like `useHighlightParam`, so a reload or a later refresh can't
+  // reopen the modal after the pilot closed it. Searches every row, not the
+  // filtered ones: a Character or Payee filter must not hide the target.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initialPaymentRef] = useState(() =>
+    parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
+  );
+  const [pendingPaymentRef, setPendingPaymentRef] = useState(initialPaymentRef);
+  useEffect(() => {
+    if (initialPaymentRef === null) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(PAYMENT_REF_PARAM);
+        return params;
+      },
+      { replace: true }
+    );
+  }, [initialPaymentRef, setSearchParams]);
+  // Adjusted during render (React's derive-state pattern), not in an effect.
+  if (pendingPaymentRef !== null && data) {
+    const target = findRowForPaymentRef(allDisplayRows, pendingPaymentRef);
+    if (target) setDetailTarget(target);
+    // A miss on cached data may be a snapshot older than the link; wait for the fresh read.
+    if (target || !loading) setPendingPaymentRef(null);
+  }
   // Settle up's rows, re-read from every load by Assignment id: a recheck
   // while it is open can absorb fresh growth into an Assignment, and paying the
   // copy taken at open would record the old amount over it.
