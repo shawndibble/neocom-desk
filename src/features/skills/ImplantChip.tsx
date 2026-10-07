@@ -1,6 +1,5 @@
-import { useLocation, useNavigate } from 'react-router-dom';
 import { Tooltip, TypeIcon } from '@/components/ui';
-import { marketLinkParams } from '@/engine/market/urlState';
+import { ItemInfoLink } from '@/features/entities';
 
 interface ImplantChipProps {
   typeId: number;
@@ -9,33 +8,17 @@ interface ImplantChipProps {
 }
 
 /**
- * One fitted implant: icon + name, clicking through to Market filtered to
- * that implant (#405) — the same target Market Browser cross-link used
- * elsewhere (`ItemContextMenu`'s "View in Market"), but a plain click here
- * rather than a right-click menu: an implant fitted to a character has
- * exactly one useful action (look it up), not the Quickbar/Compare/Build
- * Plan set a tradeable item's full context menu offers. Keyboard-accessible
- * tooltip (shown on hover or focus) carries the item's description. The
- * trigger is a real <button> so Tab reaches it and :focus-within reveals the
- * tooltip without JS.
+ * One fitted implant: icon + name, an item link that opens its Show info
+ * (DESIGN.md §6c: item -> Show info). A real anchor, so Tab and
+ * middle-click work; the tooltip carries the item's description.
  */
 export function ImplantChip({ typeId, name, description }: ImplantChipProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const trigger = (
-    <button
-      type="button"
-      onClick={() => {
-        const params = marketLinkParams(typeId, location.search);
-        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-      }}
-      className="flex items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-xs hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent"
-    >
+  const link = (
+    <ItemInfoLink typeId={typeId} className="flex items-center gap-1.5">
       <TypeIcon typeId={typeId} size={32} width={16} height={16} className="size-4 shrink-0" />
       {name}
-    </button>
+    </ItemInfoLink>
   );
 
-  return description ? <Tooltip content={description}>{trigger}</Tooltip> : trigger;
+  return description ? <Tooltip content={description}>{link}</Tooltip> : link;
 }

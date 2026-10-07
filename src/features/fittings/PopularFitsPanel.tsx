@@ -1,20 +1,19 @@
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button, Spinner, Tabs } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount, Spinner, Tabs } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
 import { useNow } from '@/lib/useNow';
 import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
 import { RackIconStrip } from './RackIconStrip';
 import { useModuleNames } from './useModuleNames';
 import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
-import { workbenchFitUrl } from './workbenchFits';
 import {
   useWorkbenchHullRows,
   workbenchHullSources,
@@ -120,8 +119,15 @@ function ZkillboardFits({
                       ` · ${t('fittings.popular.lastSeen', {
                         age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
                       })}`}
-                    {fit.value !== null &&
-                      ` · ${t('fittings.popular.value', { value: formatIskCompact(fit.value) })}`}
+                    {fit.value !== null && (
+                      <>
+                        {' · '}
+                        <Trans
+                          i18nKey="fittings.popular.value"
+                          components={{ isk: <IskAmount value={fit.value} /> }}
+                        />
+                      </>
+                    )}
                   </span>
                 </p>
                 <RackIconStrip modules={fit.parts.modules} names={names} />
@@ -179,14 +185,7 @@ function WorkbenchFits({
       {/* One line for the whole tab, not one per row: a hull can list hundreds. */}
       <p className="text-xs text-text-dim">
         {t('fittings.popular.workbench.source')}{' '}
-        <a
-          href="https://eveworkbench.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={inlineLinkClassName}
-        >
-          eveworkbench.com
-        </a>
+        <ExternalLink href="https://eveworkbench.com">eveworkbench.com</ExternalLink>
         {listed && tab.pricing ? (
           <>
             {' · '}
@@ -220,14 +219,14 @@ function WorkbenchFits({
             <>
               <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <a
-                    href={workbenchFitUrl(fit.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="truncate hover:underline"
+                  <button
+                    type="button"
+                    disabled={busy || tab.loading}
+                    onClick={() => void tab.load(fit, onOpen)}
+                    className={entityLinkClassName('truncate text-left disabled:opacity-40')}
                   >
                     {fit.name || t('fittings.popular.workbench.unnamed')}
-                  </a>
+                  </button>
                   <WorkbenchFitPrice price={price} />
                 </p>
                 <p className="text-xs text-text-dim">
@@ -248,13 +247,6 @@ function WorkbenchFits({
                   </p>
                 )}
               </div>
-              <Button
-                size="sm"
-                disabled={busy || tab.loading}
-                onClick={() => void tab.load(fit, onOpen)}
-              >
-                {t('fittings.popular.workbench.load')}
-              </Button>
             </>
           )}
         />
@@ -270,18 +262,21 @@ function WorkbenchFits({
  * on the line below.
  */
 function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
-  const { t } = useTranslation();
   if (price === undefined) return null;
-  const value = formatIskCompact(price.sell);
   return (
     <>
       <span aria-hidden className="shrink-0 text-text-dim">
         ·
       </span>
       <span className="shrink-0 tabular-nums">
-        {price.partial
-          ? t('fittings.popular.workbench.pricePartial', { value })
-          : t('fittings.popular.workbench.price', { value })}
+        <Trans
+          i18nKey={
+            price.partial
+              ? 'fittings.popular.workbench.pricePartial'
+              : 'fittings.popular.workbench.price'
+          }
+          components={{ isk: <IskAmount value={price.sell} /> }}
+        />
       </span>
     </>
   );

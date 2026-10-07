@@ -32,6 +32,15 @@
  * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
  * name emits real utility rules into the shipped stylesheet.
  */
+/*
+ * `touch:` — the input is a finger (`(pointer: coarse)`), whatever the width.
+ * The 44px touch tier is "below `md` or `touch:`", so a touch tablet or laptop
+ * is treated as touch (DESIGN.md §3, §6c). Declared here, after Tailwind's own
+ * variants, so `md:h-7 touch:h-9` lets `touch:` win above `md` on a coarse
+ * pointer while a fine pointer never matches it.
+ */
+@custom-variant touch (@media (pointer: coarse));
+
 @source '../../index.html';
 @source '../../src';
 
@@ -87,6 +96,15 @@
    * moving average is.
    */
   --color-series-order-count: #e9a13b;
+
+  /*
+   * The PI Map's "what if I add a planet" colour: what a planet type you do
+   * not have would unlock. One meaning, drawn only beside a non-colour marker
+   * (a "+" on the tile, "what if" under the planet, words in the accessible
+   * name). Clear of accent (interactive), warning (the gold picks) and every
+   * status tone.
+   */
+  --color-map-whatif: #ff79c6;
 
   /*
    * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
@@ -146,6 +164,28 @@
  * very cells they need to re-lay-out. Inside `utilities` ordinary specificity
  * applies again and `.dt-stacked td` (0,1,1) wins over a bare utility (0,1,0).
  */
+/*
+ * Tap feedback and zoom delay (DESIGN.md §6c). The browser's grey tap flash is
+ * off — the `active:` colour step from the shared recipe is the feedback — and
+ * `manipulation` drops the double-tap-zoom delay on everything tappable while
+ * keeping pan and pinch. In the `base` layer so a `touch-none` grip still wins.
+ */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+}
+
 @layer utilities {
   /*
    * The tab bar's scroll frame (`components/ui/tabStyles.ts`).
@@ -509,41 +549,73 @@
     align-self: center;
   }
 
-  /* Opt-in (`dt-actions-pinned` on the table, Contacts): the actions button
-     pinned to the card's right edge and centred across both lines, the way
-     a `start` edge control is on the left. In flow on line one its 44px
-     touch target makes that line 44px tall and pushes the meta line a
-     button's height below the title; pinned, the card is two text lines.
-     The row pads its right side to clear it. Not the default because the
-     other dense tables with actions (Hauling, Contract Search, Mining Tax)
-     carry chevrons and `end` edge boxes this has not been checked against. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned td.dt-actions {
+  /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
+     a card is itself the tap target. */
+  .dt-stacked .dt-lead-caret {
+    display: none;
+  }
+
+  /* Opt-in (`dt-actions-pinned-only` on the table, Market order book): the
+     actions button pinned to the card's right edge and centred across both
+     lines, the way a `start` edge control is on the left. In flow on line
+     one its 44px touch target makes that line 44px tall and pushes the meta
+     line a button's height below the title; pinned, the card is two text
+     lines. Not the default because the other dense tables with actions
+     (Hauling, Contract Search, Mining Tax) carry chevrons and `end` edge
+     boxes this has not been checked against. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
     position: absolute;
     top: 50%;
     right: 0.25rem;
     transform: translateY(-50%);
   }
 
-  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) {
-    padding-right: 3rem;
+  /* The headline figure stays in flow on line one (a long ISK price would
+     not fit a pinned corner's fixed width). The button flush to the card's edge, a 44px gutter of its own (the
+     row's right padding) the card's text never enters: both lines live
+     in the width left of it. Line one's figure keeps a hair of air. Line two
+     (a buy's five cells and an 8-figure quantity nearly fill it) can never
+     overlap the button or wrap on a wider font: the Range cell, the last
+     one, takes what is left (`flex-basis: 0`, so it never forces the wrap
+     itself) and ellipsizes only in that worst case; it needs room for a few
+     characters (`min-width`) before it wraps instead. The row, Range
+     included, stays in the expanded detail's reach via the column picker. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
+    right: 0;
   }
 
-  /* The headline figure (`cardCorner`) pinned beside it, centred across both
-     lines too, so the figure and the button read as one column instead of
-     the figure riding the title line's top edge. The row widens its right
-     padding to clear both. Sized for Contacts' standing icons — a short,
-     fixed-width figure; a long one (an ISK amount) would need more room. */
-  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions) td.dt-corner {
-    position: absolute;
-    top: 50%;
-    right: 2.75rem;
-    transform: translateY(-50%);
-    margin: 0;
-    padding: 0;
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
+    padding-right: 2.75rem;
+    padding-left: 0.5rem;
+    column-gap: 0.1875rem;
   }
 
-  .dt-stacked.dt-stack-dense.dt-actions-pinned tr:has(> td.dt-actions):has(> td.dt-corner) {
-    padding-right: 5.25rem;
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
+    margin-right: 0.25rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-meta[data-label='Range'] {
+    flex: 1 1 0;
+    min-width: 2.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* No expand chevron on the card: line two runs the card's full width (a
+     buy's five meta cells, an 8-figure quantity reach the button's edge), so
+     a chevron beside the pinned button either rides line one, off the
+     button's axis, or lands on the meta text. The whole card is the tap
+     target (§6c phone cards) and the ⋮ is the one visible control. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-disclosure {
+    display: none;
+  }
+
+  /* The row menu's ⋮ in the text colour, not the shared plain button's dim
+     one: this table's only visible way into the row menu. `!important`
+     because the button's own `text-text-dim` utility sits in a later layer. */
+  .dt-actions-pinned-only td.dt-actions button {
+    color: var(--color-text) !important;
   }
 
   /* The expand chevron (`expandableRow`) joins the actions on line one.
@@ -592,6 +664,15 @@
     padding-left: 2.5rem;
   }
 
+  /* A coarse pointer grows the tick box's label to 44px (`touch:size-11`):
+     0.75rem + 2.75rem of box needs more than the 2.5rem above to leave a gap
+     before the text. */
+  @media (pointer: coarse) {
+    .dt-stacked.dt-stack-dense:not(.dt-dense-tight) tr:has(> td.dt-edge-start) {
+      padding-left: 4rem;
+    }
+  }
+
   /* `end` (a quantity box): closes the meta line, pushed to its right end.
      Not pinned across both lines like `start`: a box that wide would take
      its width from the title line too, and the title needs it more.
@@ -616,7 +697,7 @@
   }
 
   /* Opt-in (`dt-dense-tight` on the table, Hauling; BPC Sourcing too, with
-     no tick or `end` box, its ISK figure too wide for `dt-actions-pinned`'s
+     no tick or `end` box, its ISK figure too wide for `dt-actions-pinned-only`'s
      corner): a card whose tick box,
      title, headline figure and More actions button all sit on line one,
      centred on each other, with the `end` box closing line two. Without it
@@ -1109,8 +1190,10 @@
     background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
   }
 
-  tr.row-mine:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  @media (hover: hover) {
+    tr.row-mine:hover {
+      background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    }
   }
 }
 

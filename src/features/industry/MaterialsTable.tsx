@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -9,7 +8,6 @@ import {
   useRef,
   useState,
   type FocusEvent,
-  type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
@@ -26,6 +24,7 @@ import {
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
@@ -35,7 +34,7 @@ import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
 import {
@@ -82,15 +81,6 @@ interface MaterialsTableProps {
   ref?: Ref<MaterialsTableHandle>;
   /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
-  /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
-  rowContextMenu?: (material: MaterialTableRow, tr: ReactElement) => ReactElement;
-  /**
-   * Visible "More actions" button for the row (WCAG 2.1.1, issue #1498) —
-   * the same item menu `rowContextMenu` opens on right-click/long-press,
-   * reachable by keyboard. Rendered in a trailing column; omitted where the
-   * caller has no menu to offer.
-   */
-  rowActions?: (material: MaterialTableRow) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
   /**
@@ -512,6 +502,14 @@ const ERRAND_LABEL_KEY: Record<MaterialErrand, string> = {
   have: 'industry.errands.have',
 };
 
+/** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus. 44px tap area is an invisible ::after. */
+const editableValueClassName = cx(
+  'relative inline-flex items-center gap-1 rounded-xs border border-transparent px-1 hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
+  interactiveClassName,
+  focusRingClassName
+);
+const editPencilClassName = 'text-text-faint';
+
 type LinkTone = 'accent' | 'build' | 'blueprint' | 'quiet';
 
 /**
@@ -522,7 +520,9 @@ type LinkTone = 'accent' | 'build' | 'blueprint' | 'quiet';
  */
 function linkClassName(tone: LinkTone): string {
   return cx(
-    'inline-flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold whitespace-nowrap underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0',
+    'inline-flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold whitespace-nowrap underline underline-offset-2 md:min-h-0',
+    interactiveClassName,
+    focusRingClassName,
     tone === 'accent' && 'text-accent decoration-accent-dim',
     tone === 'build' && 'text-success decoration-success/50',
     tone === 'blueprint' && 'text-blueprint-copy decoration-blueprint-copy/50',
@@ -643,8 +643,6 @@ export function MaterialsTable({
   onOwnedStockChange,
   ref,
   detection,
-  rowContextMenu,
-  rowActions,
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
@@ -795,11 +793,15 @@ export function MaterialsTable({
   function renderName(material: MaterialTableRow, withAction: boolean, badge = false) {
     const name = nameFor(material.typeID);
     const { advice, toggleable } = buildChoice(material);
-    const skillGate = isBuilt(material) ? skillGates?.get(material.typeID) : undefined;
+    // A built row always says what blocks it. A bought row says so only when
+    // the cost call is to build it: that is the row a pilot expects Auto Build
+    // to have taken, and the gate is why it did not.
+    const gateVerdict = skillGates?.get(material.typeID);
+    const skillGate = isBuilt(material) || advice?.verdict === 'build' ? gateVerdict : undefined;
     return (
       <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          <MarketItemLink typeId={material.typeID}>{name}</MarketItemLink>
+          <ItemInfoLink typeId={material.typeID}>{name}</ItemInfoLink>
           {/* Advice with nothing to act on here — a material something
               else produces. Inline after the name, not in a reserved slot
               before it, so every name starts at the same edge. */}
@@ -1050,7 +1052,7 @@ export function MaterialsTable({
           t('common.unknown')
         ) : (
           // Long press, not tap: the row's own tap belongs to its context menu.
-          <IskAmount value={state.lineCost} revealOn="longPress" decimals={0} />
+          <IskAmount value={state.lineCost} decimals={0} />
         )}
       </span>
     );
@@ -1134,18 +1136,6 @@ export function MaterialsTable({
           : (materialRowState(material, sourcing, pricesReady).lineCost ?? undefined),
       render: renderTotal,
     },
-    ...(rowActions
-      ? [
-          {
-            id: 'actions',
-            header: '',
-            align: 'right',
-            cardActions: true,
-            headerCellClassName: 'w-11',
-            render: (material: MaterialTableRow) => rowActions(material),
-          } satisfies DataTableColumn<MaterialTableRow>,
-        ]
-      : []),
   ];
 
   // Dropped only where Materials shares its row with Costs & revenue (`xl`
@@ -1203,7 +1193,11 @@ export function MaterialsTable({
               type="button"
               aria-expanded={haveOpen}
               onClick={() => setHaveOpen((open) => !open)}
-              className="inline-flex min-h-11 items-center gap-1 uppercase hover:text-text focus-visible:outline-2 focus-visible:outline-accent md:min-h-0"
+              className={cx(
+                'inline-flex min-h-11 items-center gap-1 rounded-xs uppercase hover:text-text md:min-h-0',
+                interactiveClassName,
+                focusRingClassName
+              )}
             >
               <Caret expanded={haveOpen} />
               {title}
@@ -1230,7 +1224,7 @@ export function MaterialsTable({
                   {t('industry.errands.unpricedCount', { count: subtotal.unpricedCount })}
                 </span>
               )}
-              <IskAmount value={subtotal.total} revealOn="longPress" decimals={0} />
+              <IskAmount value={subtotal.total} decimals={0} />
             </span>
           )
         )}
@@ -1240,8 +1234,8 @@ export function MaterialsTable({
 
   /**
    * One phone ledger row, under its section's NEED | HAVE | BUY header: the
-   * name and total; the three numbers in the header's columns, Have a dashed
-   * number you tap to edit; then the row's action on the left and its price
+   * name and total; the three numbers in the header's columns, Have a
+   * number with a pencil you tap to edit; then the row's action on the left and its price
    * (or what a build saves) on the right. No card and no box — rows are told
    * apart by a zebra tint, so the Materials panel is the only frame. A
    * Blueprint row has no numbers line, and an owned one says Owned instead of
@@ -1264,13 +1258,12 @@ export function MaterialsTable({
           <span className="min-w-0 text-sm font-semibold">{renderName(material, false, true)}</span>
           <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
             {ownedBlueprint ? (
-              <span className="rounded-xs border border-blueprint-copy/50 px-1.5 text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
+              <span className="text-[0.625rem] leading-5 font-bold tracking-widest text-blueprint-copy uppercase">
                 {t('industry.blueprintAcquisitionOwned')}
               </span>
             ) : (
               renderTotal(material)
             )}
-            {rowActions?.(material)}
           </span>
         </div>
         {!tier && (
@@ -1309,15 +1302,11 @@ export function MaterialsTable({
         </div>
       </li>
     );
-    return rowContextMenu ? (
-      <Fragment key={material.typeID}>{rowContextMenu(material, item)}</Fragment>
-    ) : (
-      item
-    );
+    return item;
   }
 
   /**
-   * The ledger's Have: the number with a dashed underline — the price's own
+   * The ledger's Have: the number with a faint pencil — the price's own
    * "tap to edit" cue — rather than a field stretched across its column. Blue
    * when the player set it, faint at 0. A tap swaps in the field, focused;
    * leaving it swaps the number back. The 44px tap area is an invisible
@@ -1344,14 +1333,16 @@ export function MaterialsTable({
         type="button"
         onClick={() => setEditingHave(material.typeID)}
         className={cx(
-          'relative tabular-nums underline decoration-dashed underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""] focus-visible:outline-2 focus-visible:outline-accent',
-          owned > 0 ? 'text-accent decoration-accent-dim' : 'text-text-faint decoration-line-bright'
+          editableValueClassName,
+          'tabular-nums',
+          owned > 0 ? 'text-accent' : 'text-text-faint'
         )}
       >
         <span className="sr-only">
           {t('industry.errands.haveFor', { material: nameFor(material.typeID) })},{' '}
         </span>
         {owned.toLocaleString()}
+        <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
       </button>
     );
   }
@@ -1386,8 +1377,9 @@ export function MaterialsTable({
         type="button"
         onClick={() => setEditingPrice(material.typeID)}
         className={cx(
-          'relative text-xs tabular-nums underline decoration-dashed underline-offset-4 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""] focus-visible:outline-2 focus-visible:outline-accent',
-          overridden ? 'text-accent decoration-accent-dim' : 'text-text decoration-line-bright'
+          editableValueClassName,
+          'text-xs tabular-nums',
+          overridden ? 'text-accent' : 'text-text'
         )}
       >
         <span className="sr-only">
@@ -1399,6 +1391,7 @@ export function MaterialsTable({
             {t('industry.priceSourceOverride')}
           </span>
         )}
+        <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
       </button>
     );
   }
@@ -1505,7 +1498,6 @@ export function MaterialsTable({
                     rowKey={(material) => material.typeID}
                     label={t('industry.errands.tableLabel', { section: sectionLabel(errand) })}
                     density="compact"
-                    rowContextMenu={rowContextMenu}
                   />
                 </div>
               ))}

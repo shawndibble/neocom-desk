@@ -153,8 +153,9 @@ describe('restoring an existing-format backup file', () => {
    * absent, so this doesn't need a real delete.
    */
   const LEGACY_OMISSIONS: Partial<Record<keyof typeof FULL_RECORDS, string[]>> = {
-    // oreLineValues (grilling session, 2026-09-27) postdates this fixture.
-    miningTaxAssignments: ['oreLineValues'],
+    // oreLineValues (grilling session, 2026-09-27) and rawOrePriced (Ore Form,
+    // 2026-10-06) postdate this fixture.
+    miningTaxAssignments: ['oreLineValues', 'rawOrePriced'],
   };
   /**
    * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than

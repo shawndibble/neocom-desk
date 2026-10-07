@@ -2,6 +2,8 @@
 
 _Recorded 2026-10-03 · issue #2472._
 
+_Amended by `20261006-143832`: the Route Preference now saves the pilot's default, so the "this route only" group and its link-only bullet no longer hold._
+
 - **Route Safety's Route rules panel edits the pilot's synced Travel Settings,
   not a page-local copy.** A pilot planning a trip wants to change what it
   avoids without leaving for Settings → Travel and back. A copy of the rules

@@ -8,6 +8,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
+import { pageOwnsReauth } from './pageOwnsReauth';
 
 /**
  * Total auth failure → /login, once, centrally. Covers what `ScopeGate` cannot:
@@ -23,23 +24,75 @@ import { beginEveLogin } from './loginFlow';
 export function AuthFailureRedirect() {
   const failure = useAuthFailure((state) => state.failure);
   const dismiss = useAuthFailure((state) => state.dismiss);
+  const markNeedsLogin = useAuthFailure((state) => state.markNeedsLogin);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (failure?.kind !== 'token' || failure.characterId !== activeCharacterId) return;
-    // Already there: redirecting would overwrite `state.from` with '/login',
-    // losing the destination this exists to preserve.
-    if (location.pathname === '/login') return;
+    // Leaves a record that outlives the consumed failure, so Characters can
+    // say why the player landed there.
+    markNeedsLogin(failure.characterId);
     dismiss();
-    navigate('/login', {
-      replace: true,
-      state: { from: `${location.pathname}${location.search}` },
-    });
-  }, [failure, activeCharacterId, dismiss, navigate, location]);
+    // Straight to Characters, skipping the /login hop that bounced there
+    // anyway. The old `state.from` is dropped: re-login lands on Characters.
+    if (location.pathname === '/characters' || location.pathname === '/login') return;
+    navigate('/characters', { replace: true });
+  }, [failure, activeCharacterId, dismiss, markNeedsLogin, navigate, location]);
 
   return null;
+}
+
+/**
+ * Notice on Characters for each Character whose dead grant redirected the
+ * player here. Stays until dismissed, login completes (the next token refresh
+ * clears the mark), or the Character is removed.
+ */
+export function NeedsLoginNotice() {
+  const { t } = useTranslation();
+  const needsLogin = useAuthFailure((state) => state.needsLogin);
+  const dismissNeedsLogin = useAuthFailure((state) => state.dismissNeedsLogin);
+  const characters = useLiveQuery(
+    () => (needsLogin.length ? db.characters.bulkGet(needsLogin) : []),
+    [needsLogin]
+  );
+
+  // A Character removed by any path (sync, another tab) must not leave its mark
+  // behind to resurface if the same id is added again this session.
+  useEffect(() => {
+    if (!characters) return;
+    needsLogin.forEach((id, i) => {
+      if (characters[i] === undefined) dismissNeedsLogin(id);
+    });
+  }, [characters, needsLogin, dismissNeedsLogin]);
+
+  const named = (characters ?? []).filter((c) => c !== undefined);
+  if (named.length === 0) return null;
+
+  return (
+    <>
+      {named.map((character) => (
+        <div
+          key={character.characterId}
+          role="status"
+          className="rounded-xs border border-warning/40 bg-panel px-3 py-1"
+        >
+          <ReauthBanner
+            title={t('reauth.needsLoginTitle', { character: character.name })}
+            hint={t('reauth.needsLoginHint', { character: character.name })}
+            actionLabel={t('reauth.staleGrantAction')}
+            onLogin={() => void beginEveLogin({ characterId: character.characterId })}
+          />
+          <div className="pb-2">
+            <Button size="sm" onClick={() => dismissNeedsLogin(character.characterId)}>
+              {t('reauth.dismiss')}
+            </Button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
 }
 
 /**
@@ -64,7 +117,11 @@ export function AuthFailureNotice() {
     [activeCharacterId]
   );
 
+  const { pathname } = useLocation();
+
   if (failure?.kind !== 'request' || failure.characterId !== activeCharacterId) return null;
+  // The page shows its own banner for this refusal; two login buttons would stack.
+  if (pageOwnsReauth(pathname, failure.endpointId)) return null;
 
   return (
     <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">

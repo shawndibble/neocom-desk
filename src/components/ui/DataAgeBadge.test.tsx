@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { DataAgeBadge } from './DataAgeBadge';
@@ -56,7 +56,24 @@ describe('DataAgeBadge', () => {
   it('says nothing beyond the timestamp when no note is given', () => {
     const date = new Date(NOW.getTime() - 5 * 60_000);
     render(<DataAgeBadge date={date} />);
-    expect(screen.getByText('5m ago')).toHaveAttribute('title', formatTimestamp(date));
+    const badge = screen.getByText('5m ago');
+    expect(badge).not.toHaveAttribute('title');
+    fireEvent.focus(badge);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(formatTimestamp(date));
+  });
+
+  it('is a keyboard stop, since a tooltip needs a focusable trigger', () => {
+    render(<DataAgeBadge date={new Date(NOW.getTime() - 5 * 60_000)} />);
+    expect(screen.getByText('5m ago')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('tooltip={false} is plain text: no tooltip, no tab stop, no title (for use inside a button)', () => {
+    render(<DataAgeBadge date={new Date(NOW.getTime() - 5 * 60_000)} tooltip={false} />);
+    const badge = screen.getByText('5m ago');
+    expect(badge).not.toHaveAttribute('tabindex');
+    expect(badge).not.toHaveAttribute('title');
+    fireEvent.focus(badge);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   /**
@@ -67,26 +84,28 @@ describe('DataAgeBadge', () => {
   it('appends a view’s own refresh cadence to the tooltip when given one', () => {
     const date = new Date(NOW.getTime() - 5 * 60_000);
     render(<DataAgeBadge date={date} note="Corp data refreshes about hourly." />);
-    expect(screen.getByText('5m ago').getAttribute('title')).toContain(
-      'Corp data refreshes about hourly.'
-    );
+    fireEvent.focus(screen.getByText('5m ago'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Corp data refreshes about hourly.');
   });
 
   describe('dotOnly', () => {
-    it('renders only the dot — no visible age text', () => {
+    it('renders only the dot — the age is screen-reader text, not visible', () => {
       const date = new Date(NOW.getTime() - 5 * 60_000);
       const { container } = render(<DataAgeBadge date={date} dotOnly />);
       const time = container.querySelector('time');
       expect(time).not.toBeNull();
-      expect(time?.textContent?.trim()).toBe('');
+      const age = screen.getByText('5m ago');
+      expect(age.className).toContain('sr-only');
+      expect(time).toContainElement(age);
     });
 
     it('moves the relative age into the tooltip, alongside the absolute timestamp', () => {
       const date = new Date(NOW.getTime() - 5 * 60_000);
       const { container } = render(<DataAgeBadge date={date} dotOnly />);
-      const title = container.querySelector('time')?.getAttribute('title');
-      expect(title).toContain('5m ago');
-      expect(title).toContain(formatTimestamp(date));
+      fireEvent.focus(container.querySelector('time') as HTMLElement);
+      const tip = screen.getByRole('tooltip');
+      expect(tip).toHaveTextContent('5m ago');
+      expect(tip).toHaveTextContent(formatTimestamp(date));
     });
 
     it('still appends a view’s own refresh-cadence note to the tooltip', () => {
@@ -94,9 +113,8 @@ describe('DataAgeBadge', () => {
       const { container } = render(
         <DataAgeBadge date={date} dotOnly note="Corp data refreshes about hourly." />
       );
-      expect(container.querySelector('time')?.getAttribute('title')).toContain(
-        'Corp data refreshes about hourly.'
-      );
+      fireEvent.focus(container.querySelector('time') as HTMLElement);
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Corp data refreshes about hourly.');
     });
 
     it('keeps the stale tone on the dot', () => {

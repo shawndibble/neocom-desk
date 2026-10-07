@@ -12,6 +12,7 @@
  * zKillboard's own (`memberCount`): ESI states no alliance-wide headcount,
  * and summing every member corp's record would cost a request per corp.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { allianceLogoUrl } from '@/lib/eveImages';
@@ -30,28 +31,14 @@ import {
   type PublicAllianceCorporations,
   type PublicAllianceInfo,
 } from './publicInfoData';
-import { CorporationLink, PersonLink } from './PublicInfoParts';
-import {
-  FACT_COLUMNS,
-  externalLinkClassName,
-  fullDate,
-  sectionHeading,
-  termClassName,
-} from './publicInfoStyles';
+import { CorporationEntry, PersonLink } from './PublicInfoParts';
+import { FACT_COLUMNS, fullDate, sectionHeading, termClassName } from './publicInfoStyles';
 
 export interface PublicInfoAllianceTabProps {
   data: PublicAllianceInfo;
-  /** Opens a pilot (the founder) in the modal, replacing this request. */
-  onShowCharacter: (characterId: number) => void;
-  /** Opens a corporation (the executor, a member) in the modal, replacing this request. */
-  onShowCorporation: (corporationId: number) => void;
 }
 
-export default function PublicInfoAllianceTab({
-  data,
-  onShowCharacter,
-  onShowCorporation,
-}: PublicInfoAllianceTabProps) {
+export default function PublicInfoAllianceTab({ data }: PublicInfoAllianceTabProps) {
   const { t } = useTranslation();
   const allianceId = data.alliance_id;
   const [now] = useState(() => new Date());
@@ -132,19 +119,14 @@ export default function PublicInfoAllianceTab({
           {executorId !== undefined && (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className={termClassName}>{t('publicInfo.executor')}</span>
-              <CorporationLink id={executorId} name={name(executorId)} onOpen={onShowCorporation} />
+              <CorporationEntry id={executorId} name={name(executorId)} />
             </p>
           )}
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
-          <a
-            href={allianceZkillUrl(allianceId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={externalLinkClassName}
-          >
-            {t('publicInfo.zkillboard')} <span aria-hidden>↗</span>
-          </a>
+          <ExternalLink href={allianceZkillUrl(allianceId)}>
+            {t('publicInfo.zkillboard')}
+          </ExternalLink>
         </div>
       </div>
 
@@ -158,18 +140,13 @@ export default function PublicInfoAllianceTab({
           <dl className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
             <dt className={termClassName}>{t('publicInfo.founder')}</dt>
             <dd>
-              <PersonLink
-                id={data.creator_id}
-                name={name(data.creator_id)}
-                onOpen={onShowCharacter}
-              />
+              <PersonLink id={data.creator_id} name={name(data.creator_id)} />
             </dd>
             <dt className={termClassName}>{t('publicInfo.foundingCorporation')}</dt>
             <dd className="min-w-0">
-              <CorporationLink
+              <CorporationEntry
                 id={data.creator_corporation_id}
                 name={name(data.creator_corporation_id)}
-                onOpen={onShowCorporation}
               />
             </dd>
             <dt className={termClassName}>{t('publicInfo.founded')}</dt>
@@ -195,11 +172,7 @@ export default function PublicInfoAllianceTab({
             <ul className="max-h-80 space-y-1.5 overflow-y-auto rounded-xs border border-line bg-bg p-2">
               {members.corporations.map((corporation) => (
                 <li key={corporation.id}>
-                  <CorporationLink
-                    id={corporation.id}
-                    name={corporation.name}
-                    onOpen={onShowCorporation}
-                  />
+                  <CorporationEntry id={corporation.id} name={corporation.name} />
                 </li>
               ))}
             </ul>

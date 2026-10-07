@@ -56,7 +56,7 @@ describe('AvoidedSystemsPanel sync', () => {
     const user = userEvent.setup();
     render(<AvoidedSystemsPanel />);
 
-    await user.click(await screen.findByRole('button', { name: 'Add system' }));
+    await user.click(await screen.findByRole('button', { name: 'Add an avoided system' }));
     await user.type(screen.getByRole('combobox'), 'ued');
     await user.click(await screen.findByRole('option', { name: /Uedama/ }));
 

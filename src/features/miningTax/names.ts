@@ -1,6 +1,6 @@
 /** Solar-system and ore-type name resolution for the Moon Mining Tax ledger (issue #523). */
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
-import { loadTypeNames } from '@/features/character/typeNames';
+import { loadOreFormNames } from './oreForm';
 import type { MoonMiningTaxRow } from './snapshot';
 
 export interface MiningTaxNames {
@@ -10,7 +10,10 @@ export interface MiningTaxNames {
   typeNames: Map<number, string>;
 }
 
-export async function resolveRowNames(rows: readonly MoonMiningTaxRow[]): Promise<MiningTaxNames> {
+export async function resolveRowNames(
+  rows: readonly MoonMiningTaxRow[],
+  compressed = true
+): Promise<MiningTaxNames> {
   const systemIds = [...new Set(rows.map((row) => row.entry.solarSystemId))];
   const typeIds = [
     ...new Set(rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
@@ -18,7 +21,7 @@ export async function resolveRowNames(rows: readonly MoonMiningTaxRow[]): Promis
 
   const [systemRows, typeNames] = await Promise.all([
     Promise.all(systemIds.map(async (id) => ({ id, ...(await loadSystemNameAndSecurity(id)) }))),
-    loadTypeNames(typeIds),
+    loadOreFormNames(typeIds, compressed),
   ]);
 
   const systemNames = new Map<number, string>();

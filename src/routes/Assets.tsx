@@ -16,9 +16,12 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
   IskAmount,
-  MenuItem,
   PageHeader,
   Panel,
   SearchInput,
@@ -50,8 +53,9 @@ import {
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { MyShipsPanel } from '@/features/character/MyShipsPanel';
 import { useUrlParams } from '@/lib/useUrlState';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -137,6 +141,8 @@ const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
+/** `?view=ships` opens My ships, a slide-in from the Tools menu. */
+const VIEW_PARAM = optionalEnumParam(['ships'] as const);
 
 /**
  * A drill-down href that keeps the page's whole query string: its filters
@@ -676,6 +682,7 @@ export function Assets() {
       q: SEARCH_PARAM,
       all: ALL_ITEMS_PARAM,
       min: MIN_VALUE_PARAM,
+      view: VIEW_PARAM,
       chars: characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
     }),
     [defaultCharacterFilter]
@@ -757,6 +764,21 @@ export function Assets() {
         : [...resolvedCrossCharacterFilter];
     return ids.filter((id) => id !== activeCharacterId);
   }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
+
+  // My ships follows the same Character filter, the active Character included.
+  const shipCharacterIds = useMemo(() => {
+    const ids =
+      resolvedCrossCharacterFilter === 'all'
+        ? crossCharacterCandidates.map((c) => c.characterId)
+        : [...resolvedCrossCharacterFilter];
+    return ids.length === 0 && activeCharacterId !== null ? [activeCharacterId] : ids;
+  }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
+  const shipsFilterIsAll =
+    resolvedCrossCharacterFilter === 'all' ||
+    (crossCharacterCandidates.length > 0 &&
+      crossCharacterCandidates.every((c) => shipCharacterIds.includes(c.characterId)));
+  const myShipsOpen = view.view === 'ships';
+  const closeMyShips = () => setView({ view: null });
 
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
@@ -867,7 +889,15 @@ export function Assets() {
     const csvAssetsByItemId = new Map(
       (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
     );
-    const matches = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
+    const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
+    // Flat views hide stacks under the minimum value on screen; the export
+    // follows. Tree view ignores the filter, so its export does too.
+    const matches =
+      flatModeActive && minValueThreshold > 0
+        ? searched.filter(
+            (m) => assetStackValue(m.asset, priceByTypeId, ownCopyValues) >= minValueThreshold
+          )
+        : searched;
 
     const byLocation = new Map<number, AssetMatch[]>();
     for (const entry of matches) {
@@ -1636,6 +1666,20 @@ export function Assets() {
                   pressed={selectMode}
                   onClick={toggleSelectMode}
                 />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton
+                      icon={<Icon.Settings />}
+                      label={t('assets.tools.label')}
+                      size="md"
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
+                      {t('assets.myShips.title')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
                 <IconButton
                   icon={<Icon.Refresh />}
@@ -1646,6 +1690,26 @@ export function Assets() {
               </div>
             </>
           }
+        />
+
+        <MyShipsPanel
+          open={myShipsOpen}
+          onClose={closeMyShips}
+          characterIds={shipCharacterIds}
+          activeCharacterId={activeCharacterId}
+          filterControl={crossCharacterFilterMeta}
+          onShowAllCharacters={
+            !shipsFilterIsAll && crossCharacterCandidates.length > 1
+              ? () => setView({ chars: 'all' })
+              : undefined
+          }
+          hrefFor={(locationId) => {
+            const params = new URLSearchParams(query);
+            params.delete('view');
+            const rest = params.toString();
+            return assetPathHref(locationId, []) + (rest ? `?${rest}` : '');
+          }}
+          route={assetsRoute}
         />
 
         {assetsResult && !assetsNeedsReauth && (
@@ -1818,7 +1882,6 @@ export function Assets() {
                         <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                           <SecurityValue
                             security={securityForStation(resolved.station.locationId)}
-                            t={t}
                           />
                           <JumpsAwayText
                             result={jumpsAwayByKey.get(
@@ -1836,13 +1899,24 @@ export function Assets() {
                           {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                         </span>
                         <span className="text-isk-pos">
-                          <IskAmount
-                            value={currentTotals.estimatedValue}
-                            revealOn="tap"
-                            decimals={0}
-                          />
+                          <IskAmount value={currentTotals.estimatedValue} decimals={0} />
                         </span>
                       </span>
+                    )}
+                    {deepest && 'kind' in deepest && deepest.kind === 'ship' && (
+                      <Button
+                        size="md"
+                        className="shrink-0"
+                        onClick={() =>
+                          void assetShipEditLocation(deepest, nodeLabel(deepest)).then(
+                            (location) => {
+                              if (location) void navigate(location);
+                            }
+                          )
+                        }
+                      >
+                        {t('assets.openInFittings')}
+                      </Button>
                     )}
                   </div>
                 ) : (
@@ -2113,31 +2187,12 @@ function NodeRowView({
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
-  const navigate = useNavigate();
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
   if (node.kind !== 'item') {
     return (
       <ContainerRow
-        menu={
-          node.kind === 'ship'
-            ? {
-                name: label,
-                items: (
-                  <MenuItem
-                    onSelect={() =>
-                      void assetShipEditLocation(node, label).then((location) => {
-                        if (location) navigate(location);
-                      })
-                    }
-                  >
-                    {t('assets.openInFittings')}
-                  </MenuItem>
-                ),
-              }
-            : undefined
-        }
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
         itemCount={node.itemCount}
@@ -2172,7 +2227,7 @@ function NodeRowView({
       estimatedValue={estimatedValue}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
-      onShowInfo={() => pageActions.showInfo(asset.type_id, label)}
+      typeId={asset.type_id}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}

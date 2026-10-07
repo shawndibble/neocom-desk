@@ -6,6 +6,7 @@
  * the blueprint load, the Character filter and the ranked rows this view
  * borrows ISK/hour from.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -25,6 +26,7 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAsset, CharacterBlueprint } from '@/esi/endpoints';
+import { useRowStartPlan } from './rowStartPlan';
 import { iskToneClass } from '@/features/character/format';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
@@ -229,6 +231,9 @@ export function OwnedBlueprintsPanel({
     columns: csvColumns,
   });
 
+  // A row click is the Start plan button's action (a blueprint with no catalog entry has none).
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
+
   const columns: DataTableColumn<OwnedBlueprintRow>[] = [
     {
       id: 'blueprint',
@@ -237,7 +242,7 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.blueprint,
       render: (row) => (
         <span className="flex flex-wrap items-center gap-1.5">
-          {row.name}
+          {row.catalogEntry ? <span className={entityLinkClassName()}>{row.name}</span> : row.name}
           {row.activity === 'reaction' && (
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.ownedBlueprintsActivity.reaction')}
@@ -251,7 +256,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsKind'),
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.kind,
       render: (row) => (
-        <span className={row.kind === 'bpo' ? 'font-medium text-accent' : undefined}>
+        <span className={row.kind === 'bpo' ? 'font-medium' : undefined}>
           {row.kind === 'bpo' ? t('industry.bpo') : t('industry.bpc')}
         </span>
       ),
@@ -310,18 +315,16 @@ export function OwnedBlueprintsPanel({
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
-        numericCell(
-          row.iskPerHour,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
-          unknown
-        ),
+        numericCell(row.iskPerHour, (v) => <IskAmount value={v} decimals={0} />, unknown),
     },
     {
       id: 'action',
       header: '',
       render: (row) => {
         const entry = row.catalogEntry;
-        return entry ? <StartPlanButton onStart={() => onStartPlan(entry)} /> : null;
+        return entry ? (
+          <StartPlanButton onStart={() => onStartPlan(entry)} planKey={entry} />
+        ) : null;
       },
     },
   ];
@@ -492,6 +495,10 @@ export function OwnedBlueprintsPanel({
                 columns={shownColumns}
                 rows={filteredRows}
                 rowKey={ownedRowKey}
+                onRowClick={(row) => {
+                  if (row.catalogEntry) startPlanFromRow(row.catalogEntry);
+                }}
+                rowClickable={(row) => Boolean(row.catalogEntry)}
                 virtualize="auto"
                 label={t('industry.ownedBlueprintsTitle')}
                 {...sortProps}

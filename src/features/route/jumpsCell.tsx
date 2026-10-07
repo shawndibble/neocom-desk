@@ -7,6 +7,7 @@
  */
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
+import { HintText } from '@/components/ui/HintText';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import type { JumpsCellValue } from './currentSystem';
 
@@ -28,28 +29,33 @@ export function renderJumpsCell(
   if (cell.kind === 'loading') return <span className="text-text-dim">…</span>;
   if (cell.kind === 'no-origin') {
     return (
-      <span className="text-text-dim" title={t('jumpRange.noOrigin')}>
+      <HintText content={t('jumpRange.noOrigin')} className="text-text-dim">
         —
-      </span>
+      </HintText>
     );
   }
   if (cell.kind === 'unknown') {
     return (
-      <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
+      <HintText content={t('jumpRange.distanceUnavailable')} className="text-text-dim">
         —
-      </span>
+      </HintText>
     );
   }
   if (cell.count === null) {
     return (
-      <span className="text-text-dim" title={t(unavailableHintKey)}>
+      <HintText content={t(unavailableHintKey)} className="text-text-dim">
         —
-      </span>
+      </HintText>
     );
   }
   return systemId == null ? (
     String(cell.count)
   ) : (
-    <JumpsLink systemId={systemId}>{cell.count}</JumpsLink>
+    <JumpsLink
+      systemId={systemId}
+      label={t('contractSearch.jumpsLinkLabel', { count: cell.count })}
+    >
+      {cell.count}
+    </JumpsLink>
   );
 }

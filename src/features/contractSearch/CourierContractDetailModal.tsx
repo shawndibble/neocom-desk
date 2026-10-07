@@ -22,9 +22,11 @@
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Tooltip } from '@/components/ui';
+import { IskAmount, Modal, Tooltip } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
+import { SystemLink } from '@/features/entities';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { formatIsk, formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -46,6 +48,8 @@ import {
   floorShare,
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
+import { LawlessTag } from '@/features/travel/LawlessTag';
+import { useLawlessSystems } from '@/features/travel/useLawlessSystems';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
@@ -160,7 +164,12 @@ function EndpointPlace({
   if (endpoint.systemName !== null || endpoint.security !== null) {
     parts.push(
       <>
-        {endpoint.systemName}
+        {endpoint.systemName !== null &&
+          (endpoint.systemId == null ? (
+            endpoint.systemName
+          ) : (
+            <SystemLink systemId={endpoint.systemId}>{endpoint.systemName}</SystemLink>
+          ))}
         {endpoint.systemName !== null && endpoint.security !== null && ' '}
         {endpoint.security !== null && <SecurityStatus security={endpoint.security} />}
       </>
@@ -182,7 +191,7 @@ function EndpointPlace({
 }
 
 /** Label over value, the shape every figure below the hero takes. */
-function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
+function Figure({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-px">
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -230,6 +239,7 @@ export function CourierContractDetailModal({
       : []),
   ];
   const exposure = useRouteExposure(row, preference);
+  const lawless = useLawlessSystems();
   // A same-system haul has a one-system path, which is no trip to review.
   const path = exposure?.kind === 'known' && exposure.path.length > 1 ? exposure.path : null;
   const [showPath, setShowPath] = useState(false);
@@ -304,7 +314,7 @@ export function CourierContractDetailModal({
               {t('contractSearch.rewardColumn')}
             </span>
             <span className="text-xl leading-tight font-semibold tabular-nums">
-              {formatIskCompact(row.reward)}
+              <IskAmount value={row.reward} />
             </span>
             <span className="text-[0.6875rem] text-text-dim tabular-nums">
               {t('contractSearch.rewardOnDelivery', { isk: formatIsk(row.reward) })}
@@ -322,7 +332,7 @@ export function CourierContractDetailModal({
                 jumpRate ? 'text-accent' : 'text-text-dim'
               }`}
             >
-              {jumpRate === null ? '—' : formatIskCompact(jumpRate)}
+              {jumpRate === null ? '—' : <IskAmount value={jumpRate} />}
             </span>
             <span className="text-[0.6875rem] text-text-dim">{jumpSpan()}</span>
           </div>
@@ -353,8 +363,9 @@ export function CourierContractDetailModal({
                 type="button"
                 aria-expanded={showPath}
                 onClick={() => setShowPath((shown) => !shown)}
-                className={`-my-2.5 flex min-h-11 items-center tabular-nums md:my-0 md:min-h-0 ${inlineLinkClassName}`}
+                className={`-my-2.5 flex min-h-11 items-center gap-1 tabular-nums md:my-0 md:min-h-0 ${inlineLinkClassName}`}
               >
+                <Caret expanded={showPath} />
                 {t('contractSearch.jumpsShort', { count: jumpCount })}
               </button>
             ) : (
@@ -388,6 +399,7 @@ export function CourierContractDetailModal({
                       </span>
                     </Tooltip>
                   )}
+                  {lawless.has(system.systemId) && <LawlessTag />}
                 </li>
               ))}
             </ol>
@@ -569,7 +581,7 @@ export function CourierContractDetailModal({
             // A haul asking no collateral says so the same way the table cell
             // does. "0 ISK" is arithmetically true and reads as a figure the
             // issuer typed, which is the opposite of "none was asked for".
-            value={collateral === 0 ? '—' : formatIskCompact(collateral)}
+            value={collateral === 0 ? '—' : <IskAmount value={collateral} />}
             note={
               collateral === 0
                 ? t('contractSearch.noCollateralNote')

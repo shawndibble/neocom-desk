@@ -5,7 +5,8 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, useState, type ReactElement } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { useMemo, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -49,8 +50,7 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -273,8 +273,8 @@ export function MarketWideOpportunitiesPanel({
     const entry = catalog?.byProductTypeID.get(row.productTypeID);
     return entry ? onStartPlan(entry) : Promise.resolve(false);
   };
-  const blueprintTypeIDFor = (productTypeID: number) =>
-    catalog ? (catalog.byProductTypeID.get(productTypeID)?.blueprintTypeID ?? null) : undefined;
+
+  const startPlanFromRow = useRowStartPlan(startPlanFor);
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
@@ -286,7 +286,11 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
+            {catalog?.byProductTypeID.has(row.productTypeID) ? (
+              <span className={entityLinkClassName()}>{row.productName}</span>
+            ) : (
+              row.productName
+            )}
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
@@ -344,7 +348,7 @@ export function MarketWideOpportunitiesPanel({
           t('common.unknown')
         ) : (
           <span className="inline-flex items-center justify-end gap-1">
-            <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+            <IskAmount value={row.iskPerHour} decimals={0} />
             {row.priceCapped && (
               <InfoTooltip
                 label={t('industry.marketOpportunitiesPriceCapped')}
@@ -360,7 +364,7 @@ export function MarketWideOpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.buildCost,
-      render: (row) => <IskAmount value={row.buildCost} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.buildCost} decimals={0} />,
     },
     {
       id: 'orderDepth',
@@ -375,18 +379,9 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
+      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
-  const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
-    <ItemContextMenu
-      typeId={row.productTypeID}
-      itemName={row.productName}
-      blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
-    >
-      {tr}
-    </ItemContextMenu>
-  );
   const { sort, onSortChange } = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
@@ -577,8 +572,8 @@ export function MarketWideOpportunitiesPanel({
                 columns={columns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
+                onRowClick={startPlanFromRow}
+                rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />
@@ -588,7 +583,6 @@ export function MarketWideOpportunitiesPanel({
               rows={shownRows}
               total={visibleRows.length}
               {...sortProps}
-              blueprintTypeIDFor={blueprintTypeIDFor}
               skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
               nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
               nameForCharacter={(id) => characterNames.get(id) ?? unknownName}

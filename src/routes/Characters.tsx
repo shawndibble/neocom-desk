@@ -1,3 +1,10 @@
+import { cx } from '@/lib/cx';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
+import { HintText } from '@/components/ui/HintText';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +46,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
+import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
+import { useAuthFailure } from '@/stores/authFailure';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
@@ -284,6 +293,15 @@ function characterLastSynced(
   return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
 }
 
+/**
+ * A corp or alliance name, plain: a roster row or card selects the Character,
+ * so its Show Info links live in the selected Character's header (§6c).
+ */
+function AffiliationName({ name }: { name: string | null | undefined }) {
+  const { t } = useTranslation();
+  return <>{name || t('common.unknown')}</>;
+}
+
 function CharacterCard({
   character,
   info,
@@ -312,23 +330,30 @@ function CharacterCard({
   return (
     <li
       aria-current={isActive ? 'true' : undefined}
-      className={`flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2 ${
-        isActive ? 'border-l-2 border-l-accent' : ''
-      }`}
+      className={cx(
+        'flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm hover:border-line-bright hover:bg-panel-2',
+        interactiveClassName,
+        isActive ? selectedRowClassName : 'bg-panel/85'
+      )}
     >
       <div className="flex flex-wrap items-start gap-2">
-        <button
-          type="button"
-          aria-label={t('characters.select', { name: character.name })}
-          onClick={() => onSelect(character.characterId)}
-          className="flex min-w-40 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <CharacterAvatar
-            characterId={character.characterId}
-            size="lg"
-            loading="lazy"
-            alt={t('characters.portraitAlt', { name: character.name })}
-          />
+        <div className="flex min-w-40 flex-1 items-start gap-3">
+          {/* Pointer convenience: the name below is the keyboard and screen-reader
+              control, so this avatar target stays out of both. */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => onSelect(character.characterId)}
+            className={cx('shrink-0 rounded-xs', interactiveClassName)}
+          >
+            <CharacterAvatar
+              characterId={character.characterId}
+              size="lg"
+              loading="lazy"
+              alt={t('characters.portraitAlt', { name: character.name })}
+            />
+          </button>
           <span className="min-w-0">
             {/* The dot rides the name's own line, not a corner of the card:
                 it needs no room of its own, so the identity block loses
@@ -337,7 +362,18 @@ function CharacterCard({
                 of pushing the dot off — and shrinking the name never touches
                 the corp/alliance lines below, which are separate rows. */}
             <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
-              <span className="max-w-full truncate text-sm font-semibold">{character.name}</span>
+              <button
+                type="button"
+                aria-label={t('characters.select', { name: character.name })}
+                onClick={() => onSelect(character.characterId)}
+                className={cx(
+                  'max-w-full truncate rounded-xs text-left text-sm font-semibold',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
+              >
+                {character.name}
+              </button>
               {isActive && (
                 <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                   {t('characters.activeLabel')}
@@ -348,13 +384,13 @@ function CharacterCard({
               )}
             </span>
             <span className="block truncate text-xs text-text-dim">
-              {info?.corporationName ?? t('common.unknown')}
+              <AffiliationName name={info?.corporationName} />
             </span>
             <span className="block truncate text-xs text-text-dim">
-              {info?.allianceName ?? t('common.unknown')}
+              <AffiliationName name={info?.allianceName} />
             </span>
           </span>
-        </button>
+        </div>
         {/* Group and remove: the card's own controls, not part of the
             name/corp/alliance identity block, so they sit at the top right
             rather than crowding the stat row below. */}
@@ -413,11 +449,7 @@ function CharacterCard({
         <StatChip
           label={t('characters.walletLabel')}
           value={
-            stats?.wallet === undefined ? (
-              t('common.unknown')
-            ) : (
-              <IskAmount value={stats.wallet} revealOn="tap" />
-            )
+            stats?.wallet === undefined ? t('common.unknown') : <IskAmount value={stats.wallet} />
           }
         />
         {queue && (
@@ -594,14 +626,12 @@ function openJobsColumn(
       // urgent, not less.
       const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
-        <Tooltip openOnTap content={t('characters.openJobsTooltip', { used: running, max })}>
-          <span
-            tabIndex={0}
-            className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-          >
-            {open}
-          </span>
-        </Tooltip>
+        <HintText
+          content={t('characters.openJobsTooltip', { used: running, max })}
+          className={tone}
+        >
+          {open}
+        </HintText>
       );
     },
   };
@@ -618,8 +648,7 @@ function buildColumns(
   onToggleStarred: (characterId: number) => void,
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
-  onMoveToGroup: (characterId: number, groupId: string | null) => void,
-  onRemove: (characterId: number, name: string) => void
+  onMoveToGroup: (characterId: number, groupId: string | null) => void
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -645,7 +674,7 @@ function buildColumns(
       header: t('characters.column.corp'),
       className: 'text-text-dim',
       sortValue: (row) => row.info?.corporationName ?? '',
-      render: (row) => row.info?.corporationName ?? t('common.unknown'),
+      render: (row) => <AffiliationName name={row.info?.corporationName} />,
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu
@@ -704,7 +733,7 @@ function buildColumns(
         row.stats?.wallet === undefined ? (
           t('common.unknown')
         ) : (
-          <IskAmount value={row.stats.wallet} revealOn="longPress" />
+          <IskAmount value={row.stats.wallet} />
         ),
     },
     lastSynced: {
@@ -732,17 +761,12 @@ function buildColumns(
           return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
         }
         return (
-          <Tooltip
-            openOnTap
+          <HintText
             content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}
+            className={tone}
           >
-            <span
-              tabIndex={0}
-              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-            >
-              {formatCountdown((row.queue.trainingFinishMs - Date.now()) / 1000)}
-            </span>
-          </Tooltip>
+            {formatCountdown((row.queue.trainingFinishMs - Date.now()) / 1000)}
+          </HintText>
         );
       },
     },
@@ -763,14 +787,12 @@ function buildColumns(
         if (expiryMs != null && isPiExpired(expiryMs, Date.now())) {
           const stoppedTone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE.idle];
           return (
-            <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
-              <span
-                tabIndex={0}
-                className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${stoppedTone}`}
-              >
-                {t('pi.attention.idle')}
-              </span>
-            </Tooltip>
+            <HintText
+              content={formatTimestamp(new Date(expiryMs), timeZone)}
+              className={stoppedTone}
+            >
+              {t('pi.attention.idle')}
+            </HintText>
           );
         }
         const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
@@ -783,18 +805,13 @@ function buildColumns(
         }
         const label = formatDuration((expiryMs - Date.now()) / 1000);
         return (
-          <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
-            <span
-              tabIndex={0}
-              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
-            >
-              {/* The countdown alone is a colour-only tell of the underlying
+          <HintText content={formatTimestamp(new Date(expiryMs), timeZone)} className={tone}>
+            {/* The countdown alone is a colour-only tell of the underlying
                   attention state (DESIGN.md §7) — colour-blind sighted readers
                   need the word too, not just screen readers, so it prints
                   rather than hiding in an sr-only span. */}
-              {t(`pi.attention.${attention}`)} · {label}
-            </span>
-          </Tooltip>
+            {t(`pi.attention.${attention}`)} · {label}
+          </HintText>
         );
       },
     },
@@ -839,23 +856,6 @@ function buildColumns(
           })}
           pressed={row.starred}
           onClick={() => onToggleStarred(row.character.characterId)}
-        />
-      ),
-    },
-    // Trailing danger `IconButton`, matching the card's separate red X
-    // (issue #2077) — same confirm dialog, not folded into the row's nav-only
-    // context menu (decision 20260927-071415).
-    remove: {
-      id: 'remove',
-      header: t('characters.column.remove'),
-      align: 'right',
-      render: (row) => (
-        <IconButton
-          size="sm"
-          icon={<Icon.Close />}
-          tone="danger"
-          label={t('characters.removeButtonLabel', { name: row.character.name })}
-          onClick={() => onRemove(row.character.characterId, row.character.name)}
         />
       ),
     },
@@ -969,8 +969,7 @@ export function Characters() {
     (id) => void handleToggleStar(id),
     timeZone,
     groupsValue.groups,
-    (id, groupId) => void handleMoveToGroup(id, groupId),
-    (id, name) => requestRemoveCharacter(id, name)
+    (id, groupId) => void handleMoveToGroup(id, groupId)
   );
   const availableColumnIds = availableCharacterColumns(
     spExtractionEnabled,
@@ -1241,6 +1240,7 @@ export function Characters() {
     setRemovingCharacter(null);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured());
+      useAuthFailure.getState().dismissNeedsLogin(id);
     } catch {
       // The local removal is one transaction, so a failure left every row in
       // place — say so rather than leave the click looking ignored.
@@ -1418,8 +1418,13 @@ export function Characters() {
           sort={tableSort}
           onSortChange={setTableSort}
           onRowClick={(row) => void select(row.character.characterId)}
+          rowMoreActions
           rowContextMenu={(row, tr) => (
-            <CharacterRowContextMenu characterId={row.character.characterId}>
+            <CharacterRowContextMenu
+              characterId={row.character.characterId}
+              name={row.character.name}
+              onRemove={() => requestRemoveCharacter(row.character.characterId, row.character.name)}
+            >
               {tr}
             </CharacterRowContextMenu>
           )}
@@ -1531,6 +1536,8 @@ export function Characters() {
           </>
         }
       />
+
+      <NeedsLoginNotice />
 
       {characters.length === 0 ? (
         <EmptyState title={t('characters.emptyTitle')} hint={t('characters.emptyHint')} />

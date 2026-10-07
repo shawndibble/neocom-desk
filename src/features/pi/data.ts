@@ -59,6 +59,9 @@ export function loadCharacterPlanets(
   return loadWithCacheStatus(characterId, LIST_KEY, fetchLive, {
     ...PLANETS_AUTH_POLICY,
     conditional,
+    // A failed list read must not read as "no colonies" (issue #2691).
+    reportFetchFailure: true,
+    authFailureEndpoint: 'getCharacterPlanets',
   });
 }
 

@@ -17,15 +17,27 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import {
+  DisabledMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  MenuItem,
+  MenuSeparator,
+  RowActionsMenu,
+  RowMoreActions,
   Tooltip,
   iconButtonClassName,
 } from '@/components/ui';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
@@ -35,6 +47,7 @@ import { formatLocalDate } from '@/lib/localDate';
 import { doneByText } from './doneBy';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
+import { SkillLink } from '@/features/entities';
 import type { MergedRow, PinnedInProgressEntry } from './queueRows';
 import { remapInstruction } from './remapInstruction';
 import { buildRowAnnouncer, formatLevelLabel } from './rowAnnouncer';
@@ -45,13 +58,22 @@ export type BandInfo =
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /**
- * A row's icon-only buttons. `iconButtonClassName` on a bare `<button>`
- * rather than `IconButton`, which wraps each one in a Tooltip — a Radix
- * provider on every row of a long queue. It also never shrinks its glyph: a
+ * A row's icon-only buttons (grip, prereq promote). `iconButtonClassName` on a
+ * bare `<button>` rather than `IconButton`, which wraps each one in a Tooltip —
+ * a Radix provider on every row of a long queue. (The ⋮ is `RowMoreActions`;
+ * its menu content mounts only when opened, so a long queue pays for the
+ * trigger button only.) It also never shrinks its glyph: a
  * text `Button` narrowed to `w-7` kept its `px-2.5` padding and squeezed a
  * 1rem icon into what was left, down to a dot.
  */
 const ICON_BUTTON = iconButtonClassName({ size: 'sm' });
+/** A row's drag grip: the shared recipe plus the grab cursor and the touch hit area. */
+const GRIP_BUTTON = cx(
+  'cursor-grab touch-none rounded-xs px-1 text-text-faint hover:text-text',
+  interactiveClassName,
+  focusRingClassName,
+  gripHitAreaClassName
+);
 const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
 /**
  * Every training-time cell and its desktop column header, so the two cannot
@@ -109,7 +131,7 @@ function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   return (
     <span
       aria-label={t('plans.attributePairLabel', { pair: label })}
-      className="rounded-xs border border-line px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
+      className="px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
     >
       {label}
     </span>
@@ -208,9 +230,14 @@ function PriorityPill({
           className={`group inline-flex items-center ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
           <span
-            className={`rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+            className={`${interactiveClassName} rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
           >
             {t(priorityLabelKey(priority))}
+            <Icon.Expanded
+              size="0.75rem"
+              aria-hidden="true"
+              className="ml-0.5 inline-block align-[-0.125em]"
+            />
           </span>
         </button>
       </DropdownMenuTrigger>
@@ -311,7 +338,7 @@ function milestoneStateKey(state: MilestoneState): string {
  * Plan Milestone (CONTEXT.md): a named goal ("Fly Loki") pinned to this row's
  * skill level. Decorative only — sits beside the name so a flagged row reads
  * as one at a glance; the Add/Rename/Remove actions live in the row's own
- * `MilestoneRowMenu` instead, so this never has to fight the name's own
+ * the row's ⋮ menu instead, so this never has to fight the name's own
  * `truncate` for click area.
  */
 function MilestoneMark({ status }: { status: MilestoneStatus }) {
@@ -321,63 +348,19 @@ function MilestoneMark({ status }: { status: MilestoneStatus }) {
       ? formatLocalDate(status.finish)
       : t(milestoneStateKey(status.state));
   return (
-    <span
-      title={status.milestone.name}
-      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-xs border border-line-bright px-1 text-[0.6875rem] text-text-dim"
-    >
-      <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      <span className="max-w-[8rem] truncate">{status.milestone.name}</span>
-      <span className="tabular-nums">{dateText}</span>
-    </span>
-  );
-}
-
-interface MilestoneRowMenuProps {
-  /** For the menu trigger's accessible name — the row's own label ("Loki IV"). */
-  rowLabel: string;
-  /** Present when this row already carries a milestone — swaps Add for Rename/Remove. */
-  status: MilestoneStatus | undefined;
-  onAdd: () => void;
-  onRename: () => void;
-  onRemove: () => void;
-}
-
-/**
- * The row's second control (the first is `PriorityPill`): a bare "Add
- * milestone" button when the row has none — one action needs no menu to sit
- * behind — or a Rename/Remove menu once it does, where a single fixed-width
- * slot has to offer two.
- */
-function MilestoneRowMenu({ rowLabel, status, onAdd, onRename, onRemove }: MilestoneRowMenuProps) {
-  const { t } = useTranslation();
-  if (!status) {
-    return (
-      <button
-        type="button"
-        className={ICON_BUTTON}
-        onClick={onAdd}
-        aria-label={t('plans.milestone.addLabel', { name: rowLabel })}
+    <Tooltip content={status.milestone.name}>
+      <span
+        tabIndex={0}
+        className={cx(
+          'ml-2 inline-flex shrink-0 items-center gap-1 rounded-xs px-1 text-[0.6875rem] text-text-dim',
+          focusRingClassName
+        )}
       >
         <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      </button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={ICON_BUTTON}
-          aria-label={t('plans.milestone.menuLabel', { name: rowLabel })}
-        >
-          <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onRename}>{t('plans.milestone.rename')}</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onRemove}>{t('plans.milestone.remove')}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <span className="max-w-[8rem] truncate">{status.milestone.name}</span>
+        <span className="tabular-nums">{dateText}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -394,8 +377,8 @@ interface EntryRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
-  /** Opens the shared Skill Detail modal (description, prereqs, price) for this row's skill. */
-  onOpenSkillDetail: (skillTypeID: number) => void;
+  /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
+  onStageSkillDetail: (skillTypeID: number) => void;
   /**
    * Undefined when the row is freely removable. Set to a plain-language
    * reason (naming what still needs it) when some other entry — a later
@@ -439,7 +422,7 @@ const EntryRow = memo(function EntryRow({
   columns,
   isDesktop,
   onRemove,
-  onOpenSkillDetail,
+  onStageSkillDetail,
   removalBlockedReason,
   onSetPriority,
   pinnedInProgress,
@@ -469,7 +452,7 @@ const EntryRow = memo(function EntryRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.reorderEntry', { name: rowLabel })}
-      className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      className={GRIP_BUTTON}
     >
       <Icon.DragHandle />
     </button>
@@ -481,13 +464,13 @@ const EntryRow = memo(function EntryRow({
   // them necessary.
   const nameSpan = (
     <span className={NAME_CELL}>
-      <button
-        type="button"
-        onClick={() => onOpenSkillDetail(entry.skillTypeID)}
-        className="truncate text-left hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      <SkillLink
+        typeId={entry.skillTypeID}
+        onClick={() => onStageSkillDetail(entry.skillTypeID)}
+        className="truncate"
       >
         {name}
-      </button>{' '}
+      </SkillLink>{' '}
       <span className="shrink-0">
         <span>{ROMAN[entry.targetLevel - 1]}</span>
         {boosted && <BoosterMark />}
@@ -515,52 +498,41 @@ const EntryRow = memo(function EntryRow({
     />
   ) : null;
 
-  const milestoneMenu = (
-    <MilestoneRowMenu
-      rowLabel={rowLabel}
-      status={milestoneStatus}
-      onAdd={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}
-      onRename={() => milestoneStatus && onRenameMilestone(milestoneStatus.milestone.id)}
-      onRemove={() => milestoneStatus && onRemoveMilestone(milestoneStatus.milestone.id)}
-    />
-  );
-
   const blockedReason = removalBlockedReason(entry.skillTypeID, entry.targetLevel);
-  // `aria-disabled`, not the native attribute (DESIGN.md's `FilterChip` rule,
-  // same reasoning as `Characters.tsx`'s refresh-all button): a natively
-  // disabled button takes no hover and no focus, so the Tooltip explaining
-  // why it's inert could never be read by either route — only a stray mouse
-  // hover would work, and unreliably even then. The click still does
-  // nothing; the guard just moved from the DOM into the handler.
-  const removeButtonEl = (
-    <button
-      type="button"
-      className={
-        blockedReason
-          ? `${ICON_BUTTON} aria-disabled:cursor-default aria-disabled:opacity-40`
-          : DANGER_ICON_BUTTON
-      }
-      onClick={() => {
-        if (blockedReason) return;
-        onRemove(entry.skillTypeID, entry.targetLevel);
-      }}
-      aria-label={t('plans.removeEntry', { name: rowLabel })}
-      aria-disabled={blockedReason ? true : undefined}
-    >
-      <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-    </button>
-  );
-  // Tooltip only when blocked (rare relative to a long queue's row count) —
-  // every row wrapping in a Radix provider is exactly what ICON_BUTTON's own
-  // comment above says to avoid. `openOnTap`: the tap does nothing while
-  // blocked (same as `ItemPriceAlertBell`'s disabled case), so a plain tap
-  // reveals the reason instead of needing a touch-and-hold.
-  const removeButton = blockedReason ? (
-    <Tooltip content={blockedReason} openOnTap>
-      {removeButtonEl}
-    </Tooltip>
-  ) : (
-    removeButtonEl
+  // One ⋮ ends the row (right-click and touch-and-hold open the same menu):
+  // the milestone's actions, then Remove as the danger item. A blocked removal
+  // is an `aria-disabled` item with a tap-reachable reason (`DisabledMenuItem`)
+  // rather than a click that silently undoes itself.
+  const rowMenuItems = (
+    <>
+      {milestoneStatus ? (
+        <>
+          <MenuItem onSelect={() => onRenameMilestone(milestoneStatus.milestone.id)}>
+            {t('plans.milestone.rename')}
+          </MenuItem>
+          <MenuItem onSelect={() => onRemoveMilestone(milestoneStatus.milestone.id)}>
+            {t('plans.milestone.remove')}
+          </MenuItem>
+        </>
+      ) : (
+        <MenuItem onSelect={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}>
+          {t('plans.milestone.add')}
+        </MenuItem>
+      )}
+      <MenuSeparator />
+      {blockedReason ? (
+        <DisabledMenuItem reason={blockedReason}>
+          {t('plans.removeEntry', { name: rowLabel })}
+        </DisabledMenuItem>
+      ) : (
+        <MenuItem
+          className="text-danger"
+          onSelect={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+        >
+          {t('plans.removeEntry', { name: rowLabel })}
+        </MenuItem>
+      )}
+    </>
   );
 
   /**
@@ -601,35 +573,41 @@ const EntryRow = memo(function EntryRow({
         isDragging ? 'bg-panel-2' : ''
       }`}
     >
-      {isDesktop ? (
-        <div className="flex items-center justify-between gap-2">
-          {dragHandle}
-          {nameSpan}
-          {attributeBadge}
-          {priorityControl}
-          {columns.perLevelTime && (
-            <TimeCell value={formatCountdown(takesSeconds)} dim label={t('plans.columnTakes')} />
+      <RowActionsMenu name={rowLabel} items={rowMenuItems}>
+        <div>
+          {isDesktop ? (
+            <div className="flex items-center justify-between gap-2">
+              {dragHandle}
+              {nameSpan}
+              {attributeBadge}
+              {priorityControl}
+              {columns.perLevelTime && (
+                <TimeCell
+                  value={formatCountdown(takesSeconds)}
+                  dim
+                  label={t('plans.columnTakes')}
+                />
+              )}
+              {columns.cumulativeTime && (
+                <TimeCell
+                  value={doneByText(row.cumulativeSeconds, startDate)}
+                  label={t('plans.columnDoneBy')}
+                />
+              )}
+              <RowMoreActions />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                {dragHandle}
+                {nameSpan}
+                <RowMoreActions />
+              </div>
+              {metaLine}
+            </>
           )}
-          {columns.cumulativeTime && (
-            <TimeCell
-              value={doneByText(row.cumulativeSeconds, startDate)}
-              label={t('plans.columnDoneBy')}
-            />
-          )}
-          {milestoneMenu}
-          {removeButton}
         </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            {dragHandle}
-            {nameSpan}
-            {milestoneMenu}
-            {removeButton}
-          </div>
-          {metaLine}
-        </>
-      )}
+      </RowActionsMenu>
     </li>
   );
 });
@@ -645,7 +623,8 @@ interface PrereqRowProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   onPromote: (rowId: string) => void;
-  onOpenSkillDetail: (skillTypeID: number) => void;
+  /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
+  onStageSkillDetail: (skillTypeID: number) => void;
 }
 
 /**
@@ -667,7 +646,7 @@ const PrereqRow = memo(function PrereqRow({
   columns,
   isDesktop,
   onPromote,
-  onOpenSkillDetail,
+  onStageSkillDetail,
 }: PrereqRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
@@ -678,13 +657,13 @@ const PrereqRow = memo(function PrereqRow({
       type="button"
       {...handleProps}
       aria-label={t('plans.dragPrereq', { name: label })}
-      className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      className={GRIP_BUTTON}
     >
       <Icon.DragHandle />
     </button>
   );
 
-  // Icon-only with an aria-label, exactly like EntryRow's remove button —
+  // Icon-only with an aria-label, like the grip —
   // and deliberately not wrapped in a Tooltip, which would put a Radix
   // provider on every row of a long queue to restate the label.
   const promoteButton = (
@@ -700,13 +679,13 @@ const PrereqRow = memo(function PrereqRow({
 
   const nameSpan = (
     <span className={NAME_CELL}>
-      <button
-        type="button"
-        onClick={() => onOpenSkillDetail(row.step.skillTypeID)}
-        className="truncate text-left hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      <SkillLink
+        typeId={row.step.skillTypeID}
+        onClick={() => onStageSkillDetail(row.step.skillTypeID)}
+        className="truncate"
       >
         {name}
-      </button>{' '}
+      </SkillLink>{' '}
       <span className="shrink-0">
         <span>{ROMAN[row.step.level - 1]}</span>
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
@@ -825,7 +804,7 @@ const MarkerRow = memo(function MarkerRow({
         type="button"
         {...handleProps}
         aria-label={t('plans.reorderMarker')}
-        className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={GRIP_BUTTON}
       >
         <Icon.DragHandle />
       </button>
@@ -833,7 +812,7 @@ const MarkerRow = memo(function MarkerRow({
         <button
           type="button"
           onClick={() => onEdit(markerIndex)}
-          className="flex-1 truncate text-left tabular-nums hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className={entityLinkClassName('flex-1 truncate text-left tabular-nums')}
         >
           {remapInstruction(attributes, implants)}
         </button>
@@ -843,7 +822,7 @@ const MarkerRow = memo(function MarkerRow({
           <button
             type="button"
             onClick={() => onEdit(markerIndex)}
-            className="font-semibold tracking-widest uppercase hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            className={entityLinkClassName('font-semibold tracking-widest uppercase')}
           >
             {t('plans.markerRow')}
           </button>
@@ -884,7 +863,8 @@ interface EntryListProps {
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   /** See EntryRowProps' field of the same name. */
-  onOpenSkillDetail: (skillTypeID: number) => void;
+  /** Runs as a skill name is clicked, before the link navigates — carries this plan's entries to the modal. */
+  onStageSkillDetail: (skillTypeID: number) => void;
   /** See EntryRowProps' field of the same name. */
   removalBlockedReason: (skillTypeID: number, targetLevel: number) => string | undefined;
   onRemoveMarker: (markerIndex: number) => void;
@@ -934,7 +914,7 @@ export function EntryList({
   startDate,
   onReorder,
   onRemove,
-  onOpenSkillDetail,
+  onStageSkillDetail,
   removalBlockedReason,
   onRemoveMarker,
   markerAttributesFor,
@@ -1017,7 +997,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onRemove={onRemove}
-                      onOpenSkillDetail={onOpenSkillDetail}
+                      onStageSkillDetail={onStageSkillDetail}
                       removalBlockedReason={removalBlockedReason}
                       onSetPriority={onSetPriority}
                       pinnedInProgress={pinnedInProgress}
@@ -1041,7 +1021,7 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       onPromote={onPromotePrereq}
-                      onOpenSkillDetail={onOpenSkillDetail}
+                      onStageSkillDetail={onStageSkillDetail}
                     />
                   )}
                   {row.kind === 'marker' && (

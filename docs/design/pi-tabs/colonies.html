@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planet Colonies</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* Follows DESIGN-RULES.md: Panel is the only bordered display box; a box means click me; radius 2px; no gradients/glows. */
+:root{--hs:#5fd584;--ls:#f5b94a;--ns:#ff7369}
+html,body{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,system-ui,sans-serif}
+body{min-height:100vh}
+img{display:block}
+a{color:var(--accent)}
+main.pi-page{padding-bottom:48px}
+/* shared header fits 390px: let its action buttons wrap under the title (header markup unchanged) */
+@media (max-width:480px){.pi-hdr-row{flex-wrap:wrap;row-gap:6px}.pi-hdr-acts{margin-left:0}}
+.hide{display:none!important}
+.gloss-btn{display:flex;align-items:center;gap:8px;height:32px;border-color:var(--accent-dim);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.gloss-btn b{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-contrast);font-size:11px}
+.short-only{display:none}
+.mock{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;margin-top:14px;border:1px dashed var(--line-bright);border-radius:2px;font-size:12px;color:var(--text-dim)}
+.mock .chip{height:26px}
+.micro{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.num,.tab{font-variant-numeric:tabular-nums}
+/* ---- controls ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:2px;background:transparent;color:var(--text);font-weight:600;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;cursor:pointer;text-decoration:none;font-family:inherit}
+.btn.md{height:36px;padding:0 16px;font-size:12px}
+.btn.sm{height:28px;padding:0 10px;font-size:11px}
+.btn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast)}
+.btn.primary:hover{background:color-mix(in srgb,var(--accent) 85%,transparent)}
+.btn.accent{border-color:var(--accent);color:var(--accent)}
+.btn.accent:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.btn.danger{border-color:color-mix(in srgb,var(--danger) 60%,transparent);color:var(--danger)}
+.btn.danger:hover{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent)}
+.btn.done{border-color:var(--accent-dim);background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.btn:focus-visible,.crow:focus-visible,.fchip:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn svg{width:16px;height:16px}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:2px;cursor:pointer;font-family:inherit}
+.fchip:hover{border-color:var(--line-bright);color:var(--text)}
+.fchip.on{border-color:var(--accent-dim);background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.fchip .ck{width:12px;height:12px;border:1px solid currentColor;border-radius:2px;display:grid;place-items:center;font-size:9px;line-height:1}
+select.sel{height:28px;padding:0 8px;font-size:12px;border:1px solid var(--line-bright);background:var(--panel-2);color:var(--text);border-radius:2px}
+.txtact{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.txtact:hover{text-decoration:underline}
+/* InfoTooltip */
+.ib{all:unset;box-sizing:border-box;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--line);color:var(--text-dim);font-size:10px;font-weight:600;cursor:pointer;vertical-align:-3px;margin-left:4px;position:relative;letter-spacing:0;text-transform:none}
+.ib::after{content:"";position:absolute;inset:-14px}
+.ib:hover,.ib.on{border-color:var(--line-bright);color:var(--text)}
+.tip{position:absolute;z-index:50;max-width:224px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--panel);box-shadow:0 8px 24px #00000080;font-size:11px;line-height:1.45;color:var(--text-dim)}
+.tip b{display:block;margin-bottom:2px;color:var(--text);font-weight:600}
+/* ---- Panel ---- */
+.pnl{border:1px solid var(--line);background:rgba(17,22,29,.85);backdrop-filter:blur(4px);border-radius:2px;margin-top:16px}
+.pnl > header{min-height:36px;padding:4px 12px;background:var(--panel-2);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pnl > header h2{margin:0;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:10px}
+.pnl > header .meta{font-size:11px;color:var(--text-dim);font-weight:400;letter-spacing:0;text-transform:none}
+.pnl > header .acts{display:flex;align-items:center;gap:4px;margin-left:auto}
+.pbody{padding:12px}
+/* StatChips */
+.chips{display:flex;flex-wrap:wrap;align-items:center;row-gap:0}
+.sc{display:inline-flex;align-items:center;gap:6px;height:28px;font-size:11px;white-space:nowrap;padding-left:12px;margin-right:12px;position:relative}
+.sc::before{content:"";position:absolute;left:0;top:7px;width:1px;height:14px;background:var(--line)}
+.sc:first-child{padding-left:0}.sc:first-child::before{display:none}
+.sc .l{font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.sc .v{font-weight:500;font-variant-numeric:tabular-nums;color:var(--text)}
+.t-ok{color:var(--success)!important}.t-w{color:var(--warning)!important}.t-bad{color:var(--danger)!important}.t-acc{color:var(--accent)!important}.t-dim{color:var(--text-dim)!important}
+.pos{color:var(--isk-pos)}
+/* DataAgeBadge */
+.age{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-dim);letter-spacing:0;text-transform:none;font-weight:400}
+.age::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.age.w{color:var(--warning)}.age.bad{color:var(--danger)}
+/* static tags (Advisor fault chips / VerbTag) */
+.tag{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 6px;border:1px solid var(--line);border-radius:2px;font-size:11px;color:var(--text-dim);white-space:nowrap}
+.tag img{width:16px;height:16px}
+.tag.w{border-color:color-mix(in srgb,var(--warning) 60%,transparent);color:var(--warning)}
+.tag.bad{border-color:color-mix(in srgb,var(--danger) 60%,transparent);color:var(--danger)}
+.tag.acc{border-color:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.verb{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid;border-radius:2px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;flex:none}
+.verb.go{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
+.verb.warn{border-color:color-mix(in srgb,var(--warning) 45%,transparent);background:color-mix(in srgb,var(--warning) 10%,transparent);color:var(--warning)}
+.who-tag{display:inline-grid;place-items:center;height:18px;min-width:22px;padding:0 4px;font-size:10px;font-weight:700;color:var(--bg);border-radius:2px;flex:none}
+.who-tag.me{background:var(--line-bright);color:var(--text)}
+/* LoadMeter-style tracks */
+.track{position:relative;height:6px;border-radius:9999px;background:var(--line);overflow:hidden;flex:1}
+.track > i{position:absolute;top:0;bottom:0;left:0;background:var(--success);border-radius:9999px}
+.track > i.w{background:var(--warning)}.track > i.bad{background:var(--danger)}.track > i.acc{background:var(--accent)}
+.track > s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,var(--danger) 0 2px,transparent 2px 5px);opacity:.75}
+.haulmk{position:absolute;right:0;top:-3px;bottom:-3px;width:2px;background:var(--text)}
+.trackwrap{position:relative;flex:1;display:flex;align-items:center}
+/* ---- Today ---- */
+.today{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.today > div{padding:12px}
+.today .side{border-left:1px solid var(--line)}
+.nextdo{display:flex;align-items:center;gap:12px}
+.nextdo .pic{position:relative;flex:none}
+.nextdo .pic > img{width:56px;height:56px;border-radius:50%}
+.nextdo .pic .ov{position:absolute;right:-6px;bottom:-4px;width:26px;height:26px;border-radius:50%;background:var(--bg);display:grid;place-items:center}
+.nextdo .pic .ov img{width:22px;height:22px}
+.nextdo .what{font-size:20px;font-weight:600;line-height:1.25;margin:2px 0}
+.nextdo .why{font-size:12px;color:var(--text-dim)}
+.today .chips{margin-top:10px}
+.orbrow{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.orb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;padding:6px 2px;border-radius:2px;font-size:11px;color:var(--text-dim);text-align:center}
+.orb:hover{background:var(--panel-2);color:var(--text)}
+.orb img{width:36px;height:36px;border-radius:50%}
+.orb.stop img{filter:grayscale(.8) brightness(.7)}
+.orb .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.orb .st{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.orb .st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.earn{font-size:12px;color:var(--text-dim);margin-top:8px}
+.earn b{color:var(--text);font-weight:600}
+.hero{display:flex;align-items:baseline;gap:10px;margin:4px 0 8px;flex-wrap:wrap}
+.hero .n{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
+.hero .c{font-size:11px;color:var(--text-dim)}
+.trip{list-style:none;margin:0;padding:0}
+.trip li{display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 0;border-top:1px solid var(--line)}
+.trip li:last-child{border-bottom:1px solid var(--line)}
+.trip li > img{width:24px;height:24px;border-radius:50%;flex:none}
+.trip li .tx{flex:1;min-width:0}
+.trip li em{font-style:normal;font-size:11px;color:var(--text-dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.side .note{font-size:12px;color:var(--text-dim);margin-top:8px}
+.habit{display:flex;gap:6px 8px;flex-wrap:wrap;font-size:12px;color:var(--text-dim);align-items:center;margin-top:10px}
+/* what we can't see */
+.cantsee{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--text-dim)}
+.cantsee b{color:var(--text);font-weight:600}
+/* ---- colony rows ---- */
+.crow{display:grid;grid-template-columns:40px minmax(190px,1.15fr) minmax(0,1fr) minmax(0,1fr) minmax(130px,.7fr) 200px 12px;gap:6px 16px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);cursor:pointer}
+.clist > .crow:first-child,.clist > .colw:first-child > .crow{border-top:0}
+.crow:hover{background:var(--panel-2)}
+.colw.open > .crow{background:var(--panel-2)}
+.crow > img{width:40px;height:40px;border-radius:50%}
+.crow .nm{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
+.crow .nm b{font-size:14px;font-weight:600}
+.crow .prod{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);margin-top:3px;min-width:0}
+.crow .prod img{width:20px;height:20px;flex:none}
+.crow .prod .ar{color:var(--text-faint)}
+.crow .prod span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt{min-width:0}
+.mt .lb{display:flex;justify-content:space-between;gap:6px;align-items:center;margin-bottom:5px;white-space:nowrap}
+.mt .lb .v{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.mt .ft{font-size:11px;color:var(--text-dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lm{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim)}
+.lm + .lm{margin-top:5px}
+.lm .k{width:40px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.lm .p{min-width:28px;text-align:right;font-variant-numeric:tabular-nums}
+.act{display:flex;flex-direction:column;align-items:stretch;gap:3px}
+.act .btn{width:100%}
+.act small{font-size:11px;color:var(--text-dim);text-align:center}
+.chev{color:var(--text-dim);font-size:18px;line-height:1;justify-self:end}
+.faults{grid-column:2/6;display:flex;gap:6px;flex-wrap:wrap;margin-top:-2px}
+/* ---- expanded detail (inside the Panel: panel-2 fill + hairlines, no nested boxes) ---- */
+.detail{background:color-mix(in srgb,var(--panel-2) 55%,transparent);border-top:1px solid var(--line);display:grid;grid-template-columns:1.25fr 1fr 1fr}
+.dsec{padding:12px;min-width:0}
+.dsec + .dsec{border-left:1px solid var(--line)}
+.dsec h3{margin:0 0 6px;display:flex;align-items:center;gap:6px}
+.dsec h3 svg{color:var(--text-dim);width:14px;height:14px}
+.dsec h3 .r{margin-left:auto;font-weight:400;letter-spacing:0;text-transform:none}
+.ex{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.ex > img{width:28px;height:28px;grid-row:1/3}
+.ex .n{font-size:12px;font-weight:600}
+.ex .n small{font-weight:400;color:var(--text-dim)}
+.ex .rs{grid-row:1/3;grid-column:3;text-align:right}
+.ex .rs .nw{font-size:11px;color:var(--text-dim);max-width:130px}
+.ex .chips{grid-column:2/3}
+.decay{display:flex;align-items:flex-end;gap:2px;height:22px;grid-column:2/4}
+.decay i{flex:1;background:color-mix(in srgb,var(--t0) 45%,transparent)}
+.decay i.past{background:color-mix(in srgb,var(--text-faint) 45%,transparent)}
+.decay i.now{background:var(--warning)}
+.dcap{grid-column:2/4;display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim)}
+.hrow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12px}
+.hrow img{width:24px;height:24px;flex:none}
+.hrow .ar{color:var(--text-faint)}
+.hrow .tx{flex:1;min-width:0}
+.hrow .r{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ccm{padding:6px 0;border-top:1px solid var(--line)}
+.ccm .lm .k{width:44px}
+.ccm .lm .p{min-width:120px;color:var(--text)}
+.fine{font-size:11px;color:var(--text-dim);margin-top:6px}
+.fixes{grid-column:1/-1;padding:0 12px 4px;border-top:1px solid var(--line)}
+.fixes .hrow:first-of-type{border-top:0}
+.fixes h3{margin:10px 0 2px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.dfoot{grid-column:1/-1;display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--text-dim)}
+.dfoot .age{margin-left:auto}
+/* ---- alts ---- */
+.portrait{width:28px;height:28px;border-radius:2px;display:grid;place-items:center;font-weight:700;font-size:11px;flex:none;color:var(--bg)}
+.pnl > header h2 .cn{color:var(--text);letter-spacing:.06em}
+.noalt{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+/* ---- empty ---- */
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 16px;text-align:center}
+.empty .ghosts{display:flex;gap:8px;margin-bottom:6px}
+.empty .ghosts img{width:40px;height:40px;border-radius:50%;filter:grayscale(.5) brightness(.75)}
+.empty .ghosts i{width:40px;height:40px;border-radius:50%;border:1px dashed var(--line-bright);display:block}
+.empty h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.empty p{margin:0;font-size:12px;color:var(--text-dim);max-width:384px}
+.empty .btn{margin-top:8px}
+.what3{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.what3 div{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--text-dim);padding:12px}
+.what3 div + div{border-left:1px solid var(--line)}
+.what3 svg{flex:none;color:var(--text-dim);width:18px;height:18px}
+.what3 b{color:var(--text);display:block;font-weight:600}
+/* ---- ctx ---- */
+.ctx{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin-top:14px}
+.ctx label{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.sample{font-size:11px;color:var(--warning)}
+.est{display:inline-flex;align-items:center;height:18px;padding:0 5px;border:1px solid color-mix(in srgb,var(--warning) 60%,transparent);color:var(--warning);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border-radius:2px;vertical-align:1px}
+/* explainer drawer (same as Plan) */
+.scrim{position:fixed;inset:0;background:#000a;z-index:40;display:none}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:470px;max-width:100%;background:var(--panel);border-left:1px solid var(--line-bright);z-index:41;transform:translateX(105%);transition:transform .2s;overflow:auto;padding:20px}
+body.gl .scrim{display:block}body.gl .drawer{transform:none}
+.drawer h3{margin:0 0 4px;font-size:19px}
+.pinsx div{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.pinsx svg{flex:none;color:var(--accent);width:22px;height:22px}
+.pinsx b{display:block}.pinsx small{color:var(--text-dim);font-size:12px}
+/* ---- responsive ---- */
+@media (max-width:1180px){
+  .crow{grid-template-columns:40px minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 180px 12px}
+  .crow .mt.load{display:none}
+  .faults{grid-column:2/5}
+  .detail{grid-template-columns:1fr 1fr}
+  .detail .dsec:first-child{grid-column:1/-1}
+  .detail .dsec:nth-child(2){border-left:0;border-top:1px solid var(--line)}
+  .detail .dsec:nth-child(3){border-top:1px solid var(--line)}
+}
+@media (max-width:760px){
+  .gloss-btn .long{display:none}.short-only{display:inline}
+  .mock{font-size:11px}
+  .btn.md,.fchip,select.sel,.ex .rs .btn{height:44px}.btn.sm{height:36px}
+  .pnl > header{min-height:44px}
+  .today{grid-template-columns:1fr}
+  .today .side{border-left:0;border-top:1px solid var(--line)}
+  .nextdo .what{font-size:17px}
+  .nextdo .pic > img{width:48px;height:48px}
+  .orb{width:calc(33.333% - 3px)}
+  .crow{grid-template-columns:40px minmax(0,1fr) 12px;gap:10px 12px;padding:12px}
+  .crow .nmb{grid-column:2/3}
+  .crow .chev{grid-column:3;grid-row:1}
+  .crow .meters2{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .crow .mt.load{display:block;grid-column:1/-1}
+  .crow .act{grid-column:1/-1}
+  .act small{text-align:left}
+  .mt .lb{flex-wrap:wrap;white-space:normal;row-gap:2px}
+  .mt .lb .v{white-space:nowrap}
+  .act .btn.quietbtn{display:none}
+  .faults{grid-column:1/-1;margin-top:0}
+  .detail{grid-template-columns:1fr}
+  .detail .dsec{grid-column:auto!important;border-left:0!important}
+  .detail .dsec + .dsec{border-top:1px solid var(--line)}
+  .ex{grid-template-columns:28px minmax(0,1fr)}
+  .ex > img{grid-row:auto}
+  .ex .rs{grid-row:auto;grid-column:1/-1;order:5;text-align:left}
+  .ex .rs .btn{width:100%}
+  .ex .rs .nw{max-width:none}
+  .ex .chips,.decay,.dcap{grid-column:1/-1}
+  .fixes .hrow{flex-wrap:wrap}
+  .dfoot .txtact{min-height:44px}
+  .dfoot .age{margin-left:0}
+  .what3{grid-template-columns:1fr}
+  .what3 div + div{border-left:0;border-top:1px solid var(--line)}
+  .tip{left:16px!important;right:16px;max-width:none}
+  .habit select.sel{height:44px}
+  .noalt .btn{height:44px}
+}
+@media (min-width:761px){ .crow .meters2{display:contents} }
+</style>
+</head>
+<body>
+<!-- ===== PI SHARED HEADER (copy this whole block into each PI tab mockup) =====
+     Matches the real app chrome: page header (20px uppercase h1 + DataAgeBadge + ghost
+     IconButtons) and PageTabs. Includes the shared fluid page container rule (.pi-page):
+     full width, padding-inline 24px (16px below 640px), no centred max-width column.
+     Wrap the page body in <main class="pi-page"> too. Set class "on" +
+     on the current tab. Page-specific buttons go in .pi-hdr-slot (leave empty otherwise). -->
+<header class="pi-hdr pi-page">
+  <style>
+    .pi-page{width:100%;padding-inline:24px;box-sizing:border-box}
+    @media (max-width:639px){.pi-page{padding-inline:16px}}
+    .pi-hdr{padding-top:16px}
+    .pi-hdr-row{min-height:36px;display:flex;align-items:center;gap:8px;min-width:0}
+    .pi-hdr-title{margin:0;font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text);white-space:nowrap}
+    .pi-hdr-age{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;margin-left:4px}
+    .pi-hdr-age::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+    .pi-hdr-acts{margin-left:auto;display:flex;align-items:center;gap:6px}
+    .pi-hdr-ib{display:inline-grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:2px;cursor:pointer;padding:0}
+    .pi-hdr-ib:hover{border-color:var(--line-bright);color:var(--text)}
+    .pi-hdr-ib svg{width:18px;height:18px}
+    .pi-hdr-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:2px;font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+    .pi-hdr-btn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+    .pi-hdr-btn svg{display:none;width:18px;height:18px}
+    @media (max-width:639px){.pi-hdr-btn{width:44px;height:44px;padding:0;justify-content:center;background:var(--panel-2);color:var(--text-dim)}.pi-hdr-btn .pi-hdr-btxt{display:none}.pi-hdr-btn svg{display:block}}
+    .pi-hdr-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:12px;overflow-x:auto}
+    .pi-hdr-tabs a{display:flex;align-items:center;height:36px;padding:0 12px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+    .pi-hdr-tabs a:hover{background:rgba(22,29,39,.4);color:var(--text)}
+    .pi-hdr-tabs a.on{border-bottom-color:var(--accent);background:rgba(22,29,39,.6);color:var(--text)}
+    @media (max-width:767px){.pi-hdr-age{display:none}.pi-hdr-title{white-space:normal;min-width:0;line-height:1.2;flex:1}.pi-hdr-acts{flex:none}.pi-hdr-ib{width:44px;height:44px}.pi-hdr-tabs a{height:44px;flex:1;justify-content:center}}
+  </style>
+  <div class="pi-hdr-row">
+    <h1 class="pi-hdr-title">Planetary Industry</h1>
+    <span class="pi-hdr-age" title="Colony data age">just now</span>
+    <div class="pi-hdr-acts">
+      <span class="pi-hdr-slot"><button class="pi-hdr-btn" id="gloss-btn" title="New to PI? 60-second explainer" aria-label="New to PI? 60-second explainer"><span class="pi-hdr-btxt">New to PI?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.5M12 17h.01"/></svg></button></span>
+      <button class="pi-hdr-ib" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button>
+      <button class="pi-hdr-ib" title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+    </div>
+  </div>
+  <nav class="pi-hdr-tabs" aria-label="Planetary Industry">
+    <a href="plan.html">Plan</a>
+    <a href="map.html">Map</a>
+    <a href="colonies.html" class="on" aria-current="page">Colonies</a>
+  </nav>
+</header>
+<!-- ===== /PI SHARED HEADER ===== -->
+
+<main class="pi-page">
+  <div class="mock">Mockup only, switch the sample pilot:<span id="pilotsw"></span></div>
+  <div class="ctx" id="ctx"></div>
+  <section id="body"></section>
+</main>
+<div class="tip hide" id="tip" role="tooltip"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="PI explainer"></aside>
+
+<script src="data.js"></script>
+<script src="calc.js"></script>
+<script src="icons.js"></script>
+<script>
+(function(){
+const B = PI_BY_ID, N = PI_BY_NAME;
+const CAP = 6000, TAX = 0.10;
+const PROG = 24;            // extractor program length the pilot sets (restart every day, the app default, as Plan says)
+const NOW = {day:'Tue', h:12}; // EVE time for the sample
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// ---------- pilots (same as Plan: names, types, products, markets) ----------
+const C6 = SAMPLE_COLONIES;
+const PILOTS = {
+  six:{key:'6', label:'6 colonies', home:'Efa', sec:0.4, cols:C6, market:'Amarr', alts:true},
+  two:{key:'2', label:'2 colonies (highsec)', home:'Hek', sec:0.5, cols:C6.filter(c=>c.type==='barren'||c.type==='temperate').map(c=>({...c,cc:c.type==='barren'?1:4})), market:'Rens', alts:false},
+  none:{key:'none', label:'No colonies', home:'Hek', sec:0.5, cols:[], market:'Jita', alts:false},
+  nul:{key:'null', label:'No colonies (nullsec, corp buyback)', home:'Sample null system', sec:-0.3, cols:[], market:'Buyback', alts:false},
+};
+const MARKETS = {Jita:1, Amarr:.98, Dodixie:.96, Rens:.97, Hek:.95, Buyback:null};
+
+// ---------- storage (shared with Plan) ----------
+const LS = { get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
+const keyToPilot = k => Object.keys(PILOTS).find(p=>PILOTS[p].key===k);
+
+const S = { pilot:'six', market:'Amarr', buyback:90, open:null, alts:false, haul:24, done:new Set() };
+const P = () => PILOTS[S.pilot];
+
+// ---------- formatting ----------
+const fm = v => { const a=Math.abs(v), s=v<0?'−':''; if(a>=1e6) return s+(a/1e6).toFixed(2)+'M'; if(a>=1e3) return s+Math.round(a/1e3)+'k'; return s+Math.round(a); };
+const cap = s => s[0].toUpperCase()+s.slice(1);
+const ic = (id, cls='') => `<img class="${cls}" src="${iconFor(id)}" alt="${B[id].name}" title="${B[id].name}">`;
+const pl = (t, cls='') => `<img class="${cls}" src="${planetIcon(t)}" alt="${t} planet" title="${cap(t)} planet">`;
+const secCol = s => `var(--${s>=0.45?'hs':s>0?'ls':'ns'})`;
+const dur = h => h>336 ? 'over 2 weeks' : h<=0 ? 'now' : h<1 ? Math.round(h*60)+' min' : h<10 && h%1 ? Math.floor(h)+' h '+Math.round(h%1*60)+' min' : h<48 ? Math.round(h)+' h' : `${Math.floor(h/24)} d${Math.round(h%24)?' '+Math.round(h%24)+' h':''}`;
+const clock = h => { const mins=Math.round((NOW.h+h)*60), t=Math.floor(mins/60), d=DAYS[((DAYS.indexOf(NOW.day)+Math.floor(t/24))%7+7)%7]; return `${d} ${String(((t%24)+24)%24).padStart(2,'0')}:${String(((mins%60)+60)%60).padStart(2,'0')}`; };
+const haulWord = () => S.haul===24?'every day':S.haul===72?'every 3 days':'once a week';
+
+// ---------- money: same model as Plan (one planet ~6,000 raw/h → 40 processed/h, minus 10% customs) ----------
+const mf = () => S.market==='Buyback' ? S.buyback/100 : MARKETS[S.market];
+const value = id => (CAP/PI.p0PerUnit(id))*24*(B[id].sell*mf() - PI.TAX_BASE[B[id].tier]*TAX);
+const marketLabel = () => S.market==='Buyback' ? `corp buyback (${S.buyback}% of Jita)` : S.market;
+
+// ---------- glossary ("i") ----------
+const TERMS = {
+  extractor:['Extractor','The building that drills one raw resource out of the planet. You start it for a set time (here 1 day). When the time runs out it stops, and you restart it in the game.'],
+  launchpad:['Launchpad','Your colony\'s warehouse and shipping dock. Finished products pile up here until you send them up to the customs office and haul them away. Holds 10,000 m³.'],
+  storage:['Storage','Space on the planet for goods (launchpad or storage unit). When it is full, the factories stop and you lose production until you haul.'],
+  cc:['Command Center','Your base on the planet. Its upgrade level (0–5) sets how much CPU and power you have for buildings.'],
+  banked:['Banked','How much the extractor has already pulled out in this run. It slows down over a run, so most of it comes early.'],
+  decay:['Slowing down','Extractors pull a lot at first and less every hour. Restarting resets them to full speed, which is why an early restart can pay.'],
+  cpupg:['CPU and power','Every building uses some of the Command Center\'s CPU and power (PG). Free room means you can add buildings.'],
+  esi:['Why it can be out of date','Neocom reads your colonies from CCP\'s ESI. ESI only recalculates a colony when you open it in the game\'s Planetary Industry window, so storage and banked numbers can be hours old.'],
+};
+const ib = k => `<button class="ib" data-tipk="${k}" aria-label="What is ${TERMS[k][0]}?">?</button>`;
+
+// ---------- glyphs ----------
+const G = {
+  ext:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v13"/><path d="M8 11l4 4 4-4"/><circle cx="12" cy="19" r="3"/></svg>`,
+  fac:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V10l6 4V10l6 4V5h6v16z"/></svg>`,
+  box:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>`,
+  cc:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18a8 8 0 0116 0z"/><path d="M2 18h20M12 6V3"/></svg>`,
+  lp:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c3 3 4 7 4 11H8c0-4 1-8 4-11z"/><path d="M8 13l-3 4h4M16 13l3 4h-4M10 20h4"/></svg>`,
+  clock:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+  plan:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16M7 15l4-4 3 3 5-6"/></svg>`,
+  poco:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/></svg>`,
+};
+
+// ---------- colony state as ESI would report it (sample). Fixes = Plan's Quick wins, same planets and gains ----------
+// ext: [hours left, banked units, % of run done, ISK/day gained by restarting now]
+const STATE = {
+  six:{
+    'Hek VI':{upd:2.5, ext:[[50,182400,31,2000],[50,176900,31,2000]], fac:[{n:4,idle:0}], heads:8, store:{used:2140,rate:7.6,extra:[]},
+      fixes:[{k:'tip',icon:2267,short:'Room for 2 more extractor heads',txt:'Hek VI has room for 2 more extractor heads.',gain:55000,m:2,verb:'Add 2 heads'}]},
+    'Hek VIII':{upd:2.5, ext:[[6,371300,92,58000],[6,358700,92,37000]], fac:[{n:4,idle:0}], heads:8, store:{used:3420,rate:7.6,extra:[]}, decayed:60,
+      fixes:[{k:'reset',icon:2305,short:'Slowed to 60% of its first day',txt:"Restart Hek VIII's Autotrophs extractor: it stops in 6 h and has slowed to 60% of its first day.",gain:95000,m:1,verb:'Restart'}]},
+    'Uttindar II':{upd:2.5, ext:[[52,171800,28,1000],[52,169200,28,1000]], fac:[{n:4,idle:0}], heads:8, store:{used:1180,rate:7.6,extra:[]}, fixes:[]},
+    'Uttindar V':{upd:2.5, ext:[[40,214600,44,3000],[40,207100,44,3000]], fac:[{n:4,idle:0},{n:2,idle:2}], heads:6, store:{used:2860,rate:9.1,extra:[[2311,41200]]},
+      fixes:[{k:'idle',icon:2392,short:'2 idle factories',txt:'Uttindar V has 2 Basic factories with no input. Remove them, or set them to Oxidizing Compound to use the spare raw.',gain:40000,m:1,verb:'Fix 2 factories'}]},
+    'Uttindar VII':{upd:2.5, ext:[[14,302500,81,9000],[14,296800,81,8000]], fac:[{n:4,idle:0}], heads:8, store:{used:4030,rate:7.6,extra:[]}, fixes:[]},
+    'Lustrevik III':{upd:2.5, ext:[[44,201300,39,3000],[44,198000,39,3000]], fac:[{n:4,idle:0}], heads:8, store:{used:9520,rate:30,extra:[[2287,1310000]]},
+      fixes:[{k:'store',icon:2395,short:'Launchpad full in 16 h',txt:"Lustrevik III's launchpad is full in 16 h, before your next haul. Haul now or add a storage unit.",save:120000,m:2,verb:'Haul now'}]},
+  },
+  two:{
+    'Hek VI':{upd:1.2, ext:[[50,182400,31,2000]], fac:[{n:2,idle:0}], heads:5, store:{used:9700,rate:15,extra:[[2267,960000]]},
+      fixes:[{k:'store',icon:2398,short:'Launchpad full in 20 h',txt:"Hek VI's launchpad is full in 20 h, before your next haul. Haul now or add a storage unit.",save:80000,m:2,verb:'Haul now'}]},
+    'Hek VIII':{upd:1.2, ext:[[6,371300,92,58000],[6,358700,92,37000]], fac:[{n:4,idle:0}], heads:8, store:{used:3420,rate:7.6,extra:[]}, decayed:60,
+      fixes:[{k:'reset',icon:2305,short:'Slowed to 60% of its first day',txt:"Restart Hek VIII's Autotrophs extractor: it stops in 6 h and has slowed to 60% of its first day.",gain:95000,m:1,verb:'Restart'}]},
+  },
+};
+// Other characters on the account (sample)
+const ALTS = [
+  {name:'Vela Arrano', initials:'VA', hue:'#b48cf2', age:2, cols:[
+    {name:'Efa IV', type:'barren', cc:4, doing:'Extracting Base Metals → Reactive Metals', st:{upd:2, ext:[[-3,421000,100,0],[-3,409000,100,0]], fac:[{n:4,idle:4}], heads:8, store:{used:2600,rate:0,extra:[]}, stopped:3,
+      fixes:[{k:'stop',icon:2267,short:'Stopped 3 h ago',txt:'Both Base Metals extractors stopped 3 h ago. Nothing is being made.',gain:null,m:1,verb:'Restart'}]}},
+    {name:'Efa II', type:'temperate', cc:4, doing:'Extracting Complex Organisms → Proteins', st:{upd:2, ext:[[30,251000,58,4000],[30,247000,58,4000]], fac:[{n:4,idle:0}], heads:8, store:{used:3900,rate:7.6,extra:[]}, fixes:[]}},
+    {name:'Efa VII', type:'ice', cc:3, doing:'Extracting Heavy Metals → Toxic Metals', st:{upd:2, ext:[[61,98000,15,0]], fac:[{n:2,idle:0}], heads:6, store:{used:900,rate:7.6,extra:[]}, fixes:[]}},
+  ]},
+  {name:'Sorin Vale', initials:'SV', hue:'#6fc3a0', age:26, cols:[
+    {name:'Lustrevik I', type:'plasma', cc:4, doing:'Extracting Noble Metals → Precious Metals', st:{upd:26, ext:[[20,288000,72,6000],[20,281000,72,6000]], fac:[{n:4,idle:0}], heads:8, store:{used:5100,rate:7.6,extra:[]}, fixes:[]}},
+    {name:'Lustrevik V', type:'gas', cc:4, doing:'Extracting Ionic Solutions → Electrolytes', st:{upd:26, ext:[[58,120000,19,0],[58,118000,19,0]], fac:[{n:4,idle:0}], heads:8, store:{used:1600,rate:7.6,extra:[]}, fixes:[]}},
+  ]},
+];
+// The stopped alt colony's restart is worth all of what it makes
+ALTS[0].cols[0].st.fixes[0].gain = null;
+
+const prodOf = c => N[c.doing.split('→')[1].trim()].id;
+const rawOf = c => N[c.doing.replace('Extracting ','').split('→')[0].trim()].id;
+
+function model(c, st, owner){
+  const p1=prodOf(c), p0=rawOf(c);
+  const left = Math.min(...st.ext.map(e=>e[0]));
+  const fullIn = st.store.rate ? (10000-st.store.used)/st.store.rate : Infinity;
+  const fixes = st.fixes.map(f=>f.k==='stop'&&f.gain==null?{...f,gain:value(p1)}:f);
+  const stopped = left<=0;
+  const fillBad = fullIn < S.haul;
+  const idle = st.fac.reduce((s,f)=>s+f.idle,0);
+  const status = stopped?'stop': left<24?'exp': (fillBad||idle)?'att':'ok';
+  const pins = {ecu:st.ext.length, head:st.heads, basic:st.fac.reduce((s,f)=>s+f.n,0), launchpad:1};
+  let cpu=0,pg=0; for(const [k,n] of Object.entries(pins)){cpu+=PI.PIN[k].cpu*n;pg+=PI.PIN[k].pg*n;}
+  const ccMax = PI.CC[c.cc];
+  // urgency in hours: when this colony next needs you
+  const due = Math.min(stopped?0:left, fillBad?fullIn:Infinity, fixes.length?Infinity:Infinity);
+  const score = stopped?0 : left<24?1 : fillBad?2 : idle?3 : fixes.length?4 : 5;
+  return {c, st, owner, p1, p0, left, fullIn, fixes, stopped, fillBad, idle, status, cpu, pg, ccMax, due, score, earn:stopped?0:value(p1)};
+}
+const mine = () => P().cols.map(c=>model(c, STATE[S.pilot][c.name], null)).sort((a,b)=>a.score-b.score || a.left-b.left);
+const altModels = () => P().alts ? ALTS.map(a=>({...a, ms:a.cols.map(c=>model(c,c.st,a)).sort((x,y)=>x.score-y.score||x.left-y.left)})) : [];
+
+
+// ---------- context bar ----------
+function renderCtx(){
+  document.getElementById('pilotsw').innerHTML = Object.entries(PILOTS).map(([k,p])=>`<button class="chip ${S.pilot===k?'on':''}" data-pilot="${k}">${p.label}</button>`).join(' ');
+  const p=P(), n=p.cols.length;
+  document.getElementById('ctx').innerHTML = `
+    <div class="chips"><span class="sc"><span class="l">Home</span><span class="v">${p.home} <b style="color:${secCol(p.sec)}">${p.sec.toFixed(1)}</b></span></span>
+      <span class="sc"><span class="l">Colonies</span><span class="v">${n}</span></span>
+      <span class="sc"><span class="l">EVE time</span><span class="v">${NOW.day} ${String(NOW.h).padStart(2,'0')}:00</span></span></div>
+    <label>Where do you sell? <select class="sel" id="market">${Object.keys(MARKETS).map(m=>`<option value="${m}" ${S.market===m?'selected':''}>${m==='Buyback'?'My corp buyback':m}</option>`).join('')}</select></label>
+    <span class="sample">Sample prices, ${marketLabel()} · 10% customs</span>`;
+}
+
+const STW = {stop:['Stopped','t-bad'], exp:['Expiring soon','t-w'], att:['Needs a look','t-w'], ok:['Healthy','t-ok']};
+const ageCls = h => h<1?'':h<24?'w':'bad';
+const sc = (l,v,cls='') => `<span class="sc"><span class="l">${l}</span><span class="v ${cls}">${v}</span></span>`;
+
+// ---------- today ----------
+function tasks(ms){
+  const t=[];
+  ms.forEach(m=>{
+    if(m.stopped) t.push({m, at:0, verb:'Restart', why:`stopped ${m.st.stopped||0} h ago`, gain:m.fixes[0]?.gain, icon:m.p0, mins:3});
+    else if(m.left<24) t.push({m, at:m.left, verb:'Restart', why:`extractors stop in ${dur(m.left)}`, gain:m.fixes.find(f=>f.k==='reset')?.gain, icon:m.p0, mins:m.fixes.find(f=>f.k==='reset')?1:3});
+    if(m.fillBad) t.push({m, at:m.fullIn, verb:'Haul', why:`launchpad full in ${dur(m.fullIn)}`, save:m.fixes.find(f=>f.k==='store')?.save, icon:m.p1, mins:2});
+  });
+  return t.sort((a,b)=>a.at-b.at);
+}
+const ownerName = m => m.owner ? m.owner.name : 'your main';
+const whoTag = m => m.owner ? `<span class="who-tag" style="background:${m.owner.hue}" title="${m.owner.name}">${m.owner.initials}</span>` : (S.alts?'<span class="who-tag me" title="Your main character">Main</span>':'');
+function today(ms){
+  const t=tasks(ms), first=t[0];
+  const stop=ms.filter(m=>m.stopped).length, exp=ms.filter(m=>!m.stopped&&m.left<24).length, full=ms.filter(m=>m.fillBad).length;
+  const fixes=ms.filter(m=>!m.owner).flatMap(m=>m.fixes.filter(f=>f.k!=='stop'&&f.k!=='store'&&f.gain));
+  const fixGain=ms.filter(m=>!m.owner).flatMap(m=>m.fixes).reduce((s,f)=>s+(f.gain||0),0);
+  const mineEarn=ms.filter(m=>!m.owner).reduce((s,m)=>s+m.earn,0), allEarn=ms.reduce((s,m)=>s+m.earn,0);
+  const loginAt = first ? first.at : Math.min(...ms.map(m=>m.left));
+  const trip = t.filter(x=>x.at<=loginAt+24);
+  const chars=[...new Set(trip.map(x=>ownerName(x.m)))], mins=trip.reduce((s,x)=>s+x.mins,0);
+  const firstWho = first && first.m.owner ? ` <span class="t-dim" style="font-size:14px;font-weight:400">on ${first.m.owner.name}</span>` : '';
+  const next = first
+    ? `<div class="nextdo"><div class="pic">${pl(first.m.c.type)}<span class="ov">${ic(first.icon)}</span></div>
+        <div><div class="micro">Next thing to do</div><div class="what">${first.verb} ${first.m.c.name} <span class="${first.at<=0?'t-bad':'t-w'}">${first.at<=0?'now':'in '+dur(first.at)}</span>${firstWho}</div>
+        <div class="why">${cap(first.why)}${first.gain?` · restarting brings back <b class="pos">+${fm(first.gain)} ISK/day</b>`:first.save?` · hauling saves about <b class="pos">${fm(first.save)}</b> of lost output`:''}</div></div></div>`
+    : `<div class="nextdo"><div class="pic">${pl(ms[0].c.type)}</div><div><div class="micro">Next thing to do</div><div class="what">Nothing urgent. Everything is running.</div></div></div>`;
+  const orbs = ms.filter(m=>!m.owner||m.status!=='ok').map(m=>{const [w,c]=STW[m.status]; return `<button class="orb ${m.status}" data-open="${rid(m)}" title="${m.c.name}${m.owner?' ('+m.owner.name+')':''}: ${w}">${pl(m.c.type)}<span class="nm">${m.owner?m.owner.initials+' · ':''}${m.c.name}</span><span class="st ${c}">${w}</span></button>`;}).join('');
+  return `<section class="pnl"><header><h2>Today's check <span class="age ${ageCls(Math.min(...ms.map(m=>m.st.upd)))}">updated ${dur(Math.min(...ms.map(m=>m.st.upd)))} ago</span></h2>${ms.some(m=>m.owner)?'<span class="meta">Includes your other characters</span>':''}</header>
+    <div class="today">
+      <div>${next}
+        <div class="chips">${sc('Stopped',stop,stop?'t-bad':'t-dim')}${sc('Expiring today',exp,exp?'t-w':'t-dim')}${sc('Full before your haul',full,full?'t-w':'t-dim')}${fixes.length?sc('Small fixes',`${fixes.length} · <span class="pos">+${fm(fixGain)}/day</span>`):''}${sc('Healthy',ms.filter(m=>m.status==='ok').length,'t-ok')}</div>
+        <div class="orbrow">${orbs}</div>
+        <div class="earn">Your ${P().cols.length} ${P().cols.length===1?'colony makes':'colonies make'} about <b>${fm(mineEarn)} ISK/day</b>${ms.some(m=>m.owner)?` (<b>${fm(allEarn)}</b> with your other characters)`:''}.${fixGain?` The small fixes add <b class="pos">+${fm(fixGain)}/day</b>: the same list as <a href="plan.html" data-plan="">Plan's Quick wins</a>.`:''} <span class="est">Estimate</span></div>
+      </div>
+      <div class="side">
+        <div class="micro">Log in next</div>
+        <div class="hero"><span class="n ${loginAt<=0?'t-bad':'t-w'}">${loginAt<=0?'Now':'in '+dur(loginAt)}</span><span class="c">${loginAt<=0?'today':clock(loginAt)+' EVE'}</span></div>
+        ${trip.length?`<ul class="trip">${trip.map(x=>`<li>${pl(x.m.c.type)}<span class="verb ${x.verb==='Haul'?'warn':'go'}">${x.verb}</span><span class="tx">${x.m.c.name}</span>${whoTag(x.m)}<em>~${x.mins} min</em></li>`).join('')}</ul>
+          <div class="note">${chars.length>1?`<b class="t-w">${chars.length} logins</b>, ~${mins} min: ${chars.join(', then ')}. Each character can only reach its own colonies.`:`One login, ~${mins} min, covers everything due in the next day.`} Doing it a few hours early costs almost nothing.</div>`
+         :`<div class="note">Nothing needs you before then.</div>`}
+        <div class="habit">You haul <select class="sel" id="haul">${[[24,'every day'],[72,'every 3 days'],[168,'once a week']].map(([v,l])=>`<option value="${v}" ${S.haul===v?'selected':''}>${l}</option>`).join('')}</select> · restart every day</div>
+      </div>
+    </div></section>`;
+}
+
+// ---------- colony row ----------
+const rid = m => (m.owner?m.owner.initials:'')+m.c.name;
+function meters(m){
+  const lp = Math.max(0,m.left)/PROG*100, lt = m.stopped?'bad':m.left<24?'w':'';
+  const ex = `<div class="mt ext"><div class="lb"><span class="micro">Extractors${ib('extractor')}</span><span class="v ${lt?'t-'+lt:''}">${m.stopped?`Stopped ${m.st.stopped} h ago`:`${dur(m.left)} left`}</span></div>
+    <div class="track"><i class="${lt}" style="width:${m.stopped?100:Math.max(3,lp)}%"></i></div>
+    <div class="ft">${m.stopped?'Nothing is being extracted':m.st.decayed?`Slowed to ${m.st.decayed}% of its first day`:`Stops ${clock(m.left)}`}</div></div>`;
+  const fp = Math.min(m.fullIn,S.haul)/S.haul*100, st = m.fillBad?(m.fullIn<24?'bad':'w'):'';
+  const sto = `<div class="mt sto"><div class="lb"><span class="micro">Storage full in${ib('storage')}</span><span class="v ${st?'t-'+st:''}">${m.st.store.rate===0?'not filling':dur(m.fullIn)}</span></div>
+    <div class="trackwrap" title="Bar = time until your next haul (${haulWord()})"><div class="track"><i class="${st}" style="width:${m.st.store.rate===0?Math.round(m.st.store.used/100):fp}%"></i>${m.fillBad?`<s style="left:${fp}%;right:0"></s>`:''}</div><span class="haulmk"></span></div>
+    <div class="ft">${m.st.store.rate===0?'Nothing coming in':m.fillBad?`<span class="t-w">Stalls ${dur(S.haul-m.fullIn)} before your haul</span>`:`After your haul (${haulWord()}) ✓`}</div></div>`;
+  const cp=m.cpu/m.ccMax.cpu*100, gp=m.pg/m.ccMax.pg*100;
+  const ld = `<div class="mt load"><div class="lb"><span class="micro">Load${ib('cpupg')}</span><span class="v t-dim" style="font-weight:400;font-size:11px">CC level ${m.c.cc}</span></div>
+    <div class="lm"><span class="k">CPU</span><div class="track"><i class="${cp>90?'w':'acc'}" style="width:${cp}%"></i></div><span class="p">${Math.round(cp)}%</span></div>
+    <div class="lm"><span class="k">Power</span><div class="track"><i class="${gp>90?'w':'acc'}" style="width:${gp}%"></i></div><span class="p">${Math.round(gp)}%</span></div></div>`;
+  return `<div class="meters2">${ex}${sto}${ld}</div>`;
+}
+function action(m, isFirst){
+  const f = m.fixes[0], key = rid(m);
+  if(S.done.has(key)) return `<div class="act"><button class="btn md done" data-done="${key}">✓ Done in game</button><small>Tap to undo</small></div>`;
+  const b = (cls,label,sub) => `<div class="act"><button class="btn md ${isFirst?'primary':cls}" data-done="${key}">${label}</button><small>${sub}</small></div>`;
+  if(m.stopped) return b('danger',`Restart: +${fm(value(m.p1))}/day`,'Brings back all of its output');
+  if(f && f.k==='reset') return b('accent',`${f.verb}: +${fm(f.gain)}/day`,`~${f.m} min in the PI window`);
+  if(f && f.k==='store') return b('accent',`${f.verb}: saves ~${fm(f.save)}`,`or add a storage unit · ~${f.m} min`);
+  if(f) return b('',`${f.verb}: +${fm(f.gain)}/day`,`Small fix · ~${f.m} min`);
+  if(m.left<24) return b('accent',`Restart by ${clock(m.left)}`,`Keeps ${fm(m.earn)}/day coming`);
+  return `<div class="act"><button class="btn md quietbtn" data-open="${key}">Details</button><small>All good · ~${fm(m.earn)}/day</small></div>`;
+}
+function faultTags(m){
+  const ch=[];
+  if(m.st.decayed) ch.push(`<span class="tag w">${ic(m.p0)}${m.c.name} · slowed to ${m.st.decayed}%${ib('decay')}</span>`);
+  if(m.idle) ch.push(`<span class="tag bad">${ic(m.p1)}${m.idle} idle factor${m.idle>1?'ies':'y'}${m.stopped?' (no input)':''}</span>`);
+  if(m.fillBad) ch.push(`<span class="tag ${m.fullIn<24?'bad':'w'}">${ic(m.p1)}Launchpad full in ${dur(m.fullIn)}, before your haul</span>`);
+  m.fixes.filter(f=>f.k==='tip').forEach(f=>ch.push(`<span class="tag acc">${ic(f.icon)}${f.short} · +${fm(f.gain)}/day</span>`));
+  if(m.st.upd>12) ch.push(`<span class="tag w">Data ${dur(m.st.upd)} old${ib('esi')}</span>`);
+  return ch.length ? `<div class="faults">${ch.join('')}</div>` : '';
+}
+function row(m, isFirst){
+  const id = rid(m), open = S.open===id, [w,c]=STW[m.status];
+  return `<div class="colw ${open?'open':''}" id="c-${id.replace(/\s/g,'')}">
+    <div class="crow" role="button" tabindex="0" data-open="${id}" aria-expanded="${open}">
+      ${pl(m.c.type)}
+      <div class="nmb"><div class="nm"><b>${m.c.name}</b>${sc('Status',w,c)}</div>
+        <div class="prod">${ic(m.p0)}<span class="ar">→</span>${ic(m.p1)}<span>${B[m.p1].name} · ${cap(m.c.type)}</span></div></div>
+      ${meters(m)}
+      ${action(m, isFirst)}
+      <span class="chev" aria-hidden="true">${open?'⌄':'›'}</span>
+      ${faultTags(m)}
+    </div>
+    ${open?detail(m):''}
+  </div>`;
+}
+function detail(m){
+  const st=m.st, prodPerH=CAP/PI.p0PerUnit(m.p1);
+  const exs = st.ext.map((e,i)=>{
+    const [left,banked,pct,gain]=e, cls=left<=0?'t-bad':left<24?'t-w':'';
+    const nowK=Math.min(11,Math.floor(pct/100*12));
+    const bars = Array.from({length:12},(_,k)=>`<i class="${k<nowK?'past':k===nowK&&left>0?'now':''}" style="height:${Math.round(100*Math.pow(0.82,k)+8)}%"></i>`).join('');
+    const worth = gain>=20000 || left<=0, g = left<=0 ? value(m.p1)/st.ext.length : gain, k=rid(m)+'#'+i;
+    return `<div class="ex">${ic(m.p0)}<div class="n">${B[m.p0].name} extractor <small>· ${Math.round(st.heads/st.ext.length)} heads</small></div>
+      <div class="rs">${worth?`<button class="btn sm ${left<=0?'danger':'accent'}" data-done="${k}">${S.done.has(k)?'✓ Done':`Reset now +${fm(g)}/day`}</button>`:`<div class="nw">Reset now: +${fm(gain)}/day. Not worth a trip yet.</div>`}</div>
+      <div class="chips">${sc('Stops',left<=0?`${-left} h ago`:`in ${dur(left)}`,cls)}${sc('Banked'+ib('banked'),`${banked.toLocaleString()} (${pct}%)`)}</div>
+      <div class="decay" title="Each bar is a slice of the 1-day run; it slows down over time">${bars}</div><div class="dcap"><span>Speed at start</span><span>${left<=0?'stopped':'now ▮'}</span></div></div>`;
+  }).join('');
+  const groups = st.fac.map(f=>{ const idle=f.idle===f.n;
+    return `<div class="hrow">${ic(m.p0)}<span class="ar">→</span>${ic(m.p1)}<span class="tx">${f.n}× Basic factory → ${B[m.p1].name}</span><span class="r ${idle?'t-bad':'t-ok'}">${idle?`${f.idle} idle: no input`:'Running'}</span></div>`;}).join('');
+  const lpP1 = Math.round((st.store.used - st.store.extra.reduce((s,x)=>s+x[1]*B[x[0]].vol,0))/B[m.p1].vol);
+  const items = [[m.p1,lpP1],...st.store.extra];
+  const used=st.store.used, fp=used/100, ft=m.fillBad?(m.fullIn<24?'bad':'w'):'';
+  const cpuFree=m.ccMax.cpu-m.cpu, pgFree=m.ccMax.pg-m.pg, cp=m.cpu/m.ccMax.cpu*100, gp=m.pg/m.ccMax.pg*100;
+  return `<div class="detail">
+    <div class="dsec"><h3 class="micro">${G.ext}Extractors${ib('extractor')}<span class="r">daily runs</span></h3>${exs}</div>
+    <div class="dsec"><h3 class="micro">${G.fac}Production<span class="r">${Math.round(prodPerH)} ${B[m.p1].name}/h</span></h3>${groups}
+      <h3 class="micro" style="margin-top:14px">${G.cc}Command Center${ib('cc')}<span class="r">level ${m.c.cc}</span></h3>
+      <div class="ccm"><div class="lm"><span class="k">CPU</span><div class="track"><i class="acc" style="width:${cp}%"></i></div><span class="p">${m.cpu.toLocaleString()} / ${m.ccMax.cpu.toLocaleString()} tf</span></div>
+        <div class="lm"><span class="k">Power</span><div class="track"><i class="acc" style="width:${gp}%"></i></div><span class="p">${m.pg.toLocaleString()} / ${m.ccMax.pg.toLocaleString()} MW</span></div></div>
+      <div class="fine">Free: ${cpuFree.toLocaleString()} tf CPU, ${pgFree.toLocaleString()} MW power${m.fixes.some(f=>f.k==='tip')?' (enough for the 2 extra extractor heads)':''}. Links between buildings use a little more.</div></div>
+    <div class="dsec"><h3 class="micro">${G.box}Launchpad${ib('launchpad')}<span class="r">10,000 m³</span></h3>
+      ${items.map(([id,q])=>`<div class="hrow">${ic(id)}<span class="tx">${B[id].name}</span><span class="r">${q.toLocaleString()} <span class="t-dim">· ${Math.round(q*B[id].vol).toLocaleString()} m³</span></span></div>`).join('')}
+      <div class="lm" style="margin-top:8px"><span class="k">Used</span><div class="track"><i class="${ft}" style="width:${fp}%"></i></div><span class="p">${Math.round(fp)}%</span></div>
+      <div style="font-size:12px;margin-top:6px">${used.toLocaleString()} m³ used. ${st.store.rate===0?'Nothing is coming in.':`Full in <b class="${ft?'t-'+ft:''}">${dur(m.fullIn)}</b>${m.fullIn<336?` (${clock(m.fullIn)})`:''}; you haul ${haulWord()}.`}</div>
+      ${st.store.extra.length?`<div class="fine">${B[st.store.extra[0][0]].name} is piling up: the extractors pull more than the factories use.</div>`:''}
+      <div class="fine">As of the last time you opened this colony in game.${ib('esi')}</div></div>
+    ${m.fixes.length?`<div class="fixes"><h3 class="micro">Small fixes here<span style="font-weight:400;letter-spacing:0;text-transform:none">${m.owner?'':'Same as Plan → Quick wins'}</span></h3>${m.fixes.map(f=>`<div class="hrow"><span class="verb ${f.k==='store'?'warn':'go'}">${f.verb.split(' ')[0]}</span>${ic(f.icon)}<span class="tx">${f.txt.replace('before your weekly haul',`before your haul (${haulWord()})`)}</span><span class="r">${f.gain?`<span class="pos">+${fm(f.gain)}/day</span>`:`<span class="t-w">saves ~${fm(f.save)}</span>`} <span class="t-dim">· ~${f.m} min</span></span></div>`).join('')}</div>`:''}
+    <div class="dfoot"><a class="txtact" href="plan.html#plan-${m.c.name.toLowerCase().replace(/\s+/g,'-')}" data-plan="${m.c.name}">${G.plan.replace('width="22" height="22"','width="14" height="14"')}Plan this colony: rebuild ideas →</a><span>Want more than small fixes? Plan compares what else this ${cap(m.c.type)} planet could make.</span><span class="age ${ageCls(st.upd)}">updated ${dur(st.upd)} ago (${clock(-st.upd).replace(/^\w+ /,'')} EVE)</span></div>
+  </div>`;
+}
+
+// ---------- alts ----------
+function altPanels(){
+  if(!S.alts) return '';
+  const as = altModels();
+  if(!as.length) return `<section class="pnl"><header><h2>Other characters</h2></header><div class="pbody noalt">No other characters linked to Neocom Desk yet. <button class="btn sm">+ Add a character</button></div></section>`;
+  return as.map(a=>{
+    const stop=a.ms.filter(m=>m.stopped).length, exp=a.ms.filter(m=>!m.stopped&&m.left<24).length, ok=a.ms.filter(m=>m.status==='ok').length;
+    return `<section class="pnl"><header><h2><span class="portrait" style="background:${a.hue}" title="Portrait placeholder">${a.initials}</span><span class="cn">${a.name}</span><span class="age ${ageCls(a.age)}">cached ${dur(a.age)} ago</span></h2>
+      <div class="chips">${sc('Colonies',a.ms.length)}${sc('Makes',`~${fm(a.ms.reduce((s,m)=>s+m.earn,0))}/day`)}${stop?sc('Stopped',stop,'t-bad'):''}${exp?sc('Expiring today',exp,'t-w'):''}${sc('Healthy',ok,'t-ok')}</div></header>
+      ${a.age>12?`<div class="pbody" style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px" class="t-w"><span class="t-w">Sign in as ${a.name} again to refresh: this data is ${dur(a.age)} old.</span></div>`:''}
+      <div class="clist">${a.ms.map(m=>row(m,false)).join('')}</div></section>`;}).join('');
+}
+
+// ---------- empty ----------
+function empty(){
+  return `<section class="pnl"><header><h2>Colonies <span class="meta">0</span></h2></header>
+    <div class="empty"><div class="ghosts">${['gas','barren','lava'].map(t=>pl(t)).join('')}<i></i><i></i><i></i></div>
+      <h2>No colonies yet</h2><p>Once you set up a planet, this tab tells you each day what's stopped, running out or full, and when to log in next.</p>
+      <a class="btn md primary" href="plan.html" data-plan="">Find the best thing to build →</a></div>
+    <div class="what3">
+      <div>${G.clock}<span><b>Restart reminders</b>Extractors${ib('extractor')} run for a few days, then stop.</span></div>
+      <div>${G.box}<span><b>Full-storage warnings</b>Before your launchpad${ib('launchpad')} fills and production stalls.</span></div>
+      <div>${G.cc}<span><b>Quick health check</b>Idle factories and spare room in your Command Center${ib('cc')}.</span></div>
+    </div></section>`;
+}
+
+// ---------- render ----------
+function render(){
+  renderCtx();
+  const el=document.getElementById('body');
+  if(!P().cols.length){ el.innerHTML = empty(); return; }
+  const ms = mine(), alts = S.alts ? altModels().flatMap(a=>a.ms) : [];
+  const firstKey = tasks([...ms,...alts])[0]?.m;
+  const latest = Math.min(...ms.map(m=>m.st.upd));
+  el.innerHTML = `
+    ${today([...ms,...alts])}
+    <div class="cantsee"><span><b>What we can't see:</b> the game only updates a colony's storage and extractors when you open it in the PI window, so these numbers can be a few hours old.${ib('esi')}</span><span class="age ${ageCls(latest)}">last updated ${dur(latest)} ago</span></div>
+    <section class="pnl"><header><h2>${P().cols.length} colonies <span class="meta">needs attention first</span></h2>
+      <div class="acts">${P().alts||true?`<button class="fchip ${S.alts?'on':''}" data-alts aria-pressed="${S.alts}"><span class="ck">${S.alts?'✓':''}</span>Show my other characters' colonies</button>`:''}</div></header>
+      <div class="clist">${ms.map(m=>row(m, m===firstKey)).join('')}</div></section>
+    ${altPanels()}`;
+}
+function setPilot(k){
+  const p=PILOTS[k]; S.pilot=k; S.open=null; S.done.clear(); S.market=p.market;
+  LS.set('piMock.pilot', p.key); LS.set('piMock.market', S.market);
+  render();
+}
+
+// ---------- explainer (same content as Plan) ----------
+document.getElementById('drawer').innerHTML=`
+  <div style="display:flex;align-items:center"><div><div class="micro">New to PI?</div><h3>The 60-second explainer</h3></div><button class="btn sm" style="margin-left:auto" id="gloss-x">Close ✕</button></div>
+  <p class="t-dim" style="margin:6px 0 12px;font-size:13px">Planetary Industry (PI) means building a small base on a planet that mines resources and turns them into products you sell. Set it up once; it keeps running while you're offline. This tab is your daily check: restart what stopped, haul what's full.</p>
+  <div class="pinsx">
+    <div>${G.cc}<span><b>Command Center</b><small>${TERMS.cc[1]}</small></span></div>
+    <div>${G.ext}<span><b>Extractor</b><small>${TERMS.extractor[1]}</small></span></div>
+    <div>${G.fac}<span><b>Factory</b><small>Basic factories make processed products from raw. Advanced factories combine two products.</small></span></div>
+    <div>${G.lp}<span><b>Launchpad</b><small>${TERMS.launchpad[1]}</small></span></div>
+    <div>${G.poco}<span><b>Customs office</b><small>The station in orbit where you pick up your products. Its owner keeps a tax (here 10%).</small></span></div>
+  </div>
+  <p style="font-size:13px">Learn more: <a href="https://wiki.eveuniversity.org/Planetary_Industry" target="_blank" rel="noopener">EVE University: Planetary Industry ↗</a></p>`;
+
+// ---------- events ----------
+const tip=document.getElementById('tip');
+function showTip(btn){
+  const [t,txt]=TERMS[btn.dataset.tipk]; tip.innerHTML=`<b>${t}</b>${txt}`; tip.classList.remove('hide');
+  document.querySelectorAll('.ib.on').forEach(x=>x.classList.remove('on')); btn.classList.add('on');
+  const r=btn.getBoundingClientRect(), w=224;
+  tip.style.left = Math.max(16, Math.min(window.scrollX+r.left-20, window.scrollX+window.innerWidth-w-16))+'px';
+  tip.style.top = (window.scrollY+r.bottom+8)+'px';
+}
+function hideTip(){ tip.classList.add('hide'); document.querySelectorAll('.ib.on').forEach(x=>x.classList.remove('on')); }
+document.addEventListener('change',e=>{
+  if(e.target.id==='market'){ S.market=e.target.value; LS.set('piMock.market',S.market); render(); }
+  if(e.target.id==='haul'){ S.haul=+e.target.value; render(); }
+});
+document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.matches('.crow')){ e.preventDefault(); e.target.click(); } if(e.key==='Escape'){hideTip();document.body.classList.remove('gl');} });
+document.addEventListener('click',e=>{
+  const ibb=e.target.closest('.ib'); if(ibb){ e.stopPropagation(); e.preventDefault(); ibb.classList.contains('on')?hideTip():showTip(ibb); return; }
+  hideTip();
+  const t=e.target.closest('[data-pilot],[data-done],[data-open],[data-alts],[data-plan],#gloss-btn,#gloss-x,#scrim');
+  if(!t) return;
+  const d=t.dataset;
+  if(d.pilot){setPilot(d.pilot);return;}
+  if(d.done){ S.done.has(d.done)?S.done.delete(d.done):S.done.add(d.done); render(); return; }
+  if(d.open){ S.open = S.open===d.open?null:d.open; render(); const el=document.getElementById('c-'+d.open.replace(/\s/g,'')); if(el&&S.open) el.scrollIntoView({block:'nearest'}); return; }
+  if(d.alts!==undefined){ S.alts=!S.alts; render(); return; }
+  if(d.plan!==undefined){ LS.set('piMock.pilot',P().key); LS.set('piMock.market',S.market); return; }
+  if(t.id==='gloss-btn'){document.body.classList.add('gl');return;}
+  document.body.classList.remove('gl');
+});
+window.addEventListener('resize',hideTip);
+
+// ---------- start: ?pilot= wins, then Plan's stored pilot/market (piMock.*) ----------
+const qs=new URLSearchParams(location.search), qp=qs.get('pilot');
+const start = PILOTS[qp]?qp : keyToPilot(qp) || keyToPilot(LS.get('piMock.pilot')) || 'six';
+S.pilot=start; S.market=PILOTS[start].market;
+const sm=LS.get('piMock.market'); if(sm && sm in MARKETS && !qp) S.market=sm;
+if(qs.get('alts')) S.alts=true;
+if(qs.get('open')) S.open=qs.get('open');
+render();
+})();
+</script>
+</body>
+</html>

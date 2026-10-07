@@ -19,6 +19,7 @@ export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';
 export { IconButton } from './IconButton';
 export { textActionClassName } from './textActionClassName';
+export { entityLinkClassName } from './entityLinkClassName';
 export { iconButtonClassName } from './iconButtonClassName';
 export { ReauthBanner } from './ReauthBanner';
 export { SkillBar } from './SkillBar';
@@ -28,6 +29,7 @@ export { Modal } from './Modal';
 export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
 export { DataTable, DataTableDenseCell, DataTableSortPicker } from './DataTable';
+export { isRowOwnEvent } from './rowEvents';
 export type {
   DataTableColumn,
   DataTableExpandableRow,
@@ -45,6 +47,7 @@ export { FilterBar, FilterField } from './FilterBar';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
+export { RowCaret } from './RowCaret';
 export { FieldError } from './FieldError';
 export { Fields, Field } from './Fields';
 export type { FieldsVariant } from './Fields';
@@ -117,4 +120,4 @@ export { TextArea } from './TextArea';
 export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';
 export { IskAmount } from './IskAmount';
-export type { IskRevealGesture } from './IskAmount';
+export { IskFigureGroup } from './IskFigureGroup';

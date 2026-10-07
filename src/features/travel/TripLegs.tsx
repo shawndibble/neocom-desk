@@ -14,6 +14,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import type { RouteSafetyRow } from '@/engine/route/routeSafety';
 import { LegBody, type LegWaysProps } from './LegWays';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
@@ -79,7 +81,11 @@ export function TripLegs({
               aria-expanded={expanded}
               aria-label={parts.join(' · ')}
               onClick={() => toggle(index)}
-              className="flex min-h-11 w-full items-center gap-1.5 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+              className={cx(
+                'flex min-h-11 w-full items-center gap-1.5 py-1.5 text-left text-sm md:min-h-0',
+                rowInteractiveClassName,
+                focusRingInsetClassName
+              )}
             >
               <Caret expanded={expanded} />
               <span className="flex flex-wrap gap-x-2">

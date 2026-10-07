@@ -496,12 +496,13 @@ describe('AppraisalPanel', () => {
       expect(within(dcuRow).getByText('—')).toBeInTheDocument();
     });
 
-    it('marks a partially priced refine value', () => {
+    it('marks a partially priced refine value', async () => {
       const partial = refineOutcome();
       partial.appraisal.rows[0].refinePricedAll = false;
       renderPanel({ controller: controller({ result: partial }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(within(veldsparRow).getByTitle(/no price at this hub/)).toBeInTheDocument();
+      await userEvent.hover(within(veldsparRow).getByText('*'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
     });
 
     it('omits the refine column entirely with no active Character', () => {
@@ -535,8 +536,39 @@ describe('AppraisalPanel', () => {
         .parentElement?.parentElement;
       const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
-      expect(refineCell?.className).toContain('text-accent');
-      expect(buyCell?.className).not.toContain('text-accent');
+      expect(refineCell?.className).toContain('text-isk-pos');
+      expect(buyCell?.className).not.toContain('text-isk-pos');
+    });
+
+    it('explains the leftover that tips refine over the buy total', async () => {
+      const partBatch = refineOutcome();
+      partBatch.appraisal.rows[0] = {
+        ...partBatch.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        quantity: 999,
+        buyEach: 16_000,
+        buyTotal: 15_984_000,
+        refineTotal: 15_436_890,
+        refineUnitsLeftOver: 99,
+      };
+      renderPanel({ controller: controller({ result: partBatch }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      await userEvent.hover(within(oreRow).getByText('!'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/99 units are too few/);
+    });
+
+    it('shows no leftover mark when refine wins without the leftover', () => {
+      const clean = refineOutcome();
+      clean.appraisal.rows[0] = {
+        ...clean.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        buyTotal: 1_000,
+        refineTotal: 2_000,
+        refineUnitsLeftOver: 5,
+      };
+      renderPanel({ controller: controller({ result: clean }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      expect(within(oreRow).queryByText('!')).not.toBeInTheDocument();
     });
 
     /**
@@ -550,7 +582,7 @@ describe('AppraisalPanel', () => {
       // The highlight lives on the cell wrapper around the shorthand figure.
       const buyCell = within(dcuRow).getByText('1,345,950 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
-      expect(buyCell?.className).not.toContain('text-accent');
+      expect(buyCell?.className).not.toContain('text-isk-pos');
     });
 
     describe('Character details implant note (issue #1588)', () => {
@@ -677,12 +709,13 @@ describe('AppraisalPanel', () => {
       expect(screen.queryAllByText('Cheapest total')).toHaveLength(0);
     });
 
-    it('marks an unaffordable LP option rather than hiding it', () => {
+    it('marks an unaffordable LP option rather than hiding it', async () => {
       const unaffordable = lpOutcome();
       unaffordable.appraisal.rows[0].lpAffordable = false;
       renderPanel({ controller: controller({ result: unaffordable }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
-      expect(within(asteroRow).getByTitle(/does not hold enough LP/)).toBeInTheDocument();
+      await userEvent.hover(within(asteroRow).getByText('*'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/does not hold enough LP/);
     });
 
     it('shows a dash on a row with no LP option, when the column is present', () => {

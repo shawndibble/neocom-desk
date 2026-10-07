@@ -15,9 +15,11 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { HintText } from '@/components/ui/HintText';
 import { Tooltip, TypeIcon } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { ItemInfoLink } from '@/features/entities';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { BountyFactionSummary } from './BountyFactionSummary';
@@ -29,12 +31,15 @@ interface JournalDescriptionCellProps {
   entry: WalletJournalEntry;
   transaction: WalletTransactionCommon | undefined;
   itemName: string;
+  /** Where the Moon Mining Tax row this line paid is, when a pilot linked it there. Built by the route, so this feature never imports `miningTax`. */
+  miningTaxHref?: string;
 }
 
 export function JournalDescriptionCell({
   entry,
   transaction,
   itemName,
+  miningTaxHref,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
@@ -46,10 +51,16 @@ export function JournalDescriptionCell({
     if (name) return <>{name}</>;
     // An unnamed goal keeps its id on hover, so it can be added to the map.
     return (
-      <span title={t('wallet.dailyGoalIdTitle', { id: goalId })}>{t('wallet.dailyGoal')}</span>
+      <HintText content={t('wallet.dailyGoalIdTitle', { id: goalId })}>
+        {t('wallet.dailyGoal')}
+      </HintText>
     );
   }
-  if (!transaction && !entry.reason && contractId === undefined) return <>{entry.description}</>;
+  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref) {
+    return <>{entry.description}</>;
+  }
+  // The memo ("Moon tax 10-05 Ainsan") is the link when there is one; a line with no memo gets a labelled link instead.
+  const reasonIsTaxLink = Boolean(miningTaxHref && entry.reason && !kills);
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
         quantity: transaction.quantity.toLocaleString(),
@@ -63,28 +74,44 @@ export function JournalDescriptionCell({
       {kills ? (
         <BountyFactionSummary kills={kills} />
       ) : (
-        entry.reason && <span className="text-text-dim">{entry.reason}</span>
+        entry.reason &&
+        (reasonIsTaxLink && miningTaxHref ? (
+          <Link
+            to={miningTaxHref}
+            className={`${inlineLinkClassName} w-fit`}
+            aria-label={t('wallet.journalMiningTaxReasonLink', { reason: entry.reason })}
+          >
+            {entry.reason} →
+          </Link>
+        ) : (
+          <span className="text-text-dim">{entry.reason}</span>
+        ))
       )}
       {contractId !== undefined && (
         <Link
           to={`/contracts/history?${HIGHLIGHT_PARAM}=${contractId}`}
-          className="w-fit text-text-dim hover:text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className={inlineLinkClassName}
         >
           {t('wallet.journalContractLink')}
         </Link>
       )}
+      {miningTaxHref && !reasonIsTaxLink && (
+        <Link to={miningTaxHref} className={inlineLinkClassName}>
+          {t('wallet.journalMiningTaxLink')}
+        </Link>
+      )}
       {transaction && fill && (
         <Tooltip content={fill}>
-          <MarketItemLink
+          <ItemInfoLink
             typeId={transaction.type_id}
-            className="inline-flex w-fit items-center gap-1.5 text-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex w-fit items-center gap-1.5"
           >
             <TypeIcon typeId={transaction.type_id} size={32} className="h-4 w-4 shrink-0" />
             <span>
               {itemName}
               <span className="text-text-dim"> ×{transaction.quantity.toLocaleString()}</span>
             </span>
-          </MarketItemLink>
+          </ItemInfoLink>
         </Tooltip>
       )}
     </div>

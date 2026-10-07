@@ -16,7 +16,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Panel } from '@/components/ui';
-import { formatIskCompact } from '@/lib/isk';
 import { VITALS_WINDOW_DAYS } from '@/engine/corp/vitals';
 import type { DeadlineDay, DueSoonCount } from '@/engine/corp/deadlines';
 import { CorpDeadlineStrip } from './CorpDeadlineStrip';
@@ -56,7 +55,7 @@ function Figure({
   /** `ReactNode`, not `string`: the money figure is an `IskAmount`, the clock ones plain text. */
   value: ReactNode;
   unit?: string;
-  note: string;
+  note: ReactNode;
   tone?: string;
 }) {
   return (
@@ -133,11 +132,13 @@ export function CorpStanding({ clocks, money }: CorpStandingProps) {
               <span aria-hidden="true" className="hidden w-px shrink-0 bg-line sm:block" />
               <Figure
                 label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-                value={<IskAmount value={money.net} revealOn="tap" />}
-                note={t('corp.standing.heldNote', {
-                  total: formatIskCompact(money.total),
-                  count: money.divisionCount,
-                })}
+                value={<IskAmount value={money.net} />}
+                note={
+                  <>
+                    <IskAmount value={money.total} />{' '}
+                    {t('corp.standing.heldNote', { count: money.divisionCount })}
+                  </>
+                }
                 tone={money.net < 0 ? 'text-isk-neg' : 'text-isk-pos'}
               />
             </>

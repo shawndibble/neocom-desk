@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { BpoOffer } from './bpoAvailability';
@@ -44,21 +44,19 @@ export function BpoBadge({ bpo, mayBeCheaper, locationName, regionName }: BpoBad
   }
 
   return (
-    <Tooltip content={details} openOnTap>
-      <button
-        type="button"
-        aria-label={`${text} · ${label}`}
-        onClick={stop}
-        onKeyDown={stop}
+    // Static label with a tooltip: no box (§6c). The wrapper stops the tap
+    // reaching the row, whose own tap opens the contract.
+    <span onClick={stop} onKeyDown={stop} className="inline-flex max-w-full min-w-0">
+      <HintText
+        content={details}
         className={cx(
-          'inline-flex max-w-full min-w-0 items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-normal focus-visible:outline-2 focus-visible:outline-accent',
-          mayBeCheaper
-            ? 'border-accent-dim bg-panel-2 text-accent'
-            : 'border-line bg-panel-2 text-text-dim'
+          'min-w-0 truncate text-[0.6875rem] font-normal',
+          mayBeCheaper ? 'font-semibold text-text' : 'text-text-dim'
         )}
       >
-        <span className={cx('min-w-0 truncate', mayBeCheaper && 'font-semibold')}>{text}</span>
-      </button>
-    </Tooltip>
+        <span className="sr-only">{`${label} · `}</span>
+        {text}
+      </HintText>
+    </span>
   );
 }

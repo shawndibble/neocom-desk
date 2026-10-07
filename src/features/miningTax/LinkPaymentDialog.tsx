@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, IskInput, Checkbox, Radio } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -168,7 +168,7 @@ export function LinkPaymentDialog({
                 <label
                   className={cx(
                     'flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs',
-                    on && 'border-l border-accent'
+                    on && selectedRowClassName
                   )}
                 >
                   <Radio

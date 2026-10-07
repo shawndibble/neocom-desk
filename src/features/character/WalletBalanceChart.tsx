@@ -5,6 +5,7 @@
  * this must only ever be reached through a dynamic `import()`, never
  * imported eagerly.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   LineChart,
@@ -46,12 +47,12 @@ function BalanceTooltip({ active, payload }: TooltipContentProps): React.ReactEl
   const point = payload[0]?.payload as ChartPoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text tabular-nums shadow-lg shadow-black/50">
-      <p className="font-semibold">{point.tooltipLabel}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{point.tooltipLabel}</p>
       <p>
         {t('wallet.balanceCol')}: {formatIsk(point.balance, 2)}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -130,6 +131,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
           rows={chartData}
           rowKey={(p) => p.date}
           label={t('wallet.balanceHistoryChartLabel')}
+          responsive="table"
         />
       </div>
     </div>

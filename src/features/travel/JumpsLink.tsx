@@ -8,12 +8,10 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import { cx } from '@/lib/cx';
+import { Tooltip } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { routeToHref } from './routeSafetyLink';
 import { useViewRoute } from './useViewRoute';
-
-const linkClassName =
-  'cursor-pointer underline decoration-dotted underline-offset-2 hover:text-accent';
 
 /** A row's own click (open detail, select) must not fire when the count is the target. */
 const stop = (event: { stopPropagation: () => void }) => event.stopPropagation();
@@ -22,9 +20,12 @@ export function JumpsLink({
   systemId,
   fromId,
   preference,
+  label,
   children,
 }: {
   systemId: number;
+  /** Accessible name, when the bare count isn't one ("5 jumps — open route safety"). */
+  label?: string;
   /** Where the count starts, when that isn't the Character's current system. */
   fromId?: number | null;
   /** The page's own route picker, when the count was worked out under it. */
@@ -33,14 +34,16 @@ export function JumpsLink({
 }) {
   const { t } = useTranslation();
   return (
-    <Link
-      to={routeToHref(systemId, fromId, preference)}
-      className={linkClassName}
-      title={t('travel.waypoints.viewRoute')}
-      onClick={stop}
-    >
-      {children}
-    </Link>
+    <Tooltip content={t('travel.waypoints.viewRoute')}>
+      <Link
+        to={routeToHref(systemId, fromId, preference)}
+        className={entityLinkClassName()}
+        aria-label={label}
+        onClick={stop}
+      >
+        {children}
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -59,18 +62,19 @@ export function PlaceJumpsLink({
   const { resolving, failed, view } = useViewRoute(locationId, preference);
   return (
     <>
-      <button
-        type="button"
-        className={cx(linkClassName, 'text-left', className)}
-        disabled={resolving}
-        title={t('travel.waypoints.viewRoute')}
-        onClick={(event) => {
-          stop(event);
-          view();
-        }}
-      >
-        {children}
-      </button>
+      <Tooltip content={t('travel.waypoints.viewRoute')}>
+        <button
+          type="button"
+          className={entityLinkClassName(`text-left ${className ?? ''}`.trim())}
+          disabled={resolving}
+          onClick={(event) => {
+            stop(event);
+            view();
+          }}
+        >
+          {children}
+        </button>
+      </Tooltip>
       {failed && (
         <span role="alert" className="text-danger ml-1 text-xs">
           {t('travel.waypoints.viewRouteUnavailable')}

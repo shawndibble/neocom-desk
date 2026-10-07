@@ -26,6 +26,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
+import { HintText } from '@/components/ui/HintText';
 import {
   Button,
   DataTable,
@@ -42,8 +43,10 @@ import {
 } from '@/engine/route/routeSafety';
 import { BridgeStepLine, type BridgeStep } from './BridgeStepLine';
 import { HoleStepLine, type HoleStep } from './HoleStepLine';
+import { shipKillHeatColor } from '@/engine/route/killHeat';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { LawlessTag } from './LawlessTag';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
@@ -109,9 +112,27 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
     );
   }
   const figures = [
-    { key: 'ships', value: row.shipKills, unit: t('travel.lastHour.ships') },
-    { key: 'pods', value: row.podKills, unit: t('travel.lastHour.pods') },
-    { key: 'jumps', value: row.jumps, unit: t('travel.lastHour.jumps') },
+    {
+      key: 'ships',
+      value: row.shipKills,
+      unit: t('travel.lastHour.ships'),
+      color: shipKillHeatColor(row.shipKills ?? 0) ?? undefined,
+      className: undefined,
+    },
+    {
+      key: 'pods',
+      value: row.podKills,
+      unit: t('travel.lastHour.pods'),
+      color: undefined,
+      className: (row.podKills ?? 0) > 0 ? 'text-danger' : undefined,
+    },
+    {
+      key: 'jumps',
+      value: row.jumps,
+      unit: t('travel.lastHour.jumps'),
+      color: undefined,
+      className: undefined,
+    },
   ].filter((figure) => !isPhone || figure.key === 'jumps' || figure.value !== 0);
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
@@ -122,7 +143,12 @@ function LastHour({ row }: { row: RouteSafetyRow }) {
               ·
             </span>
           )}
-          <span>{count(figure.value)}</span>
+          <span
+            className={figure.className}
+            style={figure.color ? { color: figure.color } : undefined}
+          >
+            {count(figure.value)}
+          </span>
           {/* Spoken at every width; written out on a phone card, which has no header. */}
           <span className="sm:sr-only">{figure.unit}</span>
         </span>
@@ -145,17 +171,14 @@ function useColumns(
         <DataTableDenseCell>
           <span className="font-semibold whitespace-nowrap">{row.name ?? DASH}</span>
           {row.chokepoint && (
-            <Tooltip content={t('travel.chokepointHint')} openOnTap>
-              <span
-                tabIndex={0}
-                // A tap explains the badge; it never opens the row.
-                data-row-control
-                className="rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] whitespace-nowrap text-warning"
-              >
-                {t('travel.chokepoint')}
-              </span>
-            </Tooltip>
+            <HintText
+              content={t('travel.chokepointHint')}
+              className="text-[0.6875rem] whitespace-nowrap text-warning"
+            >
+              {t('travel.chokepoint')}
+            </HintText>
           )}
+          {row.lawless && <LawlessTag />}
         </DataTableDenseCell>
       ),
     },
@@ -172,12 +195,11 @@ function useColumns(
       header: t('travel.col.region'),
       className: 'text-text-dim',
       render: (row) => (
-        <span
-          className="inline-block max-w-[12rem] truncate align-bottom"
-          title={row.regionName ?? undefined}
-        >
-          {row.regionName ?? DASH}
-        </span>
+        <Tooltip content={row.regionName ?? ''}>
+          <span className="inline-block max-w-[12rem] truncate align-bottom">
+            {row.regionName ?? DASH}
+          </span>
+        </Tooltip>
       ),
     },
     {

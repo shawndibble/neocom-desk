@@ -4,6 +4,7 @@
  * `market/PriceHistoryChart.tsx` — this must only ever be reached through a
  * dynamic `import()` from `OverviewTab.tsx`, never imported eagerly.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   BarChart,
@@ -40,7 +41,7 @@ import type { ChartMetric } from './chartMetricPref';
 
 export interface DailyRatePoint {
   date: string;
-  iskPerHour: number;
+  iskValue: number;
   /** The day's weakest price source (issue #1279); null on a day with no mining. */
   source: PriceSource | null;
 }
@@ -94,19 +95,21 @@ export function RateTooltip({
   const point = payload[0]?.payload as DailyRatePoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
-      <p>
-        {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">
+        {typeof label === 'string' ? formatDateTick(label) : ''}
       </p>
-      <p className="text-text-dim">{t('miningTax.overview.rateChartBasis')}</p>
+      <p>
+        {t('miningTax.overview.iskDay')}: {formatIsk(point.iskValue, 0)} ISK
+      </p>
+      <p className="text-text-dim">{t('miningTax.overview.dayChartBasis')}</p>
       {point.source && (
         <p>
           {t('miningTax.overview.sourceColumn')}:{' '}
           {t(`miningTax.overview.priceSource.${point.source}`)}
         </p>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -120,8 +123,8 @@ function CompareTooltip({
   const point = payload[0]?.payload as ComparisonBar | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{point.typeName}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{point.typeName}</p>
       <p>
         {t('miningTax.overview.rawSellValue')}: {formatIsk(point.rawValue, 0)} ISK
       </p>
@@ -140,7 +143,7 @@ function CompareTooltip({
           ))}
         </ul>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -165,22 +168,24 @@ function MetricRateTooltip({
   const point = payload[0]?.payload as DailyMetricPoint | undefined;
   if (!point) return null;
   const valueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
   );
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">
+        {typeof label === 'string' ? formatDateTick(label) : ''}
+      </p>
       <p>
         {valueLabel}: {formatMetricCompact(metric, point.value)}
       </p>
       <p className="text-text-dim">
         {t(
           metric === 'volume'
-            ? 'miningTax.overview.rateChartBasisVolume'
-            : 'miningTax.overview.rateChartBasisCount'
+            ? 'miningTax.overview.dayChartBasisVolume'
+            : 'miningTax.overview.dayChartBasisCount'
         )}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -197,8 +202,8 @@ function MetricCompareTooltip({
     metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
   );
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{point.typeName}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{point.typeName}</p>
       <p>
         {valueLabel}: {formatMetricCompact(metric, point.value)}
       </p>
@@ -211,7 +216,7 @@ function MetricCompareTooltip({
           ))}
         </ul>
       )}
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -238,9 +243,9 @@ function IskCharts({
         render: (point) => formatDateTick(point.date),
       },
       {
-        id: 'iskPerHour',
-        header: t('miningTax.overview.iskPerHour'),
-        render: (point) => `${formatIsk(point.iskPerHour, 0)} ISK`,
+        id: 'iskValue',
+        header: t('miningTax.overview.iskDay'),
+        render: (point) => `${formatIsk(point.iskValue, 0)} ISK`,
       },
       {
         id: 'source',
@@ -305,12 +310,12 @@ function IskCharts({
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.overview.rateChartTitle')}
+          {t('miningTax.overview.dayChartTitle')}
         </p>
         <p className="mb-1 text-[0.6875rem] text-text-dim">
-          {t('miningTax.overview.rateChartBasis')}
+          {t('miningTax.overview.dayChartBasis')}
         </p>
-        <div role="img" aria-label={t('miningTax.overview.rateChartTitle')} className="h-64 w-full">
+        <div role="img" aria-label={t('miningTax.overview.dayChartTitle')} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={dailyRate}
@@ -327,13 +332,14 @@ function IskCharts({
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                 width={COMPACT_ISK_Y_AXIS_WIDTH}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
               <Bar
                 isAnimationActive={false}
-                dataKey="iskPerHour"
-                name={t('miningTax.overview.iskPerHour')}
+                dataKey="iskValue"
+                name={t('miningTax.overview.iskDay')}
               >
                 {dailyRate.map((point) => (
                   <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
@@ -347,9 +353,10 @@ function IskCharts({
         <div className="sr-only">
           <DataTable
             columns={rateColumns}
+            responsive="table"
             rows={dailyRate}
             rowKey={(point) => point.date}
-            label={t('miningTax.overview.rateChartTitle')}
+            label={t('miningTax.overview.dayChartTitle')}
           />
         </div>
         <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
@@ -387,6 +394,7 @@ function IskCharts({
                 type="number"
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                // SVG axis text: IskAmount can't render inside the chart (documented exception).
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <YAxis
@@ -411,6 +419,7 @@ function IskCharts({
                   <LabelList
                     dataKey="rawValue"
                     position="right"
+                    // SVG label text: IskAmount can't render inside the chart (documented exception).
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
                     style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                   />
@@ -431,6 +440,7 @@ function IskCharts({
         <div className="sr-only">
           <DataTable
             columns={compareColumns}
+            responsive="table"
             rows={typeComparison}
             rowKey={(point) => point.typeId}
             label={compareChartTitle}
@@ -464,13 +474,13 @@ function MetricCharts({
   const { t } = useTranslation();
   const rateChartTitle = t(
     metric === 'volume'
-      ? 'miningTax.overview.rateChartTitleVolume'
-      : 'miningTax.overview.rateChartTitleCount'
+      ? 'miningTax.overview.dayChartTitleVolume'
+      : 'miningTax.overview.dayChartTitleCount'
   );
   const rateChartBasis = t(
     metric === 'volume'
-      ? 'miningTax.overview.rateChartBasisVolume'
-      : 'miningTax.overview.rateChartBasisCount'
+      ? 'miningTax.overview.dayChartBasisVolume'
+      : 'miningTax.overview.dayChartBasisCount'
   );
   const compareChartTitle = t(
     metric === 'volume'
@@ -478,7 +488,7 @@ function MetricCharts({
       : 'miningTax.overview.compareChartTitleCount'
   );
   const rateValueLabel = t(
-    metric === 'volume' ? 'miningTax.overview.m3PerHour' : 'miningTax.overview.countPerHour'
+    metric === 'volume' ? 'miningTax.overview.m3PerDay' : 'miningTax.overview.countPerDay'
   );
   const totalValueLabel = t(
     metric === 'volume' ? 'miningTax.overview.volumeTotal' : 'miningTax.overview.countTotal'
@@ -569,6 +579,7 @@ function MetricCharts({
         <div className="sr-only">
           <DataTable
             columns={rateColumns}
+            responsive="table"
             rows={dailyPoints}
             rowKey={(point) => point.date}
             label={rateChartTitle}
@@ -627,6 +638,7 @@ function MetricCharts({
         <div className="sr-only">
           <DataTable
             columns={compareColumns}
+            responsive="table"
             rows={typeComparison}
             rowKey={(point) => point.typeId}
             label={compareChartTitle}

@@ -25,6 +25,8 @@ import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -119,9 +121,18 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
     return (
       <Link
         to={contractHref}
-        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={cx(
+          'group flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
       >
         {body}
+        <Icon.Descend
+          size={Icon.ICON_SIZE.sm}
+          aria-hidden="true"
+          className="mt-1 shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
+        />
       </Link>
     );
   }
@@ -135,7 +146,11 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
       <button
         type="button"
         onClick={() => onSelectEvent(Number(item.sourceId))}
-        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={cx(
+          'flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
       >
         {body}
       </button>

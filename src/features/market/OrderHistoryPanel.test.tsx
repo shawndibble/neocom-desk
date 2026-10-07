@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('OrderHistoryPanel — the row as an item', () => {
-  it('carries the item context menu on every row', async () => {
+  it('has no row menu or More actions button: the item name links to Show info', async () => {
     mockedLoadHistory.mockResolvedValue({
       cached: {
         data: [historyOrder()],
@@ -69,15 +69,18 @@ describe('OrderHistoryPanel — the row as an item', () => {
       },
       needsReauth: false,
     });
-    const { actions } = renderPanel();
+    renderPanel();
 
-    fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
+    const row = await screen.findByRole('row', { name: /Damage Control II/ });
+    expect(within(row).getByRole('link', { name: 'Damage Control II' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('2048')
+    );
+    fireEvent.contextMenu(row);
 
-    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    // Right-click may still offer the table's own Export; never item actions.
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
   it('exports a truncated fetch from the title-bar menu as a -partial file', async () => {
@@ -106,22 +109,6 @@ describe('OrderHistoryPanel — the row as an item', () => {
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-orders-history-\d{4}-\d{2}-\d{2}-partial\.csv$/);
     expect(spy.mock.calls[0][1]).toContain('"Damage Control II","Sell",460800,0,3,');
     spy.mockRestore();
-  });
-
-  it('asks for the blueprint catalog the first time a row menu opens', async () => {
-    mockedLoadHistory.mockResolvedValue({
-      cached: {
-        data: [historyOrder()],
-        fetchedAt: new Date(),
-        fromCache: false,
-        truncated: false,
-      },
-      needsReauth: false,
-    });
-    const { actions } = renderPanel();
-
-    fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
-    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 });
 
@@ -213,24 +200,18 @@ describe('OrderHistoryPanel — phone', () => {
     });
   }
 
-  it('shows item, filled and shorthand price per row, and opens the rest on tap', async () => {
+  it('stays a plain table, shedding side and state below sm (issued is the default sort: it stays)', async () => {
     load([historyOrder({ volume_remain: 1, volume_total: 3 })]);
     renderPanel();
 
-    const toggle = await screen.findByRole('button', { name: /^Damage Control II/ });
-    expect(screen.queryByRole('table')).toBeNull();
-    expect(within(toggle).getByText('2/3')).toBeInTheDocument();
-    expect(within(toggle).getByText('460.8K')).toBeInTheDocument();
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('1 / 3')).toBeInTheDocument();
-    expect(screen.getByText('460,800')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View in Market' })).toHaveAttribute(
-      'href',
-      expect.stringContaining('2048')
-    );
+    const row = await screen.findByRole('row', { name: /Damage Control II/ });
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(within(row).getByText('1 / 3')).toBeInTheDocument();
+    const cell = (label: string) => row.querySelector(`td[data-label="${label}"]`);
+    expect(cell('Side')).toHaveClass('max-sm:hidden');
+    expect(cell('Issued')).not.toHaveClass('max-sm:hidden');
+    expect(cell('State')).toHaveClass('max-sm:hidden');
+    expect(cell('Price')).not.toHaveClass('max-sm:hidden');
   });
 
   it('sorts by price from the column header', async () => {
@@ -245,22 +226,16 @@ describe('OrderHistoryPanel — phone', () => {
       historyOrder({ order_id: 2, type_id: 2, price: 1_000 }),
     ]);
     renderPanel();
-    await screen.findByRole('button', { name: /^Cheap Thing/ });
+    await screen.findByRole('row', { name: /Cheap Thing/ });
 
     const names = () =>
       screen
-        .getAllByRole('button', { name: /^(Cheap|Pricey) Thing/ })
-        .map((b) => b.textContent?.match(/(Cheap|Pricey) Thing/)?.[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Sort by Price' }));
+        .getAllByRole('row')
+        .map((r) => r.textContent?.match(/(Cheap|Pricey) Thing/)?.[0])
+        .filter(Boolean);
+    fireEvent.click(screen.getByRole('button', { name: /^Price/ }));
     expect(names()).toEqual(['Cheap Thing', 'Pricey Thing']);
-    fireEvent.click(screen.getByRole('button', { name: 'Price, sorted ascending' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Price/ }));
     expect(names()).toEqual(['Pricey Thing', 'Cheap Thing']);
-  });
-
-  it('carries the item context menu on every row', async () => {
-    load([historyOrder()]);
-    renderPanel();
-    fireEvent.contextMenu(await screen.findByRole('button', { name: /^Damage Control II/ }));
-    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { cx } from '@/lib/cx';
+import { disabledClassName, focusRingClassName, interactiveClassName } from './controlStyles';
 
 export type IconButtonVariant = 'ghost' | 'plain';
 export type IconButtonTone = 'default' | 'danger' | 'positive' | 'warning';
@@ -34,9 +35,9 @@ export interface IconButtonClassNameOptions {
  * that navigates rather than acting, say — can match it exactly instead of
  * hand-copying the cascade. Mirrors `buttonClassName` for the same reason.
  *
- * The size classes are the 44px touch tier below `md` and the standard 36px
- * control above it (DESIGN.md §3): a pointer never gets the phone-sized box
- * and a thumb never gets the mouse-sized one.
+ * The size classes are the 44px touch tier below `md` or on a coarse pointer
+ * (`touch:`) and the standard 36px control above it (DESIGN.md §3): a pointer
+ * never gets the phone-sized box and a thumb never gets the mouse-sized one.
  */
 export function iconButtonClassName({
   variant = 'ghost',
@@ -48,9 +49,14 @@ export function iconButtonClassName({
 }: IconButtonClassNameOptions = {}): string {
   return cx(
     'inline-flex shrink-0 items-center justify-center rounded-xs',
-    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-    'disabled:cursor-not-allowed disabled:opacity-40',
-    size === 'md' ? 'size-11 md:size-9' : size === 'row' ? 'size-11 md:size-7' : 'size-9 md:size-7',
+    interactiveClassName,
+    focusRingClassName,
+    disabledClassName,
+    size === 'md'
+      ? 'size-11 md:size-9 touch:size-11'
+      : size === 'row'
+        ? 'size-11 md:size-7 touch:size-11'
+        : 'size-9 md:size-7 touch:size-9',
     // `border` alone here: each state below names its own border colour, so no
     // two border-colour utilities ever land on the element at once. Tailwind
     // resolves same-property utilities by stylesheet order, not by their order
@@ -58,22 +64,37 @@ export function iconButtonClassName({
     // something to rely on.
     variant === 'ghost' && 'border',
     pressed === true
-      ? cx('bg-accent/12 text-accent', variant === 'ghost' && 'border-accent')
+      ? cx(
+          'bg-accent/12 text-accent',
+          variant === 'ghost' && 'border-accent',
+          !disabled && 'hover:bg-accent/20 active:bg-accent/28'
+        )
       : tone === 'danger'
         ? cx(
             'text-danger',
             variant === 'ghost' && 'border-danger/60',
-            !disabled && 'hover:bg-danger/10',
+            !disabled && 'hover:bg-danger/10 active:bg-danger/20',
             variant === 'ghost' && !disabled && 'hover:border-danger'
           )
         : tone === 'positive'
-          ? cx('text-isk-pos', variant === 'ghost' && 'border-line')
+          ? cx(
+              'text-isk-pos',
+              variant === 'ghost' && 'border-line',
+              !disabled && 'hover:bg-isk-pos/10 active:bg-isk-pos/20',
+              variant === 'ghost' && !disabled && 'hover:border-isk-pos'
+            )
           : tone === 'warning'
-            ? cx('text-warning', variant === 'ghost' && 'border-line')
+            ? cx(
+                'text-warning',
+                variant === 'ghost' && 'border-line',
+                !disabled && 'hover:bg-warning/10 active:bg-warning/20',
+                variant === 'ghost' && !disabled && 'hover:border-warning'
+              )
             : cx(
                 'text-text-dim',
                 variant === 'ghost' && 'border-line',
-                !disabled && 'hover:text-text',
+                !disabled && 'hover:text-text active:bg-panel',
+                variant === 'plain' && !disabled && 'hover:bg-panel-2',
                 variant === 'ghost' && 'bg-panel-2',
                 variant === 'ghost' && !disabled && 'hover:border-line-bright'
               ),

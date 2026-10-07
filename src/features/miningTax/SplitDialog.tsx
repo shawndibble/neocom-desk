@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -9,13 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
-  TypeIcon,
   Radio,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { planSplit } from '@/engine/miningTax/split';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -210,11 +209,11 @@ export function SplitDialog({
               return (
                 <li key={line.typeId} className="space-y-1.5 px-2 py-2">
                   <div className="flex items-center gap-1.5">
-                    <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                    <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <label htmlFor={inputId} className="min-w-0 flex-1 truncate">
-                      <MarketItemLink typeId={line.typeId}>
+                      <OreLink typeId={line.typeId}>
                         {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                      </MarketItemLink>
+                      </OreLink>
                       <span className="ml-1.5 text-xs text-text-dim tabular-nums">
                         {line.quantity.toLocaleString()}
                       </span>

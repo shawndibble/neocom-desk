@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { BuildPlanList } from './BuildPlanList';
+import { rowStateClassName } from './planRowStyles';
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }): BuildPlanRecord {
   return {
@@ -76,6 +77,16 @@ const NOOP_GROUP_PROPS = {
   statsByPlanId: new Map(),
   statsByGroupId: new Map(),
 };
+
+/** The rename field must survive the menu closing: its focus hand-back would otherwise blur (and commit) it. */
+async function expectRenameFieldHeld(name: string) {
+  const field = await screen.findByRole('textbox', { name });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  expect(screen.getByRole('textbox', { name })).toBe(field);
+  expect(field).toHaveFocus();
+}
 
 describe('BuildPlanList', () => {
   const PLANS = [
@@ -304,9 +315,7 @@ describe('BuildPlanList: build groups (#626)', () => {
     // plan the moment a member is edited. So Fit Import puts the ship in the
     // name and the list never derives it.
     renderGrouped();
-    expect(
-      screen.getByRole('button', { name: "Delete group Loru's Max Hacker — Buzzard" })
-    ).toBeInTheDocument();
+    expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
   });
 
   it('shows the members once expanded', () => {
@@ -314,21 +323,23 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
   });
 
-  it('titles the truncated group name button with the full name (#2175)', () => {
+  it('shows the full group name in a tooltip when truncated (#2175)', async () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     renderGrouped({
       groups: [{ id: 'g1', name: longName, order: 0 }],
     });
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    await userEvent.hover(screen.getByText(longName));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 
-  it('titles the truncated plan name button with the full name (#2175)', () => {
+  it('shows the full plan name in a tooltip when truncated (#2175)', async () => {
     const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
     renderGrouped({
       plans: [plan({ id: 'a', name: longName, buildGroupId: 'g1' })],
       expandedGroupIds: new Set(['g1']),
     });
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    await userEvent.hover(screen.getByText(longName));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 
   it('always lists a plan that is in no group', () => {
@@ -386,7 +397,7 @@ describe('BuildPlanList: build groups (#626)', () => {
     fireEvent.contextMenu(nameButton);
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
 
-    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename group');
   });
 });
 
@@ -396,7 +407,6 @@ describe('BuildPlanList: build groups (#626)', () => {
 // the list. So these cover the rendered contract only: the handle is there, and
 // it is deliberately not the accessibility path.
 describe('BuildPlanList: dragging a plan into a group (#627)', () => {
-  const HANDLE_TITLE = 'Drag onto a group to move this plan into it';
   const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
   const PLANS = [
     plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
@@ -425,14 +435,14 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
 
   it('gives every plan row a drag handle', () => {
     renderDraggable();
-    expect(screen.getAllByTitle(HANDLE_TITLE)).toHaveLength(2);
+    expect(screen.getAllByTestId('plan-drag-handle')).toHaveLength(2);
   });
 
   it('offers no handle at all until there is a group to drag into', () => {
     // With no groups every drop resolves to the plan's own (absent) group, so
     // a grab cursor would be advertising a move that cannot happen.
     renderDraggable({ groups: [] });
-    expect(screen.queryByTitle(HANDLE_TITLE)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('plan-drag-handle')).not.toBeInTheDocument();
   });
 
   it('keeps the handle out of the tab order and hidden from assistive tech', () => {
@@ -440,7 +450,7 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     // raw droppable ids; the per-row menu reaches the same destinations
     // properly, so the handle is pointer-only on purpose.
     renderDraggable();
-    for (const handle of screen.getAllByTitle(HANDLE_TITLE)) {
+    for (const handle of screen.getAllByTestId('plan-drag-handle')) {
       expect(handle).toHaveAttribute('aria-hidden', 'true');
       expect(handle).toHaveAttribute('tabindex', '-1');
       // Without this a touch-drag scrolls the list instead of dragging (#408).
@@ -448,10 +458,11 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     }
   });
 
-  it('keeps only Delete visible per row, moving move-to-group into the row context menu', () => {
+  it('keeps one trailing ⋮ per row and no standalone Delete or Move to group button', () => {
     renderDraggable();
     expect(screen.queryByRole('button', { name: /Move to group/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete Rokh' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for Rokh' })).toBeInTheDocument();
   });
 
   it('opens "Move to group" from the row context menu, reachable via focus + the native menu key', () => {
@@ -546,6 +557,16 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
   });
 
+  it('renames the plan from the right-click menu and keeps the field focused', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rokh' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    await expectRenameFieldHeld('Rename');
+  });
+
   it('renames the plan from the "More actions" button', async () => {
     const user = userEvent.setup();
     renderWithGroups();
@@ -553,7 +574,127 @@ describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
 
-    expect(screen.getByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename');
+  });
+});
+
+describe('BuildPlanList: the whole row opens it', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderRows(overrides: Record<string, unknown> = {}) {
+    const onSelect = vi.fn();
+    const onSelectGroup = vi.fn();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={onSelect}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        onSelectGroup={onSelectGroup}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+    return { onSelect, onSelectGroup };
+  }
+
+  const rowOf = (name: string) => screen.getByRole('button', { name }).closest('li')!;
+
+  it('opens the plan from a click on blank row space, once', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(rowOf('Rokh'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith('c');
+  });
+
+  it('opens the plan once from the name, not twice', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'Rokh' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the group from a click on its blank header space', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup, onSelect } = renderRows();
+    await user.click(rowOf('Buzzard fit'));
+    expect(onSelectGroup).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the caret toggle separate from opening the group', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup } = renderRows();
+    await user.click(screen.getByRole('button', { name: /Show or hide the plans in Buzzard fit/ }));
+    expect(onSelectGroup).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the ⋮, its menu items or the drag handle', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    await user.click(screen.getAllByTestId('plan-drag-handle')[1]);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the compare checkbox', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows({ compareMode: true });
+    await user.click(screen.getByRole('checkbox', { name: /Rokh/ }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('renames on double-click of the name', async () => {
+    const user = userEvent.setup();
+    renderRows();
+    await user.dblClick(screen.getByRole('button', { name: 'Rokh' }));
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+  });
+
+  it('does not open the plan from the click that ends a long touch press', () => {
+    const { onSelect } = renderRows();
+    const row = rowOf('Rokh');
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.contextMenu(row);
+    fireEvent.click(row, { detail: 1 });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('gives the plan and group names the entity link style', () => {
+    renderRows();
+    for (const name of ['Rokh', 'Buzzard fit']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'text-accent',
+        'underline',
+        'dt-primary'
+      );
+    }
+  });
+
+  it('keeps the row hover fill off a live drop target so the accent fill shows', () => {
+    // Pure class recipe: the drop state is internal to a dnd-kit drag.
+    expect(rowStateClassName(false, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(true, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(false, false)).toContain('hover:bg-panel-2');
+  });
+
+  it('marks the row as clickable with hover and pressed states', () => {
+    renderRows();
+    const row = rowOf('Rokh');
+    expect(row).toHaveClass('cursor-pointer', 'hover:bg-panel-2', 'active:bg-panel');
   });
 });
 
@@ -597,10 +738,13 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
     await user.click(
       screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
     );
-    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Rename']);
+    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual([
+      'Rename',
+      'Delete group',
+    ]);
 
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
-    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+    await expectRenameFieldHeld('Rename group');
   });
 });
 

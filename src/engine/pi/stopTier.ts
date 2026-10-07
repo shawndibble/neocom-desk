@@ -231,10 +231,11 @@ export interface ScoredStopTier extends CandidateBase {
    * Carried because `blocks` is a ratio count and not something a pilot can go
    * and place: a recommendation reads "2x Extractor Control Unit -> 8x Basic
    * Industry Facility", which needs the counts rather than the ratio they came
-   * from. The rest of the `ColonyFit` is still dropped — `used` and `budget`
-   * belong to a meter this candidate is not rendered with.
+   * from.
    */
   pins: PinCounts;
+  /** What `pins` draws: launchpad, links and heads included. A meter for this layout reads it. */
+  used: PinLoad;
   /** Which of the two ceilings stopped the fit there. */
   limitedBy: ColonyFit['limitedBy'];
   /** What the fitted colony makes an hour. */
@@ -436,6 +437,7 @@ function rejectOrScore(
     status: 'scored',
     blocks: fit.blocks,
     pins: fit.pins,
+    used: fit.used,
     limitedBy: fit.limitedBy,
     unitsPerHour,
     marginPerUnit,

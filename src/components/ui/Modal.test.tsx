@@ -102,4 +102,30 @@ describe('Modal', () => {
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
     expect(screen.queryByText('Import plan')).not.toBeInTheDocument();
   });
+
+  it('hands focus to the fallback when nothing was focused as it opened', async () => {
+    function Gone() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" id="fallback">
+            Fallback
+          </button>
+          <Modal
+            open={open}
+            onClose={() => setOpen(false)}
+            title="Import plan"
+            returnFocusFallback={() => document.getElementById('fallback')}
+          >
+            <button type="button">Inside</button>
+          </Modal>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Gone />);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fallback' })).toHaveFocus();
+  });
 });

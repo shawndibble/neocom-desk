@@ -12,8 +12,10 @@
  * the bottom. Sorting on the date instead would put the people still playing
  * first, which answers a question nobody opened this page to ask.
  */
-import { useMemo, type ReactElement } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CharacterLink, SystemLink } from '@/features/entities';
+import { ItemInfoLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
@@ -73,22 +75,24 @@ export function CorpRosterSummary({
   if (isEmptyRosterDiff(diff)) return null;
 
   const nameList = (ids: readonly number[]) =>
-    ids.map((id) => names.get(id) ?? `#${id}`).join(', ');
+    ids.map((id, index) => (
+      <Fragment key={id}>
+        {index > 0 && ', '}
+        <CharacterLink id={id}>{names.get(id) ?? `#${id}`}</CharacterLink>
+      </Fragment>
+    ));
 
   return (
     <p className="text-text-dim text-xs">
       {diff.joined.length > 0 && (
         <span className="text-success">
-          {t('corp.members.joined', {
-            count: diff.joined.length,
-            names: nameList(diff.joined),
-          })}
+          {t('corp.members.joined', { count: diff.joined.length })} {nameList(diff.joined)}
         </span>
       )}
       {diff.joined.length > 0 && diff.left.length > 0 && <span> · </span>}
       {diff.left.length > 0 && (
         <span className="text-warning">
-          {t('corp.members.left', { count: diff.left.length, names: nameList(diff.left) })}
+          {t('corp.members.left', { count: diff.left.length })} {nameList(diff.left)}
         </span>
       )}
     </p>
@@ -131,6 +135,9 @@ function rolesText(roles: readonly string[] | null): string | null {
     .join(', ');
 }
 
+/** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */
+const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
+
 /** Longest silence first — the view's whole point (see the module note). */
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
@@ -142,17 +149,17 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'member',
         header: t('corp.members.columnMember'),
-        // Also the card title below `sm`. It is already the first column, but
-        // saying so pins it: reordering the columns later must not silently
-        // retitle every card.
-        primary: true,
+        // Pinned while the other columns scroll sideways on a phone.
+        stickyStart: true,
         className: 'truncate',
         // The name truncates, the tag does not: a long name must not ellipsize it away.
         render: (row) => (
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate">{label(row.name, row.characterId)}</span>
+            <CharacterLink id={row.characterId} className="truncate">
+              {label(row.name, row.characterId)}
+            </CharacterLink>
             {row.isSelf && (
-              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
+              <span className="shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
                 {t('corp.members.you')}
               </span>
             )}
@@ -184,14 +191,30 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         id: 'ship',
         header: t('corp.members.columnShip'),
         className: 'truncate',
-        render: (row) => label(row.shipName, row.shipTypeId),
+        render: (row) =>
+          row.shipTypeId === null ? (
+            label(row.shipName, row.shipTypeId)
+          ) : (
+            <ItemInfoLink typeId={row.shipTypeId}>
+              {label(row.shipName, row.shipTypeId)}
+            </ItemInfoLink>
+          ),
         sortValue: (row) => row.shipName ?? undefined,
       },
       {
         id: 'location',
         header: t('corp.members.columnLocation'),
         className: 'truncate',
-        render: (row) => label(row.locationName, row.locationId),
+        // A solar system links to Route Safety / Travel, where waypoints are
+        // set; a station or structure id is not a system, so stays text.
+        render: (row) =>
+          row.locationId !== null &&
+          row.locationName !== null &&
+          isSolarSystemId(row.locationId) ? (
+            <SystemLink systemId={row.locationId}>{row.locationName}</SystemLink>
+          ) : (
+            label(row.locationName, row.locationId)
+          ),
         sortValue: (row) => row.locationName ?? undefined,
       },
       {
@@ -251,13 +274,10 @@ const rosterRowKey = (row: RosterRow) => row.characterId;
 
 export function CorpRosterTable({
   rows,
-  rowContextMenu,
   tableProps,
 }: {
   rows: readonly RosterRow[];
-  /** Row context menu (issue #421): Show Info + Copy Character Name. */
-  rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
-  /** `useTableExport(...).tableProps` — row menus gain "Export table ▸". */
+  /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
   tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();
@@ -291,20 +311,19 @@ export function CorpRosterTable({
   }
 
   return (
-    <DataTable
-      {...tableProps}
-      columns={shownColumns}
-      rows={rows}
-      rowContextMenu={rowContextMenu}
-      rowMoreActions={rowContextMenu !== undefined}
-      rowKey={rosterRowKey}
-      highlightRowKey={highlightedMemberId}
-      virtualize="auto"
-      label={t('corp.members.tableLabel')}
-      density="compact"
-      {...sortProps}
-      mobileSort
-      stackSummary={t('corp.members.mobileSortSummary', { count: rows.length })}
-    />
+    <div className="overflow-x-auto">
+      <DataTable
+        {...tableProps}
+        columns={shownColumns}
+        rows={rows}
+        responsive="table"
+        rowKey={rosterRowKey}
+        highlightRowKey={highlightedMemberId}
+        virtualize="auto"
+        label={t('corp.members.tableLabel')}
+        density="compact"
+        {...sortProps}
+      />
+    </div>
   );
 }

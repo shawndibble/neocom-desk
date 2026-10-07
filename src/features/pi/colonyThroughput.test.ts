@@ -5,7 +5,7 @@ import type { PiData } from '@/sde/types';
 import type { PlanetPin } from '@/esi/endpoints';
 import { sustainedRatePerHour } from '@/engine/pi/extraction';
 import type { ExtractorYieldProgram } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import { colonyThroughputCheck, peakRatePerHour } from './colonyThroughput';
 
 // The real snapshot, same reasoning as pinBudget.test.ts: the volumes and

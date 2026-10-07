@@ -29,6 +29,7 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '650': { name: 'Drake', groupID: 27, volume: 92150 },
+  '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '691': { name: 'Rifter Blueprint', groupID: 105, volume: 0.01 },
 };
 
@@ -43,6 +44,8 @@ vi.mock('@/features/market/ItemDetailModal', () => ({
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
+  // Group 25 (Frigate) is in category 6, Ship.
+  loadGroupCategories: vi.fn(async () => ({ '25': 6 })),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
@@ -682,13 +685,19 @@ describe('Assets', () => {
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+    // The ship row carries no ⋮ or menu; "Open in Fittings" lives in the opened ship's header.
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
     await openLocation(user, 'Drake');
     expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open in Fittings' })).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
     await openLocation(user, 'Cargo Hold');
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    // A bay is not a ship: no shortcut there.
+    expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
     // Back walks up exactly one level per press: Cargo Hold -> Drake -> the
     // station's own contents -> the root list.
@@ -792,21 +801,21 @@ describe('station pins (issue #84)', () => {
 });
 
 describe('item name and blueprint badge', () => {
-  it('opens Show info from the item name', async () => {
+  it('links the item name to its Show info (Item Detail)', async () => {
     const user = userEvent.setup();
     render(<App />);
     await openLocation(user, JITA);
 
-    const name = await screen.findByRole('button', { name: 'Tritanium' });
-    await user.click(name);
-    expect(screen.getByRole('dialog', { name: 'Item detail: Tritanium' })).toBeInTheDocument();
+    const name = await screen.findByRole('link', { name: 'Tritanium' });
+    expect(name.getAttribute('href')).toMatch(/info=type-34$/);
+    expect(name).not.toHaveAttribute('title');
   });
 
   it('keeps right-click on the name opening the row menu, not Show info', async () => {
     render(<App />);
     const user = userEvent.setup();
     await openLocation(user, JITA);
-    const name = await screen.findByRole('button', { name: 'Tritanium' });
+    const name = await screen.findByRole('link', { name: 'Tritanium' });
     fireEvent.contextMenu(name);
 
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
@@ -1024,6 +1033,62 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
+  describe('CSV export honours the min-value filter (issue #2840)', () => {
+    async function exportCsv() {
+      vi.mocked(exportRows).mockClear();
+      const user = userEvent.setup();
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Assets' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
+      return JSON.stringify(vi.mocked(exportRows).mock.calls[0][2]);
+    }
+
+    it('leaves out stacks below the minimum in the All items view', async () => {
+      window.history.replaceState({}, '', '/assets?all=1&min=10000');
+      render(<App />);
+      await screen.findByText('Pyerite');
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Pyerite');
+      expect(rows).not.toContain('Tritanium');
+    });
+
+    it('filters nothing while prices are still loading', async () => {
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(
+        http.get('https://esi.evetech.net/markets/prices', async () => {
+          await gate;
+          return HttpResponse.json([{ type_id: 35, average_price: 5000 }]);
+        })
+      );
+      window.history.replaceState({}, '', '/assets?all=1&min=10000');
+      render(<App />);
+      await screen.findByText('Tritanium');
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Tritanium');
+      expect(rows).toContain('Pyerite');
+      release();
+    });
+
+    it('exports the full list in the tree view even with min in the URL', async () => {
+      window.history.replaceState({}, '', '/assets?min=10000');
+      render(<App />);
+      await screen.findByText(JITA);
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Pyerite');
+      expect(rows).toContain('Tritanium');
+    });
+  });
+
   it('takes ISK shorthand in the minimum value, with no echo line in the strip (issue #2227)', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1201,6 +1266,99 @@ describe('cross-character search (issue #85)', () => {
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  describe('My ships', () => {
+    const ship = (itemId: number, locationId: number) => ({
+      item_id: itemId,
+      type_id: 587,
+      quantity: 1,
+      location_id: locationId,
+      location_type: 'station' as const,
+      location_flag: 'Hangar',
+      is_singleton: true,
+    });
+
+    beforeEach(() => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json([...assetPage1, ship(300, 60003760)], { headers: { 'X-Pages': '1' } })
+        ),
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+          HttpResponse.json([ship(301, 60003762)], { headers: { 'X-Pages': '1' } })
+        ),
+        http.get('https://esi.evetech.net/universe/systems/30002187', () =>
+          HttpResponse.json({ system_id: 30002187, name: 'Amamake', security_status: 0.9 })
+        )
+      );
+    });
+
+    async function openMyShips(user: ReturnType<typeof userEvent.setup>) {
+      await screen.findByText(JITA);
+      await user.click(screen.getByRole('button', { name: 'Tools' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'My ships' }));
+      return screen.findByRole('dialog', { name: 'My ships' });
+    }
+
+    it('opens from the Tools menu, backed by ?view=ships, and lists only the filtered characters’ ships', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      expect(window.location.search).toContain('view=ships');
+      expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
+      expect(
+        within(panel)
+          .getAllByRole('row')
+          .filter((r) => r.tagName === 'A')
+      ).toHaveLength(1);
+      expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
+    });
+
+    it('widens to every character from the panel’s own filter', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+      await within(panel).findByText('Rifter');
+
+      await user.click(within(panel).getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+
+      await waitFor(() =>
+        expect(
+          within(panel)
+            .getAllByRole('row')
+            .filter((r) => r.tagName === 'A')
+        ).toHaveLength(2)
+      );
+      expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+    });
+
+    it('a row is one link into the ship’s location', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      const row = (await within(panel).findAllByRole('row')).find((r) => r.tagName === 'A');
+      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/60003760'));
+      expect(row).not.toHaveAttribute('href', expect.stringContaining('view=ships'));
+      expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
+    });
+
+    it('offers “Show all characters” when this character owns no ship', async () => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json(assetPage1, { headers: { 'X-Pages': '1' } })
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      await user.click(await within(panel).findByRole('button', { name: 'Show all characters' }));
+      expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
+      expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+    });
   });
 
   it('returns to single-character search once switched back to "This character"', async () => {
@@ -1387,8 +1545,9 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
 
-    const badge = await screen.findByTitle('No route found to this station.');
-    expect(badge).toHaveTextContent('-');
+    const badge = await screen.findByText('-');
+    await userEvent.hover(badge);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('No route found to this station.');
   });
 
   it('shows "-" with a reason tooltip when the character\'s own location is unavailable', async () => {
@@ -1404,9 +1563,9 @@ describe('jumps-away distance (issue #87)', () => {
     render(<App />);
 
     // Both visible locations degrade the same way — no pin needed for either.
-    const badges = await screen.findAllByTitle('Character location unavailable.');
-    expect(badges.length).toBeGreaterThan(0);
-    for (const badge of badges) expect(badge).toHaveTextContent('-');
+    const badges = await screen.findAllByText('-');
+    await userEvent.hover(badges[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Character location unavailable.');
     expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
   });
 

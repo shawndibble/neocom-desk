@@ -10,7 +10,7 @@
  * front of every render of Mail, Contracts, Contacts, Assets and Employment
  * History — part of the wait those pages showed a spinner for.
  */
-import { postUniverseNames } from '@/esi/endpoints';
+import { postUniverseNames, type UniverseName } from '@/esi/endpoints';
 import {
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
@@ -18,8 +18,52 @@ import {
   writeCachedMany,
 } from '@/esi/cache';
 
+/** ESI's per-request cap for /universe/names. */
+const NAMES_BATCH = 1000;
+
 function cacheKey(id: number): string {
   return `name:${id}`;
+}
+
+function categoryKey(id: number): string {
+  return `category:${id}`;
+}
+
+export type NameCategory = UniverseName['category'];
+
+/**
+ * What kind of entity each id is (character, corporation, alliance, ...), for
+ * a caller that can't tell from context — a contract's acceptor may be a pilot
+ * or a corp. Cache-first like `resolveNames`; a name cached before categories
+ * were stored has none, so it is looked up once. Ids that can't be resolved
+ * are absent.
+ */
+export async function resolveCategories(
+  ids: readonly number[]
+): Promise<Map<number, NameCategory>> {
+  const unique = [...new Set(ids)];
+  const map = new Map<number, NameCategory>();
+  if (unique.length === 0) return map;
+  const cached = await readCachedEntries<NameCategory>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    unique.map(categoryKey)
+  );
+  const unknown: number[] = [];
+  for (const id of unique) {
+    const row = cached.get(categoryKey(id));
+    if (row === undefined) unknown.push(id);
+    else map.set(id, row.value);
+  }
+  if (unknown.length > 0) {
+    for (const [id, category] of await fetchCategories(unknown)) map.set(id, category);
+  }
+  return map;
+}
+
+async function fetchCategories(ids: readonly number[]): Promise<Map<number, NameCategory>> {
+  const out = new Map<number, NameCategory>();
+  for (const [id, entry] of await fetchEntries(ids)) out.set(id, entry.category);
+  return out;
 }
 
 /**
@@ -84,18 +128,30 @@ export async function readCachedNames(ids: readonly number[]): Promise<Map<numbe
 /** Resolves and caches. Never rejects, so the background call needs no handler of its own. */
 async function fetchNames(ids: readonly number[]): Promise<Map<number, string>> {
   const resolved = new Map<number, string>();
-  try {
-    const entries = await postUniverseNames([...ids]);
-    const fetchedAt = Date.now();
-    for (const entry of entries) resolved.set(entry.id, entry.name);
-    await writeCachedMany(
-      GLOBAL_CACHE_CHARACTER_ID,
-      entries.map((entry) => [cacheKey(entry.id), entry.name] as const),
-      fetchedAt
-    );
-  } catch {
-    // Offline or ESI failure. Whatever the caller already read from cache
-    // stands; an id with nothing cached is simply absent from its map.
+  for (const [id, entry] of await fetchEntries(ids)) resolved.set(id, entry.name);
+  return resolved;
+}
+
+async function fetchEntries(ids: readonly number[]): Promise<Map<number, UniverseName>> {
+  const resolved = new Map<number, UniverseName>();
+  // One POST per batch, each guarded, so a failed batch keeps the others' names.
+  for (let i = 0; i < ids.length; i += NAMES_BATCH) {
+    try {
+      const entries = await postUniverseNames(ids.slice(i, i + NAMES_BATCH));
+      const fetchedAt = Date.now();
+      for (const entry of entries) resolved.set(entry.id, entry);
+      await writeCachedMany(
+        GLOBAL_CACHE_CHARACTER_ID,
+        entries.flatMap((entry) => [
+          [cacheKey(entry.id), entry.name] as const,
+          [categoryKey(entry.id), entry.category] as const,
+        ]),
+        fetchedAt
+      );
+    } catch {
+      // Offline or ESI failure. Whatever the caller already read from cache
+      // stands; an id with nothing cached is simply absent from its map.
+    }
   }
   return resolved;
 }

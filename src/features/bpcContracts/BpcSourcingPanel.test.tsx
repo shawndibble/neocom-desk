@@ -17,6 +17,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
+import { useLpValue } from '@/features/loyalty/lpValue';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
@@ -160,6 +161,13 @@ vi.mock('@/features/market/orderBook', async (importOriginal) => {
   };
 });
 
+// LP Store source: the pilot's LP corporations' blueprint offers. None unless a test says otherwise.
+const findLpOfferMatches = vi.fn();
+vi.mock('@/features/market/appraisalLpAcquisition', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/market/appraisalLpAcquisition')>();
+  return { ...actual, findLpOfferMatches: (...args: unknown[]) => findLpOfferMatches(...args) };
+});
+
 // No item trades in a Global Market Region unless a test says otherwise.
 const loadGlobalMarkets = vi.fn<() => Promise<GlobalMarketEntry[]>>();
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
@@ -297,6 +305,7 @@ async function resetSession() {
   localJumpDistances.mockReset();
   localJumpDistances.mockResolvedValue({ kind: 'unknown' });
   usePickedSystems.setState({ value: {}, hydrated: false });
+  useLpValue.setState({ value: 0, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
@@ -1499,9 +1508,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      const badge = await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
+      const badge = (await within(table).findByText(/BPO on contract: 4M/)).parentElement!;
       // Short visible text; price and location live in the tooltip.
-      expect(badge).toHaveTextContent(/^BPO may be cheaper$/);
+      expect(badge).toHaveTextContent(/BPO may be cheaper$/);
     });
 
     it('badges one copy per blueprint, not every offer row, when several are listed', async () => {
@@ -1517,8 +1526,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+      await within(table).findByText(/BPO on contract: 4M/);
+      expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
     });
 
     it('badges the cheapest copy across the whole set, even when the snapshot lists it last', async () => {
@@ -1533,8 +1542,8 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
-      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+      await within(table).findByText(/BPO on contract: 4M/);
+      expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
     });
 
     it('with one blueprint picked, says BPO once in callout cards rather than on every row', async () => {
@@ -1605,7 +1614,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(contractCard).not.toHaveTextContent('BPO may be cheaper');
 
       // Said once, in the cards: no row badge, and no duplicate chip.
-      expect(within(table).queryByRole('button', { name: /BPO on/ })).not.toBeInTheDocument();
+      expect(within(table).queryByText(/BPO on/)).not.toBeInTheDocument();
       expect(screen.queryByText('Cheapest BPO')).not.toBeInTheDocument();
     });
 
@@ -1618,7 +1627,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       render(<App />);
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-      const badge = await within(table).findByRole('button', { name: /BPO on contract: 40M/ });
+      const badge = (await within(table).findByText(/BPO on contract: 40M/)).parentElement!;
       expect(badge).not.toHaveTextContent('BPO may be cheaper');
     });
 
@@ -1638,7 +1647,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
 
-      const badge = await within(table).findByRole('button', { name: /BPO on market: 2M/ });
+      const badge = (await within(table).findByText(/BPO on market: 2M/)).parentElement!;
       expect(badge).toHaveTextContent('BPO may be cheaper');
       // "All regions" reads the pilot's market hub (Jita by default) region.
       expect(getOrderBook).toHaveBeenCalledWith(10000002, 638);
@@ -1657,6 +1666,92 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(within(table).getAllByText('Jita IV - Moon 4').length).toBeGreaterThan(0);
       // The hub's own station is marked (location 60003760 is the Jita hub).
       expect(within(table).getByText('Trade hub')).toBeInTheDocument();
+    });
+
+    it('opens the Market entry for the item when a market row is clicked', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      getOrderBook.mockImplementation(async (_regionId, typeId) => ({
+        orders: typeId === 638 ? [sellOrder({ price: 2_000_000 })] : [],
+        truncated: false,
+        fetchedAt: 0,
+      }));
+      loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await within(table).findByText(/BPO on market: 2M/);
+      await openFilters(user);
+      await toggleFilterOption(user, 'Market BPOs');
+      const marketCell = await within(table).findByText('2,000,000.00 ISK', {
+        selector: '.sr-only',
+      });
+
+      await user.click(marketCell);
+
+      await waitFor(() => expect(window.location.pathname).toBe('/market/browser'));
+      expect(window.location.search).toContain('638');
+    });
+
+    it('lists an LP Store blueprint and opens that store with the offer selected on click', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      findLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map([
+          [
+            638,
+            [
+              {
+                corporationId: 1000125,
+                corpName: 'Sisters of EVE',
+                playerLp: 9_000,
+                offer: {
+                  offer_id: 4321,
+                  type_id: 638,
+                  quantity: 1,
+                  isk_cost: 1_000_000,
+                  lp_cost: 400,
+                  required_items: [],
+                },
+              },
+            ],
+          ],
+        ]),
+        requiredItemTypeIds: [],
+      });
+      // The pilot's own LP Value, so no market rate is fetched. Set on the
+      // store too: `beforeAll`'s warm-up render already hydrated it at 0, so the
+      // db row alone is never re-read and the lookup fetched a real market rate
+      // (~2.5s) before pricing the row.
+      await db.settings.put({ key: 'sync.loyaltyLpValue', value: 1_000 });
+      useLpValue.setState({ value: 1_000, hydrated: true });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+      const lpCell = await within(table).findByText('Sisters of EVE');
+      await user.click(lpCell);
+
+      await waitFor(() => expect(window.location.pathname).toBe('/market/lp-store/1000125'));
+      expect(window.location.search).toContain('offer=4321');
+    });
+
+    it('lists no LP Store rows, and no error, when the pilot holds no LP', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      findLpOfferMatches.mockResolvedValue({ matchesByTypeId: new Map(), requiredItemTypeIds: [] });
+      window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+      await waitFor(() => expect(findLpOfferMatches).toHaveBeenCalled());
+      expect(within(table).queryByText('Sisters of EVE')).not.toBeInTheDocument();
+      expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     });
 
     it("says which market books couldn't be checked, rather than reading a failure as no BPO", async () => {
@@ -1803,12 +1898,17 @@ describe('BpcSourcingPanel Jump Range', () => {
     const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
     expect(jitaRow).toBeDefined();
     const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
-    // findByTitle, not getByTitle: the cell can still show the "…" pending
-    // placeholder for a tick after loadCharacterSolarSystemId's mock resolves.
+    // The dash is a HintText trigger now (no native title). waitFor: the cell can
+    // still show the "…" pending placeholder for a tick after
+    // loadCharacterSolarSystemId's mock resolves.
+    const trigger = await waitFor(() => {
+      const el = (jumpsCell as HTMLElement).querySelector<HTMLElement>('[tabindex="0"]');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    await userEvent.hover(trigger);
     expect(
-      await within(jumpsCell as HTMLElement).findByTitle(
-        'Set your current system to filter by distance.'
-      )
+      await screen.findByRole('tooltip', { name: 'Set your current system to filter by distance.' })
     ).toBeInTheDocument();
   });
 

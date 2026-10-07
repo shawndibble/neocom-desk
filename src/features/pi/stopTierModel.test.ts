@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import {
   colonyStopTierAdvice,
   meanExtractorRate,
@@ -226,5 +226,24 @@ describe('colonyStopTierAdvice', () => {
     // Test Cultures needs Microorganisms and Aqueous Liquids; a Lava planet
     // yields neither.
     expect(entries.some((entry) => entry.typeId === TEST_CULTURES)).toBe(false);
+  });
+});
+
+describe('colonyStopTierAdvice richness override', () => {
+  const entryIds = (advice: ReturnType<typeof colonyStopTierAdvice>) =>
+    advice.status === 'advised' ? advice.advice.entries.map((e) => e.typeId).sort() : [];
+
+  it('is unchanged by an absent or empty override', () => {
+    const base = colonyStopTierAdvice(input());
+    expect(colonyStopTierAdvice(input({ picked: [] }))).toEqual(base);
+    expect(colonyStopTierAdvice(input({ picked: undefined }))).toEqual(base);
+  });
+
+  it('scores only what the picked resources can make', () => {
+    const base = entryIds(colonyStopTierAdvice(input()));
+    const narrowed = entryIds(colonyStopTierAdvice(input({ picked: [MICROORGANISMS] })));
+    expect(narrowed.length).toBeGreaterThan(0);
+    expect(narrowed.length).toBeLessThan(base.length);
+    for (const id of narrowed) expect(base).toContain(id);
   });
 });

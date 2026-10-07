@@ -91,7 +91,11 @@ const catalog = {
   byProductTypeID: new Map([[200, { blueprintTypeID: 1200, productTypeID: 200 }]]),
 } as unknown as BlueprintCatalog;
 
-function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
+function renderPanel(
+  actions = fakeItemActions(),
+  initialEntries = ['/'],
+  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false)
+) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       {withItemActions(
@@ -101,7 +105,7 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
           catalog={catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
-          onStartPlan={() => Promise.resolve(false)}
+          onStartPlan={onStartPlan}
         />,
         actions
       )}
@@ -110,46 +114,32 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
-  it('links the product name to its Market listing', () => {
+  it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
-    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
   });
 
-  it('opens the item menu for the row product', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-
-    fireEvent.contextMenu(screen.getByText('Widget Beta').closest('tr')!);
-    fireEvent.click(await screen.findByText('Add to Quickbar'));
-
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-    expect(screen.getAllByRole('button', { name: 'Plan' })[0]).toBeInTheDocument();
+  it('starts the plan on a row click; a row with no catalog entry is inert', () => {
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(fakeItemActions(), ['/'], onStartPlan);
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    const gamma = screen.getByText('Widget Gamma').closest('tr')!;
+    expect(gamma).not.toHaveAttribute('tabindex');
+    fireEvent.click(gamma);
+    expect(onStartPlan).not.toHaveBeenCalled();
+    expect(beta).toHaveAttribute('tabindex', '0');
+    fireEvent.click(screen.getByText('Widget Beta'));
+    expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
-  it('shows no blueprint for a product the catalog has no entry for', async () => {
+  it('has no row menu: Start plan is the row’s one control', () => {
     renderPanel();
-
-    fireEvent.contextMenu(screen.getByText('Widget Gamma').closest('tr')!);
-
-    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
-  });
-
-  it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-    const user = userEvent.setup();
     const row = screen.getByText('Widget Beta').closest('tr')!;
-
-    await user.click(within(row).getByRole('button', { name: 'More actions for Widget Beta' }));
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
   });
 });
 
@@ -361,8 +351,8 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
   const productOrder = () =>
     screen
-      .getAllByRole('link')
-      .map((link) => link.textContent)
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
       .filter((name) => name?.startsWith('Widget'));
 
   afterEach(() => {

@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import {
@@ -523,99 +522,36 @@ describe('the board (AC2, AC5, AC6)', () => {
     expect(criticalIcon?.innerHTML).not.toEqual(clearIcon?.innerHTML);
   });
 
-  describe('row context menu (issue #419)', () => {
-    const readyJob = {
-      job_id: 7,
-      installer_id: 1,
-      activity_id: 1,
-      blueprint_id: 1,
-      blueprint_type_id: 1001,
-      blueprint_location_id: 1,
-      output_location_id: 1,
-      facility_id: 1,
-      location_id: 1,
-      runs: 1,
-      start_date: at(-10 * DAY),
-      end_date: at(-3 * HOUR),
-      status: 'ready' as const,
-    };
-
-    it('offers Copy name, Show info and Check Market for a job row, keyed off its product', async () => {
+  describe('board rows are read-only', () => {
+    it('has no row menu or More actions button; an item subject links to Show info', async () => {
       mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-      mocked.loadCorporationIndustryJobs.mockResolvedValue(cached([readyJob]));
-      renderCorp();
-
-      const row = (await screen.findByText('Type 1001')).closest('li');
-      fireEvent.contextMenu(row!);
-
-      expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-    });
-
-    it('offers only Copy name for a structure row, which has no market item of its own', async () => {
-      mocked.loadCorporationStructures.mockResolvedValue(
+      mocked.loadCorporationIndustryJobs.mockResolvedValue(
         cached([
           {
-            structure_id: 1,
-            corporation_id: CORPORATION_ID,
-            system_id: 1,
-            type_id: 1,
-            profile_id: 1,
-            name: 'Fortizar',
-            fuel_expires: at(20 * DAY),
+            job_id: 7,
+            installer_id: 1,
+            activity_id: 1,
+            blueprint_id: 1,
+            blueprint_type_id: 1001,
+            blueprint_location_id: 1,
+            output_location_id: 1,
+            facility_id: 1,
+            location_id: 1,
+            runs: 1,
+            start_date: at(-10 * DAY),
+            end_date: at(-3 * HOUR),
+            status: 'ready' as const,
           },
         ])
       );
       renderCorp();
 
-      const row = (await screen.findByText('Fortizar')).closest('li');
-      fireEvent.contextMenu(row!);
-
-      expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
-    });
-
-    it('copies the row’s subject text', async () => {
-      const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-      configureClipboard(clipboardWriteText);
-      try {
-        mocked.loadCorporationStructures.mockResolvedValue(
-          cached([
-            {
-              structure_id: 1,
-              corporation_id: CORPORATION_ID,
-              system_id: 1,
-              type_id: 1,
-              profile_id: 1,
-              name: 'Fortizar',
-              fuel_expires: at(20 * DAY),
-            },
-          ])
-        );
-        renderCorp();
-
-        const row = (await screen.findByText('Fortizar')).closest('li');
-        fireEvent.contextMenu(row!);
-        fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy name' }));
-
-        expect(clipboardWriteText).toHaveBeenCalledWith('Fortizar');
-      } finally {
-        configureClipboard(null);
-      }
-    });
-
-    it('opens the item detail modal, titled for the job’s product, on Show info', async () => {
-      mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-      mocked.loadCorporationIndustryJobs.mockResolvedValue(cached([readyJob]));
-      renderCorp();
-
       const row = (await screen.findByText('Type 1001')).closest('li');
       fireEvent.contextMenu(row!);
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
-      expect(await screen.findByRole('dialog', { name: 'Type 1001' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Type 1001' })).toBeInTheDocument();
     });
   });
 
@@ -624,7 +560,8 @@ describe('the board (AC2, AC5, AC6)', () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
     await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
-    expect(screen.getByText('30m ago').getAttribute('title')).toContain('about an hour');
+    fireEvent.focus(screen.getByText('30m ago'));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('about an hour');
   });
 
   it('offers the section’s sub-nav, which Members will join', async () => {

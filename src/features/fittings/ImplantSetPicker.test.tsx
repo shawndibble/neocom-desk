@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
+
+// Entity names are real links, so every render needs a Router.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 vi.mock('@/features/skills/typeCatalog', () => ({
   loadItemNameMap: async () =>
@@ -167,7 +172,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
 });
 
 describe('ImplantSetPicker — item info', () => {
-  it('opens an item’s details from its name', async () => {
+  it('links an item’s name to Show info and opens its details from the ⓘ button', async () => {
     const user = userEvent.setup();
     render(
       <ImplantSetPicker
@@ -178,7 +183,11 @@ describe('ImplantSetPicker — item info', () => {
       />
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Standard Blue Pill Booster' }));
+    const link = await screen.findByRole('link', { name: 'Standard Blue Pill Booster' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('info=type-9950'));
+    await user.click(
+      screen.getByRole('button', { name: 'Show details of Standard Blue Pill Booster' })
+    );
     expect(screen.getByText('Info: Standard Blue Pill Booster (9950)')).toBeInTheDocument();
   });
 });

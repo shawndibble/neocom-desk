@@ -15,11 +15,12 @@
  *
  * Conditions, never verdicts (decision `20260912-172628`).
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { DataTable, textActionClassName, type DataTableColumn } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { DataTable, entityLinkClassName, type DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import {
   jumpsSortValue,
   shipSizeRank,
@@ -33,7 +34,7 @@ const DASH = '—';
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
 
 const hubBadgeClassName =
-  'shrink-0 rounded-xs border border-line px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
+  'shrink-0 rounded-xs bg-panel-2 px-1 text-[0.625rem] font-normal tracking-widest whitespace-nowrap text-text-dim uppercase';
 
 /** Route Safety through a row's hole, or `null` for a row it is not offered on. */
 type RouteViaHref = (row: TheraConnectionRow) => string | null;
@@ -59,13 +60,23 @@ function RouteVia({
     <Link
       to={to}
       data-row-control
-      className={textActionClassName(cx('whitespace-nowrap', className))}
+      className={entityLinkClassName(
+        cx(
+          'group inline-flex min-h-11 items-center gap-0.5 whitespace-nowrap md:min-h-0',
+          className
+        )
+      )}
       aria-label={t('travel.thera.routeViaLabel', {
         hub: t(`travel.thera.hub.${row.hub}`),
         system: row.exitSystemName ?? DASH,
       })}
     >
       {t('travel.thera.routeVia')}
+      <Icon.Descend
+        aria-hidden="true"
+        size={Icon.ICON_SIZE.sm}
+        className="text-text-faint group-hover:text-accent"
+      />
     </Link>
   );
 }
@@ -227,16 +238,13 @@ function HoleDetail({ row, routeVia }: { row: TheraConnectionRow; routeVia?: Rou
         exitSignature: row.exitSignature ?? DASH,
       })}
     </span>,
-    <a
+    <ExternalLink
       key="zkill"
       href={systemZkillUrl(row.exitSystemId)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={inlineLinkClassName}
       aria-label={t('travel.thera.detail.zkillboardLabel', { system: row.exitSystemName ?? DASH })}
     >
       {t('travel.thera.detail.zkillboard')}
-    </a>,
+    </ExternalLink>,
     routeViaTarget(row, routeVia) === null ? null : (
       <RouteVia key="route-via" row={row} href={routeVia} />
     ),

@@ -17,6 +17,7 @@ import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import type { GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { kindSegmentClassName } from '@/components/ui/kindTone';
 import { useDayLoadLabel } from './dayLoadLabel';
 
@@ -61,6 +62,8 @@ export function CalendarDayTicker({
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
             className={cx(
               'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
+              interactiveClassName,
+              focusRingClassName,
               isSelected ? 'border-accent-dim bg-accent/15' : 'border-transparent',
               isPast ? 'calendar-map-past' : ''
             )}

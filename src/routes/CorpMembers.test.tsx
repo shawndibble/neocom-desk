@@ -16,7 +16,7 @@ import * as boardData from '@/features/corp/boardData';
 import * as corpMembers from '@/features/corp/members';
 import * as rosterState from '@/features/corp/rosterState';
 import * as download from '@/lib/download';
-import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
+import { configureClipboard } from '@/lib/clipboard';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { db } from '@/db';
 import {
@@ -204,6 +204,17 @@ describe('the roster table', () => {
     expect(row).toHaveTextContent('Rifter');
     expect(row).toHaveTextContent('Jita IV - Moon 4');
     expect(row).toHaveTextContent('1h ago');
+    // Member and ship names are real links (§6c): Show Info and Market.
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Jita Local' })
+        .getAttribute('href')
+    ).toContain('info=character-');
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Rifter' })
+        .getAttribute('href')
+    ).toContain('info=type-587');
   });
 
   it('says Never for a member who joined and has not logged in', async () => {
@@ -340,8 +351,13 @@ describe('the joins/leaves summary', () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
     mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
     await rosterTable();
-    expect(screen.getByText('1 joined: Silent Ren')).toBeInTheDocument();
-    expect(screen.getByText('1 left: Departed Soul')).toBeInTheDocument();
+    expect(screen.getByText(/^1 joined:/)).toBeInTheDocument();
+    const summary = screen.getByText(/^1 joined:/).closest('p');
+    expect(
+      within(summary as HTMLElement).getByRole('link', { name: 'Silent Ren' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^1 left:/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Departed Soul' })).toBeInTheDocument();
   });
 
   /** A leaver is in neither read any more, so their name has to be asked for. */
@@ -372,53 +388,16 @@ describe('the joins/leaves summary', () => {
   });
 });
 
-/** Right-clicks a member row by its resolved name and returns the row. */
-async function openMemberMenu(name: string) {
-  const row = (await screen.findByText(name)).closest('tr');
-  if (!row) throw new Error(`expected a ${name} row`);
-  fireEvent.contextMenu(row);
-  return row;
-}
+describe('roster rows are read-only', () => {
+  it('has no More actions button or context menu; the name is the Show info link', async () => {
+    const table = await rosterTable();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
 
-describe('row context menu (issue #421, AC1)', () => {
-  it('offers Show info and Copy name', async () => {
-    await rosterTable();
-    await openMemberMenu('Jita Local');
+    expect(within(table).getByRole('link', { name: 'Jita Local' })).toBeInTheDocument();
 
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-  });
-
-  it('Show info opens the shared Public Info Modal for the character', async () => {
-    await rosterTable();
-    await openMemberMenu('Jita Local');
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-
-    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1001 });
-  });
-
-  it('Copy name copies the resolved name to the clipboard', async () => {
-    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-    configureClipboard(clipboardWriteText);
-    await rosterTable();
-    await openMemberMenu('Jita Local');
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-
-    expect(clipboardWriteText).toHaveBeenCalledWith('Jita Local');
-  });
-
-  it('falls back to the #id when the row has no resolved name', async () => {
-    mocked.loadMemberLabels.mockResolvedValue(labels({ characters: new Map() }));
-    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-    configureClipboard(clipboardWriteText);
-    await rosterTable();
-    await openMemberMenu('#1001');
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-
-    expect(clipboardWriteText).toHaveBeenCalledWith('#1001');
+    fireEvent.contextMenu(within(table).getByText('Jita Local'));
+    expect(screen.queryByRole('menuitem', { name: 'Copy name' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
   });
 });
 

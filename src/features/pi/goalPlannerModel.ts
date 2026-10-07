@@ -4,12 +4,8 @@
  * readings the engine leaves to its caller (hauling split out/in, and the
  * plain verdict).
  *
- * ## Why a new loader, not the Advisor's
+ * ## Loader
  *
- * `AdvisorPanel` keeps a private snapshot loader that also reads every system's
- * planet list, every unbuilt planet's type and the alt roster — none of which
- * the planner uses — and its behaviour is pinned by a 1,700-line test. Moving
- * it out to share would put that at risk for nothing the planner needs, so
  * `goalPlannerSnapshot.ts` is a slim loader over the *same* lower-level reads
  * (`loadCharacterPlanets`, `loadAllColonyDetails`, `loadSystemSecurity`,
  * `loadCustomsCodeExpertise`, `loadPlanPrices` ...). Both tabs therefore see
@@ -52,11 +48,11 @@ import type {
   PriceBooks,
 } from '@/engine/pi/goalTypes';
 import type { BaselineTotal } from '@/engine/pi/baseline';
-import type { PinLoad } from '@/engine/pi/types';
+import type { PinLoad, PiTier } from '@/engine/pi/types';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR } from '@/engine/pi/stopTier';
 import { salesTaxPct } from '@/engine/industry/fees';
-import { builtAdvice, localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
+import { builtAdvice, localResourcesFor, type BuiltColonyAdvice } from './systemPlanetModel';
 import { extractorProgramsFromPins } from './adapters';
 import { currentProductTypeIds, meanHeadsPerExtractor } from './stopTierModel';
 import { medianNewLinkLoad } from './unbuiltPlanModel';
@@ -65,19 +61,10 @@ import {
   totalColonyEarnings,
   type TotalColonyEarnings,
 } from './colonyEarningsModel';
-import {
-  colonySpaceFor,
-  customsRateSource,
-  defaultCustomsRate,
-  type CustomsRateSource,
-} from './customsRate';
-import { customsRateFor, type CustomsOverrides } from './customsOverride';
-
-/**
- * What an unknown player-office rate is costed at: the untrained highsec NPC
- * rate, a common owner tax and the conservative direction (never 0%).
- */
-export const ASSUMED_UNKNOWN_CUSTOMS = 0.1;
+import { type CustomsRateSource } from './customsRate';
+import { type CustomsOverrides } from './customsOverride';
+import { resolveColonyCustoms } from './colonyCustoms';
+import { effectiveLocalResources, type RichnessByPlanet } from './richnessOverride';
 
 /** Heads per ECU when the pilot runs no extractor at all to read one off. */
 export const DEFAULT_PLANNER_HEADS = 10;
@@ -103,6 +90,8 @@ export interface PlannerPrefs {
   customsOverrides: CustomsOverrides;
   /** Planet ids the pilot switched off. */
   disabled: ReadonlySet<number>;
+  /** The pilot's saved richness picks, by planet (`richnessOverride.ts`). */
+  richness?: RichnessByPlanet;
 }
 
 export type ExcludedReason = 'no-detail' | 'no-planet-type' | 'no-link-cost';
@@ -188,13 +177,13 @@ export function plannerColonies(
   return snapshot.colonies.map((planet): PlannerColonyRow => {
     const planetId = planet.planet_id;
     const systemId = planet.solar_system_id;
-    const space = colonySpaceFor(snapshot.securityBySystem.get(systemId) ?? null);
-    const derived = defaultCustomsRate(space, snapshot.customsSkill);
-    const taxOverridden = prefs.customsOverrides[systemId] !== undefined;
-    const rateUnknown = space !== 'highsec' && !taxOverridden;
-    const taxRate = rateUnknown
-      ? ASSUMED_UNKNOWN_CUSTOMS
-      : customsRateFor(systemId, prefs.customsOverrides, derived);
+    const customs = resolveColonyCustoms({
+      systemId,
+      security: snapshot.securityBySystem.get(systemId) ?? null,
+      skill: snapshot.customsSkill,
+      overrides: prefs.customsOverrides,
+    });
+    const { taxRate } = customs;
     const own = advice.get(planetId) ?? null;
     const base = {
       planetId,
@@ -202,11 +191,7 @@ export function plannerColonies(
       upgradeLevel: planet.upgrade_level,
       planetType: planet.planet_type,
       advice: own,
-      taxRate,
-      taxSource: customsRateSource(space, snapshot.customsSkill),
-      taxOverridden,
-      rateUnknown,
-      taxAssumed: rateUnknown,
+      ...customs,
     };
     const excluded = (reason: ExcludedReason): PlannerColonyRow => ({
       ...base,
@@ -218,11 +203,17 @@ export function plannerColonies(
     });
 
     if (!own) return excluded('no-detail');
-    const local = localResourcesFor(planet.planet_type, pi);
-    if (local.length === 0) return excluded('no-planet-type');
+    if (localResourcesFor(planet.planet_type, pi).length === 0) return excluded('no-planet-type');
     const newLinkCost: PinLoad | null = own.pinLoad.newLinkLoad ?? borrowedLink;
     if (!newLinkCost) return excluded('no-link-cost');
 
+    // What the colony runs today stays rated whatever was picked: the capacity
+    // model refuses a layout whose P0 has no rate.
+    const running = own.extractors.flatMap((e) =>
+      e.productTypeId === null ? [] : [e.productTypeId]
+    );
+    const picked = prefs.richness?.get(planetId);
+    const local = effectiveLocalResources(planet.planet_type, pi, picked, running);
     const ownMeasured = measured.get(planetId) ?? new Map<number, number[]>();
     const ratePerEcu = new Map<number, EcuRate>();
     for (const resource of local) {
@@ -276,13 +267,31 @@ export function goalPlannerInput(rows: readonly PlannerColonyRow[]): PlannerColo
   return rows.flatMap((row) => (row.enabled && row.colony ? [row.colony] : []));
 }
 
-export function plannerPolicy(options: { maxP0Types: 1 | 2; buyP1: boolean }): PlannerPolicy {
+export function plannerPolicy(options: {
+  maxP0Types: 1 | 2;
+  buyTiers: readonly PiTier[];
+}): PlannerPolicy {
   return {
     maxEcusPerColony: 2,
     maxP0TypesPerColony: options.maxP0Types,
     extraEcuFactor: DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR,
-    buyTiers: options.buyP1 ? [1] : [],
+    buyTiers: options.buyTiers,
   };
+}
+
+/**
+ * What a sale fetches per unit: the hub's bid, or its ask where there is no
+ * bid. A corp buyback pays `buybackPct` percent of that.
+ */
+export function sellPrices(
+  prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
+  buybackPct: number | null
+): Record<number, number> {
+  const bid = { ...prices.prices, ...prices.buyPrices };
+  if (buybackPct === null) return bid;
+  return Object.fromEntries(
+    Object.entries(bid).map(([id, price]) => [id, (price * buybackPct) / 100])
+  );
 }
 
 /** The hub's books, plus which bids are really asks. */
@@ -300,12 +309,14 @@ export interface HubBooks extends PriceBooks {
  */
 export function priceBooks(
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
-  accountingLevel: number | null
+  accountingLevel: number | null,
+  buybackPct: number | null = null
 ): HubBooks {
   return {
     ask: prices.prices,
-    bid: { ...prices.prices, ...prices.buyPrices },
-    salesTaxPct: salesTaxPct(accountingLevel ?? 0),
+    bid: sellPrices(prices, buybackPct),
+    // A corp buyback pays out of its own pocket: no market sale, no sales tax.
+    salesTaxPct: buybackPct === null ? salesTaxPct(accountingLevel ?? 0) : 0,
     valuedAtAsk: new Set(
       Object.keys(prices.prices)
         .filter((id) => !Object.hasOwn(prices.buyPrices, id))
@@ -404,9 +415,10 @@ export function earningsNow(
   rows: readonly PlannerColonyRow[],
   pi: PiData,
   prices: { prices: Readonly<Record<number, number>>; buyPrices: Readonly<Record<number, number>> },
-  salesTaxPercent: number
+  salesTaxPercent: number,
+  buybackPct: number | null = null
 ): TotalColonyEarnings & { leftOut: number[]; byPlanet: Map<number, number | null> } {
-  const revenuePrices = { ...prices.prices, ...prices.buyPrices };
+  const revenuePrices = sellPrices(prices, buybackPct);
   const leftOut: number[] = [];
   const byPlanet = new Map<number, number | null>();
   const perColony = rows.flatMap((row) => {

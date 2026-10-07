@@ -78,8 +78,7 @@ describe('GroupSummaryModal payment', () => {
   it('offers Link a transaction once every member is paid', async () => {
     const onLink = vi.fn();
     renderGroup({ onLinkTransaction: onLink });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link a transaction…' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
@@ -128,8 +127,7 @@ describe('GroupSummaryModal payment', () => {
       label: '100 ISK · 2026-09-10 — Player donation',
     };
     renderGroup({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    await userEvent.click(screen.getByRole('button', { name: 'Payment actions' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Unlink this transaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Unlink this transaction' }));
     expect(onUnlink).toHaveBeenCalledWith(transaction);
   });
 });
@@ -140,7 +138,7 @@ describe('GroupSummaryModal as one entry', () => {
     renderGroup({ onEdit });
     expect(screen.getByText('2026-09-08')).toBeInTheDocument();
     expect(screen.getByText('2026-09-09')).toBeInTheDocument();
-    const edits = screen.getAllByRole('button', { name: 'Edit' });
+    const edits = screen.getAllByRole('button', { name: 'Edit…' });
     expect(edits).toHaveLength(1);
     fireEvent.click(edits[0]);
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -174,7 +172,7 @@ describe('GroupSummaryModal as one entry', () => {
       onSettleUp,
       onClose,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up…' }));
     expect(onSettleUp).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getAllByRole('button', { name: 'Close' }).at(-1)!);
     expect(onClose).toHaveBeenCalled();

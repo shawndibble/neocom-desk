@@ -10,6 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -25,9 +26,9 @@ import {
   PageHeader,
   Panel,
   Spinner,
-  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -45,7 +46,7 @@ import {
   type MiningYieldRow,
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
-import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
+import { iskPerMinedDay } from '@/engine/miningTax/yieldRate';
 import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
 import { scaleUnitPrices, scaleValuation } from '@/engine/miningTax/buybackRate';
 import { useMiningYieldRange } from './yieldRangePref';
@@ -67,6 +68,7 @@ import {
   type OverviewColumnId,
 } from './overviewColumns';
 import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
+import { readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
 import {
   BuybackRateInput,
   ChartMetricControl,
@@ -110,21 +112,18 @@ function dateRangeLabel(dates: readonly string[]): string {
 
 /**
  * Saved / Daily avg / Live / No price — where a row's ore prices came from on
- * the chosen basis, with a tooltip saying what that means. A button so the
- * tooltip is reachable by keyboard and a tap; the table keeps the click from
- * also opening the row's detail modal.
+ * the chosen basis, with a tooltip saying what that means. `HintText`: focusable, taps reveal
+ * the bubble, and the table leaves those taps from opening the row's modal.
  */
 function PriceSourceTag({ source }: { source: PriceSource }) {
   const { t } = useTranslation();
   return (
-    <Tooltip content={t(`miningTax.overview.priceSourceHint.${source}`)} openOnTap>
-      <button
-        type="button"
-        className={`cursor-help rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:outline-accent ${SOURCE_TAG_CLASS[source]}`}
-      >
-        {t(`miningTax.overview.priceSource.${source}`)}
-      </button>
-    </Tooltip>
+    <HintText
+      content={t(`miningTax.overview.priceSourceHint.${source}`)}
+      className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
+    >
+      {t(`miningTax.overview.priceSource.${source}`)}
+    </HintText>
   );
 }
 
@@ -143,7 +142,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   // must be part of the load closure. `useRouteSnapshot` only re-runs it on
   // an epoch bump, so toggling the switch also calls `refresh()` below.
   const loadSnapshot = useCallback(
-    (): Promise<MiningYieldSnapshot> => loadMiningYieldSnapshot(showRefining),
+    async (): Promise<MiningYieldSnapshot> =>
+      loadMiningYieldSnapshot(showRefining, await readCompressedOre()),
     [showRefining]
   );
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
@@ -151,6 +151,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     undefined,
     { cacheKey: 'miningYieldOverview' }
   );
+  useRefreshOnOreFormChange(refresh);
 
   const [characterFilter, setCharacterFilter] = useUrlParam(
     'overview.character',
@@ -290,7 +291,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       refineValue,
       volume: { m3: volumeM3, missingTypeIds: [...missingVolumeTypeIds] },
       dates,
-      iskPerHour: iskPerCalendarHour(rawValue, dates),
+      iskPerDay: iskPerMinedDay(rawValue, dates),
     };
   }, [visibleRows, data]);
 
@@ -315,7 +316,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       const sources = sourcesByDate.get(date);
       return {
         date,
-        iskPerHour: (byDate.get(date) ?? 0) / 24,
+        iskValue: byDate.get(date) ?? 0,
         source: sources ? weakestSource(sources) : null,
       };
     });
@@ -376,7 +377,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     character: {
       id: 'character',
       header: t('miningTax.characterColumn'),
-      render: (row) => row.characterName,
+      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
+      render: (row) => <span className={entityLinkClassName()}>{row.characterName}</span>,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -384,8 +386,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          {systemName(row)}
-          <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} t={t} />
+          <span className={entityLinkClassName()}>{systemName(row)}</span>
+          <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),
       sortValue: (row) => systemName(row),
@@ -410,7 +412,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
       // Dense phone card's headline figure (`stackLayout="dense"` below) —
       // this is the column that's on by default, so it's the number a
@@ -422,7 +424,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.totalColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
       stackAffix: { before: `${t('miningTax.overview.totalColumn')} ` },
     },
@@ -431,7 +433,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.refineValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.valuation.refineValue} decimals={0} />,
       sortValue: (row) => row.valuation.refineValue,
       // Short, dense-meta-line label ("Refined 91.6M"): the full column
       // header ("Refined value") is right for a desktop table but repeats
@@ -477,6 +479,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       render: (row) => row.entry.date,
+      // Row opens its detail modal: the accent primary cell is the cue (§6c).
+      cellClassName: () => 'text-accent',
       sortValue: (row) => row.entry.date,
       primary: true,
     },
@@ -645,28 +649,28 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.totalValueStat')}
                   </p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
-                    <IskAmount value={totals.rawValue} revealOn="tap" decimals={0} />
+                    <IskAmount value={totals.rawValue} decimals={0} />
                   </p>
                   {showRefining && (
                     <p className="text-[0.6875rem] text-text-dim">
                       {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
-                      <IskAmount value={totals.refineValue} revealOn="tap" decimals={0} />
+                      <IskAmount value={totals.refineValue} decimals={0} />
                     </p>
                   )}
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.iskPerHourStat')}
+                    {t('miningTax.overview.iskPerDayStat')}
                   </p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
-                    {totals.iskPerHour !== null ? (
-                      <IskAmount value={totals.iskPerHour} revealOn="tap" decimals={0} />
+                    {totals.iskPerDay !== null ? (
+                      <IskAmount value={totals.iskPerDay} decimals={0} />
                     ) : (
                       '—'
                     )}
                   </p>
                   <p className="text-[0.6875rem] text-text-dim">
-                    {t('miningTax.overview.iskPerHourBasisHint')}
+                    {t('miningTax.overview.iskPerDayBasisHint')}
                   </p>
                 </Panel>
                 <Panel>

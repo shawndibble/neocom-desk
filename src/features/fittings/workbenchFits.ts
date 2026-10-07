@@ -42,11 +42,6 @@ export interface WorkbenchFit {
 /** `ok: false` when the stored list couldn't be read — distinct from an empty one. */
 export type WorkbenchFitsResult = { ok: true; fits: WorkbenchFit[] } | { ok: false };
 
-/** The fit's own page on eveworkbench.com — the same `/fit/{id}` path a pasted Workbench link uses. */
-export function workbenchFitUrl(id: string): string {
-  return `https://eveworkbench.com/fit/${encodeURIComponent(id)}`;
-}
-
 /** Every part's fits as one list, one per id, newest first. */
 export function mergeWorkbenchParts(parts: readonly { fits?: unknown }[]): WorkbenchFit[] {
   const byId = new Map<string, WorkbenchFit>();

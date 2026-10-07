@@ -61,4 +61,29 @@ describe('loadMoonMiningTaxSnapshot: reauth surfacing', () => {
 
     expect(snapshot.reauthCharacters).toEqual([]);
   });
+
+  it('still yields rows for stored Assignments of a lapsed character with nothing cached', async () => {
+    ledgerMock.loadAllCharacterLedgers.mockResolvedValue([
+      ledger({ characterId: CHAR_LAPSED, characterName: 'Pilot Lapsed', needsReauth: true }),
+    ]);
+    await db.miningTaxAssignments.put({
+      id: 'a1',
+      characterId: CHAR_LAPSED,
+      date: '2026-07-01',
+      solarSystemId: 1,
+      payeeId: 'p',
+      oreLines: [{ typeId: 45490, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 5000000,
+      taxOwed: 500000,
+      status: 'outstanding',
+      updatedAt: 1,
+    });
+
+    const { loadMoonMiningTaxSnapshot } = await import('./snapshot');
+    const snapshot = await loadMoonMiningTaxSnapshot();
+
+    expect(snapshot.rows.map((r) => r.assignments.map((a) => a.id))).toEqual([['a1']]);
+    expect(snapshot.reauthCharacters.map((c) => c.characterId)).toEqual([CHAR_LAPSED]);
+  });
 });

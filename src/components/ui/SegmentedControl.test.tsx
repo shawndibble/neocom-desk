@@ -49,3 +49,40 @@ describe('SegmentedControl', () => {
     for (const button of screen.getAllByRole('button')) expect(button).toHaveClass('flex-1');
   });
 });
+
+describe('SegmentedControl states', () => {
+  it('fills an idle segment with panel-2 on hover and darkens it on press', () => {
+    render(
+      <SegmentedControl
+        label="View"
+        options={[
+          { value: 'a', label: 'A' },
+          { value: 'b', label: 'B' },
+        ]}
+        value="a"
+        onChange={() => {}}
+      />
+    );
+    const idle = screen.getByRole('button', { name: 'B' }).className;
+    expect(idle).toContain('enabled:hover:bg-panel-2');
+    expect(idle).toContain('enabled:active:bg-panel');
+  });
+
+  it('disables one segment without touching the others', async () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="View"
+        options={[
+          { value: 'a', label: 'A' },
+          { value: 'b', label: 'B', disabled: true },
+        ]}
+        value="a"
+        onChange={onChange}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'B' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'B' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});

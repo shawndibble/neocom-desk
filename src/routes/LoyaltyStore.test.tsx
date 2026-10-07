@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -119,9 +119,9 @@ function LocationProbe() {
   return null;
 }
 
-function renderStore() {
+function renderStore(search = '') {
   return render(
-    <MemoryRouter initialEntries={['/loyalty/1000168']}>
+    <MemoryRouter initialEntries={[`/loyalty/1000168${search}`]}>
       <Routes>
         <Route
           path="/loyalty/:corporationId"
@@ -200,6 +200,22 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   requiredItems: [],
   requiredItemsCost: 0,
 };
+
+describe('LoyaltyStore LP Value cog', () => {
+  it('opens the LP Value setting in a modal', async () => {
+    const user = userEvent.setup();
+    renderStore();
+    await user.click(screen.getByRole('button', { name: /LP Store settings/i }));
+    const dialog = screen.getByRole('dialog');
+    expect(
+      await within(dialog).findByRole('textbox', { name: /Your LP value/ })
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'All settings' })).toHaveAttribute(
+      'href',
+      '/settings/market'
+    );
+  });
+});
 
 describe('LoyaltyStore filters', () => {
   it('shows the filters inline on a pointer viewport', () => {
@@ -318,6 +334,25 @@ describe('LoyaltyStore filters', () => {
 });
 
 describe('LoyaltyStore selected offer (issue #1490)', () => {
+  it('keeps the item name plain (row selects) and shows the row menu trigger (#2654)', () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [ITEM_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    renderStore();
+    expect(screen.queryByRole('link', { name: ITEM_ROW.itemName })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /more actions/i }).length).toBeGreaterThan(0);
+  });
+
   it('marks the selected row aria-current and announces the change, on desktop', async () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
@@ -335,7 +370,7 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText(ITEM_ROW.itemName));
+    await user.click(screen.getByText(ITEM_ROW.itemName).closest('tr')!);
 
     expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
       'aria-current',
@@ -344,6 +379,30 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
     // The desktop split panel repaints in place with no dialog to announce
     // it — a live region says so, the way the mobile sheet does implicitly.
     expect(screen.getByText(`Showing ${ITEM_ROW.itemName}`)).toBeInTheDocument();
+  });
+});
+
+describe('LoyaltyStore linked offer', () => {
+  it('opens with the offer named in ?offer= already selected', () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [ITEM_ROW, BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    renderStore(`?offer=${ITEM_ROW.offer.offer_id}`);
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
   });
 });
 
@@ -378,7 +437,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
   it('acts on the manufactured product, not the blueprint copy, for a blueprint offer', async () => {
     const user = userEvent.setup();
     renderStore();
-    const row = screen.getByText('Republic Fleet Firetail Blueprint').closest('tr');
+    const row = screen.getAllByText('Republic Fleet Firetail')[0].closest('tr');
     if (!row) throw new Error('expected a blueprint row');
     fireEvent.contextMenu(row);
 
@@ -482,7 +541,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText('Vexor Navy Issue Blueprint'));
+    await user.click(screen.getByText('Vexor Navy Issue Blueprint').closest('tr')!);
 
     expect(screen.getByText('Required items')).toBeInTheDocument();
     expect(
@@ -503,7 +562,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText('Scourge Fury Heavy Missile'));
+    await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
 
     expect(screen.queryByText('Required items')).not.toBeInTheDocument();
   });
@@ -514,7 +573,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     // Mobile: opens in the sheet.
     const mobileUser = userEvent.setup();
     const mobile = renderStore();
-    await mobileUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
+    await mobileUser.click(screen.getByText('Vexor Navy Issue Blueprint').closest('tr')!);
     expect(
       screen.getByRole('link', { name: 'Serpentis Palladium Tag' }).closest('dt')
     ).toHaveTextContent('8 × Serpentis Palladium Tag');
@@ -524,7 +583,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     useDesktopViewport();
     const desktopUser = userEvent.setup();
     renderStore();
-    await desktopUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
+    await desktopUser.click(screen.getByText('Vexor Navy Issue Blueprint').closest('tr')!);
     expect(screen.getByText('Required items')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Serpentis Palladium Tag' }).closest('dt')
@@ -539,7 +598,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText('Some Other Offer'));
+    await user.click(screen.getByText('Some Other Offer').closest('tr')!);
 
     expect(
       screen.getByRole('link', { name: 'Unpriced Faction Tag' }).closest('dt')
@@ -555,7 +614,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText('Unpriceable Item'));
+    await user.click(screen.getByText('Unpriceable Item').closest('tr')!);
 
     expect(
       screen.getByText(
@@ -627,7 +686,7 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText(BLUEPRINT_ROW.itemName));
+    await user.click(screen.getAllByText(BLUEPRINT_ROW.productName!)[0].closest('tr')!);
 
     const link = screen.getByRole('link', { name: /View in Market/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('type=300'));
@@ -639,7 +698,9 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.click(screen.getByText(BUILD_ROW.itemName));
+    await user.click(
+      screen.getAllByText(BUILD_ROW.productName ?? BUILD_ROW.itemName)[0].closest('tr')!
+    );
 
     const link = screen.getByRole('link', { name: '#40500' });
     expect(link).toHaveAttribute('href', expect.stringContaining('type=40500'));
@@ -672,6 +733,13 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     expect(
       screen.getByRole('button', { name: 'picker: Federal Navy Academy' })
     ).toBeInTheDocument();
+  });
+
+  it("offers the corporation's Show Info from the header", () => {
+    renderAt('/loyalty/1000168');
+    expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
+      'info=corporation-1000168'
+    );
   });
 
   it('opens the picked store from the URL', () => {

@@ -29,7 +29,7 @@ export interface OtherCharacterAlerts {
  * opt-out underneath `eveNotification` (issue #274) when the entry carries
  * one, else the parent event. Shared so "does this row key off its eveType or
  * its eventId" is answered in one place instead of re-derived at every call
- * site that needs it (`isEntryVisible` below, `NotificationContextMenu.tsx`).
+ * site that needs it (`isEntryVisible` below).
  */
 export type EntryChannelTarget =
   { kind: 'eveType'; type: string } | { kind: 'event'; eventId: NotificationEventId };
@@ -49,7 +49,7 @@ export function entryChannelTarget(
  *
  * Exported because the Alerts page needs the question answered rather than
  * acted on: it shows muted types, marked and behind a chip, since
- * `NotificationContextMenu`'s own mute is one-way from a row that disappears
+ * a feed row's own mute is one-way from a row that disappears
  * the instant it applies. Un-muting has to be reachable somewhere that is not
  * Settings.
  *

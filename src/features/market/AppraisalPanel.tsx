@@ -30,12 +30,12 @@ import {
   TextArea,
   TextInput,
   type DataTableColumn,
-  type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { Caret } from '@/components/ui/Disclosure';
+import { HintText } from '@/components/ui/HintText';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -102,9 +102,9 @@ function eachCell(value: number | null): string {
 }
 
 /** A line or hub total as scannable shorthand, exact value one gesture away. */
-function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode {
+function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
-  return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
+  return <IskAmount value={value} decimals={0} />;
 }
 
 /**
@@ -120,10 +120,27 @@ type ShareState =
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
 
-/** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
-function comparisonCell(total: ReactNode, highlighted: boolean, suffix?: ReactElement | false) {
+/** Refine wins only because the leftover units sell on top; the refine total alone is below buy total. */
+function leftoverTipsRefine(row: AppraisalRow) {
   return (
-    <span className={highlighted ? 'font-semibold text-accent' : undefined}>
+    refineBeatsSellAsIs(row) &&
+    (row.refineUnitsLeftOver ?? 0) > 0 &&
+    row.refineTotal !== undefined &&
+    row.buyTotal !== null &&
+    row.refineTotal <= row.buyTotal
+  );
+}
+
+/** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
+function comparisonCell(
+  total: ReactNode,
+  highlighted: boolean,
+  suffix?: ReactElement | false,
+  prefix?: ReactElement | false
+) {
+  return (
+    <span className={highlighted ? 'font-semibold text-isk-pos' : undefined}>
+      {prefix}
       {total}
       {suffix}
     </span>
@@ -338,7 +355,7 @@ export function AppraisalPanel({
       className: 'whitespace-nowrap tabular-nums',
       render: (row) =>
         comparisonCell(
-          totalCell(row.buyTotal, 'longPress'),
+          totalCell(row.buyTotal),
           row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
@@ -348,7 +365,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sellTotal, 'longPress'),
+      render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
     refineTotal: {
@@ -360,15 +377,28 @@ export function AppraisalPanel({
         row.refineTotal === undefined
           ? '—'
           : comparisonCell(
-              totalCell(row.refineTotal, 'longPress'),
+              totalCell(row.refineTotal),
               refineBeatsSellAsIs(row),
               row.refinePricedAll === false && (
-                <span
+                <HintText
+                  content={t('market.appraisal.refinePartialHint')}
                   className="ml-0.5 text-warning"
-                  title={t('market.appraisal.refinePartialHint')}
                 >
                   *
-                </span>
+                </HintText>
+              ),
+              // Left of the number, so the right-aligned digits stay in line down the column.
+              leftoverTipsRefine(row) && (
+                <HintText
+                  content={t('market.appraisal.refineLeftoverHint', {
+                    count: row.refineUnitsLeftOver,
+                    isk: formatIskAuto((row.refineUnitsLeftOver ?? 0) * (row.buyEach ?? 0)),
+                    buyTotal: formatIskAuto(row.buyTotal ?? 0),
+                  })}
+                  className="mr-1 text-warning"
+                >
+                  !
+                </HintText>
               )
             ),
       sortValue: (row) => row.refineTotal ?? undefined,
@@ -391,17 +421,17 @@ export function AppraisalPanel({
         });
         return comparisonCell(
           <span className="inline-flex items-center gap-1">
-            {totalCell(row.lpIskCost ?? null, 'longPress')}
+            {totalCell(row.lpIskCost ?? null)}
             <LpStoreLink corporationId={row.lpCorporationId} label={label} />
           </span>,
           lpBeatsMarket(row),
           row.lpAffordable === false && (
-            <span
+            <HintText
+              content={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
               className="ml-0.5 text-warning"
-              title={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
             >
               *
-            </span>
+            </HintText>
           )
         );
       },
@@ -455,6 +485,9 @@ export function AppraisalPanel({
             id="market-appraisal-text"
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onSubmitChord={() => {
+              if (controller.canAppraise && !loading) controller.appraise();
+            }}
             rows={14}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
@@ -644,7 +677,7 @@ export function AppraisalPanel({
                       label={t('market.appraisal.instantNet')}
                       value={
                         <span className={iskToneClass(net.instantNet)}>
-                          <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
+                          <IskAmount value={net.instantNet} decimals={0} />
                         </span>
                       }
                       tooltip={t('market.appraisal.instantNetHelp', {
@@ -657,7 +690,7 @@ export function AppraisalPanel({
                       label={t('market.appraisal.listNet')}
                       value={
                         <span className={iskToneClass(net.listNet)}>
-                          <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
+                          <IskAmount value={net.listNet} decimals={0} />
                         </span>
                       }
                       tooltip={t('market.appraisal.listNetHelp', {
@@ -670,14 +703,14 @@ export function AppraisalPanel({
                     label={t('market.appraisal.spread')}
                     value={
                       <span className={iskToneClass(totals.spread)}>
-                        <IskAmount value={totals.spread} revealOn="tap" decimals={0} />
+                        <IskAmount value={totals.spread} decimals={0} />
                       </span>
                     }
                   />
                   {hasRefine && (
                     <StatChip
                       label={t('market.appraisal.refineTotal')}
-                      value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
+                      value={<IskAmount value={totals.refine} decimals={0} />}
                       tooltip={
                         implantBonusPct > 0
                           ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
@@ -688,7 +721,7 @@ export function AppraisalPanel({
                   {hasLpOption && (
                     <StatChip
                       label={t('market.appraisal.cheapestBuy')}
-                      value={<IskAmount value={totals.cheapestBuy} revealOn="tap" decimals={0} />}
+                      value={<IskAmount value={totals.cheapestBuy} decimals={0} />}
                       tone="accent"
                       tooltip={t('market.appraisal.cheapestBuyHelp')}
                     />
@@ -756,18 +789,12 @@ export function AppraisalPanel({
         {compare !== null && (
           // Deliberately not a panel: the hub cards are panel surfaces
           // themselves, so framing them put a box around five boxes. The fold
-          // survives as a bare heading-plus-caret row on the page ground — the
-          // caret stays its own `IconButton` rather than swallowing the
+          // survives as a bare caret-plus-heading row on the page ground — the
+          // leading caret stays its own `IconButton` rather than swallowing the
           // heading, so the toggle's accessible name is not an `aria-label`
           // overriding visible text (WCAG 2.5.3).
           <section aria-labelledby="market-appraisal-compare-hubs">
             <div className="flex min-h-9 items-center gap-1">
-              <h2
-                id="market-appraisal-compare-hubs"
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              >
-                {t('market.appraisal.compareHubsTitle')}
-              </h2>
               <IconButton
                 size="sm"
                 icon={<Caret expanded={compareExpanded} />}
@@ -779,6 +806,12 @@ export function AppraisalPanel({
                 aria-expanded={compareExpanded}
                 onClick={() => setCompareExpanded((open) => !open)}
               />
+              <h2
+                id="market-appraisal-compare-hubs"
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
+                {t('market.appraisal.compareHubsTitle')}
+              </h2>
             </div>
             {compareExpanded && <HubCompareCards rows={compare} />}
           </section>

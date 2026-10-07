@@ -24,6 +24,7 @@ import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projection
 import { App } from '@/app/App';
 import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
+import { consumeStaleStores } from '@/app/staleStoresReload';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import {
@@ -384,7 +385,9 @@ describe('Settings', () => {
     // Header row plus exactly one data row — the superseded success and the
     // failure both collapse into it, not two rows.
     expect(rows).toHaveLength(2);
-    expect(within(table).getByTitle(formatTimestamp(new Date(2_000)))).toBeInTheDocument();
+    const hint = within(rows[1]).getAllByRole('cell').at(-1)!.querySelector('[tabindex="0"]')!;
+    await userEvent.setup().hover(hint);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(formatTimestamp(new Date(2_000)));
   });
 });
 
@@ -476,14 +479,12 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Alerts list' })
     ).toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Sell Order Filled, device notifications' })
     ).not.toBeChecked();
-    expect(
-      screen.getByRole('checkbox', { name: 'Sell Order Filled, Overview list' })
-    ).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Sell Order Filled, Alerts list' })).toBeChecked();
   });
 
   it('flips a single event off, then back on, persisting to Dexie', async () => {
@@ -524,7 +525,7 @@ describe('Settings — Notifications (issue #170)', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', {
-        name: 'Planetary Extractor Expiring, Overview list',
+        name: 'Planetary Extractor Expiring, Alerts list',
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
@@ -592,9 +593,9 @@ describe('Settings — Notifications (issue #170)', () => {
 
     // ...but the Overview feed works with no grant at all, so its controls stay live.
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
-    expect(screen.getByRole('checkbox', { name: 'Overview notifications' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Alerts notifications' })).toBeEnabled();
 
-    expect(await screen.findByRole('checkbox', { name: 'New Mail, Overview list' })).toBeEnabled();
+    expect(await screen.findByRole('checkbox', { name: 'New Mail, Alerts list' })).toBeEnabled();
     // aria-disabled, not native disabled — the row's Tooltip explaining why
     // needs the control to stay in the hover/touch/focus path.
     expect(
@@ -1083,7 +1084,7 @@ describe('Settings — Notifications (issue #170)', () => {
       ).toBeDisabled();
       // The Overview column is unaffected — only browser is permission-gated.
       expect(
-        screen.getByRole('checkbox', { name: 'Toggle Overview notifications for every character' })
+        screen.getByRole('checkbox', { name: 'Toggle Alerts notifications for every character' })
       ).not.toBeDisabled();
     });
 
@@ -1131,7 +1132,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('turning a browser event on rebuilds once; an Overview-only toggle does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(screen.getByRole('checkbox', { name: 'New Mail, Overview list' }));
+      await user.click(screen.getByRole('checkbox', { name: 'New Mail, Alerts list' }));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
@@ -1169,7 +1170,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('the master switch and browser gate each rebuild once; the Overview gate does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Overview notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Alerts notifications' }));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
@@ -1486,7 +1487,9 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Default characters shown: This character' })
+    ).toBeInTheDocument();
   });
 
   it('persists a switch to "All characters"', async () => {
@@ -1495,10 +1498,14 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Default characters shown: This character' })
+    );
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
-    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Default characters shown: All characters' })
+    ).toBeInTheDocument();
     await waitFor(async () => {
       expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
     });
@@ -1539,6 +1546,10 @@ describe('Reset saved view preferences', () => {
     expect(await db.settings.get('overviewGroups')).toBeDefined();
     expect(await db.settings.get('characters.starred')).toBeDefined();
     expect(await db.settings.get(ACTIVE_CHARACTER_KEY)).toBeDefined();
+    // The confirmation must stay readable: the reload waits for leaving Settings.
+    expect(await screen.findByText('View preferences reset.')).toBeInTheDocument();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    consumeStaleStores();
   });
 });
 
@@ -1850,7 +1861,7 @@ describe('Settings — This device', () => {
     expect(
       await screen.findByText(/2 characters are logged in on this device/i)
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^log out$/i }));
+    await user.click(screen.getByRole('button', { name: /^log out…$/i }));
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
     expect(within(dialog).getByText(/removes 2 characters' logins/i)).toBeInTheDocument();
     // Nothing happens until the dialog is confirmed.
@@ -1870,7 +1881,7 @@ describe('Settings — This device', () => {
     render(<App />);
 
     // Disabled until the live character count resolves.
-    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    const logOut = await screen.findByRole('button', { name: /^log out…$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
@@ -1889,7 +1900,7 @@ describe('Settings — review follow-ups', () => {
     render(<App />);
 
     // Disabled until the live character count resolves.
-    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    const logOut = await screen.findByRole('button', { name: /^log out…$/i });
     await waitFor(() => expect(logOut).toBeEnabled());
     await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });

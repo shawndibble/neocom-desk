@@ -1,4 +1,8 @@
-import { controlHeightClassName } from './controlStyles';
+import {
+  controlHeightClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+} from './controlStyles';
 
 /**
  * The horizontal tab-bar look, shared by the `Tabs` widget and by real
@@ -71,9 +75,9 @@ export const tabListFlushClassName = 'flex items-end gap-1';
  * instead of overflowing, and a bar that is one tab too wide reads as a row
  * of cramped, wrapped words rather than a row you can swipe.
  */
-export const tabItemClassName = `-mb-px inline-flex ${controlHeightClassName.md} shrink-0 items-center border-b-2 px-3 text-xs font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`;
+export const tabItemClassName = `-mb-px inline-flex ${controlHeightClassName.md} shrink-0 items-center border-b-2 px-3 text-xs font-semibold tracking-widest whitespace-nowrap uppercase ${interactiveClassName} ${focusRingInsetClassName}`;
 
 export const tabItemActiveClassName = 'border-accent bg-panel-2/60 text-text';
 
 export const tabItemIdleClassName =
-  'border-transparent text-text-dim hover:bg-panel-2/40 hover:text-text';
+  'border-transparent text-text-dim hover:bg-panel-2/40 hover:text-text active:bg-panel-2/70';

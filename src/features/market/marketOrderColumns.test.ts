@@ -14,8 +14,8 @@ const SHORT = { priceChars: 4, quantityChars: 1, baitFlag: false };
 describe('orderBookWidthsRem', () => {
   it('sizes a book of short figures by its headers alone', () => {
     const widths = orderBookWidthsRem(DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS, SHORT);
-    expect(widths.cards).toBeCloseTo(40.625);
-    expect(widths.roomy).toBeCloseTo(47.625);
+    expect(widths.cards).toBeCloseTo(43.375);
+    expect(widths.roomy).toBeCloseTo(50.375);
   });
 
   it('widens Price and Quantity only as far as the longest figure on screen', () => {

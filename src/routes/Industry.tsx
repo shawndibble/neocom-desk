@@ -152,6 +152,7 @@ export function Industry() {
     setFitImportOpen(true);
   }, [location.key, location.state]);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
   const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -418,6 +419,7 @@ export function Industry() {
 
   async function handleDelete(id: string) {
     if (activeCharacterId === null) return;
+    setDeletingPlanId(null);
     await removeBuildPlan(activeCharacterId, id);
   }
 
@@ -665,7 +667,7 @@ export function Industry() {
                 // it immediately. `void`: `onCreate` only takes the entry.
                 onCreate={(entry) => void createPlan(entry)}
                 onDuplicate={(id) => void handleDuplicate(id)}
-                onDelete={(id) => void handleDelete(id)}
+                onDelete={setDeletingPlanId}
                 onRename={(id, name) => void handleRename(id, name)}
                 compareMode={compareMode}
                 compareSelectedIds={compareSelectedIds}
@@ -691,6 +693,30 @@ export function Industry() {
             )}
           </>
         )}
+
+        <Modal
+          open={deletingPlanId !== null}
+          onClose={() => setDeletingPlanId(null)}
+          title={t('industry.deletePlan')}
+        >
+          <p className="text-xs text-text-dim">
+            {t('industry.deletePlanConfirm', {
+              name: plans?.find((p) => p.id === deletingPlanId)?.name ?? '',
+            })}
+          </p>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button size="sm" onClick={() => setDeletingPlanId(null)}>
+              {t('industry.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => deletingPlanId && void handleDelete(deletingPlanId)}
+            >
+              {t('industry.delete')}
+            </Button>
+          </div>
+        </Modal>
 
         <Modal
           open={deletingGroupId !== null}

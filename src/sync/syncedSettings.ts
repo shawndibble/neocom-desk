@@ -179,6 +179,12 @@
 // a value, not an absence), so the tombstone-expiry edge does not bite it.
 // No `legacyKey`: new, with no device-local life to seed from.
 //
+// sync.miningTaxCompressedOre (decision 20261006-185915): whether Moon Mining
+// Tax and the Mining Overview value and name ore, moon ore and ice as their
+// Compressed type (default on) or the raw one. A sell-side habit, so it should
+// follow the pilot across devices. Off is a value, not an absence. See
+// features/miningTax/oreForm.ts. No `legacyKey`: new.
+//
 // sync.navHidden: the pages and views the pilot hid from the rail and the More
 // sheet — a list of nav paths, one for the whole account for the same reason
 // as the Overview's hidden cards below: "I don't do PI" is about the pilot.
@@ -248,6 +254,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketHub',
   'sync.marketPricePercent',
   'sync.miningTaxManualIgnoredTypeIds',
+  'sync.miningTaxCompressedOre',
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
   'sync.navHidden',

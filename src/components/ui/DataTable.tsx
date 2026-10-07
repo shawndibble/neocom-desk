@@ -9,7 +9,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
   type ReactElement,
   type ReactNode,
   type Ref,
@@ -18,11 +17,23 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
+import {
+  controlHeightClassName,
+  fieldBaseClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+  type ControlSize,
+} from './controlStyles';
+import { useLiftAfterHoldGuard } from './liftAfterHold';
+import { isRowOwnEvent } from './rowEvents';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
+import { Caret } from './Disclosure';
 import { InfoTooltip } from './Tooltip';
 import { RowMoreActions } from './RowActions';
+import { RowTappableContext } from './tooltipHold';
 import { nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
 import { ExportTableItems, TableExportProvider } from './TableExport';
@@ -80,6 +91,15 @@ export interface DataTableColumn<T> {
    * reader could get wrong; most columns explain themselves.
    */
   headerTooltip?: string;
+  /**
+   * Drops the column below `sm` (CSS `max-sm:hidden` on its header and cells)
+   * when the table renders as a table: `responsive="table"`, or `stacked`
+   * false. A read-only display table that is a few columns too wide for a
+   * phone sheds its low-value columns this way instead of stacking into
+   * cards. Ignored in the stacked card layout, where every cell is a labelled
+   * row. The column still sorts and exports.
+   */
+  phoneHidden?: boolean;
   render: (row: T) => ReactNode;
   /**
    * Declares the column sortable and extracts its comparable value.
@@ -152,46 +172,6 @@ export interface DataTableColumn<T> {
 }
 
 /**
- * What counts as a control of its own inside a clickable row: anything the
- * user can click to do something other than open the row. A bare
- * `tabIndex={0}` isn't enough — an ISK figure is focusable only so the
- * keyboard can reach its hover tooltip, and a click on it still opens the
- * row. A tap-to-open tooltip trigger marks itself with `data-row-control`.
- */
-const ROW_CONTROL_SELECTOR = [
-  'a[href]',
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'label',
-  'summary',
-  '[role="button"]',
-  '[role="checkbox"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="switch"]',
-  '[data-row-control]',
-].join(',');
-
-/**
- * Whether a click on a clickable row is the row's own — not one that landed on
- * a control inside it (a star button, a bulk-select checkbox, a tooltip
- * trigger), and not one bubbled up through React from something portaled out
- * of it (a menu or modal opened from the row). Keyboard activation of such a
- * control fires a click too, so this is also what keeps Enter/Space on it
- * from opening the row. Pages need no `stopPropagation` workaround of their
- * own.
- */
-function isRowOwnEvent(event: MouseEvent<HTMLElement>): boolean {
-  const row = event.currentTarget;
-  const target = event.target;
-  if (!(target instanceof Element) || !row.contains(target)) return false;
-  const control = target.closest(ROW_CONTROL_SELECTOR);
-  return control === null || control === row || !row.contains(control);
-}
-
-/**
  * Wraps a dense-stack (`stackLayout="dense"`) column's `render` output when
  * it's more than one inline piece (a value plus a badge, a name plus a
  * security-status suffix). The dense meta line puts a `·` separator right
@@ -222,6 +202,13 @@ export interface DataTableExpandableRow<T> {
    * disclosure already).
    */
   hideIcon?: boolean;
+  /**
+   * Draws the §6c expand-in-place cue instead: a leading rotating caret in
+   * the first cell, hidden in the stacked card layout (the card is the tap
+   * target). Implies `hideIcon`'s trailing chevron being dropped, so a row
+   * with a ⋮ keeps one trailing control.
+   */
+  leadingIcon?: boolean;
 }
 
 /**
@@ -283,8 +270,9 @@ interface DataTableProps<T> {
   /**
    * Marks one row as the persistent current selection — e.g. the offer the
    * LP Store's detail panel is showing. `aria-current="true"` on that row's
-   * `<tr>`, so the selection reads in text/AT rather than only through
-   * `rowClassName`'s background tint (DESIGN.md §7). Distinct from
+   * `<tr>`, so the selection reads in text/AT, and the row wears
+   * `selectedRowClassName` (accent left border, `panel-2` fill, accent
+   * primary cell) itself — a caller no longer tints it (DESIGN.md §6c, §7). Distinct from
    * `highlightRowKey`'s one-shot `"location"`: that one is a deep link the
    * reader arrives on and moves past, this one persists as long as the row
    * stays selected.
@@ -335,6 +323,12 @@ interface DataTableProps<T> {
    */
   onRowClick?: (row: T) => void;
   /**
+   * Per-row opt-out of `onRowClick`: a row it returns false for is inert (no
+   * pointer cursor, no tab stop, no Enter/Space) so it never looks clickable
+   * while doing nothing. Omit when every row opens something.
+   */
+  rowClickable?: (row: T) => boolean;
+  /**
    * Adds a per-row disclosure: clicking a row opens `renderDetail`'s content
    * in a full-width row beneath it. Independent of `onRowClick` — both fire
    * on the same click when both are given, though no caller currently
@@ -344,8 +338,10 @@ interface DataTableProps<T> {
   /**
    * How the table behaves below `sm`. `'stack'` (the default) collapses each
    * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
-   * `'table'` keeps real columns, and is only right for a table narrow enough
-   * to fit a 390px screen unaided — roughly two short columns.
+   * `'table'` keeps real columns: right when comparing across columns is
+   * the point (compare table, matrix, roster, wide numbers), interactive or
+   * not: it scrolls sideways, with the key column pinned by `stickyStart`
+   * (§6c Restraint). Cards are for rows read as a unit.
    */
   responsive?: 'stack' | 'table';
   /**
@@ -463,15 +459,20 @@ interface DataTableRowProps<T> {
   cardActionsIndex: number;
   firstMetaIndex: number;
   dense: boolean;
+  /** Card layout is on: `phoneHidden` columns stay (cards show every cell). */
+  isStacked: boolean;
   activeSortId: string | undefined;
   highlighted: boolean;
   selected: boolean;
   expandable: boolean;
   expanded: boolean;
   hideExpandIcon: boolean;
+  leadingExpandIcon: boolean;
   /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
   renderDetail: ((row: T) => ReactNode) | undefined;
   clickable: boolean;
+  /** A tap on the row runs `onRowClick`; an expand-only row does not count (see `RowTappableContext`). */
+  tapOpensRow: boolean;
   focusable: boolean;
   /** Stable (see `DataTable`'s `activateRow`). */
   onActivate: (row: T, key: string | number) => void;
@@ -512,14 +513,17 @@ function DataTableRowImpl<T>({
   cardActionsIndex,
   firstMetaIndex,
   dense,
+  isStacked,
   activeSortId,
   highlighted,
   selected,
   expandable,
   expanded,
   hideExpandIcon,
+  leadingExpandIcon,
   renderDetail,
   clickable,
+  tapOpensRow,
   focusable,
   onActivate,
   rowClassName,
@@ -559,6 +563,7 @@ function DataTableRowImpl<T>({
     observer.observe(detail);
     return () => observer.disconnect();
   }, [expanded, remeasure]);
+  const guard = useLiftAfterHoldGuard();
   const tr = (
     <tr
       role="row"
@@ -575,17 +580,27 @@ function DataTableRowImpl<T>({
       aria-current={selected ? 'true' : undefined}
       className={cx(
         'hover:bg-panel-2',
+        // A selected row keeps its `panel-2` fill while pressed.
+        clickable && !selected && 'active:bg-panel',
+        interactiveClassName,
         member && 'dt-group-member',
         clickable && 'cursor-pointer',
         focusable &&
           'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         highlighted && 'row-pulse',
+        // The 2px edge is on every row (transparent when not selected), so
+        // selecting never shifts a cell, in the table or the phone card.
+        selected ? selectedRowClassName : 'border-l-2 border-l-transparent',
         rowClassName?.(row)
       )}
       tabIndex={focusable ? 0 : undefined}
+      // A touch held for the row menu's long-press lifts into a click on some
+      // browsers; that click is the menu's, not the row's (`liftAfterHold.ts`).
+      {...(clickable ? guard.handlers : undefined)}
       onClick={
         clickable
           ? (event) => {
+              if (guard.swallowClick(event)) return;
               if (isRowOwnEvent(event)) onActivate(row, key);
             }
           : undefined
@@ -620,6 +635,7 @@ function DataTableRowImpl<T>({
             data-stack-after={column.stackAffix?.after}
             className={cx(
               cellClass[i],
+              column.phoneHidden && !isStacked && 'max-sm:hidden',
               i === primaryIndex && 'dt-primary',
               i === cardCornerIndex && 'dt-corner',
               i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
@@ -633,7 +649,20 @@ function DataTableRowImpl<T>({
               column.cellClassName?.(row)
             )}
           >
-            {column.render(row)}
+            {/* Only the body cell is "inside a tappable row": the detail row, header,
+                footer and group headers sit outside this provider. */}
+            <RowTappableContext.Provider value={tapOpensRow}>
+              {i === 0 && leadingExpandIcon ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="dt-lead-caret inline-flex">
+                    <Caret expanded={expanded} />
+                  </span>
+                  {column.render(row)}
+                </span>
+              ) : (
+                column.render(row)
+              )}
+            </RowTappableContext.Provider>
           </td>
         );
       })}
@@ -822,6 +851,7 @@ export function DataTable<T>({
   rowContextMenu,
   rowMoreActions = false,
   onRowClick,
+  rowClickable,
   expandableRow,
   responsive = 'stack',
   stackColumns = 1,
@@ -1144,8 +1174,8 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
-  const clickable = Boolean(onRowClick) || expandable;
-  const focusable = Boolean(rowContextMenu) || clickable;
+  const rowIsClickable = (row: T) =>
+    expandable || (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
 
   // Rows get one stable activator rather than `onRowClick` itself, which
   // callers pass inline — only ever called from a click or key handler, so
@@ -1199,15 +1229,18 @@ export function DataTable<T>({
         cardActionsIndex={cardActionsIndex}
         firstMetaIndex={firstMetaIndex}
         dense={dense}
+        isStacked={isStacked}
         activeSortId={activeSortId}
         highlighted={highlightRowKey !== null && key === highlightRowKey}
         selected={selectedRowKey !== null && key === selectedRowKey}
         expandable={expandable}
         expanded={expanded}
-        hideExpandIcon={expandableRow?.hideIcon ?? false}
+        hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
+        leadingExpandIcon={expandableRow?.leadingIcon ?? false}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
-        clickable={clickable}
-        focusable={focusable}
+        clickable={rowIsClickable(row)}
+        tapOpensRow={Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true)}
+        focusable={Boolean(rowContextMenu) || rowIsClickable(row)}
         onActivate={activateRow}
         rowClassName={rowClassName}
         rowContextMenu={rowContextMenu}
@@ -1248,25 +1281,29 @@ export function DataTable<T>({
 
   const sortableColumns = columns.filter((column) => column.sortValue !== undefined);
   // Hidden by CSS above `sm` when the viewport decides; by JS when the caller does.
-  const sortBar = mobileSort && sortableColumns.length > 0 && stacked !== false && (
-    <div
-      className={cx(
-        'flex min-h-[52px] items-center justify-between gap-3 px-3',
-        stacked === undefined && 'sm:hidden'
-      )}
-    >
-      {stackSummary !== undefined && (
-        <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
-      )}
-      <DataTableSortPicker
-        columns={sortableColumns}
-        sort={sort && activeSortId ? sort : undefined}
-        onSortChange={setSort}
-        className="ml-auto"
-      />
-      {stackActions}
-    </div>
-  );
+  // Only for a table that can stack: in table mode the header sort buttons are on screen.
+  const sortBar = mobileSort &&
+    sortableColumns.length > 0 &&
+    responsive === 'stack' &&
+    stacked !== false && (
+      <div
+        className={cx(
+          'flex min-h-[52px] items-center justify-between gap-3 px-3',
+          stacked === undefined && 'sm:hidden'
+        )}
+      >
+        {stackSummary !== undefined && (
+          <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
+        )}
+        <DataTableSortPicker
+          columns={sortableColumns}
+          sort={sort && activeSortId ? sort : undefined}
+          onSortChange={setSort}
+          className="ml-auto"
+        />
+        {stackActions}
+      </div>
+    );
 
   const table = (
     <table
@@ -1315,6 +1352,7 @@ export function DataTable<T>({
                 className={cx(
                   sortable ? 'p-0' : headerTextClass[i],
                   column.stickyStart && STICKY_START,
+                  column.phoneHidden && !isStacked && 'max-sm:hidden',
                   column.headerCellClassName
                 )}
                 aria-sort={
@@ -1339,7 +1377,9 @@ export function DataTable<T>({
                       onClick={() => toggleSort(column)}
                       className={cx(
                         headerTextClass[i],
-                        'inline-flex items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                        'inline-flex items-center gap-1 hover:text-text active:text-text-dim',
+                        interactiveClassName,
+                        focusRingInsetClassName,
                         // Only a right-aligned label fills the cell (it is
                         // already pushed against the "?"); left/center ones
                         // stay content-width so the "?" sits beside them.
@@ -1408,7 +1448,7 @@ export function DataTable<T>({
               const Chevron = expanded ? Icon.Expanded : Icon.Descend;
               return (
                 <Fragment key={`dt-group:${key}`}>
-                  <tr role="row" className="dt-group-header hover:bg-panel-2">
+                  <tr role="row" className={cx('dt-group-header', rowInteractiveClassName)}>
                     <td role="cell" colSpan={columns.length + trailingColumns} className="p-0">
                       <button
                         type="button"
@@ -1420,7 +1460,8 @@ export function DataTable<T>({
                           setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
                         }
                         className={cx(
-                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                          'flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left',
+                          focusRingInsetClassName,
                           // Off a phone an all-widths fold sits among table
                           // rows, so it takes their height, not a card's.
                           groupBy?.allWidths && 'sm:min-h-0'

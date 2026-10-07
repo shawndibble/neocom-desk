@@ -15,6 +15,7 @@
  * and skips the killboard and the alliance history: neither means anything
  * for a corporation no player runs.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -41,10 +42,10 @@ import {
 } from './publicInfoData';
 import { loadStationName } from './stations';
 import { useEntityName } from './useEntityName';
+import { AllianceLink } from '@/features/entities';
 import { PersonLink } from './PublicInfoParts';
 import {
   FACT_COLUMNS,
-  externalLinkClassName,
   fullDate,
   monthYear,
   sectionHeading,
@@ -59,10 +60,6 @@ export interface PublicInfoCorporationTabProps {
   allianceId: number | null;
   allianceName?: string;
   onOpenAlliance?: () => void;
-  /** Opens another pilot (the CEO, the founder) in the modal, replacing this request. */
-  onShowCharacter: (characterId: number) => void;
-  /** Opens a past alliance in the modal, replacing this request. */
-  onShowAlliance: (allianceId: number) => void;
 }
 
 export default function PublicInfoCorporationTab({
@@ -70,8 +67,6 @@ export default function PublicInfoCorporationTab({
   allianceId,
   allianceName,
   onOpenAlliance,
-  onShowCharacter,
-  onShowAlliance,
 }: PublicInfoCorporationTabProps) {
   const { t } = useTranslation();
   const corporationId = data.corporation_id;
@@ -184,25 +179,11 @@ export default function PublicInfoCorporationTab({
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
           {!npc && (
-            <a
-              href={corporationZkillUrl(corporationId)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={externalLinkClassName}
-            >
-              {t('publicInfo.zkillboard')} <span aria-hidden>↗</span>
-            </a>
+            <ExternalLink href={corporationZkillUrl(corporationId)}>
+              {t('publicInfo.zkillboard')}
+            </ExternalLink>
           )}
-          {website && (
-            <a
-              href={website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={externalLinkClassName}
-            >
-              {t('publicInfo.website')} <span aria-hidden>↗</span>
-            </a>
-          )}
+          {website && <ExternalLink href={website}>{t('publicInfo.website')}</ExternalLink>}
         </div>
       </div>
 
@@ -216,11 +197,11 @@ export default function PublicInfoCorporationTab({
           <dl className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-2">
             <dt className={termClassName}>{t('publicInfo.ceo')}</dt>
             <dd>
-              <PersonLink id={data.ceo_id} name={data.ceoName} onOpen={onShowCharacter} />
+              <PersonLink id={data.ceo_id} name={data.ceoName} />
             </dd>
             <dt className={termClassName}>{t('publicInfo.founder')}</dt>
             <dd>
-              <PersonLink id={data.creator_id} name={data.creatorName} onOpen={onShowCharacter} />
+              <PersonLink id={data.creator_id} name={data.creatorName} />
             </dd>
             {data.date_founded && (
               <>
@@ -275,13 +256,9 @@ export default function PublicInfoCorporationTab({
                     {row.allianceId === null ? (
                       <span className="text-text-dim">{t('publicInfo.noAlliance')}</span>
                     ) : (
-                      <button
-                        type="button"
-                        className={`${inlineLinkClassName} text-left`}
-                        onClick={() => onShowAlliance(row.allianceId as number)}
-                      >
+                      <AllianceLink id={row.allianceId} className="text-left">
                         {history.names.get(row.allianceId) ?? `#${row.allianceId}`}
-                      </button>
+                      </AllianceLink>
                     )}
                     <span className="text-xs text-text-dim sm:text-sm">
                       {row.endDate === null

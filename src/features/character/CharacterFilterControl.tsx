@@ -53,6 +53,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
 export interface CharacterFilterControlProps {
@@ -71,6 +77,17 @@ export interface CharacterFilterControlProps {
    * Mining Tax Overview) — see `PageHeader`'s own doc comment.
    */
   size?: 'sm' | 'md';
+  /**
+   * `'icon'` (default): the compact header trigger above. `'field'`: a form
+   * control for a settings row — field chrome (§6c "a box sized like a field")
+   * with the current value as text and a trailing `CaretDown` at every width.
+   * The icon-only trigger has no label or caret and, where the portrait does
+   * not load, reads as a blank square; it only suits a header row where the
+   * panel title says what it filters.
+   */
+  variant?: 'icon' | 'field';
+  /** `variant="field"` only: the setting's name. The button's accessible name becomes "<name>: <value>", since the value alone doesn't say what is being set. */
+  triggerLabel?: string;
 }
 
 /**
@@ -100,8 +117,8 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
  */
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
-  `tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ` +
-  `focus-visible:outline-accent md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
+  `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
+  `md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
   `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
   `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 
@@ -110,11 +127,52 @@ export function CharacterFilterControl({
   value,
   onChange,
   size = 'sm',
+  variant = 'icon',
+  triggerLabel,
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
   const isAll = resolved === 'all';
   const label = isAll ? t('character.filter.allCharacters') : t('character.filter.thisCharacter');
+  const options = (
+    <DropdownMenuContent align="start" className="w-40">
+      <DropdownMenuRadioGroup
+        value={isAll ? 'all' : 'current'}
+        onValueChange={(next) => onChange(next as CharacterFilterValue)}
+      >
+        {activeCharacterId !== null && (
+          <DropdownMenuRadioItem value="current">
+            {t('character.filter.thisCharacter')}
+          </DropdownMenuRadioItem>
+        )}
+        <DropdownMenuRadioItem value="all">
+          {t('character.filter.allCharacters')}
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  );
+
+  if (variant === 'field') {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={triggerLabel ? `${triggerLabel}: ${label}` : undefined}
+            className={`${fieldBaseClassName} ${fieldSizeClassName.md} flex w-full max-w-60 items-center justify-between gap-2 text-left`}
+          >
+            <span className="min-w-0 truncate">{label}</span>
+            <Icon.Expanded
+              size={ICON_SIZE.md}
+              aria-hidden="true"
+              className="shrink-0 text-text-dim"
+            />
+          </button>
+        </DropdownMenuTrigger>
+        {options}
+      </DropdownMenu>
+    );
+  }
 
   return (
     <DropdownMenu>
@@ -137,23 +195,10 @@ export function CharacterFilterControl({
             )}
           </span>
           <span className="hidden md:inline">{label}</span>
+          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-40">
-        <DropdownMenuRadioGroup
-          value={isAll ? 'all' : 'current'}
-          onValueChange={(next) => onChange(next as CharacterFilterValue)}
-        >
-          {activeCharacterId !== null && (
-            <DropdownMenuRadioItem value="current">
-              {t('character.filter.thisCharacter')}
-            </DropdownMenuRadioItem>
-          )}
-          <DropdownMenuRadioItem value="all">
-            {t('character.filter.allCharacters')}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
+      {options}
     </DropdownMenu>
   );
 }

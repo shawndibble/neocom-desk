@@ -150,7 +150,8 @@ export function bpoBadgeRows(rows: readonly BpcSearchRow[]): Set<BpcSearchRow> {
   const price = (row: BpcSearchRow) =>
     row.source === 'contract' && !row.contract.isMultiType ? effectivePrice(row.contract) : 0;
   for (const row of rows) {
-    if (row.runs === -1) continue;
+    // An LP offer has no known runs or price to compare: never the badge's row.
+    if (row.runs === -1 || row.source === 'lp') continue;
     const current = byType.get(row.typeId);
     if (!current) {
       byType.set(row.typeId, row);

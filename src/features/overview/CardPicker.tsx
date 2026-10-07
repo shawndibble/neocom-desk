@@ -26,6 +26,12 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { isCardShown, OVERVIEW_CARD_LABEL, type OverviewCardKey } from './hiddenCards';
 
 function CardToggle({
@@ -39,7 +45,9 @@ function CardToggle({
 }) {
   const { t } = useTranslation();
   return (
-    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-xs">
+    <label
+      className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-xs ${tappableRowClassName}`}
+    >
       <Checkbox checked={shown} onChange={() => onToggle(cardKey)} />
       <span className="truncate">{t(OVERVIEW_CARD_LABEL[cardKey])}</span>
     </label>
@@ -70,7 +78,7 @@ function SortableCardRow({
         {...attributes}
         {...listeners}
         aria-label={t('overview.board.reorderCard', { name: t(OVERVIEW_CARD_LABEL[cardKey]) })}
-        className="cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={`cursor-grab touch-none px-1 py-1.5 text-text-faint hover:text-text ${interactiveClassName} ${focusRingClassName} ${gripHitAreaClassName}`}
       >
         <Icon.DragHandle />
       </button>
@@ -112,7 +120,8 @@ export function CardPicker({
 }) {
   const { t } = useTranslation();
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // A 4px travel before a drag starts, so a tap on the grip is not a drag (as EntryList).
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const titleId = useId();

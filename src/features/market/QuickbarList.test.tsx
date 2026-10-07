@@ -30,31 +30,34 @@ function renderList(overrides: Partial<QuickbarListProps> = {}) {
   return { ...props, actions };
 }
 
-describe('QuickbarList item context menu', () => {
-  it('opens the item menu on the name button without selecting the row', async () => {
-    const props = renderList();
+describe('QuickbarList row controls', () => {
+  it('has no item menu and no More actions button: the bell and × are its controls', () => {
+    renderList();
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
-    expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
-    expect(props.actions.requestBlueprints).toHaveBeenCalled();
-    expect(props.onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
   });
 
-  it('opens the same menu from a visible More actions button, without selecting the row (#1497)', async () => {
+  it('selects the item on a name click', async () => {
     const user = userEvent.setup();
     const props = renderList();
-    await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
-
-    expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
-    expect(props.actions.requestBlueprints).toHaveBeenCalled();
-    expect(props.onSelect).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Tritanium' }));
+    expect(props.onSelect).toHaveBeenCalledWith(34);
   });
+});
 
-  it('does not open it from the drag handle, price alert or remove buttons', () => {
-    renderList();
-    for (const name of [/Reorder/i, /price alert/i, /Remove/i]) {
-      fireEvent.contextMenu(screen.getByRole('button', { name }));
-    }
-    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+describe('QuickbarList selection', () => {
+  it('marks only the selected row aria-current and gives it the selected treatment', () => {
+    renderList({
+      items: [...items, { typeId: 35, name: 'Pyerite', characterId: 1, position: 1 }],
+      selectedTypeId: 34,
+    });
+    const selected = screen.getByRole('button', { name: 'Tritanium' });
+    expect(selected).toHaveAttribute('aria-current', 'true');
+    expect(selected.closest('li')).toHaveClass('border-l-accent');
+    const other = screen.getByRole('button', { name: 'Pyerite' });
+    expect(other).not.toHaveAttribute('aria-current');
+    expect(other.closest('li')).not.toHaveClass('border-l-accent');
   });
 });

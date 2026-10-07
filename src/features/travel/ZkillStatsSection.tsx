@@ -12,7 +12,8 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, InfoTooltip, TypeIcon } from '@/components/ui';
+import { EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
+import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { cx } from '@/lib/cx';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
@@ -42,7 +43,7 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
   const { t } = useTranslation();
   return (
     <dl className={cx('grid grid-cols-2 gap-3 sm:grid-cols-3', className)}>
-      {items.map(({ label, value, help, tone }) => (
+      {items.map(({ label, value, isk, help, tone }) => (
         <div key={label} className="min-w-0 rounded-xs border border-line bg-panel-2 px-3 py-2">
           <dt className={termClassName}>
             <span className="truncate">{label}</span>
@@ -60,7 +61,7 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
               tone ? TONE_CLASS[tone] : 'text-text'
             )}
           >
-            {value}
+            {isk === undefined ? value : <IskAmount value={isk} />}
           </dd>
         </div>
       ))}
@@ -317,7 +318,9 @@ export function ZkillTopShips({ ships }: { ships: PilotTopShip[] }) {
             />
             <span className="min-w-0 space-y-1">
               <span className="block truncate text-sm text-text">
-                {names.get(ship.shipTypeId) ?? t('common.unknownType', { id: ship.shipTypeId })}
+                <ItemInfoLink typeId={ship.shipTypeId}>
+                  {names.get(ship.shipTypeId) ?? t('common.unknownType', { id: ship.shipTypeId })}
+                </ItemInfoLink>
               </span>
               <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-bg">
                 <span

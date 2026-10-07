@@ -19,6 +19,7 @@ import {
   ContextMenuTrigger,
 } from './ContextMenu';
 import { Tooltip } from './Tooltip';
+import { IskAmount } from './IskAmount';
 
 interface Row {
   id: number;
@@ -152,6 +153,134 @@ describe('DataTable selectedRowKey', () => {
   it('marks nothing when no row is selected', () => {
     renderTable();
     expect(document.querySelector('[aria-current]')).toBeNull();
+  });
+
+  it('draws the selected visual on the selected row only, not on hover alone', () => {
+    renderTable({ selectedRowKey: 2 });
+    const selected = document.querySelector('[data-row-key="2"]');
+    const other = document.querySelector('[data-row-key="1"]');
+    expect(selected).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
+    // Same 2px edge on every row, transparent when unselected: no cell shifts.
+    expect(other).toHaveClass('border-l-2', 'border-l-transparent');
+    expect(other).not.toHaveClass('border-l-accent');
+    expect(other).not.toHaveClass('bg-panel-2');
+  });
+
+  it('keeps the selected fill while pressed on a clickable row', () => {
+    renderTable({ selectedRowKey: 2, onRowClick: vi.fn() });
+    const selected = document.querySelector('[data-row-key="2"]');
+    const other = document.querySelector('[data-row-key="1"]');
+    expect(selected).not.toHaveClass('active:bg-panel');
+    expect(other).toHaveClass('active:bg-panel');
+  });
+
+  it('draws the same selected visual on the phone card render', () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((media: string) =>
+      ({
+        media,
+        matches: media === PHONE_QUERY,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      renderTable({ selectedRowKey: 2 });
+      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+      // The card is the row itself (`display: flex` under `dt-stacked`).
+      const card = document.querySelector('[data-row-key="2"]');
+      expect(card).toHaveAttribute('aria-current', 'true');
+      expect(card).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
+      expect(card?.className).toContain('[&_.dt-primary]:text-accent');
+      expect(document.querySelector('[data-row-key="1"]')).toHaveClass('border-l-transparent');
+    } finally {
+      window.matchMedia = real;
+    }
+  });
+});
+
+describe('DataTable rowClickable', () => {
+  it('makes a row it rejects inert: no pointer cursor, tab stop or activation', () => {
+    const onRowClick = vi.fn();
+    renderTable({ onRowClick, rowClickable: (row: Row) => row.item !== 'Pyerite' });
+    const live = screen.getByText('Tritanium').closest('tr')!;
+    const inert = screen.getByText('Pyerite').closest('tr')!;
+    expect(live).toHaveAttribute('tabindex', '0');
+    expect(live.className).toContain('cursor-pointer');
+    expect(inert).not.toHaveAttribute('tabindex');
+    expect(inert.className).not.toContain('cursor-pointer');
+    fireEvent.click(inert);
+    fireEvent.keyDown(inert, { key: 'Enter' });
+    expect(onRowClick).not.toHaveBeenCalled();
+    fireEvent.click(live);
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+  });
+});
+
+describe('DataTable lift-after-hold', () => {
+  function setup() {
+    const onRowClick = vi.fn();
+    renderTable({ onRowClick });
+    const row = screen.getByText('Tritanium').closest('tr')!;
+    return { onRowClick, row };
+  }
+
+  it('opens the row on an ordinary touch tap', () => {
+    const { onRowClick, row } = setup();
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.click(row, { detail: 1 });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the click that follows a touch held as long as the context-menu hold', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      vi.advanceTimersByTime(700);
+      fireEvent.click(row, { detail: 1 });
+      expect(onRowClick).not.toHaveBeenCalled();
+      // The next ordinary tap still opens it.
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      fireEvent.click(row, { detail: 1 });
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a cancelled touch press does not swallow a later keyboard-activated click', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'touch' });
+      vi.advanceTimersByTime(900);
+      fireEvent.pointerCancel(row, { pointerType: 'touch' });
+      fireEvent.click(row, { detail: 1 });
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a stale contextmenu record does not swallow a later keyboard click (detail 0)', () => {
+    const { onRowClick, row } = setup();
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.contextMenu(row);
+    fireEvent.click(row, { detail: 0 });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not swallow a slow mouse click', () => {
+    vi.useFakeTimers();
+    try {
+      const { onRowClick, row } = setup();
+      fireEvent.pointerDown(row, { pointerType: 'mouse' });
+      vi.advanceTimersByTime(2000);
+      fireEvent.click(row, { detail: 1 });
+      expect(onRowClick).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -748,6 +877,87 @@ describe('DataTable opt-in phone features', () => {
     ]) {
       expect(container.querySelector(selector)).toBeNull();
     }
+  });
+
+  describe('phoneHidden', () => {
+    const phoneColumns = [
+      sortColumns[0]!,
+      { ...sortColumns[1]!, phoneHidden: true },
+    ] as DataTableColumn<(typeof sortRows)[number]>[];
+    const props = {
+      columns: phoneColumns,
+      rows: sortRows,
+      rowKey: (row: (typeof sortRows)[number]) => row.id,
+      label: 'Values',
+    };
+
+    function withPhone(run: () => void) {
+      const original = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        run();
+      } finally {
+        window.matchMedia = original;
+      }
+    }
+
+    it('hides the column below sm on its th and tds in table mode', () => {
+      render(<DataTable {...props} responsive="table" />);
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
+      expect(screen.getByRole('columnheader', { name: /Name/ })).not.toHaveClass('max-sm:hidden');
+      const cells = document.querySelectorAll('tbody tr:first-child td');
+      expect(cells[0]).not.toHaveClass('max-sm:hidden');
+      expect(cells[1]).toHaveClass('max-sm:hidden');
+    });
+
+    it('applies in table mode on a phone, and the column still sorts', async () => {
+      const user = userEvent.setup();
+      withPhone(() => {
+        render(<DataTable {...props} stacked={false} />);
+        expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
+      });
+      await user.click(screen.getByRole('button', { name: /Value/ }));
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+    });
+
+    it('does nothing in the stacked card layout', () => {
+      withPhone(() => {
+        render(<DataTable {...props} />);
+        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+        expect(document.querySelector('.max-sm\\:hidden')).toBeNull();
+      });
+    });
+  });
+
+  describe('mobileSort in table mode', () => {
+    it('renders no sort bar when responsive="table" or stacked is false', () => {
+      for (const extra of [{ responsive: 'table' as const }, { stacked: false }]) {
+        const { container, unmount } = render(
+          <DataTable
+            columns={sortColumns}
+            rows={sortRows}
+            rowKey={(row) => row.id}
+            label="Values"
+            mobileSort
+            stackSummary="4 offers"
+            {...extra}
+          />
+        );
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        expect(container.children).toHaveLength(1);
+        expect(container.firstElementChild?.tagName).toBe('TABLE');
+        unmount();
+      }
+    });
   });
 
   describe('mobileSort', () => {
@@ -1637,5 +1847,63 @@ describe('DataTable row memoization', () => {
 
     expect([...rendered].sort()).toEqual([1, 2]);
     expect(document.querySelector('[data-row-key="2"]')?.getAttribute('aria-current')).toBe('true');
+  });
+});
+
+describe('DataTable tappable-row scope for IskAmount', () => {
+  const iskColumns: DataTableColumn<Row>[] = [
+    { id: 'item', header: 'Item', render: (row) => row.item },
+    { id: 'amount', header: 'Amount', render: (row) => <IskAmount value={row.amount * 1e6} /> },
+  ];
+  const exactOf = (row: Row) => `${(row.amount * 1e6).toLocaleString('en-US')}.00 ISK`;
+  function tapFigure(row: Row) {
+    const figure = screen.getByText(exactOf(row), { selector: '.sr-only' }).parentElement!;
+    fireEvent.touchStart(figure, { touches: [{ clientX: 0, clientY: 0 }] });
+    fireEvent.touchEnd(figure, { touches: [] });
+    return figure;
+  }
+
+  it('leaves the tap to a row with onRowClick', () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={iskColumns}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        onRowClick={() => {}}
+      />
+    );
+    tapFigure(rows[0]);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('still tap-reveals in an expand-only row, whose detail may not show the figure', async () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={iskColumns}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        expandableRow={{ renderDetail: () => <p>Detail</p> }}
+      />
+    );
+    tapFigure(rows[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('ISK');
+  });
+
+  it('still tap-reveals in expansion content, even when the row itself is clickable', async () => {
+    render(
+      <DataTable
+        label="Rows"
+        columns={[{ id: 'item', header: 'Item', render: (row) => row.item }]}
+        rows={[rows[0]]}
+        rowKey={(r) => r.id}
+        onRowClick={() => {}}
+        expandableRow={{ renderDetail: (row) => <IskAmount value={row.amount * 1e6} /> }}
+      />
+    );
+    fireEvent.click(screen.getByText('Tritanium'));
+    tapFigure(rows[0]);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('ISK');
   });
 });

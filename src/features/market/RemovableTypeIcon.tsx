@@ -14,6 +14,7 @@
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 
 export interface RemovableTypeIconProps {
@@ -45,7 +46,11 @@ export function RemovableTypeIcon({
           event.stopPropagation();
           onRemove(typeId);
         }}
-        className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-line-bright bg-panel-2 text-text after:absolute after:-inset-x-3.5 after:-top-0.5 after:-bottom-5 after:content-[''] md:after:-inset-1 hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+        className={cx(
+          "absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-line-bright bg-panel-2 text-text after:absolute after:-inset-x-3.5 after:-top-0.5 after:-bottom-5 after:content-[''] md:after:-inset-1 hover:border-accent hover:text-accent",
+          interactiveClassName,
+          focusRingClassName
+        )}
       >
         <Icon.Close size="0.625rem" aria-hidden="true" />
       </button>

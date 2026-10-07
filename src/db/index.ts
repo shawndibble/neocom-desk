@@ -727,6 +727,14 @@ export interface MiningTaxAssignmentRecord {
    * history is a group-by away without a separate synced table.
    */
   payment?: MiningTaxPaymentInfo;
+  /**
+   * `true` when `estimatedValue`/`taxOwed` were priced from the raw ore types
+   * rather than their Compressed ones (the Ore Form setting off when it was
+   * snapshotted). Absent = Compressed, which is also what every record from
+   * before the setting existed was. Lets an Outstanding record re-price when
+   * the setting flips (`oreFormReprice.ts`); paid ones just keep it.
+   */
+  rawOrePriced?: boolean;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

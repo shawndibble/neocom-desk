@@ -244,20 +244,12 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterClones'],
     strings: 'clones',
   },
-  // The three public reads add no scope — planet and schematic names, and the
-  // Advisor tab's planet list for a system — but are listed for the same
-  // reason /assets lists its universe reads: the table is meant to say what a
-  // route actually calls.
-  '/planetary-industry': {
-    endpoints: [
-      'getCharacterPlanets',
-      'getCharacterPlanet',
-      'getUniversePlanet',
-      'getUniverseSchematic',
-      'getUniverseSystem',
-    ],
-    strings: 'pi',
-  },
+  // The page needs no scope to render: Plan's Find best and Map are SDE +
+  // market only. Only the colony list needs the planets grant, so the page
+  // raises one banner above its tabs from its own `needsReauth` instead of
+  // being replaced whole (scope decision 20260912-200442, same shape as
+  // /contracts and /wallet).
+  '/planetary-industry': UNGATED,
   // Reached from Wallet's Loyalty Points panel (a store row, or the LP
   // Store picker for any store — issue #2321), from item LP links, and directly.
   // getLoyaltyStoreOffers is PUBLIC, so this one scope is what the route
@@ -271,6 +263,8 @@ export const ROUTE_REQUIREMENTS = {
   '/market/lp-store/:corporationId': LP_STORE_REQUIREMENT,
   // Its old home under Wallet: a redirect, so it needs nothing.
   '/wallet/loyalty': UNGATED,
+  // The retired PI Advisor tab: a redirect, so it needs nothing.
+  '/planetary-industry/advisor': UNGATED,
   '/wallet/loyalty/:corporationId': UNGATED,
   '/contacts': {
     endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],

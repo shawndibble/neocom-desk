@@ -3,7 +3,7 @@
  * `../goalPlan.ts` for how the steps compose.
  */
 import type { PiData, PiFactoryKind, PiRawResource, PiSchematic } from '@/sde/types';
-import { expandChain, piTier } from '../chain';
+import { piTier } from '../chain';
 import type { Goal } from '../goalTypes';
 import { singleFactoryRate } from '../pinBudget';
 
@@ -42,12 +42,53 @@ export function perHour(g: Goal): number {
   return g.unitsPerDay / HOURS_PER_DAY;
 }
 
-/** Adds every chain node of `list` into `into`, summing rates per type. */
+export interface ChainRates {
+  /** Units/h of each chain type the plan makes, P0 included. */
+  made: Map<number, number>;
+  /** Units/h of each P2+ chain type bought at the hub, the goal's own type included. */
+  bought: Map<number, number>;
+}
+
+/**
+ * A goal's chain at its rate, split into what is made and what is bought
+ * (`Goal.buyShare`). Nothing beneath a bought share is demanded: the P1 and P0
+ * under a bought P2 are not extracted for it.
+ */
+export function chainRates(g: Goal, pi: PiData): ChainRates {
+  const made = new Map<number, number>();
+  const bought = new Map<number, number>();
+  const walk = (typeId: number, need: number): void => {
+    const share = g.buyShare?.get(typeId) ?? 0;
+    const buy = need * share;
+    const make = need - buy;
+    if (buy > EPSILON) bought.set(typeId, (bought.get(typeId) ?? 0) + buy);
+    if (make <= EPSILON) return;
+    made.set(typeId, (made.get(typeId) ?? 0) + make);
+    const schematic = pi.schematics[String(typeId)];
+    if (!schematic) return;
+    for (const input of schematic.inputs) {
+      walk(input.typeID, (make * input.quantity) / schematic.quantity);
+    }
+  };
+  walk(g.typeId, perHour(g));
+  return { made, bought };
+}
+
+/** The chain's made nodes: `{ typeId, tier, unitsPerHour }`, highest tier first. */
+export function madeNodes(
+  g: Goal,
+  pi: PiData
+): { typeId: number; tier: number; unitsPerHour: number }[] {
+  return [...chainRates(g, pi).made]
+    .map(([typeId, unitsPerHour]) => ({ typeId, tier: piTier(typeId, pi), unitsPerHour }))
+    .sort((a, b) => b.tier - a.tier || a.typeId - b.typeId);
+}
+
+/** Adds every made chain node of `list` into `into`, summing rates per type. */
 export function expandInto(into: Map<number, number>, list: readonly Goal[], pi: PiData): void {
   for (const g of list) {
-    const chain = expandChain(g.typeId, pi, { unitsPerHour: perHour(g) });
-    for (const node of chain.nodes) {
-      into.set(node.typeId, (into.get(node.typeId) ?? 0) + node.unitsPerHour);
+    for (const [typeId, units] of chainRates(g, pi).made) {
+      into.set(typeId, (into.get(typeId) ?? 0) + units);
     }
   }
 }

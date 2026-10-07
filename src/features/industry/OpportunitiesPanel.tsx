@@ -10,7 +10,8 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { useEffect, useMemo, useState } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ import {
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -43,8 +45,7 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -328,6 +329,9 @@ export function OpportunitiesPanel({
     columns: csvColumns,
   });
 
+  // A row click is the Start plan button's action, so the product name needs no link of its own.
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
+
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
       // Desktop-only column now (`isDesktop` gates this whole `DataTable`
@@ -338,14 +342,17 @@ export function OpportunitiesPanel({
       id: 'select',
       header: '',
       className: 'w-8',
+      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
-        <Checkbox
-          checked={selectedIds.has(row.candidate.id)}
-          onChange={() => toggleSelected(row.candidate.id)}
-          aria-label={t('industry.opportunitiesSelectFor', {
-            name: row.candidate.catalogEntry.productName,
-          })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            checked={selectedIds.has(row.candidate.id)}
+            onChange={() => toggleSelected(row.candidate.id)}
+            aria-label={t('industry.opportunitiesSelectFor', {
+              name: row.candidate.catalogEntry.productName,
+            })}
+          />
+        </label>
       ),
     },
     {
@@ -358,13 +365,7 @@ export function OpportunitiesPanel({
         const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
         return (
           <span className="flex flex-wrap items-center gap-1.5">
-            {productTypeID !== null ? (
-              <MarketItemLink typeId={productTypeID}>
-                {row.candidate.catalogEntry.productName}
-              </MarketItemLink>
-            ) : (
-              row.candidate.catalogEntry.productName
-            )}
+            <span className={entityLinkClassName()}>{row.candidate.catalogEntry.productName}</span>
             {verdict?.gated && (
               <SkillGateMarker
                 verdict={verdict}
@@ -373,7 +374,7 @@ export function OpportunitiesPanel({
               />
             )}
             {showCharacterColumn && (
-              <span className="text-[0.6875rem] text-text-dim">{row.candidate.characterName}</span>
+              <span className="text-[0.6875rem]">{row.candidate.characterName}</span>
             )}
           </span>
         );
@@ -410,7 +411,7 @@ export function OpportunitiesPanel({
         numericCell(
           unitMargin(row),
           // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -442,7 +443,7 @@ export function OpportunitiesPanel({
         numericCell(
           row.result.iskPerHour,
           // Tap: the figure is inert — the row's own controls are buttons of their own.
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -475,24 +476,14 @@ export function OpportunitiesPanel({
       // Compare button, which needs 2+ selected rows to do anything.
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => onStartPlan(row.candidate.catalogEntry)} />,
+      render: (row) => (
+        <StartPlanButton
+          onStart={() => onStartPlan(row.candidate.catalogEntry)}
+          planKey={row.candidate.catalogEntry}
+        />
+      ),
     },
   ];
-  // A row whose product type is unknown has no item to open a menu for, so it
-  // renders bare (the price-history button is withheld for the same reason).
-  const rowContextMenu = (row: OpportunityRow, tr: ReactElement): ReactElement => {
-    const { productTypeID, productName, blueprintTypeID } = row.candidate.catalogEntry;
-    if (productTypeID === null) return tr;
-    return (
-      <ItemContextMenu
-        typeId={productTypeID}
-        itemName={productName}
-        blueprintTypeID={blueprintTypeID}
-      >
-        {tr}
-      </ItemContextMenu>
-    );
-  };
   const sortProps = useUrlSort(
     OPPORTUNITIES_SORT_KEY,
     OPPORTUNITIES_DEFAULT_SORT,
@@ -629,8 +620,7 @@ export function OpportunitiesPanel({
             rowKey={opportunityRowKey}
             virtualize="auto"
             label={t('industry.opportunitiesTitle')}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions
+            onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
             {...sortProps}
           />
         </div>

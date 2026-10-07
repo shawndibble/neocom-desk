@@ -8,6 +8,8 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { HintText } from '@/components/ui/HintText';
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -739,6 +741,13 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
   return answer && answer.rows === rows && answer.routeKey === routeKey ? answer.state : PENDING;
 }
 
+/** A system name, plain: a courier row opens its contract modal, where the system links to Route Safety. */
+function EndpointSystem({ endpoint }: { endpoint: CourierRouteRow['origin'] }) {
+  const name = endpointSystemName(endpoint);
+  // Plain: the row opens the contract modal, which carries the system link.
+  return <span className={entityLinkClassName()}>{name}</span>;
+}
+
 /**
  * A folded lane's toggle on a phone: the lane itself, how many hauls run it,
  * the best ISK/jump among them, and every warning any of them carries.
@@ -755,6 +764,7 @@ function useJumpCounts(rows: readonly CourierRouteRow[], route: JumpBasis): Jump
  *
  * Rendered inside the toggle `<button>`, so everything here is plain text —
  * no `IskAmount` long-press reveal, which would be a control inside a control.
+ * Documented exception to the IskAmount rule: `formatIskCompact` stays here.
  */
 function LaneGroupHeader({
   rows,
@@ -826,6 +836,7 @@ function LaneGroupHeader({
               <RiskMarker
                 key={kind}
                 kind={kind}
+                plain
                 detailOptions={
                   kind === 'over-rate'
                     ? { multiple: formatMagnitude(Math.max(...multiples)) }
@@ -1168,7 +1179,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         sortValue: (row) => row.reward,
         stackAffix: { after: t('contractSearch.courierMobile.rewardAffix') },
         // Long press, not tap: the row's own tap opens the haul's detail modal.
-        render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
+        render: (row) => <IskAmount value={row.reward} />,
       },
       collateral: {
         id: 'collateral',
@@ -1183,11 +1194,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // dash says "none asked", where "0.00 ISK" reads as a figure the issuer
         // actually typed.
         render: (row) =>
-          courierCollateral(row) === 0 ? (
-            '—'
-          ) : (
-            <IskAmount value={courierCollateral(row)} revealOn="longPress" />
-          ),
+          courierCollateral(row) === 0 ? '—' : <IskAmount value={courierCollateral(row)} />,
       },
       jumps: {
         id: 'jumps',
@@ -1204,9 +1211,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           const count = jumpsByContract.get(row.contractId) ?? null;
           if (count === null) {
             return (
-              <span className="text-text-dim" title={t('contractSearch.jumpsUnavailableHint')}>
+              <HintText
+                content={t('contractSearch.jumpsUnavailableHint')}
+                className="text-text-dim"
+              >
                 —
-              </span>
+              </HintText>
             );
           }
           return row.destination.systemId == null ? (
@@ -1216,6 +1226,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               systemId={row.destination.systemId}
               fromId={row.origin.systemId}
               preference={preferenceOverride}
+              label={t('contractSearch.jumpsLinkLabel', { count })}
             >
               {count}
             </JumpsLink>
@@ -1248,7 +1259,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 // tap opens the modal). The " /J" only shows on the phone
                 // card, which has no column header to name the figure.
                 <span className="whitespace-nowrap">
-                  <IskAmount value={rate} revealOn="longPress" />
+                  <IskAmount value={rate} />
                   <span className="text-[0.625rem] font-semibold text-text-dim sm:hidden">
                     {t('contractSearch.courierMobile.perJumpSuffix')}
                   </span>
@@ -1306,6 +1317,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // the ISK/jump column never sees, and whole-ISK formatting clamps
         // anything under half an ISK to "0" — which would print a low-paying
         // bulk haul exactly like the deliberate zero of a favour run.
+        // Exception to "IskAmount for compact figures": a sub-ISK rate is not compact.
         render: (row) => {
           const rate = iskPerVolume(row.reward, row.volume);
           return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
@@ -1337,7 +1349,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         render: (row) => (
           <div className="flex flex-col gap-0.5">
             <span>
-              {endpointSystemName(row.origin)}
+              <EndpointSystem endpoint={row.origin} />
               <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
@@ -1346,7 +1358,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             </span>
             <span className="text-text-dim">
               {'→ '}
-              {endpointSystemName(row.destination)}
+              <EndpointSystem endpoint={row.destination} />
               <EndpointSecurity security={row.destination.security} />
               {destinationRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>

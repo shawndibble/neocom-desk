@@ -35,6 +35,7 @@ import {
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -174,7 +175,9 @@ export function CalendarKindFilterMenu({
           type="button"
           onClick={onShowAll}
           disabled={hidden.length === 0}
-          className={`mt-1 flex w-full items-center border-t border-line px-2 text-left text-[0.6875rem] font-semibold tracking-widest text-accent uppercase disabled:text-text-faint ${controlHeightClassName.md}`}
+          className={textActionClassName(
+            `mt-1 w-full rounded-none border-t border-line px-2 text-left disabled:text-text-faint ${controlHeightClassName.md}`
+          )}
         >
           {t('calendar.filter.showAll')}
         </button>

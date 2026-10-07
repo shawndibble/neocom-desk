@@ -12,6 +12,41 @@ async function openMenu() {
 }
 
 describe('CharacterFilterControl', () => {
+  it('field variant shows the value as visible text with a caret, at any width', () => {
+    const { container } = render(
+      <CharacterFilterControl
+        variant="field"
+        triggerLabel="Default characters shown"
+        activeCharacterId={1}
+        value="current"
+        onChange={() => {}}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Default characters shown: This character',
+    });
+    expect(trigger.querySelector('span')).toHaveTextContent('This character');
+    expect(trigger.querySelector('span')?.className).not.toMatch(/hidden/);
+    expect(trigger.querySelector('svg')).toBeInTheDocument();
+    expect(trigger.className).toMatch(/\bh-11\b/);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('field variant opens the same two-option menu', async () => {
+    const onChange = vi.fn();
+    render(
+      <CharacterFilterControl
+        variant="field"
+        activeCharacterId={1}
+        value="current"
+        onChange={onChange}
+      />
+    );
+    const user = await openMenu();
+    await user.click(screen.getByRole('menuitemradio', { name: 'All characters' }));
+    expect(onChange).toHaveBeenCalledWith('all');
+  });
+
   it('labels the trigger "This character" for the literal \'current\'', () => {
     render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
@@ -76,13 +111,14 @@ describe('CharacterFilterControl', () => {
       const { rerender } = render(
         <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
       );
-      const trigger = () => screen.getByRole('button');
-      expect(trigger().querySelector('img')).toBeInTheDocument();
-      expect(trigger().querySelector('svg')).not.toBeInTheDocument();
+      // The phone icon slot only: the md+ text pill carries its own CaretDown.
+      const slot = () => screen.getByRole('button').children[0];
+      expect(slot().querySelector('img')).toBeInTheDocument();
+      expect(slot().querySelector('svg')).not.toBeInTheDocument();
 
       rerender(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
-      expect(trigger().querySelector('svg')).toBeInTheDocument();
-      expect(trigger().querySelector('img')).not.toBeInTheDocument();
+      expect(slot().querySelector('svg')).toBeInTheDocument();
+      expect(slot().querySelector('img')).not.toBeInTheDocument();
     });
 
     it("defaults to the sm touch tier (a panel meta row's own IconButton size)", () => {

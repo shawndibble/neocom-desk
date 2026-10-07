@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -31,6 +31,8 @@ interface AutoBuildControlProps {
   /** Names the affected plan count in the overwrite confirmation. */
   confirmMessage?: string;
   onApply: (options: { strategy: BuildStrategy }) => void;
+  /** Group-planning tools shown at the end of the same row (Retarget, copy shopping list). */
+  trailing?: ReactNode;
 }
 
 /**
@@ -55,6 +57,7 @@ export function AutoBuildControl({
   initialStrategy,
   confirmMessage,
   onApply,
+  trailing,
 }: AutoBuildControlProps) {
   const { t } = useTranslation();
   const [strategy, setStrategy] = useState<BuildStrategy>(initialStrategy ?? 'cost-effective');
@@ -75,8 +78,9 @@ export function AutoBuildControl({
           onClick={() => setConfirmOpen(true)}
           disabled={disabled || maxDepth === 0}
         >
-          {t('industry.autoBuildApply')}
+          {t('industry.autoBuildApply')}…
         </Button>
+        {trailing && <div className="ml-auto flex items-center gap-1">{trailing}</div>}
       </div>
 
       <Modal

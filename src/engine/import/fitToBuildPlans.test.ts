@@ -1,3 +1,4 @@
+import { MAX_JOB_RUNS } from '../industry/types';
 import { describe, expect, it } from 'vitest';
 import { parseEftFit } from './eftFit';
 import { fitToBuildPlans, type FitBlueprintLookup } from './fitToBuildPlans';
@@ -139,12 +140,12 @@ describe('fitToBuildPlans — runs and spare', () => {
     expect(fitToBuildPlans(fit, ammoLookup).items[0].runs).toBe(1);
   });
 
-  it('clamps runs to the 100k ceiling the plan itself computes at', () => {
-    // A stored 2,000,000 would *display* as 2,000,000 while every number on
+  it('clamps runs to the ceiling the plan itself computes at', () => {
+    // A stored 2,000,000,000 would *display* as itself while every number on
     // the page was computed at computeBuildPlan's own clamp — a silent lie.
-    const fit = parseEftFit('[Drake, PvE]\n\nScourge Fury Heavy Missile x200000000');
+    const fit = parseEftFit('[Drake, PvE]\n\nScourge Fury Heavy Missile x2000000000');
     const [row] = fitToBuildPlans(fit, ammoLookup).items;
-    expect(row.runs).toBe(100_000);
+    expect(row.runs).toBe(MAX_JOB_RUNS);
   });
 });
 

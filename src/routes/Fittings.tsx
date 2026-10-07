@@ -3,12 +3,20 @@ import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittin
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import type { FittingLoadState } from '@/lib/shortcuts';
-import { Button, Disclosure, Modal, Panel, SlideOver, Tabs, TextInput } from '@/components/ui';
+import {
+  Button,
+  Disclosure,
+  IskAmount,
+  Modal,
+  Panel,
+  SlideOver,
+  Tabs,
+  TextInput,
+} from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
@@ -26,6 +34,7 @@ import {
   addDronesWithinBay,
   addModule,
   cargoGroups,
+  droneRoom,
   droneTotals,
   firstFreeSlotIndex,
   moveModule,
@@ -84,7 +93,7 @@ import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
@@ -123,6 +132,9 @@ function FittingsPage() {
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
+  // The HTML5 drag gate follows the input, not just the width: a touch laptop
+  // is wide, but a long-press there belongs to the row menu, not a drag.
+  const coarsePointer = useMediaQuery(COARSE_POINTER_QUERY);
   const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
     ? 'docked'
     : isDesktop
@@ -204,7 +216,7 @@ function FittingsPage() {
   // The page's Item Actions — here only Show info (the Fitting editor's menu
   // has no Add to Quickbar or Build Plan): a List name click or a menu's
   // "Show info" opens the page's Item Detail modal.
-  const pageItemActions = usePageItemActions({ activeCharacterId });
+  const pageItemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
@@ -349,8 +361,16 @@ function FittingsPage() {
       moduleResults={moduleResults}
       onLoadCharge={(chargeTypeId) => charges.load(chargeTypeId)}
       onAddCargo={(typeId, quantity) => edit((f) => addCargo(f, typeId, quantity))}
-      dragToRing={isDesktop}
+      dragToRing={isDesktop && !coarsePointer}
       showDrones={dronesShown}
+      droneRoomFor={(typeId) => droneRoom(fitting, typeId, droneBay)}
+      slotFreeFor={
+        slotCounts === null
+          ? undefined
+          : (rack) =>
+              (target?.kind === 'slot' && target.slot === rack) ||
+              firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null
+      }
     />
   );
 
@@ -565,9 +585,10 @@ function FittingsPage() {
           </span>
           {workspace.price && (
             <span className="text-text tabular-nums">
-              {t('fittings.stats.unit.isk', {
-                value: formatIskCompact(workspace.price.totals.sell),
-              })}
+              <Trans
+                i18nKey="fittings.stats.unit.iskAmount"
+                components={{ isk: <IskAmount value={workspace.price.totals.sell} /> }}
+              />
             </span>
           )}
         </>

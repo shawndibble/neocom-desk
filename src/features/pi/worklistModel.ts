@@ -160,7 +160,7 @@ export interface WorklistColony {
   conversions: readonly WorklistOpportunity[];
   rebuild: WorklistRebuild | null;
   throughput: WorklistThroughput | null;
-  /** Set when an extractor's own program has run dry — see `advisorModel.ts`'s `stoppedExtraction`. */
+  /** Set when an extractor's own program has run dry — see `systemPlanetModel.ts`'s `stoppedExtraction`. */
   stopped: { count: number; hoursStopped: number } | null;
 }
 

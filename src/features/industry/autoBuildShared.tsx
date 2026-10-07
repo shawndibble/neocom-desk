@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { HintText } from '@/components/ui/HintText';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Tooltip,
   type ControlSize,
 } from '@/components/ui';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -83,16 +83,15 @@ export function BuildStrategySelect({
 // than the `sm` `Select`/`Button`/`IconButton` it sits beside in this row at
 // every width — a `StatChip`-style flat height fixes that instead of
 // growing it into the responsive scale it was never a target on.
-// `cursor-help` matches the other non-button `Tooltip` triggers in the app
-// (e.g. `OrderRowSummaryText`'s match note) — the only visual cue this chip
-// has something to hover, since it draws no underline of its own.
+// `HintText` draws the dotted underline + `cursor-help` (DESIGN.md §6c); the
+// chip stays a neutral tone because accent text would read as clickable.
 const ACTIVE_CLASSES =
-  'inline-flex h-7 shrink-0 cursor-help items-center rounded-xs border border-accent-dim bg-accent/15 px-2 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase';
+  'inline-flex h-7 shrink-0 items-center rounded-xs bg-accent/15 px-2 text-[0.6875rem] font-semibold tracking-widest text-text uppercase';
 // No `opacity-*`: it read as inactive well enough already (grey border + dim
 // text vs. the accent chip beside it) without also taking the text below
 // AA (issue #1491 — the faded chip was 3.2:1, `text-dim` alone is 6.6:1).
 const RESERVED_CLASSES =
-  'inline-flex h-7 shrink-0 cursor-help items-center rounded-xs border border-line bg-panel-2 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+  'inline-flex h-7 shrink-0 items-center rounded-xs bg-panel-2 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface CraftScopeChipsProps {
   /**
@@ -127,22 +126,16 @@ export function CraftScopeChips({ scope }: CraftScopeChipsProps) {
   const reactionsEligible = scope.includes('reaction');
   return (
     <span className="flex items-center gap-1">
-      <Tooltip
+      <HintText
         content={
           reactionsEligible
             ? t('industry.craftScopeReactionsEnabledHint')
             : t('industry.craftScopeReactionsDisabledHint')
         }
-        openOnTap
+        className={reactionsEligible ? ACTIVE_CLASSES : RESERVED_CLASSES}
       >
-        <span
-          tabIndex={0}
-          aria-disabled={reactionsEligible ? undefined : true}
-          className={reactionsEligible ? ACTIVE_CLASSES : RESERVED_CLASSES}
-        >
-          {t('industry.craftScopeReactions')}
-        </span>
-      </Tooltip>
+        {t('industry.craftScopeReactions')}
+      </HintText>
     </span>
   );
 }

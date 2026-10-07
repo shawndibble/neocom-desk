@@ -297,7 +297,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   async function openSettleUp(page: Page): Promise<Locator> {
     // Exact: the selection toolbar's own action is "Settle up {{count}}".
-    await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+    await page.getByRole('button', { name: 'Settle up…', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
     await expect(dialog).toBeVisible();
     // A single entry starts folded into its summary line; the itemized row
@@ -471,7 +471,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     await expect(boxes).toHaveCount(1);
     await boxes.first().check();
 
-    const settleUp = page.getByRole('button', { name: /^Settle up \d+$/ });
+    const settleUp = page.getByRole('button', { name: /^Settle up \d+…$/ });
     await expect(settleUp).toBeVisible();
     return {
       settleUpHeight: async () => (await settleUp.boundingBox())?.height,
@@ -498,6 +498,33 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     expect(await heights.settleUpHeight()).toBeCloseTo(36, 0);
     // Clear's own `sm` pointer value is untouched.
     expect(await heights.clearHeight()).toBeCloseTo(28, 0);
+  });
+});
+
+test.describe('Mining Tax phone card — tick box clears the card text', () => {
+  // A coarse pointer grows the tick box's label to 44px (`touch:size-11`).
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+  test('tick box sits left of the card text with a visible gap', async ({ page }) => {
+    await signInAndGoto(page);
+    await seedPayeeBalance(page);
+    await page.goto('./mining/tax');
+
+    const box = page.getByLabel('Select this row');
+    await expect(box).toHaveCount(1);
+    const row = page.locator('tr', { has: box });
+    const boxRect = await box.locator('xpath=ancestor::label[1]').boundingBox();
+    const rowCells = row.locator('td:not(.dt-edge)');
+    const textLefts = await rowCells.evaluateAll((cells) =>
+      cells.map((c) => {
+        const range = document.createRange();
+        range.selectNodeContents(c);
+        return range.getBoundingClientRect();
+      })
+    );
+    const textLeft = Math.min(...textLefts.filter((r) => r.width > 0).map((r) => r.left));
+    // Gap between the label's right edge and the first text: not touching.
+    expect(textLeft - (boxRect!.x + boxRect!.width)).toBeGreaterThanOrEqual(4);
   });
 });
 

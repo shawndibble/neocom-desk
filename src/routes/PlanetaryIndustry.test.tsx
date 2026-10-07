@@ -9,6 +9,8 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useAuthFailure } from '@/stores/authFailure';
+import { DEFAULT_PI_CADENCE, PI_CADENCE_KEY, useCadence } from '@/features/pi/cadencePref';
 import {
   useShowAltColonies,
   DEFAULT_PI_COLONIES_SHOW_ALTS,
@@ -17,6 +19,7 @@ import {
 import { App } from '@/app/App';
 import { piTier } from '@/engine/pi/chain';
 import * as routeChunks from '@/app/routeChunks';
+import { loadPlanPrices } from '@/features/pi/planPrices';
 import type { PiData } from '@/sde/types';
 
 /** A P1 a temperate colony makes from its own Aqueous Liquids. */
@@ -47,6 +50,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => piData),
   loadPiPlanetRadius: vi.fn(async () => ({ [String(40000001)]: 5_000 })),
+  // The product drawer's planet finder: no systems needed for these tests.
+  loadPiSystemPlanets: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
@@ -120,7 +125,7 @@ const detailPayload = {
   routes: [],
 };
 
-const PRODUCT_ID = 2288;
+const PRODUCT_ID = 2307; // Felsic Magma in pi.json
 const FACTORY_TYPE_ID = 3001;
 const STORAGE_TYPE_ID = 3002;
 const SCHEMATIC_ID = 131;
@@ -286,7 +291,7 @@ async function resetSession(): Promise<void> {
     scopes: ['esi-planets.manage_planets.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/planetary-industry');
+  window.history.pushState({}, '', '/planetary-industry/colonies');
 }
 
 beforeAll(async () => {
@@ -298,13 +303,19 @@ beforeAll(async () => {
   await resetSession();
   window.history.pushState({}, '', '/planetary-industry/plan');
   const { unmount } = render(<App />);
-  await screen.findByRole('heading', { name: 'Goals' }, { timeout: 25_000 });
+  await screen.findByRole('heading', { name: 'What do you want to do?' }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
 }, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(resetSession);
+beforeEach(async () => {
+  useAuthFailure.setState({ failure: null });
+  // The haul cadence persists like any setting: a test that changes it must not set the next one's window.
+  await db.settings.delete(PI_CADENCE_KEY);
+  useCadence.setState({ value: DEFAULT_PI_CADENCE, hydrated: false });
+  await resetSession();
+});
 
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 
@@ -326,28 +337,24 @@ async function addAlt(characterId: number, name: string, scopes: string[]) {
 
 /**
  * The per-colony row+drilldown wrapper for a planet, found by its own
- * heading and expanded (clicked open) if it wasn't already — the Colonies
- * panel is Concept C, summary-then-drill-down: a collapsed row carries only
- * status/expiry/product/pin-count text, and the extraction/production/
- * infrastructure cards a lot of these assertions check only mount once the
- * row's drilldown region is open.
+ * heading and expanded (clicked open) if it wasn't already: a collapsed row
+ * carries the status, the meters and one action, and the per-extractor,
+ * production and launchpad detail only mounts once the row's region is open.
  *
- * The cross-character timeline above the colonies panel names the same
- * planets, products and states, so a page-wide `getByText` is ambiguous here
- * by design — the two surfaces really do say the same words about the same
- * colony. An assertion about the pin table therefore says which panel it
- * means rather than loosening its counts.
+ * The Today panel above the list names the same planets and states, so a
+ * page-wide `getByText` is ambiguous here by design. An assertion about one
+ * colony therefore says which row it means rather than loosening its counts.
  */
 async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
+  // The page's load has settled (its Refresh button re-enables): a row can draw
+  // from the first, detail-less snapshot and then redraw as the pins arrive.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled());
   const heading = await screen.findByRole('heading', { name });
-  const panel = heading.closest('div');
+  const panel = heading.closest('[data-colony-status]');
   if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
-  // Scoped to the heading itself (the `<h3>`), not the whole panel: an
-  // already-expanded region carries its own `InfoTooltip` button(s) (Last
-  // Update, and Status for unknown/decayed), so a panel-wide
-  // `getByRole('button')` is only unambiguous before expansion. The `<h3>`
-  // wraps nothing but the summary row's trigger.
-  const trigger = within(heading).getByRole('button');
+  // The row's toggle, not the "more actions" menu or the primary action: those
+  // carry their own accessible names.
+  const trigger = within(panel).getByRole('button', { name: /^Show details for / });
   if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   await within(panel).findByRole('region');
   return panel;
@@ -355,56 +362,88 @@ async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
 
 /** The whole Colonies panel (every character's rows once the toggle is on), found by its own "N colony/colonies" header — as opposed to `colonyPanelFor`'s single-colony wrapper. */
 function coloniesPanel(): HTMLElement {
-  const heading = screen.getByRole('heading', { name: /colon(y|ies)$/i });
+  const heading = screen.getByRole('heading', { name: /^\d+ colon(y|ies)$/i });
   const panel = heading.closest('section');
   if (!(panel instanceof HTMLElement)) throw new Error('no colonies panel found');
   return panel;
 }
 
 describe('PlanetaryIndustry', () => {
-  it('lists a colony with its planet, and shows the extractor as expired from expiry_time alone', async () => {
+  it('lists a colony with its planet, and shows the extractor as stopped from expiry_time alone', async () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('Extractor Control Unit')).toBeInTheDocument();
-    // The summary row's own expiry cell names the product alongside the
-    // word, so a stopped row never reads as a bare "—" or "Stopped" alone.
-    expect(within(panel).getByText('Unknown product · Stopped')).toBeInTheDocument();
-    // The attention chip, the extraction card's Status chip, and its Expires
-    // field all read "Stopped" for an already-expired extractor — one word
-    // for the condition, not "Idle"/"Expired" split across surfaces.
-    expect(within(panel).getAllByText('Stopped')).toHaveLength(3);
+    expect(panel).toHaveAttribute('data-colony-status', 'stopped');
+    // The planet is a Route Safety link, the status a word (never colour alone).
+    expect(within(panel).getByRole('link', { name: 'Jita IV' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/travel/route')
+    );
+    expect(within(panel).getByText('Stopped', { selector: 'span' })).toBeInTheDocument();
+    // Its one action is a restart, and says what it is without a figure when
+    // the model has none to give.
+    expect(within(panel).getByRole('button', { name: /^Restart/ })).toBeInTheDocument();
+    // Unlabelled product: the extractor names no product, so the row says so
+    // rather than guessing one.
+    expect(within(panel).getAllByText('Unknown product').length).toBeGreaterThan(0);
   });
 
-  it('explains the staleness rule in the UI', async () => {
+  it("explains what the page can't see, in plain words", async () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     expect(
-      screen.getByText(/only recalculates a colony's data when it's opened in the EVE client/)
+      screen.getByText(/the game only updates a colony's storage and extractors/)
     ).toBeInTheDocument();
   });
 
-  it('reads a colony with no readable extraction program as unknown, never blank', async () => {
+  it('reads a colony with no readable extraction program as unknown storage, never blank', async () => {
     // The fixture's one extractor pin carries no install-time baseline, so
-    // `colonyHoursToFull` cannot measure it — the row must still say so
-    // rather than showing nothing, which a pilot could misread as "safe".
+    // `colonyHoursToFull` cannot measure it: the row must still say so rather
+    // than showing nothing, which a pilot could misread as "safe".
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('Storage full in: unknown')).toBeInTheDocument();
+    expect(within(panel).getByText("Can't tell yet")).toBeInTheDocument();
   });
 
-  it('gives the expiry and fill-time cells a title attribute so their text is readable when the cell truncates', async () => {
+  it('leads with the next thing to do, and when to log in', async () => {
     render(<App />);
-    const panel = await colonyPanelFor(/Jita IV/);
-    const expiryCell = within(panel).getByText('Unknown product · Stopped');
-    expect(expiryCell).toHaveAttribute('title', 'Unknown product · Stopped');
-    const fillTimeCell = within(panel).getByText('Storage full in: unknown');
-    expect(fillTimeCell).toHaveAttribute('title', 'Storage full in: unknown');
+    await colonyPanelFor(/Jita IV/);
+    const heading = screen.getByRole('heading', { name: "Today's check" });
+    const today = heading.closest('section');
+    if (!(today instanceof HTMLElement)) throw new Error('no Today panel');
+    // The one stopped colony is due now.
+    expect(within(today).getByText(/^Restart Jita IV/)).toBeInTheDocument();
+    expect(within(today).getByText('Log in next')).toBeInTheDocument();
+    expect(within(today).getByText('Now')).toBeInTheDocument();
+    expect(within(today).getAllByText('Stopped').length).toBeGreaterThan(0);
+    // Display only: the planet strip is not a row of controls.
+    expect(within(today).queryAllByRole('button', { name: /Jita IV/ })).toHaveLength(0);
+  });
+
+  it('names the haul cadence beside the log-in time, and changes it from there', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const today = screen
+      .getByRole('heading', { name: "Today's check" })
+      .closest('section') as HTMLElement;
+    await user.click(within(today).getByRole('combobox', { name: 'You haul' }));
+    await user.click(await screen.findByRole('option', { name: 'once a week' }));
+    await waitFor(() =>
+      expect(within(today).getByRole('combobox', { name: 'You haul' })).toHaveTextContent(
+        'once a week'
+      )
+    );
   });
 
   it('shows the empty state when there are no colonies', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
     render(<App />);
-    expect(await screen.findByText('No planetary colonies')).toBeInTheDocument();
+    expect(await screen.findByText('No colonies yet')).toBeInTheDocument();
+    // The way out: Plan, where "what should I build" lives.
+    expect(screen.getByRole('link', { name: /Find the best thing to build/ })).toHaveAttribute(
+      'href',
+      '/planetary-industry/plan'
+    );
   });
 
   it('shows a re-login prompt when the planets scope itself was revoked', async () => {
@@ -445,7 +484,9 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
 
     // The banner is not a substitute for the panel: both render.
-    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText('Log in again to see your colonies')).length
+    ).toBeGreaterThan(0);
     const toggle = await screen.findByRole('button', { name: /show \d+ alt/i });
 
     const user = userEvent.setup();
@@ -453,25 +494,44 @@ describe('PlanetaryIndustry', () => {
     // No `universe/planets/{id}` mock is registered for the alt's planet in
     // this test, so it renders its "Planet #id" fallback — a real row for a
     // real (if unnamed) colony, not an error state.
-    const altRow = screen.getByRole('button', { name: new RegExp(`Planet #${ALT_PLANET_ID}`) });
+    const altRow = screen.getByRole('button', {
+      name: new RegExp(`^Show details for Planet #${ALT_PLANET_ID}`),
+    });
     expect(altRow).toHaveAttribute('aria-expanded', 'false');
 
     // Expanding an alt's row exercises the composite `${characterId}:${planetId}`
     // key and DOM ids end to end, not just that the row renders collapsed.
     await user.click(altRow);
     expect(altRow).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('region')).toBeInTheDocument();
+    expect(within(coloniesPanel()).getByRole('region')).toBeInTheDocument();
   });
 
-  it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
+  it("opens a colony's ⋮ menu by right-click on the row too, but leaves its links to the browser", async () => {
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    const row = within(panel)
+      .getByRole('button', { name: /^Show details for / })
+      .closest('[data-colony-status] > div');
+    if (!row) throw new Error('no row');
+    // A right-click on the planet link stays the browser's link menu (DESIGN.md §6c "Entities").
+    const link = within(panel).getAllByRole('link')[0];
+    const onLink = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    link.dispatchEvent(onLink);
+    expect(onLink.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    expect(await screen.findByRole('menuitem', { name: 'Hide details' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Plan this colony' })).toBeInTheDocument();
+  });
+
+  it('leaves both yield figures blank for an extractor with no install-time baseline', async () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     // The fixture's pin has an expiry but no qty_per_cycle/cycle_time/
-    // install_time, so Banked and Reset now are em-dashed — never a zero,
-    // which would read as "this program has produced nothing" — and the
-    // summary row's own product cell is a third dash, since this fixture has
-    // no factory pins at all.
-    expect(within(panel).getAllByText('—')).toHaveLength(3);
+    // install_time, so Banked and Reset now are em-dashed, never a zero, which
+    // would read as "this program has produced nothing".
+    const region = within(panel).getByRole('region');
+    expect(within(region).getAllByText('—')).toHaveLength(2);
     expect(within(panel).queryByText('0 (0%)')).not.toBeInTheDocument();
   });
 
@@ -484,16 +544,12 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
-    expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
-    // Scoped to the drilldown region, not the whole row: the summary row's
-    // own product cell reads "—" too, since this fixture has no factory
-    // pins — this assertion is about the extraction card having no blanks,
-    // not about the row.
+    expect(within(panel).getByText('+793,859 units/day')).toBeInTheDocument();
     const region = within(panel).getByRole('region');
     expect(within(region).queryByText('—')).not.toBeInTheDocument();
   });
 
-  it('flags a colony whose extractors are all past the efficient window as decayed', async () => {
+  it('flags a colony whose extractors are all past the efficient window as needing a look', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(decayedDetailPayload)
@@ -502,28 +558,39 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     // Five days in, a trailing day of output runs at ~24% of the program's
-    // first day — under EFFICIENT_WINDOW_FRACTION — while expiry is still nine
-    // days out, so this is neither idle nor expiring-soon.
-    expect(within(panel).getByText('Decayed')).toBeInTheDocument();
+    // first day, under EFFICIENT_WINDOW_FRACTION, while expiry is still nine
+    // days out: neither stopped nor expiring soon, but worth a trip.
+    expect(panel).toHaveAttribute('data-colony-status', 'needs-look');
+    expect(within(panel).getByText('Needs a look')).toBeInTheDocument();
+    expect(within(panel).getByText(/slowed to \d+% of its first day/)).toBeInTheDocument();
     expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
-    expect(within(panel).queryByText('Stopped')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('Stopped', { selector: 'span' })).not.toBeInTheDocument();
   });
 
-  it('leaves a colony one day into its program healthy, not decayed', async () => {
+  it('leaves a colony one day into its program healthy, not needing a look', async () => {
     // The regression #316 exists for: on the old per-cycle read this colony
     // wore the badge four hours in, with 6% of a fortnight's output banked.
+    // With a launchpad to hold it: a colony with nowhere to store anything
+    // fills at once, which is its own "needs a look".
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
-        HttpResponse.json(agedDetailPayload)
+        HttpResponse.json({
+          ...agedDetailPayload,
+          pins: [
+            ...agedDetailPayload.pins,
+            { pin_id: 3, type_id: 2256, latitude: 0.5, longitude: 0.9 },
+          ],
+        })
       )
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
+    expect(panel).toHaveAttribute('data-colony-status', 'healthy');
     expect(within(panel).getByText('Healthy')).toBeInTheDocument();
-    expect(within(panel).queryByText('Decayed')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('Needs a look')).not.toBeInTheDocument();
   });
 
-  it('titles the extraction card by its product, not by the extractor pin type', async () => {
+  it('names each extractor by its product, as a link to its PI detail, not by the extractor pin type', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(decayedDetailPayload)
@@ -531,11 +598,14 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
+    const region = within(panel).getByRole('region');
     // "Extractor Control Unit" (the pin type) reads identically on every
-    // extractor and identifies nothing; the resolved product is what
-    // actually names the card, so it — not the pin type — is the heading.
-    expect(within(panel).getByText('Felsic Magma').closest('h3')).toBeInTheDocument();
-    expect(within(panel).getByText('Extractor Control Unit').closest('h3')).not.toBeInTheDocument();
+    // extractor and identifies nothing; the resolved product is what names it.
+    expect(within(region).getByRole('link', { name: 'Felsic Magma' })).toHaveAttribute(
+      'href',
+      `/planetary-industry/map?product=${PRODUCT_ID}`
+    );
+    expect(within(panel).queryByText('Extractor Control Unit')).not.toBeInTheDocument();
   });
 
   it('groups factory pins into one Production row per schematic, with a facility count', async () => {
@@ -549,25 +619,11 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
+    const region = within(panel).getByRole('region');
     // Two Basic Industry Facility pins running the same schematic collapse
-    // into one row, not two identical dashed rows.
-    expect(within(panel).getByText('Plasmoids')).toBeInTheDocument();
-    expect(within(panel).getByText('2 facilities running')).toBeInTheDocument();
-  });
-
-  it('lists infrastructure pins as chips, not dashed rows', async () => {
-    server.use(
-      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
-        HttpResponse.json(roleCardsDetailPayload)
-      ),
-      http.get(`${ESI}/universe/schematics/${SCHEMATIC_ID}`, () =>
-        HttpResponse.json({ schematic_name: 'Plasmoids', cycle_time: 1800 })
-      )
-    );
-    render(<App />);
-    const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('Infrastructure')).toBeInTheDocument();
-    expect(within(panel).getByText('Storage Facility')).toBeInTheDocument();
+    // into one row, not two identical ones.
+    expect(within(region).getByText('Plasmoids')).toBeInTheDocument();
+    expect(within(region).getByText(/^2×/)).toBeInTheDocument();
   });
 
   it('shows an unknown status rather than a confident Healthy when a colony detail failed to load', async () => {
@@ -576,7 +632,8 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('Unknown')).toBeInTheDocument();
+    expect(panel).toHaveAttribute('data-colony-status', 'unknown');
+    expect(within(panel).getByText('Unknown', { selector: 'span' })).toBeInTheDocument();
     expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
   });
 
@@ -680,6 +737,13 @@ describe('PlanetaryIndustry', () => {
     expect(screen.queryByText('Log in again to see your colonies')).not.toBeInTheDocument();
   });
 
+  it('shows the page banner for a planets refusal another reader recorded', async () => {
+    useAuthFailure.getState().reportRequestFailure(CHAR_ID, 'getCharacterPlanets');
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
+  });
+
   it('keeps the colony view on the default tab, with no URL param needed', async () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
@@ -694,6 +758,8 @@ describe('PlanetaryIndustry', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Plan' }));
 
+    // A pilot with colonies is asked what to do with them; the planner is one answer.
+    await user.click(await screen.findByRole('button', { name: /Make a specific product/ }));
     await screen.findByRole('heading', { name: 'Goals' });
     expect(window.location.pathname).toBe('/planetary-industry/plan');
     // The colony surface is a peer view, not a section below the planner.
@@ -709,12 +775,34 @@ describe('PlanetaryIndustry', () => {
     await waitFor(() => expect(window.location.search).toBe(`?goals=${TRANSMITTER}%3A10`));
   });
 
+  it("keeps the browser's link menu on a goal's name and moves the item menu behind a visible ⋮", async () => {
+    window.history.pushState({}, '', `/planetary-industry/plan?goals=${TRANSMITTER}:10`);
+    render(<App />);
+    await screen.findByLabelText(`${TRANSMITTER_NAME} per day`);
+    const goals = screen.getByRole('list', { name: 'Goals' });
+    const name = within(goals).getByRole('link', { name: TRANSMITTER_NAME });
+    const onName = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    name.dispatchEvent(onName);
+    expect(onName.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+
+    // The × folded into the ⋮ (DESIGN.md §6c: never a destructive × beside a ⋮).
+    expect(
+      within(goals).queryByRole('button', { name: `Remove ${TRANSMITTER_NAME}` })
+    ).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(
+      within(goals).getByRole('button', { name: `More actions for ${TRANSMITTER_NAME}` })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: `Remove ${TRANSMITTER_NAME}` }));
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
   it('drops a ?type= the planner cannot plan rather than seeding it', async () => {
     // Aqueous Liquids is a P0: extracted, never a goal.
     window.history.pushState({}, '', '/planetary-industry/plan?type=2268');
     render(<App />);
 
-    await screen.findByRole('heading', { name: 'Goals' });
     await waitFor(() => expect(window.location.search).toBe(''));
     expect(screen.queryByLabelText(/per day$/)).not.toBeInTheDocument();
   });
@@ -723,8 +811,13 @@ describe('PlanetaryIndustry', () => {
     window.history.pushState({}, '', `/planetary-industry/colonies?colony=${PLANET_ID}`);
     render(<App />);
 
-    const heading = await screen.findByRole('heading', { name: /Jita IV/ });
-    expect(within(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+    const row = (await screen.findByRole('heading', { name: /Jita IV/ })).closest(
+      '[data-colony-status]'
+    ) as HTMLElement;
+    expect(within(row).getByRole('button', { name: /^Show details for / })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
   });
 
   it("plans the URL's goals over the colony: Lift first, then the change list", async () => {
@@ -755,8 +848,10 @@ describe('PlanetaryIndustry', () => {
         'Customs tax (POCO/Skyhook) for Jita IV (applies to all colonies in Jita)'
       )
     ).toHaveValue('6');
+    const flow = screen.getByRole('table', { name: 'Everything the goals need, by tier' });
+    // Its rows' item menu is behind a visible ⋮, not right-click alone (DESIGN.md §6c "Rows").
     expect(
-      screen.getByRole('table', { name: 'Everything the goals need, by tier' })
+      within(flow).getByRole('button', { name: `More actions for ${WATER_NAME}` })
     ).toBeInTheDocument();
   });
 
@@ -773,11 +868,328 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByRole('checkbox', { name: /^Jita IV/ })).toBeDisabled();
   });
 
-  it('falls back to the colony view rather than crashing on a tab it does not know', async () => {
+  it('falls back to the Plan tab rather than crashing on a tab it does not know', async () => {
     window.history.pushState({}, '', '/planetary-industry/nonsense?type=not-a-number');
     render(<App />);
+    await screen.findByRole('heading', { name: 'What do you want to do?' });
+    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens on Plan, with the tabs in Plan, Map, Colonies order', async () => {
+    window.history.pushState({}, '', '/planetary-industry');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'What do you want to do?' });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Plan',
+      'Map',
+      'Colonies',
+    ]);
+    expect(window.location.pathname).toBe('/planetary-industry/plan');
+  });
+
+  it('opens Plan on "Make more from my planets" when the pilot has colonies, and says why', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+    expect(
+      screen.getByText(/Opened “Make more from my planets” because we found 1 colony/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('opens Plan on "Find the best thing to build" when there are no colonies', async () => {
+    server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByText(/You have no colonies yet, so we opened/)).toBeInTheDocument();
+  });
+
+  it('restores the question from ?q= on load', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Find the best thing to build/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('ignores a junk ?q= and opens on the default question', async () => {
+    window.history.pushState({}, '', '/planetary-industry/plan?q=bogus');
+    render(<App />);
+    const option = await screen.findByRole('button', { name: /Make more from my planets/ });
+    expect(option).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('opens the Goal Planner on #customs, and a pick writes ?q= and drops the hash', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan#customs');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    await user.click(screen.getByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.location.hash).toBe('');
+    expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+  });
+
+  it('writes the picked question to ?q= without adding history entries', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/plan');
+    const before = window.history.length;
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /Find the best thing to build/ }));
+    expect(window.location.search).toBe('?q=find-best');
+    expect(window.history.length).toBe(before);
+  });
+
+  it('keeps the Goal Planner behind a ?goals= link, with no picker choice needed', async () => {
+    window.history.pushState({}, '', `/planetary-industry/plan?goals=${WATER}:24`);
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Goals' });
+    expect(
+      screen.getByText('Opened “Make a specific product” because your link names a product.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Make a specific product/ })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.getByLabelText(`${WATER_NAME} per day`)).toHaveValue('24');
+  });
+
+  it('opens the 60-second explainer from "New to PI?" on every tab', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/planetary-industry/colonies');
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'New to PI?' }));
+    expect(
+      await screen.findByRole('dialog', { name: /New to PI\? The 60-second explainer/ })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Skyhook (nullsec only)')).toBeInTheDocument();
+  });
+
+  describe('with hub prices unavailable', () => {
+    const NOTICE = 'Hub prices could not be fetched';
+    beforeEach(() => {
+      vi.mocked(loadPlanPrices).mockResolvedValueOnce({
+        prices: {},
+        buyPrices: {},
+        unpriced: [],
+        failed: true,
+        fetchedAt: new Date(),
+      });
+    });
+
+    it('says so on Plan, with no zero figures', async () => {
+      window.history.pushState({}, '', '/planetary-industry/plan');
+      render(<App />);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+      expect(screen.queryByText(/\+0 ISK/)).toBeNull();
+      expect(screen.queryByText(/Haul 0/)).toBeNull();
+      expect(screen.queryByText(/can't measure this colony/)).toBeNull();
+    });
+
+    it('says so on Map instead of drawing without it', async () => {
+      window.history.pushState({}, '', '/planetary-industry/map');
+      render(<App />);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+    });
+
+    it('says so on Colonies, keeps the status rows, and shows no ISK/day', async () => {
+      render(<App />);
+      const panel = await colonyPanelFor(/Jita IV/);
+      expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+      expect(panel).toHaveAttribute('data-colony-status', 'stopped');
+      expect(screen.queryByText(/0\.00 ISK/)).toBeNull();
+    });
+  });
+
+  describe('when ESI does not answer the planets read (issue #2691)', () => {
+    const NOTICE = "ESI didn't answer";
+    const down = () =>
+      http.get(`${ESI}/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+      );
+
+    it.each([
+      ['plan', '/planetary-industry/plan'],
+      ['map', '/planetary-industry/map'],
+      ['colonies', '/planetary-industry/colonies'],
+    ])(
+      'says so on %s, never "no colonies", and Retry re-reads',
+      async (_tab, path) => {
+        server.use(down());
+        window.history.pushState({}, '', path);
+        const user = userEvent.setup();
+        render(<App />);
+        expect(await screen.findByText(NOTICE, {}, { timeout: 15_000 })).toBeInTheDocument();
+        expect(screen.queryByText('No colonies yet')).toBeNull();
+        expect(screen.queryByText(/no colonies yet/i)).toBeNull();
+        expect(
+          screen.queryByText(/Couldn't load this character's planetary colonies yet/)
+        ).toBeNull();
+        if (_tab === 'map') {
+          expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+        }
+
+        server.resetHandlers();
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByText(NOTICE)).toBeNull(), { timeout: 15_000 });
+      },
+      30_000
+    );
+
+    it('keeps a warm cache on screen instead of the notice', async () => {
+      await db.esiCache.put({
+        characterId: CHAR_ID,
+        key: 'planets',
+        value: planetsPayload,
+        fetchedAt: 1234,
+      });
+      server.use(down());
+      render(<App />);
+      await colonyPanelFor(/Jita IV/);
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+
+    it('still says "no colonies" for an answer that really is empty', async () => {
+      server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
+      render(<App />);
+      expect(await screen.findByText('No colonies yet')).toBeInTheDocument();
+      expect(screen.queryByText(NOTICE)).toBeNull();
+    });
+  });
+
+  it('draws the planet map on the Map tab', async () => {
+    window.history.pushState({}, '', '/planetary-industry/map');
+    render(<App />);
+    expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('The PI map is coming')).toBeNull();
+  });
+
+  describe("a product's PI detail is a URL (?product=)", () => {
+    const BIOFUELS = 2396;
+    const drawer = () => screen.findByRole('dialog', { name: /^(How to make|Where to get) / });
+
+    it('opens the Map with that product drawer open, and a reload reopens it', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      const first = render(<App />);
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Map' })).toHaveAttribute('aria-selected', 'true');
+      first.unmount();
+      render(<App />);
+      expect(within(await drawer()).getByText('Biofuels', { selector: 'div' })).toBeInTheDocument();
+    });
+
+    it('carries View in Market and Show info, the destinations the name link displaced', async () => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      const dialog = await drawer();
+      expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('/market/browser')
+      );
+      expect(within(dialog).getByRole('button', { name: 'Show info' })).toBeInTheDocument();
+    });
+
+    it('closes on Back: a tile click pushes the entry, Back pops it', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/map');
+      render(<App />);
+      const board = await screen.findByRole('group', { name: /^Planet map/ });
+      const tile = within(board).getByRole('link', { name: /^Biofuels\. / });
+      expect(tile).toHaveAttribute('href', `/planetary-industry/map?product=${BIOFUELS}`);
+      await user.click(tile);
+      await drawer();
+      expect(window.location.search).toBe(`?product=${BIOFUELS}`);
+      window.history.back();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(window.location.pathname).toBe('/planetary-industry/map');
+      expect(window.location.search).toBe('');
+    });
+
+    it.each(['999999999', 'abc', '-1'])('ignores a junk product id (%s)', async (junk) => {
+      window.history.pushState({}, '', `/planetary-industry/map?product=${junk}`);
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it("keeps Plan's ?q= beside ?product=: a name on Plan opens the drawer, Back returns to the question", async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/planetary-industry/plan?q=find-best');
+      render(<App />);
+      const link = await waitFor(() => {
+        const found = document.querySelector<HTMLAnchorElement>('main a[href*="product="]');
+        expect(found).not.toBeNull();
+        return found!;
+      });
+      expect(link.getAttribute('href')).toMatch(
+        /^\/planetary-industry\/map\?q=find-best&product=\d+$/
+      );
+      await user.click(link);
+      await drawer();
+      expect(window.location.search).toMatch(/^\?q=find-best&product=\d+$/);
+      window.history.back();
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/plan'));
+      expect(window.location.search).toBe('?q=find-best');
+    });
+
+    it('ignores a junk product id beside ?q=, keeping ?q=', async () => {
+      window.history.pushState({}, '', '/planetary-industry/map?q=find-best&product=abc');
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).toBe('?q=find-best'));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('drops ?product= when a tab switch leaves the Map', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', `/planetary-industry/map?product=${BIOFUELS}`);
+      render(<App />);
+      await drawer();
+      await user.click(screen.getByRole('tab', { name: 'Colonies' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/colonies'));
+      await waitFor(() => expect(window.location.search).not.toContain('product'));
+    });
+
+    it('drops ?planet= when a tab switch leaves the Map', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', `/planetary-industry/map?planet=${PLANET_ID}`);
+      render(<App />);
+      expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
+      await user.click(screen.getByRole('tab', { name: 'Plan' }));
+      await waitFor(() => expect(window.location.pathname).toBe('/planetary-industry/plan'));
+      await waitFor(() => expect(window.location.search).not.toContain('planet'));
+    });
+  });
+
+  it('redirects the retired Advisor URL to Colonies, with no Advisor left on the page', async () => {
+    window.history.pushState({}, '', '/planetary-industry/advisor');
+    render(<App />);
     await colonyPanelFor(/Jita IV/);
-    expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.pathname).toBe('/planetary-industry/colonies');
+    expect(screen.queryByRole('heading', { name: 'Advisor' })).toBeNull();
+    expect(screen.queryByText('Advisor')).toBeNull();
+  });
+
+  it('puts the shared header strip, with the Sell at picker, under the tabs on every tab', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const strip = screen.getByTestId('pi-header-strip');
+    expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
+    expect(within(strip).getByText('Colonies')).toBeInTheDocument();
+  });
+
+  it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('combobox', {
+      name: 'Where do you sell?',
+    });
+    expect(picker).toHaveClass('min-w-40', 'w-auto');
+    expect(picker).not.toHaveClass('w-40');
   });
 
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {
@@ -1002,7 +1414,7 @@ describe('PlanetaryIndustry', () => {
       within(panel).queryByText(new RegExp(`Planet #${ALT_PLANET_ID}`))
     ).not.toBeInTheDocument();
 
-    await user.click(within(panel).getByRole('button', { name: /Amarr III/ }));
-    expect(await within(panel).findByText('Some Product')).toBeInTheDocument();
+    await user.click(within(panel).getByRole('button', { name: 'Show details for Amarr III' }));
+    expect((await within(panel).findAllByText('Some Product')).length).toBeGreaterThan(0);
   });
 });

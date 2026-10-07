@@ -18,7 +18,7 @@ export function fakeItemActions(
     names?: Record<number, string>;
     /** Charge type id -> the `moduleKey`s of the modules that take it. */
     takes?: Record<number, string[]>;
-    /** What a module's "Load charge ▸" lists. */
+    /** What a module's "Load charge" lists. */
     cargoCharges?: number[];
     /** Type id -> the rack it fits; anything absent is no module. */
     racks?: Record<number, CandidateRack>;

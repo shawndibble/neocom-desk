@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, Modal, type DataTableColumn } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  entityLinkClassName,
+  Modal,
+  type DataTableColumn,
+} from '@/components/ui';
 import type { Appraisal, AppraisalRow } from '@/engine/market/appraisal';
 import { multibuyText } from '@/engine/market/haulingPlan';
 import { useMarketHub } from '@/features/market/hub';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -32,7 +39,16 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
     value === null ? '—' : t('fittings.stats.unit.isk', { value: formatIsk(value) });
 
   const columns: DataTableColumn<AppraisalRow>[] = [
-    { id: 'name', header: t('fittings.appraisal.item'), render: (row) => row.name },
+    {
+      id: 'name',
+      header: t('fittings.appraisal.item'),
+      className: 'min-w-32 break-words',
+      render: (row) => (
+        <MarketItemLink typeId={row.typeId} className={entityLinkClassName()}>
+          {row.name}
+        </MarketItemLink>
+      ),
+    },
     {
       id: 'quantity',
       header: t('fittings.appraisal.quantity'),
@@ -79,6 +95,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
           rowKey={(row) => row.typeId}
           label={t('fittings.appraisal.tableLabel')}
           density="compact"
+          responsive="table"
         />
         <div className="flex justify-between gap-2 border-t border-line pt-2 text-sm font-semibold">
           <span>{t('fittings.appraisal.total')}</span>

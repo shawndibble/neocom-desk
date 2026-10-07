@@ -1,6 +1,17 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { HintText } from '@/components/ui/HintText';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  Fragment,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Navigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
   Caret,
@@ -13,6 +24,7 @@ import {
   FilterChip,
   IconButton,
   InfoTooltip,
+  IskAmount,
   MenuItem,
   MultiSelect,
   Panel,
@@ -23,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  Tooltip,
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
@@ -55,7 +66,6 @@ import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
-import { MarketItemLink } from './MarketItemLink';
 import { OpenOrdersList } from './OpenOrdersList';
 import { isOffHubStation } from './hubStation';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
@@ -417,8 +427,8 @@ export function OpenOrdersPanel() {
               sortValue: (row) => row.typeName,
               render: (row) => (
                 <span className="flex flex-wrap items-center gap-1">
-                  <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
+                  <span className={entityLinkClassName()}>{row.typeName}</span>
+                  {showCharacterStrip && <CharacterBadge characterName={row.characterName} />}
                 </span>
               ),
             },
@@ -433,14 +443,9 @@ export function OpenOrdersPanel() {
                     {row.stationName === null ? (
                       t('market.unknownStructure')
                     ) : (
-                      <Tooltip content={row.stationName} openOnTap>
-                        <span
-                          tabIndex={0}
-                          className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                        >
-                          {stationShortName(row.stationName)}
-                        </span>
-                      </Tooltip>
+                      <HintText content={row.stationName}>
+                        {stationShortName(row.stationName)}
+                      </HintText>
                     )}
                   </span>
                   {isOffHubStation(row.stationName, row.locationId) && (
@@ -504,15 +509,6 @@ export function OpenOrdersPanel() {
                 row.expiry
                   ? new Date(row.expiry.expiresAt).toLocaleDateString()
                   : t('common.unknown'),
-            },
-            {
-              id: 'details',
-              header: t('market.orders.details'),
-              render: (row) => (
-                <Button size="sm" onClick={() => setDetailOrderId(row.orderId)}>
-                  {t('market.orders.details')}
-                </Button>
-              ),
             },
           ],
     [isPhone, t, showCharacterStrip]
@@ -629,9 +625,7 @@ export function OpenOrdersPanel() {
   const visibleColumns = columns.filter(
     (column) =>
       (column.id !== 'floor' || hasFloorData) &&
-      (column.id === 'item' ||
-        column.id === 'details' ||
-        isColumnVisible(column.id as OpenOrderColumnId))
+      (column.id === 'item' || isColumnVisible(column.id as OpenOrderColumnId))
   );
   // Only for `ColumnPickerMenu`'s labels — built from the same definitions
   // `columns` already carries, not a second copy of them. Empty on a phone
@@ -1033,7 +1027,11 @@ export function OpenOrdersPanel() {
                         type="button"
                         aria-expanded={!folded}
                         onClick={toggle}
-                        className="flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
+                        className={cx(
+                          'flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase md:min-h-0',
+                          rowInteractiveClassName,
+                          focusRingInsetClassName
+                        )}
                       >
                         <Caret expanded={!folded} />
                         {groupTitle} · {group.rows.length}
@@ -1091,6 +1089,7 @@ export function OpenOrdersPanel() {
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
                       rowMoreActions
+                      onRowClick={(row) => setDetailOrderId(row.orderId)}
                       label={`${groupTitle} · ${group.rows.length}`}
                       highlightRowKey={highlightId}
                     />
@@ -1101,13 +1100,9 @@ export function OpenOrdersPanel() {
           )}
 
           <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-            <button
-              type="button"
-              className={textActionClassName()}
-              onClick={() => setLegendOpen(true)}
-            >
+            <Button size="sm" onClick={() => setLegendOpen(true)}>
               {t('market.orders.legendOpen')}
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -1171,10 +1166,16 @@ function groupHeaderLine(
     showCharacters,
     t,
   }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
-): string {
-  const parts: string[] = [t(`market.orders.group.${problem}Hint`)];
+): ReactNode {
+  const parts: ReactNode[] = [t(`market.orders.group.${problem}Hint`)];
   if (summary) {
-    parts.push(t('market.orders.groupSummaryIsk', { isk: formatIskCompact(summary.iskTiedUp) }));
+    parts.push(
+      <Trans
+        key="isk"
+        i18nKey="market.orders.groupSummaryIsk"
+        components={{ isk: <IskAmount value={summary.iskTiedUp} /> }}
+      />
+    );
     if (summary.worstGapPct !== null) {
       parts.push(t('market.orders.groupSummaryWorst', { pct: summary.worstGapPct.toFixed(1) }));
     }
@@ -1182,5 +1183,10 @@ function groupHeaderLine(
       parts.push(summary.byCharacter.map((s) => `${s.characterName} ${s.count}`).join(', '));
     }
   }
-  return parts.join(' \u00b7 ');
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && ' \u00b7 '}
+      {part}
+    </Fragment>
+  ));
 }

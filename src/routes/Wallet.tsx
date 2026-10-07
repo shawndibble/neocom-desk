@@ -10,19 +10,24 @@ import {
   EmptyState,
   IconButton,
   InfoTooltip,
-  MenuItem,
   PageHeader,
   Panel,
   Spinner,
+  RowCaret,
   Tabs,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
+import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
+import { linkedRefIds } from '@/features/miningTax/paymentLinks';
 import {
   loadWalletBalanceWithStatus,
-  loadWalletJournal,
+  loadWalletJournalWithStatus,
   loadWalletTransactions,
   loadAllCharactersWalletBalances,
   totalWalletBalance,
@@ -31,7 +36,6 @@ import {
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -104,6 +108,8 @@ interface Snapshot {
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   balanceNeedsReauth: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  journalNeedsReauth: boolean;
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
@@ -116,13 +122,14 @@ async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, loyaltyStatus] = await Promise.all([
+  const [balanceStatus, journalStatus, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
-    loadWalletJournal(characterId),
+    loadWalletJournalWithStatus(characterId),
     loadCharacterLoyaltyPoints(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
+  const { cached: journalResult, needsReauth: journalNeedsReauth } = journalStatus;
   const journalTruncated = journalResult?.truncated ?? false;
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   const corporationIds = signal.cancelled
@@ -133,6 +140,7 @@ async function loadWalletSnapshot(
     balanceResult,
     balanceNeedsReauth,
     journalResult,
+    journalNeedsReauth,
     journalTruncated,
     loyaltyResult,
     loyaltyNeedsReauth,
@@ -295,6 +303,7 @@ export function Wallet() {
   const balanceResult = data?.balanceResult ?? null;
   const balanceNeedsReauth = data?.balanceNeedsReauth ?? false;
   const journalResult = data?.journalResult ?? null;
+  const journalNeedsReauth = data?.journalNeedsReauth ?? false;
   const journalTruncated = data?.journalTruncated ?? false;
   const loyaltyResult = data?.loyaltyResult ?? null;
   const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
@@ -319,12 +328,14 @@ export function Wallet() {
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        // A real link as well as the row click: the row alone has no link
-        // role or name, so keyboard and screen-reader users could not tell
-        // it leads to the LP Store. DataTable ignores row clicks that land on
-        // a link, so the two never double-navigate.
+        // The row navigates to the LP Store (§6c): the name is its accent
+        // link, the caret column closes the row. Show Info for the corporation
+        // is on the LP Store page header.
         render: (entry) => (
-          <Link to={`/market/lp-store/${entry.corporation_id}`} className="hover:text-accent">
+          <Link
+            to={`/market/lp-store/${entry.corporation_id}`}
+            className={entityLinkClassName('group')}
+          >
             {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
           </Link>
         ),
@@ -338,6 +349,12 @@ export function Wallet() {
         className: 'tabular-nums font-semibold',
         render: (entry) => entry.loyalty_points.toLocaleString(),
         sortValue: (entry) => entry.loyalty_points,
+      },
+      {
+        id: 'go',
+        header: '',
+        align: 'right',
+        render: () => <RowCaret />,
       },
     ],
     [t, corporationNames]
@@ -353,7 +370,7 @@ export function Wallet() {
       {
         id: 'character',
         header: t('wallet.balanceCharacterColumn'),
-        primary: true,
+        stickyStart: true,
         sortValue: (row) => row.characterName,
         render: (row) => row.characterName,
       },
@@ -390,10 +407,35 @@ export function Wallet() {
     [personalTransactions]
   );
   const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
+  // Journal lines a pilot linked to a Moon Mining Tax payment get a way back
+  // to the tax row they settled. Every character's Assignments, since the
+  // journal can show any of them.
+  const taxLinks = useLiveQuery(
+    async () => linkedRefIds(await db.miningTaxAssignments.toArray()),
+    [],
+    undefined
+  );
+  const miningTaxHrefFor = useCallback(
+    (entry: WalletJournalEntry) => {
+      if (!taxLinks) return undefined;
+      if (taxLinks.journal.has(entry.id)) {
+        return miningTaxPaymentHref({ kind: 'journal', id: entry.id });
+      }
+      if (
+        entry.context_id_type === 'contract_id' &&
+        entry.context_id !== undefined &&
+        taxLinks.contract.has(entry.context_id)
+      ) {
+        return miningTaxPaymentHref({ kind: 'contract', id: entry.context_id });
+      }
+      return undefined;
+    },
+    [taxLinks]
+  );
   const buildJournalColumns = useJournalColumnsBuilder();
   const journalColumns = useMemo(
-    () => buildJournalColumns(personalLinkFor, personalNameFor),
-    [buildJournalColumns, personalLinkFor, personalNameFor]
+    () => buildJournalColumns(personalLinkFor, personalNameFor, miningTaxHrefFor),
+    [buildJournalColumns, personalLinkFor, personalNameFor, miningTaxHrefFor]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
@@ -583,6 +625,7 @@ export function Wallet() {
                       rowKey={(row) => row.characterId}
                       sort={balanceSortProps.sort}
                       onSortChange={balanceSortProps.onSortChange}
+                      responsive="table"
                     />
                   )}
                 </>
@@ -631,7 +674,17 @@ export function Wallet() {
               {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
                 <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
-              {journal.length === 0 ? (
+              {journalNeedsReauth ? (
+                <div className="mt-4">
+                  <GrantBanner
+                    characterId={activeCharacterId}
+                    endpoints={['getCharacterWalletJournal']}
+                    title={t('wallet.reauthTitle')}
+                    hint={t('wallet.reauthHint')}
+                    actionLabel={t('wallet.reauthAction')}
+                  />
+                </div>
+              ) : journal.length === 0 ? (
                 <CachedEmptyState
                   result={journalResult}
                   title={t('wallet.journalEmptyTitle')}
@@ -711,23 +764,8 @@ export function Wallet() {
                 sort={loyaltySortProps.sort}
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
+                rowClassName={() => 'group'}
                 onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
-                rowMoreActions
-                rowContextMenu={(entry, tr) => (
-                  <CorpHistoryContextMenu
-                    corporationId={entry.corporation_id}
-                    name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-                    leadingItems={
-                      <MenuItem
-                        onSelect={() => navigate(`/market/lp-store/${entry.corporation_id}`)}
-                      >
-                        {t('loyalty.openStore')}
-                      </MenuItem>
-                    }
-                  >
-                    {tr}
-                  </CorpHistoryContextMenu>
-                )}
               />
             )}
           </Panel>
@@ -740,7 +778,10 @@ export function Wallet() {
             <span className="flex items-center gap-2">
               <Link
                 to="/market/history/transactions"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
+                className={cx(
+                  'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
+                  inlineLinkClassName
+                )}
               >
                 {t('wallet.transactionsLink')}
               </Link>
@@ -753,7 +794,17 @@ export function Wallet() {
             </span>
           }
         >
-          {!journalResult || journal.length === 0 ? (
+          {journalNeedsReauth ? (
+            <div className="p-3">
+              <GrantBanner
+                characterId={activeCharacterId}
+                endpoints={['getCharacterWalletJournal']}
+                title={t('wallet.reauthTitle')}
+                hint={t('wallet.reauthHint')}
+                actionLabel={t('wallet.reauthAction')}
+              />
+            </div>
+          ) : !journalResult || journal.length === 0 ? (
             <CachedEmptyState
               result={journalResult}
               title={t('wallet.journalEmptyTitle')}

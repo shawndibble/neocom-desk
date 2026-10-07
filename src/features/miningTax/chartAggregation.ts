@@ -18,9 +18,9 @@ export interface DailyMetricPoint {
 }
 
 /**
- * One point per day in `dates`, each day's known m³ divided by 24 — the same
- * "sum for the day, divide by calendar hours" convention `dailyRate` uses for
- * ISK/hr (see the range's decision doc). A day mixing known- and
+ * One point per day in `dates`, each day's known m³ total. The ledger has no
+ * time of day, so no honest per-hour figure exists (see the range's decision
+ * doc). A day mixing known- and
  * unknown-volume lines sums only the known ones; a day with none known reads
  * as a true 0, not a hidden bar.
  */
@@ -39,10 +39,10 @@ export function dailyVolumePoints(
     );
     byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + m3);
   }
-  return dates.map((date) => ({ date, value: (byDate.get(date) ?? 0) / 24 }));
+  return dates.map((date) => ({ date, value: byDate.get(date) ?? 0 }));
 }
 
-/** Same calendar-hour convention as `dailyVolumePoints`, for item quantity instead of m³. */
+/** Same per-day total as `dailyVolumePoints`, for item quantity instead of m³. */
 export function dailyCountPoints(
   rows: readonly MiningYieldRow[],
   dates: readonly string[]
@@ -51,7 +51,7 @@ export function dailyCountPoints(
   for (const row of rows) {
     byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + sumUnits(row.entry.oreLines));
   }
-  return dates.map((date) => ({ date, value: (byDate.get(date) ?? 0) / 24 }));
+  return dates.map((date) => ({ date, value: byDate.get(date) ?? 0 }));
 }
 
 /**

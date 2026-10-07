@@ -21,7 +21,6 @@ import {
   loadWorkbenchFits,
   mergeWorkbenchParts,
   resetWorkbenchFitsCache,
-  workbenchFitUrl,
   workbenchPartCount,
   type WorkbenchFit,
 } from './workbenchFits';
@@ -120,11 +119,5 @@ describe('loadWorkbenchFits', () => {
     syncConfigured.value = false;
     expect(await loadWorkbenchFits(626)).toEqual({ ok: false });
     expect(getDocMock).not.toHaveBeenCalled();
-  });
-});
-
-describe('workbenchFitUrl', () => {
-  it("links the fit's page on eveworkbench.com", () => {
-    expect(workbenchFitUrl('cc7c9893-6e13')).toBe('https://eveworkbench.com/fit/cc7c9893-6e13');
   });
 });

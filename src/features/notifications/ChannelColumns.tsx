@@ -7,10 +7,10 @@
  * The captions matter more than they look: a column of bare checkboxes says
  * nothing about what it does, and the two channels are genuinely
  * independent — an event can raise a browser notification without joining
- * the Overview list, or the reverse.
+ * the Alerts page, or the reverse.
  */
+import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
 import { NOTIFICATION_CHANNELS } from './eventSelection';
 
 /**
@@ -43,23 +43,15 @@ export function ChannelColumnHeadings({ pinned = false }: { pinned?: boolean }) 
       <span aria-hidden="true" className="flex-1" />
       <div className={CHANNEL_COLUMNS}>
         {NOTIFICATION_CHANNELS.map((channel) => (
-          <Tooltip
+          //  HintText is focusable so the hint can be read without a pointer (ADR 0008);
+          // uppercase micro-heading per docs/DESIGN.md §2, matching the Family headers below.
+          <HintText
             key={channel}
             content={t(`settings.notifications.columnHint.${channel}`)}
-            openOnTap
+            className="text-[0.6875rem] leading-tight font-semibold tracking-widest text-text-dim uppercase"
           >
-            {/* `tabIndex` because a Tooltip's trigger has to be focusable to
-                be read without a pointer (`components/ui/Tooltip.tsx`, ADR
-                0008), and the dotted underline is what says there is
-                something to read. Uppercase micro-heading per docs/DESIGN.md
-                §2, matching the Family headers further down. */}
-            <span
-              tabIndex={0}
-              className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-widest text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-            >
-              {t(`settings.notifications.column.${channel}`)}
-            </span>
-          </Tooltip>
+            {t(`settings.notifications.column.${channel}`)}
+          </HintText>
         ))}
       </div>
     </div>
