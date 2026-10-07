@@ -30,6 +30,8 @@ describe('spForLevel', () => {
     expect(spForLevel(16, 5)).toBe(4096000);
     // 1414.21... * 5 = 7071.06 -> 7072
     expect(spForLevel(5, 2)).toBe(7072);
+    // 250 * 2 * 2^2.5 = 2,828.43, rounded up; in-game observation (#2882).
+    expect(spForLevel(2, 2)).toBe(2829);
   });
 
   it('rejects invalid level or rank', () => {

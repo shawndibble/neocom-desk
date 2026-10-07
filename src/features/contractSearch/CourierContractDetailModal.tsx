@@ -48,6 +48,8 @@ import {
   floorShare,
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
+import { LawlessTag } from '@/features/travel/LawlessTag';
+import { useLawlessSystems } from '@/features/travel/useLawlessSystems';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
@@ -237,6 +239,7 @@ export function CourierContractDetailModal({
       : []),
   ];
   const exposure = useRouteExposure(row, preference);
+  const lawless = useLawlessSystems();
   // A same-system haul has a one-system path, which is no trip to review.
   const path = exposure?.kind === 'known' && exposure.path.length > 1 ? exposure.path : null;
   const [showPath, setShowPath] = useState(false);
@@ -396,6 +399,7 @@ export function CourierContractDetailModal({
                       </span>
                     </Tooltip>
                   )}
+                  {lawless.has(system.systemId) && <LawlessTag />}
                 </li>
               ))}
             </ol>

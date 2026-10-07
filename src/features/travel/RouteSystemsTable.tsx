@@ -46,6 +46,7 @@ import { HoleStepLine, type HoleStep } from './HoleStepLine';
 import { shipKillHeatColor } from '@/engine/route/killHeat';
 import { RecentKillsCell, RecentKillsDetail } from './RecentKillsCell';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { LawlessTag } from './LawlessTag';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
@@ -177,6 +178,7 @@ function useColumns(
               {t('travel.chokepoint')}
             </HintText>
           )}
+          {row.lawless && <LawlessTag />}
         </DataTableDenseCell>
       ),
     },

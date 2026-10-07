@@ -211,10 +211,19 @@ function usableOwnedStockLocation(value: unknown): boolean {
 
 function usableOwnedStockScope(value: unknown): value is OwnedStockScope {
   if (typeof value !== 'object' || value === null) return false;
-  const { mode, locations } = value as { mode?: unknown; locations?: unknown };
+  const { mode, locations, excludedContainers } = value as {
+    mode?: unknown;
+    locations?: unknown;
+    excludedContainers?: unknown;
+  };
   if (mode === 'everywhere') return true;
   return (
-    mode === 'selected' && Array.isArray(locations) && locations.every(usableOwnedStockLocation)
+    mode === 'selected' &&
+    Array.isArray(locations) &&
+    locations.every(usableOwnedStockLocation) &&
+    (excludedContainers === undefined ||
+      (Array.isArray(excludedContainers) &&
+        excludedContainers.every((id) => typeof id === 'number' && Number.isFinite(id))))
   );
 }
 

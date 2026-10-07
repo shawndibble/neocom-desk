@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
 import { marketWideOpportunitiesCsvColumns, opportunitiesCsvColumns } from './opportunitiesCsv';
 
@@ -69,9 +69,10 @@ describe('marketWideOpportunitiesCsvColumns', () => {
     marginPct: 62.5,
     seconds: 3600,
     iskPerHour: null,
+    iskPerDay: 48_000,
     buildCost: 1_500_000,
     orderDepth: 'deep',
-  } as unknown as MarketWideResultRow;
+  } as unknown as MarketWideDayRow;
 
   it('orders columns as the table does', () => {
     expect(columns.map((c) => c.header)).toEqual([
@@ -80,6 +81,7 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       'industry.csvMarginPct',
       'industry.csvTimeSeconds',
       'industry.iskPerHour',
+      'industry.iskPerDay',
       'industry.buildCost',
       'industry.opportunitiesOrderDepthLabel',
     ]);
@@ -92,6 +94,7 @@ describe('marketWideOpportunitiesCsvColumns', () => {
       62.5,
       3600,
       null,
+      48_000,
       1_500_000,
       'industry.opportunitiesOrderDepth.deep',
     ]);

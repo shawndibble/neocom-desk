@@ -57,6 +57,19 @@ describe('buildRouteSafetyRows', () => {
     });
   });
 
+  it('flags only the listed lawless systems', () => {
+    const rows = buildRouteSafetyRows(
+      [JITA, PERIMETER, UEDAMA],
+      inputs({ lawless: new Set([PERIMETER]) })
+    );
+    expect(rows.map((row) => row.lawless ?? false)).toEqual([false, true, false]);
+  });
+
+  it('flags nothing without a lawless list', () => {
+    const rows = buildRouteSafetyRows([JITA, PERIMETER], inputs());
+    expect(rows.every((row) => row.lawless === undefined)).toBe(true);
+  });
+
   it('shows security as the game does, rounded to one decimal', () => {
     const [amamake] = buildRouteSafetyRows([AMAMAKE], inputs());
     expect(amamake.security).toBe(0.3);
