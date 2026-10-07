@@ -177,14 +177,17 @@ async function loadContractsSnapshot(
   const issuers = contracts.map(contractIssuer);
   // Receivers share the name map; their kind comes from the resolved category.
   const receiverIds = contracts.flatMap((c) => contractReceiver(c, characterId)?.id ?? []);
+  // Contacts and the names don't depend on the categories, so they run alongside.
+  const contactsPromise = signal.cancelled ? Promise.resolve(null) : loadContacts(characterId);
+  const namesPromise = resolveNames([...issuers.map((i) => i.id), ...receiverIds]);
   const receiverCategories = await resolveCategories(receiverIds);
   const receivers = contracts.flatMap(
     (c) => contractReceiver(c, characterId, receiverCategories) ?? []
   );
   // Only characters have affiliations/standings.
   const [issuerNames, contactsStatus, issuerAffiliations] = await Promise.all([
-    resolveNames([...issuers.map((i) => i.id), ...receivers.map((r) => r.id)]),
-    signal.cancelled ? Promise.resolve(null) : loadContacts(characterId),
+    namesPromise,
+    contactsPromise,
     resolveAffiliations([
       ...issuers.filter((i) => i.kind === 'character').map((i) => i.id),
       ...receivers.filter((r) => r.kind === 'character').map((r) => r.id),
@@ -727,7 +730,11 @@ export function Contracts() {
           }
           issuerStanding={
             contractIssuer(selectedContract).kind === 'character'
-              ? characterStanding(standingIndex, selectedContract.issuer_id, issuerAffiliations)
+              ? characterStanding(
+                  standingIndex,
+                  contractIssuer(selectedContract).id,
+                  issuerAffiliations
+                )
               : null
           }
           receiver={modalReceiver}

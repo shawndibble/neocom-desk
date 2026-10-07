@@ -33,8 +33,9 @@ function assigneeKind(contract: Contract): ContractReceiver['kind'] {
  * Who received a contract: the acceptor once accepted, else the assignee it
  * was offered to. Null for a public/unassigned contract and when the party is
  * the viewing pilot (the Issuer column already covers the other side).
- * An assignee's kind follows availability; ESI's `/universe/names` category
- * isn't cached, and availability says it for any non-public assignment.
+ * With the resolved `/universe/names` category the kind is exact; without it
+ * (not yet resolved, or the lookup failed) an assignee's kind follows
+ * availability and an acceptor is taken for a character.
  */
 export function contractReceiver(
   contract: Contract,

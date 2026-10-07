@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { resolveNames } from './names';
+import { resolveCategories, resolveNames } from './names';
 
 const server = setupServer();
 
@@ -151,5 +151,45 @@ describe('resolveNames — cache writes', () => {
     expect((await db.esiCache.get([0, 'name:3']))?.value).toBe('Carol');
     put.mockRestore();
     bulkPut.mockRestore();
+  });
+});
+
+describe('resolveCategories', () => {
+  it('resolves and caches the category beside the name', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 7, name: 'Some Corp', category: 'corporation' }])
+      )
+    );
+
+    const categories = await resolveCategories([7, 7]);
+
+    expect(categories.get(7)).toBe('corporation');
+    expect((await db.esiCache.get([0, 'category:7']))?.value).toBe('corporation');
+    expect((await db.esiCache.get([0, 'name:7']))?.value).toBe('Some Corp');
+  });
+
+  it('answers from cache with no request', async () => {
+    await db.esiCache.put({ characterId: 0, key: 'category:7', value: 'alliance', fetchedAt: 1 });
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+
+    expect((await resolveCategories([7])).get(7)).toBe('alliance');
+  });
+
+  it('looks up a name cached before categories were stored', async () => {
+    await db.esiCache.put({ characterId: 0, key: 'name:7', value: 'Old', fetchedAt: 1 });
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 7, name: 'Old', category: 'character' }])
+      )
+    );
+
+    expect((await resolveCategories([7])).get(7)).toBe('character');
+  });
+
+  it('leaves the id absent when the lookup fails', async () => {
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+
+    expect((await resolveCategories([7])).has(7)).toBe(false);
   });
 });
