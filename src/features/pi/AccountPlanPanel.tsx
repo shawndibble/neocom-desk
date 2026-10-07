@@ -61,7 +61,7 @@ function Row({
         </p>
       </div>
       <span className="text-xs text-text-dim">
-        {t('piPlan.account.apart')} <IskAmount value={group.apartPerDay} decimals={0} />
+        {t('piPlan.account.apart')} <PerDay value={group.apartPerDay} />
       </span>
       <b className="text-base font-semibold tabular-nums">
         <IskAmount value={group.iskPerDay} decimals={0} />
