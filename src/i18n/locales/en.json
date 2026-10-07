@@ -8391,6 +8391,7 @@
     "searchFirstTitle": "Search to see contract offers",
     "searchFirstHint": "Type an item name or set a filter — a region, a price ceiling or a jump range all count. The offers are downloading in the background.",
     "downloadProgress": "Downloading offers… {{done}} of {{total}}",
+    "downloadStarting": "Downloading offers…",
     "loadingCourier": "Loading courier contracts, this may take a moment.",
     "namingTypes": "Loading item names…",
     "refreshingInBackground": "Refreshing in the background…",

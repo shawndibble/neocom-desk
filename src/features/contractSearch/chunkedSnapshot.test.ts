@@ -47,7 +47,10 @@ function serveDocs(
       'publicCourierContracts/meta',
       withChunkCount ? { lastSyncedAt, chunkCount: chunks.length } : { lastSyncedAt },
     ],
-    ...chunks.map((rows, i) => [`publicCourierContracts/${chunkDocId(i)}`, { rows }] as const),
+    ...chunks.map(
+      (rows, i) =>
+        [`publicCourierContracts/${chunkDocId(i)}`, { rows, publishedAt: lastSyncedAt }] as const
+    ),
   ]);
   getDoc.mockImplementation(async (ref: { path: string }) => ({ data: () => data.get(ref.path) }));
 }
@@ -108,23 +111,53 @@ describe('loadChunkedSnapshot', () => {
     expect(useChunkProgressStore.getState().byKey[SOURCE.cacheKey]).toBeUndefined();
   });
 
-  it('re-reads once when a publish lands mid-read', async () => {
-    serveDocs(1, [[{ id: 'old' }]]);
-    const base = getDoc.getMockImplementation()!;
-    let metaReads = 0;
+  it('re-reads once when a chunk belongs to a newer publish than the meta it began with', async () => {
+    // First pass: meta says 1, but chunk 1 was already rewritten by publish 2.
+    let pass = 0;
     getDoc.mockImplementation(async (ref: { path: string }) => {
       if (ref.path.endsWith('/meta')) {
-        metaReads += 1;
-        // Second read (the post-check) sees a newer publish; later reads settle.
-        if (metaReads === 2) return { data: () => ({ lastSyncedAt: 2, chunkCount: 1 }) };
-        if (metaReads >= 3) return { data: () => ({ lastSyncedAt: 2, chunkCount: 1 }) };
+        pass += 1;
+        return { data: () => ({ lastSyncedAt: pass === 1 ? 1 : 2, chunkCount: 2 }) };
       }
-      return base(ref);
+      const stamp = pass === 1 && ref.path.endsWith('chunk-0001') ? 2 : pass;
+      return { data: () => ({ rows: [{ id: `${ref.path}@${stamp}` }], publishedAt: stamp }) };
     });
 
     const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
 
     expect(result.cached?.data.lastSyncedAt).toBe(2);
+    expect(result.cached?.data.rows.map((r) => r.id)).toEqual([
+      'publicCourierContracts/chunk-0000@2',
+      'publicCourierContracts/chunk-0001@2',
+    ]);
+  });
+
+  it('accepts a chunk with no stamp, as written before stamps existed', async () => {
+    getDoc.mockImplementation(async (ref: { path: string }) => ({
+      data: () =>
+        ref.path.endsWith('/meta')
+          ? { lastSyncedAt: 4, chunkCount: 1 }
+          : { rows: [{ id: 'legacy' }] },
+    }));
+
+    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+
+    expect(result.cached?.data.rows).toEqual([{ id: 'legacy' }]);
+    expect(getDoc).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops reading and clears progress when a chunk read fails', async () => {
+    getDoc.mockImplementation(async (ref: { path: string }) => {
+      if (ref.path.endsWith('/meta')) return { data: () => ({ lastSyncedAt: 1, chunkCount: 40 }) };
+      throw new Error('unavailable');
+    });
+
+    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+
+    expect(result.cached).toBeNull();
+    // Six workers each hit one failure at most; none keeps walking the rest.
+    expect(getDoc.mock.calls.length).toBeLessThanOrEqual(1 + 6);
+    expect(useChunkProgressStore.getState().byKey[SOURCE.cacheKey]).toBeUndefined();
   });
 
   it('falls back to one whole-collection read when meta has no chunk count', async () => {

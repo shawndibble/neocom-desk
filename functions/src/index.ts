@@ -64,6 +64,7 @@ import {
   accumulateRequestedPlex,
   chunkDocId,
   buildContractOfferIndex,
+  chunkDocData,
   chunkRows,
   compactContractOfferRow,
   courierContractFrom,
@@ -344,10 +345,14 @@ async function writeChunkedSnapshot<Row>(
   const metaRef = collection.doc(snapshot.metaDoc);
   const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
 
+  // Fixed before the first write and stamped on every chunk, then reused as
+  // `meta.lastSyncedAt` and the index's: a reader that finds a chunk from a
+  // different publish than the `meta` it began with knows it read across one.
+  const publishedAt = Date.now();
   const chunks = chunkRows(rows, snapshot.chunkSize);
   const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = chunks.map((chunk, index) => {
     const ref = collection.doc(chunkDocId(index));
-    return (batch) => batch.set(ref, { rows: chunk });
+    return (batch) => batch.set(ref, chunkDocData(chunk, publishedAt));
   });
   for (let i = chunks.length; i < previousChunkCount; i += 1) {
     const ref = collection.doc(chunkDocId(i));
@@ -355,13 +360,12 @@ async function writeChunkedSnapshot<Row>(
   }
   await commitInPages(db, ops, snapshot.chunkDocsPerBatch);
 
-  const lastSyncedAt = Date.now();
   await metaRef.set({
-    lastSyncedAt,
+    lastSyncedAt: publishedAt,
     chunkCount: chunks.length,
     rowCount: rows.length,
   });
-  return lastSyncedAt;
+  return publishedAt;
 }
 
 const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {

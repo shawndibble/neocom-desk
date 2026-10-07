@@ -24,10 +24,19 @@ _Recorded 2026-10-07 · issue #2921._
   at the end. A snapshot whose `meta` carries no `chunkCount` (published before
   it was recorded) falls back to the old one-query read, with an indeterminate
   bar.
-- **`meta` is re-read after the chunks and the read retried once if it moved.**
-  The writer replaces chunks one by one and `meta` last, so a publish landing
-  mid-read would otherwise hand back chunks from two cycles. The collection
-  query was close to atomic; per-doc reads are not.
+- **Every chunk doc is stamped with the publish it belongs to
+  (`publishedAt`), and readers compare it, not `meta`.** The writer replaces
+  chunks in batches and writes `meta` last, so for the length of a publish
+  `meta` still names the previous one while the chunks are already new —
+  re-reading `meta` afterwards proves nothing, and the old one-query read was
+  never atomic either. The writer now fixes one `publishedAt` before the first
+  write and uses it for every chunk, `meta.lastSyncedAt` and the index. The
+  full read retries once if any chunk's stamp differs from the `meta` it began
+  with (an unstamped chunk predates the stamp and is accepted); an early read
+  rejects any chunk whose stamp is not the index's.
+- **Speed is unmeasured.** ~126 per-doc reads replace one streaming query; the
+  six-way concurrency is expected to match or beat it, but no cold-load
+  comparison was run against the live collection.
 - **Not done here:** the Courier board is unchanged (one chunk doc, nothing to
   prompt for), and BPC Sourcing keeps its whole-collection read.
 - **The snapshot is sorted by item type, and an index doc records where each
@@ -46,13 +55,13 @@ _Recorded 2026-10-07 · issue #2921._
   doc there would crash them. The index write also never fails a sync run: it
   is an optimisation, logged on failure, and a client with no index waits for
   the full snapshot as before.
-- **An early read is trusted only while the index still describes what is
-  published.** The index and `meta` both carry `lastSyncedAt`; the reader
-  checks `meta` before and after fetching the chunks and returns nothing if it
-  moved, so a publish landing mid-search cannot hand back rows from the wrong
-  layout. A search whose types span more than 12 chunks, or that names no type
-  (price, region or jump range alone), waits for the full download, which is
-  already running. Chunk docs are memoised per publish cycle.
+- **An early read is trusted only if its chunks belong to the index's
+  publish.** Each chunk it fetches must carry the index's `lastSyncedAt`;
+  otherwise the read returns nothing and the board waits for the full
+  download, which is already running. A search whose types span more than 12
+  chunks, or that names no type (price, region or jump range alone), also
+  waits for it. Chunk docs are memoised per publish cycle, and a mismatched
+  chunk is not memoised.
 - **The early rows are a stand-in, not a second source of truth.** Names,
   region options, locations and the table read `rows`, which is the early rows
   until the full snapshot lands and the full rows after, so nothing downstream

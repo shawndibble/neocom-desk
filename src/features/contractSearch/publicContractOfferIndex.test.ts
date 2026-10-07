@@ -26,9 +26,18 @@ function serve(published: { lastSyncedAt: number }, indexDoc: unknown) {
   const docs = new Map<string, unknown>([
     ['publicContractOffersIndex/types', indexDoc],
     ['publicContractOffers/meta', published],
-    ['publicContractOffers/chunk-0000', { rows: [row(34, 1), row(35, 2)] }],
-    ['publicContractOffers/chunk-0001', { rows: [row(35, 3), row(36, 4)] }],
-    ['publicContractOffers/chunk-0002', { rows: [row(37, 5)] }],
+    [
+      'publicContractOffers/chunk-0000',
+      { rows: [row(34, 1), row(35, 2)], publishedAt: published.lastSyncedAt },
+    ],
+    [
+      'publicContractOffers/chunk-0001',
+      { rows: [row(35, 3), row(36, 4)], publishedAt: published.lastSyncedAt },
+    ],
+    [
+      'publicContractOffers/chunk-0002',
+      { rows: [row(37, 5)], publishedAt: published.lastSyncedAt },
+    ],
   ]);
   getDoc.mockImplementation(async (ref: { path: string }) => ({ data: () => docs.get(ref.path) }));
 }
@@ -120,8 +129,19 @@ describe('loadOffersForTypes', () => {
     expect(chunkReads()).toEqual(['publicContractOffers/chunk-0000']);
   });
 
-  it('is null when a newer publish has replaced what the index describes', async () => {
+  it('is null when a chunk belongs to a newer publish than the index describes', async () => {
+    // The chunks are already publish 200; the index still describes 100.
     serve({ lastSyncedAt: 200 }, INDEX_DOC);
+
+    expect(await loadOffersForTypes(parseOfferIndex(INDEX_DOC), new Set([34]), 7)).toBeNull();
+  });
+
+  it('is null for a chunk with no stamp, which predates the writer that makes an index', async () => {
+    serve({ lastSyncedAt: 100 }, INDEX_DOC);
+    const base = getDoc.getMockImplementation()!;
+    getDoc.mockImplementation(async (ref: { path: string }) =>
+      ref.path.includes('chunk-0000') ? { data: () => ({ rows: [row(34, 1)] }) } : base(ref)
+    );
 
     expect(await loadOffersForTypes(parseOfferIndex(INDEX_DOC), new Set([34]), 7)).toBeNull();
   });

@@ -22,7 +22,6 @@ import { chunkDocId } from './chunkedSnapshot';
 const INDEX_COLLECTION = 'publicContractOffersIndex';
 const INDEX_DOC = 'types';
 const OFFERS_COLLECTION = 'publicContractOffers';
-const META_DOC = 'meta';
 const INDEX_CACHE_KEY = 'publicContractOffersIndex';
 /** Same cadence as the chunks it describes (`publicContractOffers.ts`). */
 const STALE_AFTER_MS = 30 * 60_000;
@@ -88,19 +87,22 @@ export async function loadOfferIndex(characterId: number): Promise<OfferIndex | 
 /** Chunk docs already read this publish cycle, keyed by `lastSyncedAt:chunk`, so a second search for a neighbouring type does not re-read them. */
 const chunkMemo = new Map<string, Promise<PublicContractOfferRow[]>>();
 
-async function readPublishedAt(): Promise<number | null> {
-  const snap = await getDoc(doc(getSyncFirestore(), OFFERS_COLLECTION, META_DOC));
-  return (snap.data() as { lastSyncedAt?: number } | undefined)?.lastSyncedAt ?? null;
-}
-
 function readChunk(index: OfferIndex, chunk: number): Promise<PublicContractOfferRow[]> {
   const key = `${index.lastSyncedAt}:${chunk}`;
   let pending = chunkMemo.get(key);
   if (!pending) {
-    pending = getDoc(doc(getSyncFirestore(), OFFERS_COLLECTION, chunkDocId(chunk))).then(
-      (snap) => (snap.data() as { rows?: PublicContractOfferRow[] } | undefined)?.rows ?? []
-    );
-    // A failed read must not poison the memo for the retry.
+    pending = getDoc(doc(getSyncFirestore(), OFFERS_COLLECTION, chunkDocId(chunk))).then((snap) => {
+      const data = snap.data() as
+        { rows?: PublicContractOfferRow[]; publishedAt?: number } | undefined;
+      // The chunk must belong to the publish the index describes: ranges from
+      // one publish are meaningless against the rows of another. An unstamped
+      // chunk predates the writer that produces an index, so it cannot match.
+      if (data?.publishedAt !== index.lastSyncedAt) {
+        throw new Error('chunk is from another publish');
+      }
+      return data.rows ?? [];
+    });
+    // A failed or mismatched read must not poison the memo for the retry.
     pending.catch(() => chunkMemo.delete(key));
     chunkMemo.set(key, pending);
   }
@@ -114,9 +116,8 @@ export function resetOfferChunkMemo(): void {
 
 /**
  * The offers of just these types, read from only the chunk docs the index says
- * hold them. `null` when the index no longer describes what is published (a
- * newer publish landed, so its chunk ranges cannot be trusted) or a read
- * failed — the caller then waits for the full snapshot instead.
+ * hold them. `null` when a chunk is from a different publish than the index
+ * describes (its ranges cannot be trusted) or a read failed — the caller then waits for the full snapshot instead.
  */
 export async function loadOffersForTypes(
   index: OfferIndex,
@@ -125,8 +126,6 @@ export async function loadOffersForTypes(
 ): Promise<PublicContractOfferRow[] | null> {
   try {
     await ensureAnySession(characterId);
-    if ((await readPublishedAt()) !== index.lastSyncedAt) return null;
-
     const chunks = new Set<number>();
     for (const typeId of typeIds) {
       const entry = index.types.get(typeId);
@@ -147,7 +146,6 @@ export async function loadOffersForTypes(
       Array.from({ length: Math.min(CHUNK_READ_CONCURRENCY, wanted.length) }, worker)
     );
 
-    if ((await readPublishedAt()) !== index.lastSyncedAt) return null;
     return wanted.flatMap((chunk) =>
       (byChunk.get(chunk) ?? []).filter((row) => typeIds.has(row.typeId))
     );

@@ -1232,10 +1232,14 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       <SnapshotProgress
                         done={downloadProgress?.done ?? 0}
                         total={downloadProgress?.total ?? null}
-                        label={t('contractSearch.downloadProgress', {
-                          done: downloadProgress?.done ?? 0,
-                          total: downloadProgress?.total ?? 0,
-                        })}
+                        label={
+                          downloadProgress?.total != null
+                            ? t('contractSearch.downloadProgress', {
+                                done: downloadProgress.done,
+                                total: downloadProgress.total,
+                              })
+                            : t('contractSearch.downloadStarting')
+                        }
                       />
                     )}
                   </div>

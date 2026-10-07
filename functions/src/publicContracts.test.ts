@@ -11,6 +11,7 @@ import {
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
   buildContractOfferIndex,
+  chunkDocData,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   courierContractFrom,
   isOutstandingCourierContract,
@@ -449,6 +450,12 @@ describe('sortContractOfferRows', () => {
   });
 });
 
+describe('chunkDocData', () => {
+  it('stamps a chunk with the publish it belongs to, alongside its rows', () => {
+    expect(chunkDocData([{ a: 1 }], 1234)).toEqual({ rows: [{ a: 1 }], publishedAt: 1234 });
+  });
+});
+
 describe('buildContractOfferIndex', () => {
   const offer = (fields: Partial<PublicContractOfferRow>) =>
     ({
@@ -476,6 +483,19 @@ describe('buildContractOfferIndex', () => {
       '35': [1, 70, 1, 1],
       '36': [2, 10, 1, 2],
     });
+  });
+
+  it('prices an auction at its buyout, as the client does, not at its starting bid', () => {
+    const index = buildContractOfferIndex(
+      [offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 })],
+      10
+    );
+    expect(index.types['34']).toEqual([1, 2_000_000, 0, 0]);
+  });
+
+  it('falls back to the starting bid for an auction with no buyout', () => {
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })], 10);
+    expect(index.types['34']).toEqual([1, 7, 0, 0]);
   });
 
   it('leaves cheapest null for a type with only unpriced (zero-price) offers', () => {

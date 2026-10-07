@@ -156,6 +156,22 @@ export function chunkRows<T>(rows: readonly T[], chunkSize: number): T[][] {
   return chunks;
 }
 
+/**
+ * A chunk doc as written: its rows plus the publish it belongs to. `meta` is
+ * written after every chunk, so for the length of a publish `meta` still names
+ * the previous one while the chunks are already new. The stamp is how a reader
+ * tells — it compares each chunk's against the `lastSyncedAt` it started from.
+ */
+export function chunkDocData<T>(
+  rows: readonly T[],
+  publishedAt: number
+): {
+  rows: readonly T[];
+  publishedAt: number;
+} {
+  return { rows, publishedAt };
+}
+
 /** Zero-padded so lexicographic (Firestore query) and numeric chunk order agree. */
 export function chunkDocId(index: number): string {
   return `chunk-${String(index).padStart(4, '0')}`;
@@ -378,8 +394,12 @@ export function buildContractOfferIndex(
     const entry = (types[key] ??= [0, null, chunk, chunk]);
     entry[0] += 1;
     entry[3] = chunk;
-    if (row.price > 0 && !row.requestedPlex && (entry[1] === null || row.price < entry[1])) {
-      entry[1] = row.price;
+    // The same ISK figure the client prices a row at: an auction's buyout when
+    // it has one, else its starting bid, so a suggestion's "from" price does
+    // not change when the full rows replace the index's stand-in.
+    const ask = row.isAuction && row.buyout != null && row.buyout > 0 ? row.buyout : row.price;
+    if (ask > 0 && !row.requestedPlex && (entry[1] === null || ask < entry[1])) {
+      entry[1] = ask;
     }
   });
   return { types, regionIds: [...regions].sort((a, b) => a - b) };
