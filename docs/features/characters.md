@@ -2,21 +2,21 @@
 
 Route `/characters` (`src/routes/Characters.tsx`). The roster of every Character logged in on this device: stats, filtering, grouping, starring, add, remove. Picking one makes it active and navigates away. UNGATED (`src/app/routeScopes.ts:51`), cache-first from Dexie. Also the landing after adding an alt (`Callback.tsx`) and the fallback when Characters exist but none is active (`Root`). Shared pieces `CharacterHeader` and `CharacterFilterControl` are described at the end.
 
-| Feature | Where |
-|---|---|
-| Card (default) / Table view toggle | `Characters.tsx:1751`, `useCharacterViewMode` (`charactersViewMode`) |
-| Search (name or corp) | `FILTER_PARAMS.q` |
-| Filters: queue state, corporation, group, starred only, has alerts | `Characters.tsx:1585-1671` |
-| Sort: name, SP, wallet, group, alerts + direction | `SORT_KEYS`, `groups.ts sortCharacterIds` |
-| Starred-first layer | `starredCharacters.ts` |
-| Groups (create, rename, reorder, delete, assign) | `GroupSectionHeader`, `overviewGroups.ts`, `groups.ts` |
-| Columns picker (table) | `ColumnPickerMenu`, `characterColumns.ts` |
-| Export CSV / XLSX / copy | `charactersCsv.ts`, `TableActionsMenu` |
-| Row menu (context menu / more actions) | `CharacterRowContextMenu.tsx` |
-| Refresh all (live) | `handleRefreshAll` `:1192` |
-| Add character (plain / custom permissions) | split button `:1501`, `loginFlow.ts` |
-| Remove character | modal `:1819`, `removeCharacter.ts` |
-| Density select | shared `useFontScale` |
+| Feature                                                            | Where                                                                |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Card (default) / Table view toggle                                 | `Characters.tsx:1751`, `useCharacterViewMode` (`charactersViewMode`) |
+| Search (name or corp)                                              | `FILTER_PARAMS.q`                                                    |
+| Filters: queue state, corporation, group, starred only, has alerts | `Characters.tsx:1585-1671`                                           |
+| Sort: name, SP, wallet, group, alerts + direction                  | `SORT_KEYS`, `groups.ts sortCharacterIds`                            |
+| Starred-first layer                                                | `starredCharacters.ts`                                               |
+| Groups (create, rename, reorder, delete, assign)                   | `GroupSectionHeader`, `overviewGroups.ts`, `groups.ts`               |
+| Columns picker (table)                                             | `ColumnPickerMenu`, `characterColumns.ts`                            |
+| Export CSV / XLSX / copy                                           | `charactersCsv.ts`, `TableActionsMenu`                               |
+| Row menu (context menu / more actions)                             | `CharacterRowContextMenu.tsx`                                        |
+| Refresh all (live)                                                 | `handleRefreshAll` `:1192`                                           |
+| Add character (plain / custom permissions)                         | split button `:1501`, `loginFlow.ts`                                 |
+| Remove character                                                   | modal `:1819`, `removeCharacter.ts`                                  |
+| Density select                                                     | shared `useFontScale`                                                |
 
 ## Purpose and user goal
 
@@ -30,7 +30,7 @@ Filter bar (`FilterBar` funnel + search "Search by name or corporation..."): que
 
 Card (`CharacterCard`): portrait (pointer-only), name button (select), "Active" label + `aria-current`, data-age dot (stalest read), corp and alliance text, star toggle (filled when starred), group `Select` (if groups exist), danger remove x, chips SP, Wallet, Queue, Alerts (if > 0), PI (idle or expiring soon). Starred first within a section, chosen sort underneath. Group header (card only): name (double-click rename), up/down (disabled at ends), rename, delete (modal: characters become ungrouped); empty group text. Grid `sm:2 / lg:3`.
 
-Table: one flat `DataTable`, scrolls sideways at every width, sticky name (`responsive="table"`). Columns (default visible marked *): name*, corp, group* (only if groups exist; inline Select), spTotal, wallet, lastSynced*, training* (state or countdown, tooltip timestamp), open jobs Mfg/Sci/Rxn* (free slots; red when all idle, amber when >= half open; dash if unknown), pi* (label + countdown), spReady (only when SP monitoring on), alerts*, starred*. Header-click sort is separate (URL `table.sort`; a sort on a hidden column reads unsorted). Row click selects. Row menu (right-click or more-actions): Overview, Skills, Industry, Planetary Industry, Alerts (each sets active Character then navigates), danger Remove, plus Export table submenu. Export file holds every data column regardless of picker; countdowns exported as state plus ISO UTC timestamp columns ("Training finishes", "PI expires"); SP/wallet/alerts raw numbers; open slots as numbers.
+Table: one flat `DataTable`, scrolls sideways at every width, sticky name (`responsive="table"`). Columns (default visible marked _): name_, corp, group* (only if groups exist; inline Select), spTotal, wallet, lastSynced*, training* (state or countdown, tooltip timestamp), open jobs Mfg/Sci/Rxn* (free slots; red when all idle, amber when >= half open; dash if unknown), pi* (label + countdown), spReady (only when SP monitoring on), alerts*, starred*. Header-click sort is separate (URL `table.sort`; a sort on a hidden column reads unsorted). Row click selects. Row menu (right-click or more-actions): Overview, Skills, Industry, Planetary Industry, Alerts (each sets active Character then navigates), danger Remove, plus Export table submenu. Export file holds every data column regardless of picker; countdowns exported as state plus ISO UTC timestamp columns ("Training finishes", "PI expires"); SP/wallet/alerts raw numbers; open slots as numbers.
 
 ## Persistence and sync
 

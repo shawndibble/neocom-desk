@@ -2,11 +2,11 @@
 
 Two routes outside `RequireCharacter`/`ScopeGate`, neither in the nav: `/styleguide` (`src/routes/Styleguide.tsx`) and the `*` catch-all (`src/routes/NotFound.tsx`). Both declared at `src/app/App.tsx:360,373`. Lazy `Suspense` fallback `RouteFallback` for `/styleguide`; `NotFound` is eager.
 
-| Route | Purpose | Auth |
-|---|---|---|
-| `/styleguide` | Hidden live reference of design tokens, base components and the 6c interaction grammar | none; no ESI, no Dexie |
-| `*` (NotFound) | Dead or mistyped URL screen with one way out | none |
-| `/error` (sibling, `ErrorProbe.tsx`) | Undisclosed Sentry probe: throws on render | none |
+| Route                                | Purpose                                                                                | Auth                   |
+| ------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------- |
+| `/styleguide`                        | Hidden live reference of design tokens, base components and the 6c interaction grammar | none; no ESI, no Dexie |
+| `*` (NotFound)                       | Dead or mistyped URL screen with one way out                                           | none                   |
+| `/error` (sibling, `ErrorProbe.tsx`) | Undisclosed Sentry probe: throws on render                                             | none                   |
 
 ## Styleguide (`/styleguide`)
 

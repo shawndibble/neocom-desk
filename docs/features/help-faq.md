@@ -4,15 +4,16 @@ Route `/help` (`src/routes/Help.tsx`), a footer-group page (`src/app/navDestinat
 
 Command palette (`src/features/commandPalette`) is covered elsewhere; here only its link to Help: the `?` key and the palette's shortcuts command both land on `/help/shortcuts`.
 
-| Tab | Component | Content |
-|---|---|---|
-| Shortcuts | `src/features/help/ShortcutsPanel.tsx` | Every key the app answers to, from the same array that dispatches them |
-| FAQ | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | 8 collapsible questions; "what we store" commitments |
-| Support | `src/features/help/HelpPanel.tsx` | Discord, source, say thanks |
+| Tab       | Component                                            | Content                                                                |
+| --------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| Shortcuts | `src/features/help/ShortcutsPanel.tsx`               | Every key the app answers to, from the same array that dispatches them |
+| FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | 8 collapsible questions; "what we store" commitments                   |
+| Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                            |
 
 ## Shortcuts tab
 
 Three panels, definition lists (two columns from `md`, one on phone), each row = description + `<kbd>`.
+
 - "Keyboard shortcuts": first row "Open the command palette" with the chord (Cmd+K on Apple platforms via `isApplePlatform`, Ctrl K otherwise; `commandPaletteDisplayKey`; not a `SHORTCUTS` row, fires inside text fields). Then every `SHORTCUTS` entry (`src/lib/shortcuts.ts`): `C` switch character, `O` Overview, `M` Market, `I` Industry, `W` Wallet, `P` Planetary Industry, `A` Alerts, `T` Mining tax, `,` Settings, `?` show this list (allows Shift), `Esc` close the open dialog (native, no handler). Dispatch in `app/useKeyboardShortcuts.ts`. Single-key shortcuts are always on (no off switch).
 - "On a page": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo." Rows: save fitting (Mod+S), save as new copy (Mod+Shift+S), submit a pasted list or fit (Mod+Enter, any paste box).
 - "Paste anywhere": hint that outside a text field a pasted fit or item list opens where it belongs; rows Paste (Cmd/Ctrl V), EFT fitting -> "Opens in Fittings", Item list -> "Opens in Appraisal" (`app/GlobalPasteRouter.tsx`).
@@ -20,7 +21,7 @@ Three panels, definition lists (two columns from `md`, one on phone), each row =
 ## FAQ tab
 
 - Intro: "We store what you make in the app. What we read from EVE stays on this device."
-- 8 `FaqItem` disclosures (`aria-expanded`, `aria-controls`; all closed; independent open state; question set body-size, `rowInteractiveClassName`): 
+- 8 `FaqItem` disclosures (`aria-expanded`, `aria-controls`; all closed; independent open state; question set body-size, `rowInteractiveClassName`):
   1. What syncs between my devices? (`WHAT_WE_STORE_GROUPS` "synced"): Skill Plans; Build Plans; Production Runs (with linked sales/orders); Market Quickbar; pinned stations/structures in Assets; PI resource picks; Moon Mining payees and assignments (incl. the ore and ISK snapshot); saved Fittings (name + share code); already-seen alerts (kept 30 days); synced preferences with sub-bullets (notifications, defaults, industry, market, skills incl. Alpha/Omega, fittings, PI and mining tax, layout incl. Overview cards and hidden nav pages, travel and Route Safety). Filed under each character's EVE ID, never a name or email.
   2. What stays on this device? ("local"): all ESI character data (assets, wallet, contracts, mail, contacts, clones, calendar, skills, queue, jobs, colonies); corporation data; market prices/books/LP stores; 90 days of mining ledger; the EVE login token (never leaves); display settings and remembered sorts/filters/sections; Ansiblex jump gate list.
   3. Does Neocom Desk change anything in EVE? The five writes (mail read flag, calendar response, mail send, Fitting save, autopilot waypoints). Text `settings.faq.store.notes.writes`.
@@ -36,6 +37,7 @@ Three panels, definition lists (two columns from `md`, one on phone), each row =
 ## Support tab
 
 Three `Panel`s of prose with `Trans` (links mid-sentence):
+
 - "Bugs, ideas and chat": everything goes through Discord (`DISCORD_URL`, `ExternalLink`); hint to include steps and expected result.
 - "Source code": open source on GitHub (`REPO_URL`), pull requests welcome; hint to report bugs/ideas on Discord, not GitHub.
 - "Say thanks": in game "Mero Otichoda"; donations welcome, never expected; app stays free.

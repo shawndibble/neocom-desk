@@ -4,22 +4,22 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Summary
 
-| Feature | Where | Notes |
-|---|---|---|
-| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757` | ISK balance, EverMarks, balance-history chart, LP-per-corp table |
-| Journal tab (`/wallet/journal`) | `Wallet.tsx:759-816` | filterable/sortable/virtualized ledger, column picker, export |
-| `transactions` alias tab | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions` |
-| Cross-character balance (`?char=`) | `Wallet.tsx:570` | per-Character table + total, picker, CSV/XLSX/clipboard export |
-| Balance-history chart | `WalletBalanceChart.tsx` | lazy Recharts line from journal `balance` field |
-| Loyalty Points table | `Wallet.tsx:707-756` | per-corp LP, row → LP Store, export, LP Store picker |
-| LP Store picker | `features/loyalty/LpStorePicker.tsx` | select-box over every NPC corp with an LP Store |
-| Journal filters | `WalletJournalTable.tsx` | ref type, date range, free text; filtered count + net total |
-| Journal column picker | `walletJournalColumns.ts` | date/description/amount/balance toggle; device-local |
-| Journal row enrichments | `JournalDescriptionCell.tsx` | bounty factions, daily-goal names, contract link, mining-tax link, market item |
-| Wallet-alert deep link | `Wallet.tsx:185` | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row |
-| Exports | `useTableExport` + `TableActionsMenu` | 3 surfaces: `wallet-journal`, `wallet-balances`, `loyalty-points` |
-| Refresh | `Wallet.tsx:530` | PageHeader icon button |
-| Corp wallet | pointer only | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers |
+| Feature                                  | Where                                 | Notes                                                                          |
+| ---------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | ISK balance, EverMarks, balance-history chart, LP-per-corp table               |
+| Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                  |
+| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                         |
+| Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                 |
+| Balance-history chart                    | `WalletBalanceChart.tsx`              | lazy Recharts line from journal `balance` field                                |
+| Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                           |
+| LP Store picker                          | `features/loyalty/LpStorePicker.tsx`  | select-box over every NPC corp with an LP Store                                |
+| Journal filters                          | `WalletJournalTable.tsx`              | ref type, date range, free text; filtered count + net total                    |
+| Journal column picker                    | `walletJournalColumns.ts`             | date/description/amount/balance toggle; device-local                           |
+| Journal row enrichments                  | `JournalDescriptionCell.tsx`          | bounty factions, daily-goal names, contract link, mining-tax link, market item |
+| Wallet-alert deep link                   | `Wallet.tsx:185`                      | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row       |
+| Exports                                  | `useTableExport` + `TableActionsMenu` | 3 surfaces: `wallet-journal`, `wallet-balances`, `loyalty-points`              |
+| Refresh                                  | `Wallet.tsx:530`                      | PageHeader icon button                                                         |
+| Corp wallet                              | pointer only                          | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                         |
 
 ## Route, nav, redirects
 
@@ -36,16 +36,16 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Data sources and scopes
 
-| Data | Loader | ESI endpoint / source | Scope |
-|---|---|---|---|
-| ISK balance | `features/character/wallet.ts` `loadWalletBalanceWithStatus` | `getCharacterWallet` | `esi-wallet.read_character_wallet.v1` |
-| Journal | `loadWalletJournal` (paged, `truncated` flag) | `getCharacterWalletJournal` | same |
-| Fills (only to name journal items) | `loadWalletTransactions` → `loadPersonalFills` (`Wallet.tsx:158`) | `getCharacterWalletTransactions`, capped at `MAX_TRANSACTION_PAGES = 5` (`esi/endpoints.ts:502`) | same |
-| Loyalty points / EverMarks | `features/character/loyalty.ts` | `getCharacterLoyaltyPoints` | `esi-characters.read_loyalty.v1` |
-| Corp names for LP rows | `features/character/names` `resolveNames` | `postUniverseNames` | public |
-| Item names on journal lines | `features/character/typeNames.ts` | local SDE `types.json`, then `postUniverseNames`/`getUniverseType` | public |
-| Mining tax links | Dexie `miningTaxAssignments` (`linkedRefIds`) | local | none |
-| LP-store corp list | `loadLpCorporations` (`@/sde/loadMarketSde`) | local SDE | none |
+| Data                               | Loader                                                            | ESI endpoint / source                                                                            | Scope                                 |
+| ---------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| ISK balance                        | `features/character/wallet.ts` `loadWalletBalanceWithStatus`      | `getCharacterWallet`                                                                             | `esi-wallet.read_character_wallet.v1` |
+| Journal                            | `loadWalletJournal` (paged, `truncated` flag)                     | `getCharacterWalletJournal`                                                                      | same                                  |
+| Fills (only to name journal items) | `loadWalletTransactions` → `loadPersonalFills` (`Wallet.tsx:158`) | `getCharacterWalletTransactions`, capped at `MAX_TRANSACTION_PAGES = 5` (`esi/endpoints.ts:502`) | same                                  |
+| Loyalty points / EverMarks         | `features/character/loyalty.ts`                                   | `getCharacterLoyaltyPoints`                                                                      | `esi-characters.read_loyalty.v1`      |
+| Corp names for LP rows             | `features/character/names` `resolveNames`                         | `postUniverseNames`                                                                              | public                                |
+| Item names on journal lines        | `features/character/typeNames.ts`                                 | local SDE `types.json`, then `postUniverseNames`/`getUniverseType`                               | public                                |
+| Mining tax links                   | Dexie `miningTaxAssignments` (`linkedRefIds`)                     | local                                                                                            | none                                  |
+| LP-store corp list                 | `loadLpCorporations` (`@/sde/loadMarketSde`)                      | local SDE                                                                                        | none                                  |
 
 - Cache keys: `wallet:balance`, `wallet:journal`, `wallet:transactions`, `loyalty` (`wallet.ts:24-28`, `loyalty.ts`).
 - Auth-failure handling: balance and loyalty use `loadWithCacheStatus` → `needsReauth`; 401/403 shows grant banner not "offline".
@@ -106,13 +106,13 @@ Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent w
 
 ## Proving a payment to someone else (e.g. a corp)
 
-| Step | Where | Notes |
-|---|---|---|
-| Find the line | Wallet > Journal | Filter Ref type (`player_donation`, `contract_price` ...), date range, search description/reason. Active Character only |
-| Copy the facts | Journal CSV / Excel / copy-for-Sheets | Filtered rows; includes Date (ISO), Type, Amount, Reason, Context ID, First/Second party ID. No per-row "copy proof" action |
-| Contract payment | Contracts page; contract id in Mining Settle up record | Contract id is the reference the receiver can search in game |
-| See the app's link | Mining > Tax row > payment links card; Journal "Mining tax →" | Shows which Assignment a journal line or contract is linked to |
-| Corp side | `/corp/wallet` journal (needs `canReadWallet`) | Same table; only for members with the wallet role |
+| Step               | Where                                                         | Notes                                                                                                                       |
+| ------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Find the line      | Wallet > Journal                                              | Filter Ref type (`player_donation`, `contract_price` ...), date range, search description/reason. Active Character only     |
+| Copy the facts     | Journal CSV / Excel / copy-for-Sheets                         | Filtered rows; includes Date (ISO), Type, Amount, Reason, Context ID, First/Second party ID. No per-row "copy proof" action |
+| Contract payment   | Contracts page; contract id in Mining Settle up record        | Contract id is the reference the receiver can search in game                                                                |
+| See the app's link | Mining > Tax row > payment links card; Journal "Mining tax →" | Shows which Assignment a journal line or contract is linked to                                                              |
+| Corp side          | `/corp/wallet` journal (needs `canReadWallet`)                | Same table; only for members with the wallet role                                                                           |
 
 Gaps: no share link or screenshot-friendly view of one journal row; journal lags ESI; a donation carries only the reason text the sender typed.
 
@@ -181,15 +181,15 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 ## Persistence and sync
 
-| State | Where | Synced |
-|---|---|---|
-| Tab | URL path segment `/wallet/<tab>` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`) | no |
-| Character filter | `?char=`; default from synced Settings default-character-filter (`useDefaultCharacterFilter`); URL value is never written back | default synced, URL not |
-| Journal filter / sort | `?journal.q`, `journal.refType`, `journal.start`, `journal.end`, `journal.sort`; balance `balance.sort`; loyalty `loyalty.sort` | no |
-| Journal visible columns | device-local `walletJournalVisibleColumns`, shared with corp journal | no (view prefs are not Editable Data) |
-| Highlighted row | `?highlight=<journal id>` | no |
-| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `CONTEXT.md` glossary) | no |
-| Mining-tax links | Dexie `miningTaxAssignments` | synced elsewhere (Mining Tax) |
+| State                            | Where                                                                                                                           | Synced                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Tab                              | URL path segment `/wallet/<tab>` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`)                            | no                                    |
+| Character filter                 | `?char=`; default from synced Settings default-character-filter (`useDefaultCharacterFilter`); URL value is never written back  | default synced, URL not               |
+| Journal filter / sort            | `?journal.q`, `journal.refType`, `journal.start`, `journal.end`, `journal.sort`; balance `balance.sort`; loyalty `loyalty.sort` | no                                    |
+| Journal visible columns          | device-local `walletJournalVisibleColumns`, shared with corp journal                                                            | no (view prefs are not Editable Data) |
+| Highlighted row                  | `?highlight=<journal id>`                                                                                                       | no                                    |
+| Balance, journal, fills, loyalty | Dexie ESI cache per Character (API-Derived Data, never synced through the backend, `CONTEXT.md` glossary)                       | no                                    |
+| Mining-tax links                 | Dexie `miningTaxAssignments`                                                                                                    | synced elsewhere (Mining Tax)         |
 
 ## Decisions (why)
 
@@ -243,17 +243,17 @@ Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; p
 
 The LP Store page `/market/lp-store[/:corporationId]` (`src/routes/LoyaltyStore.tsx:427`) is Market's, documented in full in `market.md` (offers ranked by ISK/LP, hub and price basis, affordable-only default on, offer detail, LP Value setting, fee-netting profit formula `profit = revenue − salesTax − brokerFee − iskCost − requiredItemsCost − buildCost`). Only the Wallet side is specified here:
 
-| Hook | Code | Behaviour |
-|---|---|---|
-| LP table row / name | `Wallet.tsx:330-336`, `:753` | name is accent `Link` to `/market/lp-store/<corporation_id>`; row click does the same; caret closes the row (DESIGN §6c). Show info for the corp is on the store page header, not here |
-| LP Store picker | `Wallet.tsx:717` → `LpStorePicker.tsx:51` | `corporationName={null}`, size sm, width `w-44`, always rendered, even with 0 LP (issue #2321) |
-| Picker option order | `lpStorePickerOptions.ts` | corps with `loyalty_points > 0` first, highest balance first with the balance shown; rest alphabetical; a typed query uses `rankedSearch` over all corps but held corps stay pinned above; only corps in `lpCorporations.json` appear (Paragon/EverMarks has no store so is never offered) |
-| Picker data | `LpStorePicker.tsx` | `loadLpCorporations` (SDE) and `loadCharacterLoyaltyPoints`; failures are swallowed (list stays empty) per `market.md` gaps |
-| Scope gate | `routeScopes.ts` (LP store entries ~37-41, 262-263 per `market.md`) | store pages need `esi-characters.read_loyalty.v1` even to browse a store with 0 LP (decision `20260929-224008`); Wallet itself stays ungated and shows a grant banner in the LP panel |
-| Legacy URLs | `src/app/legacyPaths.ts`, `App.tsx` | `/wallet/loyalty[/:id]` redirects to `/market/lp-store[/:id]` |
-| Command Palette | `navDestinations.ts:101,193` | "Loyalty points" alias finds the LP Store sub-view |
-| Reuse elsewhere | `features/loyalty/LpStoreLink.tsx:22` | icon link used by Appraisal's LP column and Blueprint Acquisition |
-| Cached LP for hints | `loyalty.ts:readCachedLoyaltyBalances` | palette's LP Stores group reads the cache; empty until the Wallet loyalty view has loaded once |
+| Hook                | Code                                                                | Behaviour                                                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| LP table row / name | `Wallet.tsx:330-336`, `:753`                                        | name is accent `Link` to `/market/lp-store/<corporation_id>`; row click does the same; caret closes the row (DESIGN §6c). Show info for the corp is on the store page header, not here                                                                                                     |
+| LP Store picker     | `Wallet.tsx:717` → `LpStorePicker.tsx:51`                           | `corporationName={null}`, size sm, width `w-44`, always rendered, even with 0 LP (issue #2321)                                                                                                                                                                                             |
+| Picker option order | `lpStorePickerOptions.ts`                                           | corps with `loyalty_points > 0` first, highest balance first with the balance shown; rest alphabetical; a typed query uses `rankedSearch` over all corps but held corps stay pinned above; only corps in `lpCorporations.json` appear (Paragon/EverMarks has no store so is never offered) |
+| Picker data         | `LpStorePicker.tsx`                                                 | `loadLpCorporations` (SDE) and `loadCharacterLoyaltyPoints`; failures are swallowed (list stays empty) per `market.md` gaps                                                                                                                                                                |
+| Scope gate          | `routeScopes.ts` (LP store entries ~37-41, 262-263 per `market.md`) | store pages need `esi-characters.read_loyalty.v1` even to browse a store with 0 LP (decision `20260929-224008`); Wallet itself stays ungated and shows a grant banner in the LP panel                                                                                                      |
+| Legacy URLs         | `src/app/legacyPaths.ts`, `App.tsx`                                 | `/wallet/loyalty[/:id]` redirects to `/market/lp-store[/:id]`                                                                                                                                                                                                                              |
+| Command Palette     | `navDestinations.ts:101,193`                                        | "Loyalty points" alias finds the LP Store sub-view                                                                                                                                                                                                                                         |
+| Reuse elsewhere     | `features/loyalty/LpStoreLink.tsx:22`                               | icon link used by Appraisal's LP column and Blueprint Acquisition                                                                                                                                                                                                                          |
+| Cached LP for hints | `loyalty.ts:readCachedLoyaltyBalances`                              | palette's LP Stores group reads the cache; empty until the Wallet loyalty view has loaded once                                                                                                                                                                                             |
 
 Interview Qs (LP, wallet side): **Why does Wallet show LP at all if the store moved to Market?** Balances are the character's wallet-like data; shopping is a market errand (`20261002-145653`). **Why is EverMarks not in the LP table?** It is split out into the balance box and has no store. `loyalty.ts:36-43`, `lpStorePickerOptions.ts` header. **What if the loyalty scope was never granted?** Wallet LP panel shows `GrantBanner`; the picker still opens stores but the store page's route gate asks for the grant.
 

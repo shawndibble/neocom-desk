@@ -2,15 +2,15 @@
 
 Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device has fired, device-wide, grouped by type. Distinct from Settings > Notifications (`src/features/notifications/NotificationsPanel.tsx`), which holds preferences. UNGATED (`src/app/routeScopes.ts:89`): Dexie only; rows were written by the Foreground Poller or a Web Push. Primary nav group, mobile tab (`navDestinations.ts:126`); global shortcut `A`.
 
-| Feature | Where |
-|---|---|
-| Grouped list, expand per fire | `Alerts.tsx`, `AlertGroupRow.tsx`, `alertGroups.ts` |
-| Search, Character filter, severity chips, Muted chip (URL-backed) | `alertsFilter.ts`, `Alerts.tsx:94,275-318` |
-| Mute/unmute type (feed channel only) | `AlertGroupRow.tsx` |
-| Dismiss one / type / all | `feedSync.ts dismissFeedEntriesAndSync` |
-| Row click-through | `notificationUrlForSubject` (`notificationClick.ts`) |
-| Unread badge (rail, app icon) | `useUnreadAlertCount.ts`, `appBadge.ts` |
-| Delivery, preferences | `notifications.md` |
+| Feature                                                           | Where                                                |
+| ----------------------------------------------------------------- | ---------------------------------------------------- |
+| Grouped list, expand per fire                                     | `Alerts.tsx`, `AlertGroupRow.tsx`, `alertGroups.ts`  |
+| Search, Character filter, severity chips, Muted chip (URL-backed) | `alertsFilter.ts`, `Alerts.tsx:94,275-318`           |
+| Mute/unmute type (feed channel only)                              | `AlertGroupRow.tsx`                                  |
+| Dismiss one / type / all                                          | `feedSync.ts dismissFeedEntriesAndSync`              |
+| Row click-through                                                 | `notificationUrlForSubject` (`notificationClick.ts`) |
+| Unread badge (rail, app icon)                                     | `useUnreadAlertCount.ts`, `appBadge.ts`              |
+| Delivery, preferences                                             | `notifications.md`                                   |
 
 ## Purpose and user goal
 

@@ -2,18 +2,18 @@
 
 Routes `/login` (`src/routes/Login.tsx`), `/callback` (`src/routes/Callback.tsx`), outside `RequireCharacter`/`ScopeGate`, eagerly loaded (`src/app/App.tsx:339-340`). Engine `src/auth/` (`sso.ts`, `session.ts`, `pkce.ts`, `jwt.ts`, `loginReturnTo.ts`); entry points `src/app/loginFlow.ts`, `src/features/character/addCharacter.ts`, `src/features/permissions/`. EVE SSO v2 + PKCE; refresh tokens in Dexie only (ADR 0001).
 
-| Feature | Where |
-|---|---|
-| Landing page for signed-out users | `Login.tsx` |
-| "Log in with EVE Online" button | `SsoButton` `Login.tsx:679` |
-| Custom permissions dialog | `CustomizePermissionsDialog.tsx` |
-| SSO redirect, PKCE, state | `session.ts startLogin`, `sso.ts buildAuthorizeUrl` |
-| Callback: exchange, error panel, one auto retry | `Callback.tsx` |
-| Token store, refresh, cross-tab single-flight | `session.ts getValidAccessToken`, `persistTokens` |
-| Consent-change cache purge | `purgeCacheIfConsentChangedOrPending` |
-| Post-login landing stash | `loginReturnTo.ts` |
-| Re-auth / grant for known Character | `loginFlow.ts beginEveLogin`, `app/grantAction.ts`, `AuthFailureNotice.tsx` |
-| Root gate | `Root`, `RequireCharacter` |
+| Feature                                         | Where                                                                       |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| Landing page for signed-out users               | `Login.tsx`                                                                 |
+| "Log in with EVE Online" button                 | `SsoButton` `Login.tsx:679`                                                 |
+| Custom permissions dialog                       | `CustomizePermissionsDialog.tsx`                                            |
+| SSO redirect, PKCE, state                       | `session.ts startLogin`, `sso.ts buildAuthorizeUrl`                         |
+| Callback: exchange, error panel, one auto retry | `Callback.tsx`                                                              |
+| Token store, refresh, cross-tab single-flight   | `session.ts getValidAccessToken`, `persistTokens`                           |
+| Consent-change cache purge                      | `purgeCacheIfConsentChangedOrPending`                                       |
+| Post-login landing stash                        | `loginReturnTo.ts`                                                          |
+| Re-auth / grant for known Character             | `loginFlow.ts beginEveLogin`, `app/grantAction.ts`, `AuthFailureNotice.tsx` |
+| Root gate                                       | `Root`, `RequireCharacter`                                                  |
 
 ## Purpose / user goal
 

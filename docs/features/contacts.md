@@ -8,22 +8,22 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
 
 ## Summary
 
-| Feature | What | Where |
-| --- | --- | --- |
-| This character table | Portrait, Name (+NPC badge, flags on phone), optional Type / Affiliation / Labels / Standing / Flags | `Contacts.tsx:~860-990` |
-| All characters table | Merged contacts across every Character on the device: Name, Type, Held by (n of N), Standings | `AcrossCharactersPanel` `:535` |
-| View switch | `CharacterFilterControl` in header, only when > 1 Character | `Contacts.tsx:1082` |
-| Search | Name or numeric id substring, URL `q` | `filterContacts` |
-| Type chips | Character, NPC, Corp, Alliance, Faction with counts | `ContactsFilterBar` `:356` |
-| Standing chips | Good / Neutral / Bad with counts (This character only in effect) | same |
-| Only disagreements | Across view chip with count, URL `across.disagree` | same |
-| Column picker | Per-view optional columns, device-local, Reset | `ColumnPickerMenu`, `contactsColumns.ts` |
-| Sort | Header sort, URL `sort` (this) / `across.sort` (across) | `useUrlSort` |
-| Fetch all characters | Button on Across view: live refetch of each Character's contacts | `:577` |
-| Row click | Opens Public Info modal (character/corp/alliance); faction unclickable | `onRowClick` |
-| CSV export | Visible rows of the active view; `-partial` suffix when truncated | `contactsCsv.ts` |
-| Refresh + Data Age | Header | `Contacts.tsx:1077,1104` |
-| Reauth banner | Contacts scope missing/revoked | `GrantBanner` |
+| Feature              | What                                                                                                 | Where                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| This character table | Portrait, Name (+NPC badge, flags on phone), optional Type / Affiliation / Labels / Standing / Flags | `Contacts.tsx:~860-990`                  |
+| All characters table | Merged contacts across every Character on the device: Name, Type, Held by (n of N), Standings        | `AcrossCharactersPanel` `:535`           |
+| View switch          | `CharacterFilterControl` in header, only when > 1 Character                                          | `Contacts.tsx:1082`                      |
+| Search               | Name or numeric id substring, URL `q`                                                                | `filterContacts`                         |
+| Type chips           | Character, NPC, Corp, Alliance, Faction with counts                                                  | `ContactsFilterBar` `:356`               |
+| Standing chips       | Good / Neutral / Bad with counts (This character only in effect)                                     | same                                     |
+| Only disagreements   | Across view chip with count, URL `across.disagree`                                                   | same                                     |
+| Column picker        | Per-view optional columns, device-local, Reset                                                       | `ColumnPickerMenu`, `contactsColumns.ts` |
+| Sort                 | Header sort, URL `sort` (this) / `across.sort` (across)                                              | `useUrlSort`                             |
+| Fetch all characters | Button on Across view: live refetch of each Character's contacts                                     | `:577`                                   |
+| Row click            | Opens Public Info modal (character/corp/alliance); faction unclickable                               | `onRowClick`                             |
+| CSV export           | Visible rows of the active view; `-partial` suffix when truncated                                    | `contactsCsv.ts`                         |
+| Refresh + Data Age   | Header                                                                                               | `Contacts.tsx:1077,1104`                 |
+| Reauth banner        | Contacts scope missing/revoked                                                                       | `GrantBanner`                            |
 
 ## Routing and view selection
 
@@ -67,14 +67,14 @@ This page lists personal contacts only. The Character's standings with NPC corpo
 
 ## Data sources and scopes
 
-| Data | Endpoint | Scope | Notes |
-| --- | --- | --- | --- |
-| Contacts (paginated) | `GET /characters/{id}/contacts` | `esi-characters.read_contacts.v1` | conditional paged fetch; `truncated` flag |
-| Labels | `GET /characters/{id}/contacts/labels` | same | errors swallowed -> no Labels column |
-| Names | `POST /universe/names` | public | all contacts, affiliations, across contacts |
-| Affiliations | `POST /characters/affiliation` | public | player contacts + self |
-| Standings (NPC faction/agent) | `GET /characters/{id}/standings/` | `esi-characters.read_standings.v1` | not on this page; used for broker fees (`features/character/standings.ts`) and `StandingsScopeNotice` |
-| Portraits/logos | EVE image server | public | lazy |
+| Data                          | Endpoint                               | Scope                              | Notes                                                                                                 |
+| ----------------------------- | -------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Contacts (paginated)          | `GET /characters/{id}/contacts`        | `esi-characters.read_contacts.v1`  | conditional paged fetch; `truncated` flag                                                             |
+| Labels                        | `GET /characters/{id}/contacts/labels` | same                               | errors swallowed -> no Labels column                                                                  |
+| Names                         | `POST /universe/names`                 | public                             | all contacts, affiliations, across contacts                                                           |
+| Affiliations                  | `POST /characters/affiliation`         | public                             | player contacts + self                                                                                |
+| Standings (NPC faction/agent) | `GET /characters/{id}/standings/`      | `esi-characters.read_standings.v1` | not on this page; used for broker fees (`features/character/standings.ts`) and `StandingsScopeNotice` |
+| Portraits/logos               | EVE image server                       | public                             | lazy                                                                                                  |
 
 Missing contacts scope -> `GrantBanner` asking only that Permission (characterDetails group). Across view still shows other Characters' cached lists. Standings scope missing never blocks this page.
 

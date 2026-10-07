@@ -2,16 +2,16 @@
 
 User goal: send someone a short URL to an appraisal or a fitting; the recipient (account or not) sees it read-only and can open it in the app.
 
-| Route / piece | What | Where |
-|---|---|---|
-| `/share/:shareId` | Stored Share Link, 9-char id, 7 days | `src/routes/SharedLink.tsx` |
-| `/share/fitting?f=<code>` | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx` |
-| Create: Appraisal "Copy Share Link" | `createShareLink` | `src/features/market/AppraisalPanel.tsx:191` |
-| Create: Fittings Export "Copy Share Link" / "Copy permanent link" | | `src/features/fittings/useFittingExport.ts:64` |
-| Shared Appraisal screen | read-only table, totals, export | `src/features/market/AppraisalShareScreen.tsx` |
-| Shared Fitting view | stats at all skills V, modules, Copy Fitting | `FittingShared.tsx FittingShareView` |
-| Frame + "Open Neocom Desk" | | `src/features/share/ShareShell.tsx` |
-| Store | Firestore `shares/{id}` | `src/features/share/shareStore.ts`, `firestore.rules:243` |
+| Route / piece                                                     | What                                                   | Where                                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| `/share/:shareId`                                                 | Stored Share Link, 9-char id, 7 days                   | `src/routes/SharedLink.tsx`                               |
+| `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
+| Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
+| Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
+| Shared Appraisal screen                                           | read-only table, totals, export                        | `src/features/market/AppraisalShareScreen.tsx`            |
+| Shared Fitting view                                               | stats at all skills V, modules, Copy Fitting           | `FittingShared.tsx FittingShareView`                      |
+| Frame + "Open Neocom Desk"                                        |                                                        | `src/features/share/ShareShell.tsx`                       |
+| Store                                                             | Firestore `shares/{id}`                                | `src/features/share/shareStore.ts`, `firestore.rules:243` |
 
 Both routes sit outside `RequireCharacter`/`ScopeGate` (`src/app/App.tsx:360-370`; `routeScopes.test.ts` asserts the exemption). The literal `/share/fitting` outranks `:shareId`.
 
@@ -20,10 +20,12 @@ See also: `entities-share.md` (another author; id format, 7-day TTL and in-memor
 ## Controls and behavior
 
 **Creating**
+
 - Appraisal icon button "Copy Share Link": snapshot = hub id, price percent, `generatedAt` (epoch s), items with per-unit prices at 100% (`buildAppraisalSnapshot`, max `MAX_SNAPSHOT_ITEMS` = 1000). Disabled with no Character, sync not configured, no rows, too many items, or while saving. Tooltips only for too-large, saving, failed, copied ("works for 7 days"). Clipboard refusal shows a "Share Link - works for 7 days" row with Copy (`manual`). Icon becomes a tick when copied.
 - Fitting: encodes `fittingShareCode`; too large -> "Too large to share as a link."; no Character or sync not configured -> "Couldn't create the Share Link. Try again."; clipboard refusal after save -> "Share Link ready - choose Copy Share Link again to copy it." A reused link copies with no await so it stays inside the click gesture.
 
 **Opening `/share/:shareId`** (`loadShare`)
+
 - Bad id shape -> `not-found` with no Firestore read; `permission-denied` -> `not-found`; other error -> `failed`; missing or expired -> `not-found`; unknown type -> `unsupported`.
 - A result for a previous id is ignored if the visitor follows another link.
 - `appraisal`: `parseAppraisalSnapshot` -> `AppraisalShareScreen` (invalid state on parse failure). Never redirects, even signed in (the live tab re-prices; the sender's figures would vanish).

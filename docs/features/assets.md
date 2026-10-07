@@ -6,28 +6,28 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 
 ## Summary
 
-| Feature | Where | Notes |
-|---|---|---|
-| Location list (root `/assets`) | `Assets.tsx:1118-1190` | one row per location; pinned first, unresolved last |
-| Drill-down (`/assets/<locationId>/<seg>/…`) | `engine/assetPath.ts` | station → ship/container/bay → items; Back + breadcrumb |
-| Search (`?q=`) | `Assets.tsx:683` | name substring, flattens to result list, across all locations |
-| "All items" flat view (`?all=1`) | `Assets.tsx:1627` | every item, sortable, no drill-down |
-| Min-value filter (`?min=`) | `Assets.tsx:1742-1750` | flat views only; ISK shorthand accepted |
-| Flat sort (Name/Value/Quantity) | `assetSortPreference.ts` | device-local |
-| Location sort (Name/Value/Item count/Jumps away) | `stationSortPreference.ts` | device-local; pins always first |
-| Cross-character search (`?chars=`) | `Assets.tsx:719-798` | This/All Characters; only while a search is active |
-| Station Pins | `stationPins.ts`, `LocationRow` | 3-state cycle, synced Editable Data |
-| Jumps away + security | `Assets.tsx:1237-1466` | lazy, bounded to pinned/visible/open locations |
-| Route preference select | `Assets.tsx:1905` | this-view override of Travel default |
-| Select mode + bulk actions | `Assets.tsx:1658` | Quickbar, Compare, copy names, select all |
-| Item context menu | `features/market/ItemContextMenu.tsx` | right-click / long-press / More actions |
-| Item name link | `assetBrowserRows.tsx` `ItemRow` | name → Show info (Item Detail) |
-| Value estimates + totals | `engine/assetTree.ts` | average price; BPC from contract listings |
-| BPO/BPC badge | `assetBrowserRows.tsx:134-148` | blueprint stacks |
-| Open in Fittings | `Assets.tsx:1841-1855` | shown on a ship level |
-| CSV/XLSX/copy export | `assetsCsv.ts` | active Character, search-matched only |
-| Re-login, offline, truncated, stale-link states | `Assets.tsx:1691-1722,1939` | |
-| Command Palette "Assets" group | `features/commandPalette/assetsProvider.ts` | item → `/assets?q=` |
+| Feature                                          | Where                                       | Notes                                                         |
+| ------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------- |
+| Location list (root `/assets`)                   | `Assets.tsx:1118-1190`                      | one row per location; pinned first, unresolved last           |
+| Drill-down (`/assets/<locationId>/<seg>/…`)      | `engine/assetPath.ts`                       | station → ship/container/bay → items; Back + breadcrumb       |
+| Search (`?q=`)                                   | `Assets.tsx:683`                            | name substring, flattens to result list, across all locations |
+| "All items" flat view (`?all=1`)                 | `Assets.tsx:1627`                           | every item, sortable, no drill-down                           |
+| Min-value filter (`?min=`)                       | `Assets.tsx:1742-1750`                      | flat views only; ISK shorthand accepted                       |
+| Flat sort (Name/Value/Quantity)                  | `assetSortPreference.ts`                    | device-local                                                  |
+| Location sort (Name/Value/Item count/Jumps away) | `stationSortPreference.ts`                  | device-local; pins always first                               |
+| Cross-character search (`?chars=`)               | `Assets.tsx:719-798`                        | This/All Characters; only while a search is active            |
+| Station Pins                                     | `stationPins.ts`, `LocationRow`             | 3-state cycle, synced Editable Data                           |
+| Jumps away + security                            | `Assets.tsx:1237-1466`                      | lazy, bounded to pinned/visible/open locations                |
+| Route preference select                          | `Assets.tsx:1905`                           | this-view override of Travel default                          |
+| Select mode + bulk actions                       | `Assets.tsx:1658`                           | Quickbar, Compare, copy names, select all                     |
+| Item context menu                                | `features/market/ItemContextMenu.tsx`       | right-click / long-press / More actions                       |
+| Item name link                                   | `assetBrowserRows.tsx` `ItemRow`            | name → Show info (Item Detail)                                |
+| Value estimates + totals                         | `engine/assetTree.ts`                       | average price; BPC from contract listings                     |
+| BPO/BPC badge                                    | `assetBrowserRows.tsx:134-148`              | blueprint stacks                                              |
+| Open in Fittings                                 | `Assets.tsx:1841-1855`                      | shown on a ship level                                         |
+| CSV/XLSX/copy export                             | `assetsCsv.ts`                              | active Character, search-matched only                         |
+| Re-login, offline, truncated, stale-link states  | `Assets.tsx:1691-1722,1939`                 |                                                               |
+| Command Palette "Assets" group                   | `features/commandPalette/assetsProvider.ts` | item → `/assets?q=`                                           |
 
 ## Route, nav, gating
 
@@ -40,21 +40,21 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 
 ## Data sources and scopes
 
-| Data | Loader | Source | Scope |
-|---|---|---|---|
-| Assets | `features/character/assets.ts` `loadCharacterAssets` | `getCharacterAssets`, X-Pages, capped at `MAX_ASSET_PAGES = 25` (`esi/endpoints.ts:595`) | `esi-assets.read_assets.v1` |
-| Type names | `features/character/typeNames.ts` | local SDE `types.json`, then batched `postUniverseNames`, per-id `getUniverseType` on a batch 404 | public |
-| Type volumes (m³) | `loadTypeVolumes` | SDE snapshot only, never live | none |
-| NPC station names | `features/character/stations.ts` | SDE `stations.json`; ESI only if snapshot unreadable | public |
-| Structure names / systems | `features/character/structures.ts` | `getUniverseStructure` (ACL-checked, 403 is normal not re-login; names shared across the roster) | `esi-universe.read_structures.v1` |
-| Solar-system names, security | `systemSecurity.ts` | local/public | none |
-| Orphan parent names | `loadStructureName` for a `location_type:item` parent with no row (e.g. personal-hangar division in a structure) | same | same |
-| Prices | `market/prices.ts` `getAveragePriceByType` | ESI public market prices (`average_price`), stale copy shown at once, outage → badges 0 | public |
-| BPC values | `features/character/assetCopyValues.ts` | Public Contract Offers snapshot (Firestore, via dynamic import) + owner's blueprint records for ME/TE/runs (decision `20260930-120122`) | `esi-characters.read_blueprints.v1` optional; best-effort |
-| Blueprint type set (BPO badge) | `useBlueprintTypeIds` | SDE `blueprints.json`; only loads if a name ends " Blueprint"/" Formula" | none |
-| Character location (jumps) | `features/character/location.ts` | `getCharacterLocation`, once per page load per Character | `esi-location.read_location.v1` (optional) |
-| Station pins | Dexie `stationPins`, synced | local + sync | none |
-| Build plans (material menu action) | Dexie `buildPlans` | local | none |
+| Data                               | Loader                                                                                                           | Source                                                                                                                                  | Scope                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Assets                             | `features/character/assets.ts` `loadCharacterAssets`                                                             | `getCharacterAssets`, X-Pages, capped at `MAX_ASSET_PAGES = 25` (`esi/endpoints.ts:595`)                                                | `esi-assets.read_assets.v1`                               |
+| Type names                         | `features/character/typeNames.ts`                                                                                | local SDE `types.json`, then batched `postUniverseNames`, per-id `getUniverseType` on a batch 404                                       | public                                                    |
+| Type volumes (m³)                  | `loadTypeVolumes`                                                                                                | SDE snapshot only, never live                                                                                                           | none                                                      |
+| NPC station names                  | `features/character/stations.ts`                                                                                 | SDE `stations.json`; ESI only if snapshot unreadable                                                                                    | public                                                    |
+| Structure names / systems          | `features/character/structures.ts`                                                                               | `getUniverseStructure` (ACL-checked, 403 is normal not re-login; names shared across the roster)                                        | `esi-universe.read_structures.v1`                         |
+| Solar-system names, security       | `systemSecurity.ts`                                                                                              | local/public                                                                                                                            | none                                                      |
+| Orphan parent names                | `loadStructureName` for a `location_type:item` parent with no row (e.g. personal-hangar division in a structure) | same                                                                                                                                    | same                                                      |
+| Prices                             | `market/prices.ts` `getAveragePriceByType`                                                                       | ESI public market prices (`average_price`), stale copy shown at once, outage → badges 0                                                 | public                                                    |
+| BPC values                         | `features/character/assetCopyValues.ts`                                                                          | Public Contract Offers snapshot (Firestore, via dynamic import) + owner's blueprint records for ME/TE/runs (decision `20260930-120122`) | `esi-characters.read_blueprints.v1` optional; best-effort |
+| Blueprint type set (BPO badge)     | `useBlueprintTypeIds`                                                                                            | SDE `blueprints.json`; only loads if a name ends " Blueprint"/" Formula"                                                                | none                                                      |
+| Character location (jumps)         | `features/character/location.ts`                                                                                 | `getCharacterLocation`, once per page load per Character                                                                                | `esi-location.read_location.v1` (optional)                |
+| Station pins                       | Dexie `stationPins`, synced                                                                                      | local + sync                                                                                                                            | none                                                      |
+| Build plans (material menu action) | Dexie `buildPlans`                                                                                               | local                                                                                                                                   | none                                                      |
 
 - Cache key `assets` (`assets.ts:14`). Snapshot loads rows first and publishes progressively: assets, then names, volumes, location names, prices, BPC values behind (`loadAssetsSnapshot`, `Assets.tsx:273`).
 - Other Characters' assets: `loadOtherCharactersAssets` (cache-or-live per Character, concurrency capped, a failing/ungranted Character is skipped, not fatal). Cached per resolved id set within the page visit (`crossCharacterCacheRef`).
@@ -181,18 +181,18 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 
 ## Persistence and sync
 
-| State | Where | Synced |
-|---|---|---|
-| Drill path | URL `/assets/<id>/<seg>…` | no |
-| Search, All items, min value, Character filter | `?q`, `?all`, `?min`, `?chars` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`) | no |
-| Location sort | device-local `assetsStationSort` | no |
-| Item (flat) sort | device-local `assetsItemSort` | no |
-| Route override | component state only | no |
-| Select mode, selection | component state only (cleared on toggle off) | no |
-| Station Pins | Dexie `stationPins` (scope `character` or `account`) | **synced** Editable Data; an account pin from any Character elevates the station for all |
-| Quickbar adds | Dexie quickbar | synced |
-| Compare Set adds | memory store | no |
-| Assets, names, prices | Dexie ESI cache; per Character | no |
+| State                                          | Where                                                                                              | Synced                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Drill path                                     | URL `/assets/<id>/<seg>…`                                                                          | no                                                                                       |
+| Search, All items, min value, Character filter | `?q`, `?all`, `?min`, `?chars` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`) | no                                                                                       |
+| Location sort                                  | device-local `assetsStationSort`                                                                   | no                                                                                       |
+| Item (flat) sort                               | device-local `assetsItemSort`                                                                      | no                                                                                       |
+| Route override                                 | component state only                                                                               | no                                                                                       |
+| Select mode, selection                         | component state only (cleared on toggle off)                                                       | no                                                                                       |
+| Station Pins                                   | Dexie `stationPins` (scope `character` or `account`)                                               | **synced** Editable Data; an account pin from any Character elevates the station for all |
+| Quickbar adds                                  | Dexie quickbar                                                                                     | synced                                                                                   |
+| Compare Set adds                               | memory store                                                                                       | no                                                                                       |
+| Assets, names, prices                          | Dexie ESI cache; per Character                                                                     | no                                                                                       |
 
 ## Decisions (why)
 
@@ -257,6 +257,7 @@ Root list and drill-in; total value chip (#1617); focus to heading (#1485); syst
 Entry points from Assets: item row name link (`ItemInfoLink`, `assetBrowserRows.tsx:390` `ItemRow`), item menu "Show info" (`ItemContextMenu.tsx:153`, `ShowInfoMenuItem`). Not from search rows (plain link). From Contracts: every item line name (`ItemInfoLink`) in the three detail modals. From Wallet: journal market-line name (`JournalDescriptionCell.tsx`).
 
 Behaviour:
+
 - Mounted only while open; mounting is the open signal (`ItemDetailModal.tsx:124`). The app-level host (`ItemInfoModal`) is used from Assets/Wallet/Contracts, so Item Detail opens over the page via URL `?info=type-<id>`; Back closes it (`closeOnBack` is true only when no `onLeave`, `:245`). A link that leaves the modal (Open in Market, price figure, Used-in menu) replaces the history entry and calls `onLeave`, not `onClose`, to avoid racing the link (`:92-97`).
 - Header: item name, **Open in Market** button (only when `showOpenInMarket`, which `ItemInfoModal` sets, `ItemInfoModal.tsx:61`; the Market Browser itself omits it). Link target `marketItemUrl(typeId, search)` keeps the page's hub/region query.
 - Body (all live except local SDE bits): icon 64px, packaged **volume** (m³), **Best sell / Best buy** figures, description (`EveMarkupText`).
@@ -275,6 +276,7 @@ Interview Qs: **Why does Show info keep working offline?** It does not fully: ty
 ## Corp assets: the shared surface (`/corp/assets`)
 
 Full spec in `docs/features/corp.md` section 4. What it shares with Assets and where it differs (all verified in code):
+
 - Shared: `ItemRow`, `ContainerRow`, `LocationRow`, `SectionHeading` (`assetBrowserRows.tsx`), tree engine `engine/assetTree.ts` (`buildAssetGroups`, `assetTree.ts:292-381`), `ItemContextMenu`, selection helpers (`assetSelection.ts`), CSV shape (Location, Item, Quantity), 250 ms search debounce, URL `q`, virtualized rows.
 - Different: top level is a group (hangar division or special flag) not a station, via `engine/corp/assetDivisions.ts` and `engine/corp/assetPath.ts`; `LocationRow` is rendered with `showPin={false}` and no security/jumps (`CorpAssets.tsx:805-818`); no cross-character merge, no All-items toggle, no min-value filter, no route/jumps selects (`CorpAssets.tsx:20-30` header comment); item menu has `blueprintTypeID={null}` so Build Plan is permanently "No blueprint options" and the blueprint catalog never loads (`:29`); blueprint copy values only if `canReadBlueprints`.
 - Gating: `canReadAssets` capability (Director) hides the destination when absent (`navDestinations.ts:141`, `CorpDenied`). Scope `esi-assets.read_corporation_assets.v1` + divisions scope (`corp.md` access model). Route `UNGATED` with capability gate instead (`routeScopes.ts:156-165`).

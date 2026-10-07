@@ -4,17 +4,17 @@ Fitting = one hull + modules, charges, drones, fighters, cargo, under a name (CO
 
 ## Summary
 
-| Feature | Route | Notes |
-|---|---|---|
-| Start screen (library) | `/ships/fittings` | search, grouped by hull, preview pane, New from hull, Import |
-| Editor | `/ships/fittings/edit?f=<code>` | Ring/List, Add panel, stats sections, header |
-| Load (Import) | dialog / inline card | EFT, DNA, share code, eveship.fit, EVE Workbench, killmail, EVE XML |
-| My Fittings | Dexie `fittings`, synced | Save / Update / Save as new / rename / delete / notes |
-| In-game Fittings | ESI read + write | Save to EVE, overwrite = delete + create |
-| Export | editor menu | Share Link, EFT, multibuy, EVE XML, Manufacture Plan, Appraise |
-| Compare | `/ships/fittings/compare?f=&f=&f=` | up to 3 Fittings, 2 CSVs |
-| Shared view | `/share/fitting?f=` (+ `/share/:id`) | read-only, no login, all skills V |
-| Legacy redirects | `/fittings/*`, `/skills/ships` | permanent |
+| Feature                | Route                                | Notes                                                               |
+| ---------------------- | ------------------------------------ | ------------------------------------------------------------------- |
+| Start screen (library) | `/ships/fittings`                    | search, grouped by hull, preview pane, New from hull, Import        |
+| Editor                 | `/ships/fittings/edit?f=<code>`      | Ring/List, Add panel, stats sections, header                        |
+| Load (Import)          | dialog / inline card                 | EFT, DNA, share code, eveship.fit, EVE Workbench, killmail, EVE XML |
+| My Fittings            | Dexie `fittings`, synced             | Save / Update / Save as new / rename / delete / notes               |
+| In-game Fittings       | ESI read + write                     | Save to EVE, overwrite = delete + create                            |
+| Export                 | editor menu                          | Share Link, EFT, multibuy, EVE XML, Manufacture Plan, Appraise      |
+| Compare                | `/ships/fittings/compare?f=&f=&f=`   | up to 3 Fittings, 2 CSVs                                            |
+| Shared view            | `/share/fitting?f=` (+ `/share/:id`) | read-only, no login, all skills V                                   |
+| Legacy redirects       | `/fittings/*`, `/skills/ships`       | permanent                                                           |
 
 Scope gating: `/ships` and `/ships/fittings/compare` are UNGATED (`src/app/routeScopes.ts:104-111`); only In-game Fittings panel and Save to EVE gate on scope.
 
@@ -42,6 +42,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 - Variants: `page`, dialog (editor "Open a fitting"), Compare picker; `importInline` swaps list for Load card with Back.
 
 ### New from hull (`HullPicker.tsx`, modal `NewFromHullDialog`)
+
 - Search hulls (placeholder "Vexor, Gila, heavy assault..."); prompt until query typed; no-match state.
 - Pick, then Start fitting (double-click starts at once).
 - Popular fits panel per hull (`PopularFitsPanel.tsx`): source tabs zKillboard / EVE Workbench.
@@ -50,6 +51,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
   - Failure/empty/loading states each have copy; "Everything else still works".
 
 ### Load / Import (`FittingLoadCard.tsx`, `loadFittingFromText.ts`, `engine/fittings/load.ts`)
+
 - Paste box "Link or text" + Load. Accepts: EFT text, in-game fitting link / DNA string, Fitting Share Code or Share Link, eveship.fit link, EVE Workbench fit link, zKillboard killmail link (ESI killmail via hash from zKillboard).
 - Errors: invalid link, newer-version code, unrecognised, workbench not-found/failed, killmail not-found/failed.
 - Unresolved lines/items listed (EFT line number + reason), non-fatal.
@@ -59,12 +61,14 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 ## Editor (`src/routes/Fittings.tsx`)
 
 Layout (`THREE_COLUMN_QUERY` 100rem):
+
 - Wide: module browser (Add panel) | Ring or List | stats sections.
 - Narrower desktop: Add panel is a left `SlideOver`, opened by an empty slot or "Add module".
 - Below desktop (mobile): tabs Ring / List / Stats (`phoneTabs`), Add as a sheet `Modal`, rack sheets, drones sheet.
 - Open Fitting shows no page header / tab bar.
 
 ### Header (`FittingHeader.tsx`)
+
 - Fittings menu: New from a hull..., Import..., Open a fitting... (modal of the Start list), Compare.
 - Fitting name with Rename; "Saved in My Fittings" badge; kebab "Fitting actions" (Export submenu, Compare).
 - Header badges: Alpha chip (`AlphaCloneChip`: Alpha OK / Omega only by skill caps, with tooltip listing blockers), Mastery chip (`MasteryChip`: hull Mastery tiers, hide completed, suggested note, total time), Missing skills chip (`MissingSkillsChip`: count + train time, opens skill list with add-to-plan).
@@ -75,6 +79,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Price hub select (`PriceHubSelect`), Manage.
 
 ### Save (`FittingSaveButton.tsx`)
+
 - Save / Update (split button): Save as new... (name modal, default "<name> copy"), Save to EVE.
 - Shortcuts: Mod+S save, Mod+Shift+S save as new (`useChord`; listed in Help > Shortcuts).
 - Disabled states with reason: needs Character, too large, needs permission.
@@ -82,6 +87,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Save to EVE (`SaveToEveDialog.tsx`, `saveToEve.ts`): name, target "New In-game Fitting" or "Replace <name>" (confirm text; delete after successful create; partial-failure dialog "Saved, but the old Fitting is still there"). Drops module state, charge binding, implants (`dropsNote`). Needs `esi-fittings.write_fittings.v1` (`GrantBanner` if absent); ESI POST/DELETE `/characters/{id}/fittings/`.
 
 ### Ring / List
+
 - Ring (`FittingRing.tsx`, `engine/fittings/ringLayout.ts`): slot tiles by rack (high, medium, low, rig, subsystem), cargo tiles, CPU / powergrid / calibration / drone bandwidth gauges with over-by state, hardpoint counters (turret/launcher, over-hull warning), rack count and "N can't use" (missing skills) badges, drone count "x of y launched". Empty-slot click opens Add targeted at that slot. Keyboard-operable tiles.
 - List (`FittingRackList.tsx`, `FittingModuleList.tsx`): same racks as rows with resource meters, state control, charge, remove, drag-to-move, variations; drones section (bay, launch squares, quantity); cargo section with hold m3.
 - Ring/List toggle persisted as setting `fittingsView` (`fittingViewPreference.ts`).
@@ -94,6 +100,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Over-budget flash (`useOverBudgetFlash`).
 
 ### Add panel (`FittingAddPanel.tsx`)
+
 - Tabs: Modules, Charges, Drones, Cargo. Search items. Filters: Fits this slot, Hull, Resources, Skills (tooltips), Meta level select; "N more hidden by filters - show".
 - Row disabled reasons: missing skills, doesn't fit hull, no bay room, no free slot, too much CPU/PG/calibration. Hull check runs whole-catalogue in a Web Worker with cached results (`hullFitService.ts`, `hullFit.worker.ts`, `hullFitCache.ts`); search works before ship data is downloaded.
 - Charges tab: charge-taker list with loaded state; `ChargePicker` / `ListChargePicker` group by type or faction or Chart (range vs damage), Sort range/damage/price, Tech I / In cargo / Usable filters, "Fighting at..." distance, quick picks (max damage, max range, best value), "strictly worse" notes, price per hub (`engine/fittings/chargeChoice.ts`). Cap booster guide (`CapBoosterGuide`, `capBoosterChoice.ts`: stable %, GJ/s, ISK/GJ, smallest stable / most GJ/s / best value). Mining crystal guide (`MiningCrystalGuide`, `crystalChoice.ts`: Type A/B/C help, ore families, yield, cycle, residue).
@@ -101,7 +108,9 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Click fits; drag onto Ring/List.
 
 ### Stats sections (`FittingStatsSections.tsx:276-310`)
+
 Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToTrain, offense, appliedDps, defense, capacitor, support, mining, fleetBoosts, projected, targeting, navigation, drones, fighters, fitting, price. Open/closed map is a device-local setting `fittingsStatsSections` (`statsSectionsPreference.ts`, localStorage-backed `createLocalSetting`, never in URL, not synced): untouched sections follow the default (open on desktop for offense, appliedDps, defense, capacitor, support, mining, fleetBoosts, navigation, drones, fighters; assumptions/whatToTrain/projected/targeting/fitting/price start collapsed; everything collapsed on a phone). There is no reorder or hide control (verified: the key stores booleans only).
+
 - Toolbar (`StatsToolbar.tsx`): Copy stats (plain text via `fittingStatsText.ts`), Overheat all (every figure overheated).
 - Offense: per-weapon DPS/volley/range, total, unheated vs overheated, sustained with reload, "N weapons have no charge" hint, drones don't overheat.
 - Applied DPS (`AppliedDpsPanel`, `AppliedDpsChart`, `engine/fittings/appliedDps.ts`): raw vs applied at best range, graphs vs range and vs target speed, overlay another Fitting; own calculation (not the engine's), assumptions text. Target profile picker (`TargetProfilePicker`, built-in NPC classes + custom: signature, speed, resists; synced settings `sync.fittingTargetProfiles`, `sync.fittingTargetProfileId`).
@@ -114,10 +123,12 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 - States: downloading ship data % (indeterminate), engine error with Try again, skills load error, "Not available".
 
 ### Other editor dialogs
+
 - Appraisal modal (`FittingAppraisalModal.tsx`): item, qty, unit price, line total, basis "lowest <hub> sell order", Copy to multibuy.
 - Rename (`SavedFittingModals`), Delete confirm ("can't be undone"), Save as new, Save to EVE, Open a fitting, Item variations/affected-by, Cargo quantity, Implants & boosters.
 
 ### Export menu (`FittingExportMenu.tsx`, `useFittingExport.ts`, `fittingExportText.ts`)
+
 - Copy Share Link: short `/share/<id>` link via `features/share/shareStore` (same code gives same link, expires; Firestore backed); too-large and failure notices.
 - Copy Fitting (EFT), Copy multibuy list, Download EVE XML (`fittingXmlDocument.ts`), Manufacture Plan (router state to `/industry`, `@/lib/shortcuts`), Appraise in Market (router state to Market). Price preview Jita sell/buy in menu.
 
@@ -125,14 +136,14 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 
 No one-click "make it fit" or auto-fit exists (no such module in `src/features/fittings` or `src/engine/fittings`). Tools that avoid trying alternatives one by one:
 
-| Tool | Where | What it shows |
-|---|---|---|
-| Gauge / Fitting section | Ring gauges, stats "Fitting" section | CPU/PG used vs total, over-by state, over-budget flash |
-| Swap for meta variant / Variations modal | Item menu on a module | All meta variants in one table: whole-fitting stat changes, Fits / Doesn't fit, can-fly, price; click to swap; CSV |
-| Add panel filters | Add panel > Modules | "Fits this slot", Resources filter, Meta level; rows disabled with reason "too much CPU/PG" |
-| What to train | Stats section | Skill levels ranked by effect on the fit (CPU/PG skills included), Add to Skill Plan; Tech II upgrades within a few skills |
-| Implant Finder | Header Implants control | Tries every implant on this fit; lists cheapest fixes when over CPU/PG (`implantFinder.ts`) |
-| Skill basis: All V | Header Skill basis control | Stats only; shows if skills alone would fix it |
+| Tool                                     | Where                                | What it shows                                                                                                              |
+| ---------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Gauge / Fitting section                  | Ring gauges, stats "Fitting" section | CPU/PG used vs total, over-by state, over-budget flash                                                                     |
+| Swap for meta variant / Variations modal | Item menu on a module                | All meta variants in one table: whole-fitting stat changes, Fits / Doesn't fit, can-fly, price; click to swap; CSV         |
+| Add panel filters                        | Add panel > Modules                  | "Fits this slot", Resources filter, Meta level; rows disabled with reason "too much CPU/PG"                                |
+| What to train                            | Stats section                        | Skill levels ranked by effect on the fit (CPU/PG skills included), Add to Skill Plan; Tech II upgrades within a few skills |
+| Implant Finder                           | Header Implants control              | Tries every implant on this fit; lists cheapest fixes when over CPU/PG (`implantFinder.ts`)                                |
+| Skill basis: All V                       | Header Skill basis control           | Stats only; shows if skills alone would fix it                                                                             |
 
 Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot rules only (`FittingVariationsPanel.tsx:95-110`).
 
@@ -158,32 +169,32 @@ Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot
 
 ## Data sources
 
-| Data | Source |
-|---|---|
-| Hulls, modules, attributes | SDE / `loadSde`, pinned dogma engine assets (Cache Storage) |
-| My Fittings, notes | Dexie `fittings` (synced) |
-| In-game Fittings | ESI GET `/characters/{id}/fittings` (`esi-fittings.read_fittings.v1`), cached key `fittings:inGame` |
-| Save to EVE | ESI POST/DELETE fittings (`esi-fittings.write_fittings.v1`) |
-| Popular fits | zKillboard + ESI killmail; Firestore `workbenchFits` |
-| Prices | market hub data (price hub setting) |
-| Share Links | `features/share/shareStore` |
-| Prefs | settings `fittingsView`, `fittingsStatsSections`, synced damage/target profile keys, charge picker settings |
-| Skills / implants / clone | active Character's cached ESI data (`fittingPilotProfile.ts`) |
+| Data                       | Source                                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Hulls, modules, attributes | SDE / `loadSde`, pinned dogma engine assets (Cache Storage)                                                 |
+| My Fittings, notes         | Dexie `fittings` (synced)                                                                                   |
+| In-game Fittings           | ESI GET `/characters/{id}/fittings` (`esi-fittings.read_fittings.v1`), cached key `fittings:inGame`         |
+| Save to EVE                | ESI POST/DELETE fittings (`esi-fittings.write_fittings.v1`)                                                 |
+| Popular fits               | zKillboard + ESI killmail; Firestore `workbenchFits`                                                        |
+| Prices                     | market hub data (price hub setting)                                                                         |
+| Share Links                | `features/share/shareStore`                                                                                 |
+| Prefs                      | settings `fittingsView`, `fittingsStatsSections`, synced damage/target profile keys, charge picker settings |
+| Skills / implants / clone  | active Character's cached ESI data (`fittingPilotProfile.ts`)                                               |
 
 ## Persistence and sync map
 
-| State | Where | Synced |
-|---|---|---|
-| Open Fitting (the working state) | URL `?f=<Share Code>` on `/ships/fittings/edit`; every edit pushes a history entry, edits from one control within 1 s coalesce (`20260924-183346`, `useFittingWorkspace.ts:166-185`) | no (URL only) |
-| Saved Fitting | Dexie `fittings` (`id, characterId`), record = name + code + optional notes + updatedAt (`myFittings.ts`) | yes, Firestore via `planSync` `fittingSpec`; deletes tombstoned by `markFittingDeleted` |
-| In-game Fittings list | ESI cache key `fittings:inGame` (`inGameFittings.ts`, conditional fetch, ETag) | no (ESI re-pulled per device) |
-| Ring / List choice | local setting `fittingsView` | no |
-| Stats section open/closed | local setting `fittingsStatsSections`; default open on desktop per section list, collapsed on phone (`statsSectionsPreference.ts`) | no |
-| Damage profiles, target profiles (custom + selected id) | settings `sync.fittingDamageProfiles/Id`, `sync.fittingTargetProfiles/Id` | yes |
-| Hull-fit check results | Dexie `hullFitCache`, one row per hull + skill set, newest 40 kept (`hullFitCache.ts:12`) | no, rebuildable |
-| Dogma engine WASM + `sde.dat` (~10 MB) | Cache Storage `dogma-engine-assets-<pin>`; stale pins deleted (`dogmaFittingEngine.ts`) | no |
-| Short Share Links | Firestore share docs, TTL 7 days, reused if >24 h left (`shareStore.ts:23,69`) | server-side |
-| Query-level state not persisted | Add-panel search text, filter chips, chosen slot never touch the URL | n/a |
+| State                                                   | Where                                                                                                                                                                                | Synced                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Open Fitting (the working state)                        | URL `?f=<Share Code>` on `/ships/fittings/edit`; every edit pushes a history entry, edits from one control within 1 s coalesce (`20260924-183346`, `useFittingWorkspace.ts:166-185`) | no (URL only)                                                                           |
+| Saved Fitting                                           | Dexie `fittings` (`id, characterId`), record = name + code + optional notes + updatedAt (`myFittings.ts`)                                                                            | yes, Firestore via `planSync` `fittingSpec`; deletes tombstoned by `markFittingDeleted` |
+| In-game Fittings list                                   | ESI cache key `fittings:inGame` (`inGameFittings.ts`, conditional fetch, ETag)                                                                                                       | no (ESI re-pulled per device)                                                           |
+| Ring / List choice                                      | local setting `fittingsView`                                                                                                                                                         | no                                                                                      |
+| Stats section open/closed                               | local setting `fittingsStatsSections`; default open on desktop per section list, collapsed on phone (`statsSectionsPreference.ts`)                                                   | no                                                                                      |
+| Damage profiles, target profiles (custom + selected id) | settings `sync.fittingDamageProfiles/Id`, `sync.fittingTargetProfiles/Id`                                                                                                            | yes                                                                                     |
+| Hull-fit check results                                  | Dexie `hullFitCache`, one row per hull + skill set, newest 40 kept (`hullFitCache.ts:12`)                                                                                            | no, rebuildable                                                                         |
+| Dogma engine WASM + `sde.dat` (~10 MB)                  | Cache Storage `dogma-engine-assets-<pin>`; stale pins deleted (`dogmaFittingEngine.ts`)                                                                                              | no                                                                                      |
+| Short Share Links                                       | Firestore share docs, TTL 7 days, reused if >24 h left (`shareStore.ts:23,69`)                                                                                                       | server-side                                                                             |
+| Query-level state not persisted                         | Add-panel search text, filter chips, chosen slot never touch the URL                                                                                                                 | n/a                                                                                     |
 
 ## Formulas and limits (what the numbers mean)
 
@@ -208,17 +219,18 @@ Engine split: `@eveshipfit/dogma-engine` (WASM, ADR 0016) computes attributes, r
 
 ## Scope and degraded behavior
 
-| Need | Scope / data | When missing |
-|---|---|---|
-| Open, edit, stats, Compare, Share view | none (SDE + dogma) | ungated routes (`routeScopes.ts:104-114`) |
-| Own skills in stats / can-fly | `esi-skills.read_skills.v1` | pilot profile load fails: "Couldn't load this Character's skills" with Try again (`usePilotProfile`); with no Character: All V profile |
-| Clone implants in stats | `esi-clones.read_implants.v1` | `ImplantsAssumedNote`; stats assume none |
-| In-game Fittings list | `esi-fittings.read_fittings.v1` | panel-level `GrantBanner`; rest of Start screen works |
-| Save to EVE | `esi-fittings.write_fittings.v1` | Save to EVE dialog shows GrantBanner; ESI refusal also yields `needsPermission` |
-| Popular fits / killmail Load | none (zKillboard public + ESI public killmail) | note only; Load shows killmail errors |
-| No Character at all | none | Save disabled with reason; stats at all-V |
+| Need                                   | Scope / data                                   | When missing                                                                                                                           |
+| -------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Open, edit, stats, Compare, Share view | none (SDE + dogma)                             | ungated routes (`routeScopes.ts:104-114`)                                                                                              |
+| Own skills in stats / can-fly          | `esi-skills.read_skills.v1`                    | pilot profile load fails: "Couldn't load this Character's skills" with Try again (`usePilotProfile`); with no Character: All V profile |
+| Clone implants in stats                | `esi-clones.read_implants.v1`                  | `ImplantsAssumedNote`; stats assume none                                                                                               |
+| In-game Fittings list                  | `esi-fittings.read_fittings.v1`                | panel-level `GrantBanner`; rest of Start screen works                                                                                  |
+| Save to EVE                            | `esi-fittings.write_fittings.v1`               | Save to EVE dialog shows GrantBanner; ESI refusal also yields `needsPermission`                                                        |
+| Popular fits / killmail Load           | none (zKillboard public + ESI public killmail) | note only; Load shows killmail errors                                                                                                  |
+| No Character at all                    | none                                           | Save disabled with reason; stats at all-V                                                                                              |
 
 ## Test-covered behavior (read from the tests; none run)
+
 - Routes (`fittingRoutes.test.ts`): Fittings, editor and Tree live under `/ships`; a Share Link on the Fittings tab moves to the editor keeping the query; editor with no Fitting goes to the library; every old `/fittings?f=` link opens the editor in one hop; old library/editor/compare paths and old Skills > Ships go to their new homes keeping query and hash.
 - Compare URL (`compareUrl.test.ts`): reads every `f` in order, drops empties, caps at 3, clearing removes `f`, other query keys untouched.
 - Compare engine (`engine/fittings/fittingCompare.test.ts`): best is higher for DPS/volley/tank/repair, lower for signature radius/agility; no highlight for CPU used etc.; 3-way tie marks all indices; ties after rounding mean "not differing"; stable capacitor outranks unstable, then higher stable % / longer depletion; unstable encoded negative; price rows only when prices supplied.
@@ -239,6 +251,7 @@ Engine split: `@eveshipfit/dogma-engine` (WASM, ADR 0016) computes attributes, r
 - Implant Finder (`ImplantFinder.test.tsx`): goals by fit problem, LP Store price when cheaper and redeemable, family keeps Remove, boosters for a weapon, slot-strip narrowing, info button.
 
 ## Decision links
+
 ADR `docs/adr/0016-fitting-stats-from-eveshipfit-dogma-engine.md`. Scope decisions in `docs/context/decisions/`: `20260924-150509` (fitter after all), `20260924-183346` (edits push history), `20260924-191854` (My Fittings per Character), `20260924-195833` (killmail hash via zKillboard), `20260925-113331` (Load launches drones), `20260925-152418` + `20261001-210222` (one list, tap opens on phone), `20261002-191845` (bay count counts every carried drone; supersedes `20260930-184245`), `20261004-135042` (one implants control), `20261002-194757/231614` (Implant Finder), `20261003-173240` + `20261004-144240` (out-of-date Workbench fits never listed), `20261005-220111` (Ctrl/Cmd+S chords, Back is undo), `20261004-101406` (specialised holds, Industry side), `20260927-104634` (Manufacture Plan export).
 
 ## Interview Q&A
@@ -260,6 +273,7 @@ ADR `docs/adr/0016-fitting-stats-from-eveshipfit-dogma-engine.md`. Scope decisio
 ## Observed gaps
 
 Verified against code in this pass:
+
 - Compare capped at 3 (`compareUrl.ts:9`); phone shows a window with Previous/Next, CSV includes all Fittings.
 - Corporation fittings: no ESI source; EVE XML Load only.
 - Save to EVE cannot keep module state, charge binding or implants; overwrite order is create-then-delete so a failed delete leaves both (`saveToEve.ts`).
@@ -274,6 +288,7 @@ Verified against code in this pass:
 - English only.
 
 ## Improvement ideas
+
 - Retry control on Popular fits and a distinct rate-limited message.
 - Library multi-select with bulk delete and bulk EFT/XML export; CSV of a single Fitting's stats.
 - Optional ESI fitting write that preserves charges by emitting them as cargo/fitted charge flags, and show a diff before overwrite.

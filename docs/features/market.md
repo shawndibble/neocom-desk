@@ -4,22 +4,22 @@ Scope: `/market` (Browser, Open orders, History, History > Transactions, Apprais
 
 ## Summary table
 
-| Feature | Where | Notes |
-|---|---|---|
-| Market page shell | `/market`, `src/routes/Market.tsx` | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves |
-| Browser | `/market/browser` | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters |
-| Order book item tabs | Browser item panel | Order book, Variations, Price history |
-| Quickbar | Browser finder column | Per-character pinned items, drag reorder, price alerts |
-| Compare drawer | all Market tabs when set non-empty | Prices + Attributes views; scratch set |
-| Open orders | `/market/orders` | All-character worklist by problem; Order Detail modal |
-| History (orders) | `/market/history` | Expired/cancelled orders |
-| Transactions | `/market/history/transactions` | Wallet fills with realized margin; reached via History view select (not its own tab button) |
-| Appraisal | `/market/appraisal` | Paste list, price at hub, net/refine/LP, Compare Hubs, share link |
-| Hauling | `/market/hauling` | Hub price-gap scan, Trip Plan, Multibuy |
-| LP Store | `/market/lp-store[/:corporationId]` | Market sub-view (nav), own route; ISK/LP ranking |
-| Contract Item search | `/contracts/search/items` | Public contract lines from shared Firestore snapshot |
-| Courier search | `/contracts/search/courier` | Public courier contracts ranked ISK/jump |
-| Page paste | `src/app/GlobalPasteRouter.tsx` | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal |
+| Feature              | Where                               | Notes                                                                                       |
+| -------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| Market page shell    | `/market`, `src/routes/Market.tsx`  | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves               |
+| Browser              | `/market/browser`                   | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters      |
+| Order book item tabs | Browser item panel                  | Order book, Variations, Price history                                                       |
+| Quickbar             | Browser finder column               | Per-character pinned items, drag reorder, price alerts                                      |
+| Compare drawer       | all Market tabs when set non-empty  | Prices + Attributes views; scratch set                                                      |
+| Open orders          | `/market/orders`                    | All-character worklist by problem; Order Detail modal                                       |
+| History (orders)     | `/market/history`                   | Expired/cancelled orders                                                                    |
+| Transactions         | `/market/history/transactions`      | Wallet fills with realized margin; reached via History view select (not its own tab button) |
+| Appraisal            | `/market/appraisal`                 | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                           |
+| Hauling              | `/market/hauling`                   | Hub price-gap scan, Trip Plan, Multibuy                                                     |
+| LP Store             | `/market/lp-store[/:corporationId]` | Market sub-view (nav), own route; ISK/LP ranking                                            |
+| Contract Item search | `/contracts/search/items`           | Public contract lines from shared Firestore snapshot                                        |
+| Courier search       | `/contracts/search/courier`         | Public courier contracts ranked ISK/jump                                                    |
+| Page paste           | `src/app/GlobalPasteRouter.tsx`     | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                             |
 
 ## 1. Route, nav, scopes
 
@@ -30,40 +30,39 @@ Scope: `/market` (Browser, Open orders, History, History > Transactions, Apprais
 - Page layout: `max-w-[96rem]` on Browser else `max-w-6xl` (`Market.tsx:759`). Header hub picker/refresh described in section 2.1.
 - Held at route level so they survive tab switches: `useAppraisal` (pasted list), `useOrderBookOrchestration` (CompareDrawer and Item Detail read it), Compare Set (`Market.tsx:473,493`).
 
-
 ## 2. Browser tab (`/market/browser`)
 
 Default tab (`/market` and unknown segments redirect here; `src/app/pageTabs.ts:126`, first `MARKET_TABS` entry). Finder column (22rem, sticky on `lg`) left, selected item's panel right; phone shows one column at a time (finder, or item with a Back icon button in the panel header: `src/routes/Market.tsx:681-689`). Page width `max-w-[96rem]` on Browser, `max-w-6xl` elsewhere (`Market.tsx:759`). Source: ESI `GET /markets/{region}/orders?type_id=&order_type=all` (public, no scope; `src/esi/endpoints.ts:936`), ADR 0003; catalogue (groups/types/systems/stations/regions) lazy-loaded SDE JSON (`useMarketCatalogue`), not precached. Route is `UNGATED` (`src/app/routeScopes.ts:57`).
 
 ### 2.1 Page header (Browser + Appraisal only)
 
-| Control | Behavior |
-|---|---|
-| Location Mode chips (Trade Hub / Region) | Browser only. Device-local pref (`locationMode`), URL `hub`/`region` wins. `Market.tsx:773` |
-| Trade Hub select | `TRADE_HUBS` (`src/market/hubs`). Shown in Hub mode, always on Appraisal. Device-local; a linked `?hub=` is copied into the device setting (`useMarketBrowser.ts:230`, decision `20260926-201312`) |
-| Region select (`RegionSelect`, searchable) | Region mode. Options = baked Market Regions; first option "All regions" = `region=all` (`engine/market/locationMode.ts:ALL_REGIONS`) |
-| Refresh icon | Section aware: Browser re-reads item's order book bypassing 300s TTL; Appraisal re-prices pasted list; if catalogue failed, retries catalogue. Disabled with no item/while loading (`Market.tsx:641-656,831`) |
-| Hauling refresh | On Hauling tab the header holds Hauling's reload (`HaulingPanel` hands handler up; `Market.tsx:838`) |
+| Control                                    | Behavior                                                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Location Mode chips (Trade Hub / Region)   | Browser only. Device-local pref (`locationMode`), URL `hub`/`region` wins. `Market.tsx:773`                                                                                                                   |
+| Trade Hub select                           | `TRADE_HUBS` (`src/market/hubs`). Shown in Hub mode, always on Appraisal. Device-local; a linked `?hub=` is copied into the device setting (`useMarketBrowser.ts:230`, decision `20260926-201312`)            |
+| Region select (`RegionSelect`, searchable) | Region mode. Options = baked Market Regions; first option "All regions" = `region=all` (`engine/market/locationMode.ts:ALL_REGIONS`)                                                                          |
+| Refresh icon                               | Section aware: Browser re-reads item's order book bypassing 300s TTL; Appraisal re-prices pasted list; if catalogue failed, retries catalogue. Disabled with no item/while loading (`Market.tsx:641-656,831`) |
+| Hauling refresh                            | On Hauling tab the header holds Hauling's reload (`HaulingPanel` hands handler up; `Market.tsx:838`)                                                                                                          |
 
 ### 2.2 Finder (left column)
 
-| Feature | Notes |
-|---|---|
-| Search box | Filters EVE Market Group tree by item name, min 3 chars (`MARKET_TREE_MIN_QUERY_LENGTH`), debounced write to URL `browser.q` (reload/share restores). Hints: "too short", "closest spellings" (fuzzy, only when no substring match: `lib/fuzzySearch`), capped at 50 matches with total shown (`features/market/marketTree.ts:11-14`). Exact-name match pinned as "Best match" above tree |
-| Filter funnel (`BrowserFilterBar`) | Same `BrowserFilterValue` as the scope bar: Distance (Jump Range select + Current System picker), Min quantity, Security chips (high/low/null/etc via `SPACE_KINDS`), NPC stations only. Security + NPC only appear when the book spans stations (Region mode or Jump Range set). Active-count badge. Phone: sheet with draft + Apply. `OrderBookScopeBar.tsx:59-125` |
-| Market Group tree | Expand/collapse, items with type icon, `aria-current` on selected. Search forces matched branches open but user can still collapse (separate `searchCollapsedIds`). `?group=` cross-link pre-expands a category once. Max height 32rem / viewport on desktop. 44px rows on touch. `Market.tsx:156-258` |
-| Empty/loading/error | Spinner while loading; `market.loadFailedTitle` + Refresh retries; "no results" EmptyState |
-| Quickbar list | Below tree. See section 4.6 |
+| Feature                            | Notes                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search box                         | Filters EVE Market Group tree by item name, min 3 chars (`MARKET_TREE_MIN_QUERY_LENGTH`), debounced write to URL `browser.q` (reload/share restores). Hints: "too short", "closest spellings" (fuzzy, only when no substring match: `lib/fuzzySearch`), capped at 50 matches with total shown (`features/market/marketTree.ts:11-14`). Exact-name match pinned as "Best match" above tree |
+| Filter funnel (`BrowserFilterBar`) | Same `BrowserFilterValue` as the scope bar: Distance (Jump Range select + Current System picker), Min quantity, Security chips (high/low/null/etc via `SPACE_KINDS`), NPC stations only. Security + NPC only appear when the book spans stations (Region mode or Jump Range set). Active-count badge. Phone: sheet with draft + Apply. `OrderBookScopeBar.tsx:59-125`                     |
+| Market Group tree                  | Expand/collapse, items with type icon, `aria-current` on selected. Search forces matched branches open but user can still collapse (separate `searchCollapsedIds`). `?group=` cross-link pre-expands a category once. Max height 32rem / viewport on desktop. 44px rows on touch. `Market.tsx:156-258`                                                                                    |
+| Empty/loading/error                | Spinner while loading; `market.loadFailedTitle` + Refresh retries; "no results" EmptyState                                                                                                                                                                                                                                                                                                |
+| Quickbar list                      | Below tree. See section 4.6                                                                                                                                                                                                                                                                                                                                                               |
 
 ### 2.3 Item panel header
 
-| Control | Notes |
-|---|---|
-| Pin (Quickbar add/remove) | Disabled with tooltip when no active character (Quickbar is per character, Dexie `quickbars`). `Market.tsx:996` |
-| Compare (add/remove from Compare Set) | Opens Compare drawer when set non-empty; see section 4.3 |
-| Price alert bell (`ItemPriceAlertBell`) | Sets above/below target on the Quickbar item (pins if needed); disabled with no character |
-| Info icon | Show info: the shared Item Detail modal, priced at `orderBookLocation` (`ItemActionsProvider`) |
-| Required skills disclosure (`ItemSkillsDisclosure`) | Folded; "N of M trained" with a character, else count; open shows same section as Show info (Add to Plan) |
+| Control                                             | Notes                                                                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Pin (Quickbar add/remove)                           | Disabled with tooltip when no active character (Quickbar is per character, Dexie `quickbars`). `Market.tsx:996` |
+| Compare (add/remove from Compare Set)               | Opens Compare drawer when set non-empty; see section 4.3                                                        |
+| Price alert bell (`ItemPriceAlertBell`)             | Sets above/below target on the Quickbar item (pins if needed); disabled with no character                       |
+| Info icon                                           | Show info: the shared Item Detail modal, priced at `orderBookLocation` (`ItemActionsProvider`)                  |
+| Required skills disclosure (`ItemSkillsDisclosure`) | Folded; "N of M trained" with a character, else count; open shows same section as Show info (Add to Plan)       |
 
 ### 2.4 Scope bar + item tabs
 
@@ -73,27 +72,28 @@ Item tabs (`Tabs`, state `itemTab` in URL `browser.itemTab`): **Order book** | *
 
 ### 2.5 Order book tab
 
-| Feature | Where | Notes |
-|---|---|---|
-| Summary strip: best sell, best buy, spread (ISK and %) | `MarketOrderBook.tsx:OrderBookSummaryStrip` | Hidden < sm (phone toggle carries best prices) |
-| Hub comparison line | `HubComparisonLine` | Only while a Jump Range replaced header scope: hub's best sell/buy vs in-range best, signed %, ("125x" past 10x), jumps link, "View <hub>" button (clears range), Set destination button (Hub mode) |
-| Sell and Buy cards | `OrderSideCard` | Stacked Sell over Buy at all widths (decision `20261004-100214`). Heading: count + best price. Sell sorted price asc, Buy desc, default; price ties broken by distance (`engine/market/orderBookDepth.ts:sortBookSide`) |
-| Phone Sell/Buy toggle | `BookSideToggle` | One side at a time; other side CSS-hidden (no remount); each segment shows count + best |
-| Columns | `marketOrderColumns.ts` | Price, Quantity, Jumps, Location, Security, Expiry; Buy adds Range, Min. volume (off by default). Column picker menu per card (shared pref `marketOrderVisibleColumns`, device-local; unknown ids dropped). Every column sortable (`sortValue`) |
-| Cards layout | `Market.tsx:605-613`, `orderBookWidthsRem` | Rows become two-line cards on phone or when book is too narrow for picked columns + figure widths (measured via `useElementNarrowerThan`); Location squeezes 16rem to 9rem first |
-| Row cap | `ROW_CAP = 15` (`routes/Market.tsx:105`) | "Show all N" button per side; CSV export always covers every row (`source: 'sorted-rows'`, `truncated` flag) |
-| Bait flag | `BaitFlag` | Sell price >= 10x best sell flagged, never hidden (`SELL_OUTLIER_FACTOR`, `engine/market/orderBookDepth.ts`) |
-| "Mine" highlight | `row-mine` class | Rows matching the active character's open order ids tinted + sr-only "my order"; from `loadAllCharactersOpenOrders` |
-| Row expand | `OrderRowDetail` | Click row: remaining/total + filled, issued, fill meter, order value, versus best, expiry + days left, min volume (buy), player-structure note, hidden-column facts, depth ("buying down to here" avg, `bookDepth`), Filter to station, Copy price |
-| Row context menu / ⋮ | `OrderRowContextMenu` | Copy location, Copy price (plain digits, #2294), Show info, Filter to this station, Set waypoint |
-| Station filter banner | `Market.tsx:1147` | URL `browser.station`; "Filtered to X" + Clear. Cleared on any item/location change |
-| CSV export | `TableActionsMenu`, `useTableExport` surfaces `market-sell`, `market-buy`; `orderBookCsv.ts` | Per card |
-| Notes | `Market.tsx:1129-1146` | Global-market override note (PLEX etc trade in own region, `resolveOrderBookRegion`); jump-range note (`JumpRangeNote`: no Current System / loading); "N regions failed" warning status |
-| Empty | per side | Sell: nothing selling; with station filter / narrowing filters / blueprint hints. Blueprint with empty book links to BPC sourcing (BPCs are contract only, `bpcSourcingHref`) |
-| Error | `orderBookFailed` | ESI 420 / Error Budget refusal: distinct "failed" EmptyState with Retry (not "nobody is selling") |
-| Loading | Spinner until first view; All regions keeps previous data while fanning |
+| Feature                                                | Where                                                                                        | Notes                                                                                                                                                                                                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Summary strip: best sell, best buy, spread (ISK and %) | `MarketOrderBook.tsx:OrderBookSummaryStrip`                                                  | Hidden < sm (phone toggle carries best prices)                                                                                                                                                                                                     |
+| Hub comparison line                                    | `HubComparisonLine`                                                                          | Only while a Jump Range replaced header scope: hub's best sell/buy vs in-range best, signed %, ("125x" past 10x), jumps link, "View <hub>" button (clears range), Set destination button (Hub mode)                                                |
+| Sell and Buy cards                                     | `OrderSideCard`                                                                              | Stacked Sell over Buy at all widths (decision `20261004-100214`). Heading: count + best price. Sell sorted price asc, Buy desc, default; price ties broken by distance (`engine/market/orderBookDepth.ts:sortBookSide`)                            |
+| Phone Sell/Buy toggle                                  | `BookSideToggle`                                                                             | One side at a time; other side CSS-hidden (no remount); each segment shows count + best                                                                                                                                                            |
+| Columns                                                | `marketOrderColumns.ts`                                                                      | Price, Quantity, Jumps, Location, Security, Expiry; Buy adds Range, Min. volume (off by default). Column picker menu per card (shared pref `marketOrderVisibleColumns`, device-local; unknown ids dropped). Every column sortable (`sortValue`)    |
+| Cards layout                                           | `Market.tsx:605-613`, `orderBookWidthsRem`                                                   | Rows become two-line cards on phone or when book is too narrow for picked columns + figure widths (measured via `useElementNarrowerThan`); Location squeezes 16rem to 9rem first                                                                   |
+| Row cap                                                | `ROW_CAP = 15` (`routes/Market.tsx:105`)                                                     | "Show all N" button per side; CSV export always covers every row (`source: 'sorted-rows'`, `truncated` flag)                                                                                                                                       |
+| Bait flag                                              | `BaitFlag`                                                                                   | Sell price >= 10x best sell flagged, never hidden (`SELL_OUTLIER_FACTOR`, `engine/market/orderBookDepth.ts`)                                                                                                                                       |
+| "Mine" highlight                                       | `row-mine` class                                                                             | Rows matching the active character's open order ids tinted + sr-only "my order"; from `loadAllCharactersOpenOrders`                                                                                                                                |
+| Row expand                                             | `OrderRowDetail`                                                                             | Click row: remaining/total + filled, issued, fill meter, order value, versus best, expiry + days left, min volume (buy), player-structure note, hidden-column facts, depth ("buying down to here" avg, `bookDepth`), Filter to station, Copy price |
+| Row context menu / ⋮                                   | `OrderRowContextMenu`                                                                        | Copy location, Copy price (plain digits, #2294), Show info, Filter to this station, Set waypoint                                                                                                                                                   |
+| Station filter banner                                  | `Market.tsx:1147`                                                                            | URL `browser.station`; "Filtered to X" + Clear. Cleared on any item/location change                                                                                                                                                                |
+| CSV export                                             | `TableActionsMenu`, `useTableExport` surfaces `market-sell`, `market-buy`; `orderBookCsv.ts` | Per card                                                                                                                                                                                                                                           |
+| Notes                                                  | `Market.tsx:1129-1146`                                                                       | Global-market override note (PLEX etc trade in own region, `resolveOrderBookRegion`); jump-range note (`JumpRangeNote`: no Current System / loading); "N regions failed" warning status                                                            |
+| Empty                                                  | per side                                                                                     | Sell: nothing selling; with station filter / narrowing filters / blueprint hints. Blueprint with empty book links to BPC sourcing (BPCs are contract only, `bpcSourcingHref`)                                                                      |
+| Error                                                  | `orderBookFailed`                                                                            | ESI 420 / Error Budget refusal: distinct "failed" EmptyState with Retry (not "nobody is selling")                                                                                                                                                  |
+| Loading                                                | Spinner until first view; All regions keeps previous data while fanning                      |
 
 Engine / data:
+
 - `features/market/orderBook.ts`: in-memory 300s TTL cache (`ORDER_BOOK_TTL_MS`), coalesces concurrent callers; manual refresh bypasses. `truncated` when page cap bit.
 - All regions / range: fans out one request per Market Region at concurrency 4 (`ORDER_BOOK_FANOUT_CONCURRENCY`); with a Jump Range, only regions containing in-range systems (`regionsForSystems`, `useOrderBookOrchestration.ts:368`). Waits for hub/mode/filter hydration to avoid double fan-out. Per-region failures counted (`failedRegionCount`), partial book shown.
 - Filters (`engine/market/orderBookFilters.ts`): Jump Range and Security fold into one allowed-system set; Min quantity drops `volume_remain < n`; NPC-only drops orders at non-NPC `location_id`.
@@ -105,6 +105,7 @@ URL state (ADR 0015, `engine/market/urlState.ts`): `type`, `hub`, `region` (id o
 Browser decisions: `20260831-140406-market-browser-rebuild`, `20260831-140406-the-market-browsers-state-lives-in-the-url`, `20260923-104008-market-browser-all-regions-and-order-book-filters`, `20260923-174003-...hub-region-is-device-local`, `20260927-084218-...filter-bar-remembers-device-default`, `20260929-204125-...jump-range-works-in-every-location`, `20260924-002813-market-labels-name-one-thing-each-order-book`, `20261004-100214-...order-book-rework-scope-bar-stacked`.
 
 ### Observed gaps (Browser)
+
 - Compare Set is local scratch; Quickbar is per-character (synced); Quickbar add disabled with no active character, no fallback storage.
 - Order book fetch is one item at a time; Quickbar rows show no live price, only an alert target (`QuickbarList.tsx:94-96`).
 - Only first 15 rows per side render until "Show all" (CSV unaffected).
@@ -118,34 +119,35 @@ Paths relative to repo root. Tabs from `MARKET_TABS` (`src/app/pageTabs.ts`): `o
 
 ### Summary table
 
-| Feature | Where | Notes |
-|---|---|---|
-| Open orders worklist | `/market/orders`, `OpenOrdersPanel.tsx` | all authenticated characters' open orders, grouped by worst problem |
-| Problem groups | `openOrdersModel.ts`, `engine/market/orderProblems.ts` | belowFloor, undercutStation, undercutSystem, undercutRegion, expiringOrStale, outbid, healthy; healthy folded by default |
-| Problem badge + one-line summary | `OrderProblemBadge.tsx`, `orderBadgeKind.ts`, `OrderRowSummaryText.tsx` | 10 badge kinds; colour = scope, words always shown |
-| Badge legend modal | `OrderBadgeLegend.tsx` | opened from button under groups |
-| Filter bar + chips + URL state | `openOrdersFilter.ts`, panel :713-960 | text, side, problem, cost basis, expiry, ISK tied up, location, character, sort; all in URL `orders.*` |
-| Column picker | `openOrdersColumns.ts` | where, price, problem, floor, remaining, expires; desktop only |
-| Check deeper (per group) | `useOrderDetail.ts`, `orderCompetition.ts` | on-demand system/region/structure book fetch, reclassifies rows |
-| Order Detail modal | `OrderDetailModal.tsx` | verdict, next step, stats, 4 folding sections |
-| Row context menu | panel `rowContextMenu` :587 | item menu + Copy new price + Set waypoint |
-| Phone list | `OpenOrdersList.tsx` | 3-line tap rows, no column picker |
-| CSV export | `useTableExport` surface `orders-open`, `character/ordersCsv` | visible rows, ESI order fields |
-| Multi-character | `openOrdersData.ts` | strip + badges only when >1 character has orders; per-character reauth |
-| Cost basis / Floor | `orderCostBasis.ts`, `engine/market/orderFloor.ts`, `walletCostBasis.ts` | Production Run first, wallet FIFO fills the rest |
-| Frequently undercut flag | `engine/market/orderProblemHistory.ts`, `orderProblemSamples.ts` | rolling local samples |
-| Undercut notification | `features/notifications/events.ts:147` | `marketOrderUndercut`, station tier only |
-| History (orders) | `/market/history`, `OrderHistoryPanel.tsx` | expired/cancelled orders; search, side, state filter, sort, CSV |
-| History view switch | `HistoryViewSelect.tsx` | select (desktop) / segmented (phone) between Orders and Transactions |
-| Transactions | `/market/history/transactions`, `TransactionsPanel.tsx` | personal wallet fills; search/side/date filter, summary strip, margin column, CSV |
-| Realized margin | `transactionMargins.ts`, `engine/market/realizedMargin.ts` | FIFO vs own wallet buys minus sales tax |
-| Fill highlight | `transactionHighlight.ts` | `?highlight=<typeId>` from fill alert -> newest sell of item |
+| Feature                          | Where                                                                    | Notes                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Open orders worklist             | `/market/orders`, `OpenOrdersPanel.tsx`                                  | all authenticated characters' open orders, grouped by worst problem                                                      |
+| Problem groups                   | `openOrdersModel.ts`, `engine/market/orderProblems.ts`                   | belowFloor, undercutStation, undercutSystem, undercutRegion, expiringOrStale, outbid, healthy; healthy folded by default |
+| Problem badge + one-line summary | `OrderProblemBadge.tsx`, `orderBadgeKind.ts`, `OrderRowSummaryText.tsx`  | 10 badge kinds; colour = scope, words always shown                                                                       |
+| Badge legend modal               | `OrderBadgeLegend.tsx`                                                   | opened from button under groups                                                                                          |
+| Filter bar + chips + URL state   | `openOrdersFilter.ts`, panel :713-960                                    | text, side, problem, cost basis, expiry, ISK tied up, location, character, sort; all in URL `orders.*`                   |
+| Column picker                    | `openOrdersColumns.ts`                                                   | where, price, problem, floor, remaining, expires; desktop only                                                           |
+| Check deeper (per group)         | `useOrderDetail.ts`, `orderCompetition.ts`                               | on-demand system/region/structure book fetch, reclassifies rows                                                          |
+| Order Detail modal               | `OrderDetailModal.tsx`                                                   | verdict, next step, stats, 4 folding sections                                                                            |
+| Row context menu                 | panel `rowContextMenu` :587                                              | item menu + Copy new price + Set waypoint                                                                                |
+| Phone list                       | `OpenOrdersList.tsx`                                                     | 3-line tap rows, no column picker                                                                                        |
+| CSV export                       | `useTableExport` surface `orders-open`, `character/ordersCsv`            | visible rows, ESI order fields                                                                                           |
+| Multi-character                  | `openOrdersData.ts`                                                      | strip + badges only when >1 character has orders; per-character reauth                                                   |
+| Cost basis / Floor               | `orderCostBasis.ts`, `engine/market/orderFloor.ts`, `walletCostBasis.ts` | Production Run first, wallet FIFO fills the rest                                                                         |
+| Frequently undercut flag         | `engine/market/orderProblemHistory.ts`, `orderProblemSamples.ts`         | rolling local samples                                                                                                    |
+| Undercut notification            | `features/notifications/events.ts:147`                                   | `marketOrderUndercut`, station tier only                                                                                 |
+| History (orders)                 | `/market/history`, `OrderHistoryPanel.tsx`                               | expired/cancelled orders; search, side, state filter, sort, CSV                                                          |
+| History view switch              | `HistoryViewSelect.tsx`                                                  | select (desktop) / segmented (phone) between Orders and Transactions                                                     |
+| Transactions                     | `/market/history/transactions`, `TransactionsPanel.tsx`                  | personal wallet fills; search/side/date filter, summary strip, margin column, CSV                                        |
+| Realized margin                  | `transactionMargins.ts`, `engine/market/realizedMargin.ts`               | FIFO vs own wallet buys minus sales tax                                                                                  |
+| Fill highlight                   | `transactionHighlight.ts`                                                | `?highlight=<typeId>` from fill alert -> newest sell of item                                                             |
 
 ### Open orders (`/market/orders`)
 
 What: worklist of every authenticated character's open market orders, each filed under the one worst problem. Source: `src/features/market/OpenOrdersPanel.tsx`; data `openOrdersPageSnapshot.ts:loadOpenOrdersSnapshot` (one read shared with Overview board counts, per its header). Design lineage: `docs/notes/open-orders-redesign-feasibility.md`; decisions `20260906-155913-open-orders-reads-as-a-worklist`, `20260906-170442-open-orders-rows-say-what-is-happening-not`, `20260924-001906-open-orders-derives-a-cost-basis-from-personal`, `20260924-013535-order-detail-modal-leads-with-the-call-and`, `20260924-020211-open-orders-gets-a-compact-phone-list-the`, `20260914-135534-often-undercut-flag-samples-on-the-open-orders`, `20260922-221531` (location filter remembered), `20260906-203425-opt-in-structuremarkets-scope-wired-into-station-tier`, `20260908-123516` (notification highlight).
 
 **Data / scopes**
+
 - `GET /characters/{id}/orders` per character, `esi-markets.read_character_orders.v1` (`src/esi/registry.ts:317`). Scope checked up front per character (`openOrdersData.ts` header): never-granted -> `skipped` note ("characterNotShared", panel :694), granted-but-401/403 -> entry with `needsReauth` -> per-character `GrantBanner` (panel :670).
 - Station tier: Fuzzwork station aggregates keyed `locationId:typeId` (`orderCompetition.ts:63 loadStationBestPrices`). System/region tier: ESI region order book per type, lazy (`loadRegionCompetition` :102). Player structures: `loadStructureCompetition` :152, needs optional `esi-markets.structure_markets.v1` (`registry.ts:543`).
 - Also read: type names, NPC stations SDE (`stationsLoaded` false -> "not checked", never "player structure"), character skills (accounting, broker relations, advanced broker relations), standings per order, Production Run cost bases, wallet transactions (cost basis), Dexie problem samples.
@@ -159,6 +161,7 @@ What: worklist of every authenticated character's open market orders, each filed
 **Groups** (`openOrdersModel.ts groupOpenOrders`, ORDER_PROBLEMS order in `engine/market/orderProblems.ts:39`): belowFloor > undercutStation > undercutSystem > undercutRegion > expiringOrStale > outbid > healthy. Buy order never belowFloor; buy undercuts collapse to `outbid`. Group header = caret toggle button (fold), title + count, hint line with ISK tied up (`IskAmount`), worst gap %, per-character counts when >1 character (`groupHeaderLine` panel :1162). Left stripe colour by severity (`GROUP_ACCENT` :133). Healthy group has "Show healthy / Hide healthy" text action tied to `hideHealthy` filter (default true, `DEFAULT_FILTER` :114). Per-group "check system and region" icon button (`checkDeeper`, panel :1054). Highlighted row (from notification) forces its group open (`openOrdersView.ts isGroupFolded`).
 
 **Filter bar** (`FilterBar` funnel + search; all fields URL-persisted `orders.*`, `openOrdersFilter.ts`):
+
 - Search: item name or character name.
 - Chips: Buy, Sell; one chip per problem (FILTERABLE_PROBLEMS = all except healthy) with live counts, zero-count still shown; cost basis Linked / Missing.
 - Selects: Expiring within (any, 3, 7, 14, 30 days); Min ISK tied up (any, 10M, 100M, 1B); Sort (worstFirst, expirySoonest, iskTiedUp, item, character).
@@ -174,6 +177,7 @@ What: worklist of every authenticated character's open market orders, each filed
 **Mobile**: below `sm` `OpenOrdersList.tsx` replaces `DataTable`: line 1 item/character/price, line 2 badge (non-interactive, no "?") + sentence, line 3 remaining, floor (if any), Off-hub. Whole row is a button opening the modal, `RowMoreActions` beside it. Location and expiry dropped (in modal). No column picker. Highlight row scrolls and pulses (`useScrollToRowKey`).
 
 **Order Detail modal** (`OrderDetailModal.tsx`, `OrderDetailContent`; title "character · item", `placement="wide"`; remounts per order, keyed by `orderId`; every Disclosure starts folded; page-level caches in `useOrderDetail.ts`, loads via `useOpenOrderDetail`, view from `orderDetailView.ts assembleOrderDetailView`):
+
 - Layout: top row = "Quick answer" card (19rem) + stat grid; then "Who is cheaper" Disclosure; then, sell orders only (#1733), cost basis and exits cards side by side. Buy orders get neither, and the scope section reads "Who bids higher".
 - Quick answer: badge; verdict (`orderVerdict.ts`: raisePrice / matchThem / letGo / leaveItAlone; needs Floor + sell order, `:690`) else the badge's action text, else "not checked"; "Next step" (`orderNextAction.ts`: raisePrice and matchThem are copyable via `CopyablePrice`; keepAt, cheapestRival plain; `badgeAdvice` prints nothing, badge text already says it); Floor row (rounded UP via `roundPriceUp`, red when price < exact relist, `floorHelp` tooltip, caption names Production Run vs wallet vs no basis); `OrderRowSummaryText`; "View in Market" link (phone list rows are not links); outbid buy order: copyable suggested bid (`outbidSuggestion`).
 - Stat grid (phone: "numbers" Disclosure with sell-out read as trailing; desktop always open): My price (+ "rank N of M" at station, only from a complete untruncated region book, `stationRank`); Sells out in / Fills in for buys (`computeSellThrough`: remaining / region avg units per day over last 30 d of price history x my share of same-side units priced at-or-better from the deep book, share 1 before it loads; danger tone + "past expiry" line when days > days left; no history = unknown, never invented); Volume left (`remain / total` + meter); Order expires (days left, warning <= 7 d, caption with expiry and listed dates); "If it sells / fills as listed" (`price - floor.fill`, signed, per unit after fees; unknown without a Floor).
@@ -184,6 +188,7 @@ What: worklist of every authenticated character's open market orders, each filed
 **Badge legend modal** (`OrderBadgeLegend.tsx`): lists ORDER_BADGE_KINDS (belowFloor, undercutStation, undercutSystem, undercutRegion, expiring, outbid, frequentlyUndercut, best, topBid, noCostBasis) with meaning + action, colour rule note.
 
 **Engine calcs**
+
 - `orderProblems.ts`: one worst problem by fixed precedence; `allProblems` returns every applicable (filters overlap by `problems`).
 - `undercut.ts`: nested scopes station => system => region; `worst` = tightest scope with rival; absent scope = not checked (distinct from clear).
 - `stationUndercutState.ts`: beaten/clear/unknown; null best price = unknown (failed fetch), not "no rival".
@@ -201,6 +206,7 @@ What: worklist of every authenticated character's open market orders, each filed
 ### History (`/market/history`)
 
 What: character's expired + cancelled orders (ESI order history). `OrderHistoryPanel.tsx`.
+
 - Data: `GET /characters/{id}/orders/history`, scope `esi-markets.read_character_orders.v1` (`getCharacterOrderHistory`), paginated; `truncated` flag -> "incomplete" warning. cacheKey `market:order-history`. Active character only.
 - Header: `HistoryViewSelect` (Orders | Transactions), refresh, `TableActionsMenu` (CSV surface `orders-history`, filtered rows, `orderHistoryCsvColumns`), data age.
 - Filter bar (`orderHistoryFilter.ts`, URL `history.q`, `history.side`, `history.state`, `history.sort`): search (item name), Buy/Sell chips, Expired/Cancelled chips; funnel count excludes text; column picker (side, price, remaining, issued, state; device-local `orderHistoryVisibleColumns`; hidden on phone). Default sort issued desc.
@@ -211,6 +217,7 @@ What: character's expired + cancelled orders (ESI order history). `OrderHistoryP
 ### Transactions (`/market/history/transactions`)
 
 What: character's buy/sell fills; corp fills live on `/corp/wallet`. `TransactionsPanel.tsx`.
+
 - Data: `GET /characters/{id}/wallet/transactions` (`esi-wallet.read_character_wallet.v1`; `loadWalletTransactionsWithStatus`, page cap -> `truncated` warning) + wallet journal (only for Margin; failure blanks Margin, not the tab). cacheKey `market:transactions`.
 - Header: `HistoryViewSelect`, refresh, `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows), `DataAgeBadge`.
 - Filter bar: reuses `TransactionsFilterBar` from `src/features/corp/CorpTransactionsPanel.tsx:94` — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
@@ -238,20 +245,20 @@ What: character's buy/sell fills; corp fills live on `/corp/wallet`. `Transactio
 
 Summary table
 
-| Feature | Where | Notes |
-| --- | --- | --- |
-| Appraisal tab | `/market/appraisal`, `src/features/market/AppraisalPanel.tsx` | Paste list, price at one Trade Hub, Price Percent, net-of-fees, refine, LP, share |
-| Compare Hubs | Appraisal, foldable under result, `HubCompareCards.tsx` | Same pile at all 5 hubs, sell/buy totals, click copies |
-| Share Link | Appraisal header IconButton; `AppraisalShareScreen.tsx` | Firestore snapshot, 7-day TTL, read-only view |
-| Copy sell list | Appraisal header IconButton | `name<TAB>price`, one tick under hub, for in-game Import Prices |
-| Hauling tab | `/market/hauling`, `HaulingPanel.tsx` | Hub-to-hub price-gap scan, Trip Plan, Copy Multibuy |
-| Cargo space popover | Hauling trip bar, `HaulingCargoControl.tsx` | Ship / saved Fitting / custom m3 + ISK budget |
-| Compare drawer | Market (all tabs when set non-empty), `CompareDrawer.tsx` | Prices + Attributes views, resizable bottom drawer |
-| Variations tab | Browser item panel, `VariationsTable.tsx` | Tech/meta siblings priced at scope; Compare button |
-| Price History tab | Browser item panel, `PriceHistoryPanel.tsx` / `PriceHistoryChart.tsx` | ESI daily history, 7d/30d/90d/1y, MA line, day table |
-| Quickbar | Browser finder column, `QuickbarList.tsx` | Per-character pinned items, drag reorder, price alert per item |
-| Price alerts | Quickbar row, header bell, item menu; `PriceAlertForm.tsx` | Target price above/below vs lowest sell at the Market hub, stored on Quickbar item |
-| Page paste | `src/app/GlobalPasteRouter.tsx` | Ctrl/Cmd+V off-field routes EFT fit to Fittings or item list to Appraisal |
+| Feature             | Where                                                                 | Notes                                                                              |
+| ------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Appraisal tab       | `/market/appraisal`, `src/features/market/AppraisalPanel.tsx`         | Paste list, price at one Trade Hub, Price Percent, net-of-fees, refine, LP, share  |
+| Compare Hubs        | Appraisal, foldable under result, `HubCompareCards.tsx`               | Same pile at all 5 hubs, sell/buy totals, click copies                             |
+| Share Link          | Appraisal header IconButton; `AppraisalShareScreen.tsx`               | Firestore snapshot, 7-day TTL, read-only view                                      |
+| Copy sell list      | Appraisal header IconButton                                           | `name<TAB>price`, one tick under hub, for in-game Import Prices                    |
+| Hauling tab         | `/market/hauling`, `HaulingPanel.tsx`                                 | Hub-to-hub price-gap scan, Trip Plan, Copy Multibuy                                |
+| Cargo space popover | Hauling trip bar, `HaulingCargoControl.tsx`                           | Ship / saved Fitting / custom m3 + ISK budget                                      |
+| Compare drawer      | Market (all tabs when set non-empty), `CompareDrawer.tsx`             | Prices + Attributes views, resizable bottom drawer                                 |
+| Variations tab      | Browser item panel, `VariationsTable.tsx`                             | Tech/meta siblings priced at scope; Compare button                                 |
+| Price History tab   | Browser item panel, `PriceHistoryPanel.tsx` / `PriceHistoryChart.tsx` | ESI daily history, 7d/30d/90d/1y, MA line, day table                               |
+| Quickbar            | Browser finder column, `QuickbarList.tsx`                             | Per-character pinned items, drag reorder, price alert per item                     |
+| Price alerts        | Quickbar row, header bell, item menu; `PriceAlertForm.tsx`            | Target price above/below vs lowest sell at the Market hub, stored on Quickbar item |
+| Page paste          | `src/app/GlobalPasteRouter.tsx`                                       | Ctrl/Cmd+V off-field routes EFT fit to Fittings or item list to Appraisal          |
 
 Decisions cited (docs/context/decisions/): `20260908-164742-appraisal-prices-at-a-trade-hub-and-shares`, `20260908-180023-an-appraised-row-is-an-item-link-menu`, `20260911-110045-appraisal-share-links-encode-base36-pairs-no-compression`, `20260914-180533-appraisal-reads-an-eft-fit-on-its-own`, `20260924-010954-appraisal-shows-net-of-fees-totals-at-100`, `20260924-124701-appraisal-undercut-lists-one-tick-under-the-hubs`, `20260924-131419-appraisal-undercut-becomes-a-bulk-sell-list-copy`, `20260906-215500-hauling-is-a-hub-price-gap-and-a`, `20260926-161750-hauling-opportunities-v1-scope`, `20260929-235337-hauling-opportunities-selling-into-buy-orders`, `20260930-004332-hauling-opportunities-any-hub-at-one-end`, `20261004-233720-hauling-lots-are-capped-at-a-share-of`, `20260910-091729-price-history-moving-average-window-fixed-7-days`, `20260914-124036-price-history-keeps-every-esi-history-field-and`, `20260914-132059-price-history-polish-a-series-token-and-no`, `20261001-211035-page-level-paste-offers-fittings-or-appraisal`, `20261002-133425-page-level-paste-opens-fittings-or-the-appraisal`, `20260923-174003-market-browsers-current-hub-region-is-device-local`. ADR 0002 (Fuzzwork for hub prices), 0003 (ESI order books for Browser), 0015 (tab = path segment).
 
@@ -268,6 +275,7 @@ Layout: grid, paste Panel left (21rem on lg), result Panel + foldable Compare Hu
 Page header (shared with Browser, `Market.tsx:140,763`): Trade Hub select (no Location Mode chips, no Region mode on Appraisal; reason: Fuzzwork aggregates are per station) and a Refresh IconButton. On Appraisal Refresh re-prices bypassing the Fuzzwork TTL (`invalidateHubPrices`, `appraisalData.ts:181,274`); disabled until a result exists or while loading (`Market.tsx:831`).
 
 Paste panel
+
 - TextArea 14 rows, mono, Ctrl/Cmd+Enter submits (`onSubmitChord`). Typing does not re-price; Appraise button does (`useAppraisal.ts` header doc).
 - Lines chip: count of paste lines (`countPasteLines`), differs from row count because repeats merge.
 - Price Percent number field (0-1000, default 100, `pricePercent.ts:19-27`), device-local setting `useMarketPricePercent`; field holds typed string, writes only when in range (`AppraisalPanel.tsx:268`). `?percent=` URL param overrides for one visit (`Market.tsx:304`), cleared when user types.
@@ -280,6 +288,7 @@ Accepted paste shapes (`src/engine/market/appraisalPaste.ts`): inventory copy `N
 Entry points into Appraisal besides typing: Fitting Export menu and page-level paste send `location.state.appraiseText` (`Market.tsx:480`); Quickbar "View in Appraisal" (opens Compare Hubs expanded, `Market.tsx:351`); Shared Appraisal "Open Neocom Desk" (`?share=<id>&hub=&percent=`, `sharedAppraisalSeed.ts`; param stripped after read).
 
 Result panel
+
 - Header meta chip: hub name + "at N%".
 - Actions: ColumnPickerMenu (optional columns, device-local `appraisalVisibleColumns`), Share, Copy sell list, TableActionsMenu (CSV).
 - StatChips: Sell total (accent), Buy total, Instant net, List net, Spread, Refine total (only if any row has refine), Cheapest buy (only if any row has an LP option), Total volume (`AppraisalVolumeChip`), Items count. Sell/Buy use `FullIskTotal`; others `IskAmount` shorthand with exact on tap/hover.
@@ -305,6 +314,7 @@ Compare Hubs (`HubCompareCards.tsx`, data `compareHubs` in `appraisalData.ts`): 
 Data source: Fuzzwork station aggregates via `market/prices.ts getHubPrices` (15-min TTL, per-type null fallback; ADR 0002); packaged volume from SDE market types (`loadMarketTypesById`); reprocessing from SDE `loadReprocessing` (1.4 MB, active character only); skills from Dexie `loadCharacterModifiers`; LP from ESI `getCharacterLoyaltyPoints` + public `getLoyaltyStoreOffers` for corps the character holds LP with (`appraisalLpAcquisition.ts`).
 
 Engine (`src/engine/market/appraisal.ts`)
+
 - `buildAppraisal`: price*percent/100 per side, totals skip null sides, `unpricedRows` counts them.
 - `appraisalUndercut`: sell price one tick below hub's lowest sell (`priceTick.ts`); null if no seller or at 0.01.
 - `appraisalNet` (always 100%): instantNet = sum(buy*qty - sales tax); listNet = undercut value - sales tax - broker fee (Accounting, Broker Relations, standings via `useTradeHubStandings`).
@@ -313,6 +323,7 @@ Engine (`src/engine/market/appraisal.ts`)
 - `compareMargin` (spread, spread %, after-fees): used by Compare drawer.
 
 Observed gaps
+
 - Refine and LP columns are on screen but missing from CSV (`appraisalCsv.ts`).
 - Shared view has no refine/LP/net and no Compare Hubs; Compare Hubs has no refine/LP either (by design comment, `appraisalShareData.ts`).
 - Share needs a Character, Firebase sync and a signed-in session; otherwise the button is disabled with no explanatory tooltip for the no-character/no-sync cases (tooltip only for too-large/saving/failed/copied, `AppraisalPanel.tsx:578`).
@@ -330,6 +341,7 @@ Route `/market/hauling` (`HaulingPanel.tsx`, 1255 lines). Page header has no hub
 Concept: scan one market category (or Everything) for items cheaper at origin hub than destination hub, price them at Expected Sell Price (what a hauler realistically gets, not the cheapest listing), size to a hold + budget, produce Trip Plan and Multibuy text.
 
 Controls (FilterBar, `HaulingPanel.tsx:750+`)
+
 - From and To hub selects (5 hubs + Any hub; one end only; both Any = EmptyState `bothAny`; same hub = `sameHub` EmptyState). Defaults: From = device default hub, To = Jita (Amarr if From is Jita) (`haulingHubs.ts`). Picking Any on one side forces the other off Any (`pickHaulingHub`).
 - Category select: Everything + Ammunition & Charges (default, id 11), Ship Equipment, Drones, Implants & Boosters, Trade Goods, Ship and Module Modifications, Planetary Infrastructure; ships excluded (packaged volume mismatch) (`haulingCategories.ts`).
 - Mode select: `list` (list at destination, default) / `instant` (sell into destination buy orders) (`HAUL_MODES`, `haulingData.ts:86`).
@@ -344,6 +356,7 @@ Trip bar (rendered only when at least one row is shown; not in the loading/error
 Cargo space popover (`HaulingCargoControl.tsx`; Cargo space control and its hint live in the trip bar, so they appear only with rows): tabs Ship (search ship catalogue, base holds), Fitting (saved Fittings, exact holds with skills/expanders via `haulingFittingStats.ts` -> dogma engine, lazy import; "no fittings" hint), Custom (m3 + hold kind: general or one of 9 specialised kinds: commandCenter, mineral, gas, ice, fuel, ammo, planetary, mining, infrastructure, `src/engine/market/cargoHolds.ts`). Ship tab lists the first 30 of "Haulers and Industrial Ships" until searched. Picking closes the popover; the trigger button is primary-styled ("choose a ship") until a cargo is set, then shows label + total m3. Clear removes the cargo and the ISK budget together; spinner while computing; failure text. ISK budget field (optional). Persisted device-local: `haulingCargo`, `haulingBudget` (`haulingCargo.ts`). Without a cargo choice a hint ("choose a ship") replaces the meter; list still works.
 
 Table (`DataTable`, virtualize auto, compact density, dense stacked cards, expandable row detail, `rowContextMenu` = `ItemContextMenu`, `rowMoreActions`): select checkbox, Item (icon + name + flags), Hub (only with Any hub), Buy (origin lowest sell), Expected Sell Price (instant: Buy Order price), Margin % (green at >= 3%, dim below; wide tables add "+X each" suffix), ISK/m3, Days to Sell with demand mark (dot/ring/square: most-days/bursts/rarely; words shown only in wide tables) (list only), Bring (editable numeric box; empty or 0 unticks; tooltip names what limited it). Unticked rows dimmed (opacity-60). Flags per row: crowded, thin, outlier (>=100% margin), low margin (<3%) shown as one warning IconButton next to the name (tap/hover tooltip lists every flag). Instant mode relabels Expected as "Buy order" and uses its own margin tooltip. Row click expands detail (no chevron, `hideIcon`).
+
 - Card layout when table width < 47.5rem (53 with Any hub) or phone; figures compact when < 56rem (60) or phone (`TABLE_WIDTHS`, ADR 0017 stack-by-class).
 - Row detail (`HaulingRowDetail.tsx`): list mode groups (1) Expected sell price (recent sale vs undercut, lower of the two; cheapest listing for reference), (2) How fast it sells (per day, units listed ahead, days to sell; region history note), (3) load and margin (buy qty x price, fees indented, profit, margin, max buy price). Beside: destination sell ladder (8 levels, expected price marked), behind a button below `lg`. Instant mode: working lot (buy at origin, sell into buy orders, tax, profit, margin) beside destination buy orders with filled ones shaded. Links: Open in Market (Browser at that hub), route-safety link (SystemLink).
 - Footer line: scanned count or hidden counts by reason (thin / slow / low margin).
@@ -356,10 +369,12 @@ Multibuy: `multibuyText(plan.lines)` -> clipboard; list shown on demand.
 Data sources (`haulingData.ts`): pass 1 Fuzzwork aggregates once per hub the lanes touch (`getHubPrices`; list: dest lowest sell >= 1.10x origin lowest sell; instant: dest highest buy >= 1.035x), each item keeps only its best lane (matters with Any hub), top 80 by gap (`MAX_PRICED_CANDIDATES`); pass 2 (list only) ESI destination-region history for all 80 (`loadPriceHistory`): drops items with no recent price/volume or whose recent price x 0.94 / buy < 1.03, shortlist top 40 by that proxy (`MAX_BOOK_CANDIDATES`); instant skips history and takes the top 40 by gap; pass 3 ESI order books for the shortlist at both hub stations (`getOrderBook`, ADR 0003). Prices unavailable at every origin = error state. Fees from active character skills (`useHaulingFees`); no scope required.
 
 Engine
+
 - `haulingMarket.ts` `HAULING_THRESHOLDS`: horizon 7d, own share of demand 25%, min unit margin 5%, history 30d, recent price 7d, mean orders per trading day < 2 = rarely whatever the day count, else >=20 trading days = most days, >=8 = bursts, else rarely (trading day = volume > 0 inside the 30d window); crowded 10 orders within 1%, low margin 3%, suspicious 100%. `estimateSale` = lower of recent sale price and one-tick-under cheapest; `summarizeDemand`; `lotEconomics`.
 - `haulingPlan.ts` `planTrip`: unticked rows ship 0, typed quantities are kept and reserve space/budget first; the rest are ranked by profit per share of the scarcest resource (hold space or remaining budget), then each gets min(sales cap, profitable supply, eligible space, remaining budget) in that order; fills specialised holds first (narrowest), spills to general (`cargoHolds.ts holdAccepts`); `limitedBy` names the cap.
 
 Observed gaps
+
 - Category list is hard-coded seven market groups; ships excluded (`haulingCategories.ts` header).
 - Both ends Any hub unsupported (v1, 20 lanes would blow request budget, `haulingHubs.ts`).
 - Demand read from region-wide history while ladders are hub-station (popover says so); no per-station history in ESI.
@@ -382,6 +397,7 @@ Prices view columns: Item (removable icon, MarketItemLink), Best sell, Best buy,
 Attributes view (`CompareAttributesMatrix.tsx`, `useCompareAttributes.ts`, `compareAttributesCsv.ts`): items as columns, dogma attributes as rows grouped by category (collapsible, row counts), synthetic "Worth" row (Estimated price from the order-book summary); "Differences only" checkbox on by default with "N identical hidden"; shared words of item names moved to header corner (`shortCompareLabels`); sticky header + pinned attribute column, sideways scroll beyond ~5 items on phone; no-differences message. Engine `attributeCompareMatrix.ts` (`isUniformRow`), `attributeUnits.ts`, `itemAttributes.ts` (reference-name resolution `attributeReferenceNames.ts`).
 
 Observed gaps
+
 - Compare Set not persisted or synced (header doc).
 - No relative best/worst colouring in Attributes (deferred, issue #146 per `attributeCompareMatrix.ts` header).
 - Prices view priced at Browser's location only; Hub Compare in Appraisal is a separate mechanism.
@@ -398,18 +414,20 @@ Observed gaps: priced from the same loader as order book, no staleness indicator
 ### 5. Price History tab (Browser item panel)
 
 `PriceHistoryPanel.tsx` + lazy `PriceHistoryChart.tsx` (Recharts, dynamic import keeps it out of initial bundle). Region = resolved region of the order book scope (`Market.tsx:1085`; global-market override for PLEX). Source: ESI `/markets/{region}/history` (`getMarketHistory`), cached via `loadWithCache` until ESI `Expires` (daily rollover); ESI 400 for untradable type cached as empty (`priceHistory.ts`). All ESI fields kept (average, highest, lowest, volume, order_count).
+
 - Range Select 7d/30d/90d/1y (`PRICE_HISTORY_RANGES`), device-local `marketPriceHistoryRange` default 30d (`priceHistoryRangePref.ts`); range only slices the full series. Full-width row on phone.
 - Summary strip: Hi, Lo, Median, Volume, Orders/day (`summarizePriceHistory`, `summaryNone` when empty).
 - Chart: two stacked synced charts. Price pane: high/low band, average line, moving-average line (7-day window; 3-day on the 7d range, `movingAverageWindowDays`, `PriceHistoryPanel.tsx:28-37`). Volume pane: volume bars + order-count line on a right axis (axis hidden on phone, line stays). One shared legend row (not per chart). Tooltip: date, avg, price range, volume, order count. `role=img` chart label. Moving average computed on the full series, then sliced to the range.
 - Day table below chart (`DataTable`: date, average, price range, volume, orders) with `TableActionsMenu` CSV (`priceHistoryCsv.ts`): date (UTC midnight), average, low, high, volume, order count. Range applies to table and CSV.
 - States: spinner (loading), error EmptyState (fetch threw; distinct from empty), empty EmptyState (ESI has no history), inline `summaryNone` text when history exists but none in the chosen range (chart still renders).
-Observed gaps: region-wide, not station-scoped (ESI limitation); no export of the moving average; MA window fixed (decision `20260910-091729-price-history-moving-average-window-fixed-7-days`).
+  Observed gaps: region-wide, not station-scoped (ESI limitation); no export of the moving average; MA window fixed (decision `20260910-091729-price-history-moving-average-window-fixed-7-days`).
 
 ---
 
 ### 6. Quickbar and price alerts
 
 `QuickbarList.tsx`, `quickbar.ts`, `useQuickbar.ts`. Per-character Editable Data (Dexie `quickbars` table; one record per Character, synced to Firestore `characters/{uid}/quickbars` via `QUICKBARS` in `src/sync/syncedCollections.ts:337`, tombstone-aware merge, never deleted, only emptied), rendered in Browser's left finder column under the tree. Reads as empty with no active character; Add disabled then (tooltip `market.contextMenu.quickbarNoCharacter`).
+
 - Add: pin IconButton in item header (toggles), item context menus; remove: row button or header pin; reorder: dnd-kit drag (pointer + keyboard, `reorderQuickbarItems`); dedupe by typeId.
 - Row: grip drag handle (4px pointer activation, keyboard sensor), name button (selects item in Browser; `aria-current` on the open item; selected row highlighted), icon, compact alert target `≥`/`≤` + price when set (`QuickbarList.tsx:92-98`, text not `IskAmount`), bell IconButton (`pressed` when target set) opening the alert popover, danger remove IconButton. No live price on the row.
 - Header: title + "View in Appraisal" IconButton (market icon; disabled when empty).
@@ -430,46 +448,51 @@ Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed 
 
 Summary
 
-| Feature | Where | Notes |
-| --- | --- | --- |
-| LP Store page | `/market/lp-store[/:corporationId]` | Market subView (`src/app/navDestinations.ts:185-195`), not a MARKET_TABS tab. Own route `src/routes/LoyaltyStore.tsx` |
-| Store picker | page header, `src/features/loyalty/LpStorePicker.tsx` | Hand-built combobox popover; held-LP corps pinned first with balance |
-| Landing state | `/market/lp-store` | Picker + empty state only (`LoyaltyStore.tsx:406`) |
-| Offers list | left panel, `DataTable` | Ranked ISK/LP desc; virtualized; select row -> detail |
-| Offer detail | right panel (desktop) / bottom-sheet `Modal` (phone) | Profit breakdown, View in Market, Plan in Industry, materials table |
-| Filters | `FilterBar` | Hub, price basis, affordable-only (default on), blueprints-only, search; all but hub/basis in URL |
-| Column picker | filter bar action | Optional cols `profit`, `iskPerLp`; device-local |
-| CSV export | list panel action + materials table | `surface: lp-offers`, `lp-offer-materials` |
-| LP Value setting | gear -> `PageSettingsButton` -> `LpValueSettingsForm` | Synced `sync.loyaltyLpValue`; 0 = market rate |
-| LpStoreLink | `src/features/loyalty/LpStoreLink.tsx` | Icon link used by Appraisal LP column + Blueprint Acquisition modal |
-| Wallet LP rows | `src/routes/Wallet.tsx:331,753` | Link/row click into the store |
-| Legacy `/wallet/loyalty[/:id]` | `src/app/legacyPaths.ts:9`, `src/app/App.tsx:181-182` | `LegacyPathRedirect`; UNGATED (`routeScopes.ts:265,268`) |
+| Feature                        | Where                                                 | Notes                                                                                                                 |
+| ------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| LP Store page                  | `/market/lp-store[/:corporationId]`                   | Market subView (`src/app/navDestinations.ts:185-195`), not a MARKET_TABS tab. Own route `src/routes/LoyaltyStore.tsx` |
+| Store picker                   | page header, `src/features/loyalty/LpStorePicker.tsx` | Hand-built combobox popover; held-LP corps pinned first with balance                                                  |
+| Landing state                  | `/market/lp-store`                                    | Picker + empty state only (`LoyaltyStore.tsx:406`)                                                                    |
+| Offers list                    | left panel, `DataTable`                               | Ranked ISK/LP desc; virtualized; select row -> detail                                                                 |
+| Offer detail                   | right panel (desktop) / bottom-sheet `Modal` (phone)  | Profit breakdown, View in Market, Plan in Industry, materials table                                                   |
+| Filters                        | `FilterBar`                                           | Hub, price basis, affordable-only (default on), blueprints-only, search; all but hub/basis in URL                     |
+| Column picker                  | filter bar action                                     | Optional cols `profit`, `iskPerLp`; device-local                                                                      |
+| CSV export                     | list panel action + materials table                   | `surface: lp-offers`, `lp-offer-materials`                                                                            |
+| LP Value setting               | gear -> `PageSettingsButton` -> `LpValueSettingsForm` | Synced `sync.loyaltyLpValue`; 0 = market rate                                                                         |
+| LpStoreLink                    | `src/features/loyalty/LpStoreLink.tsx`                | Icon link used by Appraisal LP column + Blueprint Acquisition modal                                                   |
+| Wallet LP rows                 | `src/routes/Wallet.tsx:331,753`                       | Link/row click into the store                                                                                         |
+| Legacy `/wallet/loyalty[/:id]` | `src/app/legacyPaths.ts:9`, `src/app/App.tsx:181-182` | `LegacyPathRedirect`; UNGATED (`routeScopes.ts:265,268`)                                                              |
 
 ### Nav, route, gating
+
 - Nav: `subViews` of Market (`navDestinations.ts:193`, label `loyaltyStore.title`, palette alias `loyalty.title`). Decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`: shopping an LP store is a market errand; balances stay on Wallet.
 - Doc title: `src/app/documentTitle.ts:41-42` keys the new `/market/lp-store` paths; the old `/wallet/loyalty` entries (`:43-44`) remain as dead duplicates.
 - Scope: both `/market/lp-store` and `/:corporationId` gated on `getCharacterLoyaltyPoints` (`routeScopes.ts:37-41,262-263`, shared `LP_STORE_REQUIREMENT`). Decision `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate`: browsing a store with 0 LP still works (0 balance), but gate stays; no anonymous browse.
 - Data: `GET /loyalty/stores/{corp}/offers/` public (`features/loyalty/store.ts`), cached Dexie global key `loyalty-store-offers:<id>`, `STALE_AFTER.static`, conditional fetch. Corp name `getCorporationPublicInfo`. LP balance `loadCharacterLoyaltyPoints`. Prices from Fuzzwork/hub snapshot via `useMarketSnapshot` (same as Build Plan). Skills via `loadCorrectedSkills`. Corp list for picker: baked `lpCorporations.json` (`loadLpCorporations`).
 
 ### Page header
+
 - Title = corp name (or "LP Store"). `DataAgeBadge` of offers fetch. `CorporationLink` (show info). StatChips: Your LP (active character's balance with this corp), Offers shown `n / total`.
 - Actions: `LpStorePicker` (w-72, wraps to own line on phone) + settings gear (section `market`).
 - Offline banner when offers served from cache (`LoyaltyStore.tsx:852`).
 - Remount keyed on corporationId so switching stores drops selection/state.
 
 ### Picker (`LpStorePicker.tsx`, `lpStorePickerOptions.ts`)
+
 - Select-styled button opens dialog popover with pinned search; list = every NPC corp running an LP store. Held corps (LP>0) first, desc by balance, shows balance; rest alphabetical. Typed query uses `rankedSearch`; held stay pinned.
 - Keys: Arrow/Home/End highlight (`aria-activedescendant`), Enter opens highlighted (or first match if typed), Escape closes + refocus, blur outside closes. Live-region count + "no matches" state. Pick navigates to `/market/lp-store/:id`.
 - Decisions: `20260930-144709-select-box-lp-store-picker`, `20260905-114550` (hand-built ARIA).
 - Corps with LP but no store (e.g. EverMarks/Paragon) are not listed.
 
 ### Filters (FILTER_PARAMS, `LoyaltyStore.tsx:379`)
+
 - Search (item name substring, deferred value), `affordableOnly` (default true, omitted from URL when default; chip shows affordable count), `blueprintsOnly`, `offer` (selected offer id; deep link from BPC Sourcing LP rows opens it; phone opens sheet on arrival).
 - Hub select (`TRADE_HUBS`, writes `useMarketHub`, device-local shared with Market) and Price basis select (Sell = list at hub lowest sell; Buy = instant into hub highest buy; `usePriceBasis`, `loyaltyStorePriceBasis`, device-local). `FilterBar` draft model: hub/basis/chips commit together; funnel collapses on phone.
 - Reset filters button in no-match empty state (shown when rows exist and search/affordable/blueprints narrow them; clears search, turns Affordable OFF and Blueprints off, `LoyaltyStore.tsx:655-659`). Active-filter badge counts only Affordable and Blueprints.
 - `AssumesBaseStandingsNote` shown above list when basis = sell (broker fee standings assumed base; `LoyaltyStore.tsx:669`).
 
 ### Offers table
+
 - Columns: Item (identity, never hidden; shows `BP` badge, "LP + ISK" caption), Profit (ISK, net), ISK/LP (1 decimal, bold, tone by sign). Column picker: `profit`, `iskPerLp` (`loyaltyStoreColumns.ts`, key `loyaltyStoreOffersVisibleColumns`; reset available).
 - Sort: URL `sort`, default `iskPerLp desc`; sortable cols item/profit/iskPerLp; unpriceable (null) sink last (`rankByIskPerLp`; sortValue undefined). `mobileSort` on phone, `stackSummary` "n offers".
 - Row click selects; row context menu = `ItemContextMenu` on the product (blueprint rows target the manufactured product; Build Plan item if blueprint). No three-dot `rowMoreActions` by decision `20260927-144329-lp-store-offers-table-skips-the-row-three` (though `rowMoreActions` prop is present in code, `LoyaltyStore.tsx:689`: see gaps).
@@ -477,6 +500,7 @@ Summary
 - States: spinner until offers + blueprint catalog + market snapshot all loaded (`ready`); empty store ("emptyTitle"); filters hide all ("noMatch" + reset).
 
 ### Offer detail (`OfferDetail`)
+
 - Header: product name (+ blueprint name subline). Buttons: View in Market (hub-aware link), Plan in Industry (blueprints with a product; navigates to Industry plans with `product=` and a Blueprint Acquisition price seed from `lpBlueprintPickPrice`; unpriced redemption opens unseeded).
 - Big ISK/LP and Net profit; breakdown lines: sell/buy price at hub, store cost (LP + ISK), required items (each priced, or "not priced" warning), materials + job fee (blueprints), net profit.
 - Notes: "need N more LP" when unaffordable; warnings when profit null (separate copy for unpriced required item vs unpriced product/material).
@@ -484,6 +508,7 @@ Summary
 - Desktop: list + detail `Panel` side by side, `aria-live` announcement on selection; detail shows `selectPrompt` until a row is picked. Phone: row tap opens `Modal placement="sheet"`.
 
 ### Engine
+
 - `engine/loyalty/offerProfit.ts`: `profit = revenue - salesTax - brokerFee - iskCost - requiredItemsCost - buildCost`; `iskPerLp = profit/lpCost`; broker fee only on sell basis, once per redemption (100 ISK min per stack); sales tax both bases; fees from `engine/industry/fees.ts`. `affordableLp = playerLp >= lpCost`. Decision `20260914-213119-lp-offer-profit-nets-market-fees-one-redemption`.
 - `features/loyalty/offerRows.ts` `computeLoyaltyOfferRows`: blueprint offers via `buildVsBuy` (cost side only, 1 run), plain items at hub price; required items priced at sell side.
 - `engine/loyalty/marketLpValue.ts`: market LP Value per corp = median of top-5 offers' ISK/LP with iskPerLp>0 and hub sell volume >= 5 x quantity per redemption (`MIN_DEPTH_REDEMPTIONS`); needs >=3 qualifying else null. `lpRate(own, market)`: own LP Value wins if >0, else market, else null (unpriced, never 0).
@@ -492,6 +517,7 @@ Summary
 - Standing: offers carry no home station, so standing resolved against the configured hub (`useLoyaltyStoreOffers.ts:58-62`, issue #1238).
 
 ### Observed gaps (LP Store)
+
 - No error state: a failed/unresolvable offers load becomes `[]` and shows the "empty store" copy (`useLoyaltyStoreOffers.ts:82` `offersResult?.data ?? []`); no retry/refresh control on the page.
 - `useUrlParams` has no hub/basis in URL; shared links do not carry price basis.
 - Offers table passes `rowMoreActions` (`LoyaltyStore.tsx:689`) although decision `20260927-144329` says not to; verify intent.
@@ -508,37 +534,40 @@ Summary
 
 Summary
 
-| Feature | Where | Notes |
-| --- | --- | --- |
-| Item search tab | `/contracts/search/items` (`CONTRACTS_TABS` id `search/items`, `src/app/pageTabs.ts`) | `ContractSearchPanel mode=items`; public item_exchange/auction lines, any item type |
-| Courier tab | `/contracts/search/courier` | `CourierResults` in same panel; public courier contracts as hauls |
-| Mode memory | `contractSearchModePref.ts` key `contractSearchMode` | Bare `/contracts` lands on last-used mode; Search/History choice not persisted |
-| Freshness + Refresh | page header (`routes/Contracts.tsx`) | Status reported up via `onStatusChange`; Refresh reloads both snapshots |
-| Item filters | `ContractSearchFilterBar` | type query, region, max price, min qty, sale kind, exclude auctions/PLEX, jump range, current system |
-| Type suggestions | panel under bar | click pins `items.type`; shows offer count + cheapest |
-| Summary chips | when a type pinned | Offers / Cheapest / Median + Clear item |
-| Items columns | picker `contractSearchItemsVisibleColumns` | qty, price, system, jumps, region, expires (+ identity Item) |
-| Contract detail (items) | `PublicContractDetailModal` | Region, system, location, expires, contract id copy, contents (you receive / hand over) |
-| Row context menu | Build Plan menu | `BuildPlanContextMenu` seeded from offer row (`seedFromOfferRow`) |
-| Items CSV | `contract-search` | `contractSearchCsv.ts` |
-| Courier filters | `CourierFilterBar` | route text, origin/dest region, From my region, dest space chips, min reward, max collateral, max volume, min days, over-rate, hide uncompletable, route preference |
-| Courier columns | picker `courierVisibleColumns` | reward, collateral, jumps, ISK/jump, ISK/m3, expires (+ identity Route) |
-| Courier detail | `CourierContractDetailModal` | route path, reverse lane, going-rate benchmark, community floor, risks, figures |
-| Courier CSV | `courier-contracts` | `courierContractsCsv.ts` |
-| Phone lane groups | `DataTable groupBy` | Collapsed lane headers with best ISK/jump + risk markers |
+| Feature                 | Where                                                                                 | Notes                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Item search tab         | `/contracts/search/items` (`CONTRACTS_TABS` id `search/items`, `src/app/pageTabs.ts`) | `ContractSearchPanel mode=items`; public item_exchange/auction lines, any item type                                                                                 |
+| Courier tab             | `/contracts/search/courier`                                                           | `CourierResults` in same panel; public courier contracts as hauls                                                                                                   |
+| Mode memory             | `contractSearchModePref.ts` key `contractSearchMode`                                  | Bare `/contracts` lands on last-used mode; Search/History choice not persisted                                                                                      |
+| Freshness + Refresh     | page header (`routes/Contracts.tsx`)                                                  | Status reported up via `onStatusChange`; Refresh reloads both snapshots                                                                                             |
+| Item filters            | `ContractSearchFilterBar`                                                             | type query, region, max price, min qty, sale kind, exclude auctions/PLEX, jump range, current system                                                                |
+| Type suggestions        | panel under bar                                                                       | click pins `items.type`; shows offer count + cheapest                                                                                                               |
+| Summary chips           | when a type pinned                                                                    | Offers / Cheapest / Median + Clear item                                                                                                                             |
+| Items columns           | picker `contractSearchItemsVisibleColumns`                                            | qty, price, system, jumps, region, expires (+ identity Item)                                                                                                        |
+| Contract detail (items) | `PublicContractDetailModal`                                                           | Region, system, location, expires, contract id copy, contents (you receive / hand over)                                                                             |
+| Row context menu        | Build Plan menu                                                                       | `BuildPlanContextMenu` seeded from offer row (`seedFromOfferRow`)                                                                                                   |
+| Items CSV               | `contract-search`                                                                     | `contractSearchCsv.ts`                                                                                                                                              |
+| Courier filters         | `CourierFilterBar`                                                                    | route text, origin/dest region, From my region, dest space chips, min reward, max collateral, max volume, min days, over-rate, hide uncompletable, route preference |
+| Courier columns         | picker `courierVisibleColumns`                                                        | reward, collateral, jumps, ISK/jump, ISK/m3, expires (+ identity Route)                                                                                             |
+| Courier detail          | `CourierContractDetailModal`                                                          | route path, reverse lane, going-rate benchmark, community floor, risks, figures                                                                                     |
+| Courier CSV             | `courier-contracts`                                                                   | `courierContractsCsv.ts`                                                                                                                                            |
+| Phone lane groups       | `DataTable groupBy`                                                                   | Collapsed lane headers with best ISK/jump + risk markers                                                                                                            |
 
 ### How tabs mount (`src/routes/Contracts.tsx`)
+
 - `CONTRACTS_TABS`: `search/items` (default), `search/courier`, `history` (skipped here). Tab ids are full path suffixes (`pageTabs.ts` comment). `/contracts/search` alone redirects to Item search.
 - Search is switched outside the history chain (`Contracts.tsx:601`): needs no character contracts or `contracts` scope; `/contracts` route is UNGATED (`routeScopes.ts:230`), History tab gates `getCharacterContracts` per tab with its own `GrantBanner` (decisions `20260912-200442-contracts-is-ungated-its-scope-is-gated-per`, `20260912-200030-contracts-opens-on-search-not-history`).
 - Selecting a search tab writes the mode pref (`Contracts.tsx:367`).
 
 ### Data source
+
 - ADR `docs/adr/0013`: scheduled Cloud Function `syncPublicContractOffers` (every 30 min, `functions/src/index.ts:639`) fetches EVE Ref public-contracts dataset, writes wholesale-replaced chunked Firestore snapshots (3000 rows/chunk, `PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE` in `functions/src/publicContracts.ts:377`; the ADR's ~2000 is stale; + `meta`). Client reads `publicContractOffers` (all item lines, `publicContractOffers.ts`, cache key `publicContractOffersAll`) and `publicCourierContracts` (`publicCourierContracts.ts`, single chunk, <620 rows) via `chunkedSnapshot.ts`; Dexie-cached, stale after 30 min, `useRouteSnapshot` with `staleWhileRevalidate` (#963). Decisions: `20260912-032407-generalized-public-contract-snapshot-schema-and-sizing`, `20260912-050724-contract-search-reads-the-shared-snapshot-as-its`, `20260912-055542-courier-contracts-get-a-sibling-snapshot-not-more`, `20260912-065131-courier-contracts-are-a-sibling-mode-of-contract`, `20260912-160012-each-contract-search-board-loads-on-its-own`.
 - Guarded by `isSyncConfigured()`: build with no sync backend shows `notConfigured` empty state, reads nothing.
 - Needs an active character (cache keyed by character): `Contracts.tsx:550` redirects to `/characters` when none is active (after a hydration spinner), so the panel's own spinner (`ContractSearchPanel.tsx:943`, `!hydrated || activeCharacterId === null`) is only a hydration state in practice. That spinner is checked before `isSyncConfigured()`, so `notConfigured` appears only after hydration. No ESI scope for search itself. Per-contract detail items fetched live (public ESI contract items) in modal.
 - Name resolution fills behind boards (`contractSearchNames.ts`: type names, region names; `offerLocations.ts`: station/structure system lookup; `courierEndpoints.ts`: NPC stations from `stations.json`, structures left unresolved to avoid 403 fan-out).
 
 ### Item search tab
+
 - Filter bar (`ContractSearchFilterBar`, `FilterBar` funnel; all filter state in URL, prefix `items.`: q, region, maxPrice, minQty, kind, hideAuctions, hidePlex, jumps, type): search box sits in the bar itself (type text; free text widens to many types, pinned type narrows to exactly one), Region (`RegionSelect`), Max price (`IskInput`), Min quantity, sale kind chips (exchange/auction toggle), Exclude CheckboxSelect (hide auctions, hide PLEX asks with tooltip), Jump range (`JumpRangeSelect`) + `CurrentSystemPicker` (writes own setting immediately, not part of the Apply draft; origin for distances), active-filter count; `JumpRangeNote` under the bar explains a range with no origin. Bar actions: ColumnPickerMenu + TableActionsMenu (CSV).
 - Suggestions list (when typing; max-h-72 scroll): per type, offer count and cheapest; click -> `selectType`. Summary chips (Offers, Cheapest, Median) + "Clear item" button show once a type is pinned. No-match EmptyState's Reset filters clears every field. Spinner "naming types" while names resolve and typed query non-empty.
 - Price semantic: asking price rule `offerAskingPrice` (auction shows buyout vs starting bid; PLEX asks converted via `usePlexPrice`, shown as "ISK + PLEX"; unpriced offers (zero price, multi-type unknowable) marked and sorted last; decisions `20260915-102046-zero-price-contract-treated-as-unpriceable...`, `20260915-093419-multi-type-contract-price-treated-as-unknowable...`).
@@ -549,6 +578,7 @@ Summary
 - Engine: `engine/contracts/contractSearch.ts` filter (type set, region, max price, min qty, kind, hideAuctions, hidePlexRequests, plexPrice); auction without buyout passes max-price (unknowable passes); `contractOffers.ts` BPC/BPO narrowing is for BPC Sourcing, not this tab. Decision `20260926-004049-public-contract-search-and-bpc-sourcing-virtualize-instead`.
 
 ### Courier tab (`CourierResults.tsx`)
+
 - Filters (URL prefix `courier.`, remembered default via `useRememberedUrlParams` + `courierFilterPref.ts` key `contractSearchCourierFilter`): route text (matches endpoint station/system names), Origin region, Destination region (options limited to regions present), "From my region" button (resolves via `esi-location` -> `solarSystems.json`; quiet disabled states: location unavailable / no hauls from region), Destination space chips (only bands present; unplaced destination excluded when narrowed, with explanatory empty state), Min reward, Max collateral, Max volume (m3), Min days to complete (missing deadline passes), Over-rate (all/only/hide), Hide uncompletable chip (player-structure/no-gate-route), Route preference select (shortest/safer etc.; absent = Travel default from Settings > Travel; `courier.pref`; not counted in the active-filter badge). Route text (`courier.q`) and `courier.pref` are not remembered with the other filters.
 - Columns: Route (identity: origin -> destination systems + security + risk markers), Reward, Collateral, Jumps (`JumpsLink` to Travel), ISK/jump, ISK/m3, Expires. Volume and days are filters/modal figures, not columns. Default sort `iskPerJump desc`. Jumps computed in one batched local pass (`localJumpCountsForRoutes`) honoring route preference; states pending/known/unknown (snapshot unavailable note).
 - Phone: lane-grouped (`groupBy laneKey`), collapsed by default; header = lane, haul count, regions, best ISK/jump, risk markers; `stackLayout="dense"`, `mobileSort`, summary "hauls / lanes".
@@ -557,6 +587,7 @@ Summary
 - Engine: `courierRates.ts`: `iskPerJump = reward / max(jumps,1)`; `iskPerVolume`; `courierGoingRate.ts`: median ISK/jump of corpus, needs >=20 samples, "far above" at multiple >=8; `courierRisk.ts`: risks per endpoint, `blocksCompletion` for structure/no-gate; high-collateral flag at ratio setting (`collateralThreshold.ts`, synced `sync.courierHighCollateralRatio`, presets 20/50/100/200, default 50); `courierReverseLane.ts` counts placeable return hauls; `routeExposure.ts`. Decisions: `20260912-141100-courier-hauls-rank-on-isk-per-jump-and`, `20260912-143620-isk-per-m3-is-the-courier-boards-secondary`, `20260912-165245-courier-hauls-carry-endpoint-space-not-route-safety`, `20260912-172628-courier-risk-flags-state-a-condition-never-a`, `20260912-191729-reverse-lane-counts-placeable-return-hauls-only`, `20260922-141611-courier-endpoints-show-system-security-not-the-space`, `20260925-234907-high-collateral-courier-flag-modal-only-at-50x`, `20260926-195118-three-more-settings-defaults-courier-collateral-multiple-bpc`.
 
 ### Observed gaps (contract search)
+
 - Search needs an active character even though it needs no scope; with none, `Contracts.tsx:550` sends the user to `/characters` (no sign-in-free browse).
 - Courier endpoints that are player structures stay unnamed (raw id); "unknown" destination excluded when a space band is narrowed (explained only in empty state).
 - Courier volume/days not sortable (not columns).
@@ -566,20 +597,19 @@ Summary
 - Both boards depend on a single backend snapshot (30 min, EVE Ref); no live ESI fallback, and unsynced builds show `notConfigured`.
 - Mode pref remembers items/courier only; filters not remembered for items (courier filters are).
 
-
 ## 7. Persistence and sync matrix (verified)
 
-| State | Where | Synced to Firestore |
-|---|---|---|
-| Quickbar items + alert targets | Dexie `quickbars` | Yes (`syncedCollections.ts:337`) |
-| LP Value (`sync.loyaltyLpValue`), courier collateral ratio (`sync.courierHighCollateralRatio`) | settings | Yes |
-| Appraisal share snapshot | Firestore `share` doc, 7-day TTL (`shareStore.ts:23`) | Yes (written on Share) |
-| Public contract/courier snapshots | Firestore (Cloud Function written), Dexie-cached | Read only |
-| Hub, Location Mode, Price Percent, column pickers, Hauling cargo/budget/filters, price-history range, LP price basis, contract mode, courier filter | device-local (localStorage/Dexie settings) | No |
-| Browser filters/tabs, Orders/History/Transactions filters, Hauling lane, LP filters, contract filters | URL params (ADR 0015) | No |
-| Compare Set, Appraisal paste, LP "own materials" chip | memory only | No |
-| Open-orders problem samples | Dexie, rolling 7 d | No |
-| Order book | memory 300 s; Fuzzwork hub prices 15 min memory + Dexie (`prices.ts:26`) | No |
+| State                                                                                                                                               | Where                                                                    | Synced to Firestore              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------- |
+| Quickbar items + alert targets                                                                                                                      | Dexie `quickbars`                                                        | Yes (`syncedCollections.ts:337`) |
+| LP Value (`sync.loyaltyLpValue`), courier collateral ratio (`sync.courierHighCollateralRatio`)                                                      | settings                                                                 | Yes                              |
+| Appraisal share snapshot                                                                                                                            | Firestore `share` doc, 7-day TTL (`shareStore.ts:23`)                    | Yes (written on Share)           |
+| Public contract/courier snapshots                                                                                                                   | Firestore (Cloud Function written), Dexie-cached                         | Read only                        |
+| Hub, Location Mode, Price Percent, column pickers, Hauling cargo/budget/filters, price-history range, LP price basis, contract mode, courier filter | device-local (localStorage/Dexie settings)                               | No                               |
+| Browser filters/tabs, Orders/History/Transactions filters, Hauling lane, LP filters, contract filters                                               | URL params (ADR 0015)                                                    | No                               |
+| Compare Set, Appraisal paste, LP "own materials" chip                                                                                               | memory only                                                              | No                               |
+| Open-orders problem samples                                                                                                                         | Dexie, rolling 7 d                                                       | No                               |
+| Order book                                                                                                                                          | memory 300 s; Fuzzwork hub prices 15 min memory + Dexie (`prices.ts:26`) | No                               |
 
 Scope matrix: Browser, Variations, Compare, Price History, Appraisal, Hauling = no scope (skills/standings/LP enrich when granted, absent otherwise). Orders + History = `esi-markets.read_character_orders.v1`; Transactions = `esi-wallet.read_character_wallet.v1`; both panel-level `GrantBanner`. Structure competition = optional `esi-markets.structure_markets.v1` (row shows "unavailable"). LP Store = loyalty scope, page-level gate (`routeScopes.ts:262`). Contract search = none; History tab needs contracts scope. Fill/undercut alerts = `getCharacterOrders` scope.
 

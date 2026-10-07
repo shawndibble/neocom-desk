@@ -6,22 +6,22 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailFolderPref,mailDr
 
 ## Summary
 
-| Feature | What | Where |
-| --- | --- | --- |
-| Folder chips | Inbox / Corp / Alliance / Sent multi-select toggles, per-folder unread count | `Mail.tsx:600`, `engine/mail.ts` `MAIL_FOLDERS` |
-| Search | Subject or sender name, 250 ms debounce, URL `search` | `Mail.tsx:628`, `mailSearchMatches` |
-| Hide read | Toggle chip, URL `hideRead` | `Mail.tsx:636` |
-| List | Two-line rows, unread dot, folder glyph+name, date; newest first; capped at 200 rendered | `Mail.tsx:675`, `capHeadersForDisplay` |
-| Load more | Pages older mail via `last_mail_id`, 50 per page | `Mail.tsx:805`, `loadMoreMailHeaders` |
-| Reader | Subject, From (+standing tag), To, body (EVE markup stripped), timestamp | `Mail.tsx:862-965` |
-| Mark read | Instant local dim + ESI write on open | `markMailReadOnEsi` |
-| Reply (reply-all) | Inline compose box, recipients prefilled, quoted body | `MailComposeBox.tsx` |
-| Forward | Same box, empty recipients + recipient picker | `MailComposeBox.tsx` |
-| Drafts | Auto-saved per (character, mail) in Dexie | `mailDrafts.ts` |
-| Standing tag | Sender colour-tag from own contacts, inherits corp/alliance | `StandingTag`, `characterStanding` |
-| Refresh | Header icon button | `Mail.tsx:550` |
-| Data Age badge | Header meta, from headers fetch | `Mail.tsx:547` |
-| Re-login banner | 401/403 on mail endpoints | `GrantBanner` |
+| Feature           | What                                                                                     | Where                                           |
+| ----------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Folder chips      | Inbox / Corp / Alliance / Sent multi-select toggles, per-folder unread count             | `Mail.tsx:600`, `engine/mail.ts` `MAIL_FOLDERS` |
+| Search            | Subject or sender name, 250 ms debounce, URL `search`                                    | `Mail.tsx:628`, `mailSearchMatches`             |
+| Hide read         | Toggle chip, URL `hideRead`                                                              | `Mail.tsx:636`                                  |
+| List              | Two-line rows, unread dot, folder glyph+name, date; newest first; capped at 200 rendered | `Mail.tsx:675`, `capHeadersForDisplay`          |
+| Load more         | Pages older mail via `last_mail_id`, 50 per page                                         | `Mail.tsx:805`, `loadMoreMailHeaders`           |
+| Reader            | Subject, From (+standing tag), To, body (EVE markup stripped), timestamp                 | `Mail.tsx:862-965`                              |
+| Mark read         | Instant local dim + ESI write on open                                                    | `markMailReadOnEsi`                             |
+| Reply (reply-all) | Inline compose box, recipients prefilled, quoted body                                    | `MailComposeBox.tsx`                            |
+| Forward           | Same box, empty recipients + recipient picker                                            | `MailComposeBox.tsx`                            |
+| Drafts            | Auto-saved per (character, mail) in Dexie                                                | `mailDrafts.ts`                                 |
+| Standing tag      | Sender colour-tag from own contacts, inherits corp/alliance                              | `StandingTag`, `characterStanding`              |
+| Refresh           | Header icon button                                                                       | `Mail.tsx:550`                                  |
+| Data Age badge    | Header meta, from headers fetch                                                          | `Mail.tsx:547`                                  |
+| Re-login banner   | 401/403 on mail endpoints                                                                | `GrantBanner`                                   |
 
 ## Page and states
 
@@ -75,19 +75,19 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailFolderPref,mailDr
 
 ## Data sources and scopes
 
-| Data | Endpoint | Scope | Cache |
-| --- | --- | --- | --- |
-| Headers (50, `last_mail_id` paging) | `GET /characters/{id}/mail` | `esi-mail.read_mail.v1` | default, conditional |
-| Body | `GET /characters/{id}/mail/{mail_id}` | `esi-mail.read_mail.v1` | static tier |
-| Labels + unread counts | `GET /characters/{id}/mail/labels` | `esi-mail.read_mail.v1` | default |
-| Mailing lists | `GET /characters/{id}/mail/lists` | `esi-mail.read_mail.v1` | static |
-| Mark read | `PUT /characters/{id}/mail/{mail_id}/` | `esi-mail.organize_mail.v1` | patches cached header |
-| Send | `POST /characters/{id}/mail/` | `esi-mail.send_mail.v1` (base grant) | deletes cached headers row |
-| Names | `POST /universe/names` | public | name cache |
-| Affiliations | `POST /characters/affiliation` | public | affiliation cache |
-| Contacts (standing tag, forward quick-picks) | `GET /characters/{id}/contacts` | `esi-characters.read_contacts.v1` | default; empty when scope missing |
-| Recipient search | `GET /characters/{id}/search` | `esi-search.search_structures.v1` | none |
-| Local only | Dexie `mailDrafts`, setting `mailFolders` | n/a | device |
+| Data                                         | Endpoint                                  | Scope                                | Cache                             |
+| -------------------------------------------- | ----------------------------------------- | ------------------------------------ | --------------------------------- |
+| Headers (50, `last_mail_id` paging)          | `GET /characters/{id}/mail`               | `esi-mail.read_mail.v1`              | default, conditional              |
+| Body                                         | `GET /characters/{id}/mail/{mail_id}`     | `esi-mail.read_mail.v1`              | static tier                       |
+| Labels + unread counts                       | `GET /characters/{id}/mail/labels`        | `esi-mail.read_mail.v1`              | default                           |
+| Mailing lists                                | `GET /characters/{id}/mail/lists`         | `esi-mail.read_mail.v1`              | static                            |
+| Mark read                                    | `PUT /characters/{id}/mail/{mail_id}/`    | `esi-mail.organize_mail.v1`          | patches cached header             |
+| Send                                         | `POST /characters/{id}/mail/`             | `esi-mail.send_mail.v1` (base grant) | deletes cached headers row        |
+| Names                                        | `POST /universe/names`                    | public                               | name cache                        |
+| Affiliations                                 | `POST /characters/affiliation`            | public                               | affiliation cache                 |
+| Contacts (standing tag, forward quick-picks) | `GET /characters/{id}/contacts`           | `esi-characters.read_contacts.v1`    | default; empty when scope missing |
+| Recipient search                             | `GET /characters/{id}/search`             | `esi-search.search_structures.v1`    | none                              |
+| Local only                                   | Dexie `mailDrafts`, setting `mailFolders` | n/a                                  | device                            |
 
 Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 
@@ -111,14 +111,14 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 
 ## Persistence and sync
 
-| State | Storage | Synced? |
-| --- | --- | --- |
-| `search`, `hideRead` | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no |
-| Selected folders | Dexie `settings` key `mailFolders`, device-wide | no |
-| Selected mail, open compose, locally-read set | React state only | no |
-| Headers/labels/lists/bodies | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`) | no |
-| Drafts | Dexie `mailDrafts` | no |
-| Read flag | ESI (source of truth) + patched cache | via ESI |
+| State                                         | Storage                                                                                                  | Synced? |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
+| `search`, `hideRead`                          | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no      |
+| Selected folders                              | Dexie `settings` key `mailFolders`, device-wide                                                          | no      |
+| Selected mail, open compose, locally-read set | React state only                                                                                         | no      |
+| Headers/labels/lists/bodies                   | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`)                | no      |
+| Drafts                                        | Dexie `mailDrafts`                                                                                       | no      |
+| Read flag                                     | ESI (source of truth) + patched cache                                                                    | via ESI |
 
 ## Test-covered behaviours (`src/routes/Mail.test.tsx`)
 

@@ -3,27 +3,28 @@
 Route `/contracts` (`src/routes/Contracts.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:207`). Tabbed (`CONTRACTS_TABS`, `src/app/pageTabs.ts:103-110`): three tabs, one page. Terms per `CONTEXT.md`: **Contract Search**, **Public Contract Offers snapshot**, **Public Courier Contracts snapshot**, **Published Snapshot**, **Offer**, **Going Rate**, **Jump Basis**, **Jump Range**, **Multi-Type Contract**.
 
 User goal by tab:
+
 - **Item search**: find the cheapest public item_exchange/auction listing of any item, anywhere in New Eden.
 - **Courier**: find hauls worth taking, ranked by pay per jump, with scam/strand risk stated.
 - **History**: see this Character's own issued/accepted contracts and open one for detail.
 
 ## Summary
 
-| Feature | Where | Notes |
-|---|---|---|
-| Item search tab `/contracts/search/items` (default) | `ContractSearchPanel.tsx` | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
-| Courier tab `/contracts/search/courier` | `CourierResults.tsx` | hauls as routes: filters, ISK/jump, risk markers, detail modal |
-| History tab `/contracts/history` | `Contracts.tsx:601-691` | Character's own contracts, filter chips, column picker, export, detail modal |
-| Remembered landing tab | `contractSearchModePref.ts` | bare `/contracts` opens last of Items/Courier; History never remembered |
-| Public contract detail modal | `features/contracts/PublicContractDetailModal.tsx` | merged lines, two-sided headings, market value per side |
-| Courier detail modal | `CourierContractDetailModal.tsx` | rate hero, route + path, risks, going-rate benchmark, reverse lane |
-| Character contract detail modal | `features/character/ContractDetailModal.tsx` | everything the in-game window shows |
-| Remembered courier filter | `courierFilterPref.ts` | all fields but text query and route preference |
-| Column pickers (3 tables) | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local |
-| Exports | `useTableExport` | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items` |
-| Jump Range filter + Current System picker | Items tab filter bar | measured on the stargate graph under the Jump Basis |
-| PLEX-ask pricing | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts` | converts PLEX ask to ISK at the global-market sell price |
-| Notifications | `features/notifications/events.ts:165-195` | contract accepted/completed/failed, courier delivery due |
+| Feature                                             | Where                                                                       | Notes                                                                              |
+| --------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Item search tab `/contracts/search/items` (default) | `ContractSearchPanel.tsx`                                                   | ranked name search over public offers, 8 filters, suggestions, stats, detail modal |
+| Courier tab `/contracts/search/courier`             | `CourierResults.tsx`                                                        | hauls as routes: filters, ISK/jump, risk markers, detail modal                     |
+| History tab `/contracts/history`                    | `Contracts.tsx:601-691`                                                     | Character's own contracts, filter chips, column picker, export, detail modal       |
+| Remembered landing tab                              | `contractSearchModePref.ts`                                                 | bare `/contracts` opens last of Items/Courier; History never remembered            |
+| Public contract detail modal                        | `features/contracts/PublicContractDetailModal.tsx`                          | merged lines, two-sided headings, market value per side                            |
+| Courier detail modal                                | `CourierContractDetailModal.tsx`                                            | rate hero, route + path, risks, going-rate benchmark, reverse lane                 |
+| Character contract detail modal                     | `features/character/ContractDetailModal.tsx`                                | everything the in-game window shows                                                |
+| Remembered courier filter                           | `courierFilterPref.ts`                                                      | all fields but text query and route preference                                     |
+| Column pickers (3 tables)                           | `contractsColumns.ts`, `contractSearchItemsColumns.ts`, `courierColumns.ts` | device-local                                                                       |
+| Exports                                             | `useTableExport`                                                            | surfaces `contracts`, `contract-search`, `courier-contracts`, `contract-items`     |
+| Jump Range filter + Current System picker           | Items tab filter bar                                                        | measured on the stargate graph under the Jump Basis                                |
+| PLEX-ask pricing                                    | `engine/contracts/contractSearch.ts`, `features/market/plexPrice.ts`        | converts PLEX ask to ISK at the global-market sell price                           |
+| Notifications                                       | `features/notifications/events.ts:165-195`                                  | contract accepted/completed/failed, courier delivery due                           |
 
 ## Route, tabs, URL
 
@@ -40,24 +41,24 @@ User goal by tab:
 
 ## Data sources and scopes
 
-| Data | Loader | Source | Scope |
-|---|---|---|---|
-| Own contracts | `features/character/contracts.ts` `loadContracts` | `getCharacterContracts` paged, `truncated` flag | `esi-contracts.read_character_contracts.v1` |
-| Own contract items (on modal open) | `contractItems.ts` | `getCharacterContractItems`; cached `STALE_AFTER.static` (lines fixed at issue) | same |
-| Public contract items (on modal open) | `features/bpcContracts/publicContractItems.ts` | `getPublicContractItems` public route; global-sentinel cache; 404 cached as `not-found` | none |
-| Public offers | `contractSearch/publicContractOffers.ts` | Firestore `publicContractOffers` (EVE Ref crawl, republished every 30 min), cache key `publicContractOffersAll`, 30 min window | none, but needs a Firebase session (`ensureAnySession`) and a build with sync configured (`isSyncConfigured`) |
-| Public courier | `publicCourierContracts.ts` | Firestore `publicCourierContracts`, one small chunk (~620 rows at ADR 0013 sizing) | same |
-| Item names | `contractSearchNames.ts` `useListedTypeNames` | SDE then `postUniverseNames` | public |
-| Courier endpoint names | `courierEndpoints.ts` | local `stations.json`/`systems.json` only, never ESI | none |
-| Offer locations/system/security | `offerLocations.ts` | local SDE | none |
-| Region names | `useRegionNames` | public `getUniverseRegion` | public |
-| Contract location names | `features/character/contractLocationName.ts` | SDE station membership decides NPC vs structure; structure → `getUniverseStructure` (ACL; null = unknown, retried) | `esi-universe.read_structures.v1` |
-| Issuer/receiver names, affiliations | `names.ts`, `affiliations.ts` | `postUniverseNames`, affiliation endpoint | public |
-| Standing tags | `loadContacts` | own contact list | contacts scope, optional (absent → no tag) |
-| Market value in modals | `contractMarketValue.ts` → `market/prices.ts getHubPrices` | Fuzzwork hub aggregates (ADR 0002), sell min at reader's Trade Hub | public |
-| PLEX price | `features/market/plexPrice.ts` | cheapest sell order in PLEX's global market region | public |
-| Current location (jump range, "from my region") | `character/location.ts` | `getCharacterLocation` | `esi-location.read_location.v1` optional |
-| Travel rules | `useJumpBasis` | Settings → Travel + Route Safety saved settings | none |
+| Data                                            | Loader                                                     | Source                                                                                                                         | Scope                                                                                                         |
+| ----------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Own contracts                                   | `features/character/contracts.ts` `loadContracts`          | `getCharacterContracts` paged, `truncated` flag                                                                                | `esi-contracts.read_character_contracts.v1`                                                                   |
+| Own contract items (on modal open)              | `contractItems.ts`                                         | `getCharacterContractItems`; cached `STALE_AFTER.static` (lines fixed at issue)                                                | same                                                                                                          |
+| Public contract items (on modal open)           | `features/bpcContracts/publicContractItems.ts`             | `getPublicContractItems` public route; global-sentinel cache; 404 cached as `not-found`                                        | none                                                                                                          |
+| Public offers                                   | `contractSearch/publicContractOffers.ts`                   | Firestore `publicContractOffers` (EVE Ref crawl, republished every 30 min), cache key `publicContractOffersAll`, 30 min window | none, but needs a Firebase session (`ensureAnySession`) and a build with sync configured (`isSyncConfigured`) |
+| Public courier                                  | `publicCourierContracts.ts`                                | Firestore `publicCourierContracts`, one small chunk (~620 rows at ADR 0013 sizing)                                             | same                                                                                                          |
+| Item names                                      | `contractSearchNames.ts` `useListedTypeNames`              | SDE then `postUniverseNames`                                                                                                   | public                                                                                                        |
+| Courier endpoint names                          | `courierEndpoints.ts`                                      | local `stations.json`/`systems.json` only, never ESI                                                                           | none                                                                                                          |
+| Offer locations/system/security                 | `offerLocations.ts`                                        | local SDE                                                                                                                      | none                                                                                                          |
+| Region names                                    | `useRegionNames`                                           | public `getUniverseRegion`                                                                                                     | public                                                                                                        |
+| Contract location names                         | `features/character/contractLocationName.ts`               | SDE station membership decides NPC vs structure; structure → `getUniverseStructure` (ACL; null = unknown, retried)             | `esi-universe.read_structures.v1`                                                                             |
+| Issuer/receiver names, affiliations             | `names.ts`, `affiliations.ts`                              | `postUniverseNames`, affiliation endpoint                                                                                      | public                                                                                                        |
+| Standing tags                                   | `loadContacts`                                             | own contact list                                                                                                               | contacts scope, optional (absent → no tag)                                                                    |
+| Market value in modals                          | `contractMarketValue.ts` → `market/prices.ts getHubPrices` | Fuzzwork hub aggregates (ADR 0002), sell min at reader's Trade Hub                                                             | public                                                                                                        |
+| PLEX price                                      | `features/market/plexPrice.ts`                             | cheapest sell order in PLEX's global market region                                                                             | public                                                                                                        |
+| Current location (jump range, "from my region") | `character/location.ts`                                    | `getCharacterLocation`                                                                                                         | `esi-location.read_location.v1` optional                                                                      |
+| Travel rules                                    | `useJumpBasis`                                             | Settings → Travel + Route Safety saved settings                                                                                | none                                                                                                          |
 
 - Shared `chunkedSnapshot.ts`: reads `meta` doc + N chunk docs of `rows`, cached under `GLOBAL_CACHE_CHARACTER_ID`, `allowStaleServe: true` so a lapsed row renders while the new read runs (issue #963). `fromCache` marks a failed revalidation (warning copy); `revalidating` shows "Refreshing in the background…" (`role=status`). Manual Refresh cannot beat the 30-min window by design (nothing newer exists); decision `20260912-160012-each-contract-search-board-loads-on-its-own`.
 - Each board has its own `useRouteSnapshot` so Courier never waits for ~370k offer rows (#963).
@@ -68,6 +69,7 @@ User goal by tab:
 Panel without title; table label "Contract Search". Mounts only after snapshot load.
 
 States (in order, `ContractSearchPanel.tsx:964-1031`):
+
 1. Build without sync: "Contract search isn't available / requires the app's sync backend".
 2. `fromCache`: "offline" or (after a refresh) "refresh failed" line; `revalidating` status line.
 3. Loading with 0 rows: spinner "loading offers" plus visible copy (first sync is slow).
@@ -79,7 +81,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 
 - Search box "Search item name…": ranked search (`rankedSearch`) over only item types currently listed (`listedContractTypeOptions`), limit 50 types for free text; `deferredTypeQuery` so a keystroke does not stall on ~370k rows (#2024).
 - Region (`RegionSelect`, searchable; only regions present in rows) → `items.region`.
-- Max price (`IskInput`, shorthand ok). Min quantity (number). 
+- Max price (`IskInput`, shorthand ok). Min quantity (number).
 - Sale kind chips Exchange / Auction (toggle; `items.kind`).
 - Exclude (`CheckboxSelect`): Hide auctions; Hide PLEX requests (tooltip "Hide contracts asking for PLEX in return, rather than ISK").
 - Jump range (`JumpRangeSelect`): Any, current system only, 3/5/10/15/20 jumps under the Jump Basis. `CurrentSystemPicker`: game location by default or a hand-picked system, stored device-local per Character (`currentSystemPicks`), writes immediately (not part of the draft). `JumpRangeNote` explains missing origin.
@@ -116,6 +118,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 ### Public contract detail modal
 
 Opened by an Items row (title = item name). Header `StatChips`: Price (full sentence: buyout/starting bid/incl. PLEX), Qty, plus ME/TE and Runs for a copy. Grid: Region, System (Route Safety link, when known), Location (spinner then name or "Unknown location (#id)"), Expires, Contract id with copy button (`CopyContractIdButton`, 1.5 s check). Contents:
+
 - Lines merged per item (`mergeContractItemLines`), icon, name → Show info, ×qty, ME/TE/runs on copies.
 - Two-sided item_exchange: "What you hand over" (requested) first, then "What you get" (included); one-sided shows "Everything on this contract" or "What you hand over" when only requested (decision `20260912-190109`).
 - Market value row per side: sum of sell-min × qty at the reader's Trade Hub (PLEX at global price) with "(N items unpriced)" suffix; neutral colour on purpose (no side known). Priced unconditionally since every public row is standing.

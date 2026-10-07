@@ -5,6 +5,7 @@ Scope: `src/routes/Industry.tsx` shell + header, Active Jobs, Records tab, BPC S
 Terms per `CONTEXT.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
 
 Where brief items actually live (code differs from the obvious guess):
+
 - Records tab renders only `ProductionLogPanel`. Nothing else.
 - Active Jobs panel (personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
 - Owned blueprints panel + `ownedBlueprints` CSV = Opportunities tab "All owned" view (`opps.view=owned`).
@@ -13,25 +14,25 @@ Where brief items actually live (code differs from the obvious guess):
 
 ## 1. Summary table
 
-| Feature | Where | Notes |
-|---|---|---|
-| Industry shell, 4-tab strip | `/industry/{plans,records,sourcing,opportunities}` `src/routes/Industry.tsx`, `IndustryHeader.tsx`, `industryTabs.ts` | Tab = path segment (ADR 0015). Header + Active Jobs shared with plan/group pages |
-| Per-tab settings gear | `IndustryHeader.tsx` `tabSettings` | plans: IndustrySettingsForm; opportunities: assumed-ME only; sourcing: BpcSourcingSettingsForm; records: none |
-| Blueprints reauth banner | `IndustryHeader.tsx` | GrantBanner for `getCharacterBlueprints`; all tabs |
-| Deep links `?product=` `?material=` + seed | `Industry.tsx`, `planSeed.ts` | Opens/creates plan, redirects to plan page |
-| Active Jobs panel | header, all tabs `ActiveJobsPanel.tsx` | Personal + corp jobs, filters, CSV, slot readout, Log production |
-| Log production from job | job row button, `LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts` | Finished mfg/reaction personal jobs only; 0/1/many plan resolve |
-| Production Log (Records) | `/industry/records` `ProductionLogPanel.tsx` | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs |
-| Sold split button + modals | Records runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts` | Link Past Sale, Watch Open Order, Manual Sale, Delete run |
-| Realized profit breakdown | `RealizedProfitCell` / `RealizedProfitBreakdown.tsx` | Modal per run |
-| BPC Sourcing search | `/industry/sourcing` `BpcSourcingPanel.tsx` | 5 sources, filters, autocomplete, strip, 200-row table, CSV |
-| BPC contract detail modal | `BpcContractModal.tsx` -> `PublicContractDetailModal` | Row click on contract rows |
-| BPO badge/cards | `BpoBadge.tsx`, `BpoCard.tsx`, `bpoAvailability.ts` | Contract + market originals |
-| Build Opportunities (Ranked) | `/industry/opportunities` `OpportunitiesPanel.tsx` | Owned blueprints ranked by ISK/hour, compare seeding, CSV |
-| All owned view | `OwnedBlueprintsPanel.tsx` | Library of owned BPO/BPC (+corp), column picker, CSV |
-| Market-Wide Build Opportunities | `MarketWideOpportunitiesPanel.tsx` | Opt-in scan, filters, paging by 200, CSV |
-| Phone card lists | `MobileOpportunityList`, `MobileOwnedBlueprintList`, `MobileMarketWideList`, `MobileSortToolbar` | Cards, sort menu, identical-copy folding |
-| Blueprint Acquisition modal | mounted by `BuildPlanDetail.tsx`; logic in `BlueprintAcquisitionModal.tsx` | Link-up only; shared row builders with BPC Sourcing |
+| Feature                                    | Where                                                                                                                 | Notes                                                                                                         |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Industry shell, 4-tab strip                | `/industry/{plans,records,sourcing,opportunities}` `src/routes/Industry.tsx`, `IndustryHeader.tsx`, `industryTabs.ts` | Tab = path segment (ADR 0015). Header + Active Jobs shared with plan/group pages                              |
+| Per-tab settings gear                      | `IndustryHeader.tsx` `tabSettings`                                                                                    | plans: IndustrySettingsForm; opportunities: assumed-ME only; sourcing: BpcSourcingSettingsForm; records: none |
+| Blueprints reauth banner                   | `IndustryHeader.tsx`                                                                                                  | GrantBanner for `getCharacterBlueprints`; all tabs                                                            |
+| Deep links `?product=` `?material=` + seed | `Industry.tsx`, `planSeed.ts`                                                                                         | Opens/creates plan, redirects to plan page                                                                    |
+| Active Jobs panel                          | header, all tabs `ActiveJobsPanel.tsx`                                                                                | Personal + corp jobs, filters, CSV, slot readout, Log production                                              |
+| Log production from job                    | job row button, `LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts`                                           | Finished mfg/reaction personal jobs only; 0/1/many plan resolve                                               |
+| Production Log (Records)                   | `/industry/records` `ProductionLogPanel.tsx`                                                                          | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
+| Sold split button + modals                 | Records runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts`                                                     | Link Past Sale, Watch Open Order, Manual Sale, Delete run                                                     |
+| Realized profit breakdown                  | `RealizedProfitCell` / `RealizedProfitBreakdown.tsx`                                                                  | Modal per run                                                                                                 |
+| BPC Sourcing search                        | `/industry/sourcing` `BpcSourcingPanel.tsx`                                                                           | 5 sources, filters, autocomplete, strip, 200-row table, CSV                                                   |
+| BPC contract detail modal                  | `BpcContractModal.tsx` -> `PublicContractDetailModal`                                                                 | Row click on contract rows                                                                                    |
+| BPO badge/cards                            | `BpoBadge.tsx`, `BpoCard.tsx`, `bpoAvailability.ts`                                                                   | Contract + market originals                                                                                   |
+| Build Opportunities (Ranked)               | `/industry/opportunities` `OpportunitiesPanel.tsx`                                                                    | Owned blueprints ranked by ISK/hour, compare seeding, CSV                                                     |
+| All owned view                             | `OwnedBlueprintsPanel.tsx`                                                                                            | Library of owned BPO/BPC (+corp), column picker, CSV                                                          |
+| Market-Wide Build Opportunities            | `MarketWideOpportunitiesPanel.tsx`                                                                                    | Opt-in scan, filters, paging by 200, CSV                                                                      |
+| Phone card lists                           | `MobileOpportunityList`, `MobileOwnedBlueprintList`, `MobileMarketWideList`, `MobileSortToolbar`                      | Cards, sort menu, identical-copy folding                                                                      |
+| Blueprint Acquisition modal                | mounted by `BuildPlanDetail.tsx`; logic in `BlueprintAcquisitionModal.tsx`                                            | Link-up only; shared row builders with BPC Sourcing                                                           |
 
 ## 2. Industry shell (`src/routes/Industry.tsx`)
 
@@ -56,12 +57,14 @@ Where brief items actually live (code differs from the obvious guess):
 What: "Active jobs" panel above the tabs; running industry jobs of all activities (manufacturing 1, research TE/ME, copying, invention, reactions 11), soonest end first.
 
 Data / scopes:
+
 - Personal: ESI `getCharacterIndustryJobs`, scope `esi-industry.read_character_jobs.v1`, `include_completed=false`, cached key `industryJobs`, conditional fetch. 403 -> `needsReauth` (no cache fallback).
 - Corp (issue #2302): `loadAccountCorpIndustryJobs` -> `getCorporationIndustryJobs` via any account Character with scope `esi-industry.read_corporation_jobs.v1` (opt-in) and role `canReadIndustry` (`corpCapabilities`); one read per corporation (`pickCorpReaders`, active Character preferred); scope checked from stored token first so no app-wide reauth banner. Listed by `installer_id` for selected account Characters; job an alert named is kept even if not installed by one (`visibleCorpJobs`). Never rejects.
 - Skills for slot readout: `loadCorrectedSkills(skipQueueWithoutScope)`.
 - Multi-Character: `loadAllCharactersIndustryJobs` fan-out (`ESI_FANOUT_CONCURRENCY`), characters without scope listed in `skipped` note.
 
 Controls and states:
+
 - Panel header: Character filter (`CharacterFilterControl`, hidden for single-Character accounts; URL `jobs.chars`, default from Settings `useDefaultCharacterFilter`), one-line summary "N running, N done" + next finish ("name in 2h"), job slot readout (`HintText`: open slots mfg / science / reactions, colour danger when all open, warning when >=50% open; tooltip used/max per category), caret to fold list.
 - List folded by default; auto-expands when a notification deep link `?highlight=<job_id>` (`useHighlightParam`; alerts `industryJobComplete`/`corpIndustryJobReady`) points at a job. Row pulses via `highlightRowKey`.
 - "Done" = `end_date` passed (`isJobDone`), not ESI `status`; "Completing soon" = 0 < remaining <= 1h (`jobs.ts:171-178`). Log production enabled for activities 1 and 11 only (`jobs.ts:187`).
@@ -74,6 +77,7 @@ Controls and states:
 - Countdown tick 30 s (`useTicker`, paused when tab hidden). Result snapshot cached via `useRouteSnapshot` key `industry:active-jobs`.
 
 Observed gaps:
+
 - No completed-job history: delivered jobs drop off; Records' own caveat says unlogged completed jobs are not counted (`industry.productionLogCaveat`).
 - Log production is personal jobs only (comment cites decision `20260905-181537-production-log-row-per-allocation-sync-accept-wallet`); corp job rows have no action.
 - Header ghost-reauth for corp scope is intentionally absent (decision `20260929-184545-no-note-for-corp-jobs-nobody-here-can`).
@@ -87,6 +91,7 @@ What: account-wide (active Character) realized-profit rollup of every logged **P
 Data: Dexie `productionRuns`, `productionSaleLinks`, `productionOrderWatches` (live queries by `characterId`; synced via `markProductionRunDeleted` / `scheduleSync`). Plans (to know if a run's plan exists), catalog (names), skills (`modifiers.skills`: Accounting, Broker Relations), Trade Hub standing (`useTradeHubStandings`) per run's plan hub.
 
 Layout:
+
 - Left: hero "Total realized profit" (tone-coloured ISK) + subtitle + caveat ("N logged runs across N items; unlogged completed jobs not counted"), `AssumesBaseStandingsNote` when any run paid broker fee, ledger rows: Total cost logged, Total revenue linked, Open inventory value, Avg margin (unknown until a sale linked).
 - Right: profit-over-time chart (lazy Recharts `ProductionProfitChart`, only when >=2 daily points; cumulative realized profit by local day, line coloured by trend up/down/flat, tooltip, `role=img` label), "By item" table, folded "All production runs" panel.
 - Date range: `FilterBar` with From/To date inputs (`records.from`, `records.to`, ISO dates; mobile = filter sheet). Filters runs by logged date (`productionLogFilter.ts`).
@@ -99,6 +104,7 @@ Layout:
 Engine: `summarizeProductionRun` (`productionRunSummary.ts`): sold qty = linked sales + watched-order filled units; `realizedProfit` (`src/engine/industry/realizedProfit.ts`) nets sales tax and broker fee (only on watched-order revenue); status new/open/closed; open inventory = remaining x cost per unit. Item rollup margin is revenue-weighted, not averaged; `soldUnitsMargin` = net revenue less sold units' share of cost.
 
 Observed gaps:
+
 - No Records content beyond Production Log; completed jobs not logged are invisible here.
 - Run rows are inert once their plan is deleted (by design: runs are locked records).
 - Date range filters only by logged date; no item/plan filter or search.
@@ -111,6 +117,7 @@ Observed gaps:
 What: search over every public contract Blueprint Copy for sale in New Eden plus (optional) contract BPOs, market BPO sell orders, LP Store copies, and the pilot's owned blueprints. ADR 0013 (Firestore shared snapshot fed by scheduled EVE Ref crawl), ADR 0015 (URL state).
 
 Data source:
+
 - Public Contract Offers snapshot: Firestore `publicContractOffers` written by `syncPublicContractOffers` (every 30 min, admin write only, signed-in read; ADR 0013 amendments 2026-09-12). Read via `loadPublicBpcContracts` (`syncedContracts.ts`), narrowed to copies in browser (`engine/contracts/contractOffers.ts`), originals kept separately for BPO source. Cached through `esi/cache.ts` `GLOBAL_CACHE_CHARACTER_ID`; stale window = publish interval (30 min); panel Refresh bypasses. Needs Firebase sync configured (`isSyncConfigured`), not an ESI scope. UI shows snapshot `lastSyncedAt` as `DataAgeBadge`.
 - Owned: `loadCharacterBlueprints` (scope `esi-characters.read_blueprints.v1`; 401/403 resolves empty here, header banner covers reauth).
 - Market BPOs: `useMarketBpoOrders` -> `loadOrderBookView` per type (ESI market orders, region mode, Global Market Region aware), lazy, short debounce, concurrency-capped; only for the picked blueprint or closest typed matches (`MARKET_BPO_LOOKUP_LIMIT = 10`, `useMarketBpoOrders.ts:32`).
@@ -119,12 +126,14 @@ Data source:
 - Contract detail items: `publicContractItems.ts` read live on modal open (public ESI route, cached globally).
 
 Search/filter controls (`BpcFilterBar`, FilterBar: inline from `md`, sheet below; active chips row on phone with Clear all):
+
 - Search box = ARIA combobox autocomplete (`SUGGESTION_LIMIT = 8`, `BpcSourcingPanel.tsx:257`): arrow keys move highlight, Enter picks, Escape hides, ArrowDown reopens. Rows show offer counts and best ME/TE. Typing = free-text match on name (minus "Blueprint", decision `20260908-203708`); picking = pins one blueprint (`sourcing.type`), unlocking per-blueprint summary strip. Editing text drops the pin. `bpcSourcingHref(typeId)` builds "search BPC Sourcing for this" links.
 - Region (`sourcing.region`, RegionSelect), Jump Range (`sourcing.jumps`, from Current System via `CurrentSystemPicker`; unplaceable rows drop; note when no origin), Min ME / Min TE / Min runs / Max price (`sourcing.minMe|minTe|minRuns|maxPrice`, text parsed to ints, blank/invalid ignored), Exclude: Auctions (`sourcing.hideAuctions`), PLEX contracts (`sourcing.hidePlex`) with defaults from Settings (`sync.bpcHideAuctions`, `sync.bpcHidePlex`; URL wins, nothing writes back), Source multiselect (`sourcing.src`: contract, contractBpo, market, lp, owned; default contract+owned; remembered per device `bpcSourcingSources`; link wins), Space multiselect (high/low/null/wormhole; device-local `bpcSearchSpaceFilter`; empty rejected).
 - Reset filters (empty-state action), ColumnPicker (`bpcSearchVisibleColumns.v2`; default Location, Jumps, ME, TE, Price; optional Source, Runs, Qty, ISK/run, Region, Space, Expires; Item always).
 - Suggestion counts use the same non-type filter as the table so counts agree.
 
 Results:
+
 - Strip above table when one blueprint picked: stat chips (Cheapest, Cheapest per run, Median, Best ME/TE), "Cheapest by region" cells (max 6, `REGION_CELL_LIMIT`; scrolls sideways on phone), Market BPOs / Contract BPOs cards (`BpoCard`, cheapest card gets accent; "may be cheaper than copy" check `bpoMayBeCheaper`), market scope note (hub vs region, checking, failed N, capped 10).
 - With several blueprints, one copy per type gets a "BPO too" `BpoBadge` (tooltip: price, location, region; tap only explains).
 - Table: `DataTable` stackLayout dense (two-line cards on phone, sort picker `mobileSort`), virtualized, default sort Price asc (`sourcing.sort`), cap `RESULT_LIMIT = 200` rows after sort (`BpcSourcingPanel.tsx:267`; note "Showing 200 of N"). Price cell: ISK, PLEX-only/ISK+PLEX, auction buyout/starting bid, LP cost, whole-contract marker for bundles. Owned rows tagged "Owned" in Item cell.
@@ -136,6 +145,7 @@ Results:
 Key pure calcs (`src/engine/contracts/bpcSearch.ts`): `effectivePrice` (auction = buyout), `iskPerRun`, `cheapestByRegion`, `bpcPriceSummary` (cheapest/median/best ME-TE), `filterBpcSearchRows`, `blueprintOfferStats`. BPO cheapest from `blueprintAcquisitionSources` builders (skip multi-type bundles and zero-price barters).
 
 Observed gaps:
+
 - Table capped at 200 rows; broader searches must be narrowed (decision `20261003-112230-bpc-sourcing-caps-its-table-at-200-rows`).
 - Market BPO lookup limited to picked blueprint or 10 closest matches; failed book reported, not read as "no BPO".
 - Owned rows have no click action; a blueprint in a container/ship has no location name and no waypoint.
@@ -149,6 +159,7 @@ Observed gaps:
 Two panels, Market-Wide first.
 
 ### 6a. Ranked (Build Opportunities), `OpportunitiesPanel.tsx`
+
 - What: every manufacturing blueprint (BPO or BPC) the selected Characters own, priced and ranked by ISK/hour. Reactions and SDE-unknown blueprints excluded from ranking (`buildOpportunityCandidates`). No auto-build depth (removed, issue #652).
 - Data: `loadCharacterBlueprints` per selected Character (ESI blueprints scope); oldest fetch -> header `DataAgeBadge`. Market via `loadMarketSnapshot(s)` batched per distinct Trade Hub (Fuzzwork hub prices, ESI adjusted prices + system cost index, ADR 0002); hub per owning Character = hub of that Character's most recently updated plan else default (`hubForCharacter`). Per-Character skills/implants (`useCharacterModifiersByCharacter`, effective levels) and Trade Hub standings. Owned stock snapshot reduces material cost (owned materials claimed). Skill-gate verdict from account skills (`useAccountSkillLevels`, raw active level).
 - Controls: view toggle Ranked / All owned (`opps.view`; desktop segmented, phone select that doubles as title), Character filter (`opps.chars`, default current, hidden for one Character), progress counter "done/total" while pricing, Refresh button when manual-only, "Add N to Compare" (desktop, when >=2 ticked) -> seeds plans and opens Plans tab compare, CSV `industry-opportunities` (Product, Character, Blueprint, Runs, Unit margin, Margin %, Time s, ISK/hour, Order depth; `opportunitiesCsv.ts`).
@@ -158,6 +169,7 @@ Two panels, Market-Wide first.
 - Engine: `computeOpportunityRow` prices candidate via `buildVsBuy`/`computeBuildPlan`; top-level blueprint owned so no acquisition gap priced; ISK/hour = profit / (seconds/3600) (`buildVsBuy.ts`); `rankOpportunityRows` sorts, unpriceable last; `classifyOrderDepth` = hub sell-order ISK / build cost: deep >= 3, thin < 0.5, else moderate, unknown if no hub sell price; unit margin = profit / (product qty x priced runs; BPO priced at 1 run). Incremental: shared batched snapshot fetch then chunked pricing with `setTimeout(0)` yields; progress frames re-ranked at most every 500 ms (`throttledRanking.ts`, `useOpportunities.ts:63`). Module-level `rowsCache` survives tab switches; above 10 candidates a remount never recomputes (`AUTO_RECALCULATE_MAX = 10`, `opportunities.ts:439`), and `opportunitiesInputsKey` drops stale cache (assumed ME, owned ME/TE).
 
 ### 6b. All owned view, `OwnedBlueprintsPanel.tsx` (`opps.view=owned`)
+
 - What: every blueprint of selected Characters (and optionally their corp) as a library; nothing dropped (reactions, unknown, unpriceable). ISK/hour borrowed from ranked rows when available.
 - Data: same blueprint loads as Ranked; corp blueprints `useCorpOwnedBlueprints` -> `loadCorporationBlueprints` (scope `esi-corporations.read_blueprints.v1`, role `canReadBlueprints`); toggle shown only when available. Placement: container walk-up through owner's cached assets (`resolveBlueprintPlacement`, assets scope); location names `loadBlueprintLocation` per (Character, location) lazily; corp blueprints in containers show "In container".
 - Controls: search (`opps.q`), Kind (All/BPO/BPC `opps.kind`, inline above cards on phone), Activity (All/Manufacturing/Reaction `opps.activity`), Include corporation chip (`opps.corp`), FilterBar (count badge; kind not counted on phone), column picker (desktop, device-local `ownedBlueprintsVisibleColumns`: kind, ME, TE, runs, qty, location, owner, ISK/hour), CSV `industry-owned-blueprints` (Blueprint, Product, Activity, Kind, ME, TE, Runs, Quantity, Location, Owner, ISK/hour).
@@ -166,6 +178,7 @@ Two panels, Market-Wide first.
 - States: loading; no blueprints (`ownedBlueprintsEmptyTitle`); no match for filters.
 
 ### 6c. Market-Wide Build Opportunities, `MarketWideOpportunitiesPanel.tsx`
+
 - What: opt-in "Run market scan" (never auto) ranking manufacturable products across whole SDE whose blueprint is obtainable. Cold-start answer.
 - Data: precomputed flattened trees `public/data/marketWideTrees.json` (ME-0 approximation, `scripts/build-sde.mjs`); two-phase pricing: (1) product sell prices for all candidates, `selectLiquidCandidates` = **Liquidity Floor** `DEFAULT_LIQUIDITY_FLOOR_ISK = 50,000,000` sell-order ISK at hub plus top N = 5 per Market Group (`marketWideOpportunities.ts:51,54`); (2) material prices for survivors, `computeMarketWideRows`. Troll sell orders priced at CCP average (`priceCapped` InfoTooltip). Job fee assumes NPC station at hub's own system index (no owned facility). Hub fixed `DEFAULT_TRADE_HUB`, no picker.
 - Blueprint sources (`blueprintSourceSets.ts`, each best-effort, failures listed in "sources unavailable" note): owned (any account Character), market (NPC-seeded T1 originals), contract (Public Contract Offers snapshot via any Character's Firebase session), lpStore (corps any Character holds LP with). Preference order owned, market, contract, lpStore (`BLUEPRINT_SOURCES`).
@@ -176,6 +189,7 @@ Two panels, Market-Wide first.
 - States: before scan `marketOpportunitiesEmptyTitle`; a failed scan sets `error` in `useMarketWideOpportunities.ts:119` but the panel never reads it: reads as no-results (`marketOpportunitiesNoResultsTitle`); scanning spinner (Scan button disabled/"Scanning..."); no results + unavailable sources note; Assumes base standings note.
 
 Observed gaps (Opportunities):
+
 - Price history reachable only from the phone card menu; desktop Ranked table has no row menu or history action (`PriceHistoryPanel` modal opens only via `onViewHistory`: `OpportunitiesPanel.tsx:636` -> modal `:644-655`, fired from the card menu at `MobileOpportunityList.tsx:324`; desktop `DataTable` at `OpportunitiesPanel.tsx:616` is chosen by `isDesktop` and only has `onRowClick` = Start plan).
 - No `rowContextMenu` or `rowMoreActions` on Ranked (`:616`), All owned (`OwnedBlueprintsPanel.tsx:493`) or Market-Wide (`MarketWideOpportunitiesPanel.tsx:570`) tables (grep: none in the three panels).
 - Market-Wide has no compare/select and no hub picker; ME-0 trees and NPC-station fees are approximations (CONTEXT: "selecting a row still opens a real Build Plan for exact numbers").
@@ -187,6 +201,7 @@ Observed gaps (Opportunities):
 ## 7. Blueprint Acquisition modal (link-up, `BlueprintAcquisitionModal.tsx`)
 
 Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because BPC Sourcing shares its row builders (`blueprintAcquisitionSources.ts`: `contractOfferRows`, `marketSellRows`, `lpOfferRows`, `ownedTierRows`, `cheapestRow`, `groupContractOffers`, `sectionRows` cap 10) and its pricing offers (`blueprintPurchaseOffers.ts`, `blueprintSourceSets.ts`).
+
 - Opens from an icon on any Blueprint Acquisition row (top-level or sub-build). Sections: Owned tiers (per tier, "use automatic"), Public Contracts (copies + originals, hub region or all regions, bundles/barters unpickable and hidden unless nothing else), Market sell orders (whole region, hub picker affects only the modal), LP Store offers (ISK + LP at LP Value + turn-ins), Manual entry (ME, TE, price with validation). Each row "Use this blueprint"; cheapest tagged; "Showing 10 of N".
 - A pick writes `MaterialSourcing.acquisitionTierOverride` (+ `overridePrice` for non-owned) keyed by blueprint typeID via `overridePatchFor`; `runsForPickedRow` sets plan runs to what the pick brings (LP: none). `isCurrentPick` marks the selected row. Override price = one purchase of the row (a short copy listing is underpriced vs automatic `shortfallCost`; modal shows runs and ISK/run to judge).
 - Data self-fetched on open: snapshot (`loadPublicBpcContracts`), `loadOrderBookView`, `findLpOfferMatches`; station names SDE-only. Loading/unavailable/empty per section.
@@ -195,64 +210,64 @@ Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because
 
 ## 8. URL parameters (ADR 0015; defaults omitted, writes replace history)
 
-| Key | Panel | Notes |
-|---|---|---|
-| `jobs.chars` | Active Jobs | Character filter; default = synced default |
-| `jobs.activity`, `jobs.status` | Active Jobs | id list / enum set, empty = none |
-| `jobs.sort` | Active Jobs | default endsIn asc |
-| `highlight` | Active Jobs | job id from alert deep link |
-| `records.from`, `records.to` | Records | ISO date |
-| `records.itemSort`, `records.runSort` | Records | optional sort, unsorted default |
-| `sourcing.q`, `.region`, `.minMe`, `.minTe`, `.minRuns`, `.maxPrice` | BPC Sourcing | text/id |
-| `sourcing.hideAuctions`, `.hidePlex` | BPC Sourcing | default from Settings |
-| `sourcing.src` | BPC Sourcing | set; default contract+owned or remembered |
-| `sourcing.jumps` | BPC Sourcing | Jump Range |
-| `sourcing.type` | BPC Sourcing | pinned blueprint typeId |
-| `sourcing.sort` | BPC Sourcing | default price asc |
-| `opps.view` | Opportunities | ranked / owned |
-| `opps.chars` | Opportunities | default current |
-| `opps.sort` | Ranked | default iskPerHour desc |
-| `opps.kind`, `opps.activity`, `opps.q`, `opps.corp`, `opps.ownedSort` | All owned | |
-| `marketWide.tiers`, `.categories`, `.sources`, `.maxCost`, `.hideGated`, `.hideRare`, `.sort` | Market-Wide | |
-| `plans.compare` | Plans (other doc) | |
-| `product`, `material` + seed keys | shell | deep links (`planSeed.ts`) |
+| Key                                                                                           | Panel             | Notes                                      |
+| --------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------ |
+| `jobs.chars`                                                                                  | Active Jobs       | Character filter; default = synced default |
+| `jobs.activity`, `jobs.status`                                                                | Active Jobs       | id list / enum set, empty = none           |
+| `jobs.sort`                                                                                   | Active Jobs       | default endsIn asc                         |
+| `highlight`                                                                                   | Active Jobs       | job id from alert deep link                |
+| `records.from`, `records.to`                                                                  | Records           | ISO date                                   |
+| `records.itemSort`, `records.runSort`                                                         | Records           | optional sort, unsorted default            |
+| `sourcing.q`, `.region`, `.minMe`, `.minTe`, `.minRuns`, `.maxPrice`                          | BPC Sourcing      | text/id                                    |
+| `sourcing.hideAuctions`, `.hidePlex`                                                          | BPC Sourcing      | default from Settings                      |
+| `sourcing.src`                                                                                | BPC Sourcing      | set; default contract+owned or remembered  |
+| `sourcing.jumps`                                                                              | BPC Sourcing      | Jump Range                                 |
+| `sourcing.type`                                                                               | BPC Sourcing      | pinned blueprint typeId                    |
+| `sourcing.sort`                                                                               | BPC Sourcing      | default price asc                          |
+| `opps.view`                                                                                   | Opportunities     | ranked / owned                             |
+| `opps.chars`                                                                                  | Opportunities     | default current                            |
+| `opps.sort`                                                                                   | Ranked            | default iskPerHour desc                    |
+| `opps.kind`, `opps.activity`, `opps.q`, `opps.corp`, `opps.ownedSort`                         | All owned         |                                            |
+| `marketWide.tiers`, `.categories`, `.sources`, `.maxCost`, `.hideGated`, `.hideRare`, `.sort` | Market-Wide       |                                            |
+| `plans.compare`                                                                               | Plans (other doc) |                                            |
+| `product`, `material` + seed keys                                                             | shell             | deep links (`planSeed.ts`)                 |
 
 Device-local settings (not URL): `bpcSearchVisibleColumns.v2`, `bpcSearchSpaceFilter`, `bpcSourcingSources`, `ownedBlueprintsVisibleColumns`. Synced: `sync.bpcHideAuctions`, `sync.bpcHidePlex`, `sync.loyaltyLpValue`.
 
 ## 9. CSV export surfaces (`TableActionsMenu` + `useTableExport`)
 
-| Surface id | Where | Rows |
-|---|---|---|
-| `industry-jobs` | Active Jobs | filtered jobs, table order |
-| `production-log-items` | Records By item | rollup rows |
-| `production-log-runs` | Records All runs | filtered runs |
-| `industry-owned-blueprints` | All owned | filtered rows |
-| `industry-opportunities` | Ranked | all ranked rows |
-| `market-wide-opportunities` | Market-Wide | visible (filtered) rows |
-| `bpc-sourcing` | BPC Sourcing | all matches in table order |
+| Surface id                  | Where            | Rows                       |
+| --------------------------- | ---------------- | -------------------------- |
+| `industry-jobs`             | Active Jobs      | filtered jobs, table order |
+| `production-log-items`      | Records By item  | rollup rows                |
+| `production-log-runs`       | Records All runs | filtered runs              |
+| `industry-owned-blueprints` | All owned        | filtered rows              |
+| `industry-opportunities`    | Ranked           | all ranked rows            |
+| `market-wide-opportunities` | Market-Wide      | visible (filtered) rows    |
+| `bpc-sourcing`              | BPC Sourcing     | all matches in table order |
 
 ## 10. Data sources and scopes
 
 Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itself.
 
-| Data | Source | Scope / gate |
-|---|---|---|
-| Personal jobs | ESI `getCharacterIndustryJobs` | `esi-industry.read_character_jobs.v1` (403 -> reauth) |
-| Corp jobs | ESI `getCorporationIndustryJobs` | `esi-industry.read_corporation_jobs.v1` (opt-in) + role `canReadIndustry` |
-| Owned blueprints | ESI `getCharacterBlueprints` | `esi-characters.read_blueprints.v1` |
-| Corp blueprints | ESI `getCorporationBlueprints` | `esi-corporations.read_blueprints.v1` + role `canReadBlueprints` |
-| Owned assets (placement, stock) | ESI `getCharacterAssets` | `esi-assets.read_assets.v1` |
-| Corp assets (plan stock) | ESI `getCorporationAssets` | `esi-assets.read_corporation_assets.v1` + director role |
-| Wallet transactions (link sale) | ESI wallet transactions | `esi-wallet.read_character_wallet.v1` |
-| Open orders (watch order) | ESI character orders | `esi-markets.read_character_orders.v1` |
-| LP balances | ESI loyalty points | `esi-characters.read_loyalty.v1` |
-| Skills | ESI skills (+queue) | skills scopes; used for fees, job slots, skill gate |
-| Hub prices | Fuzzwork (ADR 0002) | none |
-| Adjusted prices, cost indices | ESI public | none |
-| Market order books / history | ESI public (ADR 0003) | none |
-| Public contract offers | Firestore `publicContractOffers` | Firebase sync configured + signed-in session |
-| Blueprints/types/trees/market groups | static SDE snapshots | none |
-| Production runs, sale links, order watches, build plans | Dexie, synced to Firestore per Character | none |
+| Data                                                    | Source                                   | Scope / gate                                                              |
+| ------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
+| Personal jobs                                           | ESI `getCharacterIndustryJobs`           | `esi-industry.read_character_jobs.v1` (403 -> reauth)                     |
+| Corp jobs                                               | ESI `getCorporationIndustryJobs`         | `esi-industry.read_corporation_jobs.v1` (opt-in) + role `canReadIndustry` |
+| Owned blueprints                                        | ESI `getCharacterBlueprints`             | `esi-characters.read_blueprints.v1`                                       |
+| Corp blueprints                                         | ESI `getCorporationBlueprints`           | `esi-corporations.read_blueprints.v1` + role `canReadBlueprints`          |
+| Owned assets (placement, stock)                         | ESI `getCharacterAssets`                 | `esi-assets.read_assets.v1`                                               |
+| Corp assets (plan stock)                                | ESI `getCorporationAssets`               | `esi-assets.read_corporation_assets.v1` + director role                   |
+| Wallet transactions (link sale)                         | ESI wallet transactions                  | `esi-wallet.read_character_wallet.v1`                                     |
+| Open orders (watch order)                               | ESI character orders                     | `esi-markets.read_character_orders.v1`                                    |
+| LP balances                                             | ESI loyalty points                       | `esi-characters.read_loyalty.v1`                                          |
+| Skills                                                  | ESI skills (+queue)                      | skills scopes; used for fees, job slots, skill gate                       |
+| Hub prices                                              | Fuzzwork (ADR 0002)                      | none                                                                      |
+| Adjusted prices, cost indices                           | ESI public                               | none                                                                      |
+| Market order books / history                            | ESI public (ADR 0003)                    | none                                                                      |
+| Public contract offers                                  | Firestore `publicContractOffers`         | Firebase sync configured + signed-in session                              |
+| Blueprints/types/trees/market groups                    | static SDE snapshots                     | none                                                                      |
+| Production runs, sale links, order watches, build plans | Dexie, synced to Firestore per Character | none                                                                      |
 
 ## 11. Engine calcs (1-2 lines each)
 
@@ -276,11 +291,13 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 ## 13. Exact formulas, thresholds, edge cases
 
 Fee primitives (`src/engine/industry/fees.ts`, `jobCost.ts`), used by Ranked, Market-Wide and Records:
+
 - Sales tax % = 7.5 x (1 - 0.11 x Accounting) (`fees.ts:18,35-38`). Levels asserted integer 0..5, else RangeError.
 - Broker fee % = max(0, 3 - 0.3 x Broker Relations - 0.03 x faction standing - 0.02 x corp standing); fee = max(100 ISK, value x %), 0 when value <= 0 (`fees.ts:20-24,41-53,61-70`). Standings absent = 0 (the UI says "Assumes base standings" via `AssumesBaseStandingsNote`).
 - Job fee = EIV x systemCostIndex x (1 - structureBonus%) + EIV x 4% (SCC) + EIV x facility tax% (NPC station 0.25%, structures default 0) (`jobCost.ts:32-45`; SCC 4% = `SCC_SURCHARGE_PCT`, `types.ts:394`; NPC station 0.25% = `FACILITY_PRESETS.npcStation`, `types.ts:217-226`). EIV = ME0 quantities x ESI adjusted price x runs; missing adjusted price counts 0; ME does not reduce it.
 
 Ranked (Build Opportunities), per owned manufacturing blueprint:
+
 - Priced runs = BPC remaining runs, BPO (-1) = 1 (`features/industry/opportunities.ts:170`). So a BPO ISK/hr is a one-run rate, not a batch rate.
 - Candidate inclusion: SDE-known, `activity !== 'reaction'` (`features/industry/opportunities.ts:59-69`, skip at :69). Row id `characterId:item_id`: two stacks of the same BPC are two rows (phone folds by `identicalBlueprintKey`).
 - Cost = materials (owned stock claimed free via `takeEveryOffer`, `features/industry/opportunities.ts:155`) + job fee at the remembered manufacturing build system. Owned blueprint = free at top level always, "Include Blueprint Cost" setting ignored (`:318`, decision 20260926-222310).
@@ -292,6 +309,7 @@ Ranked (Build Opportunities), per owned manufacturing blueprint:
 - The "10-blueprint cap" is only this auto-recompute limit; there is no row cap on Ranked (virtualized).
 
 Market-Wide scan (`engine/industry/marketWide*.ts`, `features/industry/marketWideOpportunities.ts`), order of operations in `runMarketWideScan` (`:101-205`):
+
 1. Candidate products = `marketWideTrees.json` (only market-grouped products).
 2. Drop products with no obtainable blueprint (`blueprintSource`, preference owned > market > contract > lpStore). NPC market = market-grouped AND T1/Structure T1 meta group (`blueprintObtainability.ts:45-56`); invention not a source.
 3. Apply tier/category/source `include` filter (before cut).
@@ -300,11 +318,13 @@ Market-Wide scan (`engine/industry/marketWide*.ts`, `features/industry/marketWid
 6. Material prices for survivors = hub sell-min per material; ONE `jobFee` over the whole flattened tree at the NPC station (0.25% tax, no bonus) using the hub system's cost index (`engine :190`).
 7. Row excluded if any material unpriced or tree time <= 0 (`:188`). Revenue = sell price x tree output qty; profit = revenue - tax - broker - (materials + fee); margin null at 0 revenue; seconds = `jobDurationSeconds(tree.time, 1 run, TE 0, modifiers, NPC ctx, blueprint skills)`; ISK/hr = profit/seconds x 3600 (`:193-213`). ME is 0 (no research, no owned stock, no auto-build).
 8. Rank by ISK/hr desc with same depth classification as Ranked. Max-build-cost, hide-gated and hide-rarely-sold narrow after ranking.
+
 - Rarely sold: `averageDailyVolume` = units in last 30 days summed over 5 trade-hub regions / 30 (zero-trade days count as 0); `< 5` per day = rare (`marketWideSanity.ts:34-61`). History fetched only while the filter is on; unreadable = stays visible.
 - Tier map: meta groups 1,54 -> tech1; 2,53 -> tech2; 14 -> tech3; 4,52 -> faction; undefined -> tech1; any other -> special. Category by root market group (4 ships, 9 modules, 955 rigs, 11 ammo, 157 drones, 475 components, 477/2202/2203 structures, 24 implants, else other) (`marketWideFilters.ts`).
 - Known undercount: single `jobFee` over a flattened multi-tier tree undercounts vs real per-job fees (engine doc `:150-156`).
 
 BPC Sourcing (`engine/contracts/bpcSearch.ts`):
+
 - `effectivePrice` = buyout for an auction with buyout, else `price` (starting bid) (`:440`).
 - `iskPerRun` = price / (runs x quantity); null if multi-type bundle, price <= 0 (barter/giveaway), runs <= 0 or quantity <= 0 (`:475`). Divides by all copies in the listing.
 - `bpcPriceSummary`: cheapest, cheapest per run, median (not mean), best ME and best TE taken independently (may come from different contracts). Offer = contract row, not copy.

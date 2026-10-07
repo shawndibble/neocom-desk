@@ -6,16 +6,16 @@ Part indexes: [A](README-A.md) · [B](README-B.md) · [C](README-C.md).
 
 ## Areas
 
-| Area | Files |
-| --- | --- |
+| Area           | Files                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------- |
 | Account, shell | auth-login, characters, app-shell, settings, sync-backup, share-links, entities-share |
-| Home, feed | overview, alerts, notifications, command-palette, calendar |
-| Character | clones, employment-history, skills, ships, fittings, mining, contacts, mail |
-| Economy | wallet, assets, contracts, market |
-| Industry | industry-plans, industry-records-sourcing, planetary-industry |
-| Corp | corp |
-| Exploration | travel, pilot-lookup |
-| Support | help-faq, styleguide-notfound |
+| Home, feed     | overview, alerts, notifications, command-palette, calendar                            |
+| Character      | clones, employment-history, skills, ships, fittings, mining, contacts, mail           |
+| Economy        | wallet, assets, contracts, market                                                     |
+| Industry       | industry-plans, industry-records-sourcing, planetary-industry                         |
+| Corp           | corp                                                                                  |
+| Exploration    | travel, pilot-lookup                                                                  |
+| Support        | help-faq, styleguide-notfound                                                         |
 
 alerts.md (A) and notifications.md (C) overlap. share-links.md (A) and entities-share.md (C) overlap. Read both.
 

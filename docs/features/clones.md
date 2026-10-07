@@ -2,15 +2,15 @@
 
 Route `/clones` (`src/routes/Clones.tsx`). Second tab of the Character overview (`OverviewSubNav`). Sub-view of Overview in nav (`src/app/navDestinations.ts:117`), not a rail item.
 
-| Feature | Where |
-|---|---|
-| Shared Character header + sub-nav | `CharacterHeader`, `OverviewSubNav` |
-| Home Clone row (location, last moved) | `Clones.tsx:317-330` |
-| Jump Cooldown chip | `Clones.tsx:331`, `src/engine/cloneJump.ts` |
-| Jump clone table: Location (+ clone name), Implants | `Clones.tsx:195` |
-| Implant link (Show Info) + description tooltip | `ImplantLink` |
-| Data age, Refresh, Export (CSV/XLSX/copy) | `Panel actions`, `clonesCsv.ts` |
-| Re-login banner when scope missing | `GrantBanner` |
+| Feature                                             | Where                                       |
+| --------------------------------------------------- | ------------------------------------------- |
+| Shared Character header + sub-nav                   | `CharacterHeader`, `OverviewSubNav`         |
+| Home Clone row (location, last moved)               | `Clones.tsx:317-330`                        |
+| Jump Cooldown chip                                  | `Clones.tsx:331`, `src/engine/cloneJump.ts` |
+| Jump clone table: Location (+ clone name), Implants | `Clones.tsx:195`                            |
+| Implant link (Show Info) + description tooltip      | `ImplantLink`                               |
+| Data age, Refresh, Export (CSV/XLSX/copy)           | `Panel actions`, `clonesCsv.ts`             |
+| Re-login banner when scope missing                  | `GrantBanner`                               |
 
 ## Purpose / user goal
 

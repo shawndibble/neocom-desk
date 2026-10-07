@@ -2,15 +2,15 @@
 
 Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Character: `Root` sends active-Character users here (`src/app/App.tsx:230`), first-ever login lands here (`Callback.tsx`). First of three Character-overview tabs (`OverviewSubNav`: Overview / Clones / Employment; see `clones.md`, `employment-history.md`). Page is UNGATED (`src/app/routeScopes.ts:95`); gating is per card because the page mixes skills, queue and wallet scopes.
 
-| Feature | Where |
-|---|---|
-| Character header (portrait, name, corp/alliance links, SP) | `src/features/character/CharacterHeader.tsx` |
-| Summary strip: next deadline, training, wallet, data age, refresh, edit cards | `src/features/overview/SummaryStrip.tsx` |
-| 11 domain cards | `src/features/overview/cards.tsx` |
-| Alerts column / folded line | `AlertsColumn` `cards.tsx:866` |
-| "Everything else" folded card (phone) | `EverythingElseCard` `cards.tsx:969` |
-| Edit cards popover (hide, drag reorder, show all, reset) | `CardPicker.tsx` |
-| Severity, summary, layout, deadline model | `boardSeverity.ts`, `boardSummary.ts`, `boardLayout.ts` |
+| Feature                                                                       | Where                                                   |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Character header (portrait, name, corp/alliance links, SP)                    | `src/features/character/CharacterHeader.tsx`            |
+| Summary strip: next deadline, training, wallet, data age, refresh, edit cards | `src/features/overview/SummaryStrip.tsx`                |
+| 11 domain cards                                                               | `src/features/overview/cards.tsx`                       |
+| Alerts column / folded line                                                   | `AlertsColumn` `cards.tsx:866`                          |
+| "Everything else" folded card (phone)                                         | `EverythingElseCard` `cards.tsx:969`                    |
+| Edit cards popover (hide, drag reorder, show all, reset)                      | `CardPicker.tsx`                                        |
+| Severity, summary, layout, deadline model                                     | `boardSeverity.ts`, `boardSummary.ts`, `boardLayout.ts` |
 
 ## Purpose and user goal
 
@@ -23,6 +23,7 @@ Scope: active Character, except Alerts (device-wide feed), Structures and Moon e
 Layout order: `CharacterHeader`, `OverviewSubNav`, `SummaryStrip`, "all cards hidden" notice, card grid (+ alerts column from `xl`). Grid `sm:grid-cols-2`; from `xl` a `2fr/1fr` split; below `xl` alerts stack under cards (`Overview.tsx:812`).
 
 Summary strip (`SummaryStrip.tsx`):
+
 - Next deadline (largest type): soonest clock across visible cards plus skill-training finish; links to the owning page. Empty: "Nothing on a clock". Hidden cards contribute none (`soonestDeadline`).
 - Training now: active skill, time left, queued count; links `/skills/plans`. Queue scope lapsed: warning "unavailable". Idle queue: warning link unless `characterNotTraining` is muted for that Character (then dim; issue #1731).
 - Wallet: balance, links `/wallet`; scope lapsed or load error show warning text.
@@ -31,20 +32,20 @@ Summary strip (`SummaryStrip.tsx`):
 
 Cards (severity via `boardSeverity.ts`; unreadable = warning):
 
-| Card (key) | Body | Links | Severity | Source (scope) |
-|---|---|---|---|---|
-| Open orders (`orders`) | Tiles Undercut, Outbid, Relist; footer below-floor count + slots used/max | Header `/market/orders`; each tile to Orders pre-filtered to that problem + this Character | critical: below-floor; warning: undercut/outbid; watch: expiring/stale | `loadOpenOrdersSnapshot` filtered to active Character; `esi-markets.read_character_orders.v1`; slot max from corrected skills |
-| Mining tax (`mining`) | Tiles ISK unpaid, Unassigned; footer payees + oldest unpaid days | `/mining/tax` | warning if oldest unpaid >= 30 d; watch if unpaid or unassigned | `loadMoonMiningTaxSnapshot` all ledgers (`getCharacterMining`, `esi-industry.read_character_mining.v1`) |
-| Contracts (`contracts`) | Tiles In progress, Due; deadline note | `/contracts/history?history.status=in_progress` | critical overdue; warning due soon | `loadContracts`; `esi-contracts.read_character_contracts.v1` |
-| Planetary (`planetary`) | One row per reset batch (max 4), colony count | `/planetary-industry` | worst batch | `loadCharacterPlanets` + details; `esi-planets.manage_planets.v1` |
-| Industry (`industry`) | Done summary + up to 4 running jobs | `/industry` | warning any job done; watch completing in <= 1 h | `loadCharacterIndustryJobs`; `esi-industry.read_character_jobs.v1` |
-| Structures (`structures`) | Counts Reinforced, Low fuel, Services offline; worst rows | `/corp` | `corpCards.ts` | `esi-corporations.read_structures.v1` + `canReadStructures` |
-| Moon extractions (`moonChunks`) | Drill count; next chunks | `/corp` | `moonChunkSeverity` | `esi-industry.read_corporation_mining.v1` + `canReadMoonExtractions` |
-| Coming up (`comingUp`) | Up to 4 committed events | `/calendar` | watch within 24 h | `esi-calendar.read_calendar_events.v1` |
-| SP extraction (`spExtraction`) | Tiles spare SP, extractors; threshold footer | `/characters` | watch when ready | skills read; settings |
-| Mail (`mail`) | Unread count + up to 4 newest | `/mail` | watch if unread | `esi-mail.read_mail.v1` |
-| Price alerts (`priceAlerts`) | Hit vs watched Quickbar targets (max 4) | `/market` | warning if crossed | Dexie `quickbars` + poller price snapshot; no scope |
-| Alerts (column) | Up to 7 groups, Dismiss all, "N more"/"Open alerts" | `/alerts` | worst group | Dexie `notificationFeed` via `visibleFeedEntries` (muted excluded) |
+| Card (key)                      | Body                                                                      | Links                                                                                      | Severity                                                               | Source (scope)                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Open orders (`orders`)          | Tiles Undercut, Outbid, Relist; footer below-floor count + slots used/max | Header `/market/orders`; each tile to Orders pre-filtered to that problem + this Character | critical: below-floor; warning: undercut/outbid; watch: expiring/stale | `loadOpenOrdersSnapshot` filtered to active Character; `esi-markets.read_character_orders.v1`; slot max from corrected skills |
+| Mining tax (`mining`)           | Tiles ISK unpaid, Unassigned; footer payees + oldest unpaid days          | `/mining/tax`                                                                              | warning if oldest unpaid >= 30 d; watch if unpaid or unassigned        | `loadMoonMiningTaxSnapshot` all ledgers (`getCharacterMining`, `esi-industry.read_character_mining.v1`)                       |
+| Contracts (`contracts`)         | Tiles In progress, Due; deadline note                                     | `/contracts/history?history.status=in_progress`                                            | critical overdue; warning due soon                                     | `loadContracts`; `esi-contracts.read_character_contracts.v1`                                                                  |
+| Planetary (`planetary`)         | One row per reset batch (max 4), colony count                             | `/planetary-industry`                                                                      | worst batch                                                            | `loadCharacterPlanets` + details; `esi-planets.manage_planets.v1`                                                             |
+| Industry (`industry`)           | Done summary + up to 4 running jobs                                       | `/industry`                                                                                | warning any job done; watch completing in <= 1 h                       | `loadCharacterIndustryJobs`; `esi-industry.read_character_jobs.v1`                                                            |
+| Structures (`structures`)       | Counts Reinforced, Low fuel, Services offline; worst rows                 | `/corp`                                                                                    | `corpCards.ts`                                                         | `esi-corporations.read_structures.v1` + `canReadStructures`                                                                   |
+| Moon extractions (`moonChunks`) | Drill count; next chunks                                                  | `/corp`                                                                                    | `moonChunkSeverity`                                                    | `esi-industry.read_corporation_mining.v1` + `canReadMoonExtractions`                                                          |
+| Coming up (`comingUp`)          | Up to 4 committed events                                                  | `/calendar`                                                                                | watch within 24 h                                                      | `esi-calendar.read_calendar_events.v1`                                                                                        |
+| SP extraction (`spExtraction`)  | Tiles spare SP, extractors; threshold footer                              | `/characters`                                                                              | watch when ready                                                       | skills read; settings                                                                                                         |
+| Mail (`mail`)                   | Unread count + up to 4 newest                                             | `/mail`                                                                                    | watch if unread                                                        | `esi-mail.read_mail.v1`                                                                                                       |
+| Price alerts (`priceAlerts`)    | Hit vs watched Quickbar targets (max 4)                                   | `/market`                                                                                  | warning if crossed                                                     | Dexie `quickbars` + poller price snapshot; no scope                                                                           |
+| Alerts (column)                 | Up to 7 groups, Dismiss all, "N more"/"Open alerts"                       | `/alerts`                                                                                  | worst group                                                            | Dexie `notificationFeed` via `visibleFeedEntries` (muted excluded)                                                            |
 
 Edit cards (`CardPicker.tsx`): popover (not a menu, to avoid clashing with drag keys). Rows: drag handle, checkbox, name; Alerts row checkbox-only. Drag by pointer (4 px travel) or keyboard (space, arrows, space; Esc cancels and the popover leaves Esc to the drag); live-region announcements. Footer: Show all cards, Reset order (when customised).
 

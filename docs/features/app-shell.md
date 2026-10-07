@@ -4,31 +4,31 @@ Everything around the feature pages: router and route table, the signed-in `Layo
 
 ## Feature table
 
-| Feature | URL / trigger | Code | Persistence | Scope |
-|---|---|---|---|---|
-| Route table, signed-in shell, gates | all | `src/app/App.tsx:151,229,133` | - | per route (`src/app/routeScopes.ts`) |
-| Desktop left rail with groups, per-page view carets, Go to button | `md`+ (`min-width: 48rem`) | `src/app/RailNav.tsx`, `src/app/Layout.tsx:337` | hidden list synced (`sync.navHidden`) | lock dots from `useLockedRoutes` |
-| Phone bottom tab bar (4 chosen + More) | below `md` | `src/app/Layout.tsx`, `src/lib/mobileTabs.ts` | device-local `mobileTabs` | lock dots |
-| More sheet (search, Recent, grouped tiles, hidden folder, Settings/Help/Character rows) | tab bar "More" | `src/app/MobileMoreSheet.tsx` | Recent device-local `navRecent` | lock dots |
-| Hide pages and views you don't use | rail foot "Hide pages you don't use"; More sheet "Hide pages you don't use" | `src/app/navRail.ts`, `src/app/navPreferences.ts`, `NavItem.tsx:175` | synced | - |
-| Phone tab bar picker | Settings › Display (phone only) | `src/routes/Settings.tsx:600` | device-local | - |
-| Character switcher | rail footer portrait, More sheet portrait row, key `C`, palette, `/characters` | `src/app/Layout.tsx:170`, `src/routes/Characters.tsx:1177` | active Character in Dexie | - |
-| `?character=<id>` alert deep link | any URL | `src/app/AlertCharacterSwitch.tsx` | - | - |
-| Command palette | Go to button, Ctrl/Cmd+K | `src/features/commandPalette/*` (see `command-palette.md`) | - | - |
-| Keyboard shortcuts | single keys | `src/lib/shortcuts.ts:152`, `src/app/useKeyboardShortcuts.ts` | none | - |
-| Global paste router | Ctrl/Cmd+V outside a field | `src/app/GlobalPasteRouter.tsx` | none | - |
-| ScopeGate / ReauthBanner / GrantNote / grant notices | locked routes, degraded figures | `src/app/ScopeGate.tsx`, `src/app/GrantNote.tsx`, `src/app/AuthFailureNotice.tsx`, `src/app/StandingsScopeNotice.tsx` | standings dismissal in `localStorage` | per route/endpoint |
-| Permissions panel; Customize permissions dialog | Settings › Permissions; Login and Characters "Add" split menu | `src/features/permissions/*` | selection device-local | all 15 Permissions |
-| Install Prompt | phones/tablets, once | `src/app/InstallPrompt.tsx`, `installPromptRules.ts` | `installPrompt.seen` | - |
-| Reload/update flow | invisible | `src/app/ReloadPrompt.tsx`, `src/app/forceUpdate.ts` | service worker | - |
-| Boot screen + stall recovery | cold load | `src/app/BootScreen.tsx`, `bootRecovery.ts`, `bootStallReport.ts` | - | - |
-| Error boundary, Not found, `/error` probe | render throw, bad URL | `src/app/ErrorBoundary.tsx`, `src/routes/NotFound.tsx`, `src/routes/ErrorProbe.tsx` | - | - |
-| Document title | every route | `src/app/documentTitle.ts`, `DocumentTitleTracker.tsx` | - | - |
-| Legacy path redirects | old URLs | `src/app/legacyPaths.ts`, `LegacyPathRedirect.tsx` | - | - |
-| Analytics page views | every route change | `src/app/AnalyticsPageViewTracker.tsx`, `src/app/analytics.ts` | - | - |
-| Sync dot / error note / prefetch dot | rail header; page top | see `sync-backup.md` | - | - |
-| Help & FAQ page | `/help` (`/help/shortcuts` default, `/help/faq`, `/help/support`) | `src/routes/Help.tsx:15` | open FAQ items in memory | - |
-| Settings (pointer) | `/settings` | `src/routes/Settings.tsx` | - | - |
+| Feature                                                                                 | URL / trigger                                                                  | Code                                                                                                                  | Persistence                           | Scope                                |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ |
+| Route table, signed-in shell, gates                                                     | all                                                                            | `src/app/App.tsx:151,229,133`                                                                                         | -                                     | per route (`src/app/routeScopes.ts`) |
+| Desktop left rail with groups, per-page view carets, Go to button                       | `md`+ (`min-width: 48rem`)                                                     | `src/app/RailNav.tsx`, `src/app/Layout.tsx:337`                                                                       | hidden list synced (`sync.navHidden`) | lock dots from `useLockedRoutes`     |
+| Phone bottom tab bar (4 chosen + More)                                                  | below `md`                                                                     | `src/app/Layout.tsx`, `src/lib/mobileTabs.ts`                                                                         | device-local `mobileTabs`             | lock dots                            |
+| More sheet (search, Recent, grouped tiles, hidden folder, Settings/Help/Character rows) | tab bar "More"                                                                 | `src/app/MobileMoreSheet.tsx`                                                                                         | Recent device-local `navRecent`       | lock dots                            |
+| Hide pages and views you don't use                                                      | rail foot "Hide pages you don't use"; More sheet "Hide pages you don't use"    | `src/app/navRail.ts`, `src/app/navPreferences.ts`, `NavItem.tsx:175`                                                  | synced                                | -                                    |
+| Phone tab bar picker                                                                    | Settings › Display (phone only)                                                | `src/routes/Settings.tsx:600`                                                                                         | device-local                          | -                                    |
+| Character switcher                                                                      | rail footer portrait, More sheet portrait row, key `C`, palette, `/characters` | `src/app/Layout.tsx:170`, `src/routes/Characters.tsx:1177`                                                            | active Character in Dexie             | -                                    |
+| `?character=<id>` alert deep link                                                       | any URL                                                                        | `src/app/AlertCharacterSwitch.tsx`                                                                                    | -                                     | -                                    |
+| Command palette                                                                         | Go to button, Ctrl/Cmd+K                                                       | `src/features/commandPalette/*` (see `command-palette.md`)                                                            | -                                     | -                                    |
+| Keyboard shortcuts                                                                      | single keys                                                                    | `src/lib/shortcuts.ts:152`, `src/app/useKeyboardShortcuts.ts`                                                         | none                                  | -                                    |
+| Global paste router                                                                     | Ctrl/Cmd+V outside a field                                                     | `src/app/GlobalPasteRouter.tsx`                                                                                       | none                                  | -                                    |
+| ScopeGate / ReauthBanner / GrantNote / grant notices                                    | locked routes, degraded figures                                                | `src/app/ScopeGate.tsx`, `src/app/GrantNote.tsx`, `src/app/AuthFailureNotice.tsx`, `src/app/StandingsScopeNotice.tsx` | standings dismissal in `localStorage` | per route/endpoint                   |
+| Permissions panel; Customize permissions dialog                                         | Settings › Permissions; Login and Characters "Add" split menu                  | `src/features/permissions/*`                                                                                          | selection device-local                | all 15 Permissions                   |
+| Install Prompt                                                                          | phones/tablets, once                                                           | `src/app/InstallPrompt.tsx`, `installPromptRules.ts`                                                                  | `installPrompt.seen`                  | -                                    |
+| Reload/update flow                                                                      | invisible                                                                      | `src/app/ReloadPrompt.tsx`, `src/app/forceUpdate.ts`                                                                  | service worker                        | -                                    |
+| Boot screen + stall recovery                                                            | cold load                                                                      | `src/app/BootScreen.tsx`, `bootRecovery.ts`, `bootStallReport.ts`                                                     | -                                     | -                                    |
+| Error boundary, Not found, `/error` probe                                               | render throw, bad URL                                                          | `src/app/ErrorBoundary.tsx`, `src/routes/NotFound.tsx`, `src/routes/ErrorProbe.tsx`                                   | -                                     | -                                    |
+| Document title                                                                          | every route                                                                    | `src/app/documentTitle.ts`, `DocumentTitleTracker.tsx`                                                                | -                                     | -                                    |
+| Legacy path redirects                                                                   | old URLs                                                                       | `src/app/legacyPaths.ts`, `LegacyPathRedirect.tsx`                                                                    | -                                     | -                                    |
+| Analytics page views                                                                    | every route change                                                             | `src/app/AnalyticsPageViewTracker.tsx`, `src/app/analytics.ts`                                                        | -                                     | -                                    |
+| Sync dot / error note / prefetch dot                                                    | rail header; page top                                                          | see `sync-backup.md`                                                                                                  | -                                     | -                                    |
+| Help & FAQ page                                                                         | `/help` (`/help/shortcuts` default, `/help/faq`, `/help/support`)              | `src/routes/Help.tsx:15`                                                                                              | open FAQ items in memory              | -                                    |
+| Settings (pointer)                                                                      | `/settings`                                                                    | `src/routes/Settings.tsx`                                                                                             | -                                     | -                                    |
 
 ## Routes (`src/app/App.tsx`)
 
@@ -84,20 +84,20 @@ Characters page features (cards/table, groups, filters, Add split button): `docs
 
 Single keys, always on (decision `20261002-165816-shortcuts-move-to-help-always-on-and-lose.md` removed the off switch), dispatched by `src/app/useKeyboardShortcuts.ts` from `Layout`:
 
-| Key | Action |
-|---|---|
-| `C` | Switch character (`/characters`) |
-| `O` | Overview |
-| `M` | Market |
-| `I` | Industry |
-| `W` | Wallet |
-| `P` | Planetary Industry |
-| `A` | Alerts |
-| `T` | Mining tax (`/mining/tax`) |
-| `,` | Settings |
-| `?` | Help › Shortcuts (`/help/shortcuts`; matches `?`, Shift allowed via `allowsShift`) |
-| `Esc` | Closes the open dialog (native `<dialog>`; listed, no handler of its own) |
-| Ctrl/Cmd+K | Command palette (own listener, fires inside text fields too, toggles) |
+| Key        | Action                                                                             |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `C`        | Switch character (`/characters`)                                                   |
+| `O`        | Overview                                                                           |
+| `M`        | Market                                                                             |
+| `I`        | Industry                                                                           |
+| `W`        | Wallet                                                                             |
+| `P`        | Planetary Industry                                                                 |
+| `A`        | Alerts                                                                             |
+| `T`        | Mining tax (`/mining/tax`)                                                         |
+| `,`        | Settings                                                                           |
+| `?`        | Help › Shortcuts (`/help/shortcuts`; matches `?`, Shift allowed via `allowsShift`) |
+| `Esc`      | Closes the open dialog (native `<dialog>`; listed, no handler of its own)          |
+| Ctrl/Cmd+K | Command palette (own listener, fires inside text fields too, toggles)              |
 
 Guards: ignored with Ctrl/Meta/Alt held; ignored while typing in input/textarea/select/contenteditable (`isTypingTarget`, `src/lib/shortcuts.ts`); ignored while any overlay is present (`OVERLAY_SELECTOR` = `dialog[open]`, `[role=menu]`, `[role=listbox]`, `[role=dialog]`, `[data-keyboard-overlay]`, `src/lib/shortcuts.ts:53`); key compared lower-cased so Caps Lock works; Shift narrows (Shift+C is not C) except `?`. `isModChord` uses one modifier per platform: Cmd on Apple, Ctrl elsewhere (Ctrl+K on Mac is kill-line; Win+K is OS Cast) (`:85`). Palette also refuses to open over an open `<dialog>` (`src/features/commandPalette/CommandPaletteHost.tsx`).
 
@@ -131,12 +131,12 @@ Banner is one-shot; no Settings/Help/FAQ path to install afterwards (grep `insta
 
 ## ESI outage, rate limit, offline (what the player sees)
 
-| Situation | App behaviour | What the player sees |
-| --- | --- | --- |
+| Situation                      | App behaviour                                                                                                                                                                                         | What the player sees                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | ESI 420/429 or error-limit low | `esi/budget.ts` shuts the gate (`Retry-After`, circuit up to `MAX_CIRCUIT_MS` 5 min); callers wait up to `MAX_BUDGET_WAIT_MS` 5 s then refuse without a request; `esi/cache.ts` serves the stored row | Same as offline: "Showing cached data", amber "offline" line, Data Age badge ages; no mention of ESI or rate limit |
-| ESI slow | per-call `REQUEST_TIMEOUT_MS` 30 s, then cache | Same |
-| Device offline | cache fallback | Same, plus Update/sync skipped; sync error note only on Firebase failure |
-| Downtime (daily) | no special handling found | Same as outage |
+| ESI slow                       | per-call `REQUEST_TIMEOUT_MS` 30 s, then cache                                                                                                                                                        | Same                                                                                                               |
+| Device offline                 | cache fallback                                                                                                                                                                                        | Same, plus Update/sync skipped; sync error note only on Firebase failure                                           |
+| Downtime (daily)               | no special handling found                                                                                                                                                                             | Same as outage                                                                                                     |
 
 Foreground requests for the active Character get permits before background work (`ESI_FOREGROUND_RESERVE` 4 of `ESI_MAX_IN_FLIGHT` 12). No page distinguishes cause. Ticket #2856.
 
@@ -153,7 +153,7 @@ No UI. Service worker `registerType: 'prompt'`. Polls `registration.update()` ev
 
 ## Document title (`src/app/documentTitle.ts`)
 
-`{most specific} — {…} — Neocom Desk` (separator ` — `, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/styleguide`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
+`{most specific} — {…} — Neocom Desk` (separator `—`, `:14`), computed per pathname (tabbed pages add the tab label, nested routes add the section; duplicate names collapse so Market's Browser reads once, `:100`); `ROUTE_TITLE_KEYS` is `satisfies Record<AppRoutePath, ...>` so a new route without a title fails to compile; unmatched -> "Page not found"; `/login`, `/callback`, `/styleguide`, `/` -> app name alone. Updates when the language changes (WCAG 2.4.2).
 
 ## Route focus and tab routes
 
@@ -161,7 +161,7 @@ After a real page change focus moves to the new page's `<h1>` without scrolling 
 
 ## Analytics (`src/app/analytics.ts`)
 
-Firebase Analytics (GA4) `page_view` on every route change, only when `VITE_FIREBASE_MEASUREMENT_ID` is set, not in tests, and `isSupported()` (`:24`; lazy-imported, kept out of the startup bundle by `bootImportGraph.test.ts`). `page_path` is the route *pattern* (`pagePathFor`, so `/skills/plans/:planId`); the redirect-only path of a tabbed page is skipped (`isTabRedirectPath`). `page_location` is the full `window.location.href` including the query string (`:71`). Failures drop the event silently.
+Firebase Analytics (GA4) `page_view` on every route change, only when `VITE_FIREBASE_MEASUREMENT_ID` is set, not in tests, and `isSupported()` (`:24`; lazy-imported, kept out of the startup bundle by `bootImportGraph.test.ts`). `page_path` is the route _pattern_ (`pagePathFor`, so `/skills/plans/:planId`); the redirect-only path of a tabbed page is skipped (`isTabRedirectPath`). `page_location` is the full `window.location.href` including the query string (`:71`). Failures drop the event silently.
 
 ## Help & FAQ (`/help`, `src/routes/Help.tsx:15`)
 
@@ -177,16 +177,16 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 
 ## Mobile vs desktop summary
 
-| Aspect | Desktop (`md`+) | Phone |
-|---|---|---|
-| Navigation | sticky 13rem left rail, grouped, carets open views | 4-tab bottom bar + More sheet; views only through tabs, Recent, search |
-| Hide editor | in the rail | in the More sheet |
-| Tab bar choice | n/a | Settings › Display |
-| Sync dot | rail header | none (error note only) |
-| Settings | rail + section | grouped list with one-line summaries, back link |
-| Install Prompt | never | iOS/Android only |
-| Shortcuts | all single keys | same (needs a hardware keyboard) |
-| Switching to desktop width with the sheet open | - | sheet unmounts, `moreOpen` resets |
+| Aspect                                         | Desktop (`md`+)                                    | Phone                                                                  |
+| ---------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| Navigation                                     | sticky 13rem left rail, grouped, carets open views | 4-tab bottom bar + More sheet; views only through tabs, Recent, search |
+| Hide editor                                    | in the rail                                        | in the More sheet                                                      |
+| Tab bar choice                                 | n/a                                                | Settings › Display                                                     |
+| Sync dot                                       | rail header                                        | none (error note only)                                                 |
+| Settings                                       | rail + section                                     | grouped list with one-line summaries, back link                        |
+| Install Prompt                                 | never                                              | iOS/Android only                                                       |
+| Shortcuts                                      | all single keys                                    | same (needs a hardware keyboard)                                       |
+| Switching to desktop width with the sheet open | -                                                  | sheet unmounts, `moreOpen` resets                                      |
 
 ## Hooks into other feature areas
 

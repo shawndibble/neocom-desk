@@ -8,31 +8,31 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 
 ## Feature summary
 
-| Feature | Where | Notes |
-|---|---|---|
-| Route Safety itinerary | `/travel/route` | One row per system on a stargate route: security, region, last-hour ESI jumps/ship/pod/NPC kills, zKillboard kills. Local graph, no per-row ESI. |
-| Start picker (From) | Stops panel | Defaults to Current System; saved in link `from`. |
-| Stops (up to 10) | Stops panel | Add, remove, drag-reorder (keyboard: Space + arrows). Link `stops`. |
-| Optimize stop order | Stops panel | Exact Held-Karp under active route rules. Options: Return to start, Keep last stop last. |
-| Route rules panel | left column / below route on < xl | Route Preference, security penalty, EDENCOM / Triglavian / pod-kill avoid, Avoided Systems, Thera/Turnur holes, Ansiblex. Edits synced Travel Settings in place. |
-| Facts chips | top of route Panel | Jumps, by gate / wormholes / bridges, high/low/null counts, lowest sec, last-hour kills, chokepoints. |
-| Route strip | below facts | One cell per system, security-coloured; chokepoint line, kill dot, hatched hole cell, dashed bridge cell. |
-| Quiet-stretch fold | route table | 2+ consecutive middle systems with known-zero figures fold into one row; opens in place. |
-| Route table | route Panel | DataTable: System, Sec., Region, Last hour (ships · pods · jumps), zKillboard kills, Avoid. Row expands for NPC kills + off-route kill spots. |
-| Avoid system dialog | row action | Preview whole trip with system avoided; then save to Avoided Systems. |
-| Legs | multi-stop | Collapsible per-leg sections with own header, table, ways panel. |
-| Ways to fly | beside each leg | Gates only / Via Thera / Via Turnur / Via Ansiblex / planner's pick; Use for this leg pins one (`pin`). |
-| Hole jump rows | route table | Own row: warp-to system + signature + Copy, type, size, life, EVE-Scout age. |
-| Ansiblex bridges | rules panel + dialog | Device-local list; find via character structure search or paste. One-jump connections. |
-| Set waypoints in game | facts line | Sends Stops to EVE client autopilot. Needs `esi-ui.write_waypoint.v1`. |
-| Share link | URL | Every setting in query params (see Link parameters). |
-| Thera / Turnur table | `/travel/thera` | EVE-Scout open holes: exit, sec, region, fits, life left, jumps, signature, Route via. |
-| Thera filters | Thera tab | From, Hub (with counts), Exit, Fits, Route Preference; Reset filters. |
-| Route via | Thera row | Opens Route Safety from the origin with that hole pinned for leg 1. |
-| Jumps links elsewhere | Assets, Market, Courier, BPC, PI Hauling, entity links | Jump count opens Route Safety to that system. |
-| Set waypoint / View route menu items | Market + BPC row menus, order detail | One-place autopilot destination via `postAutopilotWaypoint`. |
-| Travel Settings | Settings > Travel | Preference, penalty, avoid rules, wormhole/bridge defaults, Avoided Systems. |
-| Command palette | Ctrl/Cmd+K | Only generic Pages entries; no travel commands. |
+| Feature                              | Where                                                  | Notes                                                                                                                                                            |
+| ------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route Safety itinerary               | `/travel/route`                                        | One row per system on a stargate route: security, region, last-hour ESI jumps/ship/pod/NPC kills, zKillboard kills. Local graph, no per-row ESI.                 |
+| Start picker (From)                  | Stops panel                                            | Defaults to Current System; saved in link `from`.                                                                                                                |
+| Stops (up to 10)                     | Stops panel                                            | Add, remove, drag-reorder (keyboard: Space + arrows). Link `stops`.                                                                                              |
+| Optimize stop order                  | Stops panel                                            | Exact Held-Karp under active route rules. Options: Return to start, Keep last stop last.                                                                         |
+| Route rules panel                    | left column / below route on < xl                      | Route Preference, security penalty, EDENCOM / Triglavian / pod-kill avoid, Avoided Systems, Thera/Turnur holes, Ansiblex. Edits synced Travel Settings in place. |
+| Facts chips                          | top of route Panel                                     | Jumps, by gate / wormholes / bridges, high/low/null counts, lowest sec, last-hour kills, chokepoints.                                                            |
+| Route strip                          | below facts                                            | One cell per system, security-coloured; chokepoint line, kill dot, hatched hole cell, dashed bridge cell.                                                        |
+| Quiet-stretch fold                   | route table                                            | 2+ consecutive middle systems with known-zero figures fold into one row; opens in place.                                                                         |
+| Route table                          | route Panel                                            | DataTable: System, Sec., Region, Last hour (ships · pods · jumps), zKillboard kills, Avoid. Row expands for NPC kills + off-route kill spots.                    |
+| Avoid system dialog                  | row action                                             | Preview whole trip with system avoided; then save to Avoided Systems.                                                                                            |
+| Legs                                 | multi-stop                                             | Collapsible per-leg sections with own header, table, ways panel.                                                                                                 |
+| Ways to fly                          | beside each leg                                        | Gates only / Via Thera / Via Turnur / Via Ansiblex / planner's pick; Use for this leg pins one (`pin`).                                                          |
+| Hole jump rows                       | route table                                            | Own row: warp-to system + signature + Copy, type, size, life, EVE-Scout age.                                                                                     |
+| Ansiblex bridges                     | rules panel + dialog                                   | Device-local list; find via character structure search or paste. One-jump connections.                                                                           |
+| Set waypoints in game                | facts line                                             | Sends Stops to EVE client autopilot. Needs `esi-ui.write_waypoint.v1`.                                                                                           |
+| Share link                           | URL                                                    | Every setting in query params (see Link parameters).                                                                                                             |
+| Thera / Turnur table                 | `/travel/thera`                                        | EVE-Scout open holes: exit, sec, region, fits, life left, jumps, signature, Route via.                                                                           |
+| Thera filters                        | Thera tab                                              | From, Hub (with counts), Exit, Fits, Route Preference; Reset filters.                                                                                            |
+| Route via                            | Thera row                                              | Opens Route Safety from the origin with that hole pinned for leg 1.                                                                                              |
+| Jumps links elsewhere                | Assets, Market, Courier, BPC, PI Hauling, entity links | Jump count opens Route Safety to that system.                                                                                                                    |
+| Set waypoint / View route menu items | Market + BPC row menus, order detail                   | One-place autopilot destination via `postAutopilotWaypoint`.                                                                                                     |
+| Travel Settings                      | Settings > Travel                                      | Preference, penalty, avoid rules, wormhole/bridge defaults, Avoided Systems.                                                                                     |
+| Command palette                      | Ctrl/Cmd+K                                             | Only generic Pages entries; no travel commands.                                                                                                                  |
 
 ## Routing, access, scopes
 
@@ -46,19 +46,19 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 
 ## Data sources
 
-| Source | Used for | Code |
-|---|---|---|
-| Local stargate graph (SDE snapshot) | Route, jumps, ways, distances | `src/engine/route/jumpRoute.ts`, `src/features/route/localRoute.ts` |
-| ESI `GET /universe/system_kills/`, `/universe/system_jumps/` (public) | Last-hour ship/pod/NPC kills and jumps for every system; 2 requests per visit, ETag, global cache (not per Character) | `src/features/travel/routeSafetyData.ts` |
-| ESI `POST /universe/names` | Region names not in `regions.json` | `loadRouteRegionNames` |
-| ESI `GET /universe/stargates/{id}` | Names a kill's gate + `destination.system_id` for "on your path"; once per session | `routeKillsData.ts` |
-| zKillboard `kills/regionID/{id}/pastSeconds/3600/` | Player kills last hour per region; concurrency 3, 5 min cache per region, paged (1,000/page, 10-page backstop), per-system fallback if region unknown | `src/lib/zkillboard.ts:450`, `useRouteKills.ts`, decision `20261005-125019` |
-| EVE-Scout `api.eve-scout.com/v2/public/signatures` | Thera/Turnur holes; 5 min memory cache; plain fetch, no custom headers; failed refresh keeps last good list | `src/lib/eveScout.ts` |
-| Dexie `ansiblexGates` | Known Ansiblex list; device-only, never synced/logged | `ansiblexGates.ts` |
-| Synced settings (Firestore via `createSyncedSetting`) | Route Preference, penalty, avoid rules, hole settings | `src/features/route/routeRules.ts`, `routeHoleSettings.ts` |
-| Local setting | Use jump bridges switch (`routeBridges`); picked Current System | `routeBridgeSettings.ts`, `currentSystem.ts` |
-| ESI `POST /ui/autopilot/waypoint` (`group: autopilot`) | Set waypoints | `sendWaypoints.ts`, registry `postAutopilotWaypoint` |
-| ESI `GET /characters/{id}/search`, `/universe/structures/{id}` | Ansiblex find | `ansiblexGates.ts` |
+| Source                                                                | Used for                                                                                                                                              | Code                                                                        |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Local stargate graph (SDE snapshot)                                   | Route, jumps, ways, distances                                                                                                                         | `src/engine/route/jumpRoute.ts`, `src/features/route/localRoute.ts`         |
+| ESI `GET /universe/system_kills/`, `/universe/system_jumps/` (public) | Last-hour ship/pod/NPC kills and jumps for every system; 2 requests per visit, ETag, global cache (not per Character)                                 | `src/features/travel/routeSafetyData.ts`                                    |
+| ESI `POST /universe/names`                                            | Region names not in `regions.json`                                                                                                                    | `loadRouteRegionNames`                                                      |
+| ESI `GET /universe/stargates/{id}`                                    | Names a kill's gate + `destination.system_id` for "on your path"; once per session                                                                    | `routeKillsData.ts`                                                         |
+| zKillboard `kills/regionID/{id}/pastSeconds/3600/`                    | Player kills last hour per region; concurrency 3, 5 min cache per region, paged (1,000/page, 10-page backstop), per-system fallback if region unknown | `src/lib/zkillboard.ts:450`, `useRouteKills.ts`, decision `20261005-125019` |
+| EVE-Scout `api.eve-scout.com/v2/public/signatures`                    | Thera/Turnur holes; 5 min memory cache; plain fetch, no custom headers; failed refresh keeps last good list                                           | `src/lib/eveScout.ts`                                                       |
+| Dexie `ansiblexGates`                                                 | Known Ansiblex list; device-only, never synced/logged                                                                                                 | `ansiblexGates.ts`                                                          |
+| Synced settings (Firestore via `createSyncedSetting`)                 | Route Preference, penalty, avoid rules, hole settings                                                                                                 | `src/features/route/routeRules.ts`, `routeHoleSettings.ts`                  |
+| Local setting                                                         | Use jump bridges switch (`routeBridges`); picked Current System                                                                                       | `routeBridgeSettings.ts`, `currentSystem.ts`                                |
+| ESI `POST /ui/autopilot/waypoint` (`group: autopilot`)                | Set waypoints                                                                                                                                         | `sendWaypoints.ts`, registry `postAutopilotWaypoint`                        |
+| ESI `GET /characters/{id}/search`, `/universe/structures/{id}`        | Ansiblex find                                                                                                                                         | `ansiblexGates.ts`                                                          |
 
 ## Route Safety (`/travel/route`)
 
@@ -66,15 +66,15 @@ Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, R
 
 ### Link parameters (`src/features/travel/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
-| Param | Meaning |
-|---|---|
-| `from` | Start system id; absent = Current System |
-| `stops` | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read |
-| `opt`, `ret`, `keep` | Optimize stop order, Return to start, Keep last stop last |
-| `pref` | Route Preference override; absent = saved default |
-| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override |
-| `jb` | Use jump bridges override |
-| `pin` | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick |
+| Param                             | Meaning                                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `from`                            | Start system id; absent = Current System                                                                   |
+| `stops`                           | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read                                      |
+| `opt`, `ret`, `keep`              | Optimize stop order, Return to start, Keep last stop last                                                  |
+| `pref`                            | Route Preference override; absent = saved default                                                          |
+| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override                                                   |
+| `jb`                              | Use jump bridges override                                                                                  |
+| `pin`                             | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick |
 
 Parameter edits `push` history (Back works). Unreadable pin tokens degrade to "not pinned".
 
@@ -82,14 +82,14 @@ Link builders: `routeToHref(systemId, fromId?, preference?)` (View route / jump 
 
 ### Page states (`RouteBody`, `RouteSafetyTab.tsx:373`)
 
-| State | Shown |
-|---|---|
-| `incomplete` | EmptyState pickTitle / pickHint (or `ways.pickDestination` when a pin awaits a stop) |
-| `same-system` | EmptyState (one stop = start) |
-| `no-route` | EmptyState (no stargate route; single stop) |
-| `unknown` | EmptyState (stargate snapshot unreadable) |
-| `loading` | Spinner |
-| `route` | Panel with facts, strip, status lines, leg(s) |
+| State                        | Shown                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `incomplete`                 | EmptyState pickTitle / pickHint (or `ways.pickDestination` when a pin awaits a stop)                         |
+| `same-system`                | EmptyState (one stop = start)                                                                                |
+| `no-route`                   | EmptyState (no stargate route; single stop)                                                                  |
+| `unknown`                    | EmptyState (stargate snapshot unreadable)                                                                    |
+| `loading`                    | Spinner                                                                                                      |
+| `route`                      | Panel with facts, strip, status lines, leg(s)                                                                |
 | status lines (`role=status`) | holes loading; holes unavailable (route gates-only, said so); ESI activity loading; ESI activity unavailable |
 
 Multi-stop: an unreachable stop shows its leg's no-route message while other legs draw; facts line/strip wait for every leg; Optimize disabled (`optimizeBlocked`).
@@ -126,14 +126,14 @@ Jumps; by gate / through wormholes / over Ansiblex (only when a hole/bridge flow
 
 ### Route table (`RouteSystemsTable.tsx`)
 
-| Column | Content |
-|---|---|
-| System | Name; "Gank Chokepoint" tag with hint |
-| Sec. | `SecurityStatus` (card corner on phone) |
-| Region | Name, truncated with tooltip |
-| Last hour | Ship kills (heat colour `shipKillHeatColor`: stops 3 yellow / 6 orange / 10 red) · pod kills (red when > 0) · jumps; J-space shows N/A with info tooltip; "—" for unknown |
+| Column                   | Content                                                                                                                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| System                   | Name; "Gank Chokepoint" tag with hint                                                                                                                                                              |
+| Sec.                     | `SecurityStatus` (card corner on phone)                                                                                                                                                            |
+| Region                   | Name, truncated with tooltip                                                                                                                                                                       |
+| Last hour                | Ship kills (heat colour `shipKillHeatColor`: stops 3 yellow / 6 orange / 10 red) · pod kills (red when > 0) · jumps; J-space shows N/A with info tooltip; "—" for unknown                          |
 | zKillboard (recentKills) | Count linking to `zkillboard.com/system/{id}`; on-path gate lines ("3 kills at Stargate (X), last one 32 min ago"), tags "Interdictor or HIC on the mail" (nullsec only) and "Smartbombs involved" |
-| Avoid | Button per middle row (not start/stops/already-avoided) |
+| Avoid                    | Button per middle row (not start/stops/already-avoided)                                                                                                                                            |
 
 - Row expand: NPC kills count; zKillboard kill locations off the route ("elsewhere in the system" pool for unnamed planets/moons/belts/structures).
 - Quiet stretch fold header: "N systems, A → B, lowest X.X"; opens in place. Hole/bridge neighbours never fold; unknown/loading/J-space systems never fold.
@@ -156,6 +156,7 @@ Modal opened from a row's Avoid button. Preview = the page's trip planned again 
 ### Ansiblex dialog (`AnsiblexGatesDialog.tsx`)
 
 Opened from rules panel "Manage" (mode `search`), Via Ansiblex box ("find" `search` / "paste" `paste`), or Settings > Travel. Sections:
+
 - Local-only notice (list never leaves the device).
 - Find with a character: one row per Character with Find button (disabled while another search runs); "Find with all" when > 1 character; per-row status (searching, found N, systems it could not place, failed); Characters lacking scopes show "needs grant" + Grant button (`beginGrant`). Search term `" » "`; each id read via `/universe/structures/{id}`; a character's finds replace its earlier ones.
 - Paste: textarea (Ctrl/Cmd+Enter submits), Add; per-line errors (`format`, `unknown`, `same-system`, `not-nullsec`).
@@ -193,15 +194,15 @@ Filters (content-sized selects in one row, desktop): From (SolarSystemPicker), H
 
 Table (`DataTable`, compact, default sort Jumps asc, `mobileSort`, expandable rows):
 
-| Column | Notes |
-|---|---|
-| Exit | System + hub badge; sortable by name |
-| Sec. | `SecurityStatus`, or class letters (C1..) for J-space |
-| Region | |
-| Fits | Max ship size |
-| Life left | Countdown; warning style at <= 2 h (`LIFE_WARNING_MS`); ticks per minute |
-| Jumps | From origin to exit by gate (before taking the hole): number, "no gate route", or "—"; stable sort so ties (every J-space hole) stay longest-life-first |
-| Signature | Hub-side signature, select-all; phone shows "hub sig -> exit sig"; Route via link |
+| Column    | Notes                                                                                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exit      | System + hub badge; sortable by name                                                                                                                    |
+| Sec.      | `SecurityStatus`, or class letters (C1..) for J-space                                                                                                   |
+| Region    |                                                                                                                                                         |
+| Fits      | Max ship size                                                                                                                                           |
+| Life left | Countdown; warning style at <= 2 h (`LIFE_WARNING_MS`); ticks per minute                                                                                |
+| Jumps     | From origin to exit by gate (before taking the hole): number, "no gate route", or "—"; stable sort so ties (every J-space hole) stay longest-life-first |
+| Signature | Hub-side signature, select-all; phone shows "hub sig -> exit sig"; Route via link                                                                       |
 
 - Row expand: wormhole type, both signatures, exit's zKillboard page link, Route via.
 - Route via (K-space exits with a known gate route only): link to Route Safety from the origin with the hole pinned for leg 1.
@@ -215,6 +216,7 @@ Table (`DataTable`, compact, default sort Jumps asc, `mobileSort`, expandable ro
 ## Settings > Travel (`src/features/settings/TravelSettingsPanel.tsx`)
 
 Section `travel` in the Settings rail (`src/features/settings/sections.ts:27`), path `/settings/travel`. Three panels:
+
 1. Route planning: Default route preference (Select), security penalty (disabled under Prefer shorter), avoid EDENCOM / Triglavian / pod kills (+threshold). Waits for settings hydration.
 2. Wormholes and jump bridges (`SavedRouteNetworkFields`): `RouteHoleFields bare` bound to saved defaults (no link override here); Ansiblex dialog.
 3. Avoided Systems (`AvoidedSystemsPanel`): switch (off keeps the list), add via picker, name-sorted list with security and Remove; unnamable systems list as `#id`.
@@ -225,18 +227,18 @@ Jump Basis (`src/features/route/jumpBasis.ts`): the one set of rules every jump 
 
 ## Entry points from other pages
 
-| Place | Control | Behavior |
-|---|---|---|
-| `src/features/route/jumpsCell.tsx` -> `JumpsLink` | Jump-count cell of the Jump Range tables (Market Browser, Contract Search Items, BPC Sourcing), when the row passes a systemId | Count links to Route Safety to that system from Current System; tooltip "View route"; stops row click |
-| `src/features/contractSearch/CourierResults.tsx:1225` | Courier jumps | Link from pickup system, with the board's Route Preference |
-| `src/features/pi/goalPlanResults/Hauling.tsx:154` | PI hauling jumps | `JumpsLink systemId={to} fromId={from}` |
-| `src/features/market/OrderBookScopeBar.tsx:274` | Scope bar jumps | `JumpsLink` to scope system |
-| `src/features/character/assetBrowserRows.tsx:82`, `MarketOrderBook.tsx:161` | `PlaceJumpsLink` | Resolves a station/structure to its system on click (`resolvePlaceSystemId`), then navigates; error text if structure off ACL |
-| `src/features/entities/EntityLink.tsx:138` `SystemLink` | Any solar-system name (Contract modals, PI, Mining tax, Corp roster, hauling detail, etc.) | Route Safety with that system as destination (DESIGN.md §6c entity default) |
-| `SetDestinationButton` (`features/market/`) | Order detail + order book | "Set destination" (one waypoint, clears others) + `ViewRouteButton` |
-| `SetWaypointMenuItem` | Order row context menu, Open orders panel, BPC Sourcing row menu | "Set waypoint in game" (menu stays open, shows outcome; disabled with reason without Character/scope) + `ViewRouteMenuItem` |
-| `useSetDestination` (`features/travel/useSetDestination.ts`) | Shared hook | `locationId` must be a place (station/structure/system), never an item id; scope `esi-ui.write_waypoint.v1` |
-| Thera table Route via | `routeViaHref` | See above |
+| Place                                                                       | Control                                                                                                                        | Behavior                                                                                                                      |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `src/features/route/jumpsCell.tsx` -> `JumpsLink`                           | Jump-count cell of the Jump Range tables (Market Browser, Contract Search Items, BPC Sourcing), when the row passes a systemId | Count links to Route Safety to that system from Current System; tooltip "View route"; stops row click                         |
+| `src/features/contractSearch/CourierResults.tsx:1225`                       | Courier jumps                                                                                                                  | Link from pickup system, with the board's Route Preference                                                                    |
+| `src/features/pi/goalPlanResults/Hauling.tsx:154`                           | PI hauling jumps                                                                                                               | `JumpsLink systemId={to} fromId={from}`                                                                                       |
+| `src/features/market/OrderBookScopeBar.tsx:274`                             | Scope bar jumps                                                                                                                | `JumpsLink` to scope system                                                                                                   |
+| `src/features/character/assetBrowserRows.tsx:82`, `MarketOrderBook.tsx:161` | `PlaceJumpsLink`                                                                                                               | Resolves a station/structure to its system on click (`resolvePlaceSystemId`), then navigates; error text if structure off ACL |
+| `src/features/entities/EntityLink.tsx:138` `SystemLink`                     | Any solar-system name (Contract modals, PI, Mining tax, Corp roster, hauling detail, etc.)                                     | Route Safety with that system as destination (DESIGN.md §6c entity default)                                                   |
+| `SetDestinationButton` (`features/market/`)                                 | Order detail + order book                                                                                                      | "Set destination" (one waypoint, clears others) + `ViewRouteButton`                                                           |
+| `SetWaypointMenuItem`                                                       | Order row context menu, Open orders panel, BPC Sourcing row menu                                                               | "Set waypoint in game" (menu stays open, shows outcome; disabled with reason without Character/scope) + `ViewRouteMenuItem`   |
+| `useSetDestination` (`features/travel/useSetDestination.ts`)                | Shared hook                                                                                                                    | `locationId` must be a place (station/structure/system), never an item id; scope `esi-ui.write_waypoint.v1`                   |
+| Thera table Route via                                                       | `routeViaHref`                                                                                                                 | See above                                                                                                                     |
 
 `useViewRoute` (`useViewRoute.ts`): resolve place's system, `navigate(routeToHref(systemId, null, preference))`; failed state "unavailable".
 
@@ -248,17 +250,17 @@ Jump Basis (`src/features/route/jumpBasis.ts`): the one set of rules every jump 
 
 Not a separate page: the planner is Route Safety. Split by layer.
 
-| Layer | Path | Role |
-|---|---|---|
-| Pure engine | `src/engine/route/jumpRoute.ts` | Dijkstra, step costs, sweeps |
-| | `tripPlan.ts` | stops, legs, Held-Karp order |
-| | `legWays.ts`, `routeHoles.ts`, `ansiblex.ts` | ways to fly, Thera/Turnur edges, bridge edges |
-| | `routeSafety.ts`, `routeSafetyTrip.ts` | rows, facts, folds, trip assembly, step tags |
-| | `avoidRules.ts`, `chokepoints.ts`, `invasionSystems.ts`, `killHeat.ts`, `recentKills.ts`, `waypoints.ts`, `theraConnections.ts`, `jumpRange.ts` | rules and per-row facts |
-| Adapters | `src/features/route/localRoute.ts` | loads graph (`sde/jumpGraph`) + security snapshot, calls engine (`findLocalRoute`, `localJumpDistances`, `planLocalTrip`) |
-| | `src/features/route/routeRules.ts`, `routeHoleSettings.ts`, `routeBridgeSettings.ts`, `jumpBasis.ts` | settings stores and the one jump basis |
-| | `src/features/travel/useRouteSafety.ts`, `useRouteHoles.ts`, `useRouteKills.ts`, `routeSafetyData.ts`, `routeKillsData.ts`, `routeSafetyKeys.ts` | data hooks and stable request keys |
-| UI | `src/features/travel/RouteSafetyTab.tsx` and siblings | page |
+| Layer       | Path                                                                                                                                             | Role                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Pure engine | `src/engine/route/jumpRoute.ts`                                                                                                                  | Dijkstra, step costs, sweeps                                                                                              |
+|             | `tripPlan.ts`                                                                                                                                    | stops, legs, Held-Karp order                                                                                              |
+|             | `legWays.ts`, `routeHoles.ts`, `ansiblex.ts`                                                                                                     | ways to fly, Thera/Turnur edges, bridge edges                                                                             |
+|             | `routeSafety.ts`, `routeSafetyTrip.ts`                                                                                                           | rows, facts, folds, trip assembly, step tags                                                                              |
+|             | `avoidRules.ts`, `chokepoints.ts`, `invasionSystems.ts`, `killHeat.ts`, `recentKills.ts`, `waypoints.ts`, `theraConnections.ts`, `jumpRange.ts`  | rules and per-row facts                                                                                                   |
+| Adapters    | `src/features/route/localRoute.ts`                                                                                                               | loads graph (`sde/jumpGraph`) + security snapshot, calls engine (`findLocalRoute`, `localJumpDistances`, `planLocalTrip`) |
+|             | `src/features/route/routeRules.ts`, `routeHoleSettings.ts`, `routeBridgeSettings.ts`, `jumpBasis.ts`                                             | settings stores and the one jump basis                                                                                    |
+|             | `src/features/travel/useRouteSafety.ts`, `useRouteHoles.ts`, `useRouteKills.ts`, `routeSafetyData.ts`, `routeKillsData.ts`, `routeSafetyKeys.ts` | data hooks and stable request keys                                                                                        |
+| UI          | `src/features/travel/RouteSafetyTab.tsx` and siblings                                                                                            | page                                                                                                                      |
 
 Graph: static SDE snapshot (`market/jumps.json`, ~8.5k systems, ~14k edges), keyed for every system including gateless J-space (`[]`), so "in the graph, no edges" = no stargate route and "not in graph" = not a system (decision `20260912-130200`, `jumpRoute.ts:18-24`). Zero ESI requests per route.
 
@@ -266,18 +268,18 @@ Graph: static SDE snapshot (`market/jumps.json`, ~8.5k systems, ~14k edges), key
 
 ### Flag options (what the user can set)
 
-| Option | Values | Default | Stored | Effect on planner |
-|---|---|---|---|---|
-| Route Preference | Prefer shorter / safer / less secure (`shortest`, `prefer-highsec`, `avoid-highsec`) | Prefer safer (`DEFAULT_ROUTE_PREFERENCE`, `routeRules.ts:37`) | synced `sync.routePreference`; link `pref` wins until the picker is used | step cost table below |
-| Security penalty | integer 0-100 | 50 (`DEFAULT_SECURITY_PENALTY`, `jumpRoute.ts:84`) | synced `sync.routeSecurityPenalty` | `penaltyCost = exp(0.15 x penalty)`; ignored under Prefer shorter |
-| Avoided Systems | list of ids + switch (default on) | empty | synced list + `sync.avoidedSystemsEnabled` | +1e12 per avoided system entered |
-| Avoid EDENCOM | switch | off | synced | adds the 53 fortress + minor-victory ids to avoid |
-| Avoid Triglavian minor victory | switch | off | synced | adds that set (`invasionSystems.ts`, vendored from kybernaut.space; unchanged since 2020-10-13) |
-| Avoid pod-kill systems | switch + threshold 1-100 | off, 3 | synced | adds systems whose last-hour ESI pod kills >= threshold; refreshed every 15 min (`POD_KILL_REFRESH_MS`) |
-| Thera/Turnur holes | switch, ship size (small..capital), min life 0-24 h, hubs | off, medium, 1 h, all | synced one key each; link `wh/whsize/whlife/whhub` | extra edges + free hub |
-| Use jump bridges | switch | off | device-local `routeBridges`; link `jb` | known Ansiblex as extra edges |
-| Optimize stop order / Return to start / Keep last stop last | switches | off | link only (`opt/ret/keep`) | Held-Karp |
-| Pin per leg | gates / thera / turnur / ansiblex / hole id | none | link `pin` | forces a way for that leg |
+| Option                                                      | Values                                                                               | Default                                                       | Stored                                                                   | Effect on planner                                                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Route Preference                                            | Prefer shorter / safer / less secure (`shortest`, `prefer-highsec`, `avoid-highsec`) | Prefer safer (`DEFAULT_ROUTE_PREFERENCE`, `routeRules.ts:37`) | synced `sync.routePreference`; link `pref` wins until the picker is used | step cost table below                                                                                   |
+| Security penalty                                            | integer 0-100                                                                        | 50 (`DEFAULT_SECURITY_PENALTY`, `jumpRoute.ts:84`)            | synced `sync.routeSecurityPenalty`                                       | `penaltyCost = exp(0.15 x penalty)`; ignored under Prefer shorter                                       |
+| Avoided Systems                                             | list of ids + switch (default on)                                                    | empty                                                         | synced list + `sync.avoidedSystemsEnabled`                               | +1e12 per avoided system entered                                                                        |
+| Avoid EDENCOM                                               | switch                                                                               | off                                                           | synced                                                                   | adds the 53 fortress + minor-victory ids to avoid                                                       |
+| Avoid Triglavian minor victory                              | switch                                                                               | off                                                           | synced                                                                   | adds that set (`invasionSystems.ts`, vendored from kybernaut.space; unchanged since 2020-10-13)         |
+| Avoid pod-kill systems                                      | switch + threshold 1-100                                                             | off, 3                                                        | synced                                                                   | adds systems whose last-hour ESI pod kills >= threshold; refreshed every 15 min (`POD_KILL_REFRESH_MS`) |
+| Thera/Turnur holes                                          | switch, ship size (small..capital), min life 0-24 h, hubs                            | off, medium, 1 h, all                                         | synced one key each; link `wh/whsize/whlife/whhub`                       | extra edges + free hub                                                                                  |
+| Use jump bridges                                            | switch                                                                               | off                                                           | device-local `routeBridges`; link `jb`                                   | known Ansiblex as extra edges                                                                           |
+| Optimize stop order / Return to start / Keep last stop last | switches                                                                             | off                                                           | link only (`opt/ret/keep`)                                               | Held-Karp                                                                                               |
+| Pin per leg                                                 | gates / thera / turnur / ansiblex / hole id                                          | none                                                          | link `pin`                                                               | forces a way for that leg                                                                               |
 
 Settings that are edited on this page (preference, penalty, avoid rules, hole/bridge defaults) are the saved defaults, so they change every jump count in the app (`20261003-161302` as amended by `20261006-143832`; `20261004-161245`).
 
@@ -285,11 +287,11 @@ Settings that are edited on this page (preference, penalty, avoid rules, hole/br
 
 Cost is charged for the system entered. `raw` security, highsec line `0.45` (`HIGHSEC_FROM`, rounds to 0.5 shown).
 
-| Preference | raw <= 0.0 (null) | unknown security | in wanted band | in unwanted band |
-|---|---|---|---|---|
-| shortest, or no security lookup | 1 | 1 | 1 | 1 |
-| prefer-highsec (wanted: raw >= 0.45) | 2 x P | P | 0.9 | P |
-| avoid-highsec (wanted: raw < 0.45, > 0) | 2 x P | P | 0.9 | P |
+| Preference                              | raw <= 0.0 (null) | unknown security | in wanted band | in unwanted band |
+| --------------------------------------- | ----------------- | ---------------- | -------------- | ---------------- |
+| shortest, or no security lookup         | 1                 | 1                | 1              | 1                |
+| prefer-highsec (wanted: raw >= 0.45)    | 2 x P             | P                | 0.9            | P                |
+| avoid-highsec (wanted: raw < 0.45, > 0) | 2 x P             | P                | 0.9            | P                |
 
 P = `exp(0.15 x penalty)`. Worked values: penalty 0 gives P=1 (null 2, wanted 0.9; so penalty 0 is not quite Prefer shorter); penalty 50 gives P ~ 1808 (null ~ 3616); penalty 100 gives P ~ 3.27e6 (null ~ 6.5e6). Unknown security is charged as unwanted (never claims safety). Under Prefer less secure, nullsec still costs 2 x P, so it routes through lowsec before nullsec. Avoided system adds `AVOIDED_PENALTY = 1e12` (`jumpRoute.ts:98`), chosen above any possible security total so crossing one fewer avoided system always wins; avoidance is a cost, never a wall; an avoided origin/destination changes nothing.
 
@@ -318,7 +320,7 @@ Search (`jumpRoute.ts:249`): Dijkstra with a binary heap; stargates relaxed befo
 
 - `routeHoles` (`routeHoles.ts:33`): keep hub match, `maxShipSize` known and >= chosen rank, `remainingMs > 0 and >= minLife`. Hole with unknown size is excluded. `holeNetwork` makes one edge exit<->hub per hole and marks each used hub free.
 - Cost: entering a free hub over an extra edge costs 1 (`stepCostFor`, `jumpRoute.ts:143`), plus avoid penalty; every other landing (exit system, the hub when entered by gate, bridge landings) uses the normal step cost. Gate always beats a hole/bridge on the same pair, both in search order and in step tagging (`src/engine/route/routeSafetyTrip.ts:256`, decision `20261004-122315`).
-- Ansiblex (`ansiblex.ts`): name `SYS1 » SYS2 [- label]` (first spaced ` - ` ends far system so `1DQ1-A` survives); only known-space nullsec ends (`securityBand == nullsec`, not J-space); same-system, unknown and not-nullsec lines are errors with line numbers; pair deduped either direction. Search term `" » "` (ESI needs >= 3 chars; substring match). Found structure accepted only when `type_id` is 35841 (or absent), the name parses, and the name's near system equals ESI's `solar_system_id`. Bridges are two-way edges, never free.
+- Ansiblex (`ansiblex.ts`): name `SYS1 » SYS2 [- label]` (first spaced `-` ends far system so `1DQ1-A` survives); only known-space nullsec ends (`securityBand == nullsec`, not J-space); same-system, unknown and not-nullsec lines are errors with line numbers; pair deduped either direction. Search term `" » "` (ESI needs >= 3 chars; substring match). Found structure accepted only when `type_id` is 35841 (or absent), the name parses, and the name's near system equals ESI's `solar_system_id`. Bridges are two-way edges, never free.
 
 ### Trip assembly and row facts (`routeSafety.ts`, `routeSafetyTrip.ts`)
 
@@ -356,96 +358,96 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 
 ## Persistence and sync
 
-| State | Where | Synced |
-|---|---|---|
-| Route Preference, penalty, avoid rules, threshold, switches | synced settings `sync.*` (Firestore via `createSyncedSetting`) | yes, one key each |
-| Avoided Systems ids | synced `sync.avoidedSystems` (ids only) | yes |
-| Hole settings (4 keys) | synced | yes |
-| Use jump bridges | local setting `routeBridges` | no |
-| Ansiblex list | Dexie `ansiblexGates` (`src/db/index.ts:1445`), keyed `search:<structureId>` or `paste:<pair>` | never (private structure access; not logged) |
-| Picked Current System | local setting `currentSystemPicks`, per Character; applies until the game reports a different system than when picked (`src/engine/route/jumpRange.ts:75`, `src/features/route/currentSystem.ts:36`) | no |
-| From, Stops, order flags, pins, per-view overrides | URL query | via link only |
-| ESI kills/jumps feeds | Dexie cache, `GLOBAL_CACHE_CHARACTER_ID`, ETag conditional | no |
-| zKillboard, EVE-Scout | memory only | no |
-| Character's current system | ESI cache `characterLocation`, fetched once per load | no |
+| State                                                       | Where                                                                                                                                                                                                | Synced                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Route Preference, penalty, avoid rules, threshold, switches | synced settings `sync.*` (Firestore via `createSyncedSetting`)                                                                                                                                       | yes, one key each                            |
+| Avoided Systems ids                                         | synced `sync.avoidedSystems` (ids only)                                                                                                                                                              | yes                                          |
+| Hole settings (4 keys)                                      | synced                                                                                                                                                                                               | yes                                          |
+| Use jump bridges                                            | local setting `routeBridges`                                                                                                                                                                         | no                                           |
+| Ansiblex list                                               | Dexie `ansiblexGates` (`src/db/index.ts:1445`), keyed `search:<structureId>` or `paste:<pair>`                                                                                                       | never (private structure access; not logged) |
+| Picked Current System                                       | local setting `currentSystemPicks`, per Character; applies until the game reports a different system than when picked (`src/engine/route/jumpRange.ts:75`, `src/features/route/currentSystem.ts:36`) | no                                           |
+| From, Stops, order flags, pins, per-view overrides          | URL query                                                                                                                                                                                            | via link only                                |
+| ESI kills/jumps feeds                                       | Dexie cache, `GLOBAL_CACHE_CHARACTER_ID`, ETag conditional                                                                                                                                           | no                                           |
+| zKillboard, EVE-Scout                                       | memory only                                                                                                                                                                                          | no                                           |
+| Character's current system                                  | ESI cache `characterLocation`, fetched once per load                                                                                                                                                 | no                                           |
 
 ## State matrix (Route Safety)
 
-| Condition | Result |
-|---|---|
-| No From and no game location (no `esi-location.read_location.v1` or offline) | picker label "Pick a system"; `incomplete` EmptyState |
-| Hydration (rules, holes, bridges, pod kills) not finished | route not planned (no "draw once on defaults") |
-| Stargate snapshot unreadable | `unknown` EmptyState (not "no route") |
-| ESI feeds loading | route shows; status line; kill figures "—" |
-| One feed null | facts that need it withheld; figures unknown never zero; "activity unavailable" status |
-| EVE-Scout loading (holes on) | gate route shown, status line says so; hole/hub pins show `no-list` |
-| EVE-Scout unreachable | gates only, said so; Thera tab shows Retry EmptyState |
-| zKillboard row fails / 429 | that row "unavailable"; walk continues; retry only on next walk |
-| Stop unreachable (multi) | that leg no-route, other legs draw, facts/strip wait, Optimize off |
-| Pod-kill feed unreadable with rule on | rule drops; warning in rules panel |
-| Settings hydrating | rules panel spinner, controls not clickable |
+| Condition                                                                    | Result                                                                                 |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| No From and no game location (no `esi-location.read_location.v1` or offline) | picker label "Pick a system"; `incomplete` EmptyState                                  |
+| Hydration (rules, holes, bridges, pod kills) not finished                    | route not planned (no "draw once on defaults")                                         |
+| Stargate snapshot unreadable                                                 | `unknown` EmptyState (not "no route")                                                  |
+| ESI feeds loading                                                            | route shows; status line; kill figures "—"                                             |
+| One feed null                                                                | facts that need it withheld; figures unknown never zero; "activity unavailable" status |
+| EVE-Scout loading (holes on)                                                 | gate route shown, status line says so; hole/hub pins show `no-list`                    |
+| EVE-Scout unreachable                                                        | gates only, said so; Thera tab shows Retry EmptyState                                  |
+| zKillboard row fails / 429                                                   | that row "unavailable"; walk continues; retry only on next walk                        |
+| Stop unreachable (multi)                                                     | that leg no-route, other legs draw, facts/strip wait, Optimize off                     |
+| Pod-kill feed unreadable with rule on                                        | rule drops; warning in rules panel                                                     |
+| Settings hydrating                                                           | rules panel spinner, controls not clickable                                            |
 
 ## Mobile vs desktop
 
-| Area | Desktop | Phone / narrow |
-|---|---|---|
-| Layout | rail (Stops, Route rules) + route from `xl` 1280 | rail dissolves; order Stops, route, Route rules (#2591) |
-| Stops | full list | one line "Start -> N stops" with Edit/Done (open while no stops, #2519) |
-| Route rules | full | folded with `ActiveRuleChips` |
-| Route table | DataTable columns | dense cards, sec in corner, zero kill counts omitted |
-| Ways | beside rows at container >= `@5xl` | above rows 2-3 across; phone folded with Compare/Hide |
-| Set waypoints | right end of facts line | full width |
-| Thera filters | selects in one row | From own line; four chips opening radio menus; sort via `mobileSort` |
-| Thera signature | sig | "hub sig -> exit sig" |
+| Area            | Desktop                                          | Phone / narrow                                                          |
+| --------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
+| Layout          | rail (Stops, Route rules) + route from `xl` 1280 | rail dissolves; order Stops, route, Route rules (#2591)                 |
+| Stops           | full list                                        | one line "Start -> N stops" with Edit/Done (open while no stops, #2519) |
+| Route rules     | full                                             | folded with `ActiveRuleChips`                                           |
+| Route table     | DataTable columns                                | dense cards, sec in corner, zero kill counts omitted                    |
+| Ways            | beside rows at container >= `@5xl`               | above rows 2-3 across; phone folded with Compare/Hide                   |
+| Set waypoints   | right end of facts line                          | full width                                                              |
+| Thera filters   | selects in one row                               | From own line; four chips opening radio menus; sort via `mobileSort`    |
+| Thera signature | sig                                              | "hub sig -> exit sig"                                                   |
 
 ## Permissions
 
-| Feature | Scope | Missing grant |
-|---|---|---|
-| Route, Thera, strip, kills | none (public ESI, zKillboard, EVE-Scout) | n/a; page still needs an active Character (`Travel.tsx:36`, else redirects to `/characters`) |
-| Current System (default From) | `esi-location.read_location.v1` (group characterDetails) | 403 not treated as auth failure; user picks a system by hand |
-| Set waypoints | `esi-ui.write_waypoint.v1` (Permission "Autopilot waypoints", default-on) | button `aria-disabled` + tooltip; GrantBanner with Grant for chosen Character |
-| Ansiblex find | `esi-search.search_structures.v1` + `esi-universe.read_structures.v1` | Character shows "needs grant" + Grant; never searched; paste works |
+| Feature                       | Scope                                                                     | Missing grant                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Route, Thera, strip, kills    | none (public ESI, zKillboard, EVE-Scout)                                  | n/a; page still needs an active Character (`Travel.tsx:36`, else redirects to `/characters`) |
+| Current System (default From) | `esi-location.read_location.v1` (group characterDetails)                  | 403 not treated as auth failure; user picks a system by hand                                 |
+| Set waypoints                 | `esi-ui.write_waypoint.v1` (Permission "Autopilot waypoints", default-on) | button `aria-disabled` + tooltip; GrantBanner with Grant for chosen Character                |
+| Ansiblex find                 | `esi-search.search_structures.v1` + `esi-universe.read_structures.v1`     | Character shows "needs grant" + Grant; never searched; paste works                           |
 
 ## Test coverage map
 
-| Behavior | Test |
-|---|---|
-| Penalty costs, avoid > penalty, gate tie, unknown id, sweep == pair | `src/engine/route/jumpRoute.test.ts` (penalty 0/50 and 0.45 raw cases) |
-| Held-Karp exact vs brute force, ties, return/keep, 10 stops fast, unreachable | `tripPlan.test.ts` |
-| Hole filters, free hub, holeBetween | `routeHoles.test.ts` |
-| Ways, pins (`closed`, `no-hole`, `no-bridge`), never back out hole | `legWays.test.ts` |
-| Unknown vs zero, J-space, fold rules, strip keys, trip dedup | `routeSafety.test.ts` |
-| Trip assembly, step tagging | `routeSafetyTrip.test.ts` |
-| Avoid list, preview outcome, list-only | `avoidRules.test.ts` |
-| Ansiblex parse/errors/found rules | `ansiblex.test.ts`, `ansiblexGates.test.ts`, `AnsiblexGatesDialog.test.tsx` |
-| Waypoint cut-offs | `waypoints.test.ts`, `sendWaypoints.test.ts`, `SetWaypoints.test.tsx` |
-| Thera bands, jumps states, filter, hub counts, ordering | `theraConnections.test.ts` |
-| Bubble/smartbomb tags, grouping, on-path | `recentKills.test.ts`, `routeKillsData.test.ts` |
-| Link codec | `routeSafetyLink.test.ts`; keys `routeSafetyKeys.test.ts` |
-| Strip | `RouteStrip.test.tsx`; jump links `jumpsCell.test.tsx` |
-| Heat ramp, chokepoint list | `killHeat.test.ts`, `chokepoints.test.ts` |
-| Not covered by a dedicated test (from file list) | `RouteSafetyTab.tsx`, `StopsPanel.tsx`, `TheraTab.tsx`, `AvoidSystemDialog.tsx`, `TripLegs.tsx`, `LegWays.tsx` have no sibling `.test.tsx`; e2e specs may cover |
+| Behavior                                                                      | Test                                                                                                                                                            |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Penalty costs, avoid > penalty, gate tie, unknown id, sweep == pair           | `src/engine/route/jumpRoute.test.ts` (penalty 0/50 and 0.45 raw cases)                                                                                          |
+| Held-Karp exact vs brute force, ties, return/keep, 10 stops fast, unreachable | `tripPlan.test.ts`                                                                                                                                              |
+| Hole filters, free hub, holeBetween                                           | `routeHoles.test.ts`                                                                                                                                            |
+| Ways, pins (`closed`, `no-hole`, `no-bridge`), never back out hole            | `legWays.test.ts`                                                                                                                                               |
+| Unknown vs zero, J-space, fold rules, strip keys, trip dedup                  | `routeSafety.test.ts`                                                                                                                                           |
+| Trip assembly, step tagging                                                   | `routeSafetyTrip.test.ts`                                                                                                                                       |
+| Avoid list, preview outcome, list-only                                        | `avoidRules.test.ts`                                                                                                                                            |
+| Ansiblex parse/errors/found rules                                             | `ansiblex.test.ts`, `ansiblexGates.test.ts`, `AnsiblexGatesDialog.test.tsx`                                                                                     |
+| Waypoint cut-offs                                                             | `waypoints.test.ts`, `sendWaypoints.test.ts`, `SetWaypoints.test.tsx`                                                                                           |
+| Thera bands, jumps states, filter, hub counts, ordering                       | `theraConnections.test.ts`                                                                                                                                      |
+| Bubble/smartbomb tags, grouping, on-path                                      | `recentKills.test.ts`, `routeKillsData.test.ts`                                                                                                                 |
+| Link codec                                                                    | `routeSafetyLink.test.ts`; keys `routeSafetyKeys.test.ts`                                                                                                       |
+| Strip                                                                         | `RouteStrip.test.tsx`; jump links `jumpsCell.test.tsx`                                                                                                          |
+| Heat ramp, chokepoint list                                                    | `killHeat.test.ts`, `chokepoints.test.ts`                                                                                                                       |
+| Not covered by a dedicated test (from file list)                              | `RouteSafetyTab.tsx`, `StopsPanel.tsx`, `TheraTab.tsx`, `AvoidSystemDialog.tsx`, `TripLegs.tsx`, `LegWays.tsx` have no sibling `.test.tsx`; e2e specs may cover |
 
 ## Decision links (why)
 
-| Decision | Gist |
-|---|---|
-| `20260929-234357` | Travel/Intel in scope; ungated but signed-in; two ESI requests per visit |
-| `20260912-172628` | conditions, never verdicts; unknown never zero |
-| `20260912-130200` | local stargate graph; key per system incl. gateless |
-| `20260930-165116` | one route vocabulary; CCP route costs |
-| `20260930-153212` | Avoided Systems hand-entered (ESI cannot read in-game list), synced, cost not wall |
-| `20260930-002219` / `20261005-125019` | zKillboard per region (supersedes per system); stargate names via `/universe/stargates/{id}` |
-| `20261003-161302` / `20261006-143832` | rules panel edits Travel Settings in place; preference saves the default |
-| `20261003-173108` | up to 10 stops, exact optimizer, cost not jumps, typed order wins ties |
-| `20261003-175151` | waypoint scope as its own default-on Permission; stops in flying order; cut at hole/bridge |
-| `20261003-181618` | hub entry free of security cost; Route Safety-only at the time |
-| `20261004-161245` | every jump count uses the local graph + saved hole/bridge settings (Jump Basis) |
-| `20261003-204009` | Ansiblex find + paste, device-local |
-| `20261004-122315` | step kind decided once; gate beats hole/bridge |
-| `20261003-190356` / `20261004-213447` | Thera slim table, exit filter in URL `space`, filters as selects |
-| `20261002-145653-lp-store-under-market-pilot-lookup-its-own` | Pilot Lookup left Travel |
+| Decision                                                     | Gist                                                                                         |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `20260929-234357`                                            | Travel/Intel in scope; ungated but signed-in; two ESI requests per visit                     |
+| `20260912-172628`                                            | conditions, never verdicts; unknown never zero                                               |
+| `20260912-130200`                                            | local stargate graph; key per system incl. gateless                                          |
+| `20260930-165116`                                            | one route vocabulary; CCP route costs                                                        |
+| `20260930-153212`                                            | Avoided Systems hand-entered (ESI cannot read in-game list), synced, cost not wall           |
+| `20260930-002219` / `20261005-125019`                        | zKillboard per region (supersedes per system); stargate names via `/universe/stargates/{id}` |
+| `20261003-161302` / `20261006-143832`                        | rules panel edits Travel Settings in place; preference saves the default                     |
+| `20261003-173108`                                            | up to 10 stops, exact optimizer, cost not jumps, typed order wins ties                       |
+| `20261003-175151`                                            | waypoint scope as its own default-on Permission; stops in flying order; cut at hole/bridge   |
+| `20261003-181618`                                            | hub entry free of security cost; Route Safety-only at the time                               |
+| `20261004-161245`                                            | every jump count uses the local graph + saved hole/bridge settings (Jump Basis)              |
+| `20261003-204009`                                            | Ansiblex find + paste, device-local                                                          |
+| `20261004-122315`                                            | step kind decided once; gate beats hole/bridge                                               |
+| `20261003-190356` / `20261004-213447`                        | Thera slim table, exit filter in URL `space`, filters as selects                             |
+| `20261002-145653-lp-store-under-market-pilot-lookup-its-own` | Pilot Lookup left Travel                                                                     |
 
 ## Interview Q&A
 

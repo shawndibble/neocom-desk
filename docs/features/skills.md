@@ -2,18 +2,19 @@
 
 Skills section. Four routed views under one nav entry (`src/app/navDestinations.ts:145`, group `progression`, `gating: 'scope'`, mobile tab). `/skills` redirects to `/skills/plans` (`src/app/App.tsx:158`). Sub-nav is real routes, not a Tabs widget: `src/features/skills/SkillsSubNav.tsx`. All four routes are `UNGATED` in `src/app/routeScopes.ts` (panel-level grant notes instead of a page gate). No Active Character -> redirect `/characters`.
 
-| View | Route | Component | One-liner |
-|---|---|---|---|
-| Plans | `/skills/plans` | `src/routes/SkillPlans.tsx` | Skill Plan list + attributes pane + live in-game queue |
-| Plan editor | `/skills/plans/:planId` | `src/routes/SkillPlanEditor.tsx` -> `PlanEditor.tsx` | Edit, cost, optimize one Skill Plan |
-| Trained | `/skills/trained` | `src/routes/Skills.tsx` | Trained skills by group, SP, attributes, implants |
-| Compare | `/skills/compare` | `src/routes/SkillCompare.tsx` | Side-by-side trained levels across Characters |
-| Certificates | `/skills/certificates` | `src/routes/SkillCertificates.tsx` | CCP combat Certificates graded per Character |
-| Legacy | `/skills/ships` | `LegacyShipsRedirect` | Redirects to Ship Tree (see ships.md) |
+| View         | Route                   | Component                                            | One-liner                                              |
+| ------------ | ----------------------- | ---------------------------------------------------- | ------------------------------------------------------ |
+| Plans        | `/skills/plans`         | `src/routes/SkillPlans.tsx`                          | Skill Plan list + attributes pane + live in-game queue |
+| Plan editor  | `/skills/plans/:planId` | `src/routes/SkillPlanEditor.tsx` -> `PlanEditor.tsx` | Edit, cost, optimize one Skill Plan                    |
+| Trained      | `/skills/trained`       | `src/routes/Skills.tsx`                              | Trained skills by group, SP, attributes, implants      |
+| Compare      | `/skills/compare`       | `src/routes/SkillCompare.tsx`                        | Side-by-side trained levels across Characters          |
+| Certificates | `/skills/certificates`  | `src/routes/SkillCertificates.tsx`                   | CCP combat Certificates graded per Character           |
+| Legacy       | `/skills/ships`         | `LegacyShipsRedirect`                                | Redirects to Ship Tree (see ships.md)                  |
 
 Terms per `CONTEXT.md`: Skill Plan, Plan Milestone, Certified Plan, Optimize Modes, Remap, Booster, What-If Implants, Effective Skill Level, Clone State.
 
 Data sources (all views)
+
 - ESI via cache-aware loaders: `getCharacterSkills` (scope `esi-skills.read_skills.v1`), skill queue (`esi-skills.read_skillqueue.v1`), attributes (`esi-skills.read_skills.v1`, `src/esi/registry.ts:205-220`), implants (`esi-clones.read_implants.v1`), `/universe/types/{id}`, `POST /universe/names`.
 - Queue-corrected trained levels: `loadCorrectedSkills` (`src/features/skills/correctedSkills.ts`) credits levels finished in the queue that `/skills` has not caught up to. Used by every view.
 - SDE baked catalog: `loadSkillCatalog`, `loadCertificates` (`src/sde/loadSde`).
@@ -25,15 +26,15 @@ Data sources (all views)
 
 ## 1. Plans list (`/skills/plans`)
 
-| Feature | Where |
-|---|---|
-| New plan (auto-opens editor, name in rename mode) | `PlanListPane.tsx:138` |
-| From a Certified Plan... (menu next to New plan) | `PlanListPane.tsx:229-256`, `CertifiedPlanDialog.tsx` |
-| Per-plan row: name link, duration + finish date stats | `PlanList.tsx:60-135` |
-| Row menu: Rename, Duplicate, Copy to character..., Delete | `PlanList.tsx:141-181` |
-| Attributes pane (desktop only) | `AttributesPane.tsx` |
-| Current skill queue panel | `CurrentQueuePanel.tsx` |
-| Implants-assumed note | `PlanListPane.tsx:273` |
+| Feature                                                   | Where                                                 |
+| --------------------------------------------------------- | ----------------------------------------------------- |
+| New plan (auto-opens editor, name in rename mode)         | `PlanListPane.tsx:138`                                |
+| From a Certified Plan... (menu next to New plan)          | `PlanListPane.tsx:229-256`, `CertifiedPlanDialog.tsx` |
+| Per-plan row: name link, duration + finish date stats     | `PlanList.tsx:60-135`                                 |
+| Row menu: Rename, Duplicate, Copy to character..., Delete | `PlanList.tsx:141-181`                                |
+| Attributes pane (desktop only)                            | `AttributesPane.tsx`                                  |
+| Current skill queue panel                                 | `CurrentQueuePanel.tsx`                               |
+| Implants-assumed note                                     | `PlanListPane.tsx:273`                                |
 
 Page layout: header "Skills", `SkillsSubNav`, grid `lg:grid-cols-[20rem_1fr]` (list left, `AttributesPane` right; right column `hidden` below `lg`), then `CurrentQueuePanel` below when the catalog is loaded (`SkillPlans.tsx`).
 
@@ -48,12 +49,15 @@ Page layout: header "Skills", `SkillsSubNav`, grid `lg:grid-cols-[20rem_1fr]` (l
 - Loading: Spinner. Mobile: list owns the single column; editor is a separate screen.
 
 ### Certified Plan dialog (`CertifiedPlanDialog.tsx`)
+
 Modal "New certified plan". Intro text: CCP's own career plans. Career path picker (Explorer, Industrialist, Enforcer, Soldier of Fortune; fallback "Career {id}"), radio list of plans (faction name or "Any faction", skill-level count, milestone count), "All Certified Plans Complete" when the Character has finished all of a path. Create plan -> ordinary Skill Plan in CCP order, milestones as Plan Milestones, minus levels already trained (`certifiedPlan.ts`, `certifiedPlanRecord`). Loading spinner; load failure with Retry. Opens after the menu closes so focus restores to the trigger.
 
 ### Attributes pane (`AttributesPane.tsx`)
+
 Character's current attribute sheet (base + implant + booster breakdown via `AttributeChips`), remap availability. Desktop-only beside the list; in the editor the same data lives in the tools pane.
 
 ### Current skill queue panel (`CurrentQueuePanel.tsx`)
+
 In-game queue, not a plan. Times from ESI `finish_date` (never recomputed). Badges: Training, Done, Paused. "{duration} left" countdown ticks every 30s; ESI re-read every 5 min (`REFETCH_MS`, cache-aware). Notes: "N skills finished training. Log in to EVE to apply them."; "Training is paused, so EVE reports no completion times."; empty "No active in-game training queue cached."
 
 ---
@@ -65,10 +69,12 @@ Route (`SkillPlanEditor.tsx`): loads plan from Dexie (live query). Plan missing,
 Persistence: every edit is `db.skillPlans.put({...plan, updatedAt})` then `scheduleSync` (`SkillPlanEditor.tsx` `handleUpdate`).
 
 ### 2a. Plan summary header (`PlanHeader.tsx`)
+
 Stat chips: Training time, Skills (count), Projected finish, Trained ("{trained} / {total} SP", `—` until trained skills load), Next milestone (name Tooltip + finish date), Remap savings (duration or "None"; "?" tooltip when what-if implants shrank the saving; note when evaluated with fewer remaps than the plan allows), What-if chip ("What-if {lens}": saves / costs / same vs current). Plan name: editable in header on mobile only (`onRename` undefined on desktop - rename lives in the list row menu).
 Orphaned Plan Milestones (entry removed) show as warning text with a remove IconButton.
 
 ### 2b. Entries panel ("Your entries")
+
 - Live queue lead (`LiveQueueLead.tsx`): "Trains first in game: N skills, until {date}" when the plan is dated after the in-game queue; "Your in-game queue is paused, so this plan is dated from now."
 - Skill picker (`SkillPicker.tsx`): search box (debounced 250 ms, ranked by name/group/description; ~500 skills), "Filter by skill group" select, results list; expanding a skill shows level buttons I-V, each flagged "Already trained" or "Already in plan" when covered, prerequisites and unlocks. Adding announces "Added {skill} {level}" (aria-live), shows "Jump to it". Empty: `No skills match "{query}"`.
 - View controls beside the search: Group by (Priority | Attribute pair; device-local `planGroupingMode`), Columns menu (checkbox items: Attribute pair, Priority, Training time, Finish date; device-local `planColumnVisibility.v2`).
@@ -82,7 +88,9 @@ Orphaned Plan Milestones (entry removed) show as warning text with a remove Icon
 - Milestone modal (`MilestoneModal.tsx`): name input (placeholder `Goal name (e.g. "Fly Loki")`), Save / Cancel. Milestones anchor by (skillTypeID, level), not position (`src/engine/skillPlanMilestones.ts`).
 
 ### 2c. Plan tools pane (`PlanToolsPane.tsx`, sections built in `PlanEditor.tsx:1700-2040`)
+
 Sections (labelled, one panel on desktop, Disclosure on mobile):
+
 1. Actions
    - Remap budget line: "Remaps: {bonus} bonus now" + "yearly ready" / "yearly from {date}", or fallback "(from this plan's saved value - ESI attributes unavailable)".
    - Optimize dropdown (all modes preview in a Modal; nothing applies silently): Optimize for me (reorder + remap placement together), Reorder only, Shortest first (fast skills first honoring priority/prereqs), Place remaps only, Use my remap markers (disabled until a marker exists). Verdicts: "Remapping saves {duration}", no-gain/no-remaps/markers-at-end explanations, "Includes your yearly remap after {date}". Accept / Reject (Dismiss when no gain). Suggestion nudges: "Reorder suggested", "Shortest-first sort suggested".
@@ -97,6 +105,7 @@ Sections (labelled, one panel on desktop, Disclosure on mobile):
 4. Import / Export - not in pane; rendered in the page header (portal).
 
 ### 2d. Import / Export (page header)
+
 - Import menu: From skill queue (ESI queue; if plan non-empty, Modal Append / Replace plan / Cancel; Replace shows toast with Undo; empty queue -> "Your in-game skill queue is empty"; error -> "Couldn't import the skill queue: {message}"); From text or file... (dialog).
 - Import dialog (`ImportClipboardDialog.tsx`): tabs Paste | File. Paste: textarea, "Paste from clipboard" button (falls back to manual Ctrl+V when clipboard read is denied), Parse; auto-detects EFT fit ("Detected: EFT fit") vs plain skill plan, one "Skill Name Level" per line ("Detected: skill plan") (`clipboardImport.ts:53`). File: drop zone / Choose file for `.emp` (gzip) or `.xml` plan files ("Detected: plan file"), caps 2 MB compressed / 10 MB decompressed, DOCTYPE rejected, gzip via DecompressionStream (`planXmlDocument.ts`). Errors: too large, read failed, decompress failed, unsupported format, browser unsupported, malformed XML, multi-plan backup unsupported. Preview shows entries with "Already trained"/"Already in plan" flags, Warnings, Errors (`Line N: text - reason`), then Apply ("Added N skill(s)" / "0 added - all trained") or Cancel. EFT mode resolves modules and hull to required skills.
 - Export menu: Export to clipboard ("Copied to clipboard"; EVE in-game format `<Skill> <Roman>` per line, `src/engine/clipboardExport.ts`); Export CSV (`skill-queue.csv`: Skill, Level, Seconds, Cumulative seconds, Prerequisite yes/no; `queueCsv.ts`; disabled when no scheduled steps).
@@ -105,20 +114,21 @@ Sections (labelled, one panel on desktop, Disclosure on mobile):
 
 ## 3. Trained (`/skills/trained`, `Skills.tsx`)
 
-| Control | Detail |
-|---|---|
-| Header actions | Table actions menu (CSV / Excel / copy for Sheets, `TableActionsMenu`), Refresh |
-| Data-age badge | older of `/skills` and queue fetchedAt |
-| Stat chips | Total SP (ESI total + SP of queue-completed levels), Unallocated SP |
-| Attributes panel | `AttributeChips`: five attributes, tooltip "{base} base + {implant} implant + {booster} booster = {effective}" |
-| Implants | `ImplantChip` per fitted implant (opens detail); "{n} of 5 slots empty" (attribute-slot implants only) |
-| Search | sticky `SearchInput` "Search skills...", URL param `groupSearch` |
-| Expand all / Collapse all | IconButtons, disabled while searching |
-| Group sections | SDE group, all collapsed on load, count, "Training -> {level} . {time}" chip on the group holding the live skill |
-| Skill row | name (tooltip = description), `SkillBar` (level pips, progress toward next level, planned-level mark from any plan of the Character), SP; click selects |
-| Skill inspector | `SkillInspector` panel above the list |
+| Control                   | Detail                                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header actions            | Table actions menu (CSV / Excel / copy for Sheets, `TableActionsMenu`), Refresh                                                                         |
+| Data-age badge            | older of `/skills` and queue fetchedAt                                                                                                                  |
+| Stat chips                | Total SP (ESI total + SP of queue-completed levels), Unallocated SP                                                                                     |
+| Attributes panel          | `AttributeChips`: five attributes, tooltip "{base} base + {implant} implant + {booster} booster = {effective}"                                          |
+| Implants                  | `ImplantChip` per fitted implant (opens detail); "{n} of 5 slots empty" (attribute-slot implants only)                                                  |
+| Search                    | sticky `SearchInput` "Search skills...", URL param `groupSearch`                                                                                        |
+| Expand all / Collapse all | IconButtons, disabled while searching                                                                                                                   |
+| Group sections            | SDE group, all collapsed on load, count, "Training -> {level} . {time}" chip on the group holding the live skill                                        |
+| Skill row                 | name (tooltip = description), `SkillBar` (level pips, progress toward next level, planned-level mark from any plan of the Character), SP; click selects |
+| Skill inspector           | `SkillInspector` panel above the list                                                                                                                   |
 
 Behaviors:
+
 - Search while active: groups with matches forced open, collapse toggles disabled, previous collapse state restored when cleared (`Skills.tsx:306-336`). Export narrows to matches; collapsed groups still export.
 - CSV columns: Group, Skill, Level, Skill points (`skillsCsv.ts`); empty while skills scope needs re-auth.
 - Inspector: description, Prerequisites, Unlocks (`skillRequirements.ts`), Close, "Add to Skill Plan" via `SkillPlanAdd` (adds the next level into the target plan; "Already at level 5" at max; "In plan" when covered; Undo; `TargetPlanPicker` "Adding to" select; creates a plan when none exists - "Create plan and add"). Selection scrolls into view, clears on Character switch.
@@ -157,31 +167,31 @@ CCP's baked combat certificates graded for the active Character, by area rather 
 
 Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). None of these paths is guided for a returning player; Help/FAQ has no Skills text.
 
-| Intent | Where | How |
-|---|---|---|
-| I know the skill name | Plan editor skill picker | Search (name, group, description; 250 ms debounce) or group filter; pick level I-V; shows prereqs and unlocks |
-| Browse what I have | Trained | Expand a group, click a skill, inspector "Add to Skill Plan" (next level) |
-| Copy my in-game queue | Plan editor Import | From skill queue (Append or Replace, Undo) |
-| Bring a plan from elsewhere | Plan editor Import | Paste text, or `.emp`/`.xml` file; EFT fit text resolves to its required skills |
-| Follow CCP's career path | Plans > From a Certified Plan | Explorer, Industrialist, Enforcer, Soldier of Fortune; minus trained levels |
-| Combat grades | Certificates | Per group; "Add {grade} to plan" |
-| Fly a hull | Ship Tree > Ship Info > Skills & Mastery | Per skill or Add tier N (cumulative) |
-| Improve a fit | Fittings: Missing skills chip, What to train panel | Ranks next levels by effect on the fit, Tech II upgrades |
-| Item or build gate | Market item required skills, Industry skill-gate chip | Add to Skill Plan |
-| Copy what an alt knows | Compare | "Differing only" shows skills one Character has and another lacks |
-| Cost the gap | Plan tools > Skill injectors | SP gap, injectors needed, price at selected hub |
+| Intent                      | Where                                                 | How                                                                                                           |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| I know the skill name       | Plan editor skill picker                              | Search (name, group, description; 250 ms debounce) or group filter; pick level I-V; shows prereqs and unlocks |
+| Browse what I have          | Trained                                               | Expand a group, click a skill, inspector "Add to Skill Plan" (next level)                                     |
+| Copy my in-game queue       | Plan editor Import                                    | From skill queue (Append or Replace, Undo)                                                                    |
+| Bring a plan from elsewhere | Plan editor Import                                    | Paste text, or `.emp`/`.xml` file; EFT fit text resolves to its required skills                               |
+| Follow CCP's career path    | Plans > From a Certified Plan                         | Explorer, Industrialist, Enforcer, Soldier of Fortune; minus trained levels                                   |
+| Combat grades               | Certificates                                          | Per group; "Add {grade} to plan"                                                                              |
+| Fly a hull                  | Ship Tree > Ship Info > Skills & Mastery              | Per skill or Add tier N (cumulative)                                                                          |
+| Improve a fit               | Fittings: Missing skills chip, What to train panel    | Ranks next levels by effect on the fit, Tech II upgrades                                                      |
+| Item or build gate          | Market item required skills, Industry skill-gate chip | Add to Skill Plan                                                                                             |
+| Copy what an alt knows      | Compare                                               | "Differing only" shows skills one Character has and another lacks                                             |
+| Cost the gap                | Plan tools > Skill injectors                          | SP gap, injectors needed, price at selected hub                                                               |
 
 ## Ordering tools (one plan, several goals)
 
-| Tool | Effect | Limit |
-|---|---|---|
-| Drag handle (pointer or keyboard) | Exact manual order | Drop refused if a skill lands after a dependant or strands a sibling level |
-| Priority High / Normal / Low per entry | Steers Reorder only; a prerequisite inherits the most urgent priority of its dependants (`planPriority.ts`) | Three levels; no "ship" tag. Mark every skill of ship A High, ship B Normal, to finish A first |
-| Group by Priority | Shows bands "{Label} priority" | View only, device-local |
-| Optimize > Reorder only / Shortest first / Optimize for me | Reorders within priority; groups by attribute pair for speed (`reorderSuggestion.ts:100`) | Preview in a Modal, Accept or Reject. Priority only affects interleaving, so it is a soft preference, not a hard "A before B" |
-| Plan Milestones ("Fly Loki") | Named goal at a (skill, level); shows its projected finish; "Next milestone" chip | Milestones do NOT steer the optimizer (no reference in `src/engine/optimizer`) |
-| Separate Skill Plan per ship | Each plan has its own time and finish; Duplicate or Copy to character | One target plan receives adds; skills shared by two ships get counted in each plan separately |
-| Remap markers / Optimize at my markers | Place attribute remaps where they help the order | Optimizer supports at most 2 remaps |
+| Tool                                                       | Effect                                                                                                      | Limit                                                                                                                         |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Drag handle (pointer or keyboard)                          | Exact manual order                                                                                          | Drop refused if a skill lands after a dependant or strands a sibling level                                                    |
+| Priority High / Normal / Low per entry                     | Steers Reorder only; a prerequisite inherits the most urgent priority of its dependants (`planPriority.ts`) | Three levels; no "ship" tag. Mark every skill of ship A High, ship B Normal, to finish A first                                |
+| Group by Priority                                          | Shows bands "{Label} priority"                                                                              | View only, device-local                                                                                                       |
+| Optimize > Reorder only / Shortest first / Optimize for me | Reorders within priority; groups by attribute pair for speed (`reorderSuggestion.ts:100`)                   | Preview in a Modal, Accept or Reject. Priority only affects interleaving, so it is a soft preference, not a hard "A before B" |
+| Plan Milestones ("Fly Loki")                               | Named goal at a (skill, level); shows its projected finish; "Next milestone" chip                           | Milestones do NOT steer the optimizer (no reference in `src/engine/optimizer`)                                                |
+| Separate Skill Plan per ship                               | Each plan has its own time and finish; Duplicate or Copy to character                                       | One target plan receives adds; skills shared by two ships get counted in each plan separately                                 |
+| Remap markers / Optimize at my markers                     | Place attribute remaps where they help the order                                                            | Optimizer supports at most 2 remaps                                                                                           |
 
 No tool says "finish ship A fully, then B, using the best order inside each". Closest: priority High on A's skills, then Reorder.
 
@@ -189,16 +199,17 @@ No tool says "finish ship A fully, then B, using the best order inside each". Cl
 
 Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). No plan-level shopping list exists.
 
-| Need | Where | Behavior |
-|---|---|---|
-| Price of one skill | Skill detail modal (`SkillDetailModal.tsx:133`, opened from any `SkillLink`, e.g. Compare, Show info) | Lowest sell at the selected Trade Hub station, lowest sell in its region, fixed NPC price (row hidden if none), hub picker (shared synced hub), links into Market Browser (`/market/browser`, nearby = 10 jumps) |
-| Why "No sell orders" is rare | `skillSellPrices.ts` | Priced from the hub region's ESI order book, not the hub-station aggregate, because NPC-seeded books sit in NPC stations across the region |
-| Cost of reaching the SP | Plan tools > Skill injectors | Large Skill Injectors needed and price at hub; covers SP gap, not which skills to buy |
-| Buy several skills | none | Open each skill's modal, or search each in Market Browser |
+| Need                         | Where                                                                                                 | Behavior                                                                                                                                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Price of one skill           | Skill detail modal (`SkillDetailModal.tsx:133`, opened from any `SkillLink`, e.g. Compare, Show info) | Lowest sell at the selected Trade Hub station, lowest sell in its region, fixed NPC price (row hidden if none), hub picker (shared synced hub), links into Market Browser (`/market/browser`, nearby = 10 jumps) |
+| Why "No sell orders" is rare | `skillSellPrices.ts`                                                                                  | Priced from the hub region's ESI order book, not the hub-station aggregate, because NPC-seeded books sit in NPC stations across the region                                                                       |
+| Cost of reaching the SP      | Plan tools > Skill injectors                                                                          | Large Skill Injectors needed and price at hub; covers SP gap, not which skills to buy                                                                                                                            |
+| Buy several skills           | none                                                                                                  | Open each skill's modal, or search each in Market Browser                                                                                                                                                        |
 
 Gaps: no total book cost for a plan; no "skills in this plan I do not own" list; Trained inspector does not show price (modal does).
 
 ## Shared bits
+
 - `SkillDetailModal` (`src/components/SkillDetailModal.tsx`): opened by `SkillLink` from Compare and elsewhere; strings `skills.detail.*` ("Skill not found", load failure).
 - `TargetPlanPicker` / `AddToPlanBar` / `useTargetPlan`: shared add-to-plan target (also used by Ships, Fittings, Market required skills). Target per Character, synced.
 - Skill price section / required-skills list (`SkillPriceSection.tsx`, `SkillRequirementsList.tsx`, `skillSellPrices.ts`): hub-station vs region lowest sell of the skill book (region fallback because NPC seeds often have none at the hub station).
@@ -207,6 +218,7 @@ Gaps: no total book cost for a plan; no "skills in this plan I do not own" list;
 ## Engine formulas and thresholds (verified against `src/engine`)
 
 All pure (no fetch/DOM/Dexie in `src/engine`, per CLAUDE.md).
+
 - SP for a level: `ceil(250 * rank * 2^(2.5*(level-1)))` (`src/engine/sp.ts:24`). Rank 1: L1 250, L2 1,414, L3 8,000, L4 45,255, L5 256,000. Level must be integer 0..5 else RangeError; rank > 0.
 - Part-trained level: `remainingSpForLevel(rank, level, currentSp)` clamps `currentSp` into the level's own band (`sp.ts:56`); later levels of the same skill are never discounted.
 - Progress bar: `progressToNextLevel` returns null at level 5, else clamped 0..1 fraction (`sp.ts:72`).
@@ -228,36 +240,37 @@ All pure (no fetch/DOM/Dexie in `src/engine`, per CLAUDE.md).
 
 ## Persistence and sync matrix
 
-| State | Store | Syncs |
-|---|---|---|
-| Skill Plans (entries, remapCount fallback, markers, whatIfImplants, boosters, milestones, priorities, name) | Dexie `skillPlans` | Firestore via `planSync` (tombstone on delete) |
-| Alpha/Omega per Character | settings `sync.skillCloneStates` | yes |
-| Target plan per Character | settings `sync.targetSkillPlan` | yes |
-| Saved comparisons | settings `skillComparisons` | no |
-| Plan columns, Group-by | settings `planColumnVisibility.v2`, `planGroupingMode` | device-local |
-| Trained search | URL `groupSearch` | no |
-| Compare selection | URL `ids`, `comparisonId`, `differingOnly`, `groupColumn` | no |
-| Certificates filters/sort/expanded; Trained expanded groups, inspector selection | component state (all groups collapsed on load) | no |
-| ESI skills/queue/attributes/implants | HTTP cache (`loadWithCache`, honors `Expires`); Trained `useRouteSnapshot` cacheKey `skills` | no |
+| State                                                                                                       | Store                                                                                        | Syncs                                          |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Skill Plans (entries, remapCount fallback, markers, whatIfImplants, boosters, milestones, priorities, name) | Dexie `skillPlans`                                                                           | Firestore via `planSync` (tombstone on delete) |
+| Alpha/Omega per Character                                                                                   | settings `sync.skillCloneStates`                                                             | yes                                            |
+| Target plan per Character                                                                                   | settings `sync.targetSkillPlan`                                                              | yes                                            |
+| Saved comparisons                                                                                           | settings `skillComparisons`                                                                  | no                                             |
+| Plan columns, Group-by                                                                                      | settings `planColumnVisibility.v2`, `planGroupingMode`                                       | device-local                                   |
+| Trained search                                                                                              | URL `groupSearch`                                                                            | no                                             |
+| Compare selection                                                                                           | URL `ids`, `comparisonId`, `differingOnly`, `groupColumn`                                    | no                                             |
+| Certificates filters/sort/expanded; Trained expanded groups, inspector selection                            | component state (all groups collapsed on load)                                               | no                                             |
+| ESI skills/queue/attributes/implants                                                                        | HTTP cache (`loadWithCache`, honors `Expires`); Trained `useRouteSnapshot` cacheKey `skills` | no                                             |
 
 Tab is a path segment, view state in URL (`docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`).
 
 ## State matrix
 
-| Condition | Plans | Trained | Compare | Certificates |
-|---|---|---|---|---|
-| Loading | spinner in list | spinner | per-char chip spinner; page spinner while no rows | spinner |
-| Skills scope missing/401/403 | plans still work (ungated); costs assume untrained | `GrantBanner` "Log in again to see skills" | char contributes no rows; "No skill data cached" | `GrantNote` + empty state |
-| No cached data / offline | list works (Dexie) | "No skill data cached"; "Showing cached data" when from cache | "No skill data cached" | "No skill data cached" |
-| Load error | `computeError` text in entries | "Couldn't load" empty state | char silently dropped | "Couldn't load the certificates." |
-| Attributes scope missing | remap falls back to stored `remapCount`; implants-assumed-none note | attribute chips Unknown | n/a | times use default sheet |
-| Empty | "No skill plans yet" | "No skills match" (search) | "No characters selected" | "No certificates match these filters." |
+| Condition                    | Plans                                                               | Trained                                                       | Compare                                           | Certificates                           |
+| ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------- |
+| Loading                      | spinner in list                                                     | spinner                                                       | per-char chip spinner; page spinner while no rows | spinner                                |
+| Skills scope missing/401/403 | plans still work (ungated); costs assume untrained                  | `GrantBanner` "Log in again to see skills"                    | char contributes no rows; "No skill data cached"  | `GrantNote` + empty state              |
+| No cached data / offline     | list works (Dexie)                                                  | "No skill data cached"; "Showing cached data" when from cache | "No skill data cached"                            | "No skill data cached"                 |
+| Load error                   | `computeError` text in entries                                      | "Couldn't load" empty state                                   | char silently dropped                             | "Couldn't load the certificates."      |
+| Attributes scope missing     | remap falls back to stored `remapCount`; implants-assumed-none note | attribute chips Unknown                                       | n/a                                               | times use default sheet                |
+| Empty                        | "No skill plans yet"                                                | "No skills match" (search)                                    | "No characters selected"                          | "No certificates match these filters." |
 
 Rate limiting: no Skills-specific UI; ESI fan-out bounded at 10 concurrent (`src/lib/concurrency.ts:11`); shared ESI client honors `X-Ratelimit-*`/`Retry-After` (CLAUDE.md).
 
 Mobile vs desktop (`useIsDesktop`, lg): desktop = list + editor side by side, attributes pane right of list, tools pane open in sidebar, rename only in list row menu. Mobile = list and editor are separate routes ("Back to plans"), tools pane collapsed Disclosure, header name editable inline, Compare table scrolls horizontally with Skill column pinned and Group column hidden. Decisions: `20260902-052840-skill-plans-side-by-side-layout.md`, `20260926-123835-plan-rename-lives-in-the-list-row-menu.md`, `20260925-233737-plan-rows-have-no-move-up-down-control.md` (reorder is drag / Space+arrows only).
 
 Tests assert (concrete behaviors):
+
 - Trained (`src/routes/Skills.test.tsx`): groups start collapsed, expand/collapse per header and via Expand all; search hides non-matching groups, auto-expands matches, restores prior state on clear, persists in URL; export contains only the skills the search leaves; export is empty in the re-login state (stale cache cannot be exported behind the banner); 401 shows a re-login banner, not a silent offline state; queue scope never granted -> queue read skipped, no reauth notice; cached skills used when ESI unreachable; a level finished in the queue shows although `/skills` omits it; level credited but SP "Unknown" when ESI omits `level_end_sp`; only the in-progress skill gets the "Training -> level . time" chip, and the collapsed header of only its group; "N of 5 slots empty" counts only attribute-enhancer implants not hardwirings; accelerator shown as a third term beside base and implant; a transient implant type-lookup failure recovers instead of stalling on "#id"; skill already in any plan is marked on its level bar; Add to Skill Plan lives in the inspector (not the row), keeps Undo per skill; second click deselects; inspector scrolls into view (#1712).
 - Compare (`SkillCompare.test.tsx`): side-by-side levels with gaps dimmed; selection and differing-only restored from URL; unknown id in hand-edited URL pruned (no ghost column); save, list, reload, rename, delete a comparison; Save again for the same selection updates rather than duplicates; saved comparison naming a removed Character degrades; load clicked before the roster loads still resolves (#594); differing-only hides all-equal rows; group column toggle; no-cache empty state offers Refresh and re-requests; table and header Refresh stay on screen during refresh; deselected Character drops without a loading frame.
 - Certificates (`SkillCertificates.test.tsx`): graded lowest-first; grade filter options carry counts; expand lists what the next grade needs; Elite opens for description only; add next grade to plan with Undo; "Omega only" shown only for an Alpha Character whose cap blocks the grade; age badge from the skills read; Refresh keeps rows.
@@ -280,6 +293,7 @@ Tests assert (concrete behaviors):
 12. Why can a sheet fail the 99-point check? Accelerators inflate ESI attributes; app subtracts `(total-99)/5` as booster bonus; impossible totals fall back to default spread with a warning (`attributeBaseline.ts:25,42`).
 
 ## Observed gaps
+
 - Trained view has no sort, no level filter, no "untrained/partial" view; only name search and group collapse.
 - Trained and Compare export per-skill level only; no SP in Compare, no training-time columns.
 - Plan list has no CSV/export of all plans; export/import is per plan only. Multi-plan `.xml` backups are rejected on import ("multi-plan backup").
@@ -291,6 +305,7 @@ Tests assert (concrete behaviors):
 - Row menu on Trained rows does not exist; add-to-plan is only via the inspector (`SkillPlanAdd` comment: "the Skills list rows have no menu of their own").
 
 ## Improvement ideas
+
 - Trained: sortable columns (SP, level), filter for partially trained / level < 5, per-row add-to-plan action.
 - Compare: SP and "missing vs a Skill Plan / Fitting requirements" columns; sync saved comparisons like plans.
 - Plans: export/import all plans (multi-plan backup currently rejected); bulk delete.

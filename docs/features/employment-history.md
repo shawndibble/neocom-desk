@@ -2,14 +2,14 @@
 
 Route `/employment-history` (`src/routes/EmploymentHistory.tsx`). Third tab of the Character overview; sub-view of Overview in nav (`src/app/navDestinations.ts:118`). UNGATED: public endpoint (`src/app/routeScopes.ts:126`).
 
-| Feature | Where |
-|---|---|
-| Shared header + sub-nav | `CharacterHeader`, `OverviewSubNav` |
-| Table: Corporation, Joined, Duration | `EmploymentHistory.tsx:94` |
-| "Current" badge | `EmploymentHistory.tsx:109-119` |
-| Corporation name = Show Info link | `CorporationLink` |
-| Default sort Joined desc, mobile sort | `DataTable defaultSort`, `mobileSort` |
-| Data age, Refresh, Export | `Panel actions`, `employmentHistoryCsv.ts` |
+| Feature                               | Where                                      |
+| ------------------------------------- | ------------------------------------------ |
+| Shared header + sub-nav               | `CharacterHeader`, `OverviewSubNav`        |
+| Table: Corporation, Joined, Duration  | `EmploymentHistory.tsx:94`                 |
+| "Current" badge                       | `EmploymentHistory.tsx:109-119`            |
+| Corporation name = Show Info link     | `CorporationLink`                          |
+| Default sort Joined desc, mobile sort | `DataTable defaultSort`, `mobileSort`      |
+| Data age, Refresh, Export             | `Panel actions`, `employmentHistoryCsv.ts` |
 
 ## Purpose / user goal
 

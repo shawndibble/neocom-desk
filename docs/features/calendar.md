@@ -6,24 +6,24 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 
 ## Summary
 
-| Feature | What | Where |
-| --- | --- | --- |
-| Calendar Map | 7-col grid of day buttons, count + kind dots per day; Month (42 cells) or Fortnight (14) density | `CalendarMap.tsx`, `Calendar.tsx:~330` |
-| Day Ticker | Phone replacement: horizontally scrolling rolling 14 days from anchor | `CalendarDayTicker.tsx` |
-| Coming Up Rail | List grouped by day (sticky headings, Today/Tomorrow), sorted by deadline | `ComingUpRail.tsx` |
-| Day select | Click a day to filter the rail; click again or "Show all days" to clear | `Calendar.tsx:selectedDayMs` |
-| Period nav | Prev / Today / Next (month or fortnight; phone steps 14 days), URL `anchor=YYYY-MM-DD` | `Calendar.tsx:step` |
-| Density toggle | Month / Fortnight, device-local, desktop only | `useCalendarDensity` |
-| Event types filter | Checkbox menu per kind with counts, legend swatches, "Show all types" | `CalendarKindFilterMenu.tsx` |
-| Skill plan projection | Choose one Skill Plan per Character to project its steps onto the board | `calendarSkillPlan.ts` |
-| Event detail modal | Opens for calendar events: time, text, RSVP, export | `EventDetailModal.tsx` |
-| RSVP | Accept / Decline / Tentative (ESI write) | `respondToCalendarEvent` |
-| Add to calendar | `.ics` download, Google Calendar URL | `EventDetailModal.tsx`, `calendarExport.ts` |
-| CSV export | Calendar events only: date, title, response | `calendarCsv.ts`, `TableActionsMenu` |
-| Row context menu | Calendar event rows: Copy event ID | `EventContextMenu.tsx` |
-| Contract row link | Contract expiry rows link to `/contracts/history?highlight=<id>` | `CharacterBoardRow.tsx` |
-| Week start | Monday or Sunday, Settings > Display | `calendarWeekStart.ts`, `Settings.tsx:1057` |
-| Refresh / Data Age | Header refresh icon; badge = oldest source fetch time | `Calendar.tsx:~355` |
+| Feature               | What                                                                                             | Where                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Calendar Map          | 7-col grid of day buttons, count + kind dots per day; Month (42 cells) or Fortnight (14) density | `CalendarMap.tsx`, `Calendar.tsx:~330`      |
+| Day Ticker            | Phone replacement: horizontally scrolling rolling 14 days from anchor                            | `CalendarDayTicker.tsx`                     |
+| Coming Up Rail        | List grouped by day (sticky headings, Today/Tomorrow), sorted by deadline                        | `ComingUpRail.tsx`                          |
+| Day select            | Click a day to filter the rail; click again or "Show all days" to clear                          | `Calendar.tsx:selectedDayMs`                |
+| Period nav            | Prev / Today / Next (month or fortnight; phone steps 14 days), URL `anchor=YYYY-MM-DD`           | `Calendar.tsx:step`                         |
+| Density toggle        | Month / Fortnight, device-local, desktop only                                                    | `useCalendarDensity`                        |
+| Event types filter    | Checkbox menu per kind with counts, legend swatches, "Show all types"                            | `CalendarKindFilterMenu.tsx`                |
+| Skill plan projection | Choose one Skill Plan per Character to project its steps onto the board                          | `calendarSkillPlan.ts`                      |
+| Event detail modal    | Opens for calendar events: time, text, RSVP, export                                              | `EventDetailModal.tsx`                      |
+| RSVP                  | Accept / Decline / Tentative (ESI write)                                                         | `respondToCalendarEvent`                    |
+| Add to calendar       | `.ics` download, Google Calendar URL                                                             | `EventDetailModal.tsx`, `calendarExport.ts` |
+| CSV export            | Calendar events only: date, title, response                                                      | `calendarCsv.ts`, `TableActionsMenu`        |
+| Row context menu      | Calendar event rows: Copy event ID                                                               | `EventContextMenu.tsx`                      |
+| Contract row link     | Contract expiry rows link to `/contracts/history?highlight=<id>`                                 | `CharacterBoardRow.tsx`                     |
+| Week start            | Monday or Sunday, Settings > Display                                                             | `calendarWeekStart.ts`, `Settings.tsx:1057` |
+| Refresh / Data Age    | Header refresh icon; badge = oldest source fetch time                                            | `Calendar.tsx:~355`                         |
 
 ## Page structure and states
 
@@ -38,16 +38,16 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 
 Eight kinds, sorted by deadline then kind rank then id (`buildCharacterBoard`). Hue per kind (`kindTone`), glyph per kind (`CharacterBoardRow`).
 
-| Kind (label) | Deadline | Source / loader | Scope |
-| --- | --- | --- | --- |
-| `calendarEvent` Calendar events | `event_date`; shows response and "Important" (importance > 0); past = "Started" | `GET /characters/{id}/calendar` (<= 50 from now) | `esi-calendar.read_calendar_events.v1` |
-| `skillTraining` Skill queue | each entry's `finish_date` | skill queue | `esi-skills.read_skillqueue.v1` |
-| `industryJob` Industry jobs | `end_date` of active/ready jobs; past = "ready to deliver" | industry jobs | `esi-industry.read_character_jobs.v1` |
-| `planetExtraction` Planets | each extractor pin `expiry_time` (cached colony details only) | planets | `esi-planets.manage_planets.v1` |
-| `moonChunk` Moon chunks | chunk arrival, then natural decay if not fractured | corp mining extractions (+ structures for names) | corp scope `esi-industry.read_corporation_mining.v1` and Corp Capability `canReadMoonExtractions`; menu row hidden when not readable |
-| `contractExpiry` Contracts | active contracts: courier delivery deadline, else `date_expired`; type + route detail | contracts (+ location names for untitled couriers) | `esi-contracts.read_character_contracts.v1` |
-| `orderExpiry` Market orders | `issued + duration` days; buy/sell detail | orders | `esi-markets.read_character_orders.v1` |
-| `skillPlan` Skill plan | projected completion of un-queued plan steps; tagged "Projected" | chosen Skill Plan from Dexie + schedule | none (local) |
+| Kind (label)                    | Deadline                                                                              | Source / loader                                    | Scope                                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `calendarEvent` Calendar events | `event_date`; shows response and "Important" (importance > 0); past = "Started"       | `GET /characters/{id}/calendar` (<= 50 from now)   | `esi-calendar.read_calendar_events.v1`                                                                                               |
+| `skillTraining` Skill queue     | each entry's `finish_date`                                                            | skill queue                                        | `esi-skills.read_skillqueue.v1`                                                                                                      |
+| `industryJob` Industry jobs     | `end_date` of active/ready jobs; past = "ready to deliver"                            | industry jobs                                      | `esi-industry.read_character_jobs.v1`                                                                                                |
+| `planetExtraction` Planets      | each extractor pin `expiry_time` (cached colony details only)                         | planets                                            | `esi-planets.manage_planets.v1`                                                                                                      |
+| `moonChunk` Moon chunks         | chunk arrival, then natural decay if not fractured                                    | corp mining extractions (+ structures for names)   | corp scope `esi-industry.read_corporation_mining.v1` and Corp Capability `canReadMoonExtractions`; menu row hidden when not readable |
+| `contractExpiry` Contracts      | active contracts: courier delivery deadline, else `date_expired`; type + route detail | contracts (+ location names for untitled couriers) | `esi-contracts.read_character_contracts.v1`                                                                                          |
+| `orderExpiry` Market orders     | `issued + duration` days; buy/sell detail                                             | orders                                             | `esi-markets.read_character_orders.v1`                                                                                               |
+| `skillPlan` Skill plan          | projected completion of un-queued plan steps; tagged "Projected"                      | chosen Skill Plan from Dexie + schedule            | none (local)                                                                                                                         |
 
 Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to deliver") instead of a countdown. Countdown reads "due in <duration>".
 
@@ -92,12 +92,12 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 
 ## Preferences (all device-local Dexie settings, none synced)
 
-| Setting key | Control |
-| --- | --- |
-| `calendarView` (`month`/`fortnight`; legacy `week`->fortnight, `agenda`->month) | density icon button |
-| `calendarHiddenKinds` | filter menu |
-| `calendarSkillPlanByCharacter` | filter menu |
-| `calendarWeekStart` (`monday`/`sunday`) | Settings > Display "Week starts on" |
+| Setting key                                                                     | Control                             |
+| ------------------------------------------------------------------------------- | ----------------------------------- |
+| `calendarView` (`month`/`fortnight`; legacy `week`->fortnight, `agenda`->month) | density icon button                 |
+| `calendarHiddenKinds`                                                           | filter menu                         |
+| `calendarSkillPlanByCharacter`                                                  | filter menu                         |
+| `calendarWeekStart` (`monday`/`sunday`)                                         | Settings > Display "Week starts on" |
 
 ## Related
 
@@ -120,12 +120,12 @@ ESI drops an event the moment it starts. `loadCalendarEvents` keeps previously s
 
 ## Persistence and sync
 
-| State | Storage | Synced? |
-| --- | --- | --- |
-| `anchor` (shown month/fortnight start) | URL query, omitted when = today at mount (ADR 0015) | no |
-| Density, hidden kinds, week start, skill-plan choice per Character | Dexie `settings` keys listed above | no (device-local; decision `20260926-204446-calendar-week-start-day-is-a-device-local`) |
-| Selected day, open event, RSVP overrides | React state | no |
-| Events, seen events, event detail | Dexie `esiCache` rows `calendar`, `calendar:seen`, `calendar:<id>` | no |
+| State                                                              | Storage                                                            | Synced?                                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `anchor` (shown month/fortnight start)                             | URL query, omitted when = today at mount (ADR 0015)                | no                                                                                      |
+| Density, hidden kinds, week start, skill-plan choice per Character | Dexie `settings` keys listed above                                 | no (device-local; decision `20260926-204446-calendar-week-start-day-is-a-device-local`) |
+| Selected day, open event, RSVP overrides                           | React state                                                        | no                                                                                      |
+| Events, seen events, event detail                                  | Dexie `esiCache` rows `calendar`, `calendar:seen`, `calendar:<id>` | no                                                                                      |
 
 ## Test-covered behaviours
 

@@ -4,18 +4,18 @@ Route `/mining`. Two tabs. Overview = personal mining output (ISK, ISK/day, m3, 
 
 User goals: Overview = "what did I mine, what is it worth, ISK/day". Tax = "never miss an alt's obligation, bill each landlord the right amount at the right price, know what is paid".
 
-| Feature | Where |
-| --- | --- |
-| Route shell, Character gate, tab bar | `src/routes/MoonMiningTax.tsx` |
-| Overview: tiles, charts, table, day detail | `OverviewTab.tsx`, `MiningYieldCharts.tsx`, `YieldDetailModal.tsx` |
-| Overview prefs (range, basis, buyback %, refining, chart metric, columns) | `OverviewSettings.tsx`, `*Pref.ts`, `overviewColumns.ts` |
+| Feature                                                                    | Where                                                                                                     |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Route shell, Character gate, tab bar                                       | `src/routes/MoonMiningTax.tsx`                                                                            |
+| Overview: tiles, charts, table, day detail                                 | `OverviewTab.tsx`, `MiningYieldCharts.tsx`, `YieldDetailModal.tsx`                                        |
+| Overview prefs (range, basis, buyback %, refining, chart metric, columns)  | `OverviewSettings.tsx`, `*Pref.ts`, `overviewColumns.ts`                                                  |
 | Tax: owed cards, attention strip, continue card, ledger, selection toolbar | `TaxTab.tsx`, `OwedBalances.tsx`, `AttentionStrip.tsx`, `ContinueSessionCard.tsx`, `SelectionToolbar.tsx` |
-| Row detail, Assign, combined summary, edit | `RowDetailModal.tsx`, `AssignDialog.tsx`, `GroupSummaryModal.tsx`, `EntryEditDialog.tsx` |
-| Split, Combine, bulk dismiss | `SplitDialog.tsx`, `JoinAssignDialog.tsx`, `BulkDismissDialog.tsx` |
-| Settle up, link payment / transaction / wallet payment | `SettleUpDialog.tsx`, `LinkPaymentDialog.tsx`, `LinkTransactionDialog.tsx`, `LinkWalletPaymentDialog.tsx` |
-| Payees, Ore tags, page settings | `PayeeManagerDialog.tsx`, `TypeOverridesDialog.tsx`, `src/features/settings/MiningTaxSettingsForm.tsx` |
-| CSV | `yieldCsv.ts`, `taxCsv.ts` via `TableActionsMenu` |
-| Pure engine | `src/engine/miningTax/*`; refining math `src/engine/industry/{reprocessing,characterModifiers}.ts` |
+| Row detail, Assign, combined summary, edit                                 | `RowDetailModal.tsx`, `AssignDialog.tsx`, `GroupSummaryModal.tsx`, `EntryEditDialog.tsx`                  |
+| Split, Combine, bulk dismiss                                               | `SplitDialog.tsx`, `JoinAssignDialog.tsx`, `BulkDismissDialog.tsx`                                        |
+| Settle up, link payment / transaction / wallet payment                     | `SettleUpDialog.tsx`, `LinkPaymentDialog.tsx`, `LinkTransactionDialog.tsx`, `LinkWalletPaymentDialog.tsx` |
+| Payees, Ore tags, page settings                                            | `PayeeManagerDialog.tsx`, `TypeOverridesDialog.tsx`, `src/features/settings/MiningTaxSettingsForm.tsx`    |
+| CSV                                                                        | `yieldCsv.ts`, `taxCsv.ts` via `TableActionsMenu`                                                         |
+| Pure engine                                                                | `src/engine/miningTax/*`; refining math `src/engine/industry/{reprocessing,characterModifiers}.ts`        |
 
 Paths below are under `src/features/miningTax/` unless stated.
 
@@ -31,18 +31,18 @@ Paths below are under `src/features/miningTax/` unless stated.
 
 ## 2. Data sources and persistence
 
-| Data | Source | Stored where | Syncs? |
-| --- | --- | --- | --- |
-| Personal mining ledger | ESI `GET /characters/{id}/mining/` (paged, conditional fetch, cache key `miningTax:ledger`), `ledger.ts:23` | Dexie ESI cache | no |
-| Ledger history (Overview only) | merge of each fetch, `db.miningLedgerHistory` | Dexie, per Character | no (device) |
-| Daily Jita price snapshots | Fuzzwork `getHubPrices` saved on each Overview load, `db.jitaPriceSnapshots` | Dexie, pruned to 90 days | no |
-| Server hub snapshots | `loadHubSnapshotRange` (Fuzzwork 6h capture; Adam4EVE backfill) | Firestore read (public) | read-only |
-| ESI market history (daily avg) | `loadPriceHistory(Jita region)` | ESI cache | no |
-| Payees, Assignments | user data, `db.payees`, `db.miningTaxAssignments` (index `[characterId+date+solarSystemId]`) | Dexie | yes (Firestore via `planSync`, `scheduleSync(characterId)` after commit; deletes leave tombstones) |
-| Ore tags (moon / ignored) | `typeOverrides.ts` | Dexie settings `sync.*` keys | yes (`20260923-112603`) |
-| Ore Form, per-ore value mode | `oreForm.ts`, `oreValueMode.ts` (`createSyncedSetting`) | Dexie settings | yes |
-| Overview range/basis/buyback/refining/chart metric/columns | `createLocalSetting` = one Dexie `settings` key each (NOT localStorage) | Dexie | no (device) |
-| Auto-continue, dismissed continuations, ore-arrival log | `continueSessionPref.ts`, `oreArrivalLog.ts` | Dexie settings | no (device) |
+| Data                                                       | Source                                                                                                      | Stored where                 | Syncs?                                                                                             |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| Personal mining ledger                                     | ESI `GET /characters/{id}/mining/` (paged, conditional fetch, cache key `miningTax:ledger`), `ledger.ts:23` | Dexie ESI cache              | no                                                                                                 |
+| Ledger history (Overview only)                             | merge of each fetch, `db.miningLedgerHistory`                                                               | Dexie, per Character         | no (device)                                                                                        |
+| Daily Jita price snapshots                                 | Fuzzwork `getHubPrices` saved on each Overview load, `db.jitaPriceSnapshots`                                | Dexie, pruned to 90 days     | no                                                                                                 |
+| Server hub snapshots                                       | `loadHubSnapshotRange` (Fuzzwork 6h capture; Adam4EVE backfill)                                             | Firestore read (public)      | read-only                                                                                          |
+| ESI market history (daily avg)                             | `loadPriceHistory(Jita region)`                                                                             | ESI cache                    | no                                                                                                 |
+| Payees, Assignments                                        | user data, `db.payees`, `db.miningTaxAssignments` (index `[characterId+date+solarSystemId]`)                | Dexie                        | yes (Firestore via `planSync`, `scheduleSync(characterId)` after commit; deletes leave tombstones) |
+| Ore tags (moon / ignored)                                  | `typeOverrides.ts`                                                                                          | Dexie settings `sync.*` keys | yes (`20260923-112603`)                                                                            |
+| Ore Form, per-ore value mode                               | `oreForm.ts`, `oreValueMode.ts` (`createSyncedSetting`)                                                     | Dexie settings               | yes                                                                                                |
+| Overview range/basis/buyback/refining/chart metric/columns | `createLocalSetting` = one Dexie `settings` key each (NOT localStorage)                                     | Dexie                        | no (device)                                                                                        |
+| Auto-continue, dismissed continuations, ore-arrival log    | `continueSessionPref.ts`, `oreArrivalLog.ts`                                                                | Dexie settings               | no (device)                                                                                        |
 
 - Refresh tokens stay in Dexie only (CLAUDE.md). FAQ "what we store" lists mining tax synced data and local mining history (`src/features/faq/whatWeStore.ts`).
 - Why own-character ledger, not corp observer: observer endpoint needs Accountant role in the moon-owning corp, never held by a renter. Granularity ceiling = (Character, EVE/UTC date, system); no moon id, no timestamp (`20260905-170644`).
@@ -53,6 +53,7 @@ Paths below are under `src/features/miningTax/` unless stated.
 Purpose: output stats. All tracked Characters (not just active). Files: `OverviewTab.tsx`, `yieldSnapshot.ts`, `ledger.ts:141 loadAllCharacterYields`.
 
 Load (`loadMiningYieldSnapshot(showRefining, compressed)`, `yieldSnapshot.ts:158`):
+
 1. Per Character ledger (fan-out at `ESI_FANOUT_CONCURRENCY`), merged into device history, grouped by (date, system) over harvested set = ore + ice + gas clouds + manual moon tags + manual ignores (`groupMiningYield`).
 2. Pricing type per ore = Compressed counterpart when Ore Form = Compressed and one exists (`oreFormTypeId`, `src/engine/miningTax/oreForm.ts:7`). Gas prices as itself.
 3. If Show refining: load reprocessing recipes (`loadReprocessing`), Character modifiers (skills, implants). If off: skip recipes, material prices, skills/implants.
@@ -65,21 +66,23 @@ Load (`loadMiningYieldSnapshot(showRefining, compressed)`, `yieldSnapshot.ts:158
 Overview always prices at Jita (`DEFAULT_TRADE_HUB`); Tax prices at the Payee's hub.
 
 ### Controls and defaults
-| Control | Values / default | Persist |
-| --- | --- | --- |
-| Character filter | all / one / subset | URL `overview.character` |
-| Date range | 90d, 30d (default), 7d, Today | device `miningYieldRange` |
-| Price basis | Jita buy (default, "saved buy price on the day mined"), Jita sell, Now buy, Now sell | device `miningYieldPriceBasis` |
-| Buyback rate | 0-100, default 100 (off) | device `miningYieldBuybackRate` |
-| Show refining | default on | device |
-| Chart metric | ISK (default), m3, Count | device |
-| Columns picker | defaults: character, system, volume, rawValue, refineValue, pricing (off: total, oreBreakdown, units); empty selection rejected; Reset action | device `miningYieldOverviewVisibleColumns` |
-| Refresh | IconButton; also fired by Show-refining toggle (it changes what the loader fetches) and Ore Form change (`useRefreshOnOreFormChange`) | - |
-| Table sort | default Date desc | URL `overview.sort` |
+
+| Control          | Values / default                                                                                                                              | Persist                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Character filter | all / one / subset                                                                                                                            | URL `overview.character`                   |
+| Date range       | 90d, 30d (default), 7d, Today                                                                                                                 | device `miningYieldRange`                  |
+| Price basis      | Jita buy (default, "saved buy price on the day mined"), Jita sell, Now buy, Now sell                                                          | device `miningYieldPriceBasis`             |
+| Buyback rate     | 0-100, default 100 (off)                                                                                                                      | device `miningYieldBuybackRate`            |
+| Show refining    | default on                                                                                                                                    | device                                     |
+| Chart metric     | ISK (default), m3, Count                                                                                                                      | device                                     |
+| Columns picker   | defaults: character, system, volume, rawValue, refineValue, pricing (off: total, oreBreakdown, units); empty selection rejected; Reset action | device `miningYieldOverviewVisibleColumns` |
+| Refresh          | IconButton; also fired by Show-refining toggle (it changes what the loader fetches) and Ore Form change (`useRefreshOnOreFormChange`)         | -                                          |
+| Table sort       | default Date desc                                                                                                                             | URL `overview.sort`                        |
 
 Desktop: Value menu (basis, buyback %, refining) in header. Mobile: `MobileSettings` sheet.
 
 ### Formulas (exact)
+
 - Range window: today counts as day 1; `7d` = today + 6 prior days; start = today - (days-1); dates are bare UTC strings, never routed through local time (`yieldRange.ts:30`). No "All" range: history caps at 90 so it would equal 90d.
 - ISK per mined day = sum of raw value of in-range rows / count of DISTINCT dates with any mining; null when no dates (`yieldRate.ts:13`). It uses raw (sell-the-ore) value, not refined (`OverviewTab.tsx:294`). Days with no mining are NOT in the divisor. Why: ESI has no intra-day timestamp so no hourly rate is measurable; originally calendar hours (`20260909-204328`), later per-day (`20261006-085420`).
 - Days mined tile: `daysWithData / rangeDays`; "history starts" hint when the oldest saved day is later than range start (`yieldRange.ts:64`).
@@ -93,12 +96,14 @@ Desktop: Value menu (basis, buyback %, refining) in header. Mobile: `MobileSetti
 - Ledger history merge (`ledgerHistory.ts:27`): a fresh row replaces a stored row with the same (date|system|type) (today's quantity grows through the day); rows only stored are kept; duplicates inside one fetch are summed first; prune counts back from the NEWEST held day, not the wall clock (`LEDGER_HISTORY_DAYS = 90`, cutoff = newest - 89). A cached copy older than the last merge is ignored so it cannot roll today back (`ledger.ts:50`).
 
 ### Table, tiles, detail
+
 - Stat tiles: Total value (raw; refined subtitle when refining on), ISK/day, Volume (warning with count when some types lack volume), Days mined.
 - Table (`DataTable`): Date always shown (accent link, opens detail), Character only when >1 Character, System (+security), Volume, Raw sell value, Total, Refine value, Ore breakdown, Units, Pricing (tag + "Partial" when `pricedAll` false). Phone stacks cells.
 - Row click -> `YieldDetailModal`: "date - system", chips (volume, units, ore types), Sell raw card, Refine card (gain / loss / even / unknown vs raw), "Ore mined" table, "Refines into" table (per material qty and value; leftover-units note), Pricing section (basis hint + per-source). Each table has CSV/clipboard export.
 - CSV (`yieldCsv.ts`, surface `mining-overview`): every column the table can offer, not just visible ones.
 
 ### States
+
 - Loading: spinner. Error: `EmptyState common.loadFailed*`. Offline/stale: `common.offlineTitle` note + `DataAgeBadge(fetchedAt)` (oldest among Characters).
 - Needs re-login for a Character: banner per Character with "Re-authorize" -> `beginGrant(characterId, ['getCharacterMining'])`; that Character still shows device-history rows.
 - No entries: `miningTax.overview.emptyTitle/Hint`.
@@ -110,16 +115,19 @@ Desktop: Value menu (basis, buyback %, refining) in header. Mobile: `MobileSetti
 Purpose: Moon Mining Tax. All tracked Characters by default. Files: `TaxTab.tsx`, `snapshot.ts`, `ledgerActions.ts`, `assignments.ts`.
 
 ### Entities (CONTEXT.md)
+
 - Mining Ledger Entry: (Character, EVE date, system) with moon-ore lines summed per type; derived each refresh, never stored (`groupLedger.ts`). Moon ore = SDE moon set + manual "tag as moon ore"; ordinary ore/ice/ignored are excluded (that exclusion is the whole moon filter).
 - Assignment: stored record claiming (part of) an entry for a Payee at a tax %: `oreLines` snapshot, `estimatedValue`, `taxOwed` (both snapshotted), `status`, optional `groupId` (combined), `collectsGrowth`, `payment`, `reviewDiff` (`src/db/index.ts:659-700`).
 - Payee: per-Character free-text landlord with default tax %, Trade Hub (priced at that hub, default Jita; `20260907-100006`), legacy `systemId`, learned in-game entity id (`rememberPayeeEntity`).
 - Statuses (`rowStatus.ts`): unassigned, outstanding, paid, needs-review, dismissed. Open = unassigned + needs-review + outstanding (`ledgerSections.ts:3`); History = paid + dismissed.
 
 ### Load pipeline (`snapshot.ts:66`, order matters)
+
 1. Hydrate Ore Form. 2. `loadAllCharacterLedgers` (also computes unclassified types = ESI types neither moon, ore/ice, nor ignored). 3. `recordLedgerArrivals`. 4. `coalesceAssignments` (repair Combined Entry invariants before reconcile). 5. `reconcileAssignments`. 6. `repriceForOreForm`. 7. Load Payees and Assignments (after reconcile so flips show). 8. Build rows with `computeOwnership` + `findDuplicateAssignmentIds`.
-Data Age badge = oldest `fetchedAt`; `fromCache` true only if every read was cache-only (offline).
+   Data Age badge = oldest `fetchedAt`; `fromCache` true only if every read was cache-only (offline).
 
 ### Pricing for Tax (`pricing.ts`, `priceBasis.ts:125`)
+
 - Value = sum of quantity x unit price; tax owed = value x taxPct/100, computed ONCE at assign time and stored (`valuation.ts:28`). Later price moves or Payee default edits never change it. Example: 1,000 units x 5,000 ISK x 10% = 500,000 ISK.
 - Unit price tiers, buy side only: saved snapshot for the mined date -> Adam4EVE historical buy -> today's live buy (unconditional on date: deliberate difference from Overview) -> today's live SELL as last resort (flagged `live-sell`, softer "priced at today's sell" notice) -> none (0, "could not be priced" banner). A quoted 0 counts as unpriced.
 - Priced at the entry's mined date and at the Payee's hub (`hubForPayee`; absent/unknown hub = Jita). Why: `20260926-112731` (a bill created a month later must not use today's price), `20260906-081307` (compressed ore at Jita buy), `20260926-142542` (bid-less ore at sell).
@@ -127,6 +135,7 @@ Data Age badge = oldest `fetchedAt`; `fromCache` true only if every read was cac
 - Per-ore value editing (setting "Edit ore values individually"): `oreLineValues` replaces `quantity x unitPrice` for the named lines; unnamed lines still price from the book (`valuation.ts:28`, `20260927-105434`).
 
 ### Ownership, growth, review (core engine)
+
 - `computeOwnership` (`ownership.ts:60`): per ore type residual = entry qty - sum of covering Assignments' qty. Growth collector = the sole Assignment, or the one flagged `collectsGrowth` when 2+; a collector owns all residual (nothing becomes "unassigned", no other Assignment grows). With 2+ and no flag (legacy split): a type claimed by exactly one Assignment grows into it; a type claimed by none or 2+ stays an Unassigned residual. Snapshots never shrink.
 - `diffAssignedOreLines` (`needsReview.ts:15`): reports only types whose quantity strictly GREW (a new type counts as growth from 0); equal or lower never flags (false positives on real ISK are the worse failure).
 - `reconcileAssignments` (`reconcile.ts:40`): per Character, diff each Assignment against its owned fresh lines. Entry absent from the fresh read (aged out, or lapsed grant) -> left alone. Growth on an OUTSTANDING Assignment (single, or member of a combined entry) is absorbed straight in (re-priced at mined date and Payee hub, `planNeedsReviewResolution`, `assignments.ts:675`); if re-pricing throws it falls back to flagging. Growth on Paid or Dismissed flips to `needs-review` with `reviewDiff` {typeId, before, after}. Skips the write (and `scheduleSync`) when the diff is unchanged. Why: `20261004-135551` "unpaid growth has no history to protect".
@@ -137,14 +146,17 @@ Data Age badge = oldest `fetchedAt`; `fromCache` true only if every read was cac
 - Coalesce (`coalesce.ts:135`): fuses only `outstanding` Assignments with no payment on the same entry with the same terms (payee:taxPct); refuses when members span >1 existing groupId; identical members that over-claim = duplicate (keep one, values NOT summed), else quantities and values summed. `planGroupEjections` (`coalesce.ts:213`): a Combined Entry whose members disagree on terms ejects the disagreeing ones (all when fewer than 2 agree). Safety net only; writes already keep the invariant.
 
 ### Combined Entries
+
 - One obligation, one Payee, one rate, spanning EVE days (sessions crossing 00:00 UTC). Rules in `selection.ts:77 combineEligibility`: need >= 2 rows; same Character; same system; at most one distinct `groupId` (one group + ungrouped rows = add to that group); same Payee and rate across every member (`agreedTerms`). Blockers `too-few | mixed-character | mixed-system | multiple-groups | mixed-terms`, each with its own reason text.
 - Combined row: "N days" toggle, summed values, date range; status = worst member status. Settle up expands to actually-outstanding members only (`settleUpMembers`) so an already-paid member is not billed twice.
 - Take out (one day) / Uncombine all clear only `groupId`; figures and payment stay (`uncombineAssignments`).
 
 ### Continue a session across midnight UTC (`sessionContinuation.ts:39`)
+
 Offered when a wholly unassigned entry has the same Character + system on the EVE day immediately before, and that day has exactly one non-dismissed Assignment that is `outstanding` with a Payee (paid = closed session; split day = no single Payee). Continue: assigns next-day ore to the previous Payee and rate, combined with previous (or added to its group); next day priced at the Payee's hub. Undo (toast) re-reads both records inside the transaction and keeps changes since; if previous was already combined, undo leaves it combined (`ledgerActions.ts:189`). Auto mode (device `miningTaxAutoContinue`) continues each new offer once; dismissals stored per next-entry key (`miningTaxDismissedContinuations`); card also offers "choose other" (opens detail) and "keep separate".
 
 ### Settle up (`SettleUpDialog.tsx`, `settleAllocation.ts`)
+
 - Two steps: no wallet-journal link step because ESI's journal lags too far for a just-sent payment (`20260911-210622`). A recorded-but-unlinked payment is auto-matched later (`paymentLinks.ts`, no dialog).
 - Items ticked per Payee (multi-Payee supported); copy buttons (amount, "to" name, reason text from systems and dates); paid-on date; method; contract id; "Pick from wallet" (made payments); primary "Record payment", secondary "Just mark paid".
 - "I sent a different amount" (`allocateOldestFirst`, `settleAllocation.ts:27`): sort ticked entries by date ascending; accept each while `coveredTotal + taxOwed <= amount + 0.5 x (n+1)` (cumulative half-ISK slack per accepted entry: transfers are whole ISK, stored tax is not); STOP at the first that does not fit (never skips to a cheaper newer one); leftover = `max(0, amount - coveredTotal)`; non-finite or <= 0 amount covers nothing. Example: owed 100M (day 1) and 50M (day 2), sent 120M => day 1 covered, leftover 20M, day 2 stays owed. An Assignment is paid or owed, never half.
@@ -152,11 +164,13 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 - `settle` marks paid and stores `payment` info in one Dexie transaction.
 
 ### Made payments and links (`madePayments.ts`, `paymentMatches.ts`, `paymentLinks.ts`)
+
 - Sources: wallet journal outgoing amounts (amount < 0, absolute value) with ref_type in `player_donation, contract_price, contract_price_payment_corp, contract_deposit` (contract refs = method contract, else donation); completed item-exchange contracts issued by the Character with price 0 and assignee != 0 (payment in kind; amount null, never priced from cargo, pilot confirms). Each Character's reads fail independently (`.catch(() => null)`); results newest first; counterparty names via `resolveNames`. Scopes: wallet journal + contracts, ungated.
 - Matching: `amountsMatch(a,b)`: `|a-b| <= max(1, 0.005 x b)` (0.5% or 1 ISK); `LINK_WINDOW_DAYS = 14`, asymmetric (payment after mining; an entry dated well after the payment is no match). Suggested Payee: `suggestPayeeForSystem` pre-selects the Payee of the most recent non-dismissed Assignment in that system (date, then `updatedAt`), ranks others by use count then name; legacy `systemId` only breaks ties with no history (`suggestPayee.ts:40`).
 - Link transaction attaches a reference to an already-paid row; never changes status or amount; exact-ISK match preselected "Suggested". Link wallet payment = reverse flow from the Wallet side.
 
 ### Ledger table, filters, selection
+
 - Order: Owed cards, Attention strip (collapsed, header counts), Continue cards, filter row (Character filter, Payee multi-select "All payees / N selected", phone sort picker, export), Open, History.
 - Owed cards (`balances.ts:31`): per Payee sum of `taxOwed` of `outstanding` assignments (not total across statuses); sorted owed desc then name; settled Payees included at 0; a Payee unknown on this device is skipped (the table row says "Unknown Payee"). "Days waiting" = whole EVE days from the oldest owed entry to today (`OwedBalances.tsx:8`). Follows the Character filter, NOT the Payee filter. Side cards "Unassigned entries" (count; value of unassigned ore) and "Unlinked payments". Click a card filters the table to that Payee.
 - Payee filter (`TaxTab.tsx:535-557`): drops rows without a Payee (unassigned and dismissed vanish as soon as a Payee is selected); options list every Payee across all Characters, suffixed with the Character name when >1 Character; URL-held.
@@ -166,6 +180,7 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 - Attention strip rows: re-login per Character (action), unpriced ore (entries linked), sell-price fallback, duplicate Assignments, unclassified ore per type with "Tag as moon ore" / "Ignore" (synced overrides). Banners list affected entries as buttons (`findPricingGaps`, dismissed rows skipped).
 
 ### Dialogs
+
 - Row detail (`RowDetailModal`): unassigned entry opens straight into Assign; assigned shows summary, primary action by status (Settle up when owed, Accept new total when grown), Edit, More (Split, Combine, Link transaction, Link wallet payment, Mark paid / un-dismiss, Dismiss, Unassign with confirm), `PaymentLinksCard`, needs-review diff.
 - Assign (`AssignDialog`): Payee select + add inline; tax % input `min 0 max 100`; ore lines checklist; estimated value editable (per-ore boxes in individual mode); tax owed derived `value x pct/100`, editable (back-solves value when pct != 0, `AssignDialog.tsx:241`); "mark as paid"; valued-at-hub hint; no-payees hint.
 - Combine (`JoinAssignDialog`): pick compatible same-system entries; terms adopted if any assigned, else chosen here.
@@ -176,37 +191,42 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 - Page settings: Ore Form (synced), Edit ore values individually (synced), Continue sessions automatically (device).
 
 ### Atomicity (verified)
+
 Every write goes through `commit()` (`ledgerActions.ts:100`): one `db.transaction('rw', miningTaxAssignments, payees, settings)`; `write` may only await Dexie (a price fetch inside would auto-commit early: `PrematureCommitError`), so pricing for Accept new total happens before the transaction and rows are written all-or-nothing (`acceptNewTotal`). Sync is scheduled once per touched Character after commit. Actions resolve to `{ok}` or `{ok:false, reason:'already-assigned'|'save-failed'}`; the UI shows `LedgerActionError`.
 
 ### States
+
 Loading spinner; load error EmptyState; offline note; per-Character re-auth with grant button; no Payee -> `firstPayeeTitle/Hint`; no entries -> `emptyTitle/Hint`; Open empty -> `openEmpty`; save failure -> toast `miningTax.saveFailed`; stale-view race -> refresh shows what exists.
 
 ### CSV (`taxCsv.ts`)
+
 Table order: Character (only if shown), Date (range for combined), System, Payee (null when unassigned), Estimated Value, Tax Owed (null when no Assignment, not 0), Status. No ore, no payment data. Cell helpers are shared with the table so export equals screen.
 
 ## Reconciling with the corp's numbers
 
 App reads only the Character's own ledger; corp observer data (moon id, timestamps) needs the Accountant role, which a renter lacks. No corp-figure import and no moon-level view exist. Likely causes of a mismatch and the fix for each:
 
-| Cause | Check | Fix |
-|---|---|---|
-| Different price | Corp may use a different price or hub. App: buy side, mined-date snapshot, Payee's hub (default Jita), Compressed form | Payee hub in Manage Payees (new Assignments only); Ore Form setting; "Edit ore values individually" per-ore values; or edit Estimated Value / Tax Owed in Assign or Edit |
-| Different tax % | Payee default vs corp rate | Edit entry tax %; Payee default only affects new Assignments (tax owed is frozen) |
-| Ore arrived late | ESI lags up to 1 h; Needs-review flag or arrival notice | Accept new total (Outstanding absorbs growth by itself) |
-| Session crossed midnight UTC | Two entries, corp bills one | Combine, or Continue card |
-| Two landlords, same system/day | One entry, two bills | Split by quantity |
-| Wrong ore class | Attention strip "unclassified ore" | Tag as moon ore / Ignore |
-| Old bill missing | Entry older than 30 days left ESI window | None in app; Assignment stays in Dexie but is not shown or counted |
-| Paid but amount differs | Sent a different amount | Settle up "I sent a different amount" (oldest first, whole entries) |
+| Cause                          | Check                                                                                                                  | Fix                                                                                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Different price                | Corp may use a different price or hub. App: buy side, mined-date snapshot, Payee's hub (default Jita), Compressed form | Payee hub in Manage Payees (new Assignments only); Ore Form setting; "Edit ore values individually" per-ore values; or edit Estimated Value / Tax Owed in Assign or Edit |
+| Different tax %                | Payee default vs corp rate                                                                                             | Edit entry tax %; Payee default only affects new Assignments (tax owed is frozen)                                                                                        |
+| Ore arrived late               | ESI lags up to 1 h; Needs-review flag or arrival notice                                                                | Accept new total (Outstanding absorbs growth by itself)                                                                                                                  |
+| Session crossed midnight UTC   | Two entries, corp bills one                                                                                            | Combine, or Continue card                                                                                                                                                |
+| Two landlords, same system/day | One entry, two bills                                                                                                   | Split by quantity                                                                                                                                                        |
+| Wrong ore class                | Attention strip "unclassified ore"                                                                                     | Tag as moon ore / Ignore                                                                                                                                                 |
+| Old bill missing               | Entry older than 30 days left ESI window                                                                               | None in app; Assignment stays in Dexie but is not shown or counted                                                                                                       |
+| Paid but amount differs        | Sent a different amount                                                                                                | Settle up "I sent a different amount" (oldest first, whole entries)                                                                                                      |
 
 Paid stays paid when edited ("correcting isn't un-paying"). Frozen figures: later price moves never restate a bill.
 
 ## 5. Cross-feature
+
 - Overview page Mining card: unpaid tax severity `watch`, `warning` when the oldest unpaid entry is >= 30 days (`MINING_TAX_WARNING_DAYS`, `src/features/overview/boardSeverity.ts:60`, `20260925-164801`); needs re-auth => unreadable; unassigned > 0 with nothing owed = watch.
 - Calendar has a moon-chunk kind (`20260925-142253`); Wallet journal links tax payments back to the Tax row (#2818).
 - Settings > Mining tax hosts the same form as the Tax page settings modal.
 
 ## 6. Test-covered behaviors (concrete assertions)
+
 - `reconcile.test.ts`: no-op without assignments; exact match left alone; growth on a dismissed or PAID entry flips to needs-review with an explicit diff (also for a paid member of a combined entry); growth on an unpaid (outstanding) assignment, or unpaid member of a combined entry, is auto-absorbed; absorb failure (prices unavailable) flags instead; an entry aged out of the fresh read is left untouched; identical needs-review diff is not re-written/re-synced, a new diff is; a brand-new ore type folds into the sole Assignment of an entry but into neither when the entry is split across two.
 - `settleAllocation.test.ts`: amount covering all pays all; pays oldest entries it fully covers; stops at the first entry the remainder cannot pay (never skips to a newer one); tolerates whole-ISK rounding of the in-game transfer; zero/non-number covers nothing.
 - `sessionContinuation.test.ts`: rolls over months/years; pairs a fully unassigned day with the owed day before it in the same system; continues an already-combined session; ignores gaps > 1 day, other systems, other pilots; never continues paid/dismissed; skips when previous day split between Payees; looks past a dismissed slice; only offers days nobody assigned.
@@ -237,6 +257,7 @@ Paid stays paid when edited ("correcting isn't un-paying"). Frozen figures: late
 15. **Why can an old owed bill disappear from the Tax tab?** Rows come only from the 30-day ESI ledger; balances are summed over rows, so an Assignment whose entry aged out stops showing and counting though it remains in Dexie. `snapshot.ts:122`, `balances.ts:36`, `ledger.ts:80`.
 
 ## 8. Observed gaps
+
 - Tax rows come only from ESI's 30-day ledger (`snapshot.ts:122`); an owed Assignment older than 30 days vanishes from the table and from Owed balances (computed from rows, `balances.ts:36`) though it remains in Dexie. Overview's 90-day history is not used by Tax (`20260922-204846`: "The Tax tab is unchanged"). Verified contradiction: the comment at `reconcile.ts:76` ("aged out of ESI's 90-day retention") and the `MiningLedgerRow` doc in `src/esi/endpoints.ts:1478` ("90-day retention on ESI's side") say 90 days, but the ledger loader comment `ledger.ts:38-43` and `ledgerHistory.ts:3` say ESI returns only 30 days (the 90 is the device history cap). The behavior in code follows 30 (Tax uses the raw ledger); the two 90-day comments are stale/misleading.
 - `/mining` gate lists only `getCharacterMining`; wallet journal/contracts reads for payment suggestions are ungated and fail silently with no in-page prompt (`madePayments.ts` header).
 - Overview prefs are device-local (not synced, not in URL); only Character filter and sort are shareable.
@@ -249,6 +270,7 @@ Paid stays paid when edited ("correcting isn't un-paying"). Frozen figures: late
 - "Partial" on Overview is a tag only; no filter for unpriced rows.
 
 ## 9. Improvement ideas
+
 - Fold the 90-day device history into Tax (read-only History) so aged-out paid/owed rows stay visible and balances do not drop them.
 - Add an in-page "grant wallet/contracts to get payment suggestions" nudge on Settle up / Link payment.
 - Sync Overview prefs (range, basis, buyback) via `createSyncedSetting`; put range/basis in the URL for shareable views.

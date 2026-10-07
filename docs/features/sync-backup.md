@@ -4,22 +4,22 @@ Cross-device sync of Editable Data (Firebase), encrypted device backup, log out,
 
 ## Feature table
 
-| Feature | Where | Data home | Scope needed |
-|---|---|---|---|
-| Two-way sync of 11 editable collections + Notification Feed + synced settings | invisible; `src/sync/planSync.ts` | Dexie <-> Firestore `/characters/char:{id}/{remoteName}` | none to sync; the Firebase session is minted from the Character's EVE access token (any granted scope set works, no named scope) |
-| Sync triggers: boot, Character switch, edit (2 s debounce), background sweep | `src/app/App.tsx:302`, `src/sync/planSync.ts:416,514`, `src/app/backgroundSync.ts` | - | - |
-| Sync status dot (desktop rail) | `src/app/SyncStatusDot.tsx`, `src/app/Layout.tsx:373` | in-memory `src/sync/status.ts` | - |
-| "Sync error — changes saved locally" note (all widths) | `src/app/SyncErrorNote.tsx`, `src/app/Layout.tsx:394` | in-memory | - |
-| Data panel: Clear cached ESI data; Reset saved view preferences | `src/routes/Settings.tsx:517,555` | Dexie `esiCache`, `settings` | - |
-| App updates: Update now | `src/features/settings/UpdatePanel.tsx`, `src/app/forceUpdate.ts` | service worker | - |
-| Export backup (password-encrypted file) | `src/routes/Settings.tsx:369`, `src/backup/io.ts:49` | Dexie -> downloaded `.json` | - |
-| Import backup | `src/routes/Settings.tsx:427`, `src/backup/io.ts:92` | file -> Dexie | - |
-| Log out of all characters | `src/features/settings/DevicePanel.tsx`, `src/features/character/logoutAll.ts:23` | Dexie, Firebase session | - |
-| Delete all data (remote purge, then local wipe) | `DevicePanel.tsx:57`, `src/features/character/deleteAllCharacterData.ts` | Firestore + all device storage | - |
-| Remove one Character (last push, local delete) | Characters page; `src/features/character/removeCharacter.ts:52` | Dexie | - |
-| Data Age table / Activity Log (Data & storage, Activity Log) | `src/routes/Settings.tsx:289,156` | in-memory `src/stores/activityLog.ts` | - |
-| Scheduled Push device registration | `src/sync/deviceRegistration.ts` | FCM + callable `registerDevice` | pointer: Notifications panel owns the enable flow |
-| Remote inactivity purge (90 d) and feed purge | `functions/src/purgeStaleAccounts.ts`, `purgeFeed.ts` | Firestore | - |
+| Feature                                                                       | Where                                                                              | Data home                                                | Scope needed                                                                                                                     |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Two-way sync of 11 editable collections + Notification Feed + synced settings | invisible; `src/sync/planSync.ts`                                                  | Dexie <-> Firestore `/characters/char:{id}/{remoteName}` | none to sync; the Firebase session is minted from the Character's EVE access token (any granted scope set works, no named scope) |
+| Sync triggers: boot, Character switch, edit (2 s debounce), background sweep  | `src/app/App.tsx:302`, `src/sync/planSync.ts:416,514`, `src/app/backgroundSync.ts` | -                                                        | -                                                                                                                                |
+| Sync status dot (desktop rail)                                                | `src/app/SyncStatusDot.tsx`, `src/app/Layout.tsx:373`                              | in-memory `src/sync/status.ts`                           | -                                                                                                                                |
+| "Sync error — changes saved locally" note (all widths)                        | `src/app/SyncErrorNote.tsx`, `src/app/Layout.tsx:394`                              | in-memory                                                | -                                                                                                                                |
+| Data panel: Clear cached ESI data; Reset saved view preferences               | `src/routes/Settings.tsx:517,555`                                                  | Dexie `esiCache`, `settings`                             | -                                                                                                                                |
+| App updates: Update now                                                       | `src/features/settings/UpdatePanel.tsx`, `src/app/forceUpdate.ts`                  | service worker                                           | -                                                                                                                                |
+| Export backup (password-encrypted file)                                       | `src/routes/Settings.tsx:369`, `src/backup/io.ts:49`                               | Dexie -> downloaded `.json`                              | -                                                                                                                                |
+| Import backup                                                                 | `src/routes/Settings.tsx:427`, `src/backup/io.ts:92`                               | file -> Dexie                                            | -                                                                                                                                |
+| Log out of all characters                                                     | `src/features/settings/DevicePanel.tsx`, `src/features/character/logoutAll.ts:23`  | Dexie, Firebase session                                  | -                                                                                                                                |
+| Delete all data (remote purge, then local wipe)                               | `DevicePanel.tsx:57`, `src/features/character/deleteAllCharacterData.ts`           | Firestore + all device storage                           | -                                                                                                                                |
+| Remove one Character (last push, local delete)                                | Characters page; `src/features/character/removeCharacter.ts:52`                    | Dexie                                                    | -                                                                                                                                |
+| Data Age table / Activity Log (Data & storage, Activity Log)                  | `src/routes/Settings.tsx:289,156`                                                  | in-memory `src/stores/activityLog.ts`                    | -                                                                                                                                |
+| Scheduled Push device registration                                            | `src/sync/deviceRegistration.ts`                                                   | FCM + callable `registerDevice`                          | pointer: Notifications panel owns the enable flow                                                                                |
+| Remote inactivity purge (90 d) and feed purge                                 | `functions/src/purgeStaleAccounts.ts`, `purgeFeed.ts`                              | Firestore                                                | -                                                                                                                                |
 
 Sync is **configured** only when `VITE_FIREBASE_API_KEY` is set and `MODE !== 'test'` (`src/app/syncStatus.ts:25`). Unconfigured: no dot, no sync, Settings copy switches to "local only" wording (`settings.deviceLogoutHintLocalOnly`, `deviceDeleteHintLocalOnly`).
 
@@ -33,21 +33,21 @@ Quote of the user-facing promise (`src/features/faq/whatWeStore.ts:71`, strings 
 
 Registry (`src/sync/syncedCollections.ts:651`, order = sync order), remoteName -> Dexie table:
 
-| remoteName | table | what removing a Character does locally |
-|---|---|---|
-| `plans` | `skillPlans` | delete |
-| `buildPlans` | `buildPlans` | delete |
-| `quickbars` | `quickbars` | delete |
-| `stationPins` | `stationPins` | delete |
-| `planetRichness` | `planetRichness` | delete |
-| `productionRuns` | `productionRuns` | delete |
-| `productionSaleLinks` | `productionSaleLinks` | delete |
-| `productionOrderWatches` | `productionOrderWatches` | delete |
-| `payees` | `payees` | delete |
-| `fittings` | `fittings` | delete |
-| `miningTaxAssignments` | `miningTaxAssignments` | delete |
-| `notificationFeed` (kind feed) | `notificationFeed` | feed rows deleted in `removeCharacter` |
-| `settings` (kind settings) | `settings` rows with `sync.` prefix | never deleted by removal |
+| remoteName                     | table                               | what removing a Character does locally |
+| ------------------------------ | ----------------------------------- | -------------------------------------- |
+| `plans`                        | `skillPlans`                        | delete                                 |
+| `buildPlans`                   | `buildPlans`                        | delete                                 |
+| `quickbars`                    | `quickbars`                         | delete                                 |
+| `stationPins`                  | `stationPins`                       | delete                                 |
+| `planetRichness`               | `planetRichness`                    | delete                                 |
+| `productionRuns`               | `productionRuns`                    | delete                                 |
+| `productionSaleLinks`          | `productionSaleLinks`               | delete                                 |
+| `productionOrderWatches`       | `productionOrderWatches`            | delete                                 |
+| `payees`                       | `payees`                            | delete                                 |
+| `fittings`                     | `fittings`                          | delete                                 |
+| `miningTaxAssignments`         | `miningTaxAssignments`              | delete                                 |
+| `notificationFeed` (kind feed) | `notificationFeed`                  | feed rows deleted in `removeCharacter` |
+| `settings` (kind settings)     | `settings` rows with `sync.` prefix | never deleted by removal               |
 
 Synced setting keys (exact allow-list, `src/sync/syncedSettings.ts:232`): `sync.avoidEdencom`, `sync.avoidPodKills`, `sync.avoidTriglavian`, `sync.avoidedSystems`, `sync.avoidedSystemsEnabled`, `sync.bpcHideAuctions`, `sync.bpcHidePlex`, `sync.corpDarkAfterDays`, `sync.courierHighCollateralRatio`, `sync.defaultCharacterFilter`, `sync.fittingDamageProfileId`, `sync.fittingDamageProfiles`, `sync.fittingTargetProfileId`, `sync.fittingTargetProfiles`, `sync.industryAssumedMe`, `sync.industryAssumedTe`, `sync.industryBuildGroups`, `sync.industryFacilityDefaults`, `sync.industryIncludeBlueprintCost`, `sync.industryReactionFacilityDefaults`, `sync.loyaltyLpValue`, `sync.marketHub`, `sync.marketPricePercent`, `sync.miningTaxManualIgnoredTypeIds`, `sync.miningTaxCompressedOre`, `sync.miningTaxManualMoonOreTypeIds`, `sync.miningTaxOreValueMode`, `sync.navHidden`, `sync.notificationFeedPrefs`, `sync.overviewCardOrder`, `sync.overviewHiddenCards`, `sync.piCustomsRates`, `sync.piExpiringSoonHours`, `sync.podKillThreshold`, `sync.routeHoleHubs`, `sync.routeHoleMinLife`, `sync.routeHoleShipSize`, `sync.routeHoles`, `sync.routePreference`, `sync.routeSecurityPenalty`, `sync.skillCloneStates`, `sync.spExtractionMonitoringEnabled`, `sync.spExtractionThresholdSp`, `sync.targetSkillPlan` (44 keys). Adding one is a three-file edit (list, pinned test literal, FAQ words), per the header comment. Keys beginning `sync.__` are internal and never synced (`src/sync/localBookkeeping.ts:15`).
 
@@ -68,6 +68,7 @@ Refresh tokens: Dexie `tokens` only. Firebase gets one short-lived access token 
 **Incremental reads.** Per-(Character, collection) pull cursor `{high, fullAt}` in Dexie (`src/sync/localBookkeeping.ts:45`); filter `where ownerHash == hash` plus `updatedAt > high`; forced full read once `fullAt` is older than 30 days (`planSync.ts:728`) or no cursor exists; a missing composite index (`failed-precondition`) degrades to a full read (`:747`). Cursors are cleared on Remove and on owner change. Why: `docs/context/decisions/20260907-220630-sync-reads-incrementally-with-a-periodic-full-reconcile.md`, `20260907-233010-ownerhash-is-the-only-synced-field-firestore-indexes.md`.
 
 **Merge** (`src/sync/merge.ts`, pure, tests `src/sync/merge.test.ts`):
+
 - Records (`mergeRecords`, `:155`): last-write-wins on `updatedAt` (epoch ms, device clock). Both sides present: larger `updatedAt` wins, equal = no-op. Local-only: push (under a cursor, only if `updatedAt > since`). Remote-only: pull. Local tombstone vs remote: remote strictly newer than the delete wins (row comes back); otherwise the tombstone is pushed. Remote tombstone vs live local: local wins only if `updatedAt` is strictly greater (resurrect). Tombstones live 30 days (`TOMBSTONE_TTL_MS`, `:31`); a live local row clears its own tombstone; remote tombstones past TTL are deleted remotely.
 - Account-wide collections (station pins, planet richness) fan out one row per Character on the device; deletions get a shared-key tombstone so a Character added later cannot resurrect them (`accountWideBackfill.ts:278`; `docs/context/decisions/20260904-231339-account-wide-deletions-get-a-shared-key-tombstone.md`).
 - Settings (`mergeSettings`, `:508`): LWW per key; local tombstones never expire (superseded only by a newer write); remote tombstones TTL 30 days. Known accepted edge: a device offline > 30 days re-pushes a stale copy after the remote tombstone is purged (comment, `syncedSettings.ts` header).
@@ -77,14 +78,14 @@ Refresh tokens: Dexie `tokens` only. Firebase gets one short-lived access token 
 
 ## States
 
-| State | Behavior |
-|---|---|
-| Idle | Rail dot green, tooltip "Synced" (`DOT_CLASS`, `src/app/SyncStatusDot.tsx:6`) |
-| Syncing | Rail dot accent, pulses (motion-safe), "Syncing…" |
-| Error | Dot red "Sync error"; plus text note "Sync error — changes saved locally" (`role="status"`, `aria-live=polite`, uppercase, danger) above the page at every width (`Layout.tsx:394`); local edits keep working |
-| Offline | Browser offline overrides status: grey dot, "Offline — will sync when reconnected" (`src/app/syncStatus.ts` `syncDisplayState`); no text note |
-| Sync not configured | no dot, no note (note renders only in `error`, which only `planSync` sets) |
-| Boot warm-up | separate accent dot beside it, "Loading character data…" (`Layout.tsx:86`) |
+| State               | Behavior                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Idle                | Rail dot green, tooltip "Synced" (`DOT_CLASS`, `src/app/SyncStatusDot.tsx:6`)                                                                                                                                 |
+| Syncing             | Rail dot accent, pulses (motion-safe), "Syncing…"                                                                                                                                                             |
+| Error               | Dot red "Sync error"; plus text note "Sync error — changes saved locally" (`role="status"`, `aria-live=polite`, uppercase, danger) above the page at every width (`Layout.tsx:394`); local edits keep working |
+| Offline             | Browser offline overrides status: grey dot, "Offline — will sync when reconnected" (`src/app/syncStatus.ts` `syncDisplayState`); no text note                                                                 |
+| Sync not configured | no dot, no note (note renders only in `error`, which only `planSync` sets)                                                                                                                                    |
+| Boot warm-up        | separate accent dot beside it, "Loading character data…" (`Layout.tsx:86`)                                                                                                                                    |
 
 Status is per Character in memory (`src/sync/status.ts:22`); the UI subscribes to the **active** Character's stream (plus statuses without a `characterId`) (`src/app/useSyncStatus.ts:20`). Nothing about sync is persisted except bookkeeping keys (ownerHash, tombstones, cursors, heartbeat, settingsMeta) in Dexie `settings`.
 
@@ -99,7 +100,7 @@ Rendered order: a 2-up grid (from `xl`) of Data, App updates, Export, Import; th
 5. **Log out and delete** (`DevicePanel.tsx`): shows "N character(s) are logged in on this device." Two danger buttons (disabled with 0 Characters): **Log out…** and **Delete all…**, each with a confirm dialog.
    - Log out dialog ("Log out of all characters?"): runs `logoutAllCharacters` (`logoutAll.ts:23`): when sync is configured, last push for each Character (8 s cap), `removeCharacter` for each (local rows deleted per registry rule, tokens, feed rows, bookkeeping, cache purge, shared structure cache when the roster empties), `db.tokens.clear()`, unregister Scheduled Push, sign out of Firebase. No navigation: `RequireCharacter` redirects to `/login` when the count hits 0. Synced data and `sync.` settings stay on the server and device `settings` rows; logging in again pulls plans back. Failure: "Could not log out. Try again, or reload the page." (dialog stays).
    - Delete dialog ("Delete all data?") (`confirmDelete`, `:57`): step 1 (sync configured only): `purgeAllRemoteCharacterData` (`deleteAllCharacterData.ts:43`): `haltSync` for the rest of the page, then for each Character sequentially `purgeCharacterRemoteData` (`src/sync/remotePurge.ts:27`: sign in as it, delete every doc in every registry collection; the parent heartbeat doc is left for the 90-day purge). Characters whose purge failed (dead token, offline) are listed ("could not be deleted from the sync server ... deletes it automatically after 90 days"), the Cancel button disappears and only **Finish deleting** remains (closing is blocked once a partial purge exists). Step 2 `deleteAllLocalData` (`:126`): clear tokens, cancel projection rebuild and unregister push, halt sync and sign out, in parallel clear app badge, delete every other IndexedDB database (each 5 s timeout, `:24`) and every Cache Storage entry except `workbox-precache*` (`:31`, so an offline reload still boots), clear `localStorage`/`sessionStorage`, delete the app DB (5 s timeout else error "blocked by another tab"), reopen it empty; then `window.location.replace('/')`. Other tabs reload themselves when the DB is deleted (`src/app/databaseWipe.ts:13`). Failure: "Could not finish deleting. Close Neocom Desk in any other tab, reload this page, and try again." Why: `docs/context/decisions/20260926-223948-delete-all-data-purges-synced-data-immediately.md`, `20260925-084119-settings-sections-rail-and-log-out-of-this.md`.
-6. **Data Age** (`:289`): one row per (endpoint route, Character or public) — the latest *successful* call in the session's activity log (`latestFetchPerSource`, `:264`); columns Endpoint (monospace route), Character (Show Info link, plain text for public calls), Updated (relative age, 30 s tick, hover shows full timestamp, time zone per Time format setting). CSV/XLSX/clipboard export menu. Empty state from `dataAge.emptyTitle/emptyHint`. In-memory only: starts empty each load.
+6. **Data Age** (`:289`): one row per (endpoint route, Character or public) — the latest _successful_ call in the session's activity log (`latestFetchPerSource`, `:264`); columns Endpoint (monospace route), Character (Show Info link, plain text for public calls), Updated (relative age, 30 s tick, hover shows full timestamp, time zone per Time format setting). CSV/XLSX/clipboard export menu. Empty state from `dataAge.emptyTitle/emptyHint`. In-memory only: starts empty each load.
 7. **Activity Log** (`/settings/activity`, `:156`): the same in-memory `useActivityLog` entries (every ESI call: route, Character, time, outcome success / auth failure / error with tone colours), sortable table, **Clear log** (disabled when empty), export menu, `phoneHidden` Character column.
 
 ## Removing one Character (Characters page)
