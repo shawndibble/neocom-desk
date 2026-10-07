@@ -1,6 +1,6 @@
 /**
- * Works out which rigs a structure carries from the Manufacturing (or
- * Reactions) bonuses a pilot reads off its in-game services list. ESI never
+ * Works out which rigs a structure carries from the Structure Role Bonus
+ * lines a pilot reads off the Industry window's material and job-duration tooltips. ESI never
  * exposes a structure's fit, so the pilot types the two numbers in and this
  * finds every fit that produces them. Pure.
  *

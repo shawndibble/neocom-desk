@@ -219,7 +219,7 @@ Unfolded:
 
 ### 6.4 Rig match helper (`RigMatchHelper.tsx`, `engine/industry/rigMatch.ts`)
 
-Button "Match from in-game numbers" opens modal "Work out the rigs": steps text (structure Services tab, Manufacturing or Reactions line), two inputs (Material bonus %, Time bonus %), reading uses the plan's security band (fix Build System first), results list each matching fit with basis ("rig bonus alone" vs "rigs plus structure's own bonus"), "Use this fit"; "No rig fit gives those numbers" / "More than one fit matches" copy. ESI exposes no structure fits.
+Button "Match from in-game numbers" opens modal "Work out the rigs": steps text (Industry window: pick the structure as Facility, hover the material arrow and the job-duration hourglass, read each tooltip's Structure Role Bonus, with an annotated screenshot (`public/images/industry/rig-match-industry-window.png`) marking the three spots; the structure info window's Services tab only shows facility tax), two inputs (Material bonus %, Time bonus %), reading uses the plan's security band (fix Build System first), results list each matching fit with basis ("rig bonus alone" vs "rigs plus structure's own bonus"), "Use this fit"; "No rig fit gives those numbers" / "More than one fit matches" copy. ESI exposes no structure fits.
 
 ### 6.5 Materials panel (`BuildPlanDetail.tsx:1689`, `MaterialsTable.tsx`)
 

@@ -22,10 +22,10 @@ describe('RigMatchHelper', () => {
     expect([...onApply.mock.calls[0][0]].sort()).toEqual(['meT2', 'none', 'teT1']);
   });
 
-  it('says so when nothing matches, naming the service line to read', async () => {
+  it('says so when nothing matches, naming the line to read', async () => {
     await openAndType('3.33', '7');
     expect(
-      screen.getByText(/No rig fit gives those numbers.*Manufacturing line/)
+      screen.getByText(/No rig fit gives those numbers.*Structure Role Bonus/)
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use this fit' })).toBeNull();
   });
