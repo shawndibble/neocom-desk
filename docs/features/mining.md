@@ -184,6 +184,23 @@ Loading spinner; load error EmptyState; offline note; per-Character re-auth with
 ### CSV (`taxCsv.ts`)
 Table order: Character (only if shown), Date (range for combined), System, Payee (null when unassigned), Estimated Value, Tax Owed (null when no Assignment, not 0), Status. No ore, no payment data. Cell helpers are shared with the table so export equals screen.
 
+## Reconciling with the corp's numbers
+
+App reads only the Character's own ledger; corp observer data (moon id, timestamps) needs the Accountant role, which a renter lacks. No corp-figure import and no moon-level view exist. Likely causes of a mismatch and the fix for each:
+
+| Cause | Check | Fix |
+|---|---|---|
+| Different price | Corp may use a different price or hub. App: buy side, mined-date snapshot, Payee's hub (default Jita), Compressed form | Payee hub in Manage Payees (new Assignments only); Ore Form setting; "Edit ore values individually" per-ore values; or edit Estimated Value / Tax Owed in Assign or Edit |
+| Different tax % | Payee default vs corp rate | Edit entry tax %; Payee default only affects new Assignments (tax owed is frozen) |
+| Ore arrived late | ESI lags up to 1 h; Needs-review flag or arrival notice | Accept new total (Outstanding absorbs growth by itself) |
+| Session crossed midnight UTC | Two entries, corp bills one | Combine, or Continue card |
+| Two landlords, same system/day | One entry, two bills | Split by quantity |
+| Wrong ore class | Attention strip "unclassified ore" | Tag as moon ore / Ignore |
+| Old bill missing | Entry older than 30 days left ESI window | None in app; Assignment stays in Dexie but is not shown or counted |
+| Paid but amount differs | Sent a different amount | Settle up "I sent a different amount" (oldest first, whole entries) |
+
+Paid stays paid when edited ("correcting isn't un-paying"). Frozen figures: later price moves never restate a bill.
+
 ## 5. Cross-feature
 - Overview page Mining card: unpaid tax severity `watch`, `warning` when the oldest unpaid entry is >= 30 days (`MINING_TAX_WARNING_DAYS`, `src/features/overview/boardSeverity.ts:60`, `20260925-164801`); needs re-auth => unreadable; unassigned > 0 with nothing owed = watch.
 - Calendar has a moon-chunk kind (`20260925-142253`); Wallet journal links tax payments back to the Tax row (#2818).
