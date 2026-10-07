@@ -1,8 +1,9 @@
 /**
  * Skill point math.
- * SP(level) = 250 * rank * sqrt(32)^(level-1), rounded up (matches in-game
- * cumulative totals for rank 1: 250 / 1,415 / 8,000 / 45,255 / 256,000).
- * Source: EVE University wiki, "Skills and learning".
+ * SP(level) = 250 * rank * sqrt(32)^(level-1), rounded up. Source: in-game
+ * observation (#2882): rank 1 level II = 1,415, rank 2 level II = 2,829.
+ * The EVE University wiki shows 1,414 for rank 1 level II; it rounds the
+ * other way, so it is not the source of these totals.
  */
 import type { CloneState } from '@/engine/types';
 

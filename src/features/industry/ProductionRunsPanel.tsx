@@ -2,12 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type ProductionRunRecord } from '@/db';
-import {
-  markProductionRunDeleted,
-  removeProductionOrderWatch,
-  removeProductionSaleLink,
-  scheduleSync,
-} from '@/sync';
+import { removeProductionOrderWatch, removeProductionSaleLink, scheduleSync } from '@/sync';
 import {
   Button,
   CollapsiblePanel,
@@ -195,9 +190,10 @@ export function ProductionRunsPanel({
     setEditingRunId(null);
   }
 
-  async function deleteRun(runId: string) {
-    await markProductionRunDeleted(characterId, runId);
-    if (editingRunId === runId) setEditingRunId(null);
+  function requestDeleteRun(runId: string) {
+    // One modal at a time: close the edit modal before the confirm opens.
+    setEditingRunId(null);
+    sale.confirmDeleteRun(runId);
   }
 
   async function unlinkSale(linkId: string) {
@@ -360,7 +356,7 @@ export function ProductionRunsPanel({
             )}
             <Button
               variant="danger"
-              onClick={() => void deleteRun(editingRow.run.id)}
+              onClick={() => requestDeleteRun(editingRow.run.id)}
               className="w-full justify-center"
             >
               <Icon.Close /> {t('industry.deleteProductionRun')}
