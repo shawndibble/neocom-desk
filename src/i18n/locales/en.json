@@ -2214,8 +2214,8 @@
     "rigMatch": {
       "open": "Match from in-game numbers",
       "title": "Work out the rigs",
-      "steps": "In game: open the Industry window and hover the two spots below (a reaction has a formula where the blueprint is). In each tooltip, copy only the Structure Role Bonus line. The Blueprint and Skills lines are yours, not the structure's.",
-      "imageAlt": "Two Industry window tooltips with the Structure Role Bonus line boxed. Left, the material tooltip from the arrow between the input materials and the blueprint: copy its Structure Role Bonus into Material bonus. Right, the job duration tooltip from the hourglass beside the blueprint: copy its Structure Role Bonus into Time bonus.",
+      "steps": "In game: open the Industry window and hover the two spots marked 1 and 2 below (a reaction has a formula where the blueprint is). In each tooltip, copy only the Structure Role Bonus line. The Blueprint and Skills lines are yours, not the structure's.",
+      "imageAlt": "The Industry window with two marked spots: 1, the arrow between the input materials and the blueprint, and 2, the hourglass beside the blueprint. Below, the tooltip each one opens with its Structure Role Bonus line boxed: copy 1 into Material bonus and 2 into Time bonus.",
       "material": "Material bonus % (Structure Role Bonus)",
       "time": "Time bonus % (Structure Role Bonus)",
       "using": "Reading it as {{security}} space. If that is wrong, fix the Build System first.",
