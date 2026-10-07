@@ -38,6 +38,54 @@
           document.documentElement.style.fontSize = s * 100 + '%';
       } catch (e) {}
     </script>
+    <!-- Same cure as src/app/staleBuildRecovery.ts, for a build so stale that
+         its own entry's static imports 404 — main.tsx never runs then, so no
+         module code can react. Resource load errors do not bubble; capture
+         sees them. Keys and the 60s window match that module. -->
+    <script id="stale-build-boot">
+      window.addEventListener(
+        'error',
+        function (e) {
+          var t = e.target;
+          if (!t || t === window) return;
+          var u = t.src || t.href || '';
+          if (!/\/assets\/[^/]+\.js(\?|$)/.test(u)) return;
+          try {
+            var k = 'neocom:stale-build-purge-at';
+            var n = Date.now();
+            if (n - Number(sessionStorage.getItem(k) || 0) < 60000) return;
+            sessionStorage.setItem(k, String(n));
+          } catch (x) {
+            return;
+          }
+          var go = function () {
+            location.reload();
+          };
+          setTimeout(go, 3000);
+          Promise.all([
+            navigator.serviceWorker
+              ? navigator.serviceWorker.getRegistrations().then(function (r) {
+                  return Promise.all(
+                    r.map(function (w) {
+                      return w.unregister();
+                    })
+                  );
+                })
+              : 0,
+            window.caches
+              ? caches.keys().then(function (ks) {
+                  return Promise.all(
+                    ks.map(function (k2) {
+                      return caches.delete(k2);
+                    })
+                  );
+                })
+              : 0,
+          ]).then(go, go);
+        },
+        true
+      );
+    </script>
   </head>
   <body>
     <div id="root"></div>
