@@ -57,6 +57,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.industryJobHistory.clear();
+  await db.productionRuns.clear();
   // Module-scope singleton: a value left over from a previous test would
   // make the cross-character block's assertions pass or fail for the wrong
   // reason (`Settings.test.tsx`'s precedent).
@@ -900,7 +902,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-1'));
-    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+    expect(location?.state).toEqual({
+      logProductionFromJob: { runs: 3, jobFee: 5000, jobId: 1 },
+    });
   });
 
   it('offers to create a Build Plan when none builds the job’s blueprint yet, then navigates to it once created', async () => {
@@ -917,7 +921,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
 
     await waitFor(() => expect(location?.pathname).toMatch(/^\/industry\/plans\/.+/));
-    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+    expect(location?.state).toEqual({
+      logProductionFromJob: { runs: 3, jobFee: 5000, jobId: 1 },
+    });
     const created = await db.buildPlans.toArray();
     expect(created).toHaveLength(1);
     expect(created[0].blueprintTypeID).toBe(100);
@@ -1600,5 +1606,133 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
 
     expect(await screen.findByText('None')).toBeInTheDocument();
     expect(screen.queryByText(/Factory Manager/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ActiveJobsPanel: Job History (#2866)', () => {
+  function esiJob(overrides: Record<string, unknown> = {}) {
+    return {
+      job_id: 1,
+      activity_id: 1,
+      blueprint_type_id: 100,
+      product_type_id: 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 3,
+      cost: 5000,
+      start_date: new Date(NOW.getTime() - 240 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() - 120 * 60_000).toISOString(),
+      status: 'delivered',
+      ...overrides,
+    };
+  }
+
+  const RUNNING = esiJob({
+    job_id: 2,
+    blueprint_type_id: 300,
+    product_type_id: undefined,
+    activity_id: 4,
+    status: 'active',
+    end_date: new Date(NOW.getTime() + 60 * 60_000).toISOString(),
+  });
+
+  function renderPanel() {
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await db.buildPlans.clear();
+  });
+
+  async function openHistory() {
+    fireEvent.click(await screen.findByRole('button', { name: 'History' }));
+  }
+
+  it('switches between Active and History; a delivered job never counts as running or done', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+
+    expect(await screen.findByText('1 running · 0 done')).toBeInTheDocument();
+    await expandJobs();
+    expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Alpha')).not.toBeInTheDocument();
+
+    await openHistory();
+
+    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }));
+    expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+  });
+
+  it('says how many delivered jobs are unlogged while the panel is folded', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+
+    expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
+  });
+
+  it('tints an unlogged row and offers Log production', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    renderPanel();
+    await openHistory();
+
+    const button = await screen.findByRole('button', { name: 'Log production…' });
+    expect(button.closest('tr')).toHaveClass('bg-warning/10');
+    expect(screen.queryByText('Logged')).not.toBeInTheDocument();
+  });
+
+  it('marks a logged row with a badge and a link to its plan, and offers no Log production', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    await db.buildPlans.add({
+      id: 'plan-1',
+      characterId: CHAR_ID,
+      name: 'A plan',
+      blueprintTypeID: 100,
+      runs: 1,
+      me: 0,
+      te: 0,
+    } as unknown as BuildPlanRecord);
+    await db.productionRuns.add({
+      id: 'run-1',
+      characterId: CHAR_ID,
+      buildPlanId: 'plan-1',
+      productTypeID: 200,
+      quantity: 3,
+      materialCost: 0,
+      jobFee: 5000,
+      totalCost: 5000,
+      loggedAt: NOW.getTime(),
+      updatedAt: NOW.getTime(),
+      sourceJobId: 1,
+    });
+    renderPanel();
+    await openHistory();
+
+    expect(await screen.findByText('Logged')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'View plan' })).toHaveAttribute(
+      'href',
+      '/industry/plans/plan-1'
+    );
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/delivered, not logged/)).not.toBeInTheDocument();
+  });
+
+  it('keeps a delivered job listed after ESI stops returning it', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    renderPanel();
+    await openHistory();
+    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+
+    expect((await db.industryJobHistory.get(CHAR_ID))?.jobs.map((j) => j.job_id)).toEqual([1]);
   });
 });

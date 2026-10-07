@@ -156,6 +156,8 @@ describe('restoring an existing-format backup file', () => {
     // oreLineValues (grilling session, 2026-09-27) and rawOrePriced (Ore Form,
     // 2026-10-06) postdate this fixture.
     miningTaxAssignments: ['oreLineValues', 'rawOrePriced'],
+    // sourceJobId (Job History, #2866) postdates this fixture.
+    productionRuns: ['sourceJobId'],
   };
   /**
    * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than

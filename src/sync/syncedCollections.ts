@@ -434,6 +434,7 @@ export const PRODUCTION_RUNS = defineEditableCollection<
     totalCost: r.totalCost,
     loggedAt: r.loggedAt,
     updatedAt: r.updatedAt,
+    ...(r.sourceJobId !== undefined && { sourceJobId: r.sourceJobId }),
     ownerHash,
     deleted: false,
   }),
@@ -448,6 +449,7 @@ export const PRODUCTION_RUNS = defineEditableCollection<
     totalCost: r.totalCost,
     loggedAt: r.loggedAt,
     updatedAt: r.updatedAt,
+    ...(r.sourceJobId !== undefined && { sourceJobId: r.sourceJobId }),
   }),
 });
 

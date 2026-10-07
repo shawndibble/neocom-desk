@@ -83,7 +83,9 @@ beforeEach(async () => {
   scheduleSync.mockReset();
 });
 
-function renderPanel(defaults: { quantity: number; materialCost: number; jobFee: number } | null) {
+function renderPanel(
+  defaults: { quantity: number; materialCost: number; jobFee: number; sourceJobId?: number } | null
+) {
   return render(
     <ProductionRunsPanel
       characterId={CHARACTER_ID}
@@ -138,6 +140,20 @@ describe('ProductionRunsPanel', () => {
       jobFee: 50_000,
       totalCost: 550_000,
     });
+  });
+
+  it('stores the job it was logged from as sourceJobId', async () => {
+    const user = userEvent.setup();
+    renderPanel({ quantity: 10, materialCost: 500_000, jobFee: 50_000, sourceJobId: 4242 });
+
+    await user.click(screen.getByRole('button', { name: 'Log Production' }));
+    await user.click(screen.getByRole('button', { name: 'Save run' }));
+
+    await waitFor(async () => {
+      expect(await db.productionRuns.where('buildPlanId').equals(BUILD_PLAN_ID).count()).toBe(1);
+    });
+    const run = (await db.productionRuns.where('buildPlanId').equals(BUILD_PLAN_ID).toArray())[0];
+    expect(run.sourceJobId).toBe(4242);
   });
 
   it('renders a logged run as a table row with its snapshotted total cost', async () => {

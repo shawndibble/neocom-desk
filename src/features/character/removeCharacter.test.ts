@@ -107,6 +107,23 @@ async function seedCharacter(characterId: number): Promise<void> {
     rows: [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: 1230 }],
     fetchedAt: 1,
   });
+  await db.industryJobHistory.put({
+    characterId,
+    jobs: [
+      {
+        job_id: characterId * 100,
+        activity_id: 1,
+        blueprint_type_id: 638,
+        facility_id: 1,
+        station_id: 1,
+        runs: 1,
+        start_date: '2026-09-01T00:00:00Z',
+        end_date: '2026-09-01T02:00:00Z',
+        status: 'delivered',
+      },
+    ],
+    fetchedAt: 1,
+  });
 }
 
 beforeEach(async () => {
@@ -127,6 +144,7 @@ beforeEach(async () => {
     db.orderProblemSamples.clear(),
     db.mailDrafts.clear(),
     db.miningLedgerHistory.clear(),
+    db.industryJobHistory.clear(),
   ]);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
@@ -165,6 +183,7 @@ describe('removeCharacter', () => {
     expect(await db.orderProblemSamples.where('characterId').equals(1).count()).toBe(0);
     expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(0);
     expect(await db.miningLedgerHistory.get(1)).toBeUndefined();
+    expect(await db.industryJobHistory.get(1)).toBeUndefined();
   });
 
   it('deletes every synced collection’s local rows, Production Log included', async () => {
@@ -194,6 +213,7 @@ describe('removeCharacter', () => {
     expect(await db.orderProblemSamples.where('characterId').equals(2).count()).toBe(1);
     expect(await db.mailDrafts.where('characterId').equals(2).count()).toBe(1);
     expect(await db.miningLedgerHistory.get(2)).toBeDefined();
+    expect(await db.industryJobHistory.get(2)).toBeDefined();
   });
 
   it('leaves remote sync data to the inactivity purge: no remote call, no pending marker', async () => {

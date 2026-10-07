@@ -120,6 +120,7 @@ export const FULL_PRODUCTION_RUN: Required<ProductionRunRecord> = {
   totalCost: 1_025_000,
   loggedAt: UPDATED_AT - 5000,
   updatedAt: UPDATED_AT,
+  sourceJobId: 987654,
 };
 
 export const FULL_PRODUCTION_SALE_LINK: Required<ProductionSaleLinkRecord> = {
