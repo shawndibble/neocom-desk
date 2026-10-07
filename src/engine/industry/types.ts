@@ -645,7 +645,17 @@ export interface OwnedStockLocation {
  * governs the whole plan, not per-material.
  */
 export type OwnedStockScope =
-  { mode: 'everywhere' } | { mode: 'selected'; locations: readonly OwnedStockLocation[] };
+  | { mode: 'everywhere' }
+  | {
+      mode: 'selected';
+      locations: readonly OwnedStockLocation[];
+      /**
+       * Station containers (by `item_id`) whose stacks do not count even inside
+       * a selected location (issue #2869). Absent or empty: everything at the
+       * selected locations counts, as before.
+       */
+      excludedContainers?: readonly number[];
+    };
 
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
 export interface AcquisitionLine {

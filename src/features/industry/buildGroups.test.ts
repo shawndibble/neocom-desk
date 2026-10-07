@@ -342,6 +342,21 @@ describe('parseBuildGroups — ownedStock / ownedStockScope', () => {
     expect(parseBuildGroups(raw)).toEqual({});
   });
 
+  it('keeps excludedContainers on a selected scope and drops a malformed list (#2869)', () => {
+    const scope = (excludedContainers: unknown) => ({
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          ownedStockScope: { mode: 'selected', locations: [], excludedContainers },
+        },
+      ],
+    });
+    expect(parseBuildGroups(scope([7, 8]))).toEqual(scope([7, 8]));
+    expect(parseBuildGroups(scope(['x']))).toEqual({});
+  });
+
   it('keeps a group with neither field at all — the pre-#697 shape', () => {
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
     expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });

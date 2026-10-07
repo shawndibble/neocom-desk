@@ -107,4 +107,39 @@ describe('OwnedStockScopeControl', () => {
       ],
     });
   });
+
+  it('excludes a container at a selected location and keeps the locations (#2869)', async () => {
+    const onChange = vi.fn();
+    const location = { characterId: 1, locationId: 60003760, locationType: 'station' as const };
+    render(
+      <OwnedStockScopeControl
+        scope={{ mode: 'selected', locations: [location] }}
+        detectedStock={stockOf([
+          placement({ containers: [{ containerId: 700, typeId: 3465, quantity: 40 }] }),
+        ])}
+        detection={detectionOf()}
+        onChange={onChange}
+      />
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /0 containers excluded/i }));
+    await user.click(screen.getByRole('option', { name: /Container #700/ }));
+    expect(onChange).toHaveBeenCalledWith({
+      mode: 'selected',
+      locations: [location],
+      excludedContainers: [700],
+    });
+  });
+
+  it('offers no container picker when nothing sits in a container', () => {
+    render(
+      <OwnedStockScopeControl
+        scope={{ mode: 'selected', locations: [] }}
+        detectedStock={stockOf([placement()])}
+        detection={detectionOf()}
+        onChange={() => {}}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /containers excluded/i })).toBeNull();
+  });
 });
