@@ -2,8 +2,6 @@
 
 _Recorded 2026-10-06._
 
-- **<Decision>.** <Why, and what it rules out.>
-
 _Code: `src/engine/pi/accountPlan.ts`, `src/features/pi/accountPlanModel.ts`, `useAccountPlan.ts`, `AccountPlanPanel.tsx`. Amends [20261006-095530](20261006-095530-pi-p3-p4-chain-estimate-never-a-pick.md) ("never ranked", "nothing bought") and [20261006-170236](20261006-170236-pi-find-best-lists-p3-and-p4-chains.md) (the separate P3/P4 list, now gone). Decision 20261005-123211's "P3+ are never offered" now holds only for the one-planet picks below the plan._
 
 - **Find best's picks view opens with a whole-account plan for a pilot with colonies.** The question is "what is the best use of all my planets", not "what is the best one planet". The plan splits the colonies into groups: a chain across several, one colony on a product from bought inputs, or one colony left on its own best pick. The total is the sum. The separate P3 and P4 chain list is removed.
