@@ -66,7 +66,7 @@ export function resetBiggerChains(): void {
 }
 
 /** The solver reads these fields; `ratePerEcu` is a Map, so it is spelled out. */
-function coloniesKey(colonies: readonly PlannerColony[]): string {
+export function coloniesKey(colonies: readonly PlannerColony[]): string {
   return JSON.stringify(
     colonies.map((c) => [
       c.planetId,
@@ -141,7 +141,7 @@ function useColonyJumps(
   }, [pairs, wanted, systemOf, enabled]);
 }
 
-interface ChainInputs {
+export interface ChainInputs {
   colonies: readonly PlannerColony[];
   /** The pilot's planet types, sorted. */
   types: PlanetType[];
@@ -152,7 +152,11 @@ interface ChainInputs {
 }
 
 /** What both hooks price from, keyed once per input. Nothing is counted or keyed while `enabled` is off. */
-function useChainInputs(advice: PlanAdvice, pi: PiData | null, enabled: boolean): ChainInputs {
+export function useChainInputs(
+  advice: PlanAdvice,
+  pi: PiData | null,
+  enabled: boolean
+): ChainInputs {
   const colonies = advice.chainColonies;
   const systemOf = useMemo(
     () => new Map(advice.colonies.map((colony) => [colony.planetId, colony.systemId])),

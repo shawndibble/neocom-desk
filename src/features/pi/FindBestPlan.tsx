@@ -7,7 +7,7 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeFilter } from '@/engine/pi/planRecipes';
 import { PricesUnavailable } from './PricesUnavailable';
 import { AllProductsPanel } from './AllProductsPanel';
-import { ChainPicksPanel } from './ChainPicksPanel';
+import { AccountPlanSection } from './AccountPlanSection';
 import { useCadence } from './cadencePref';
 import {
   FindBestControls,
@@ -15,7 +15,7 @@ import {
   RecipeListPanel,
   type FindBestMode,
 } from './FindBestSections';
-import { buildAllProducts, buildChainPicks, buildFindBestView } from './findBestView';
+import { buildAllProducts, buildFindBestView } from './findBestView';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { SlotNudge } from './PlanSlotNudge';
 import { usePlanPreference } from './planTicksPref';
@@ -108,9 +108,8 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
         { ...input, rawRows: advice.rawRows, rawUnpriced: advice.rawUnpriced },
         snapshot.pi
       ),
-      chains: buildChainPicks({ colonyTypes, off, whatIf }, snapshot.pi, chainOf),
     };
-  }, [advice, colonyTypes, allTypes, off, whatIf, filter, snapshot.pi, chainOf]);
+  }, [advice, colonyTypes, allTypes, off, whatIf, filter, snapshot.pi]);
 
   if (state.status === 'prices-failed') {
     return <PricesUnavailable />;
@@ -126,7 +125,7 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
     );
   }
 
-  const { best, tiers, chains } = view;
+  const { best, tiers } = view;
   const { hubName } = state;
   const priceSource = priceSourceLabel(t, hubName, buybackPct);
   const mineFor = (hosts: readonly PlanetType[]) =>
@@ -173,6 +172,9 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           setOpenId(null);
         }}
       />
+      {mode === 'picks' && filter === 'any' && snapshot.colonies.length > 0 && (
+        <AccountPlanSection advice={advice} pi={snapshot.pi} />
+      )}
       {mode === 'all' ? (
         <AllProductsPanel tiers={tiers} priceSource={priceSource} estimate chainOf={chainOf} />
       ) : (
@@ -227,7 +229,6 @@ export function FindBestPlan({ snapshot, characterId }: Props) {
           )}
         />
       )}
-      {mode === 'picks' && filter === 'any' && <ChainPicksPanel picks={chains} />}
       {advice.slots.free > 0 && (
         <Panel title={t('piPlan.find.slotsTitle')} padded={false}>
           <SlotNudge slots={advice.slots} />

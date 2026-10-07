@@ -24,9 +24,7 @@ import {
 } from '@/engine/pi/planRecipes';
 import type { PiData } from '@/sde/types';
 import type { RawRow } from './planAdviceModel';
-import { chainProductIds, type ChainEstimateView } from './chainEstimateModel';
 import { canMakeWith, planetsNeeded, planetTypesOf } from './productPlanets';
-import type { ChainEstimateOf } from './useChainEstimates';
 
 export type TypeState = 'have' | 'whatif' | 'find';
 
@@ -164,53 +162,6 @@ export function buildFindBestView(input: FindBestInput): FindBestView {
         ? cards.length > 0
         : rankRecipes({ rows, haveTypes: [...have], filter: 'any' }).recipes.length > 0,
   };
-}
-
-// --- P3 and P4 chains ---------------------------------------------------------------
-
-export interface ChainPick {
-  typeId: number;
-  name: string;
-  tier: 3 | 4;
-  estimate: ChainEstimateView;
-}
-
-export interface ChainPicks {
-  /** Priced P3/P4 the planet-type toggles reach, most ISK a day first. */
-  rows: ChainPick[];
-  /** Reachable products still being priced. */
-  pending: number;
-}
-
-/**
- * P3 and P4 beside the one-planet picks: a multi-planet estimate each, in a list
- * of its own and never given a pick number or ranked against one-planet
- * figures (decision 20261006-095530). Same reach rule as the recipes: the
- * pilot's planet types (or all, with no colonies), less any switched off, plus
- * what-if planets.
- */
-export function buildChainPicks(
-  input: Pick<FindBestInput, 'colonyTypes' | 'off' | 'whatIf'>,
-  pi: PiData,
-  chainOf: ChainEstimateOf
-): ChainPicks {
-  const hasColonies = input.colonyTypes.length > 0;
-  const base = new Set<PlanetType>(
-    (hasColonies ? input.colonyTypes : planetTypesOf(pi)).filter((type) => !input.off.has(type))
-  );
-  const have = new Set<PlanetType>([...base, ...input.whatIf]);
-  const rows: ChainPick[] = [];
-  let pending = 0;
-  for (const typeId of chainProductIds(pi)) {
-    const tier = tierOf(typeId, pi);
-    if ((tier !== 3 && tier !== 4) || !canMakeWith(typeId, pi, have)) continue;
-    const estimate = chainOf(typeId);
-    if (estimate === undefined) pending += 1;
-    else if (estimate)
-      rows.push({ typeId, name: pi.schematics[String(typeId)].name, tier, estimate });
-  }
-  rows.sort((a, b) => b.estimate.iskPerDay - a.estimate.iskPerDay || a.typeId - b.typeId);
-  return { rows, pending };
 }
 
 // --- All products ----------------------------------------------------------------

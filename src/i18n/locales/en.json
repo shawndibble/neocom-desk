@@ -4856,6 +4856,27 @@
     }
   },
   "piPlan": {
+    "account": {
+      "title": "Best use of all your planets",
+      "meta": "Every planet, together · Est.",
+      "pending": "Planning your planets…",
+      "total": "All planets together:",
+      "apartTotal": "Each planet alone",
+      "buyGain": "Buying at the hub",
+      "haulGain": "Hauling between planets",
+      "onOne": "Make it on {{planets}}.",
+      "onMany": "Make it across {{planets}}, with the factories on {{host}}.",
+      "buysInputs": "Buys some inputs at the hub.",
+      "hauls": "Hauls {{value}} m³ a week.",
+      "apart": "Alone:",
+      "noChange": "No mix beats each planet on its own best pick. Every planet stays as it is.",
+      "noChangeOptIn": "Each planet is on its own best pick. Turn on hauling between planets, or pick tiers you will buy, in Settings, to see if a mix earns more.",
+      "failed": "Could not plan your planets. Reload to try again.",
+      "unknown_one": "{{count}} planet has no figure yet, so it is left out of this plan.",
+      "unknown_other": "{{count}} planets have no figure yet, so they are left out of this plan.",
+      "stays_one": "{{count}} more planet stays on its own best pick.",
+      "stays_other": "{{count}} more planets stay on their own best picks."
+    },
     "chains": {
       "optIn": "I will haul between my planets",
       "optInHint": "Adds a Bigger chains section: P3 and P4 made across several of your planets. Your picks and totals stay one planet each.",
@@ -4983,10 +5004,6 @@
       "makeP1": "Processed (P1)",
       "makeP2": "Factory goods (P2)",
       "makeHint": "e.g. if your corp buyback asks for P2",
-      "chainTitle": "P3 and P4 chains",
-      "chainMeta": "Multi-planet, needs hauling · never ranked against the picks above",
-      "chainPending_one": "Pricing {{count}} more chain…",
-      "chainPending_other": "Pricing {{count}} more chains…",
       "picksTitle": "Best picks for you",
       "picksMeta": "ISK/day per planet · {{source}}",
       "noneFit": "No one-planet setup fits a Command Center at upgrade level {{level}}.",
