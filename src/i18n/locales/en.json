@@ -4672,10 +4672,11 @@
     "whatIfBlank": "What if I add a ___ planet?",
     "whatIfNoColonies": "No colonies yet, so every planet type is ticked. Untick the types you can't reach.",
     "whatIfUnknownColonies": "Your colonies could not be read, so every planet type is ticked. Untick the types you can't reach.",
-    "whatIfHint": "Hover or focus a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark. Click it to see where to find one.",
-    "whatIfHint_touch": "Tap a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark, and where to find one.",
+    "whatIfHint": "Hover or focus a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark. Click it to see where to find one; click more to try them together.",
+    "whatIfHint_touch": "Tap a planet type you don't have ({{types}}): what it would unlock lights up pink with a + mark, and where to find one. Tap more to try them together.",
     "whatIfAll": "You have every planet type.",
     "whatIfTitle": "What if I add {{aType}} planet?",
+    "whatIfTitleMany": "What if I add {{types}} planets?",
     "whatIfNothing": "Nothing new: every raw it yields already comes from your planets.",
     "whatIfUnlocks_one": "Unlocks {{count}} product on the map.",
     "whatIfUnlocks_other": "Unlocks {{count}} products on the map.",
@@ -4697,6 +4698,7 @@
     "rawYields": "Raw resource, found on {{types}} planets",
     "pickMark": "Your pick number {{rank}}",
     "unlockedMark": "Unlocked by adding {{aType}} planet",
+    "unlockedMarkMany": "Unlocked by adding {{types}} planets",
     "tracedMark": "Traced",
     "announceTrace": "Tracing {{name}}. Needs {{planets}}. The chain is written out in the details.",
     "announceTraceCleared": "Trace cleared.",
@@ -4761,8 +4763,11 @@
     },
     "add": {
       "panelTitle": "Where to put a new colony",
-      "panelTitleFor": "Where to put a new {{type}} colony",
+      "panelTitleFor_one": "Where to put a new {{type}} colony",
+      "panelTitleFor_other": "Where to put new {{type}} colonies",
       "title": "Add {{aType}} planet",
+      "titleMany": "Add {{types}} planets",
+      "slotsShort": "These {{count}} planets need {{count}} free slots; you have {{free}}.",
       "unlockList": "Unlocked products: {{names}}.",
       "unlocks_one": "Unlocks {{count}} product (pink on the map)",
       "unlocks_other": "Unlocks {{count}} products (pink on the map)",
@@ -4776,7 +4781,8 @@
       "chainsHeading": "Bigger chains with it",
       "chainsPricing": "Pricing the Bigger chains it makes possible…",
       "chainsNone": "It makes no Bigger chain possible in your free planet slots.",
-      "chainsNoSlot": "You have no free planet slot, so its Bigger chains need a colony dropped first.",
+      "chainsNoSlot_one": "You have no free planet slot, so its Bigger chains need a colony dropped first.",
+      "chainsNoSlot_other": "These planets need {{count}} free planet slots and you have {{free}}, so their Bigger chains need a colony dropped first.",
       "chainsTip": "Its planets, haul and jumps are in the add-planet panel."
     },
     "slots": {
@@ -4836,7 +4842,7 @@
         },
         "try": {
           "title": "Try a planet.",
-          "body": "Hover or focus a planet type you don't have: pink and a + mark show what it would unlock. Click it to see where to find one.",
+          "body": "Hover or focus a planet type you don't have: pink and a + mark show what it would unlock. Click it to see where to find one; click more to try them together.",
           "body_touch": "Tap a planet type you don't have: pink and a + mark show what it would unlock, and where to find one."
         }
       },
@@ -4918,7 +4924,8 @@
       "assumesColonies_other": "Your colonies as they are: their own extraction rates, Command Centers and customs. Sold at your sell market after customs and sales tax; nothing bought. Per trip at your haul every {{count}} days.",
       "newPlanet": "a new {{type}} planet",
       "legNew": "{{from}} → {{to}}: not known yet",
-      "assumesWhatIf": "The new {{type}} planet is assumed: a level {{level}} Command Center, extractors with {{heads}} heads pulling about {{rate}} units an hour each, and your customs rate.",
+      "assumesWhatIf_one": "The new {{type}} planet is assumed: a level {{level}} Command Center, extractors with {{heads}} heads pulling about {{rate}} units an hour each, and your customs rate.",
+      "assumesWhatIf_other": "The new {{type}} planets are assumed: each with a level {{level}} Command Center, extractors with {{heads}} heads pulling about {{rate}} units an hour each, and your customs rate.",
       "whatIfTitle": "What if I add a planet?",
       "whatIfIntro": "One planet type you don't run at a time, and the Bigger chains it would make possible. It takes a free planet slot. Facts only: never a recommendation, and never in a pick or total.",
       "whatIfRow_one": "If you add {{aType}} planet, this Bigger chain becomes possible",
@@ -5781,7 +5788,9 @@
       "assumesHaul_one": "Hauling about {{m3}} m³ a week: {{perHaul}} m³ a trip at your haul every {{count}} day. Jumps between the planets are not counted.",
       "assumesHaul_other": "Hauling about {{m3}} m³ a week: {{perHaul}} m³ a trip at your haul every {{count}} days. Jumps between the planets are not counted.",
       "whatIfFigure_one": "With {{aType}} planet added, a Bigger chain on your planets (multi-planet estimate, needs hauling): about {{isk}} ISK a day across {{count}} planet",
-      "whatIfFigure_other": "With {{aType}} planet added, a Bigger chain on your planets (multi-planet estimate, needs hauling): about {{isk}} ISK a day across {{count}} planets"
+      "whatIfFigure_other": "With {{aType}} planet added, a Bigger chain on your planets (multi-planet estimate, needs hauling): about {{isk}} ISK a day across {{count}} planets",
+      "whatIfFigureMany_one": "With {{types}} planets added, a Bigger chain on your planets (multi-planet estimate, needs hauling): about {{isk}} ISK a day across {{count}} planet",
+      "whatIfFigureMany_other": "With {{types}} planets added, a Bigger chain on your planets (multi-planet estimate, needs hauling): about {{isk}} ISK a day across {{count}} planets"
     },
     "pinKind": {
       "extractorControlUnit": "Extractor Control Unit",

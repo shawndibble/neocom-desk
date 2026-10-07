@@ -53,11 +53,18 @@ export function comparisonSentence(t: TFunction, figure: ProductFigure, name?: s
 export function figureSentence(t: TFunction, figure: ProductFigure): string | null {
   if (figure.kind !== 'ranked') {
     if (figure.whatIf) {
-      return t('piShared.chain.whatIfFigure', {
-        aType: withArticle(planetName(t, figure.whatIf.type)),
-        isk: formatIsk(figure.whatIf.iskPerDay, 0),
-        count: figure.whatIf.planets,
-      });
+      const { types, iskPerDay, planets } = figure.whatIf;
+      return types.length > 1
+        ? t('piShared.chain.whatIfFigureMany', {
+            types: types.map((type) => planetName(t, type)).join(', '),
+            isk: formatIsk(iskPerDay, 0),
+            count: planets,
+          })
+        : t('piShared.chain.whatIfFigure', {
+            aType: withArticle(planetName(t, types[0])),
+            isk: formatIsk(iskPerDay, 0),
+            count: planets,
+          });
     }
     return figure.chain ? chainFigureSentence(t, figure.chain) : null;
   }
@@ -75,7 +82,7 @@ export function productAccessibleName(
   t: TFunction,
   product: MapProduct,
   figure: ProductFigure,
-  marks: { rank: number | null; unlockedBy: PlanetType | null; traced: boolean }
+  marks: { rank: number | null; unlockedBy: readonly PlanetType[]; traced: boolean }
 ): string {
   const parts: string[] = [product.name, tierWithCode(t, product.tier)];
   if (product.tier === 0) {
@@ -88,8 +95,14 @@ export function productAccessibleName(
     if (money) parts.push(money);
   }
   if (marks.rank !== null) parts.push(t('piMap.pickMark', { rank: marks.rank }));
-  if (marks.unlockedBy) {
-    parts.push(t('piMap.unlockedMark', { aType: withArticle(planetName(t, marks.unlockedBy)) }));
+  if (marks.unlockedBy.length === 1) {
+    parts.push(t('piMap.unlockedMark', { aType: withArticle(planetName(t, marks.unlockedBy[0])) }));
+  } else if (marks.unlockedBy.length > 1) {
+    parts.push(
+      t('piMap.unlockedMarkMany', {
+        types: marks.unlockedBy.map((type) => planetName(t, type)).join(', '),
+      })
+    );
   }
   if (marks.traced) parts.push(t('piMap.tracedMark'));
   return parts.join('. ');

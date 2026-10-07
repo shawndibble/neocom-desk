@@ -32,7 +32,7 @@ export interface MapPhoneProps {
   owned: ReadonlySet<PlanetType>;
   noColonies: boolean;
   ticked: ReadonlySet<PlanetType>;
-  whatIfType: PlanetType | null;
+  whatIfTypes: ReadonlySet<PlanetType>;
   litIds: ReadonlySet<number>;
   newIds: ReadonlySet<number>;
   tracedId: number | null;
@@ -63,7 +63,7 @@ export function MapPhone(props: MapPhoneProps) {
       <div role="group" aria-label={t('piMap.planetsTitle')} className="grid grid-cols-4 gap-1.5">
         {graph.planetTypes.map((type) => {
           const have = owned.has(type) || props.noColonies;
-          const pressed = have ? ticked.has(type) : props.whatIfType === type;
+          const pressed = have ? ticked.has(type) : props.whatIfTypes.has(type);
           return (
             <button
               key={type}

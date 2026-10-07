@@ -140,6 +140,21 @@ describe('useWhatIfChains', () => {
     expect(result.current.byType.get('lava')?.has(CONDENSATES)).toBe(false);
   });
 
+  it('prices a set of types together under one key, one new planet each, when slots allow', async () => {
+    const roomy = { ...twoGas, slots: { free: 2 } } as unknown as PlanAdvice;
+    const { result } = renderHook(() => useWhatIfChains(roomy, pi, [['plasma', 'lava']]));
+    await waitFor(() => expect(result.current.pending).toBe(false), { timeout: 5_000 });
+    const chains = result.current.byType.get('lava+plasma');
+    expect(chains?.has(CAMERA_DRONES)).toBe(true);
+    const planets = [...(chains?.values() ?? [])].flatMap((c) => c.colonies?.planetIds ?? []);
+    expect(planets.some((id) => id < 0)).toBe(true);
+    // Not one chain more than a single added planet's slot allows: with one slot, nothing.
+    const tight = renderHook(() => useWhatIfChains(twoGas, pi, [['plasma', 'lava']]));
+    await waitFor(() => expect(tight.result.current.pending).toBe(false), { timeout: 5_000 });
+    const none = [...(tight.result.current.byType.get('lava+plasma')?.values() ?? [])];
+    expect(none.every((c) => c.colonies === null && c.newPlanets === null)).toBe(true);
+  });
+
   it('keeps what it priced: the same type asked again (the other tab) lands at once', async () => {
     const first = renderHook(() => useWhatIfChains(twoGas, pi, LAVA));
     await waitFor(() => expect(first.result.current.pending).toBe(false), { timeout: 5_000 });

@@ -53,7 +53,7 @@ describe('chain estimate wording', () => {
     const figure: ProductFigure = { kind: 'unranked', reason: 'tier', chain: view };
     const name = productAccessibleName(t, product, figure, {
       rank: null,
-      unlockedBy: null,
+      unlockedBy: [],
       traced: false,
     });
     expect(name).toContain('Multi-planet estimate, needs hauling');

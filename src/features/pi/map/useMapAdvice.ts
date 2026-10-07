@@ -22,6 +22,7 @@ import type { FinderOrigin } from './MapDetail';
 import type { MapColony } from './PlanMap';
 import { buildMapGraph, type MapGraph } from './mapModel';
 import { colonyCountUnknown } from '../colonyStripModel';
+import { whatIfKey, whatIfTypesOf } from '../biggerChainsModel';
 import { useChainEstimates, type ChainEstimateOf } from '../useChainEstimates';
 
 export type MapAdviceState =
@@ -31,7 +32,7 @@ export type MapAdviceState =
       status: 'ready';
       graph: MapGraph;
       advice: PlanAdvice;
-      adviceWithWhatIf: (type: PlanetType) => PlanAdvice;
+      adviceWithWhatIf: (types: ReadonlySet<PlanetType>) => PlanAdvice;
       colonies: MapColony[];
       finder: FinderOrigin;
       /** The colony read failed: the board runs as for a pilot with no colonies, plus this notice. */
@@ -106,12 +107,13 @@ export function useMapAdvice(
     } catch {
       return 'error' as const;
     }
-    const cache = new Map<PlanetType, PlanAdvice>();
-    const adviceWithWhatIf = (type: PlanetType): PlanAdvice => {
-      let hit = cache.get(type);
+    const cache = new Map<string, PlanAdvice>();
+    const adviceWithWhatIf = (types: ReadonlySet<PlanetType>): PlanAdvice => {
+      const key = whatIfKey([...types]);
+      let hit = cache.get(key);
       if (!hit) {
-        hit = buildPlanAdvice({ ...input, whatIfTypes: [type] });
-        cache.set(type, hit);
+        hit = buildPlanAdvice({ ...input, whatIfTypes: whatIfTypesOf(key) });
+        cache.set(key, hit);
       }
       return hit;
     };

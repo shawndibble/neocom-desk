@@ -371,14 +371,17 @@ export function ProductDetail(props: ProductDetailProps) {
   );
 }
 
+const listFormat = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
+
 export interface AddPlanetDetailProps {
   graph: MapGraph;
-  type: PlanetType;
-  /** Products this planet type unlocks (P1 up). */
+  /** The planet types being tried, together, sorted. */
+  types: readonly PlanetType[];
+  /** Products these planet types unlock together (P1 up). */
   unlockedIds: readonly number[];
-  /** The best one-planet recipe only this type adds, priced for it. */
+  /** The best one-planet recipe only these types add, priced for them. */
   recipe: RecipeRank | null;
-  /** Recipes that only this type hosts. */
+  /** Recipes that only these types host. */
   oneHostCount: number;
   slots: SlotNudge;
   /** The pilot's weakest colony today, for "replace one". */
@@ -395,19 +398,28 @@ export interface AddPlanetDetailProps {
 export function AddPlanetDetail(props: AddPlanetDetailProps) {
   const { t } = useTranslation();
   const { slots, recipe } = props;
-  const name = planetName(t, props.type);
+  const { types } = props;
+  const typeNames = types.map((type) => planetName(t, type));
   const full = slots.free === 0 && !slots.assumed;
+  const short = !slots.assumed && slots.free < types.length;
   return (
     <div>
       <div className="flex items-center gap-3">
-        <PlanetImage
-          type={props.type}
-          size={44}
-          className="outline-2 outline-offset-1 outline-map-whatif"
-        />
+        <div className="flex shrink-0 gap-1">
+          {types.map((type) => (
+            <PlanetImage
+              key={type}
+              type={type}
+              size={types.length > 1 ? 36 : 44}
+              className="outline-2 outline-offset-1 outline-map-whatif"
+            />
+          ))}
+        </div>
         <div className="min-w-0">
           <div className="text-sm font-semibold">
-            {t('piMap.add.title', { aType: withArticle(name) })}
+            {types.length === 1
+              ? t('piMap.add.title', { aType: withArticle(typeNames[0]) })
+              : t('piMap.add.titleMany', { types: listFormat.format(typeNames) })}
           </div>
           {props.unlockedIds.length > 0 && (
             <p className="text-xs text-text-dim">
@@ -471,6 +483,11 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
               ? t('piMap.slots.trainOrReplace', { used: slots.used, allowed: slots.allowed })
               : t('piMap.slots.replace', { used: slots.used, allowed: slots.allowed })}
       </p>
+      {short && types.length > 1 && (
+        <p className="mt-1 text-xs text-text-dim">
+          {t('piMap.add.slotsShort', { count: types.length, free: slots.free })}
+        </p>
+      )}
       {full && props.weakest && recipe && (
         <p className="mt-1 text-xs text-text-dim">
           {t('piMap.slots.weakest', { name: props.weakest.name })}{' '}
@@ -481,7 +498,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
 
       <div className="mt-4 border-t border-line pt-3">
         <PlanetFinder
-          types={[props.type]}
+          types={types}
           homeSystemId={props.finder.systemId}
           homeName={props.finder.name}
           homeSecurity={props.finder.security}

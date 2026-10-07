@@ -43,8 +43,8 @@ beforeAll(() => {
   adviceNone = buildPlanAdvice(adviceInput('none'));
 });
 
-const withWhatIf = (kind: 'lean' | 'none') => (type: PlanetType) =>
-  buildPlanAdvice(adviceInput(kind, { whatIfTypes: [type] }));
+const withWhatIf = (kind: 'lean' | 'none') => (types: ReadonlySet<PlanetType>) =>
+  buildPlanAdvice(adviceInput(kind, { whatIfTypes: [...types] }));
 
 function props(overrides: Partial<PlanMapProps> = {}): PlanMapProps {
   return {
@@ -966,7 +966,7 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     renderMap({ pi });
     const picksBefore = screen.getByRole('group', { name: /picks/i }).textContent;
     await user.click(planet('Lava'));
-    expect(whatIfAskedFor).toHaveBeenLastCalledWith(['lava']);
+    expect(whatIfAskedFor).toHaveBeenLastCalledWith([['lava']]);
     expect(product('Camera Drones')).toHaveAccessibleName(
       /With a Lava planet added, a Bigger chain on your planets \(multi-planet estimate, needs hauling\): about 50,000 ISK a day across 2 planets/
     );
@@ -987,6 +987,46 @@ describe('PlanMap: what-if Bigger chains, when the pilot hauls between planets',
     await user.click(product('Camera Drones'));
     expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
     expect(product('Camera Drones')).toHaveAccessibleName(/With a Lava planet added/);
+  });
+
+  it('adds each clicked planet type to the what-if, priced as one set', async () => {
+    const user = userEvent.setup();
+    haulBetween(true);
+    renderMap({ pi, advice: { ...advice, slots: { ...advice.slots, free: 2 } } });
+    await user.click(planet('Lava'));
+    await user.click(planet('Plasma'));
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'true');
+    expect(planet('Plasma')).toHaveAttribute('aria-pressed', 'true');
+    expect(whatIfAskedFor).toHaveBeenLastCalledWith([['lava', 'plasma']]);
+    const dialog = screen.getByRole('dialog', {
+      name: 'Where to put new Lava and Plasma colonies',
+    });
+    expect(within(dialog).getByText('Add Lava and Plasma planets')).toBeInTheDocument();
+    expect(screen.getByTestId('finder')).toHaveTextContent('finder for lava,plasma');
+    // Unticking one leaves the other, and the panel open.
+    await user.click(planet('Lava'));
+    expect(planet('Lava')).toHaveAttribute('aria-pressed', 'false');
+    expect(planet('Plasma')).toHaveAttribute('aria-pressed', 'true');
+    expect(whatIfAskedFor).toHaveBeenLastCalledWith([['plasma']]);
+    expect(screen.getByRole('dialog', { name: 'Where to put a new Plasma colony' })).toBeVisible();
+    // The last one off closes it.
+    await user.click(planet('Plasma'));
+    expect(screen.queryByRole('dialog', { name: /Where to put/ })).toBeNull();
+  });
+
+  it('says so, and prices nothing, when the ticked planets need more free slots than there are', async () => {
+    const user = userEvent.setup();
+    haulBetween(true);
+    renderMap({ pi, advice: { ...advice, slots: { ...advice.slots, free: 1 } } });
+    await user.click(planet('Lava'));
+    await user.click(planet('Plasma'));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Where to put new Lava and Plasma colonies',
+    });
+    expect(
+      within(dialog).getByText(/These planets need 2 free planet slots and you have 1/)
+    ).toBeInTheDocument();
+    expect(whatIfAskedFor).toHaveBeenLastCalledWith([['lava']]);
   });
 
   it('prices nothing and shows no chains with the setting off', async () => {

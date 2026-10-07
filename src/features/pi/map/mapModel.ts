@@ -117,14 +117,15 @@ export interface Unlocked {
   productIds: number[];
 }
 
-/** What adding one planet type makes possible over the ticked ones. */
+/** What adding planet types (the ones not already ticked) makes possible over the ticked ones, all together. */
 export function unlockedBy(
   graph: MapGraph,
-  type: PlanetType,
+  types: ReadonlySet<PlanetType>,
   ticked: ReadonlySet<PlanetType>
 ): Unlocked {
-  if (ticked.has(type)) return { highlight: new Set(), productIds: [] };
-  const with_ = new Set<PlanetType>([...ticked, type]);
+  const added = [...types].filter((type) => !ticked.has(type));
+  if (added.length === 0) return { highlight: new Set(), productIds: [] };
+  const with_ = new Set<PlanetType>([...ticked, ...added]);
   const highlight = new Set<number>();
   for (const product of graph.byId.values()) {
     if (canMake(graph, product.typeId, with_) && !canMake(graph, product.typeId, ticked)) {
@@ -314,7 +315,7 @@ export type ProductFigure =
        * pilot hauls between planets: a multi-planet estimate with that planet
        * added, never a pick (`biggerChainsModel.ts`).
        */
-      whatIf?: { type: PlanetType; iskPerDay: number; planets: number };
+      whatIf?: { types: readonly PlanetType[]; iskPerDay: number; planets: number };
     };
 
 /** The multi-planet figure a P3/P4 tile shows: the what-if planet's Bigger chain first, else its chain estimate. */
@@ -372,18 +373,18 @@ export function productFigure(
 }
 
 /**
- * The best one-planet recipe a new planet of `type` adds: one only that type
- * can host among the pilot's. `advice` is built with that type as a what-if,
- * so the figure is priced for it, not for another host.
+ * The best one-planet recipe a new planet of one of `types` adds: one only
+ * those types can host among the pilot's. `advice` is built with them as
+ * what-ifs, so the figure is priced for them, not for another host.
  */
 export function unlockedRecipe(
   advice: PlanAdvice,
-  type: PlanetType,
+  types: ReadonlySet<PlanetType>,
   owned: readonly PlanetType[]
 ): RecipeRank | null {
   let best: RecipeRank | null = null;
   for (const recipe of advice.recipes.recipes) {
-    if (!recipe.hostTypes.includes(type)) continue;
+    if (!recipe.hostTypes.some((host) => types.has(host))) continue;
     if (recipe.hostTypes.some((host) => owned.includes(host))) continue;
     if (best === null || recipe.iskPerDay > best.iskPerDay) best = recipe;
   }
