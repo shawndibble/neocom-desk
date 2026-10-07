@@ -11,5 +11,7 @@ PNG exports of the chosen mockups for ready tickets. The originals are private C
 | [owned-stock-scope](owned-stock-scope/README.md) | Issue #2869 | Boards: container scope picker and group-differs hint |
 | [appraisal-recent-header](appraisal-recent-header/README.md) | Issue #2868 | Recent (load a previous paste select above the textarea) plus header option B (grouped 'You get / It's worth / Cargo') |
 | [completed-jobs-history](completed-jobs-history/README.md) | Issue #2866 | idea A, History segment on the Active Jobs panel |
+| [pilot-lookup-paste-list](pilot-lookup-paste-list/README.md) | Issue #2863 | idea C, one smart box |
+| [net-worth-chart](net-worth-chart/README.md) | Issue #2865 | Final design: net worth chart replacing the Wallet balance chart |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
