@@ -86,7 +86,7 @@ function CheckboxRow({ id, label, hint, checked, onChange }: CheckboxRowProps) {
         <label htmlFor={id} className="block cursor-pointer font-semibold">
           {label}
         </label>
-        <p className="mt-1 text-sm text-dim">{hint}</p>
+        <p className="mt-1 text-sm text-text-dim">{hint}</p>
       </div>
     </div>
   );
