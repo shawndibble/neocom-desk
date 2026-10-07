@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type PointerEvent,
   type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -105,6 +106,8 @@ const productKey = (typeId: number): Key => `p:${typeId}`;
 interface Wire {
   d: string;
   cls: string;
+  /** Where the wire meets its two nodes: dotted while the pointer or focus is on one of them. */
+  ends?: readonly [{ x: number; y: number }, { x: number; y: number }];
 }
 
 export function MapBoard(props: MapBoardProps) {
@@ -115,6 +118,16 @@ export function MapBoard(props: MapBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const nodes = useRef(new Map<Key, HTMLElement>());
   const [focusKey, setFocusKey] = useState<Key | null>(null);
+  /** The node under the pointer or focus: its own wires stand out, the rest step back. */
+  const [aim, setAim] = useState<Key | null>(null);
+  const aimEvents = (key: Key) => ({
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'mouse') setAim(key);
+    },
+    onPointerLeave: () => setAim((current) => (current === key ? null : current)),
+    onFocus: () => setAim(key),
+    onBlur: () => setAim((current) => (current === key ? null : current)),
+  });
   const [wires, setWires] = useState<Wire[]>([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [layoutVersion, setLayoutVersion] = useState(0);
@@ -177,6 +190,11 @@ export function MapBoard(props: MapBoardProps) {
       const dx = (x2 - x1) * 0.5;
       return `M${x1},${a.y} C${x1 + dx},${a.y} ${x2 - dx},${b.y} ${x2},${b.y}`;
     };
+    const ends = (a: { r: number; y: number }, b: { l: number; y: number }) =>
+      [
+        { x: a.r, y: a.y },
+        { x: b.l - 1, y: b.y },
+      ] as const;
     const traceEdges = new Set((trace?.edges ?? []).map(([from, to]) => `${from}>${to}`));
     const tracePlanetEdges = new Set(
       (trace?.planetEdges ?? []).map(([type, raw]) => `${type}>${raw}`)
@@ -192,12 +210,32 @@ export function MapBoard(props: MapBoardProps) {
         const b = spot(productKey(product.typeId));
         if (!a || !b) continue;
         const key = `${input}>${product.typeId}`;
-        if (traceEdges.has(key)) {
-          top.push({ d: curve(a, b), cls: 'stroke-accent stroke-2' });
+        const mine =
+          aim !== null && (aim === productKey(input) || aim === productKey(product.typeId));
+        // A wire that jumps a column crosses tiles: dashed, so it reads as a skip.
+        const skips =
+          (graph.byId.get(input)?.tier ?? 0) + 1 < product.tier ? '[stroke-dasharray:6_4]' : '';
+        if (mine) {
+          top.push({
+            d: curve(a, b),
+            cls: cx('stroke-accent stroke-[3]', skips),
+            ends: ends(a, b),
+          });
+        } else if (traceEdges.has(key)) {
+          top.push({
+            d: curve(a, b),
+            cls: cx(aim ? 'stroke-accent/25 stroke-1' : 'stroke-accent stroke-2', skips),
+          });
         } else if (newIds.has(product.typeId) && visible(input)) {
           mid.push({ d: curve(a, b), cls: 'stroke-map-whatif/50 stroke-[1.2]' });
         } else if (litIds.has(product.typeId) && litIds.has(input)) {
-          base.push({ d: curve(a, b), cls: quiet ? 'stroke-line/20' : 'stroke-line-bright/45' });
+          base.push({
+            d: curve(a, b),
+            cls: cx(
+              aim ? 'stroke-line/20' : quiet ? 'stroke-line/20' : 'stroke-line-bright/45',
+              skips
+            ),
+          });
         }
       }
     }
@@ -208,8 +246,14 @@ export function MapBoard(props: MapBoardProps) {
         const a = spot(planetKey(type));
         if (!a) continue;
         const key = `${type}>${raw.typeId}`;
-        if (tracePlanetEdges.has(key)) {
-          top.push({ d: curve(a, b), cls: 'stroke-warning stroke-2' });
+        const mine = aim !== null && (aim === planetKey(type) || aim === productKey(raw.typeId));
+        if (mine && (ticked.has(type) || tracePlanetEdges.has(key))) {
+          top.push({ d: curve(a, b), cls: 'stroke-warning stroke-[3]', ends: ends(a, b) });
+        } else if (tracePlanetEdges.has(key)) {
+          top.push({
+            d: curve(a, b),
+            cls: aim ? 'stroke-warning/25 stroke-1' : 'stroke-warning stroke-2',
+          });
         } else if (newIds.has(raw.typeId) && props.whatIfType === type) {
           mid.push({ d: curve(a, b), cls: 'stroke-map-whatif/50 stroke-[1.2]' });
         } else if (ticked.has(type) && litIds.has(raw.typeId) && !quiet) {
@@ -219,7 +263,18 @@ export function MapBoard(props: MapBoardProps) {
     }
     setWires([...base, ...mid, ...top]);
     setSize({ w: origin.width, h: origin.height });
-  }, [graph, litIds, newIds, ticked, trace, dimOthers, props.whatIfType, visible, layoutVersion]);
+  }, [
+    graph,
+    litIds,
+    newIds,
+    ticked,
+    trace,
+    dimOthers,
+    aim,
+    props.whatIfType,
+    visible,
+    layoutVersion,
+  ]);
 
   // --- Roving focus --------------------------------------------------------
   function move(key: Key, event: KeyboardEvent<HTMLElement>) {
@@ -304,6 +359,20 @@ export function MapBoard(props: MapBoardProps) {
           {wires.map((wire, i) => (
             <path key={i} d={wire.d} className={wire.cls} />
           ))}
+          {wires.flatMap((wire, i) =>
+            (wire.ends ?? []).map((end, j) => (
+              <circle
+                key={`${i}-${j}`}
+                cx={end.x}
+                cy={end.y}
+                r={3.5}
+                className={cx(
+                  'stroke-bg stroke-1',
+                  wire.cls.includes('warning') ? 'fill-warning' : 'fill-accent'
+                )}
+              />
+            ))
+          )}
         </svg>
 
         {/* Planets */}
@@ -320,7 +389,7 @@ export function MapBoard(props: MapBoardProps) {
           />
           <ul className="flex flex-1 flex-col justify-between">
             {graph.planetTypes.map((type) => (
-              <li key={type} className="flex justify-center">
+              <li key={type} className="flex justify-center" {...aimEvents(planetKey(type))}>
                 <PlanetToggle
                   type={type}
                   have={owned.has(type)}
@@ -404,7 +473,7 @@ export function MapBoard(props: MapBoardProps) {
                 const unlockedBy = isNew ? props.whatIfType : null;
                 const chainIsk = tileChainIsk(figure);
                 return (
-                  <li key={product.typeId} className="relative flex-none">
+                  <li key={product.typeId} className="relative flex-none" {...aimEvents(key)}>
                     <Tooltip content={tip}>
                       <Link
                         to={props.productHref(product.typeId)}
