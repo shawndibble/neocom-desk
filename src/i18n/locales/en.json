@@ -6849,6 +6849,8 @@
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "refineAssumesNoImplantsHint": "Refine value is calculated without this character's fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
+      "refineLeftoverHint_one": "{{count}} unit is too few for a full refine batch. It sells at the buy price for {{isk}} ISK. With it, refining beats the {{buyTotal}} ISK buy total.",
+      "refineLeftoverHint_other": "{{count}} units are too few for a full refine batch. They sell at the buy price for {{isk}} ISK. With them, refining beats the {{buyTotal}} ISK buy total.",
       "refinePartialHint": "At least one material has no price at this hub, so this total is a floor rather than the full value.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",

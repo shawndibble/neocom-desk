@@ -536,8 +536,39 @@ describe('AppraisalPanel', () => {
         .parentElement?.parentElement;
       const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
-      expect(refineCell?.className).toContain('text-accent');
-      expect(buyCell?.className).not.toContain('text-accent');
+      expect(refineCell?.className).toContain('text-isk-pos');
+      expect(buyCell?.className).not.toContain('text-isk-pos');
+    });
+
+    it('explains the leftover that tips refine over the buy total', async () => {
+      const partBatch = refineOutcome();
+      partBatch.appraisal.rows[0] = {
+        ...partBatch.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        quantity: 999,
+        buyEach: 16_000,
+        buyTotal: 15_984_000,
+        refineTotal: 15_436_890,
+        refineUnitsLeftOver: 99,
+      };
+      renderPanel({ controller: controller({ result: partBatch }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      await userEvent.hover(within(oreRow).getByText('!'));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(/99 units are too few/);
+    });
+
+    it('shows no leftover mark when refine wins without the leftover', () => {
+      const clean = refineOutcome();
+      clean.appraisal.rows[0] = {
+        ...clean.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        buyTotal: 1_000,
+        refineTotal: 2_000,
+        refineUnitsLeftOver: 5,
+      };
+      renderPanel({ controller: controller({ result: clean }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      expect(within(oreRow).queryByText('!')).not.toBeInTheDocument();
     });
 
     /**
@@ -551,7 +582,7 @@ describe('AppraisalPanel', () => {
       // The highlight lives on the cell wrapper around the shorthand figure.
       const buyCell = within(dcuRow).getByText('1,345,950 ISK', { selector: '.sr-only' })
         .parentElement?.parentElement;
-      expect(buyCell?.className).not.toContain('text-accent');
+      expect(buyCell?.className).not.toContain('text-isk-pos');
     });
 
     describe('Character details implant note (issue #1588)', () => {
