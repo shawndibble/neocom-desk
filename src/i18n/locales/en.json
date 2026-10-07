@@ -7666,7 +7666,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. These choices stay on this device.",
+      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. Device pop-up choices stay on this device. Alerts choices and thresholds sync with your account's other devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
@@ -7733,36 +7733,36 @@
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
       "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
-      "feedChannelLabel": "Overview notifications",
-      "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
+      "feedChannelLabel": "Alerts notifications",
+      "feedChannelHint": "A dismissible list on the Alerts page. Works on every device.",
       "column": {
         "browser": "Device",
         "feed": "Alerts"
       },
       "selectAll": {
         "browser": "Toggle all device notifications for {{character}}",
-        "feed": "Toggle all Overview notifications for {{character}}"
+        "feed": "Toggle all Alerts notifications for {{character}}"
       },
       "toggleLabel": {
         "browser": "{{event}}, device notifications",
-        "feed": "{{event}}, Overview list"
+        "feed": "{{event}}, Alerts list"
       },
       "allCharactersLabel": "All Characters",
       "allCharactersHint": "Apply a setting to every character at once. This is a one-time broadcast, not a saved default — a character added later starts from its own defaults, and any character can still be edited independently afterward.",
       "selectAllCharacters": {
         "browser": "Toggle device notifications for every character",
-        "feed": "Toggle Overview notifications for every character"
+        "feed": "Toggle Alerts notifications for every character"
       },
       "toggleAllCharactersLabel": {
         "browser": "{{event}} for every character, device notifications",
-        "feed": "{{event}} for every character, Overview list"
+        "feed": "{{event}} for every character, Alerts list"
       },
       "selectAllCharactersFamily": {
         "browser": "Toggle all device notifications for {{family}} for every character",
-        "feed": "Toggle all Overview notifications for {{family}} for every character"
+        "feed": "Toggle all Alerts notifications for {{family}} for every character"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a device pop-up — flip any of them per column.",
+      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Alerts page only, except the attack and loss alerts, which also raise a device pop-up — flip any of them per column.",
       "family": {
         "structures": "Structures",
         "war": "War",
@@ -7773,11 +7773,11 @@
       },
       "selectAllFamily": {
         "browser": "Toggle all device notifications for {{family}}",
-        "feed": "Toggle all Overview notifications for {{family}}"
+        "feed": "Toggle all Alerts notifications for {{family}}"
       },
       "columnHint": {
         "browser": "A pop-up from your phone or computer, outside the app.",
-        "feed": "A row on the Overview page, inside the app."
+        "feed": "A row on the Alerts page, inside the app."
       }
     },
     "dataTitle": "Data",
