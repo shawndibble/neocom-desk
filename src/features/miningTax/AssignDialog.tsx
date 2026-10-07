@@ -1,4 +1,5 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { OreIcon } from './OreIcon';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
-  TypeIcon,
   Checkbox,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
@@ -346,7 +346,7 @@ export function AssignDialog({
                       ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
                     })}
                   />
-                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                  <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 </label>
                 <span className="w-40 shrink-0 truncate">
                   <MarketItemLink typeId={line.typeId}>

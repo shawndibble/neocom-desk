@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { OreIcon } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -11,7 +12,6 @@ import {
   InfoTooltip,
   Modal,
   StatChip,
-  TypeIcon,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
@@ -264,7 +264,7 @@ export function RowDetailModal({
                   key={line.typeId}
                   className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                 >
-                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                  <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">
                     <MarketItemLink typeId={line.typeId}>
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}

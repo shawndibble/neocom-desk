@@ -68,6 +68,7 @@ import {
   type OverviewColumnId,
 } from './overviewColumns';
 import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
+import { readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
 import {
   BuybackRateInput,
   ChartMetricControl,
@@ -141,7 +142,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   // must be part of the load closure. `useRouteSnapshot` only re-runs it on
   // an epoch bump, so toggling the switch also calls `refresh()` below.
   const loadSnapshot = useCallback(
-    (): Promise<MiningYieldSnapshot> => loadMiningYieldSnapshot(showRefining),
+    async (): Promise<MiningYieldSnapshot> =>
+      loadMiningYieldSnapshot(showRefining, await readCompressedOre()),
     [showRefining]
   );
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
@@ -149,6 +151,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     undefined,
     { cacheKey: 'miningYieldOverview' }
   );
+  useRefreshOnOreFormChange(refresh);
 
   const [characterFilter, setCharacterFilter] = useUrlParam(
     'overview.character',

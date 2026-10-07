@@ -17,6 +17,7 @@ import {
   unlinkPaymentTransaction,
   updateCombinedAssignments,
 } from './assignments';
+import { useMiningTaxCompressedOre } from './oreForm';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 
@@ -69,6 +70,25 @@ describe('createAssignment', () => {
     // No internal price lookup — the Assign dialog already resolved (and
     // possibly corrected) the value before calling this.
     expect(pricingMock.loadUnitPricesOnDate).not.toHaveBeenCalled();
+  });
+
+  it('marks the record raw-priced when the Ore Form setting is off, so a later flip can re-price it', async () => {
+    useMiningTaxCompressedOre.setState({ value: false, hydrated: true });
+
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+
+    expect(assignment.rawOrePriced).toBe(true);
+    useMiningTaxCompressedOre.setState({ value: true, hydrated: true });
   });
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
@@ -825,7 +845,8 @@ describe('planNeedsReviewResolution', () => {
       CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'hek' }),
-      assignment.date
+      assignment.date,
+      true
     );
   });
 
@@ -849,7 +870,8 @@ describe('planNeedsReviewResolution', () => {
       CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'jita' }),
-      dismissed.date
+      dismissed.date,
+      true
     );
 
     // A dangling payeeId (the Payee was deleted after the Assignment) resolves
@@ -860,7 +882,8 @@ describe('planNeedsReviewResolution', () => {
       CHAR_A,
       expect.anything(),
       expect.objectContaining({ id: 'jita' }),
-      dismissed.date
+      dismissed.date,
+      true
     );
   });
 

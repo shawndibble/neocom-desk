@@ -7503,6 +7503,8 @@
       "podKillsUnavailable": "ESI's kill report can't be read right now, so routes aren't avoiding pod-kill systems."
     },
     "miningTaxDefaultsTitle": "Moon Mining Tax defaults",
+    "miningTaxCompressedOreLabel": "Value and show ore as compressed",
+    "miningTaxCompressedOreHint": "Prices ore, moon ore and ice at their Compressed version and shows the Compressed names. Off uses the raw ore. Ore with no Compressed version always uses the raw ore. Unpaid entries re-price when you change this; paid ones keep the ISK they were paid at.",
     "miningTaxOreValueModeLabel": "Edit ore values individually",
     "miningTaxOreValueModeHint": "When editing an entry, enter each ore's own total ISK value instead of one value per day — useful for matching a corp's moon-tax tool line by line. Estimated Value and Tax Owed are calculated from them.",
     "miningTaxAutoContinueLabel": "Continue sessions across midnight UTC automatically",
@@ -7583,7 +7585,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, and courier collateral warning.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, and how the Assign form edits ore values.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values.",
             "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }

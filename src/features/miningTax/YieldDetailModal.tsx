@@ -13,6 +13,8 @@
  * Everything here is read-only. A Mining Yield row records what ESI reported;
  * there is nothing about it for a pilot to edit.
  */
+import { OreIcon } from './OreIcon';
+import { useOreFormTypeId } from './oreForm';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
@@ -22,7 +24,6 @@ import {
   Modal,
   StatChip,
   StatChips,
-  TypeIcon,
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
@@ -95,13 +96,14 @@ export function YieldDetailModal({
   const { t } = useTranslation();
   const { valuation, entry } = row;
 
+  const shownAs = useOreFormTypeId();
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
 
   const typeNameCell = (typeId: number) => (
     <span className="flex items-center gap-1.5">
-      <TypeIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
+      <OreIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
       <span className="truncate">
-        <MarketItemLink typeId={typeId}>{typeName(typeId)}</MarketItemLink>
+        <MarketItemLink typeId={shownAs(typeId)}>{typeName(typeId)}</MarketItemLink>
       </span>
     </span>
   );

@@ -1,4 +1,5 @@
 import { HintText } from '@/components/ui/HintText';
+import { OreIcon } from './OreIcon';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
@@ -23,7 +24,6 @@ import {
   Spinner,
   Toast,
   Tooltip,
-  TypeIcon,
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
@@ -76,7 +76,7 @@ import {
   sellFallbackAtHubOnDate,
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
-import { loadTypeNames } from '@/features/character/typeNames';
+import { loadOreFormNames, readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   acceptNewTotal,
@@ -261,19 +261,21 @@ async function loadSnapshot(characterId: number, signal: RouteSnapshotSignal): P
     payees.map((payee) => payee.hubId)
   );
   const dates = [...new Set(result.rows.map((row) => row.entry.date))];
+  const compressed = await readCompressedOre();
   const [
     { systemNames, systemSecurity, typeNames: rowTypeNames },
     datedPrices,
     unclassifiedTypeNames,
   ] = await Promise.all([
-    resolveRowNames(result.rows),
+    resolveRowNames(result.rows, compressed),
     loadDatedUnitPricesByHub(
       characterId,
       result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId)),
       payeeHubIds,
-      dates
+      dates,
+      compressed
     ),
-    loadTypeNames(unclassifiedTypeIds),
+    loadOreFormNames(unclassifiedTypeIds, compressed),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
   return {
@@ -340,6 +342,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     undefined,
     { cacheKey: 'moonMiningTax' }
   );
+  useRefreshOnOreFormChange(refresh);
 
   const [{ 'tax.character': characterFilter, 'tax.payee': payeeFilter }, setTaxUrlParams] =
     useUrlParams(TAX_URL_PARAMS);
@@ -1213,7 +1216,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               .map((typeId) => (
                 <Tooltip key={typeId} content={data?.typeNames.get(typeId) ?? `#${typeId}`}>
                   <span tabIndex={0}>
-                    <TypeIcon typeId={typeId} size={32} className="h-4 w-4" />
+                    <OreIcon typeId={typeId} size={32} className="h-4 w-4" />
                   </span>
                 </Tooltip>
               ))}

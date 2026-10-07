@@ -191,6 +191,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
     contractLinks: [{ refId: 456, source: 'manual' }],
   },
   oreLineValues: { 45490: 4_800_000 },
+  rawOrePriced: true,
   updatedAt: UPDATED_AT,
 };
 
