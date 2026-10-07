@@ -496,6 +496,46 @@ describe('Wallet', () => {
     expect(beginEveLogin).toHaveBeenCalled();
   });
 
+  it('shows the re-login banner, not the empty state, when the journal scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
+    expect(screen.queryByText('No journal entries cached')).not.toBeInTheDocument();
+  });
+
+  it('shows no re-login banner when the journal loads normally', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
+  });
+
+  it('shows the offline notice and cached rows, no banner, when the journal fails offline', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:journal',
+      value: journalPage1,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.error()
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
+  });
+
   /**
    * Narrow, so the journal's filters render in the sheet rather than the row.
    * jsdom's `matchMedia` stub never matches, which `useIsNarrow` reads as a

@@ -7,7 +7,7 @@
  * The captions matter more than they look: a column of bare checkboxes says
  * nothing about what it does, and the two channels are genuinely
  * independent — an event can raise a browser notification without joining
- * the Overview list, or the reverse.
+ * the Alerts page, or the reverse.
  */
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';

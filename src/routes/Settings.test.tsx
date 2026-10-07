@@ -478,14 +478,12 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Alerts list' })
     ).toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Sell Order Filled, device notifications' })
     ).not.toBeChecked();
-    expect(
-      screen.getByRole('checkbox', { name: 'Sell Order Filled, Overview list' })
-    ).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Sell Order Filled, Alerts list' })).toBeChecked();
   });
 
   it('flips a single event off, then back on, persisting to Dexie', async () => {
@@ -526,7 +524,7 @@ describe('Settings — Notifications (issue #170)', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('checkbox', {
-        name: 'Planetary Extractor Expiring, Overview list',
+        name: 'Planetary Extractor Expiring, Alerts list',
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
@@ -594,9 +592,9 @@ describe('Settings — Notifications (issue #170)', () => {
 
     // ...but the Overview feed works with no grant at all, so its controls stay live.
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
-    expect(screen.getByRole('checkbox', { name: 'Overview notifications' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Alerts notifications' })).toBeEnabled();
 
-    expect(await screen.findByRole('checkbox', { name: 'New Mail, Overview list' })).toBeEnabled();
+    expect(await screen.findByRole('checkbox', { name: 'New Mail, Alerts list' })).toBeEnabled();
     // aria-disabled, not native disabled — the row's Tooltip explaining why
     // needs the control to stay in the hover/touch/focus path.
     expect(
@@ -1085,7 +1083,7 @@ describe('Settings — Notifications (issue #170)', () => {
       ).toBeDisabled();
       // The Overview column is unaffected — only browser is permission-gated.
       expect(
-        screen.getByRole('checkbox', { name: 'Toggle Overview notifications for every character' })
+        screen.getByRole('checkbox', { name: 'Toggle Alerts notifications for every character' })
       ).not.toBeDisabled();
     });
 
@@ -1133,7 +1131,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('turning a browser event on rebuilds once; an Overview-only toggle does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(screen.getByRole('checkbox', { name: 'New Mail, Overview list' }));
+      await user.click(screen.getByRole('checkbox', { name: 'New Mail, Alerts list' }));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
@@ -1171,7 +1169,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it('the master switch and browser gate each rebuild once; the Overview gate does not', async () => {
       const user = await renderPanelWithFakeTimers();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Overview notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Alerts notifications' }));
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
