@@ -317,7 +317,7 @@ function RecipeCard({
     <div
       className={cx(
         'grid grid-cols-[minmax(0,1fr)] gap-x-4 gap-y-2 px-3 py-3 md:items-center',
-        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_12rem_7rem_minmax(0,1.1fr)_7.5rem]'
+        'md:grid-cols-[1.5rem_minmax(0,1.3fr)_minmax(0,1.1fr)_minmax(12rem,max-content)_7rem_minmax(0,1.1fr)_7.5rem]'
       )}
     >
       <span className="hidden text-sm text-text-dim tabular-nums md:block">{card.rank}</span>
