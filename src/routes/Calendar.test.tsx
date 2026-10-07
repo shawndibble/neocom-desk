@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -18,6 +18,13 @@ import {
 } from '@/features/character/calendarKindFilter';
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { exportRows } from '@/lib/downloadCsv';
+
+// The export test reads the rows handed to the export rather than a file.
+vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/downloadCsv')>()),
+  exportRows: vi.fn(async () => {}),
+}));
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -421,6 +428,39 @@ describe('Calendar', () => {
     await waitFor(async () => {
       expect((await db.settings.get(CALENDAR_HIDDEN_KINDS_KEY))?.value).toEqual(['industryJob']);
     });
+  });
+
+  it("exports only the selected day's events, like the rail (issue #2840)", async () => {
+    const later = {
+      event_id: 2,
+      event_date: inHours(24 * 5).toISOString(),
+      title: 'Later Op',
+      importance: 0,
+      event_response: 'accepted' as const,
+    };
+    server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([...events, later])));
+    vi.mocked(exportRows).mockClear();
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Later Op')).toBeInTheDocument();
+
+    // Earliest day with a load holds the first event.
+    await user.click(
+      dayCells().find((cell) => (cell.getAttribute('aria-label') ?? '').includes('due:'))!
+    );
+    await waitFor(() => expect(screen.queryByText('Later Op')).not.toBeInTheDocument());
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Calendar' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
+    const rows = JSON.stringify(vi.mocked(exportRows).mock.calls[0][2]);
+    expect(rows).toContain('Fleet Op');
+    expect(rows).not.toContain('Later Op');
   });
 
   it('says so when every kind has been deselected', async () => {
