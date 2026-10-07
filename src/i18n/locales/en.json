@@ -7707,6 +7707,7 @@
           "piPicks": "Resources you picked per planet on the PI tab.",
           "miningTax": "Moon Mining payees and assignments.",
           "fittings": "Fittings saved to My Fittings: name and share code.",
+          "netWorthSnapshots": "Your daily net worth history: wallet, asset value, PLEX and order escrow per day, as plain numbers.",
           "miningTaxNote": "Includes the ore and ISK snapshot, because that snapshot is the invoice.",
           "notificationFeed": "Alerts you've already seen.",
           "notificationFeedNote": "Kept 30 days, so your other devices catch up.",

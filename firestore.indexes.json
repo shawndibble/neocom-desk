@@ -213,6 +213,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "netWorthSnapshots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerHash",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -459,6 +473,23 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
+    },
+    {
+      "collectionGroup": "netWorthSnapshots",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "netWorthSnapshots",
+      "fieldPath": "ownerHash",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
     }
   ]
 }
