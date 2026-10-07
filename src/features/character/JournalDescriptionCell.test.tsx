@@ -174,6 +174,24 @@ describe('JournalDescriptionCell', () => {
     );
   });
 
+  it('makes the memo line the link when a linked line has one', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'player_donation', reason: 'Moon tax 10-05 Ainsan' })}
+          transaction={undefined}
+          itemName=""
+          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Moon tax 10-05 Ainsan/ })).toHaveAttribute(
+      'href',
+      '/mining/tax?tax.payment=journal%3A1'
+    );
+  });
+
   it('shows no mining tax link for an unlinked line', () => {
     render(
       <MemoryRouter>

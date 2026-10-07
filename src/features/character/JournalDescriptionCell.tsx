@@ -59,6 +59,8 @@ export function JournalDescriptionCell({
   if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref) {
     return <>{entry.description}</>;
   }
+  // The memo ("Moon tax 10-05 Ainsan") is the link when there is one; a line with no memo gets a labelled link instead.
+  const reasonIsTaxLink = Boolean(miningTaxHref && entry.reason && !kills);
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
         quantity: transaction.quantity.toLocaleString(),
@@ -72,7 +74,18 @@ export function JournalDescriptionCell({
       {kills ? (
         <BountyFactionSummary kills={kills} />
       ) : (
-        entry.reason && <span className="text-text-dim">{entry.reason}</span>
+        entry.reason &&
+        (reasonIsTaxLink && miningTaxHref ? (
+          <Link
+            to={miningTaxHref}
+            className={`${inlineLinkClassName} w-fit`}
+            aria-label={t('wallet.journalMiningTaxReasonLink', { reason: entry.reason })}
+          >
+            {entry.reason} →
+          </Link>
+        ) : (
+          <span className="text-text-dim">{entry.reason}</span>
+        ))
       )}
       {contractId !== undefined && (
         <Link
@@ -82,7 +95,7 @@ export function JournalDescriptionCell({
           {t('wallet.journalContractLink')}
         </Link>
       )}
-      {miningTaxHref && (
+      {miningTaxHref && !reasonIsTaxLink && (
         <Link to={miningTaxHref} className={inlineLinkClassName}>
           {t('wallet.journalMiningTaxLink')}
         </Link>
