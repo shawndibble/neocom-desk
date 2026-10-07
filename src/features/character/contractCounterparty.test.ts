@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
-import { contractReceiver } from './contractCounterparty';
+import { contractIssuer, contractReceiver } from './contractCounterparty';
 
 function c(o: Partial<Contract> = {}): Contract {
   return {
@@ -51,5 +51,32 @@ describe('contractReceiver', () => {
   it('is null when the receiver is the pilot', () => {
     expect(contractReceiver(c({ acceptor_id: 10 }), 10)).toBeNull();
     expect(contractReceiver(c({ assignee_id: 10, availability: 'personal' }), 10)).toBeNull();
+  });
+});
+
+describe('contractReceiver with resolved categories', () => {
+  it('links a corp that took a public contract as a corporation', () => {
+    const cats = new Map([[5, 'corporation' as const]]);
+    expect(contractReceiver(c({ acceptor_id: 5 }), 10, cats)?.kind).toBe('corporation');
+  });
+  it('uses the category for an offered assignee too', () => {
+    const cats = new Map([[6, 'alliance' as const]]);
+    expect(contractReceiver(c({ assignee_id: 6, availability: 'personal' }), 10, cats)?.kind).toBe(
+      'alliance'
+    );
+  });
+  it('falls back when the category is unknown or not an owner kind', () => {
+    const cats = new Map([[5, 'station' as const]]);
+    expect(contractReceiver(c({ acceptor_id: 5 }), 10, cats)?.kind).toBe('character');
+    expect(contractReceiver(c({ acceptor_id: 5 }), 10, new Map())?.kind).toBe('character');
+  });
+});
+
+describe('contractIssuer', () => {
+  it('is the pilot for a personal contract', () => {
+    expect(contractIssuer(c())).toEqual({ id: 10, kind: 'character' });
+  });
+  it('is the corp when issued on its behalf', () => {
+    expect(contractIssuer(c({ for_corporation: true }))).toEqual({ id: 20, kind: 'corporation' });
   });
 });

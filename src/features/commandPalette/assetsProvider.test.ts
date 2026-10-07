@@ -7,6 +7,7 @@ import {
   buildPaletteAssets,
   createAssetsProvider,
   loadPaletteAssets,
+  loadPaletteAssetsScope,
   type PaletteAsset,
 } from './assetsProvider';
 import type { PaletteProvider, PaletteResult } from './types';
@@ -140,6 +141,15 @@ describe('createAssetsProvider', () => {
     expect(p.minQueryLength).toBe(2);
   });
 
+  it('reads out the Characters it covers, naming who is missing', () => {
+    expect(provider().scope).toBeUndefined();
+    expect(provider({ scope: { total: 3, missing: ['Alt'] } }).scope).toEqual({
+      scope: 'all',
+      total: 3,
+      missing: ['Alt'],
+    });
+  });
+
   it('answers nothing, so the group hides, before the list has loaded', () => {
     expect(answer(provider({ assets: [] }), 'trit')).toEqual([]);
   });
@@ -188,6 +198,15 @@ describe('loadPaletteAssets', () => {
     await grant(2, [ASSETS_SCOPE]);
     const rows = await loadPaletteAssets();
     expect(rows.map((r) => r.name).sort()).toEqual(['Rifter', 'Tritanium']);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('names every Character without a grant or a cached list as missing', async () => {
+    await grant(1, [ASSETS_SCOPE]);
+    await grant(2, ['esi-skills.read_skills.v1']);
+    expect(await loadPaletteAssetsScope()).toEqual({ total: 2, missing: ['Alt'] });
+    await db.esiCache.clear();
+    expect(await loadPaletteAssetsScope()).toEqual({ total: 2, missing: ['Main', 'Alt'] });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

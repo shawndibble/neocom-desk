@@ -126,6 +126,7 @@ import { PlanSlotLine } from './PlanSlotLine';
 import { categoryForActivity } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
+import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
@@ -393,6 +394,7 @@ export function BuildPlanDetail({
     request: number;
     quantity: number;
     jobFee: number;
+    jobId?: number;
   } | null>(null);
   const appliedLogProductionKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -403,7 +405,12 @@ export function BuildPlanDetail({
       ? blueprint.products[0].quantity * pendingLogProduction.runs
       : 0;
     const nextRequest = logRequest + 1;
-    setJobLogSeed({ request: nextRequest, quantity, jobFee: pendingLogProduction.jobFee });
+    setJobLogSeed({
+      request: nextRequest,
+      quantity,
+      jobFee: pendingLogProduction.jobFee,
+      jobId: pendingLogProduction.jobId,
+    });
     setLogRequest(nextRequest);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `logRequest` deliberately omitted: reapplying is gated on `pendingLogProductionKey` changing, not on `logRequest` itself, which this effect also writes
   }, [pendingLogProduction, pendingLogProductionKey, blueprint]);
@@ -1970,6 +1977,10 @@ export function BuildPlanDetail({
         )}
       </div>
 
+      <UnloggedDeliveriesBadge
+        characterId={plan.characterId}
+        blueprintTypeId={plan.blueprintTypeID}
+      />
       <ProductionRunsPanel
         characterId={plan.characterId}
         buildPlanId={plan.id}
@@ -1983,6 +1994,7 @@ export function BuildPlanDetail({
                 // that's ready (falling back to 0 only until pricing is).
                 materialCost: result?.materialCost ?? 0,
                 jobFee: jobLogSeed.jobFee,
+                sourceJobId: jobLogSeed.jobId,
               }
             : result
               ? {

@@ -59,6 +59,8 @@ export interface RouteSafetyInputs {
   kills: ReadonlyMap<number, SystemKills> | null;
   /** `null` when the feed could not be read at all. */
   jumps: ReadonlyMap<number, number> | null;
+  /** Systems under a lawless insurgency right now (issue #2870); absent or empty shows none. */
+  lawless?: ReadonlySet<number>;
 }
 
 export interface RouteSafetyRow {
@@ -76,6 +78,8 @@ export interface RouteSafetyRow {
   podKills: number | null;
   npcKills: number | null;
   chokepoint: boolean;
+  /** Set only on a lawless system: a condition at this moment, not a verdict. */
+  lawless?: boolean;
 }
 
 export interface RouteSafetySummary {
@@ -116,7 +120,7 @@ const NO_KILLS: SystemKills = { shipKills: 0, podKills: 0, npcKills: 0 };
 
 export function buildRouteSafetyRows(
   route: readonly number[],
-  { systems, regionNames, kills, jumps }: RouteSafetyInputs
+  { systems, regionNames, kills, jumps, lawless }: RouteSafetyInputs
 ): RouteSafetyRow[] {
   return route.map((systemId) => {
     const entry = systems.get(systemId);
@@ -134,6 +138,7 @@ export function buildRouteSafetyRows(
       podKills: systemKills?.podKills ?? null,
       npcKills: systemKills?.npcKills ?? null,
       chokepoint: isGankChokepoint(systemId),
+      ...(lawless?.has(systemId) ? { lawless: true } : {}),
     };
   });
 }

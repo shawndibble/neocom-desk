@@ -1,27 +1,28 @@
 # Mail
 
-`/mail` (nav: Social group, scope-gated, phone tab). Two-pane EVE mail client for the active Character: folder chips + search above, list left, reader right. Reads headers/bodies, marks read on ESI, Reply / Forward with drafts. No new-mail compose, no delete, no labels management, no mailing-list browsing.
+`/mail` (nav: Social group, scope-gated, phone tab). Two-pane EVE mail client for the active Character, or for every Character at once (see "All characters"): folder chips + search above, list left, reader right. Reads headers/bodies, marks read on ESI, Reply / Forward with drafts. No new-mail compose, no delete, no labels management, no mailing-list browsing.
 
-Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailFolderPref,mailDrafts,mailRecipientSearch,MailComposeBox}.ts(x)`, `src/engine/mail.ts` (pure), `src/features/character/{contacts,contactStandings,affiliations,names}.ts`.
+Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref,mailFolderPref,mailDrafts,mailRecipientSearch,MailComposeBox}.ts(x)`, `src/engine/mail.ts` (pure), `src/features/character/{contacts,contactStandings,affiliations,names}.ts`.
 
 ## Summary
 
-| Feature           | What                                                                                     | Where                                           |
-| ----------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Folder chips      | Inbox / Corp / Alliance / Sent multi-select toggles, per-folder unread count             | `Mail.tsx:600`, `engine/mail.ts` `MAIL_FOLDERS` |
-| Search            | Subject or sender name, 250 ms debounce, URL `search`                                    | `Mail.tsx:628`, `mailSearchMatches`             |
-| Hide read         | Toggle chip, URL `hideRead`                                                              | `Mail.tsx:636`                                  |
-| List              | Two-line rows, unread dot, folder glyph+name, date; newest first; capped at 200 rendered | `Mail.tsx:675`, `capHeadersForDisplay`          |
-| Load more         | Pages older mail via `last_mail_id`, 50 per page                                         | `Mail.tsx:805`, `loadMoreMailHeaders`           |
-| Reader            | Subject, From (+standing tag), To, body (EVE markup stripped), timestamp                 | `Mail.tsx:862-965`                              |
-| Mark read         | Instant local dim + ESI write on open                                                    | `markMailReadOnEsi`                             |
-| Reply (reply-all) | Inline compose box, recipients prefilled, quoted body                                    | `MailComposeBox.tsx`                            |
-| Forward           | Same box, empty recipients + recipient picker                                            | `MailComposeBox.tsx`                            |
-| Drafts            | Auto-saved per (character, mail) in Dexie                                                | `mailDrafts.ts`                                 |
-| Standing tag      | Sender colour-tag from own contacts, inherits corp/alliance                              | `StandingTag`, `characterStanding`              |
-| Refresh           | Header icon button                                                                       | `Mail.tsx:550`                                  |
-| Data Age badge    | Header meta, from headers fetch                                                          | `Mail.tsx:547`                                  |
-| Re-login banner   | 401/403 on mail endpoints                                                                | `GrantBanner`                                   |
+| Feature           | What                                                                                                | Where                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Folder chips      | Inbox / Corp / Alliance / Sent multi-select toggles, per-folder unread count                        | `Mail.tsx:600`, `engine/mail.ts` `MAIL_FOLDERS` |
+| Search            | Subject or sender name, 250 ms debounce, URL `search`                                               | `Mail.tsx:628`, `mailSearchMatches`             |
+| Hide read         | Toggle chip, URL `hideRead`                                                                         | `Mail.tsx:636`                                  |
+| List              | Two-line rows, unread dot, folder glyph+name, date; newest first; capped at 200 rendered            | `Mail.tsx:675`, `capHeadersForDisplay`          |
+| Load more         | Pages older mail via `last_mail_id`, 50 per page                                                    | `Mail.tsx:805`, `loadMoreMailHeaders`           |
+| Reader            | Subject, From (+standing tag), To, body (EVE markup stripped), timestamp                            | `Mail.tsx:862-965`                              |
+| Mark read         | Instant local dim + ESI write on open                                                               | `markMailReadOnEsi`                             |
+| Reply (reply-all) | Inline compose box, recipients prefilled, quoted body                                               | `MailComposeBox.tsx`                            |
+| Forward           | Same box, empty recipients + recipient picker                                                       | `MailComposeBox.tsx`                            |
+| Drafts            | Auto-saved per (character, mail) in Dexie                                                           | `mailDrafts.ts`                                 |
+| Standing tag      | Sender colour-tag from own contacts, inherits corp/alliance                                         | `StandingTag`, `characterStanding`              |
+| Scope             | This character / All characters picker (`CharacterFilterControl`), per-Character unread in its menu | `Mail()` wrapper, `mailScopePref.ts`            |
+| Refresh           | Header icon button                                                                                  | `Mail.tsx:550`                                  |
+| Data Age badge    | Header meta, from headers fetch                                                                     | `Mail.tsx:547`                                  |
+| Re-login banner   | 401/403 on mail endpoints                                                                           | `GrantBanner`                                   |
 
 ## Page and states
 
@@ -33,6 +34,17 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailFolderPref,mailDr
 - No headers: `CachedEmptyState` ("No mail cached" when nothing cached and offline; "No mail" when a fetch succeeded empty).
 - Served from cache: amber "offline" line above the chips (`common.offlineTitle`).
 - Loaded but filters hide everything: `no-matches` EmptyState ("No mail matches these filters"); no folders on: `no-folders` EmptyState with "Show all folders" button.
+
+## All characters
+
+- Scope picker = the shared `CharacterFilterControl` (#2846), only offered with 2+ Characters. Label "All characters · N"; menu lists each Character's unread (sum of its four System Labels' `unread_count`, custom labels excluded).
+- Choice persists device-wide in Dexie setting `mailScope` (`mailScopePref.ts`); URL `scope` (`current|all`) overrides it for one view and is never written back. `MailView` is keyed on the scope, so each scope loads its own snapshot (route cache key `mail` / `mail-all`).
+- Load: `loadMailForCharacters` (`mailAll.ts`) fans out the per-Character loaders under `ESI_FANOUT_CONCURRENCY`. A Character without `esi-mail.read_mail.v1`, or with nothing cached and no fetch, is skipped and named in the readout: "All characters · 3 of 4", warning icon, tooltip "Not included: …". A skipped Character lacking the grant also gets its own `GrantNote`.
+- Throttle: each Character goes live at most once per `MAIL_REFRESH_MIN_GAP_MS` (60 s). A Refresh inside the window reads Dexie for that Character instead.
+- List: same rows, merged newest first by timestamp (`mergeOwnedMail`), each with an owner chip (avatar + name). `mail_id` is per-Character, so row identity is `mailKey(ownerId, mailId)`. Folder of a row comes from its own owner's labels. Chip counts = each System Label's own `unread_count` summed across Characters (`sumUnreadByTab`).
+- Load more pages every Character that has more (`last_mail_id` per mailbox). Display cap (200) applies to the merged list.
+- Opening a mail loads the body, marks read, and Reply/Forward all as the owner (token, own-Character exclusion in reply-all, draft key `ownerId:mailId`). Reader header says "For <Character>". Standing tag uses the owner's contacts.
+- Sending refetches only the sending Character's headers.
 
 ## Folder chips
 
@@ -115,6 +127,7 @@ Registry: `src/esi/registry.ts:249-281`. Mail is not synced to Firestore.
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------- |
 | `search`, `hideRead`                          | URL query (ADR 0015 `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`), omitted when default | no      |
 | Selected folders                              | Dexie `settings` key `mailFolders`, device-wide                                                          | no      |
+| Scope (This / All characters)                 | Dexie `settings` key `mailScope`, device-wide; URL `scope` overrides per view                            | no      |
 | Selected mail, open compose, locally-read set | React state only                                                                                         | no      |
 | Headers/labels/lists/bodies                   | Dexie `esiCache` per Character (`mail:headers`, `mail:labels`, `mail:lists`, `mail:<id>`)                | no      |
 | Drafts                                        | Dexie `mailDrafts`                                                                                       | no      |

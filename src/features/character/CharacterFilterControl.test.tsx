@@ -52,6 +52,18 @@ describe('CharacterFilterControl', () => {
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
   });
 
+  it('adds the Character count to the "All" label (issue #2846)', () => {
+    render(
+      <CharacterFilterControl
+        activeCharacterId={1}
+        value="all"
+        onChange={() => {}}
+        characterCount={4}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'All characters · 4' })).toBeInTheDocument();
+  });
+
   it('labels the trigger "All characters" when the value is \'all\'', () => {
     render(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'All characters' })).toBeInTheDocument();

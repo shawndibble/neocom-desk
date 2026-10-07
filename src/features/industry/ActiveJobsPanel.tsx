@@ -1,7 +1,7 @@
 import { HintText } from '@/components/ui/HintText';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useTicker } from '@/lib/ticker';
@@ -19,10 +19,12 @@ import {
   EmptyState,
   IconButton,
   Panel,
+  SegmentedControl,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import { ItemInfoLink } from '@/features/entities';
 import { db, type BuildPlanRecord } from '@/db';
@@ -57,6 +59,8 @@ import {
   jobProductionSeed,
 } from './logProductionFromJob';
 import { LogProductionFromJobDialog } from './LogProductionFromJobDialog';
+import { countUnloggedDeliveries, isLoggableHistoryJob } from './jobHistory';
+import { useHistoryStates, useJobHistoryData } from './useJobHistory';
 import { formatDuration } from '@/lib/duration';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -83,7 +87,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { enumSetParam, idListParam } from '@/lib/urlState';
+import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 
 /**
@@ -109,6 +113,8 @@ type JobStatusFilter = 'completingSoon' | 'done';
 const JOB_FILTER_PARAMS = {
   'jobs.activity': idListParam(),
   'jobs.status': enumSetParam<JobStatusFilter>(['completingSoon', 'done'], []),
+  // Active (default, never written) or History: delivered jobs (issue #2866).
+  'jobs.view': enumParam(['active', 'history'] as const, 'active'),
 };
 const JOBS_DEFAULT_SORT = { columnId: 'endsIn', direction: 'asc' } as const;
 
@@ -542,12 +548,37 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     highlightedJobId,
   ]);
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
+  // Job History (issue #2866): delivered jobs of the Characters the picker
+  // names, read live from Dexie — the loader folds each fetch into it.
+  const historyView = jobFilters['jobs.view'] === 'history';
+  const historyData = useJobHistoryData();
+  const historyRows = useMemo<JobRow[]>(() => {
+    const selected = needsJobSlotFanOut ? resolvedJobsFilter : new Set([characterId]);
+    return (historyData.jobs ?? [])
+      .filter((job) => selected === 'all' || selected.has(job.characterId))
+      .map((job) => ({
+        ...job,
+        characterName: characterNameById.get(job.characterId) ?? '',
+        owner: 'personal' as const,
+      }))
+      .sort((a, b) => Date.parse(b.end_date) - Date.parse(a.end_date));
+  }, [historyData.jobs, needsJobSlotFanOut, resolvedJobsFilter, characterId, characterNameById]);
+  const historyStates = useHistoryStates(historyRows, historyData.runs);
+  const unloggedCount = countUnloggedDeliveries(historyRows, historyStates);
+  const planIds = useLiveQuery(() => db.buildPlans.toCollection().primaryKeys(), []);
+  const showHistorySegment = historyRows.length > 0 || historyView;
   const blockingNeedsReauth = !needsJobSlotFanOut && (result?.needsReauth ?? false);
   // Loading, re-auth and the empty states are the whole story; only a real
   // list has anything to fold.
-  const collapsible = jobs.length > 0 && !listLoading && !blockingNeedsReauth;
+  const collapsible = historyView
+    ? historyRows.length > 0
+    : jobs.length > 0 && !listLoading && !blockingNeedsReauth;
+  // History opens unfolded: a pilot who picked it (or followed the Build Plan
+  // page's badge to it) came for the rows.
   const listExpanded =
-    expanded ?? (highlightedJobId !== null && jobs.some((job) => job.job_id === highlightedJobId));
+    expanded ??
+    (historyView ||
+      (highlightedJobId !== null && jobs.some((job) => job.job_id === highlightedJobId)));
   const showList = !collapsible || listExpanded;
   // Whether more than one Character's jobs are actually on screen — the
   // character column and its badges only earn their place once they'd
@@ -559,7 +590,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // than the same panel with jobs in it. Not the same as `jobsEmptyTitle`
   // below, which means we have never fetched and genuinely don't know.
   const hasAnswered = needsJobSlotFanOut ? jobsFanOut !== null : result?.cached != null;
-  const noneActive = jobs.length === 0 && !listLoading && !blockingNeedsReauth && hasAnswered;
+  const noneActive =
+    !historyView && jobs.length === 0 && !listLoading && !blockingNeedsReauth && hasAnswered;
   const showBody = showList && !noneActive;
   // The per-character notes sit outside `showBody` — a revoked grant is worth
   // saying with the list folded — so the body is only genuinely empty, and the
@@ -692,7 +724,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         captureException(error);
       }
     },
-    [navigateToPlanWithSeed]
+    [navigateToPlanWithSeed, setLogJobDialog]
   );
 
   /**
@@ -850,6 +882,109 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       handleLogProduction,
     ]
   );
+  const planIdSet = useMemo(() => new Set(planIds ?? []), [planIds]);
+  const showHistoryCharacterColumn = new Set(historyRows.map((job) => job.characterId)).size > 1;
+  /** A logged row's plan link: the plan page bounces off a plan that isn't the active Character's, so the owner becomes active first (`navigateToPlanWithSeed`'s same reasoning). */
+  const openLoggedPlan = useCallback(
+    async (characterOwner: number, planId: string) => {
+      const { activeCharacterId, setActiveCharacter } = useActiveCharacter.getState();
+      if (activeCharacterId !== characterOwner) await setActiveCharacter(characterOwner);
+      navigate(`/industry/plans/${planId}`);
+    },
+    [navigate]
+  );
+  /** History's columns: what was delivered, when, and whether the Production Log has it. */
+  const historyColumns = useMemo<DataTableColumn<JobRow>[]>(
+    () => [
+      {
+        id: 'blueprint',
+        header: t('industry.jobsColBlueprint'),
+        className: 'font-medium',
+        sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
+        render: (job) => (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <ItemInfoLink typeId={job.product_type_id ?? job.blueprint_type_id}>
+              {nameForBlueprint(job.blueprint_type_id)}
+            </ItemInfoLink>
+            {isLoggableHistoryJob(job) && historyStates.get(job.job_id)?.kind === 'logged' && (
+              <span className="rounded-xs bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
+                {t('industry.historyLogged')}
+              </span>
+            )}
+            {showHistoryCharacterColumn && job.characterName !== '' && (
+              <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
+                <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
+              </span>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: 'activity',
+        header: t('industry.jobsColActivity'),
+        className: 'text-text-dim',
+        sortValue: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
+        render: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
+      },
+      {
+        id: 'runs',
+        header: t('industry.jobsColRuns'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (job) => job.runs,
+        render: (job) => job.runs.toLocaleString(),
+      },
+      {
+        id: 'delivered',
+        header: t('industry.historyColDelivered'),
+        className: 'whitespace-nowrap text-text-dim',
+        sortValue: (job) => Date.parse(job.end_date),
+        render: (job) => {
+          const endDate = new Date(job.end_date);
+          return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
+        },
+      },
+      {
+        // An unlogged delivery's next step, or the way to the plan that holds it.
+        id: 'logProduction',
+        header: '',
+        align: 'right',
+        cardActions: true,
+        render: (job) => {
+          if (!isLoggableHistoryJob(job)) return null;
+          const state = historyStates.get(job.job_id);
+          if (state?.kind === 'logged') {
+            return planIdSet.has(state.buildPlanId) ? (
+              <Link
+                to={`/industry/plans/${state.buildPlanId}`}
+                className={inlineLinkClassName}
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openLoggedPlan(job.characterId, state.buildPlanId);
+                }}
+              >
+                {t('industry.historyViewPlan')}
+              </Link>
+            ) : null;
+          }
+          return (
+            <Button size="sm" onClick={() => void handleLogProduction(job)}>
+              {t('industry.jobsLogProduction')}
+            </Button>
+          );
+        },
+      },
+    ],
+    [
+      t,
+      nameForBlueprint,
+      historyStates,
+      showHistoryCharacterColumn,
+      planIdSet,
+      openLoggedPlan,
+      handleLogProduction,
+    ]
+  );
   const sortProps = useUrlSort(
     'jobs.sort',
     JOBS_DEFAULT_SORT,
@@ -939,8 +1074,43 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           onChange={(next) => setJobsCharacterValues({ 'jobs.chars': next })}
         />
       )}
-      {noneActive ? (
-        <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
+      {showHistorySegment && (
+        <SegmentedControl
+          label={t('industry.jobsViewLabel')}
+          size="sm"
+          value={historyView ? 'history' : 'active'}
+          options={[
+            { value: 'active', label: t('industry.jobsViewActive') },
+            { value: 'history', label: t('industry.jobsViewHistory') },
+          ]}
+          onChange={(view) => {
+            setJobFilters({ 'jobs.view': view });
+            if (view === 'history') setExpanded(true);
+          }}
+        />
+      )}
+      {historyView ? (
+        collapsible && (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+            <span className="text-text">
+              {t('industry.historySummary', { count: historyRows.length })}
+            </span>
+            {unloggedCount > 0 && (
+              <span className="font-semibold text-warning">
+                {t('industry.jobsUnloggedPhrase', { count: unloggedCount })}
+              </span>
+            )}
+          </span>
+        )
+      ) : noneActive ? (
+        <span className="flex flex-wrap items-center gap-x-3 text-xs">
+          <span className="text-text-dim">{t('industry.jobsNoneMeta')}</span>
+          {unloggedCount > 0 && (
+            <span className="font-semibold text-warning">
+              {t('industry.jobsUnloggedPhrase', { count: unloggedCount })}
+            </span>
+          )}
+        </span>
       ) : (
         collapsible && (
           <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
@@ -955,6 +1125,11 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                   name: nameForBlueprint(summary.next.job.blueprint_type_id),
                   time: formatDuration(summary.next.seconds),
                 })}
+              </span>
+            )}
+            {!listExpanded && unloggedCount > 0 && (
+              <span className="font-semibold text-warning">
+                {t('industry.jobsUnloggedPhrase', { count: unloggedCount })}
               </span>
             )}
           </span>
@@ -973,7 +1148,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const listActions = (
     <span className="flex items-center gap-2">
       {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
-      {jobs.length > 0 && (
+      {jobs.length > 0 && !historyView && (
         <TableActionsMenu name={t('industry.jobsTitle')} tableExport={jobsExport} />
       )}
       <IconButton
@@ -1036,7 +1211,35 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             ))}
         </div>
       )}
-      {!showBody ? null : listLoading ? (
+      {!showBody ? null : historyView ? (
+        <div className="space-y-2">
+          {collapsible && <div className="flex justify-end">{listActions}</div>}
+          {historyRows.length === 0 ? (
+            <EmptyState
+              title={t('industry.historyEmptyTitle')}
+              hint={t('industry.historyEmptyHint')}
+              className="py-4"
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={historyColumns}
+                rows={historyRows}
+                rowKey={(job) => job.job_id}
+                label={t('industry.historyTableLabel')}
+                defaultSort={{ columnId: 'delivered', direction: 'desc' }}
+                density="compact"
+                mobileSort
+                rowClassName={(job) =>
+                  isLoggableHistoryJob(job) && historyStates.get(job.job_id)?.kind !== 'logged'
+                    ? 'bg-warning/10'
+                    : undefined
+                }
+              />
+            </div>
+          )}
+        </div>
+      ) : listLoading ? (
         <div className="flex justify-center py-4">
           <Spinner size="sm" label={t('common.loading')} />
         </div>

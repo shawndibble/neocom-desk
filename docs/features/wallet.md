@@ -67,7 +67,7 @@ Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent w
 
 - ISK figure, toned by sign (`iskToneClass`, `formatIsk(…, 2)`).
 - EverMarks figure (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with `InfoTooltip` explaining EverMarks. Shows "unknown" when loyalty missing or needs re-auth.
-- States: `balanceNeedsReauth` → `GrantBanner` for `getCharacterWallet` ("Log in again with EVE Online"); no cache → `EmptyState` "No wallet data cached. Reconnect to fetch it."; any cached data → offline notice.
+- States: `balanceNeedsReauth` → `GrantBanner` for `getCharacterWallet` ("Log in again with EVE Online"); no cache → `EmptyState` "No wallet data cached. Couldn't load it yet. Try again shortly."; any cached data → offline notice.
 - Balance-history chart below the figures, only when the journal has entries with a `balance` (see Chart).
 - Journal truncation warning (`common.incompleteTitle` + "Some pages failed to load. Refresh to try again.") above the chart.
 - Empty journal: `CachedEmptyState` (never fetched vs fetched empty texts differ).

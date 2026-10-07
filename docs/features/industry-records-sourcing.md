@@ -10,7 +10,7 @@ Where brief items actually live (code differs from the obvious guess):
 - Active Jobs panel (personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
 - Owned blueprints panel + `ownedBlueprints` CSV = Opportunities tab "All owned" view (`opps.view=owned`).
 - Corp blueprints = toggle inside All owned. Corp stock (`corpOwnedStock.ts`) and corp blueprints (`corpOwnedBlueprints.ts`) as plan sources = Build Plan "Corp Assets" toggle (other doc).
-- No jobs history anywhere: jobs are fetched `include_completed=false` (`src/features/industry/jobs.ts:32-40`, `src/esi/endpoints.ts:1469`).
+- Job History (issue #2866): jobs are fetched `include_completed=true`; delivered personal jobs are kept in Dexie `industryJobHistory` past ESI's window (`jobHistoryStore.ts`), shown in the panel's History segment. Corp jobs have no history.
 
 ## 1. Summary table
 
@@ -58,7 +58,7 @@ What: "Active jobs" panel above the tabs; running industry jobs of all activitie
 
 Data / scopes:
 
-- Personal: ESI `getCharacterIndustryJobs`, scope `esi-industry.read_character_jobs.v1`, `include_completed=false`, cached key `industryJobs`, conditional fetch. 403 -> `needsReauth` (no cache fallback).
+- Personal: ESI `getCharacterIndustryJobs`, scope `esi-industry.read_character_jobs.v1`, `include_completed=true`, cached key `industryJobs` (stripped to active/paused/ready before caching, so slots, alerts and the board never see delivered/cancelled/reverted jobs; delivered ones go to `industryJobHistory`), conditional fetch. 403 -> `needsReauth` (no cache fallback).
 - Corp (issue #2302): `loadAccountCorpIndustryJobs` -> `getCorporationIndustryJobs` via any account Character with scope `esi-industry.read_corporation_jobs.v1` (opt-in) and role `canReadIndustry` (`corpCapabilities`); one read per corporation (`pickCorpReaders`, active Character preferred); scope checked from stored token first so no app-wide reauth banner. Listed by `installer_id` for selected account Characters; job an alert named is kept even if not installed by one (`visibleCorpJobs`). Never rejects.
 - Skills for slot readout: `loadCorrectedSkills(skipQueueWithoutScope)`.
 - Multi-Character: `loadAllCharactersIndustryJobs` fan-out (`ESI_FANOUT_CONCURRENCY`), characters without scope listed in `skipped` note.
@@ -78,7 +78,7 @@ Controls and states:
 
 Observed gaps:
 
-- No completed-job history: delivered jobs drop off; Records' own caveat says unlogged completed jobs are not counted (`industry.productionLogCaveat`).
+- Job History: header `Active | History` segment (`jobs.view`, shown once a delivered job is stored; History opens unfolded). History lists delivered jobs newest first. Unlogged manufacturing/reaction rows: amber tint + "Log production…" (same flow as Active). Logged rows: green "Logged" badge + "View plan" link. Logged = a Production Run with `sourceJobId` = job id (set when logging from a job), else same Character + product type logged after the job ended, each run used once (`jobHistory.ts` `classifyHistoryJobs`). Folded header adds "N delivered, not logged". Build Plan page shows "N delivered jobs not logged" (this blueprint) linking to `/industry/plans?jobs.view=history`. History is device-local, deleted with the Character. Unlogged completed jobs are still not counted in Records (`industry.productionLogCaveat`); History is where to find and log them.
 - Log production is personal jobs only (comment cites decision `20260905-181537-production-log-row-per-allocation-sync-accept-wallet`); corp job rows have no action.
 - Header ghost-reauth for corp scope is intentionally absent (decision `20260929-184545-no-note-for-corp-jobs-nobody-here-can`).
 - No row context menu or row click on a job; ItemInfoLink only.
@@ -182,8 +182,8 @@ Two panels, Market-Wide first.
 - What: opt-in "Run market scan" (never auto) ranking manufacturable products across whole SDE whose blueprint is obtainable. Cold-start answer.
 - Data: precomputed flattened trees `public/data/marketWideTrees.json` (ME-0 approximation, `scripts/build-sde.mjs`); two-phase pricing: (1) product sell prices for all candidates, `selectLiquidCandidates` = **Liquidity Floor** `DEFAULT_LIQUIDITY_FLOOR_ISK = 50,000,000` sell-order ISK at hub plus top N = 5 per Market Group (`marketWideOpportunities.ts:51,54`); (2) material prices for survivors, `computeMarketWideRows`. Troll sell orders priced at CCP average (`priceCapped` InfoTooltip). Job fee assumes NPC station at hub's own system index (no owned facility). Hub fixed `DEFAULT_TRADE_HUB`, no picker.
 - Blueprint sources (`blueprintSourceSets.ts`, each best-effort, failures listed in "sources unavailable" note): owned (any account Character), market (NPC-seeded T1 originals), contract (Public Contract Offers snapshot via any Character's Firebase session), lpStore (corps any Character holds LP with). Preference order owned, market, contract, lpStore (`BLUEPRINT_SOURCES`).
-- Filters (FilterBar funnel beside Scan; URL `marketWide.*`): Max build cost (Any/10M/100M/1B/10B, `marketWide.maxCost`, applied after ranking), Tier (tech1/tech2/tech3/faction/special `marketWide.tiers`), Category (`marketWide.categories`), Blueprint source (`marketWide.sources`), Hide skill-gated (`marketWide.hideGated`, count chip), Hide rarely sold (< 5/day, `RARELY_SOLD_PER_DAY`, `marketWideSanity.ts:37`; `marketWide.hideRare`; sales = 30-day average summed over 5 trade-hub regions via `useDailySales`, "checking N" note; unreadable stays visible). Tier/category/source changes re-scan (applied before top-N), others narrow existing rows.
-- Table: Product (+skill-gate marker), Blueprint source, Margin, Time (whole-tree TE-0 time), ISK/hour (price-capped tooltip), Build cost, Order depth, Start plan. Default sort `iskPerHour` desc (`marketWide.sort`). Shows first 200 (`MARKET_WIDE_PAGE_SIZE`, `marketWidePage.ts:7`) under the active sort; "Show next 200" button; "Showing X of Y". Row click = Start plan when product has a catalog entry. CSV `market-wide-opportunities` (Product, Blueprint source, Margin %, Time s, ISK/hour, Build cost, Order depth; visible rows only, not just the shown page). Info tooltip in header explains liquidity/obtainability rule.
+- Filters (FilterBar funnel beside Scan; URL `marketWide.*`): Max build cost (Any/10M/100M/1B/10B, `marketWide.maxCost`, applied after ranking), Tier (tech1/tech2/tech3/faction/special `marketWide.tiers`), Category (`marketWide.categories`), Blueprint source (`marketWide.sources`), Hide skill-gated (`marketWide.hideGated`, count chip), Share of daily sales (5/10/25/50%, default 10%, `marketWide.share`, remembered device-local as `marketWideSalesShare`, ISK/day's volume cap), Hide rarely sold (< 5/day, `RARELY_SOLD_PER_DAY`, `marketWideSanity.ts:37`; `marketWide.hideRare`; sales = 30-day average summed over 5 trade-hub regions via `useDailySales`, "checking N" note; unreadable stays visible). Tier/category/source changes re-scan (applied before top-N), others narrow existing rows.
+- Table: Product (+skill-gate marker), Blueprint source, Margin, Time (whole-tree TE-0 time), ISK/hour (price-capped tooltip), ISK/day (sortable `iskPerDay`; `–` while sales unread, sorts last; daily sales now fetched for every ranked row, not only under Hide rarely sold; owned-blueprint views and the phone cards have no ISK/day yet), Build cost, Order depth, Start plan. Default sort `iskPerHour` desc (`marketWide.sort`). Shows first 200 (`MARKET_WIDE_PAGE_SIZE`, `marketWidePage.ts:7`) under the active sort; "Show next 200" button; "Showing X of Y". Row click = Start plan when product has a catalog entry. CSV `market-wide-opportunities` (Product, Blueprint source, Margin %, Time s, ISK/hour, ISK/day, Build cost, Order depth; visible rows only, not just the shown page). Info tooltip in header explains liquidity/obtainability rule.
 - Phone: `MobileMarketWideList` cards with rank badge, sort toolbar, Start plan icon button; no selection/compare; card tap = Start plan.
 - Skill gate: `SkillGateMarker` names the missing skill; popover (closest Character, skills to train, Add to Skill Plan); rule note under table.
 - States: before scan `marketOpportunitiesEmptyTitle`; a failed scan sets `error` in `useMarketWideOpportunities.ts:119` but the panel never reads it: reads as no-results (`marketOpportunitiesNoResultsTitle`); scanning spinner (Scan button disabled/"Scanning..."); no results + unavailable sources note; Assumes base standings note.
@@ -215,6 +215,7 @@ Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because
 | `jobs.chars`                                                                                  | Active Jobs       | Character filter; default = synced default |
 | `jobs.activity`, `jobs.status`                                                                | Active Jobs       | id list / enum set, empty = none           |
 | `jobs.sort`                                                                                   | Active Jobs       | default endsIn asc                         |
+| `jobs.view`                                                                                   | Active Jobs       | `active` (default) / `history`             |
 | `highlight`                                                                                   | Active Jobs       | job id from alert deep link                |
 | `records.from`, `records.to`                                                                  | Records           | ISO date                                   |
 | `records.itemSort`, `records.runSort`                                                         | Records           | optional sort, unsorted default            |
@@ -232,7 +233,7 @@ Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because
 | `plans.compare`                                                                               | Plans (other doc) |                                            |
 | `product`, `material` + seed keys                                                             | shell             | deep links (`planSeed.ts`)                 |
 
-Device-local settings (not URL): `bpcSearchVisibleColumns.v2`, `bpcSearchSpaceFilter`, `bpcSourcingSources`, `ownedBlueprintsVisibleColumns`. Synced: `sync.bpcHideAuctions`, `sync.bpcHidePlex`, `sync.loyaltyLpValue`.
+Device-local settings (not URL): `bpcSearchVisibleColumns.v2`, `bpcSearchSpaceFilter`, `bpcSourcingSources`, `marketWideSalesShare`, `ownedBlueprintsVisibleColumns`. Synced: `sync.bpcHideAuctions`, `sync.bpcHidePlex`, `sync.loyaltyLpValue`.
 
 ## 9. CSV export surfaces (`TableActionsMenu` + `useTableExport`)
 
@@ -280,7 +281,7 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 
 ## 12. Consolidated observed gaps
 
-- No completed-job history anywhere (`include_completed=false`); Records excludes unlogged jobs.
+- Completed-job history is personal jobs only, from the first fetch after this shipped (ESI's completed-job window is not backfilled); Records still excludes unlogged jobs.
 - Log production unavailable for corp jobs; no corp dimension in the production log.
 - Price history and row menus missing on desktop Opportunities: see section 6 gaps and Q17.
 - Market-Wide: fixed hub, ME-0 approximation, no compare, no data-age badge.
@@ -295,6 +296,8 @@ Fee primitives (`src/engine/industry/fees.ts`, `jobCost.ts`), used by Ranked, Ma
 - Sales tax % = 7.5 x (1 - 0.11 x Accounting) (`fees.ts:18,35-38`). Levels asserted integer 0..5, else RangeError.
 - Broker fee % = max(0, 3 - 0.3 x Broker Relations - 0.03 x faction standing - 0.02 x corp standing); fee = max(100 ISK, value x %), 0 when value <= 0 (`fees.ts:20-24,41-53,61-70`). Standings absent = 0 (the UI says "Assumes base standings" via `AssumesBaseStandingsNote`).
 - Job fee = EIV x systemCostIndex x (1 - structureBonus%) + EIV x 4% (SCC) + EIV x facility tax% (NPC station 0.25%, structures default 0) (`jobCost.ts:32-45`; SCC 4% = `SCC_SURCHARGE_PCT`, `types.ts:394`; NPC station 0.25% = `FACILITY_PRESETS.npcStation`, `types.ts:217-226`). EIV = ME0 quantities x ESI adjusted price x runs; missing adjusted price counts 0; ME does not reduce it.
+
+Market-Wide ISK/day (`src/engine/industry/iskPerDay.ts`): unitsPerDay = outputQuantity x 86400 / jobSeconds (one slot, same basis as ISK/hour); sellable = averageDailyVolume x share%; ISK/day = unitMargin x min(unitsPerDay, sellable). Negative margin x unitsPerDay (not volume-capped). Null for unknown/zero volume, unknown margin, jobSeconds <= 0.
 
 Ranked (Build Opportunities), per owned manufacturing blueprint:
 

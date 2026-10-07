@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectStockContainers,
   collectStockLocations,
   detectOwnedStock,
   filterStockByScope,
@@ -464,5 +465,67 @@ describe('collectStockLocations', () => {
       ])
     );
     expect(collectStockLocations(detected)).toHaveLength(3);
+  });
+});
+
+describe('container-level scope (issue #2869)', () => {
+  const CONTAINER = 700;
+  const loose = asset({ item_id: 1, type_id: TRITANIUM, quantity: 100 });
+  const box = asset({ item_id: CONTAINER, type_id: 3465, is_singleton: true });
+  const boxed = asset({
+    item_id: 2,
+    type_id: TRITANIUM,
+    quantity: 900,
+    location_id: CONTAINER,
+    location_type: 'item',
+    location_flag: 'AutoFit',
+  });
+  const stock = () => detectOwnedStock([source(1, [loose, box, boxed])], MATERIALS);
+  const selected = (excludedContainers?: number[]) => ({
+    mode: 'selected' as const,
+    locations: [{ characterId: 1, locationId: STATION, locationType: 'station' as const }],
+    ...(excludedContainers ? { excludedContainers } : {}),
+  });
+
+  it('keeps one placement per location and records the container breakdown', () => {
+    const entry = stock().get(TRITANIUM);
+    expect(entry?.quantity).toBe(1000);
+    expect(entry?.placements).toHaveLength(1);
+    expect(entry?.placements[0]?.containers).toEqual([
+      { containerId: CONTAINER, typeId: 3465, quantity: 900 },
+    ]);
+  });
+
+  it('leaves loose stacks without a container breakdown', () => {
+    const entry = detectOwnedStock([source(1, [loose])], MATERIALS).get(TRITANIUM);
+    expect(entry?.placements[0]?.containers).toBeUndefined();
+  });
+
+  it('drops only the excluded container from a selected location', () => {
+    const filtered = filterStockByScope(stock(), selected([CONTAINER]));
+    expect(filtered.get(TRITANIUM)?.quantity).toBe(100);
+    expect(filtered.get(TRITANIUM)?.placements[0]?.containers).toBeUndefined();
+  });
+
+  it('removes the material when its whole holding was excluded', () => {
+    const only = detectOwnedStock([source(1, [box, boxed])], MATERIALS);
+    expect(filterStockByScope(only, selected([CONTAINER])).size).toBe(0);
+  });
+
+  it('is unchanged when no containers are excluded', () => {
+    expect(filterStockByScope(stock(), selected()).get(TRITANIUM)?.quantity).toBe(1000);
+    expect(filterStockByScope(stock(), selected([])).get(TRITANIUM)?.quantity).toBe(1000);
+  });
+
+  it('lists every container holding stock, with its location', () => {
+    expect(collectStockContainers(stock())).toEqual([
+      {
+        containerId: CONTAINER,
+        typeId: 3465,
+        characterId: 1,
+        locationId: STATION,
+        locationType: 'station',
+      },
+    ]);
   });
 });

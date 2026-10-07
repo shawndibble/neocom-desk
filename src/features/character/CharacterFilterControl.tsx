@@ -50,6 +50,7 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
@@ -88,6 +89,10 @@ export interface CharacterFilterControlProps {
   variant?: 'icon' | 'field';
   /** `variant="field"` only: the setting's name. The button's accessible name becomes "<name>: <value>", since the value alone doesn't say what is being set. */
   triggerLabel?: string;
+  /** How many Characters "All" covers. Shown in its label ("All characters · 4"), the choosable form of `CharacterScopeReadout`. */
+  characterCount?: number;
+  /** Per-Character unread, listed under the options (Mail, issue #2867). Read-only: it informs the choice, it is not one. */
+  unreadByCharacter?: readonly { characterId: number; name: string; unread: number }[];
 }
 
 /**
@@ -129,13 +134,19 @@ export function CharacterFilterControl({
   size = 'sm',
   variant = 'icon',
   triggerLabel,
+  characterCount,
+  unreadByCharacter,
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
   const isAll = resolved === 'all';
-  const label = isAll ? t('character.filter.allCharacters') : t('character.filter.thisCharacter');
+  const allLabel =
+    characterCount === undefined
+      ? t('character.filter.allCharacters')
+      : t('character.scope.all', { count: characterCount });
+  const label = isAll ? allLabel : t('character.filter.thisCharacter');
   const options = (
-    <DropdownMenuContent align="start" className="w-40">
+    <DropdownMenuContent align="start" className={unreadByCharacter ? 'w-60' : 'w-48'}>
       <DropdownMenuRadioGroup
         value={isAll ? 'all' : 'current'}
         onValueChange={(next) => onChange(next as CharacterFilterValue)}
@@ -145,10 +156,20 @@ export function CharacterFilterControl({
             {t('character.filter.thisCharacter')}
           </DropdownMenuRadioItem>
         )}
-        <DropdownMenuRadioItem value="all">
-          {t('character.filter.allCharacters')}
-        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
+      {unreadByCharacter && unreadByCharacter.length > 0 && (
+        <>
+          <DropdownMenuSeparator />
+          <ul className="px-2 py-1.5 text-xs text-text-dim">
+            {unreadByCharacter.map((entry) => (
+              <li key={entry.characterId} className="truncate">
+                {t('character.filter.unreadFor', { name: entry.name, count: entry.unread })}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </DropdownMenuContent>
   );
 

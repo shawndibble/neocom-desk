@@ -4,6 +4,8 @@
  * #2322, Contacts #2323) is a new provider, never a change to the palette.
  */
 
+import type { CharacterScopeReadoutProps } from '@/features/character/CharacterScopeReadout';
+
 export interface PaletteResult {
   /** Unique within its provider; the palette tracks the highlight by it. */
   readonly id: string;
@@ -22,6 +24,11 @@ export interface PaletteProvider {
   readonly labelKey: string;
   /** Fixed group order, ascending. */
   readonly order: number;
+  /**
+   * Which Characters the group covers, read out beside its heading (#2846).
+   * Absent for a group that is not per-Character.
+   */
+  readonly scope?: CharacterScopeReadoutProps;
   /** Below this many (trimmed) characters the group is not searched at all. Default 0. */
   readonly minQueryLength?: number;
   /**

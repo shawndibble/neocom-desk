@@ -1,13 +1,14 @@
 /**
- * Works out which rigs a structure carries from the Manufacturing (or
- * Reactions) bonuses a pilot reads off its in-game services list. ESI never
- * exposes a structure's fit, so the pilot types the two numbers in and this
- * finds every fit that produces them. Pure.
+ * Works out which rigs a structure carries from the Structure Role Bonus
+ * lines a pilot reads off the Industry window's material and job-duration
+ * tooltips. ESI never exposes a structure's fit, so the pilot types the two
+ * numbers in and this finds every fit that produces them. Pure.
  *
- * The game's own wording for those numbers is not documented anywhere the app
- * can check, so each fit is tried both ways: the rig bonus alone, and the rig
- * bonus combined with the structure hull's own bonus (multiplicatively, as the
- * plan math does). A match says which reading it used.
+ * On a rig-less structure that line is the hull's own bonus (checked in game).
+ * Whether fitted rigs fold into the same line is not verified, so each fit is
+ * tried both ways: the rig bonus alone, and the rig bonus combined with the
+ * structure hull's own bonus (multiplicatively, as the plan math does). A
+ * match says which reading it used.
  */
 import {
   FACILITY_PRESETS,
@@ -92,9 +93,13 @@ export function matchRigFits(input: {
   return matches;
 }
 
-/** A percent as a pilot types it — "2.4", "2,4", "2.40%" — or null when it is not a number. */
+/**
+ * A percent as a pilot types it — "2.4", "2,4", "2.40%" — or null when it is
+ * not a number. The tooltips print a reduction as "-20.0%" (or with a true
+ * minus sign), so a leading sign is dropped: the reading is the size of the cut.
+ */
 export function parseReadingPct(text: string): number | null {
-  const cleaned = text.trim().replace('%', '').replace(',', '.').trim();
+  const cleaned = text.trim().replace(/^[-−]/, '').replace('%', '').replace(',', '.').trim();
   if (cleaned === '') return null;
   const value = Number(cleaned);
   return Number.isFinite(value) && value >= 0 && value < 100 ? value : null;
