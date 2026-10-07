@@ -160,3 +160,8 @@ Existing test = file:line. Proposed tests use hand arithmetic shown.
 7. Pages 404: Align_time, Effective_hit_points, Heat_and_overheating. Alternative titles were not tried.
 8. Alpha "cannot use planetary industry" unverified; check in-game before adding a gate.
 9. `Planetary_buildings` last edited 23 Oct 2022; values equal SDE-derived data, so the date is not a defect.
+
+## Hostile review addendum (2026-10-07)
+
+- Capacitor formula, turret 40,000 m constant and the PI "Varies" cell were checked against raw wikitext: all three are fetch-summary artefacts, not wiki errors.
+- Turret constant cross-checked with ESI dogma data: attribute 620 (`optimalSigRadius`) is 40,000 on Heavy Pulse Laser II (3520) and Light Neutron Blaster II (3178), tracking attribute 160 is 26.0 and 379.8. Our `appliedDps.ts:97` and the wiki formula give the same value. Neither side needs a fix.
