@@ -1,3 +1,9 @@
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, TypeIcon } from '@/components/ui';
@@ -71,10 +77,16 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                         <button
                           type="button"
                           aria-pressed={isSelected}
-                          title={hull.group}
                           onClick={() => setSelected(hull)}
                           onDoubleClick={() => onStart(hull)}
-                          className={`flex min-h-11 w-full md:min-h-9 items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                          className={cx(
+                            'flex min-h-11 w-full items-center px-2 text-left text-sm md:min-h-9',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName,
+                            isSelected
+                              ? `${selectedRowClassName} text-accent`
+                              : 'border-l-2 border-l-transparent'
+                          )}
                         >
                           {hull.name}
                         </button>

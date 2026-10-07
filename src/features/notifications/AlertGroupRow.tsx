@@ -7,8 +7,12 @@
  * neither: a type that fired 284 times has 284 different bodies, and picking
  * one to stand for the rest would be a lie about the other 283.
  */
+import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterLink } from '@/features/entities';
+import { HintText } from '@/components/ui/HintText';
 import { Caret, IconButton, InfoTooltip, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
@@ -79,7 +83,11 @@ export function AlertGroupRow({
           type="button"
           aria-expanded={expanded}
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xs py-1.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className={cx(
+            'flex min-w-0 flex-1 items-center gap-3 rounded-xs py-1.5 text-left',
+            interactiveClassName,
+            focusRingInsetClassName
+          )}
         >
           <Caret expanded={expanded} />
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums">
@@ -200,17 +208,21 @@ function AlertFireRow({
     */
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-nowrap">
       {pillName !== null && (
-        <span className="order-1 max-w-24 shrink-0 truncate rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] font-medium text-text-dim sm:order-2 sm:max-w-none">
+        <CharacterLink
+          id={entry.characterId}
+          className="order-1 max-w-24 shrink-0 truncate bg-panel-2 px-1 py-0.5 text-[0.6875rem] font-medium sm:order-2 sm:max-w-none"
+        >
           {pillName}
-        </span>
+        </CharacterLink>
       )}
       <time
         dateTime={firedAt.toISOString()}
-        title={formatTimestamp(firedAt, timeZone)}
         className="order-2 ml-auto shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:order-3 sm:ml-0 sm:w-16 sm:text-right"
       >
-        {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
-        {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
+        <HintText content={formatTimestamp(firedAt, timeZone)}>
+          {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
+          {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
+        </HintText>
       </time>
       {/* A fill dated by the poll that noticed it, until the wallet shows the sale (`fillTimeSettle.ts`). */}
       {isProvisionalFill(entry) && (
@@ -226,9 +238,15 @@ function AlertFireRow({
           entry.subjectId ?? entry.typeId,
           entry.characterId
         )}
-        className="order-4 min-w-0 basis-full rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:order-1 sm:flex-1 sm:basis-auto sm:truncate"
+        // Deliberate §6c deviation: no › caret. The dismiss × is the row's one trailing control and the body text is the link.
+        // Body text stays dim (a feed of accent sentences would drown the cues that matter); it underlines on hover.
+        className={cx(
+          'order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',
+          interactiveClassName,
+          focusRingInsetClassName
+        )}
       >
-        {body}
+        <span className="min-w-0 flex-1 sm:truncate">{body}</span>
       </Link>
       <IconButton
         ref={dismissRef}

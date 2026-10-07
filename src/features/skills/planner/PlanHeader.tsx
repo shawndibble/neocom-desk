@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, StatChips, TextInput, type StatChipTone } from '@/components/ui';
+import { Panel, StatChip, StatChips, TextInput, Tooltip, type StatChipTone } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -33,6 +34,11 @@ interface PlanHeaderProps {
    * null while the plan is costed on the real implants.
    */
   whatIf?: { lens: string; verdict: WhatIfVerdict } | null;
+  /**
+   * True when the what-if implants made the remap saving smaller than it is
+   * on the real ones; adds a "?" tooltip saying why (`remapSavingsShrank`).
+   */
+  savingsShrankWithImplants?: boolean;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
   /**
@@ -59,6 +65,7 @@ export function PlanHeader({
   nextMilestone,
   progress,
   whatIf = null,
+  savingsShrankWithImplants = false,
   trainedKnown = true,
   name,
   onRename,
@@ -149,12 +156,14 @@ export function PlanHeader({
             label={t('plans.milestone.next')}
             value={
               <>
-                <span
-                  title={nextMilestone.name}
-                  className="inline-block max-w-[8rem] overflow-hidden text-ellipsis whitespace-nowrap align-bottom md:max-w-none md:overflow-visible"
-                >
-                  {nextMilestone.name}
-                </span>{' '}
+                <Tooltip content={nextMilestone.name}>
+                  <span
+                    tabIndex={0}
+                    className={`inline-block max-w-[8rem] overflow-hidden rounded-xs text-ellipsis whitespace-nowrap align-bottom md:max-w-none md:overflow-visible ${focusRingClassName}`}
+                  >
+                    {nextMilestone.name}
+                  </span>
+                </Tooltip>{' '}
                 <span className="text-text-dim">{formatLocalDate(nextMilestone.finish)}</span>
               </>
             }
@@ -163,6 +172,10 @@ export function PlanHeader({
         {badge && (
           <StatChip
             label={t('plans.headerSavingsLabel')}
+            tooltipGlyph="info"
+            tooltip={
+              savingsShrankWithImplants ? t('plans.headerSavingsShrankWithImplants') : undefined
+            }
             tone={showsSavings ? 'success' : 'default'}
             value={
               <>

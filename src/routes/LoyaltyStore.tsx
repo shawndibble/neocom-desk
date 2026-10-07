@@ -12,6 +12,9 @@
  * (issue #2321); `/market/lp-store` with no corporation is the picker's
  * landing state.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
 import {
   useCallback,
   useDeferredValue,
@@ -21,6 +24,7 @@ import {
   type ReactElement,
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CorporationLink } from '@/features/entities/EntityLink';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -60,7 +64,7 @@ import {
 } from './loyaltyStoreColumns';
 import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -87,6 +91,17 @@ function iskPerLpTone(value: number | null): string {
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
+
+/**
+ * Item name: plain text. The row's click selects it for the detail pane, so
+ * the name is not a link (DESIGN.md §6c); `OfferDetail`'s View in Market is
+ * the Market link. A blueprint row is labelled with the product that button
+ * opens; the BP badge beside it still marks the row as a blueprint.
+ */
+function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
+  const { typeId, itemName } = resolveLoyaltyRowItem(row);
+  return <span className={entityLinkClassName()}>{typeId === null ? row.itemName : itemName}</span>;
+}
 
 /**
  * A blueprint offer's row is the *blueprint*, but every market/menu action on
@@ -164,7 +179,7 @@ function OfferDetail({
         align: 'right',
         className: 'tabular-nums text-text',
         sortValue: (material) => material.lineCost,
-        render: (material) => <IskAmount value={material.lineCost} revealOn="tap" decimals={0} />,
+        render: (material) => <IskAmount value={material.lineCost} decimals={0} />,
       },
     ],
     [t, catalog, hubId]
@@ -227,11 +242,7 @@ function OfferDetail({
             {t('loyaltyStore.netProfit')}
           </div>
           <div className={`text-xl font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>
-            {profit.profit === null ? (
-              '—'
-            ) : (
-              <IskAmount value={profit.profit} revealOn="tap" decimals={0} />
-            )}
+            {profit.profit === null ? '—' : <IskAmount value={profit.profit} decimals={0} />}
           </div>
         </div>
       </div>
@@ -369,12 +380,27 @@ const FILTER_PARAMS = {
   search: textParam(),
   affordableOnly: boolParam(true),
   blueprintsOnly: boolParam(false),
+  /** The selected offer: a link (BPC Sourcing's LP rows) arrives with one already picked. */
+  offer: optionalIdParam(),
 };
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
 /** The picker in the page header, sized so it wraps onto its own line on a phone. */
 const PICKER_CLASS = 'w-72 max-w-full';
+
+/** The header's picker plus the gear for the one setting this page's numbers lean on, LP Value. */
+function LpStoreActions({ corporationName }: { corporationName: string | null }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <LpStorePicker corporationName={corporationName} className={PICKER_CLASS} />
+      <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
+        <LpValueSettingsForm />
+      </PageSettingsButton>
+    </>
+  );
+}
 
 /** `/market/lp-store` with no corporation chosen yet: just the picker. */
 function LoyaltyStoreLanding() {
@@ -383,7 +409,7 @@ function LoyaltyStoreLanding() {
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
       <PageHeader
         title={t('loyaltyStore.title')}
-        actions={<LpStorePicker corporationName={null} className={PICKER_CLASS} />}
+        actions={<LpStoreActions corporationName={null} />}
       />
       <Panel>
         <EmptyState title={t('loyaltyStore.landingTitle')} hint={t('loyaltyStore.landingHint')} />
@@ -449,8 +475,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // Rows filter on a deferred copy so a keystroke paints the box first
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
-  const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const selectedOfferId = filterParams.offer;
+  // A phone arriving on a linked offer opens its breakdown straight away.
+  const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
   const itemActions = usePageItemActions({ activeCharacterId });
@@ -478,7 +505,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const selectedRow = filteredRows.find((row) => row.offer.offer_id === selectedOfferId);
 
   function selectRow(row: LoyaltyOfferRow) {
-    setSelectedOfferId(row.offer.offer_id);
+    setFilterParams({ offer: row.offer.offer_id });
     if (!isDesktop) setSheetOpen(true);
   }
 
@@ -516,13 +543,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     },
     [catalog]
   );
-  // Tint and `selectedRowKey` both key on the selected id rather than
-  // `selectedRow`: a selected offer filtered out of `filteredRows` has no row
-  // to mark either way, and one source keeps the two from disagreeing.
-  const offerRowClassName = useCallback(
-    (row: LoyaltyOfferRow) => (row.offer.offer_id === selectedOfferId ? 'bg-panel-2' : undefined),
-    [selectedOfferId]
-  );
+  // `DataTable` draws the selected row itself from `selectedRowKey`; it keys on the
+  // selected id rather than `selectedRow`, so a selected offer filtered out of
+  // `filteredRows` simply has no row to mark.
 
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
@@ -539,11 +562,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         sortValue: (row) => row.profit.profit ?? undefined,
         cellClassName: (row) => iskPerLpTone(row.profit.profit),
         render: (row) =>
-          row.profit.profit === null ? (
-            '—'
-          ) : (
-            <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
-          ),
+          row.profit.profit === null ? '—' : <IskAmount value={row.profit.profit} decimals={0} />,
       },
       iskPerLp: {
         id: 'iskPerLp',
@@ -566,19 +585,19 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       render: (row) => (
         <span className="flex flex-col">
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-text">{row.itemName}</span>
+            <LoyaltyItemName row={row} />
             {row.isBlueprint && (
               // `shrink-0` + `whitespace-nowrap`: as a flex item next to a
               // long item name the badge was being squeezed until "BP" broke
               // across two lines, one letter each.
-              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
+              <span className="shrink-0 px-1 text-[0.6875rem] font-bold tracking-widest whitespace-nowrap text-warning uppercase">
                 BP
               </span>
             )}
           </span>
           <span className="text-[0.6875rem] text-text-dim">
             {row.offer.lp_cost.toLocaleString()} LP +{' '}
-            <IskAmount value={row.offer.isk_cost} revealOn="longPress" decimals={0} />
+            <IskAmount value={row.offer.isk_cost} decimals={0} />
           </span>
         </span>
       ),
@@ -667,8 +686,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             stackSummary={t('loyaltyStore.offerCount', { count: filteredRows.length })}
             onRowClick={selectRow}
             rowContextMenu={rowContextMenu}
+            rowMoreActions
             selectedRowKey={selectedOfferId}
-            rowClassName={offerRowClassName}
           />
         </>
       )}
@@ -699,6 +718,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
+              <CorporationLink id={corporationId}>
+                {t('loyaltyStore.corporationInfo')}
+              </CorporationLink>
               <StatChips>
                 <StatChip
                   label={t('loyaltyStore.yourLp')}
@@ -712,7 +734,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </StatChips>
             </div>
           }
-          actions={<LpStorePicker corporationName={corpName} className={PICKER_CLASS} />}
+          actions={<LpStoreActions corporationName={corpName} />}
         />
 
         <FilterBar

@@ -1,6 +1,5 @@
 /**
- * One row of the corp ops board: its countdown, its subject, and its right-click
- * menu.
+ * One row of the corp ops board: its countdown and its subject.
  *
  * A row rather than a list. Until #566 this module also owned the flat,
  * urgency-ordered list that was the whole overview; the Kind Cards render the
@@ -12,15 +11,13 @@
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
  * its own beyond formatting.
  */
+import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { MenuItem, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
+import { Tooltip } from '@/components/ui';
+import { ItemInfoLink } from '@/features/entities';
 import * as Icon from '@/components/ui/icons';
 import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
-import { marketItemUrl } from '@/engine/market/urlState';
-import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
-import { useItemActions } from '@/features/market/itemActions';
 import { structureStateLabel } from './boardSources';
 import type { CorpBoardItem } from '@/engine/corp/board';
 
@@ -105,18 +102,12 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   }
   if (item.withinStaleWindow) {
     return (
-      // A real `<button>` rather than a styled span: `Tooltip` reveals on hover
-      // *or focus*, and the caveat is the part of this row a keyboard user most
-      // needs to reach.
-      <Tooltip content={t('corp.board.underCacheWindowHint')} openOnTap>
-        <button
-          type="button"
-          className={`${base} ${tone} cursor-help text-left underline decoration-dotted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
-        >
-          {icon}
-          {t('corp.board.underCacheWindow')}
-        </button>
-      </Tooltip>
+      // `HintText` is focusable, not just hoverable: the caveat is the part of
+      // this row a keyboard user most needs to reach.
+      <HintText content={t('corp.board.underCacheWindowHint')} className={`${base} ${tone}`}>
+        {icon}
+        {t('corp.board.underCacheWindow')}
+      </HintText>
     );
   }
   const remainingMs = item.remainingMs ?? 0;
@@ -138,48 +129,6 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   );
 }
 
-interface BoardRowAction {
-  key: string;
-  label: string;
-  onSelect: () => void;
-}
-
-/**
- * Actions shared by the right-click menu and visible button below, so they
- * can't drift. Job rows add market-item (typeId) actions; other kinds only
- * get copy name.
- */
-function useBoardRowActions(item: CorpBoardItem): BoardRowAction[] {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { showInfo } = useItemActions();
-  const typeId = item.typeId;
-
-  const actions: BoardRowAction[] = [
-    {
-      key: 'copyName',
-      label: t('corp.board.contextMenu.copyName'),
-      onSelect: () => void writeToClipboard(item.subject),
-    },
-  ];
-  if (typeId !== null) {
-    actions.push(
-      {
-        key: 'showInfo',
-        label: t('corp.board.contextMenu.showInfo'),
-        onSelect: () => showInfo(typeId, item.subject),
-      },
-      {
-        key: 'viewInMarket',
-        label: t('corp.board.contextMenu.viewInMarket'),
-        onSelect: () => navigate(marketItemUrl(typeId, location.search)),
-      }
-    );
-  }
-  return actions;
-}
-
 /**
  * One board row, exported so the Kind Cards (issue #566) render exactly this
  * and not an approximation of it.
@@ -191,40 +140,32 @@ function useBoardRowActions(item: CorpBoardItem): BoardRowAction[] {
  */
 export function CorpBoardRow({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
-  const actions = useBoardRowActions(item);
   const detail = detailText(item, t);
   return (
-    // `ContextMenuTrigger asChild` clones the `<li>` itself rather than
-    // wrapping it, the same way `VariationsTable.tsx` triggers off a `<tr>` —
-    // a wrapper element would break `<ul>` semantics and the row's own layout.
-    <RowActionsMenu
-      name={item.subject}
-      items={actions.map((action) => (
-        <MenuItem key={action.key} onSelect={action.onSelect}>
-          {action.label}
-        </MenuItem>
-      ))}
-    >
-      <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
-        <Countdown item={item} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm" title={item.subject}>
-            {item.subject}
+    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
+      <Countdown item={item} />
+      <div className="min-w-0 flex-1">
+        <Tooltip content={item.subject}>
+          <p className="truncate text-sm">
+            {/* Item rows go to Market (§6c); structures and the rest are plain names. */}
+            {item.typeId === null ? (
+              item.subject
+            ) : (
+              <ItemInfoLink typeId={item.typeId}>{item.subject}</ItemInfoLink>
+            )}
           </p>
-          <p className="truncate text-xs text-text-dim" title={detail}>
-            {detail}
-          </p>
-        </div>
-        {/*
+        </Tooltip>
+        <Tooltip content={detail}>
+          <p className="truncate text-xs text-text-dim">{detail}</p>
+        </Tooltip>
+      </div>
+      {/*
           The severity is already carried by the countdown's colour and shape;
           this is its text equivalent, for anyone who cannot use either.
           `sr-only` rather than a visible badge — a fifth element on every row
           would crowd the one thing the row exists to show.
         */}
-        <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
-        {/* The row's only keyboard-focusable element (WCAG 2.1.1). */}
-        <RowMoreActions />
-      </li>
-    </RowActionsMenu>
+      <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
+    </li>
   );
 }

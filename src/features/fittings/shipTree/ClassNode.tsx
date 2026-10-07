@@ -5,6 +5,7 @@
  */
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import { SHIP_TREE_GEOMETRY } from '@/engine/shipTree/layout';
 import type { ShipTreeHullStatus, ShipTreeNode } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
@@ -54,23 +55,22 @@ export const ClassNode = memo(function ClassNode({
     >
       <h2 className={cx('isis-label', !unlocked && 'locked')}>{name}</h2>
       <div className="isis-rule" />
-      <div
-        className={cx('isis-class', !unlocked && 'locked')}
-        title={classSkillTitle(t, name, skills, trainedLevel, skillName)}
-      >
-        <span className="isis-icon">
-          <img
-            src={classIconUrl(group?.icon ?? '')}
-            alt=""
-            width={24}
-            height={24}
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-          />
-        </span>
-        <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
-      </div>
+      <Tooltip content={classSkillTitle(t, name, skills, trainedLevel, skillName)} openOnTap>
+        <div tabIndex={0} className={cx('isis-class', !unlocked && 'locked')}>
+          <span className="isis-icon">
+            <img
+              src={classIconUrl(group?.icon ?? '')}
+              alt=""
+              width={24}
+              height={24}
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
+          <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
+        </div>
+      </Tooltip>
       <div className="isis-grid" style={{ gridTemplateColumns: `repeat(${node.cols}, ${TILE}px)` }}>
         {ships.map((s) => (
           <IsisTile

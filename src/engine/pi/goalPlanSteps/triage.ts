@@ -3,9 +3,9 @@
  * **type gap** blocks before anything is assigned. Step numbers follow the module header of `../goalPlan.ts`.
  */
 import type { PiData } from '@/sde/types';
-import { expandChain, isP0 } from '../chain';
+import { isP0 } from '../chain';
 import type { Goal, PlannerColony, PlannerPolicy, Shortfall } from '../goalTypes';
-import { HOURS_PER_DAY, rawOf, schematicOf } from './shared';
+import { madeNodes, rawOf, schematicOf } from './shared';
 
 /** Goals merged by type, zero-rate goals dropped, P0 goals refused. */
 export function normaliseGoals(goals: readonly Goal[], pi: PiData): Goal[] {
@@ -57,10 +57,9 @@ export function triageGoals(
   const blocked: Goal[] = [];
   const blockedBy = new Map<Goal, number[]>();
   for (const g of goals) {
-    const chain = expandChain(g.typeId, pi, { unitsPerHour: g.unitsPerDay / HOURS_PER_DAY });
     const gaps = buyP1
       ? []
-      : chain.nodes.filter(
+      : madeNodes(g, pi).filter(
           (n) => n.tier === 1 && !yieldable(schematicOf(n.typeId, pi).inputs[0].typeID)
         );
     if (gaps.length === 0) {

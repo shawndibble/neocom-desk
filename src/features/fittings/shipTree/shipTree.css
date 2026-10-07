@@ -60,9 +60,11 @@
   mask-image: radial-gradient(ellipse at 50% 50%, #000 30%, transparent 72%);
   pointer-events: none;
 }
-.isis-tile:hover {
-  border-color: #8fb5c6;
-  background: #1a2a34;
+@media (hover: hover) {
+  .isis-tile:hover {
+    border-color: #8fb5c6;
+    background: #1a2a34;
+  }
 }
 .isis-tile:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -324,13 +326,15 @@
   filter: grayscale(1) brightness(1.6);
   opacity: 0.8;
 }
-.isis-emblem:hover img {
-  filter: none;
-  opacity: 1;
-}
-.isis-emblem:hover {
-  border-color: #bfe3f1;
-  opacity: 1;
+@media (hover: hover) {
+  .isis-emblem:hover img {
+    filter: none;
+    opacity: 1;
+  }
+  .isis-emblem:hover {
+    border-color: #bfe3f1;
+    opacity: 1;
+  }
 }
 
 /*
@@ -492,10 +496,14 @@
 .isis-faction img {
   opacity: 0.8;
 }
-.isis-faction:hover {
-  border-color: #4d636f;
+@media (hover: hover) {
+  .isis-faction:hover {
+    border-color: #4d636f;
+  }
+  .isis-faction:hover img {
+    opacity: 1;
+  }
 }
-.isis-faction:hover img,
 .isis-faction[aria-pressed='true'] img {
   opacity: 1;
 }

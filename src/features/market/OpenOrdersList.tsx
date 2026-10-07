@@ -1,6 +1,7 @@
 import { Fragment, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RowMoreActions } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIskAuto } from '@/lib/isk';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
@@ -30,15 +31,12 @@ interface OpenOrdersListProps {
 /**
  * Open Orders below `sm`: three lines per order — item/character/price,
  * the problem badge with its sentence, then remaining (and floor, off-hub)
- * — tapping anywhere on the row opens `OrderDetailModal`, the same pattern
- * `OrderHistoryList` and `TransactionsDayList` already ship for their own
- * phone views.
+ * — tapping anywhere on the row opens `OrderDetailModal`.
  *
- * The item name renders as plain text, not `MarketItemLink`, and the badge
+ * The item name is the card's accent cue (§6c), not a `MarketItemLink`, and the badge
  * renders with `interactive={false}` (no "?" trigger): both are otherwise
  * focusable content nested inside the row's own `<button>`, which a
- * `<button>` cannot legally contain — `OrderHistoryList`'s docblock gives
- * the same reasoning for dropping its own station tooltip. Location and
+ * `<button>` cannot legally contain. Location and
  * expiry are dropped entirely here; both already show in the detail modal
  * once the row is open.
  */
@@ -66,14 +64,16 @@ export function OpenOrdersList({
               type="button"
               onClick={() => onOpen(row)}
               className={cx(
-                'flex min-h-11 min-w-0 flex-1 flex-col gap-1 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                'flex min-h-11 min-w-0 flex-1 flex-col gap-1 px-3 py-2 text-left',
+                rowInteractiveClassName,
+                focusRingInsetClassName,
                 row.orderId === highlightId && 'row-pulse'
               )}
             >
               <span className="flex items-start justify-between gap-2">
                 <span className="flex min-w-0 flex-wrap items-center gap-1">
-                  <span className="truncate text-sm text-text">{row.typeName}</span>
-                  {showCharacter && <CharacterBadge characterName={row.characterName} t={t} />}
+                  <span className="truncate text-sm text-accent">{row.typeName}</span>
+                  {showCharacter && <CharacterBadge characterName={row.characterName} />}
                 </span>
                 <span className="shrink-0 text-sm font-semibold text-text tabular-nums">
                   {formatIskAuto(row.price)}

@@ -2,11 +2,14 @@ import { Fragment, useId, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Caret, IconButton, Modal, TypeIcon } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatSeconds } from '@/lib/duration';
 import { groupCrystals, type CrystalChoice } from '@/engine/fittings/crystalChoice';
 import { formatIsk } from './chargeFormat';
+import { chargeRowClassName } from './chargeRowStyle';
 import type { WeaponChargeGroup } from './useChargeChoices';
 
 interface Props {
@@ -18,7 +21,7 @@ interface Props {
   pricesLoading: boolean;
 }
 
-const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.2rem_2.4rem_3.2rem_2.8rem]';
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.2rem_2.4rem_3.2rem_3.8rem]';
 const HELP_KEYS = ['a', 'b', 'c', 'tech2'] as const;
 
 const m3s = (value: number) =>
@@ -83,7 +86,7 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
             <TypeIcon typeId={loaded.typeId} size={32} width={20} height={20} />
             <span className="min-w-0 truncate">
               {t('fittings.chargePicker.loaded')}{' '}
-              <span className="font-semibold text-accent">{loaded.name}</span>
+              <span className="font-semibold">{loaded.name}</span>
             </span>
             <span className="ml-auto shrink-0 text-text-dim tabular-nums">
               {t('fittings.crystalGuide.m3PerSecond', { value: m3s(loaded.mining.m3PerSecond) })}
@@ -141,13 +144,19 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
                 ...(holdsLoaded ? [t('fittings.crystalGuide.familyLoaded')] : []),
               ].join(', ')}
               onClick={() => toggle(family.family)}
-              className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+              className={cx(
+                'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
+                rowInteractiveClassName,
+                focusRingInsetClassName
+              )}
             >
               <Caret expanded={isOpen} />
-              <span className={cx('shrink-0 font-semibold', holdsLoaded && 'text-accent')}>
-                {holdsLoaded && <span aria-hidden="true">● </span>}
-                {family.family}
-              </span>
+              <span className="shrink-0 font-semibold">{family.family}</span>
+              {holdsLoaded && (
+                <span className="shrink-0 text-[0.6875rem] text-success">
+                  {t('fittings.chargePicker.loadedTag')}
+                </span>
+              )}
               <span className="min-w-0 flex-1 truncate text-[0.6875rem] text-text-dim">
                 {family.ores.join(', ')}
               </span>
@@ -162,8 +171,10 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
                 <span>{t('fittings.crystalGuide.colCrystal')}</span>
                 <span className="text-right">{t('fittings.crystalGuide.colYield')}</span>
                 <span className="text-right">{t('fittings.crystalGuide.colCycle')}</span>
-                <span className="text-right" title={t('fittings.crystalGuide.colResidueTitle')}>
-                  {t('fittings.crystalGuide.colResidue')}
+                <span className="text-right">
+                  <HintText content={t('fittings.crystalGuide.colResidueTitle')}>
+                    {t('fittings.crystalGuide.colResidue')}
+                  </HintText>
                 </span>
                 <span className="text-right">{t('fittings.capGuide.colIsk')}</span>
               </div>
@@ -181,18 +192,21 @@ export function MiningCrystalGuide({ group, onLoad, wrapRow, pricesLoading }: Pr
                         onClick={() => onLoad?.(choice.typeId)}
                         aria-pressed={isLoaded}
                         aria-label={rowLabel(t, crystal)}
-                        className={cx(
-                          'grid w-full gap-1 border-t border-line px-1 py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
-                          COLUMNS,
-                          choice.skillMissing && 'opacity-50'
+                        className={chargeRowClassName(
+                          isLoaded,
+                          cx(
+                            'grid w-full gap-1 border-t border-line px-1 py-1 text-left tabular-nums',
+                            COLUMNS,
+                            choice.skillMissing && 'opacity-50'
+                          )
                         )}
                       >
-                        <span className={cx('truncate', isLoaded && 'text-accent')}>
-                          {isLoaded && '● '}
+                        <span className="truncate">
                           {t('fittings.crystalGuide.typeName', {
                             letter: crystal.letter,
                             tier: crystal.techLevel === 2 ? 'II' : 'I',
                           })}
+                          {isLoaded && ` · ${t('fittings.add.loaded')}`}
                         </span>
                         <span className="text-right">{m3s(mining.m3PerSecond)}</span>
                         <span className="text-right">{formatSeconds(mining.cycleSeconds)}</span>

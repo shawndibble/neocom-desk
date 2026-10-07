@@ -37,6 +37,10 @@ test('imports the in-game skill queue into an existing plan via Append', async (
   await expect(dialog.getByText(/in-game queue has 1 skill/i)).toBeVisible();
   await dialog.getByRole('button', { name: 'Append' }).click();
 
-  await expect(page.getByRole('button', { name: 'Remove Caldari Cruiser' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove Spaceship Command' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'More actions for Caldari Cruiser' })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'More actions for Spaceship Command' })
+  ).toBeVisible();
 });

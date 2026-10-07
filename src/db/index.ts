@@ -14,6 +14,7 @@ import type {
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
+import type { IndustryJob } from '@/esi/endpoints';
 import type { SnapshotDay } from '@/engine/miningTax/priceBasis';
 
 export interface CharacterRecord {
@@ -727,6 +728,14 @@ export interface MiningTaxAssignmentRecord {
    * history is a group-by away without a separate synced table.
    */
   payment?: MiningTaxPaymentInfo;
+  /**
+   * `true` when `estimatedValue`/`taxOwed` were priced from the raw ore types
+   * rather than their Compressed ones (the Ore Form setting off when it was
+   * snapshotted). Absent = Compressed, which is also what every record from
+   * before the setting existed was. Lets an Outstanding record re-price when
+   * the setting flips (`oreFormReprice.ts`); paid ones just keep it.
+   */
+  rawOrePriced?: boolean;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }
@@ -804,6 +813,8 @@ export interface ProductionRunRecord {
   loggedAt: number;
   /** Epoch ms of the last edit. */
   updatedAt: number;
+  /** ESI `job_id` of the industry job this run was logged from ("Log production" on a delivered job); absent for hand-logged runs. Lets Job History tell logged from unlogged exactly. */
+  sourceJobId?: number;
 }
 
 /**
@@ -923,6 +934,20 @@ export interface MailDraftRecord {
 }
 
 /**
+ * A Character's delivered industry jobs kept past ESI's completed-job window
+ * (issue #2866), newest first. Own table for the same reasons as
+ * `MiningLedgerHistoryRecord`: a cache row is wiped by "clear cache" and
+ * replaced whole on each fetch, and a job ESI has dropped can never be
+ * fetched again. Device-local, not synced. Read and written whole.
+ */
+export interface IndustryJobHistoryRecord {
+  characterId: number;
+  jobs: IndustryJob[];
+  /** Epoch ms of the newest ESI fetch merged in. */
+  fetchedAt: number;
+}
+
+/**
  * A Character's mining ledger kept past ESI's 30-day window (issue #1278),
  * up to `LEDGER_HISTORY_DAYS` (`engine/miningTax/ledgerHistory.ts`). Its own
  * table rather than an `esiCache` row: a cache row is thrown away by "clear
@@ -1004,6 +1029,7 @@ export const db = new Dexie('neocom') as Dexie & {
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
+  industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
@@ -1435,4 +1461,34 @@ db.version(20).stores({
   fittings: 'id, characterId',
   hullFitCache: 'key, savedAt',
   ansiblexGates: 'id',
+});
+
+// Adds `industryJobHistory`, delivered industry jobs kept past ESI's window (issue #2866).
+// Additive, and never synced.
+db.version(21).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
 });

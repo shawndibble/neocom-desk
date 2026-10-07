@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DataTable,
   Disclosure,
   EmptyState,
   FilterChip,
+  IconButton,
   InfoTooltip,
   IskAmount,
   Spinner,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
@@ -20,8 +21,7 @@ import {
   type OwnedStockSale,
   type OwnedStockSaleLine,
 } from '@/engine/industry/ownedStockSale';
-import { marketItemUrl } from '@/engine/market/urlState';
-import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
@@ -67,14 +67,21 @@ function CostRow({
     >
       <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
         {label}
-        {tooltip && (
-          <InfoTooltip
-            label={t('common.aboutLabel', { label })}
-            content={tooltip}
-            onClick={onTooltipClick}
-            {...(onTooltipClick ? { 'aria-haspopup': 'dialog' as const } : {})}
-          />
-        )}
+        {tooltip &&
+          (onTooltipClick ? (
+            // An ⓘ button, not a "?" tooltip: it opens the calculation (§6c).
+            <IconButton
+              size="sm"
+              variant="plain"
+              icon={<Icon.Info size={Icon.ICON_SIZE.sm} />}
+              label={t('common.aboutLabel', { label })}
+              tooltip={tooltip}
+              onClick={onTooltipClick}
+              aria-haspopup="dialog"
+            />
+          ) : (
+            <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
+          ))}
       </span>
       <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}
@@ -124,16 +131,6 @@ interface ResultsSummaryProps {
   nameFor: (typeID: number) => string;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
-  /** Wraps the revenue (product) and owned-sale (material) rows in the item context menu; omitted where the caller has none to offer. */
-  itemMenuFor?: ItemMenuFor;
-  /**
-   * Visible "More actions" button for the owned-sale rows (WCAG 2.1.1, issue
-   * #1498) — the same item menu `itemMenuFor` opens on right-click/long-press,
-   * reachable by keyboard. The revenue row has none of its own: the product's
-   * button already sits in the hero's corner. Omitted where the caller has
-   * none to offer.
-   */
-  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /**
@@ -176,12 +173,8 @@ export function ResultsSummary({
   ownedSale,
   nameFor,
   totalVolume,
-  itemMenuFor,
-  itemActionsFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
@@ -189,7 +182,12 @@ export function ResultsSummary({
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
-      { id: 'product', header: t('industry.product'), render: (row) => row.name },
+      {
+        id: 'product',
+        header: t('industry.product'),
+        stickyStart: true,
+        render: (row) => row.name,
+      },
       {
         id: 'quantity',
         header: t('industry.quantity'),
@@ -202,14 +200,14 @@ export function ResultsSummary({
         header: t('industry.unitPrice'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => <IskAmount value={row.unitPrice} revealOn="longPress" decimals={0} />,
+        render: (row) => <IskAmount value={row.unitPrice} decimals={0} />,
       },
       {
         id: 'total',
         header: t('industry.total'),
         align: 'right',
         className: 'tabular-nums',
-        render: (row) => <IskAmount value={row.total} revealOn="longPress" decimals={0} />,
+        render: (row) => <IskAmount value={row.total} decimals={0} />,
       },
     ],
     [t]
@@ -220,6 +218,7 @@ export function ResultsSummary({
       {
         id: 'material',
         header: t('industry.material'),
+        stickyStart: true,
         sortValue: (row) => nameFor(row.typeID),
         render: (row) => nameFor(row.typeID),
       },
@@ -247,19 +246,8 @@ export function ResultsSummary({
         sortValue: (row) => row.net,
         render: (row) => formatIsk(row.net),
       },
-      ...(itemActionsFor
-        ? [
-            {
-              id: 'actions',
-              header: '',
-              align: 'right',
-              cardActions: true,
-              render: (row) => itemActionsFor(row.typeID),
-            } satisfies DataTableColumn<OwnedStockSaleLine>,
-          ]
-        : []),
     ],
-    [t, nameFor, itemActionsFor]
+    [t, nameFor]
   );
 
   const saleCsvColumns = useMemo(() => ownedSaleCsvColumns(t, nameFor), [t, nameFor]);
@@ -303,13 +291,9 @@ export function ResultsSummary({
           {result.unpricedMaterials.length > 0 && result.buyCost === null && ' '}
           {result.buyCost === null &&
             (productTypeID !== null ? (
-              <button
-                type="button"
-                className="underline"
-                onClick={() => navigate(marketItemUrl(productTypeID, location.search))}
-              >
+              <MarketItemLink typeId={productTypeID}>
                 {t('industry.productUnpriced', { name: productName })}
-              </button>
+              </MarketItemLink>
             ) : (
               t('industry.productUnpriced', { name: productName })
             ))}
@@ -402,11 +386,7 @@ export function ResultsSummary({
                 rowKey={() => 'revenue'}
                 label={t('industry.revenue')}
                 density="compact"
-                rowContextMenu={
-                  itemMenuFor && productTypeID !== null
-                    ? (_row, tr) => itemMenuFor(productTypeID, tr)
-                    : undefined
-                }
+                responsive="table"
               />
             </div>
             <div className="divide-y divide-line rounded-xs border border-line">
@@ -557,8 +537,7 @@ export function ResultsSummary({
                   rowKey={(row) => row.typeID}
                   label={t('industry.useOrSell.perMaterial')}
                   density="compact"
-                  rowContextMenu={itemMenuFor && ((row, tr) => itemMenuFor(row.typeID, tr))}
-                  mobileSort
+                  responsive="table"
                 />
               </div>
             </Disclosure>

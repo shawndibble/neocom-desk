@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import {
   colonyExportablePerHour,
   colonyFactoryBalance,
@@ -86,7 +86,7 @@ describe('colonyFactoryBalance', () => {
   });
 
   it('says an extractor with no measured rate leaves its factories unmeasurable', () => {
-    // Not zero — `advisorModel` leaves an unprojectable program out of
+    // Not zero — `systemPlanetModel` leaves an unprojectable program out of
     // `extractedPerHour` entirely, and calling that a starved colony would
     // advise deleting eight working factories.
     const [line] = colonyFactoryBalance(colony({ extractedPerHour: [] }), pi);

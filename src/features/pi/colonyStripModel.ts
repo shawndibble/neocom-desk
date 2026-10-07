@@ -33,13 +33,12 @@ import { FAULT_VERBS, type Worklist } from './worklistModel';
 
 /**
  * Hours under two days read as hours; beyond that a day count is what a
- * pilot plans in. Shared by `ColonyStrip.tsx`'s row and the Colonies tab's
- * "Storage full in" figure, so the two format a fill time the same way.
+ * pilot plans in. Used by the Colonies tab's "Storage full in" figure.
  */
 export function span(hours: number, t: TFunction): string {
   return hours < 48
-    ? t('piAdvisor.hoursShort', { count: Math.round(hours) })
-    : t('piAdvisor.daysShort', { count: Math.round(hours / 24) });
+    ? t('piShared.hoursShort', { count: Math.round(hours) })
+    : t('piShared.daysShort', { count: Math.round(hours / 24) });
 }
 
 export interface ColonyStripColony {
@@ -121,4 +120,15 @@ export function colonyFillTimeDisplay(
   if (hoursToFull === null) return { kind: 'unknown' };
   if (fillsBeforeHaul(hoursToFull, haulHours)) return { kind: 'soon', hoursToFull };
   return { kind: 'none' };
+}
+
+/**
+ * The colony list could not be read, so the count is unknown, not zero: a
+ * re-login is needed (403) or ESI did not answer with nothing cached. Every PI
+ * surface words "no colonies" only when this is false.
+ */
+export function colonyCountUnknown(
+  read: { needsReauth?: boolean; fetchFailed?: boolean } | null | undefined
+): boolean {
+  return read?.needsReauth === true || read?.fetchFailed === true;
 }

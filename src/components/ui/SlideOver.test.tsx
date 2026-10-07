@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SlideOver } from './SlideOver';
@@ -42,5 +43,103 @@ describe('SlideOver', () => {
     const afterEscape = onClose.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(afterEscape + 1);
+  });
+});
+
+describe('SlideOver edge and history', () => {
+  it('pads its edge by the safe-area inset', () => {
+    render(
+      <SlideOver open onClose={() => {}} title="Add">
+        <p>Panel body</p>
+      </SlideOver>
+    );
+    expect(screen.getByRole('dialog', { name: 'Add' }).className).toContain(
+      'pb-[env(safe-area-inset-bottom)]'
+    );
+  });
+
+  it('closes on Back', async () => {
+    const onClose = vi.fn();
+    render(
+      <SlideOver open onClose={onClose} title="Add">
+        <p>Panel body</p>
+      </SlideOver>
+    );
+    act(() => window.history.back());
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe('SlideOver focus', () => {
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open panel
+        </button>
+        <SlideOver open={open} onClose={() => setOpen(false)} title="Panel">
+          <p>Body</p>
+        </SlideOver>
+      </>
+    );
+  }
+
+  it('returns focus to the opener on Escape and on the close button', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Open panel' });
+    opener.focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog', { name: 'Panel' });
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+
+  it('opens without focusing Close, so no tooltip eats the first Escape', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    screen.getByRole('button', { name: 'Open panel' }).focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog', { name: 'Panel' });
+    expect(screen.getByRole('button', { name: 'Close' })).not.toHaveFocus();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('hands focus to the fallback when what opened it is gone (the page under it changed)', async () => {
+    const user = userEvent.setup();
+    function Gone() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" id="fallback">
+            Fallback
+          </button>
+          <SlideOver
+            open={open}
+            onClose={() => setOpen(false)}
+            title="Panel"
+            returnFocusFallback={() => document.getElementById('fallback')}
+          >
+            <p>Body</p>
+          </SlideOver>
+        </>
+      );
+    }
+    // Opened by a URL, with nothing focused: no opener to return to.
+    render(<Gone />);
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Fallback' })).toHaveFocus());
   });
 });

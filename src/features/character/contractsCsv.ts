@@ -1,9 +1,10 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { Contract } from '@/esi/endpoints';
+import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { contractAmount } from './contractAmount';
 
 /**
- * CSV columns for contracts: type, status, issuer, price, expires. Mirrors
+ * CSV columns for contracts: type, status, issuer, receiver, price, expires. Mirrors
  * the DataTable columns on the Contracts page. `expires` passes through as
  * the raw ISO string, not the `toLocaleString()` display rendering. `price`
  * is the type-aware `contractAmount` like the table, and is blank (not a string)
@@ -11,12 +12,20 @@ import { contractAmount } from './contractAmount';
  */
 export function contractsCsvColumns(
   t: CsvTranslate,
-  nameFor: (issuerId: number) => string
+  nameFor: (issuerId: number) => string,
+  selfId?: number
 ): CsvColumn<Contract>[] {
   return [
     { header: t('contracts.type'), value: (contract) => contract.title || contract.type },
     { header: t('contracts.status'), value: (contract) => contract.status },
-    { header: t('contracts.issuer'), value: (contract) => nameFor(contract.issuer_id) },
+    { header: t('contracts.issuer'), value: (contract) => nameFor(contractIssuer(contract).id) },
+    {
+      header: t('contracts.receiver'),
+      value: (contract) => {
+        const receiver = selfId === undefined ? null : contractReceiver(contract, selfId);
+        return receiver ? nameFor(receiver.id) : null;
+      },
+    },
     {
       header: t('contracts.price'),
       value: (contract) => contractAmount(contract) ?? null,

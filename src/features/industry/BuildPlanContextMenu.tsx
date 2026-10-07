@@ -65,6 +65,8 @@ export interface BuildPlanContextMenuProps {
   seed?: BuildPlanSeed | null;
   /** Caller-specific entries appended after the shared ones (BPC Sourcing's "Set waypoint in game"), as `ItemContextMenu`'s are. */
   extraItems?: ReactNode;
+  /** Drops "View in Market" where the row already links the item to its Market listing. */
+  omitViewInMarket?: boolean;
 }
 
 /**
@@ -110,7 +112,12 @@ function usePlannableIndexOnOpen(): {
 
 /** The item list `BuildPlanContextMenu` publishes, to both its own right-click trigger and any `RowMoreActions` reading its `RowActionsContext`. */
 function useBuildPlanMenuNodes(
-  { typeId, itemName, seed }: Pick<BuildPlanContextMenuProps, 'typeId' | 'itemName' | 'seed'>,
+  {
+    typeId,
+    itemName,
+    seed,
+    omitViewInMarket,
+  }: Pick<BuildPlanContextMenuProps, 'typeId' | 'itemName' | 'seed' | 'omitViewInMarket'>,
   index: PlannableIndex | null
 ): ReactElement[] {
   const { t } = useTranslation();
@@ -121,17 +128,19 @@ function useBuildPlanMenuNodes(
   /** `undefined` while the index is still loading, mirroring `ItemContextMenu`'s `blueprintTypeID`. */
   const productTypeId = index ? plannableProductTypeID(index, typeId) : undefined;
 
-  const nodes: ReactElement[] = [
-    <RowMenuItem
-      key="viewInMarket"
-      onSelect={() => {
-        const params = marketLinkParams(typeId, location.search);
-        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-      }}
-    >
-      {t('market.contextMenu.viewInMarket')}
-    </RowMenuItem>,
-  ];
+  const nodes: ReactElement[] = omitViewInMarket
+    ? []
+    : [
+        <RowMenuItem
+          key="viewInMarket"
+          onSelect={() => {
+            const params = marketLinkParams(typeId, location.search);
+            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+          }}
+        >
+          {t('market.contextMenu.viewInMarket')}
+        </RowMenuItem>,
+      ];
   if (itemName !== undefined) {
     nodes.push(
       <RowMenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
@@ -169,9 +178,10 @@ export function BuildPlanContextMenu({
   itemName,
   seed,
   extraItems,
+  omitViewInMarket,
 }: BuildPlanContextMenuProps) {
   const { index, onOpenChange } = usePlannableIndexOnOpen();
-  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index);
+  const items = useBuildPlanMenuNodes({ typeId, itemName, seed, omitViewInMarket }, index);
 
   return (
     <RowActionsMenu

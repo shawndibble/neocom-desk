@@ -1,6 +1,15 @@
+import { HintText } from '@/components/ui/HintText';
+import { OreIcon } from './OreIcon';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
+import {
+  findRowForPaymentRef,
+  PAYMENT_REF_PARAM,
+  parsePaymentRefParam,
+} from '@/features/miningTax/paymentDeepLink';
 import {
   Button,
   Caret,
@@ -15,12 +24,12 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   Spinner,
   Toast,
   Tooltip,
-  TypeIcon,
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
@@ -30,7 +39,12 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
@@ -39,7 +53,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -68,7 +82,7 @@ import {
   sellFallbackAtHubOnDate,
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
-import { loadTypeNames } from '@/features/character/typeNames';
+import { loadOreFormNames, readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   acceptNewTotal,
@@ -95,7 +109,10 @@ import {
 } from '@/features/miningTax/selection';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
-import { loadMadePayments } from '@/features/miningTax/madePayments';
+import {
+  loadMadePaymentsWithStatus,
+  type MadePaymentSources,
+} from '@/features/miningTax/madePayments';
 import {
   autoMatchRecordedPayments,
   suggestLinks,
@@ -253,19 +270,21 @@ async function loadSnapshot(characterId: number, signal: RouteSnapshotSignal): P
     payees.map((payee) => payee.hubId)
   );
   const dates = [...new Set(result.rows.map((row) => row.entry.date))];
+  const compressed = await readCompressedOre();
   const [
     { systemNames, systemSecurity, typeNames: rowTypeNames },
     datedPrices,
     unclassifiedTypeNames,
   ] = await Promise.all([
-    resolveRowNames(result.rows),
+    resolveRowNames(result.rows, compressed),
     loadDatedUnitPricesByHub(
       characterId,
       result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId)),
       payeeHubIds,
-      dates
+      dates,
+      compressed
     ),
-    loadTypeNames(unclassifiedTypeIds),
+    loadOreFormNames(unclassifiedTypeIds, compressed),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
   return {
@@ -332,6 +351,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     undefined,
     { cacheKey: 'moonMiningTax' }
   );
+  useRefreshOnOreFormChange(refresh);
 
   const [{ 'tax.character': characterFilter, 'tax.payee': payeeFilter }, setTaxUrlParams] =
     useUrlParams(TAX_URL_PARAMS);
@@ -435,6 +455,35 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const characters = data?.characters ?? [];
 
   const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
+
+  // The wallet journal's "Mining tax →" link (`paymentDeepLink.ts`): opens the
+  // detail of the row that transaction paid. Latched on mount and spent at
+  // once, like `useHighlightParam`, so a reload or a later refresh can't
+  // reopen the modal after the pilot closed it. Searches every row, not the
+  // filtered ones: a Character or Payee filter must not hide the target.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [initialPaymentRef] = useState(() =>
+    parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
+  );
+  const [pendingPaymentRef, setPendingPaymentRef] = useState(initialPaymentRef);
+  useEffect(() => {
+    if (initialPaymentRef === null) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(PAYMENT_REF_PARAM);
+        return params;
+      },
+      { replace: true }
+    );
+  }, [initialPaymentRef, setSearchParams]);
+  // Adjusted during render (React's derive-state pattern), not in an effect.
+  if (pendingPaymentRef !== null && data) {
+    const target = findRowForPaymentRef(allDisplayRows, pendingPaymentRef);
+    if (target) setDetailTarget(target);
+    // A miss on cached data may be a snapshot older than the link; wait for the fresh read.
+    if (target || !loading) setPendingPaymentRef(null);
+  }
   // Settle up's rows, re-read from every load by Assignment id: a recheck
   // while it is open can absorb fresh growth into an Assignment, and paying the
   // copy taken at open would record the old amount over it.
@@ -530,6 +579,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
    * resolves, and re-runs on `refresh()` so a just-linked payment drops off.
    */
   const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
+  const [paymentSources, setPaymentSources] = useState<MadePaymentSources[]>([]);
   /**
    * Keyed on the character roster, never on `data`. `useRouteSnapshot`
    * re-runs its loader on `onCacheRevalidated`, which is a *global* signal —
@@ -545,8 +595,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   useEffect(() => {
     if (trackedCharacterIds === '') return;
     let cancelled = false;
-    void loadMadePayments(trackedCharacterIds.split(',').map(Number)).then((payments) => {
-      if (!cancelled) setMadePayments(payments);
+    void loadMadePaymentsWithStatus(trackedCharacterIds.split(',').map(Number)).then((result) => {
+      if (cancelled) return;
+      setMadePayments(result.payments);
+      setPaymentSources(result.sources);
     });
     return () => {
       cancelled = true;
@@ -1195,7 +1247,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       withDayLines(
         dr,
         dr.groupMembers ? (
-          <span className="inline-flex rounded-xs border border-accent-dim px-1.5 text-[0.6875rem] font-semibold tracking-wider text-accent uppercase">
+          <span className="inline-flex text-[0.6875rem] font-semibold tracking-wider text-text-dim uppercase">
             {t('miningTax.combined.days', { count: allMembers(dr).length })}
           </span>
         ) : (
@@ -1205,7 +1257,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               .map((typeId) => (
                 <Tooltip key={typeId} content={data?.typeNames.get(typeId) ?? `#${typeId}`}>
                   <span tabIndex={0}>
-                    <TypeIcon typeId={typeId} size={32} className="h-4 w-4" />
+                    <OreIcon typeId={typeId} size={32} className="h-4 w-4" />
                   </span>
                 </Tooltip>
               ))}
@@ -1236,7 +1288,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     render: (dr) =>
       withDayLines(
         dr,
-        isPhone ? formatIskCompact(estimatedValueOf(dr)) : `${formatIsk(estimatedValueOf(dr))} ISK`,
+        isPhone ? (
+          <IskAmount value={estimatedValueOf(dr)} />
+        ) : (
+          `${formatIsk(estimatedValueOf(dr))} ISK`
+        ),
         (m) => `${formatIsk(m.assignment.estimatedValue)} ISK`
       ),
     sortValue: (dr) => estimatedValueOf(dr),
@@ -1249,7 +1305,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             id: 'character',
             headerCellClassName: 'sm:w-28',
             header: t('miningTax.characterColumn'),
-            render: (dr: DisplayRow) => dr.row.characterName,
+            // Plain: the row opens the detail modal, which links the pilot (§6c).
+            render: (dr: DisplayRow) => (
+              <span className={entityLinkClassName()}>{dr.row.characterName}</span>
+            ),
             sortValue: (dr: DisplayRow) => dr.row.characterName,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -1260,6 +1319,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.dateColumn'),
       headerTooltip: t('miningTax.dateEveHint'),
       className: 'whitespace-nowrap',
+      // Row opens its detail modal: the accent primary cell is the cue (§6c).
+      cellClassName: () => 'text-accent',
       render: (dr) =>
         withDayLines(
           dr,
@@ -1272,7 +1333,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 onClick={() => toggleCombinedExpanded(dr.key)}
                 // In the gutter left of the date, so a combined row's date
                 // keeps the same left edge as every other row's.
-                className="absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent focus-visible:outline-2 focus-visible:outline-accent sm:inline-flex"
+                className={cx(
+                  'absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent sm:inline-flex',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
               >
                 <Caret expanded={expandedCombined.has(dr.key)} />
               </button>
@@ -1295,8 +1360,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       header: t('miningTax.systemColumn'),
       render: (dr) => (
         <DataTableDenseCell>
-          {systemName(dr)}
-          <SecurityValue security={systemSecurityOf(dr)} t={t} />
+          <span className={entityLinkClassName()}>{systemName(dr)}</span>
+          <SecurityValue security={systemSecurityOf(dr)} />
         </DataTableDenseCell>
       ),
       sortValue: (dr) => systemName(dr),
@@ -1312,14 +1377,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       render: (dr) => {
         const name = payeeDisplayName(dr);
         return (
-          <Tooltip content={name}>
-            <span
-              tabIndex={0}
-              className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
-            >
-              {name}
-            </span>
-          </Tooltip>
+          <HintText content={name} desktopOnly>
+            {name}
+          </HintText>
         );
       },
       sortValue: (dr) => payeeDisplayName(dr),
@@ -1373,11 +1433,14 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             stackEdge: 'start',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
-                <Checkbox
-                  aria-label={t('miningTax.selectForBulkAction')}
-                  checked={selection.has(dr.key)}
-                  onChange={() => toggleRowSelected(dr.key)}
-                />
+                // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
+                <label className={touchCheckboxLabelClassName}>
+                  <Checkbox
+                    aria-label={t('miningTax.selectForBulkAction')}
+                    checked={selection.has(dr.key)}
+                    onChange={() => toggleRowSelected(dr.key)}
+                  />
+                </label>
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -2148,6 +2211,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           payee={linkWalletPayee}
           owed={linkWalletOwed}
           candidates={linkWalletCandidates}
+          paymentSources={paymentSources}
           systemNames={data.systemNames}
           onLinked={() => {
             setSelection(new Set());

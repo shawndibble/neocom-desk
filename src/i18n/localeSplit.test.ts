@@ -91,15 +91,15 @@ describe('referencedLeaves', () => {
   });
 
   it('tells apart sections where one name prefixes another, in either list order', () => {
-    const tree: LocaleTree = { pi: { title: 'PI' }, piAdvisor: { slots: 'Slots' } };
+    const tree: LocaleTree = { pi: { title: 'PI' }, piShared: { slots: 'Slots' } };
     for (const sections of [
-      ['pi', 'piAdvisor'],
-      ['piAdvisor', 'pi'],
+      ['pi', 'piShared'],
+      ['piShared', 'pi'],
     ]) {
       const leaves = leafPaths(tree, sections);
       expect(
-        [...referencedLeaves(`t('piAdvisor.slots'); t('pi.title')`, leaves, sections)].sort()
-      ).toEqual(['pi.title', 'piAdvisor.slots']);
+        [...referencedLeaves(`t('piShared.slots'); t('pi.title')`, leaves, sections)].sort()
+      ).toEqual(['pi.title', 'piShared.slots']);
     }
   });
 });

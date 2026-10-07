@@ -38,8 +38,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Tooltip,
-  iconButtonClassName,
+  buttonClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { DEADLINE_SEVERITIES, type DeadlineSeverity } from '@/engine/severity';
@@ -164,7 +163,7 @@ export function Alerts() {
   /*
    * The raw feed minus dismissals — deliberately NOT `visibleFeedEntries`,
    * which also drops muted types. A muted type has to be reachable from
-   * somewhere: `NotificationContextMenu`'s "hide in feed" is one-way from a row
+   * somewhere: a feed row's "hide in feed" is one-way from a row
    * that vanishes the moment it applies, so until now the only way back was
    * Settings. Muted groups are hidden here by default and revealed by a chip.
    */
@@ -213,19 +212,13 @@ export function Alerts() {
         title={t('alerts.title')}
         actions={
           <>
-            {/* A Link styled as an icon button: it navigates, so it stays an
-                anchor, but it sits beside "Dismiss all" and reads as the same
-                control. Its name lives in the tooltip and the aria-label
-                alike, so the two can never drift. */}
-            <Tooltip content={t('alerts.settings')}>
-              <Link
-                to={tabPath(SETTINGS_TABS, 'notifications')}
-                aria-label={t('alerts.settings')}
-                className={iconButtonClassName()}
-              >
-                <Icon.Settings aria-hidden="true" />
-              </Link>
-            </Tooltip>
+            {/* Navigates, so a labelled link (§6c retires the navigating gear). */}
+            <Link
+              to={tabPath(SETTINGS_TABS, 'notifications')}
+              className={buttonClassName({ align: 'center' })}
+            >
+              {t('alerts.settings')}
+            </Link>
             {liveEntries.length > 0 && (
               <IconButton
                 icon={<Icon.DismissAll />}

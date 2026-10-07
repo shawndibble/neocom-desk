@@ -237,7 +237,7 @@ describe('ContractDetailModal', () => {
       onClose: () => {},
     });
     const link = await screen.findByRole('link', { name: /Tritanium/ });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser?'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('info=type-'));
   });
 
   it('right-clicking a blueprint line item starts a Build Plan for what it builds', async () => {
@@ -263,6 +263,28 @@ describe('ContractDetailModal', () => {
 
     // 587 (Rifter), not 638 (the blueprint on the contract).
     expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
+  });
+
+  it('shows a Received By row when a receiver is passed, none otherwise', () => {
+    const { unmount } = renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      receiver: { id: 42, kind: 'character', role: 'assignee' },
+      receiverName: 'Buyer Bob',
+      onClose: () => {},
+    });
+    expect(screen.getByText('Received By')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Buyer Bob' })).toBeInTheDocument();
+    expect(screen.getByText('(offered)')).toBeInTheDocument();
+    unmount();
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(screen.queryByText('Received By')).not.toBeInTheDocument();
   });
 
   it('shows a standing tag beside the issuer when one is passed', () => {
@@ -294,18 +316,17 @@ describe('ContractDetailModal', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('issuer name opens the shared Public Info Modal (issue #417)', () => {
+  it('issuer name links to the shared Public Info Modal (issue #417)', () => {
     renderModal({
       characterId: CHAR_ID,
       contract: ITEM_EXCHANGE,
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Mero Otichoda' }));
-    expect(usePublicInfoModalStore.getState().request).toEqual({
-      kind: 'character',
-      id: ITEM_EXCHANGE.issuer_id,
-    });
+    expect(screen.getByRole('link', { name: 'Mero Otichoda' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`info=character-${ITEM_EXCHANGE.issuer_id}`)
+    );
   });
 
   describe('Market value (issue #717)', () => {

@@ -52,6 +52,23 @@ describe('loadUnitPricesOnDate', () => {
     expect(prices.get(ZEOLITES)).toBe(1343);
   });
 
+  it('prices the raw type itself when Compressed is off', async () => {
+    pricesMock.getHubPrices.mockResolvedValue(
+      new Map([[ZEOLITES, { sellMin: 1100, buyMax: 900, sellVolume: 0, buyVolume: 0 }]])
+    );
+
+    const { prices } = await loadUnitPricesOnDate(
+      CHARACTER_ID,
+      [ZEOLITES],
+      getTradeHub('jita') as TradeHub,
+      DATE,
+      false
+    );
+
+    expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.anything(), [ZEOLITES]);
+    expect(prices.get(ZEOLITES)).toBe(900);
+  });
+
   it('prices at the buy side, not the sell side', async () => {
     pricesMock.getHubPrices.mockResolvedValue(
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])

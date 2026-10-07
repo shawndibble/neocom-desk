@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { itemInfoIsUrlBacked, openItemInfo } from '@/stores/itemInfoModal';
 import { blueprintTypeIdFor, type ItemActions } from './itemActions';
 import { useQuickbar, type Quickbar } from './useQuickbar';
 
@@ -19,6 +20,12 @@ export interface PageItemActionsOptions {
    * directly, or "No blueprint options".
    */
   lazyBlueprints?: boolean;
+  /**
+   * Keep Show info in this page's own modal (the Market Browser prices it at
+   * its effective location). Otherwise Show info is the app-wide, URL-backed
+   * Item Detail whenever the shell is mounted, so Back closes it.
+   */
+  localInfo?: boolean;
 }
 
 export interface ShownItem {
@@ -39,6 +46,7 @@ export interface PageItemActions {
 export function usePageItemActions({
   activeCharacterId,
   lazyBlueprints = false,
+  localInfo = false,
 }: PageItemActionsOptions): PageItemActions {
   const quickbar = useQuickbar(activeCharacterId);
   const [shown, setShown] = useState<ShownItem | null>(null);
@@ -58,7 +66,10 @@ export function usePageItemActions({
     () => ({
       canAddToQuickbar,
       addToQuickbar: (typeId, itemName) => latestAdd.current(typeId, itemName),
-      showInfo: (typeId, itemName) => setShown({ typeId, itemName }),
+      showInfo: (typeId, itemName) => {
+        if (!localInfo && itemInfoIsUrlBacked()) openItemInfo(typeId, itemName);
+        else setShown({ typeId, itemName });
+      },
       blueprints,
       blueprintFor: (typeId) => (lazyBlueprints ? blueprintTypeIdFor(blueprints, typeId) : null),
       requestBlueprints: () => {
@@ -71,7 +82,7 @@ export function usePageItemActions({
           });
       },
     }),
-    [canAddToQuickbar, blueprints, lazyBlueprints]
+    [canAddToQuickbar, blueprints, lazyBlueprints, localInfo]
   );
 
   return { actions, quickbar, shown, closeInfo: () => setShown(null) };

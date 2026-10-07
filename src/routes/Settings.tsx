@@ -1,8 +1,10 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
+import { markStoresStale } from '@/app/staleStoresReload';
 import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
 import {
@@ -15,6 +17,7 @@ import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
+import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
@@ -42,6 +45,8 @@ import {
   Field,
   Fields,
 } from '@/components/ui';
+import { CharacterLink } from '@/features/entities';
+import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
@@ -113,6 +118,24 @@ const OUTCOME_TONE: Record<ActivityOutcome, string> = {
   error: 'text-danger',
 };
 
+/** The Character column: a Show Info link, or plain text for a public (character-less) call. */
+function CharacterNameCell({
+  characterId,
+  characterNames,
+  t,
+}: {
+  characterId: number | undefined;
+  characterNames: ReadonlyMap<number, string>;
+  t: (key: string) => string;
+}) {
+  const label = characterCell(characterId, characterNames, t);
+  return characterId === undefined ? (
+    label
+  ) : (
+    <CharacterLink id={characterId}>{label}</CharacterLink>
+  );
+}
+
 /** Transient "it worked" note beside the button that produced it (same pattern as the skill planner's tools pane). */
 function ActionConfirmation({ message }: { message: string }) {
   return (
@@ -157,8 +180,15 @@ function ActivityLogPanel() {
       {
         id: 'character',
         header: t('activityLog.columnCharacter'),
+        phoneHidden: true,
         sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
-        render: (entry) => characterCell(entry.characterId, characterNames, t),
+        render: (entry) => (
+          <CharacterNameCell
+            characterId={entry.characterId}
+            characterNames={characterNames}
+            t={t}
+          />
+        ),
       },
       {
         id: 'time',
@@ -214,7 +244,7 @@ function ActivityLogPanel() {
             rowKey={(entry) => entry.id}
             label={t('activityLog.title')}
             density="compact"
-            mobileSort
+            responsive="table"
           />
         )}
       </div>
@@ -277,7 +307,13 @@ function DataAgePanel() {
         id: 'character',
         header: t('dataAge.columnCharacter'),
         sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
-        render: (entry) => characterCell(entry.characterId, characterNames, t),
+        render: (entry) => (
+          <CharacterNameCell
+            characterId={entry.characterId}
+            characterNames={characterNames}
+            t={t}
+          />
+        ),
       },
       {
         id: 'updated',
@@ -285,9 +321,9 @@ function DataAgePanel() {
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (entry) => entry.timestamp,
         render: (entry) => (
-          <span title={formatTimestamp(new Date(entry.timestamp), timeZone)}>
+          <HintText content={formatTimestamp(new Date(entry.timestamp), timeZone)}>
             <RelativeAge timestamp={entry.timestamp} />
-          </span>
+          </HintText>
         ),
       },
     ],
@@ -315,7 +351,7 @@ function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
-            mobileSort
+            responsive="table"
           />
         )}
       </div>
@@ -527,9 +563,10 @@ function ResetViewPreferences() {
     setTimeout(() => setConfirmed(false), 2000);
     // Every one of these is read through a `createLocalSetting` store that has
     // already hydrated, so the rows are gone but the stores still hold the old
-    // values. A reload is the honest way to show the result rather than
-    // reaching into fifteen stores from here.
-    window.location.reload();
+    // values. Settings shows none of them, so the reload that re-hydrates them
+    // waits for the next route out of Settings (`StaleStoresReloader`) — a
+    // reload here would wipe the confirmation before it could be read.
+    markStoresStale();
   }
 
   return (
@@ -666,7 +703,7 @@ function PiDefaultsPanel() {
   const { t } = useTranslation();
   return (
     <Panel title={t('settings.piDefaultsTitle')}>
-      <PiSettingsForm />
+      <PiSettingsForm showSellAt />
     </Panel>
   );
 }
@@ -714,6 +751,8 @@ function MarketDefaultsPanel() {
               onSelect={(ratio) => void setCollateralRatio(ratio)}
               labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
             />
+
+            <LpValueField id="settings-lp-value" />
           </Fields>
         </div>
       ) : (
@@ -771,6 +810,8 @@ function CharacterDefaultsPanel() {
             note={t('settings.defaultCharacterFilterHint')}
           >
             <CharacterFilterControl
+              variant="field"
+              triggerLabel={t('settings.defaultCharacterFilterLabel')}
               activeCharacterId={activeCharacterId}
               value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
               onChange={(next) =>
@@ -785,11 +826,13 @@ function CharacterDefaultsPanel() {
             inline
             note={t('settings.spExtractionEnabledHint')}
           >
-            <Checkbox
-              id="settings-sp-extraction-enabled"
-              checked={spExtractionEnabled}
-              onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
-            />
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                id="settings-sp-extraction-enabled"
+                checked={spExtractionEnabled}
+                onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+              />
+            </label>
           </Field>
           {spExtractionEnabled && (
             <Field

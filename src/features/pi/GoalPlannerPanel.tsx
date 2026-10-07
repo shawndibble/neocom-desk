@@ -8,7 +8,7 @@
  * `goalPlanView` reads the answer, and `GoalPlannerRail` /
  * `GoalPlannerResults` draw. Goals and switched-off colonies are URL state
  * (the route owns them); the standing assumptions are device-local prefs; the
- * customs rate is the synced per-system override the Advisor writes too.
+ * customs rate is the synced per-system override Colonies and Map read too.
  *
  * ## Layout
  *
@@ -23,21 +23,19 @@
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { GrantBanner } from '@/app/GrantNote';
 import { planBest, type BestPlan } from '@/engine/pi/planBest';
 import { planDiff } from '@/engine/pi/planDiff';
 import type { Goal, JumpsFn } from '@/engine/pi/goalTypes';
-import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { scheduleSync, setSyncedSetting } from '@/sync';
 import { useJumpBasis, jumpsBetween } from '@/features/route/jumpBasis';
-import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
-import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useMediaQuery } from '@/lib/useMediaQuery';
+import { PricesUnavailable } from './PricesUnavailable';
 import { useCadence } from './cadencePref';
-import { useMarketSourcing } from './marketSourcingPref';
+import { PI_MAP_HREF, PLAN_CUSTOMS_HASH } from './piPlanLink';
+import { useSellHub } from './sellHub';
 import {
   SYNCED_PI_CUSTOMS_KEY,
   withCustomsOverride,
@@ -59,6 +57,7 @@ import {
   loadGoalPlannerSnapshot,
   type GoalPlannerSnapshot,
 } from './goalPlannerSnapshot';
+import { usePlanetRichness } from './richnessOverride';
 import { parseGoals, plannableGoals, serializeGoals } from './goalsParam';
 import {
   changeSteps,
@@ -71,6 +70,7 @@ import {
 import { productOptions } from './products';
 import type { PlanPrices } from './planPrices';
 import { AssumptionsSection, ColoniesSection, GoalsSection } from './GoalPlannerRail';
+import { colonyCountUnknown } from './colonyStripModel';
 import {
   Changes,
   ColonyFit,
@@ -102,16 +102,9 @@ function Loading() {
   );
 }
 
+/** Item menus here read the page's Item Actions, which the Planetary Industry route provides. */
 export function GoalPlannerPanel(props: GoalPlannerPanelProps) {
-  const itemActions = usePageItemActions({
-    activeCharacterId: props.characterId,
-    lazyBlueprints: true,
-  });
-  return (
-    <ItemActionsProvider page={itemActions}>
-      <GoalPlanner {...props} />
-    </ItemActionsProvider>
-  );
+  return <GoalPlanner {...props} />;
 }
 
 function GoalPlanner({
@@ -126,7 +119,10 @@ function GoalPlanner({
   // Phone-sized (44px) controls below `md`; the dense tier beside a pointer.
   const size = mdUp ? 'sm' : 'md';
   // Folded on a phone, open beside a pointer, until the pilot says otherwise.
-  const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(null);
+  // `#customs` lands on the customs rate fields: Colonies open, first rate focused.
+  const { hash } = useLocation();
+  const [toCustoms, setToCustoms] = useState(hash === PLAN_CUSTOMS_HASH);
+  const [coloniesOpen, setColoniesOpen] = useState<boolean | null>(toCustoms ? true : null);
   const [assumptionsOpen, setAssumptionsOpen] = useState<boolean | null>(null);
 
   // --- Reads ---
@@ -157,28 +153,18 @@ function GoalPlanner({
   const prefs = useGoalPlannerPrefs((state) => state.value);
   const hydratePrefs = useGoalPlannerPrefs((state) => state.hydrate);
   const setPrefs = useGoalPlannerPrefs((state) => state.setValue);
-  const sourcing = useMarketSourcing((state) => state.value);
-  const hydrateSourcing = useMarketSourcing((state) => state.hydrate);
-  const setSourcing = useMarketSourcing((state) => state.setValue);
   const cadence = useCadence((state) => state.value);
   const hydrateCadence = useCadence((state) => state.hydrate);
-  const setCadence = useCadence((state) => state.setValue);
   useEffect(() => {
     void hydratePrefs();
-    void hydrateSourcing();
     void hydrateCadence();
-  }, [hydratePrefs, hydrateSourcing, hydrateCadence]);
+  }, [hydratePrefs, hydrateCadence]);
 
-  // Buying is the shared sourcing pref: when it names a hub, that hub prices
-  // the plan too, so the Advisor and the planner never disagree on a market.
-  const buyP1 = sourcing !== 'none';
-  const hub: TradeHub =
-    (buyP1 ? getTradeHub(sourcing) : getTradeHub(prefs.priceHub)) ?? DEFAULT_TRADE_HUB;
-  const setHub = (id: TradeHub['id']) => {
-    void setPrefs({ ...prefs, priceHub: id });
-    if (buyP1) void setSourcing(id);
-  };
-  const setBuyP1 = (buy: boolean) => void setSourcing(buy ? hub.id : 'none');
+  // Where the plan sells, and what it may buy there, are the shared PI
+  // settings: the page strip and the settings form edit the same record.
+  const { hub, buybackPct, buyTiers } = useSellHub();
+  const buysAnything = buyTiers.length > 0;
+  const buysP1 = buyTiers.includes(1);
 
   // --- Prices, keyed on the hub so a hub switch never refetches colonies ---
   const [priced, setPriced] = useState<{ hubId: string; prices: PlanPrices } | null>(null);
@@ -195,7 +181,7 @@ function GoalPlanner({
   }, [pi, hub]);
   const prices = priced?.hubId === hub.id ? priced.prices : null;
 
-  // --- Customs: edits layered over the snapshot, written through like the Advisor's ---
+  // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? null;
   const writeCustoms = useCallback(
@@ -216,6 +202,7 @@ function GoalPlanner({
   // --- Inputs, deferred so typing a rate never waits on a re-plan ---
   const restartHours = cadence.restartDays * HOURS_PER_DAY;
   const haulHours = cadence.haulDays * HOURS_PER_DAY;
+  const richness = usePlanetRichness(characterId);
   const disabledSet = useMemo(() => new Set(disabled), [disabled]);
   const liveRows = useMemo(
     () =>
@@ -225,9 +212,10 @@ function GoalPlanner({
             fallbackRatePerHour: prefs.fallbackRatePerHour,
             customsOverrides,
             disabled: disabledSet,
+            ...(richness ? { richness } : {}),
           })
         : [],
-    [snapshot, customsOverrides, restartHours, prefs.fallbackRatePerHour, disabledSet]
+    [snapshot, customsOverrides, restartHours, prefs.fallbackRatePerHour, disabledSet, richness]
   );
   const rows = useDeferredValue(liveRows);
   const products = useMemo(() => (pi ? productOptions(pi) : []), [pi]);
@@ -305,8 +293,8 @@ function GoalPlanner({
         {
           goals: plannedGoals,
           colonies: goalPlannerInput(rows),
-          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyP1 }),
-          books: priceBooks(prices, snapshot.accountingLevel),
+          policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyTiers }),
+          books: priceBooks(prices, snapshot.accountingLevel, buybackPct),
           jumps: jumpsFn,
         },
         pi
@@ -315,7 +303,7 @@ function GoalPlanner({
     } catch {
       return { error: true };
     }
-  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyP1, jumpsFn]);
+  }, [pi, prices, snapshot, rows, plannedGoals, prefs.maxP0Types, buyTiers, buybackPct, jumpsFn]);
 
   const names = useMemo((): PlanNames | null => {
     if (!snapshot || !pi) return null;
@@ -333,38 +321,26 @@ function GoalPlanner({
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
   if (!snapshot || !pi || !names) return <Loading />;
-  if (snapshot.needsReauth) {
-    return (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterPlanets']}
-        title={t('pi.reauthTitle')}
-        hint={t('pi.reauthHint')}
-        actionLabel={t('pi.reauthAction')}
-      />
-    );
-  }
-
   const systemName = (id: number) =>
-    snapshot.systemNames.get(id) ?? t('piAdvisor.systemLabel', { id });
+    snapshot.systemNames.get(id) ?? t('piShared.systemLabel', { id });
   const noColonies = snapshot.colonies.length === 0;
-  const advisorSystem = rows.find((row) => row.enabled)?.systemId;
+  const unknown = noColonies && colonyCountUnknown(snapshot);
 
   let results: React.ReactNode;
-  if (noColonies && !buyP1) {
+  if (noColonies && !buysAnything) {
     results = (
       <EmptyState
-        title={t('piPlan.noColoniesTitle')}
+        title={t(unknown ? 'piPlan.noColoniesUnknownTitle' : 'piPlan.noColoniesTitle')}
         hint={
           // Buying P1 covers P1 goals only; a P2+ goal needs a colony to host it.
           plannedGoals.length > 0 &&
           plannedGoals.every((goal) => products.find((p) => p.typeId === goal.typeId)?.tier === 1)
             ? `${t('piPlan.noColoniesHint')} ${t('piPlan.noColoniesBuyHint')}`
-            : t('piPlan.noColoniesHint')
+            : t(unknown ? 'piPlan.noColoniesUnknownHint' : 'piPlan.noColoniesHint')
         }
         action={
-          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
-            {t('piPlan.openAdvisor')}
+          <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+            {t('piPlan.openMap')}
           </Link>
         }
       />
@@ -372,17 +348,15 @@ function GoalPlanner({
   } else if (!prices || !result) {
     results = <Loading />;
   } else if (prices.failed) {
-    results = (
-      <EmptyState title={t('piPlan.pricesFailedTitle')} hint={t('piPlan.pricesFailedHint')} />
-    );
+    results = <PricesUnavailable />;
   } else if ('error' in result) {
     results = <EmptyState title={t('piPlan.planFailedTitle')} hint={t('piPlan.planFailedHint')} />;
   } else {
     const { best } = result;
     const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
-    const books = priceBooks(prices, snapshot.accountingLevel);
-    const earnings = earningsNow(rows, pi, prices, books.salesTaxPct);
+    const books = priceBooks(prices, snapshot.accountingLevel, buybackPct);
+    const earnings = earningsNow(rows, pi, prices, books.salesTaxPct, buybackPct);
     const verdict =
       best.economics.status === 'costed'
         ? planVerdict(
@@ -398,7 +372,11 @@ function GoalPlanner({
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
     results = (
       <div className="space-y-4">
-        {noColonies && <p className="text-xs text-text-dim">{t('piPlan.noColoniesBuying')}</p>}
+        {noColonies && (
+          <p className="text-xs text-text-dim">
+            {t(unknown ? 'piPlan.noColoniesUnknownBuying' : 'piPlan.noColoniesBuying')}
+          </p>
+        )}
         <Headline
           best={best}
           earnings={earnings}
@@ -418,9 +396,8 @@ function GoalPlanner({
           <>
             <Shortfalls
               shortfalls={best.plan.shortfalls}
-              hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buyP1))}
+              hints={best.plan.shortfalls.map((s) => shortfallHint(s, rows, buysP1))}
               names={names}
-              advisorSystem={advisorSystem}
             />
             <Changes
               steps={steps}
@@ -458,13 +435,7 @@ function GoalPlanner({
   return (
     <div className="grid items-start gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr]">
       <div className="md:col-start-1 md:row-start-1">
-        <GoalsSection
-          goals={goals}
-          products={products}
-          onGoalsChange={onGoalsChange}
-          hubId={hub.id}
-          size={size}
-        />
+        <GoalsSection goals={goals} products={products} onGoalsChange={onGoalsChange} size={size} />
       </div>
       <div className="md:col-start-1 md:row-start-2">
         <ColoniesSection
@@ -472,8 +443,12 @@ function GoalPlanner({
           planetName={names.planet}
           systemName={systemName}
           size={size}
+          focusCustoms={toCustoms}
           expanded={coloniesOpen ?? mdUp}
-          onToggleExpanded={() => setColoniesOpen(!(coloniesOpen ?? mdUp))}
+          onToggleExpanded={() => {
+            setToCustoms(false); // the deep link's focus is one-shot
+            setColoniesOpen(!(coloniesOpen ?? mdUp));
+          }}
           onToggle={(planetId, enabled) =>
             onDisabledChange(
               enabled ? disabled.filter((id) => id !== planetId) : [...disabled, planetId]
@@ -484,10 +459,9 @@ function GoalPlanner({
       </div>
       <div className="md:col-start-1 md:row-start-3">
         <AssumptionsSection
-          hubId={hub.id}
-          onHubChange={setHub}
-          buyP1={buyP1}
-          onBuyP1Change={setBuyP1}
+          hubName={hub.systemName}
+          buybackPct={buybackPct}
+          buyTiers={buyTiers}
           fallbackRate={prefs.fallbackRatePerHour}
           onFallbackRateChange={(rate) => void setPrefs({ ...prefs, fallbackRatePerHour: rate })}
           fallbackInUse={liveRows.some((row) =>
@@ -496,7 +470,6 @@ function GoalPlanner({
           maxP0Types={prefs.maxP0Types}
           onMaxP0TypesChange={(value) => void setPrefs({ ...prefs, maxP0Types: value })}
           cadence={cadence}
-          onCadenceChange={(next) => void setCadence(next)}
           size={size}
           expanded={assumptionsOpen ?? mdUp}
           onToggleExpanded={() => setAssumptionsOpen(!(assumptionsOpen ?? mdUp))}

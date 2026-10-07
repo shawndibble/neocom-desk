@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -40,10 +47,12 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
                     to={tabPath(SETTINGS_TABS, id)}
                     aria-current={active ? 'page' : undefined}
                     className={cx(
-                      'block border-l-2 px-2 py-1.5 text-xs transition-colors',
+                      'block border-l-2 px-2 py-1.5 text-xs',
+                      interactiveClassName,
+                      focusRingInsetClassName,
                       active
                         ? 'border-accent bg-panel text-text'
-                        : 'border-transparent text-text-dim hover:bg-panel-2 hover:text-text'
+                        : 'border-transparent text-text-dim hover:bg-panel-2 hover:text-text active:bg-panel'
                     )}
                   >
                     {t(LABEL_KEYS.get(id) ?? id)}
@@ -89,7 +98,11 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                 <li key={id}>
                   <Link
                     to={tabPath(SETTINGS_TABS, id)}
-                    className="flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-panel-2"
+                    className={cx(
+                      'group flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm',
+                      rowInteractiveClassName,
+                      focusRingInsetClassName
+                    )}
                   >
                     <span className="min-w-0">
                       <span className="block text-text">{t(LABEL_KEYS.get(id) ?? id)}</span>
@@ -97,9 +110,11 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                         <span className="block truncate text-xs text-text-dim">{summary}</span>
                       )}
                     </span>
-                    <span aria-hidden="true" className="text-text-dim">
-                      ›
-                    </span>
+                    <Icon.Descend
+                      size={Icon.ICON_SIZE.sm}
+                      aria-hidden="true"
+                      className="shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
+                    />
                   </Link>
                 </li>
               );
@@ -118,7 +133,11 @@ export function SettingsBackLink() {
   return (
     <Link
       to={SETTINGS_TABS.base}
-      className="inline-flex min-h-11 items-center gap-1 px-2 text-xs text-text-dim hover:text-text md:hidden"
+      className={cx(
+        'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:hidden',
+        interactiveClassName,
+        focusRingClassName
+      )}
     >
       <span aria-hidden="true">‹</span>
       {t('settings.backToList')}

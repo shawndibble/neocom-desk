@@ -255,3 +255,57 @@ export function quoteMailBody(
   const quotedLines = body.split('\n').map((line) => (line === '' ? '>' : `> ${line}`));
   return `\n\nOn ${formattedTimestamp}, ${senderName} wrote:\n${quotedLines.join('\n')}`;
 }
+
+/** A header plus the Character whose mailbox it came from — `mail_id` is per-Character, so the pair is the identity. */
+export interface OwnedMail<H extends MailHeaderLike> {
+  ownerId: number;
+  ownerName: string;
+  header: H;
+}
+
+/** Stable identity of one mail across Characters (`mail_id` alone collides between mailboxes). */
+export function mailKey(ownerId: number, mailId: number): string {
+  return `${ownerId}:${mailId}`;
+}
+
+/** Every Character's headers as one list, newest first by timestamp, each tagged with its owner. */
+export function mergeOwnedMail<H extends MailHeaderLike & { timestamp?: string }>(
+  sources: readonly { characterId: number; characterName: string; headers: readonly H[] }[]
+): OwnedMail<H>[] {
+  return sources
+    .flatMap((source) =>
+      source.headers.map((header) => ({
+        ownerId: source.characterId,
+        ownerName: source.characterName,
+        header,
+      }))
+    )
+    .sort((a, b) => (b.header.timestamp ?? '').localeCompare(a.header.timestamp ?? ''));
+}
+
+/** One Character's unread: the sum of its four System Labels' own `unread_count` (custom labels excluded). */
+export function totalSystemUnread(labels: readonly SystemLabel[]): number {
+  let total = 0;
+  for (const count of unreadCountsByTab(labels).values()) total += count;
+  return total;
+}
+
+/** Each System Label's own `unread_count`, summed across the given Characters' label sets. */
+export function sumUnreadByTab(
+  labelSets: readonly (readonly SystemLabel[])[]
+): ReadonlyMap<MailTab, number> {
+  const sums = new Map<MailTab, number>();
+  for (const labels of labelSets) {
+    for (const [tab, count] of unreadCountsByTab(labels)) {
+      sums.set(tab, (sums.get(tab) ?? 0) + count);
+    }
+  }
+  return sums;
+}
+
+/** Names of Characters the All view cannot cover: no mail grant, or nothing cached to show. */
+export function skippedMailCharacters(
+  characters: readonly { name: string; granted: boolean; hasHeaders: boolean }[]
+): string[] {
+  return characters.filter((c) => !c.granted || !c.hasHeaders).map((c) => c.name);
+}

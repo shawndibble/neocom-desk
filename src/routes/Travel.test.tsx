@@ -40,6 +40,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
+let lawlessSystems: ReadonlySet<number> = new Set();
+vi.mock('@/features/travel/useLawlessSystems', () => ({
+  useLawlessSystems: () => lawlessSystems,
+}));
+
 const loadSolarSystemJumps = vi.fn();
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadMarketSde')>()),
@@ -60,10 +65,14 @@ const NIYABAINEN = 30000150;
 const MUVOLAILEN = 30000151;
 const SOBASEKI = 30000152;
 
+// Its own region, so one rate-limited region leaves the others filling in.
+const PERIMETER_REGION = 10000043;
+const UEDAMA_REGION = 10000033;
+
 const SYSTEMS = [
   { id: JITA, name: 'Jita', security: 0.9459, regionId: 10000002 },
-  { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: 10000002 },
-  { id: UEDAMA, name: 'Uedama', security: 0.505, regionId: 10000033 },
+  { id: PERIMETER, name: 'Perimeter', security: 0.95, regionId: PERIMETER_REGION },
+  { id: UEDAMA, name: 'Uedama', security: 0.505, regionId: UEDAMA_REGION },
   { id: THERA, name: 'Thera', security: -0.99, regionId: 11000031 },
   { id: NIYABAINEN, name: 'Niyabainen', security: 0.71, regionId: 10000002 },
   { id: MUVOLAILEN, name: 'Muvolailen', security: 0.62, regionId: 10000002 },
@@ -134,12 +143,13 @@ const KILL_TIME = new Date(Date.now() - 12 * 60_000).toISOString();
 
 const server = setupServer(
   http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(SIGNATURES)),
-  http.get('https://zkillboard.com/api/kills/systemID/:id/pastSeconds/3600/', ({ params }) => {
-    if (Number(params.id) === PERIMETER) return new HttpResponse(null, { status: 429 });
-    if (Number(params.id) !== UEDAMA) return HttpResponse.json([]);
+  http.get('https://zkillboard.com/api/kills/regionID/:id/pastSeconds/3600/', ({ params }) => {
+    if (Number(params.id) === PERIMETER_REGION) return new HttpResponse(null, { status: 429 });
+    if (Number(params.id) !== UEDAMA_REGION) return HttpResponse.json([]);
     const kill = (id: number, npc: boolean) => ({
       killmail_id: id,
       killmail_time: KILL_TIME,
+      solar_system_id: UEDAMA,
       attackers: [{ ship_type_id: 4310, weapon_type_id: 3995 }],
       victim: { ship_type_id: 670 },
       zkb: { locationID: UEDAMA_GATE_TO_PERIMETER, npc },
@@ -187,7 +197,10 @@ beforeAll(async () => {
 }, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(() => resetState());
+beforeEach(() => {
+  lawlessSystems = new Set();
+  return resetState();
+});
 
 async function resetState() {
   clearJumpGraphIndex();
@@ -253,6 +266,24 @@ describe('Travel › Route Safety', () => {
     expect(routeFact('Kills 1h')).toBe('12 ship · 4 pod');
   });
 
+  it('tags a lawless system on its row, and nothing when none is listed', async () => {
+    lawlessSystems = new Set([PERIMETER]);
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    expect(await within(body[1]).findByText('Lawless')).toBeInTheDocument();
+    expect(within(body[0]).queryByText('Lawless')).toBeNull();
+    expect(within(body[2]).queryByText('Lawless')).toBeNull();
+  });
+
+  it('shows no lawless tag when the list is empty', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    expect(screen.queryByText('Lawless')).toBeNull();
+  });
+
   it('draws the route strip with a spoken description and its key systems', async () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
@@ -270,7 +301,7 @@ describe('Travel › Route Safety', () => {
 
     const table = await screen.findByRole('table', { name: 'Systems on the route' });
     const body = (await within(table).findAllByRole('row')).slice(1);
-    await within(body[2]).findByRole('link', { name: '2 player kills' });
+    await within(body[2]).findByRole('link', { name: /^2 player kills\s*\(opens/ });
     await user.click(within(body[2]).getByText('Uedama'));
     expect(await within(table).findByText('NPC kills in the last hour: 2')).toBeInTheDocument();
     expect(
@@ -311,7 +342,7 @@ describe('Travel › Route Safety', () => {
     const body = (await within(table).findAllByRole('row')).slice(1);
 
     const uedama = within(body[2]);
-    const count = await uedama.findByRole('link', { name: '2 player kills' });
+    const count = await uedama.findByRole('link', { name: /^2 player kills\s*\(opens/ });
     expect(count).toHaveAttribute('href', `https://zkillboard.com/system/${UEDAMA}/`);
     expect(
       await uedama.findByText('2 kills at Stargate (Perimeter), last one 12 min ago')
@@ -322,7 +353,7 @@ describe('Travel › Route Safety', () => {
     // A rate-limited system says so on its own row; the rest still fill in.
     expect(await within(body[1]).findByText('zKillboard unavailable')).toBeInTheDocument();
     expect(
-      await within(body[0]).findByRole('link', { name: '0 player kills' })
+      await within(body[0]).findByRole('link', { name: /^0 player kills\s*\(opens/ })
     ).toBeInTheDocument();
   });
 
@@ -465,13 +496,12 @@ describe('Travel › Route Safety › Stops', () => {
     expect(await screen.findByRole('list', { name: 'Itinerary by leg' })).toBeInTheDocument();
   });
 
-  it('reorders and removes stops with each row’s buttons', async () => {
+  it('removes a stop with its row button, and reorders only by the drag handle', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&stops=${UEDAMA},${SOBASEKI}`);
 
-    await user.click(await screen.findByRole('button', { name: 'Move Sobaseki up' }));
-    expect(stopsInLink()).toBe(`${SOBASEKI},${UEDAMA}`);
-    expect(screen.getByRole('button', { name: 'Move Sobaseki up' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Reorder Sobaseki' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove Uedama' }));
     expect(stopsInLink()).toBe(String(SOBASEKI));
@@ -530,6 +560,25 @@ describe('Travel › Route Safety › Stops', () => {
       expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
     } finally {
       matchMedia.mockRestore();
+    }
+  });
+
+  it('colors the last hour: ship kills by a heat ramp, any pod kill red', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    const lastHour = (row: HTMLElement) => within(row).getAllByRole('cell')[3];
+    await waitFor(() => expect(lastHour(body[2])).toHaveTextContent('12'));
+
+    // 12 ship kills is past the red stop; 4 pod kills is red outright.
+    expect(within(lastHour(body[2])).getByText('12')).toHaveStyle({ color: '#ff7369' });
+    expect(within(lastHour(body[2])).getByText('4')).toHaveClass('text-danger');
+    // A quiet system keeps the default text.
+    const quiet = within(lastHour(body[0])).getAllByText('0');
+    for (const figure of quiet) {
+      expect(figure).not.toHaveClass('text-danger');
+      expect(figure.getAttribute('style')).toBeNull();
     }
   });
 
@@ -593,7 +642,7 @@ describe('Travel › Route Safety › Route rules', () => {
     return within(table).findByRole('button', { name: `Avoid ${name}` });
   }
 
-  it('changes the Route Preference in the link only, never the saved default', async () => {
+  it('saves the Route Preference as the pilot default and drops the link override', async () => {
     const user = userEvent.setup();
     visit(`?from=${JITA}&to=${UEDAMA}`);
 
@@ -604,10 +653,29 @@ describe('Travel › Route Safety › Route rules', () => {
     );
     await user.click(within(group).getByRole('button', { name: 'Shorter' }));
 
-    expect(new URLSearchParams(window.location.search).get('pref')).toBe('shortest');
-    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+    await waitFor(() => expect(useDefaultRoutePreference.getState().value).toBe('shortest'));
+    expect(new URLSearchParams(window.location.search).get('pref')).toBeNull();
     // Prefer shorter counts jumps only, so the penalty is off — as in Settings.
     expect(screen.getByRole('spinbutton', { name: 'Security penalty' })).toBeDisabled();
+  });
+
+  it("opens on a link's pref over the saved default, until the picker is used", async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}&pref=shortest`);
+
+    const group = await screen.findByRole('group', { name: 'Route preference' });
+    expect(within(group).getByRole('button', { name: 'Shorter' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(useDefaultRoutePreference.getState().value).toBe('prefer-highsec');
+
+    await user.click(within(group).getByRole('button', { name: 'Safer' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('pref')).toBeNull());
+    expect(within(group).getByRole('button', { name: 'Safer' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('edits the same Travel Settings Settings → Travel does', async () => {

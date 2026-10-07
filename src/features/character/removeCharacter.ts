@@ -80,6 +80,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.orderProblemSamples,
       db.mailDrafts,
       db.miningLedgerHistory,
+      db.industryJobHistory,
       db.notificationFeed,
       db.settings,
     ],
@@ -92,7 +93,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await db.orderProblemSamples.where('characterId').equals(characterId).delete();
       await db.mailDrafts.where('characterId').equals(characterId).delete();
       await db.miningLedgerHistory.delete(characterId);
-      // Orphaned feed rows are invisible in the UI (both the Overview list and the
+      await db.industryJobHistory.delete(characterId);
+      // Orphaned feed rows are invisible in the UI (both the Alerts page and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`
       // counts the whole table — leaving an app-icon count nothing can dismiss.
       await deleteFeedForCharacter(characterId);

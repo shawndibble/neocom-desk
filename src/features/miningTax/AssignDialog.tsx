@@ -1,3 +1,5 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { OreIcon, OreLink } from './OreIcon';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,13 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
-  TypeIcon,
   Checkbox,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -335,7 +335,7 @@ export function AssignDialog({
               >
                 <label
                   htmlFor={`line-${line.typeId}`}
-                  className="flex shrink-0 items-center gap-1.5"
+                  className={`flex shrink-0 items-center gap-1.5 ${tappableRowClassName}`}
                 >
                   <Checkbox
                     id={`line-${line.typeId}`}
@@ -345,12 +345,12 @@ export function AssignDialog({
                       ore: typeNames.get(line.typeId) ?? `#${line.typeId}`,
                     })}
                   />
-                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                  <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 </label>
                 <span className="w-40 shrink-0 truncate">
-                  <MarketItemLink typeId={line.typeId}>
+                  <OreLink typeId={line.typeId}>
                     {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                  </MarketItemLink>
+                  </OreLink>
                 </span>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
               </li>
@@ -417,7 +417,7 @@ export function AssignDialog({
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
+      <label className={`flex items-center gap-2 text-sm ${tappableRowClassName}`}>
         <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
         {t('miningTax.markPaidLabel')}
       </label>

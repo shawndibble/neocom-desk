@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Tooltip, InfoTooltip } from './Tooltip';
 import { Modal } from './Modal';
 import { MenuItem, RowActionsMenu } from './RowActions';
+import { TooltipHoldContext } from './tooltipHold';
+import { IconButton } from './IconButton';
 
 describe('Tooltip', () => {
   /**
@@ -39,6 +41,35 @@ describe('Tooltip', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('One-line explanation.');
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
+  });
+
+  // PI settings gear: its modal returned and retook focus in one tick (dev remount).
+  it('ends closed when focus arrives and leaves in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.focus(trigger);
+      fireEvent.blur(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('closes on the click that opens a dialog, even if hover opened it in the same tick', () => {
+    render(
+      <Tooltip content="Page settings">
+        <button type="button">Gear</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Gear' });
+    act(() => {
+      fireEvent.pointerMove(trigger);
+      fireEvent.click(trigger);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('reveals the tooltip on keyboard focus too, with no hover delay', () => {
@@ -102,7 +133,7 @@ describe('Tooltip touch support', () => {
     vi.useRealTimers();
   });
 
-  it('reveals the tooltip after a ~500ms touch-and-hold', () => {
+  it('reveals the tooltip after a 700ms touch-and-hold', () => {
     vi.useFakeTimers();
     render(
       <Tooltip content="One-line explanation.">
@@ -114,18 +145,20 @@ describe('Tooltip touch support', () => {
 
     fireEvent.touchStart(trigger);
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
 
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
-  it('leaves touch-and-hold alone under holdToReveal={false}, for a context menu that wants it', () => {
+  it('leaves touch-and-hold alone under TooltipHoldContext=false, for a context menu that wants it', () => {
     vi.useFakeTimers();
     render(
-      <Tooltip content="One-line explanation." holdToReveal={false}>
-        <button type="button">Trigger</button>
-      </Tooltip>
+      <TooltipHoldContext.Provider value={false}>
+        <Tooltip content="One-line explanation.">
+          <button type="button">Trigger</button>
+        </Tooltip>
+      </TooltipHoldContext.Provider>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
 
@@ -138,6 +171,46 @@ describe('Tooltip touch support', () => {
     // Focus still shows it.
     fireEvent.focus(trigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('does not reveal before 700ms of holding', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    fireEvent.touchStart(screen.getByRole('button', { name: 'Trigger' }));
+    act(() => {
+      vi.advanceTimersByTime(699);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('shows an IconButton label on a hold when it sits outside any row menu', () => {
+    vi.useFakeTimers();
+    render(<IconButton icon={<span />} label="Refresh prices" />);
+    fireEvent.touchStart(screen.getByRole('button', { name: 'Refresh prices' }));
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Refresh prices');
+  });
+
+  it('shows no IconButton label on a hold inside a row menu', () => {
+    vi.useFakeTimers();
+    render(
+      <RowActionsMenu name="Row" items={<MenuItem>Act</MenuItem>}>
+        <div>
+          <IconButton icon={<span />} label="Refresh prices" />
+        </div>
+      </RowActionsMenu>
+    );
+    fireEvent.touchStart(screen.getByRole('button', { name: 'Refresh prices' }));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('gives touch-and-hold to a surrounding row menu, for the tooltips of the controls in the row', () => {
@@ -231,7 +304,7 @@ describe('Tooltip touch support', () => {
 
     fireEvent.touchStart(trigger);
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
@@ -256,7 +329,7 @@ describe('Tooltip touch support', () => {
 
     fireEvent.touchStart(trigger);
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
     fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
@@ -280,7 +353,7 @@ describe('Tooltip touch support', () => {
     fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
     fireEvent.touchMove(trigger, { touches: [{ clientX: 103, clientY: 102 }] });
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
 
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
@@ -298,7 +371,7 @@ describe('Tooltip touch support', () => {
     fireEvent.touchStart(trigger);
     fireEvent.touchCancel(trigger);
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -316,7 +389,7 @@ describe('Tooltip touch support', () => {
     fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
     fireEvent.touchMove(trigger, { touches: [{ clientX: 100, clientY: 160 }] });
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -396,7 +469,7 @@ describe('Tooltip tap-to-open', () => {
     fireEvent.touchStart(trigger);
     fireEvent.touchCancel(trigger);
     act(() => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(700);
     });
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -490,6 +563,13 @@ describe('InfoTooltip', () => {
     expect(trigger).not.toHaveClass('text-text-dim');
   });
 
+  it('is a real 24px target that keeps a 16px footprint, not a pseudo-element hit area (WCAG 2.5.8, DESIGN.md §6c)', () => {
+    render(<InfoTooltip label="About X" content="X." />);
+    const trigger = screen.getByRole('button', { name: 'About X' });
+    expect(trigger).toHaveClass('size-6', '-m-1');
+    expect(trigger.className).not.toMatch(/before:/);
+  });
+
   it('renders a labeled "?" button describing the tooltip content once revealed', () => {
     render(<InfoTooltip label="About Material Efficiency" content="Reduces material use." />);
     const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
@@ -508,32 +588,5 @@ describe('InfoTooltip', () => {
     fireEvent.touchEnd(trigger);
 
     expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
-  });
-
-  it('gives the tap back to the click action when it has one, keeping long-press for the tooltip', () => {
-    vi.useFakeTimers();
-    const onClick = vi.fn();
-    render(
-      <InfoTooltip
-        label="About Material Efficiency"
-        content="Reduces material use."
-        onClick={onClick}
-        aria-haspopup="dialog"
-      />
-    );
-    const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
-
-    fireEvent.touchStart(trigger);
-    fireEvent.touchEnd(trigger);
-    fireEvent.click(trigger);
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-
-    fireEvent.touchStart(trigger);
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
-    vi.useRealTimers();
   });
 });

@@ -208,63 +208,7 @@ describe('ProductionLogPanel', () => {
     expect(within(byItemTable).getByText('#999999')).toBeInTheDocument();
   });
 
-  it('opens the shared item menu from a By item row', async () => {
-    await addRun({ productTypeID: RIFTER_TYPE_ID });
-    vi.mocked(actions.addToQuickbar).mockClear();
-    render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
-      { wrapper: Wrapper }
-    );
-    const table = await screen.findByRole('table', { name: 'By item' });
-    fireEvent.contextMenu(within(table).getByText('Rifter').closest('tr')!);
-    fireEvent.click(await screen.findByText('Add to Quickbar'));
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(RIFTER_TYPE_ID, 'Rifter');
-  });
-
-  it('gives a By item row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
-    await addRun({ productTypeID: RIFTER_TYPE_ID });
-    render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
-      { wrapper: Wrapper }
-    );
-    const table = await screen.findByRole('table', { name: 'By item' });
-    const row = within(table).getByText('Rifter').closest('tr')!;
-    const user = userEvent.setup();
-
-    await user.click(within(row).getByRole('button', { name: 'More actions for Rifter' }));
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
-    fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
-  });
-
-  it('opens the item menu from a runs row without navigating to the Build Plan', async () => {
-    await addRun({ id: 'run-1', productTypeID: RAVEN_TYPE_ID, buildPlanId: 'plan-3' });
-    const onOpenRun = vi.fn();
-    vi.mocked(actions.showInfo).mockClear();
-    render(
-      <ProductionLogPanel
-        characterId={CHARACTER_ID}
-        catalog={CATALOG}
-        skills={{}}
-        plans={PLANS}
-        onOpenRun={onOpenRun}
-      />,
-      { wrapper: Wrapper }
-    );
-    const table = await runsTable();
-    fireEvent.contextMenu(within(table).getAllByRole('row')[1]);
-    fireEvent.click(await screen.findByText('Show info'));
-    expect(actions.showInfo).toHaveBeenCalledWith(RAVEN_TYPE_ID, 'Raven');
-    expect(onOpenRun).not.toHaveBeenCalled();
-  });
-
-  it('gives a runs-table row a visible "More actions" button with the same items as its right-click menu, without navigating to the Build Plan (issue #1498)', async () => {
+  it('gives By item and runs rows no ⋮ and no right-click menu', async () => {
     await addRun({ id: 'run-1', productTypeID: RAVEN_TYPE_ID, buildPlanId: 'plan-3' });
     const onOpenRun = vi.fn();
     render(
@@ -277,43 +221,14 @@ describe('ProductionLogPanel', () => {
       />,
       { wrapper: Wrapper }
     );
-    const table = await runsTable();
-    const row = within(table).getAllByRole('row')[1];
-    const user = userEvent.setup();
-
-    await user.click(within(row).getByRole('button', { name: 'More actions for Raven' }));
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
-    fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
-    expect(onOpenRun).not.toHaveBeenCalled();
-  });
-
-  it('renders a row bare, with no menu, when the catalog has no entry for its product', async () => {
-    await addRun({ productTypeID: 999999 });
-    render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
-      { wrapper: Wrapper }
-    );
-    const table = await screen.findByRole('table', { name: 'By item' });
-    fireEvent.contextMenu(within(table).getByText('#999999').closest('tr')!);
-    expect(screen.queryByText('Add to Quickbar')).not.toBeInTheDocument();
-  });
-
-  it('shows no More-actions button for a row whose product has no catalog entry (issue #1498)', async () => {
-    await addRun({ productTypeID: 999999 });
-    render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
-      { wrapper: Wrapper }
-    );
-    const table = await screen.findByRole('table', { name: 'By item' });
-    const row = within(table).getByText('#999999').closest('tr')!;
-    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    const byItem = await screen.findByRole('table', { name: 'By item' });
+    fireEvent.contextMenu(within(byItem).getByText('Raven').closest('tr')!);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    const runs = await runsTable();
+    fireEvent.contextMenu(within(runs).getAllByRole('row')[1]);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
   });
 
   it('lists every run in the runs table without naming which Build Plan it came from', async () => {
@@ -519,7 +434,7 @@ describe('ProductionLogPanel', () => {
     );
     await runsTable();
 
-    await user.click(await screen.findByRole('button', { name: 'Sold' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));
     await user.click(screen.getByRole('button', { name: 'Link' }));
 

@@ -138,6 +138,10 @@ export interface MarketWideRow extends RankedOpportunity {
   marginPct: number | null;
   /** The whole flattened tree's skill-adjusted job time at TE 0 — the duration `iskPerHour` divides by, not a wall-clock promise. */
   seconds: number;
+  /** Net profit per unit sold (profit ÷ `outputQuantity`) — ISK/day's per-unit margin. */
+  unitMargin: number;
+  /** Units one build yields. */
+  outputQuantity: number;
 }
 
 /**
@@ -168,6 +172,8 @@ export function computeMarketWideRows(
     iskPerHour: number;
     marginPct: number | null;
     seconds: number;
+    unitMargin: number;
+    outputQuantity: number;
     buildCost: number;
     sellDepthIsk: number;
   }[] = [];
@@ -217,6 +223,8 @@ export function computeMarketWideRows(
       iskPerHour,
       marginPct: revenue > 0 ? (profit / revenue) * 100 : null,
       seconds,
+      unitMargin: tree.outputQuantity > 0 ? profit / tree.outputQuantity : 0,
+      outputQuantity: tree.outputQuantity,
       buildCost,
       sellDepthIsk: candidate.sellDepthIsk,
     });
@@ -225,7 +233,7 @@ export function computeMarketWideRows(
   const ranked = rankOpportunities(priced, thresholds);
   const byId = new Map(priced.map((p) => [p.id, p]));
   return ranked.map((r) => {
-    const { productTypeID, marginPct, seconds } = byId.get(r.id)!;
-    return { ...r, productTypeID, marginPct, seconds };
+    const { productTypeID, marginPct, seconds, unitMargin, outputQuantity } = byId.get(r.id)!;
+    return { ...r, productTypeID, marginPct, seconds, unitMargin, outputQuantity };
   });
 }

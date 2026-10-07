@@ -9,6 +9,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
+import { useSalesShare } from './salesSharePref';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const row = (
@@ -28,6 +29,8 @@ const row = (
     orderDepth: 'deep',
     marginPct: 18.4,
     seconds: 3600,
+    unitMargin: 1000,
+    outputQuantity: 1,
     ...extra,
   }) as unknown as MarketWideResultRow;
 
@@ -91,7 +94,11 @@ const catalog = {
   byProductTypeID: new Map([[200, { blueprintTypeID: 1200, productTypeID: 200 }]]),
 } as unknown as BlueprintCatalog;
 
-function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
+function renderPanel(
+  actions = fakeItemActions(),
+  initialEntries = ['/'],
+  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false)
+) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       {withItemActions(
@@ -101,7 +108,7 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
           catalog={catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
-          onStartPlan={() => Promise.resolve(false)}
+          onStartPlan={onStartPlan}
         />,
         actions
       )}
@@ -110,46 +117,32 @@ function renderPanel(actions = fakeItemActions(), initialEntries = ['/']) {
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
-  it('links the product name to its Market listing', () => {
+  it('shows the product name as plain text: the row click is Start plan', () => {
     renderPanel();
-    expect(screen.getByRole('link', { name: 'Widget Beta' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Widget Beta' })).not.toBeInTheDocument();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
   });
 
-  it('opens the item menu for the row product', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-
-    fireEvent.contextMenu(screen.getByText('Widget Beta').closest('tr')!);
-    fireEvent.click(await screen.findByText('Add to Quickbar'));
-
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-    expect(screen.getAllByRole('button', { name: 'Plan' })[0]).toBeInTheDocument();
+  it('starts the plan on a row click; a row with no catalog entry is inert', () => {
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(fakeItemActions(), ['/'], onStartPlan);
+    const beta = screen.getByText('Widget Beta').closest('tr')!;
+    const gamma = screen.getByText('Widget Gamma').closest('tr')!;
+    expect(gamma).not.toHaveAttribute('tabindex');
+    fireEvent.click(gamma);
+    expect(onStartPlan).not.toHaveBeenCalled();
+    expect(beta).toHaveAttribute('tabindex', '0');
+    fireEvent.click(screen.getByText('Widget Beta'));
+    expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
-  it('shows no blueprint for a product the catalog has no entry for', async () => {
+  it('has no row menu: Start plan is the row’s one control', () => {
     renderPanel();
-
-    fireEvent.contextMenu(screen.getByText('Widget Gamma').closest('tr')!);
-
-    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
-  });
-
-  it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
-    const actions = fakeItemActions();
-    renderPanel(actions);
-    const user = userEvent.setup();
     const row = screen.getByText('Widget Beta').closest('tr')!;
-
-    await user.click(within(row).getByRole('button', { name: 'More actions for Widget Beta' }));
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Plan' })).toBeInTheDocument();
     fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
   });
 });
 
@@ -361,8 +354,8 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
   const productOrder = () =>
     screen
-      .getAllByRole('link')
-      .map((link) => link.textContent)
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
       .filter((name) => name?.startsWith('Widget'));
 
   afterEach(() => {
@@ -402,5 +395,73 @@ describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
     ];
     renderPanel(undefined, ['/?marketWide.sort=duration:asc']);
     expect(productOrder()).toEqual(['Widget Gamma', 'Widget Delta', 'Widget Beta']);
+  });
+});
+
+describe('MarketWideOpportunitiesPanel ISK/day', () => {
+  const productOrder = () =>
+    screen
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
+      .filter((name) => name?.startsWith('Widget'));
+
+  afterEach(() => {
+    hookState.rows = null;
+  });
+
+  // Beta sells 1/day, Gamma 50/day, Delta is unread; every job builds 24/day.
+  const threeRows = () => [
+    row(200, 'Widget Beta'),
+    row(300, 'Widget Gamma'),
+    row(400, 'Widget Delta'),
+  ];
+
+  it('shows ISK/day after ISK/hour, with – where sales are unread', () => {
+    hookState.rows = threeRows();
+    renderPanel();
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const at = (label: string) => headers.findIndex((h) => h.startsWith(label));
+    expect(at('ISK/day')).toBe(at('ISK/hour') + 1);
+    expect(
+      within(screen.getByText('Widget Delta').closest('tr')!).getAllByText(i18n.t('common.unknown'))
+        .length
+    ).toBeGreaterThan(0);
+  });
+
+  it('sorts by ISK/day descending with unknown last, volume-capped below the better seller', () => {
+    hookState.rows = threeRows();
+    renderPanel(undefined, ['/?marketWide.sort=iskPerDay:desc']);
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Beta', 'Widget Delta']);
+  });
+
+  it('keeps ISK/hour as the default sort', () => {
+    hookState.rows = [
+      row(200, 'Widget Beta', { iskPerHour: 1 }),
+      row(300, 'Widget Gamma', { iskPerHour: 2 }),
+    ];
+    renderPanel();
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Beta']);
+  });
+
+  it('changes the figures with the share in the funnel, and remembers it', async () => {
+    hookState.rows = threeRows();
+    const user = userEvent.setup();
+    renderPanel();
+    const gammaRow = () => screen.getByText('Widget Gamma').closest('tr')!;
+    const before = gammaRow().textContent;
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Share of daily sales' }));
+    await user.click(await screen.findByRole('option', { name: '25% of daily sales' }));
+    expect(gammaRow().textContent).not.toBe(before);
+    expect(useSalesShare.getState().value).toBe('25');
+  });
+
+  it('reads the share from the URL', () => {
+    hookState.rows = threeRows();
+    const base = renderPanel(undefined, ['/']);
+    const before = screen.getByText('Widget Gamma').closest('tr')!.textContent;
+    base.unmount();
+    renderPanel(undefined, ['/?marketWide.share=5']);
+    expect(screen.getByText('Widget Gamma').closest('tr')!.textContent).not.toBe(before);
   });
 });

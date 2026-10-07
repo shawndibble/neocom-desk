@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PlanList } from './PlanList';
@@ -16,43 +18,47 @@ function plan(id: string, name: string): SkillPlanRecord {
 }
 
 const noop = () => {};
+const planHref = (id: string) => `/skills/plans/${id}`;
+const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('PlanList delete confirmation (#408: names the plan)', () => {
-  it('names the plan being deleted in the confirmation modal', () => {
+  it('names the plan being deleted in the confirmation modal', async () => {
     render(
       <PlanList
         plans={[plan('1', 'Titan pilot')]}
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
         onRename={noop}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /delete titan pilot/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
   });
 
-  it('deletes the plan whose row triggered the confirmation, even with multiple plans', () => {
+  it('deletes the plan whose row triggered the confirmation, even with multiple plans', async () => {
     const onDelete = vi.fn();
     render(
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={onDelete}
         onRename={noop}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /delete beta/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');
   });
 });
 
 describe('PlanList row stats (#1416)', () => {
   const props = {
-    onOpen: noop,
+    planHref,
     onDuplicate: noop,
     onDelete: noop,
     onRename: noop,
@@ -82,7 +88,7 @@ describe('PlanList row stats (#1416)', () => {
 });
 
 describe('PlanList copy to character (#1729)', () => {
-  const props = { onOpen: noop, onDuplicate: noop, onDelete: noop, onRename: noop };
+  const props = { planHref, onDuplicate: noop, onDelete: noop, onRename: noop };
 
   it('hides the action when the account has no other character', async () => {
     const user = userEvent.setup();
@@ -116,30 +122,32 @@ describe('PlanList active plan (#1709)', () => {
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
         activePlanId="2"
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
         onRename={noop}
       />
     );
-    expect(screen.getByRole('button', { name: /^beta/i })).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByRole('button', { name: /^alpha/i })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: /^beta/i })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('link', { name: /^alpha/i })).not.toHaveAttribute('aria-current');
   });
 });
 
 describe('PlanList long name (#2105)', () => {
-  it('carries the full name as a title attribute so a truncated name is still readable on hover', () => {
+  it('shows the full name in a tooltip on focus so a truncated name is still readable', async () => {
+    const user = userEvent.setup();
     const longName = 'A very long plan name that will surely truncate in the sidebar list';
     render(
       <PlanList
         plans={[plan('1', longName)]}
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
         onRename={noop}
       />
     );
-    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+    await user.tab();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
   });
 });
 
@@ -150,7 +158,7 @@ describe('PlanList row menu', () => {
     render(
       <PlanList
         plans={[plan('1', 'Alpha')]}
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
         onRename={onRename}
@@ -172,7 +180,7 @@ describe('PlanList row menu', () => {
         plans={[plan('1', 'Alpha')]}
         autoRenamePlanId="1"
         onAutoRenameStarted={started}
-        onOpen={noop}
+        planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
         onRename={noop}
@@ -180,5 +188,23 @@ describe('PlanList row menu', () => {
     );
     expect(screen.getByRole('textbox', { name: 'Rename' })).toHaveFocus();
     expect(started).toHaveBeenCalled();
+  });
+});
+
+describe('PlanList row link (DESIGN.md §6c)', () => {
+  it('a plan row is a real link to the plan, not a button', () => {
+    render(
+      <PlanList
+        plans={[plan('p1', 'Titan pilot')]}
+        planHref={planHref}
+        onDuplicate={noop}
+        onDelete={noop}
+        onRename={noop}
+      />
+    );
+    expect(screen.getByRole('link', { name: /Titan pilot/ })).toHaveAttribute(
+      'href',
+      '/skills/plans/p1'
+    );
   });
 });

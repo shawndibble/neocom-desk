@@ -1,7 +1,7 @@
 /**
  * Route Safety's Stops panel (issue #2475): where the trip starts, then up to
  * `MAX_STOPS` Stops in the order typed — added, removed, and reordered by
- * dragging or with each row's move up / move down.
+ * dragging the grip (Space + arrow keys from the keyboard).
  *
  * Optimize stop order flies the stops in the order with the lowest total
  * route cost under the Route rules; the list here keeps the typed order, and
@@ -35,6 +35,13 @@ import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Checkbox, CollapsiblePanel, IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
@@ -57,18 +64,14 @@ function Badge({ children }: { children: ReactNode }) {
 function StopRow({
   systemId,
   index,
-  count,
   name,
   security,
-  onMove,
   onRemove,
 }: {
   systemId: number;
   index: number;
-  count: number;
   name: string;
   security: number | null;
-  onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
 }) {
   const { t } = useTranslation();
@@ -87,7 +90,12 @@ function StopRow({
         {...attributes}
         {...listeners}
         aria-label={t('travel.stops.reorder', { name })}
-        className="cursor-grab touch-none px-0.5 py-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        className={cx(
+          'cursor-grab touch-none rounded-xs px-0.5 py-1 text-text-faint hover:text-text',
+          interactiveClassName,
+          focusRingClassName,
+          gripHitAreaClassName
+        )}
       >
         <Icon.DragHandle />
       </button>
@@ -96,20 +104,6 @@ function StopRow({
         {name}
         {security !== null && <SecurityStatus security={security} className="ml-1" />}
       </span>
-      <IconButton
-        size="sm"
-        icon={<Icon.Ascending />}
-        label={t('travel.stops.moveUp', { name })}
-        disabled={index === 0}
-        onClick={() => onMove(index, index - 1)}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Descending />}
-        label={t('travel.stops.moveDown', { name })}
-        disabled={index >= count - 1}
-        onClick={() => onMove(index, index + 1)}
-      />
       <IconButton
         size="sm"
         icon={<Icon.Close />}
@@ -155,7 +149,8 @@ export function StopsPanel({
   const [expanded, setExpanded] = useState(false);
   const systems = useSolarSystemIndex();
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // A 4px travel before a drag starts, so a tap on the grip is not a drag (as EntryList).
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const position = (systemId: number | string) => stops.indexOf(Number(systemId)) + 1;
@@ -236,10 +231,8 @@ export function StopsPanel({
                     key={systemId}
                     systemId={systemId}
                     index={index}
-                    count={stops.length}
                     name={nameOf(systemId)}
                     security={systems?.get(systemId)?.security ?? null}
-                    onMove={move}
                     onRemove={remove}
                   />
                 ))}
@@ -267,7 +260,7 @@ export function StopsPanel({
 
         <fieldset className="space-y-1.5 border-t border-line pt-3">
           <legend className="sr-only">{t('travel.stops.orderLegend')}</legend>
-          <label className="flex items-center gap-2 font-semibold">
+          <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
             <Checkbox
               role="switch"
               checked={settings.optimize}
@@ -277,7 +270,7 @@ export function StopsPanel({
             {t('travel.stops.optimize')}
           </label>
           <div className="space-y-1.5 pl-6">
-            <label className="flex items-center gap-2">
+            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
               <Checkbox
                 checked={optionsOn && settings.returnToStart}
                 disabled={!optionsOn}
@@ -285,7 +278,7 @@ export function StopsPanel({
               />
               {t('travel.stops.returnToStart')}
             </label>
-            <label className="flex items-center gap-2">
+            <label className={`flex items-center gap-2 ${tappableRowClassName}`}>
               <Checkbox
                 checked={optionsOn && settings.keepLastStopLast}
                 disabled={!optionsOn}

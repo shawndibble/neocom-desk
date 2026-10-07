@@ -17,9 +17,17 @@
  * reaction consumes gets "Used in" (`UsedInSection`), off the blueprint
  * catalog — the same SDE files Build Plan reads, not ESI.
  */
+import { cx } from '@/lib/cx';
+import {
+  fieldBaseClassName,
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
 import {
   Button,
   buttonClassName,
@@ -61,7 +69,7 @@ import {
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
-import { marketIskDecimals } from '@/lib/isk';
+import { formatIsk, marketIskDecimals } from '@/lib/isk';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -77,10 +85,16 @@ export interface ItemDetailModalProps {
   location?: OrderBookLocation;
   /**
    * An "Open in Market" link in the header, for an Item Detail opened away
-   * from the Market Browser (the Command Palette, #2319). Opt-in: on the
-   * Market Browser itself it would link to the page already open.
+   * from the Market Browser (Show info on any page, the Command Palette).
+   * Opt-in: on the Market Browser itself it would link to the page already open.
    */
   showOpenInMarket?: boolean;
+  /**
+   * Set by the URL-backed host (`ItemInfoModal`): a link that leaves the modal
+   * replaces its history entry and calls this instead of `onClose`, which would
+   * navigate back and race the link.
+   */
+  onLeave?: () => void;
 }
 
 interface DetailData {
@@ -113,8 +127,10 @@ export function ItemDetailModal({
   onClose,
   location,
   showOpenInMarket = false,
+  onLeave,
 }: ItemDetailModalProps) {
   const { t } = useTranslation();
+  const leave = onLeave ?? onClose;
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -225,9 +241,13 @@ export function ItemDetailModal({
     <Modal
       open
       onClose={onClose}
+      // The URL-backed host already owns the history entry (`?info`).
+      closeOnBack={onLeave === undefined}
       title={itemName}
       titleActions={
-        showOpenInMarket ? <OpenInMarketLink typeId={typeId} onNavigate={onClose} /> : undefined
+        showOpenInMarket ? (
+          <OpenInMarketLink typeId={typeId} onNavigate={leave} replace={onLeave !== undefined} />
+        ) : undefined
       }
     >
       {loading ? (
@@ -242,7 +262,7 @@ export function ItemDetailModal({
             className="py-8"
           />
           {/* Local SDE data, so it outlives an ESI failure. */}
-          <UsedInSection typeId={typeId} onNavigate={onClose} />
+          <UsedInSection typeId={typeId} onNavigate={leave} />
         </div>
       ) : (
         <div className="space-y-4">
@@ -260,22 +280,24 @@ export function ItemDetailModal({
               </p>
               {priceState.status !== 'error' && (
                 <p className="flex gap-4 text-text-dim">
-                  <span>
-                    {t('market.itemDetail.bestSell')}{' '}
-                    <span className="tabular-nums text-text">
-                      {priceState.status === 'loading'
-                        ? '…'
-                        : priceCell(priceState.summary.bestSell)}
-                    </span>
-                  </span>
-                  <span>
-                    {t('market.itemDetail.bestBuy')}{' '}
-                    <span className="tabular-nums text-text">
-                      {priceState.status === 'loading'
-                        ? '…'
-                        : priceCell(priceState.summary.bestBuy)}
-                    </span>
-                  </span>
+                  <PriceFigure
+                    label={t('market.itemDetail.bestSell')}
+                    side="sell"
+                    typeId={typeId}
+                    price={
+                      priceState.status === 'loading' ? undefined : priceState.summary.bestSell
+                    }
+                    onNavigate={leave}
+                    replace={onLeave !== undefined}
+                  />
+                  <PriceFigure
+                    label={t('market.itemDetail.bestBuy')}
+                    side="buy"
+                    typeId={typeId}
+                    price={priceState.status === 'loading' ? undefined : priceState.summary.bestBuy}
+                    onNavigate={leave}
+                    replace={onLeave !== undefined}
+                  />
                 </p>
               )}
               {data.type.description && (
@@ -295,7 +317,7 @@ export function ItemDetailModal({
 
           <PlanetaryProduction pi={data.pi} typeId={typeId} />
 
-          <UsedInSection typeId={typeId} onNavigate={onClose} />
+          <UsedInSection typeId={typeId} onNavigate={leave} />
 
           {data.groups.length === 0 ? (
             <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
@@ -352,16 +374,106 @@ export function ItemDetailModal({
  * Its own component so the router read happens only when asked for: the
  * Market Browser's modal (and its router-less tests) never render it.
  */
-function OpenInMarketLink({ typeId, onNavigate }: { typeId: number; onNavigate: () => void }) {
+function OpenInMarketLink({
+  typeId,
+  onNavigate,
+  replace,
+}: {
+  typeId: number;
+  onNavigate: () => void;
+  replace: boolean;
+}) {
   const { t } = useTranslation();
   const { search } = useLocation();
   return (
     <Link
       to={marketItemUrl(typeId, search)}
+      replace={replace}
       onClick={onNavigate}
       className={buttonClassName({ size: 'sm' })}
     >
       {t('market.itemDetail.openInMarket')}
+    </Link>
+  );
+}
+
+/**
+ * One best-price figure. A real price is a link into the Market browser on
+ * this item, keeping the page's hub or region (`marketItemUrl`) — the one
+ * place in Item Detail where the number itself says "show me the market". It
+ * is a figure, not an entity name, so it takes the in-sentence recipe (accent,
+ * solid underline; §6c). Without a router (a router-less unit render) or a
+ * price it is plain text.
+ */
+function PriceFigure({
+  label,
+  side,
+  typeId,
+  price,
+  onNavigate,
+  replace,
+}: {
+  label: string;
+  side: 'sell' | 'buy';
+  typeId: number;
+  /** Undefined while loading; null for a side with no orders. */
+  price: number | null | undefined;
+  onNavigate: () => void;
+  replace: boolean;
+}) {
+  const { t } = useTranslation();
+  const inRouter = useInRouterContext();
+  const figure = price === undefined ? '…' : priceCell(price);
+  return (
+    <span>
+      {label}{' '}
+      {inRouter && price != null ? (
+        <PriceLink
+          typeId={typeId}
+          ariaLabel={
+            side === 'sell'
+              ? t('market.itemDetail.bestSellOpen', { price: exactPrice(price) })
+              : t('market.itemDetail.bestBuyOpen', { price: exactPrice(price) })
+          }
+          onNavigate={onNavigate}
+          replace={replace}
+        >
+          {figure}
+        </PriceLink>
+      ) : (
+        <span className="tabular-nums text-text">{figure}</span>
+      )}
+    </span>
+  );
+}
+
+function exactPrice(price: number): string {
+  return `${formatIsk(price, marketIskDecimals(price))} ISK`;
+}
+
+function PriceLink({
+  typeId,
+  ariaLabel,
+  onNavigate,
+  replace,
+  children,
+}: {
+  typeId: number;
+  ariaLabel: string;
+  onNavigate: () => void;
+  replace: boolean;
+  children: ReactNode;
+}) {
+  const { search } = useLocation();
+  return (
+    <Link
+      to={marketItemUrl(typeId, search)}
+      replace={replace}
+      onClick={onNavigate}
+      aria-label={ariaLabel}
+      className={cx(inlineLinkClassName, 'tabular-nums')}
+    >
+      {children}
     </Link>
   );
 }
@@ -373,11 +485,7 @@ function OpenInMarketLink({ typeId, onNavigate }: { typeId: number; onNavigate: 
  * The line is inert, so a tap is free to be the reveal.
  */
 function priceCell(price: number | null): ReactNode {
-  return price != null ? (
-    <IskAmount value={price} revealOn="tap" decimals={marketIskDecimals(price)} />
-  ) : (
-    '—'
-  );
+  return price != null ? <IskAmount value={price} decimals={marketIskDecimals(price)} /> : '—';
 }
 
 /**
@@ -407,9 +515,15 @@ function AttributeModifierTrigger({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className={cx(
+            fieldBaseClassName,
+            'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs',
+            interactiveClassName,
+            focusRingClassName
+          )}
         >
           {children}
+          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-2">

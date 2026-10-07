@@ -55,6 +55,20 @@ describe('loadPlanPrices', () => {
     expect(result.unpriced).toEqual([2867]);
   });
 
+  it('reads an unreachable Fuzzwork that answers with no quotes at all as failed, not as unpriced', async () => {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: {},
+      hubBuyPrices: {},
+      adjustedPrices: null,
+      systemCostIndex: null,
+    });
+
+    const result = await loadPlanPrices(TRADE_HUBS[0], [2867, 2389]);
+
+    expect(result.failed).toBe(true);
+    expect(result.prices).toEqual({});
+  });
+
   it('does nothing at all when there is nothing to price', async () => {
     const result = await loadPlanPrices(TRADE_HUBS[0], []);
 

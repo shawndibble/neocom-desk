@@ -4,6 +4,7 @@
  * `import()` (see `PriceHistoryPanel.tsx`) — importing it eagerly would put
  * Recharts back in the initial page bundle.
  */
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -118,8 +119,8 @@ function HistoryTooltip({
   const point = payload[0]?.payload as ChartRow | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
-      <p className="font-semibold">{label}</p>
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{label}</p>
       <p>
         {t('market.priceHistory.average')}: {formatMarketIsk(point.average)}
       </p>
@@ -132,7 +133,7 @@ function HistoryTooltip({
       <p>
         {t('market.priceHistory.orderCount')}: {formatVolume(point.orderCount)}
       </p>
-    </div>
+    </ChartTooltipShell>
   );
 }
 
@@ -250,6 +251,7 @@ export default function PriceHistoryChart({
       {
         id: 'date',
         header: t('market.priceHistory.date'),
+        stickyStart: true,
         render: (p) => p.date,
         sortValue: (p) => p.date,
       },
@@ -262,6 +264,7 @@ export default function PriceHistoryChart({
       {
         id: 'range',
         header: t('market.priceHistory.priceRange'),
+        phoneHidden: true,
         render: (p) => formatPriceRange(p.lowest, p.highest),
         // Sorted by the day's high — the low half of the band has no column
         // of its own to sort by instead.
@@ -276,6 +279,7 @@ export default function PriceHistoryChart({
       {
         id: 'orderCount',
         header: t('market.priceHistory.orderCount'),
+        phoneHidden: true,
         render: (p) => formatVolume(p.orderCount),
         sortValue: (p) => p.orderCount,
       },
@@ -513,27 +517,23 @@ export default function PriceHistoryChart({
        * the real question is "does anyone want these numbers", and the answer
        * to that does not change with the hinge.
        *
-       * So no breakpoint gates it. `DataTable` still stacks each row into a
-       * two-column card below `sm` (DESIGN.md §4) and draws a real table
-       * above, which is the same data laid out for the room available.
+       * So no breakpoint gates it. Below `sm` it stays a plain table, its
+       * range and order-count columns shed (`phoneHidden`): a day list is
+       * read across columns, not as cards (DESIGN.md §6c Restraint).
        */}
-      <DataTable
-        {...tableExport.tableProps}
-        columns={columns}
-        rows={chartData}
-        rowKey={(p) => p.date}
-        label={t('market.priceHistory.chartLabel', { item: itemName })}
-        // Four short figures a card: one per line would run the list twice as
-        // long for no gain in legibility.
-        stackColumns={2}
-        // `chartData` arrives oldest-first (`sortPriceHistory`), matching the
-        // chart's left-to-right X axis — keep that until a header is clicked.
-        defaultSort={{ columnId: 'date', direction: 'asc' }}
-        // The card collapse below `sm` hides the header row and its sort
-        // buttons with it — this is the table's first sortable column, so
-        // without the phone picker it would be unsortable there.
-        mobileSort
-      />
+      <div className="overflow-x-auto">
+        <DataTable
+          {...tableExport.tableProps}
+          columns={columns}
+          rows={chartData}
+          rowKey={(p) => p.date}
+          label={t('market.priceHistory.chartLabel', { item: itemName })}
+          responsive="table"
+          // `chartData` arrives oldest-first (`sortPriceHistory`), matching the
+          // chart's left-to-right X axis — keep that until a header is clicked.
+          defaultSort={{ columnId: 'date', direction: 'asc' }}
+        />
+      </div>
     </div>
   );
 }

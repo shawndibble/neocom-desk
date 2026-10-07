@@ -117,9 +117,9 @@ describe('MiningCrystalGuide', () => {
     render(<MiningCrystalGuide group={group} onLoad={onLoad} pricesLoading={false} />);
     const rows = screen.getAllByRole('button', { name: /^Simple Asteroid Mining Crystal/ });
     expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual([
-      'Simple Asteroid Mining Crystal Type A I, 10.6 m³/s, 37s cycle, 3.5 m³/s residue (34% chance at 1×), 120K ISK',
-      'Simple Asteroid Mining Crystal Type A II, 12.7 m³/s, 37s cycle, 4.7 m³/s residue (38% chance at 1×), 950K ISK',
-      'Simple Asteroid Mining Crystal Type C II, 1.4 m³/s, 37s cycle, 37 m³/s residue (93% chance at 29×), 900K ISK',
+      'Simple Asteroid Mining Crystal Type A I, 10.6 m³/s, 37s cycle, 3.5 m³/s residue (34% chance at 1×), 120,000 ISK',
+      'Simple Asteroid Mining Crystal Type A II, 12.7 m³/s, 37s cycle, 4.7 m³/s residue (38% chance at 1×), 950,000 ISK',
+      'Simple Asteroid Mining Crystal Type C II, 1.4 m³/s, 37s cycle, 37 m³/s residue (93% chance at 29×), 900,000 ISK',
     ]);
     expect(rows[1]).toHaveAttribute('aria-pressed', 'true');
     await user.click(rows[2]!);

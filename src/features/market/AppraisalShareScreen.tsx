@@ -36,7 +36,7 @@ function eachCell(value: number | null): string {
 /** A line total as scannable shorthand, exact value one gesture away. */
 function totalCell(value: number | null): ReactNode {
   if (value === null) return '—';
-  return <IskAmount value={value} revealOn="tap" decimals={0} />;
+  return <IskAmount value={value} decimals={0} />;
 }
 
 export type AppraisalShareState =
@@ -78,13 +78,14 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
     {
       id: 'item',
       header: t('market.appraisal.columnItem'),
-      primary: true,
+      stickyStart: true,
       render: (row) => row.name,
       sortValue: (row) => row.name,
     },
     {
       id: 'buyEach',
       header: t('market.appraisal.columnBuyEach'),
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => eachCell(row.buyEach),
@@ -93,6 +94,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
     {
       id: 'sellEach',
       header: t('market.appraisal.columnSellEach'),
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => eachCell(row.sellEach),
@@ -114,7 +116,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
-    appraisalVolumeColumn(t),
+    { ...appraisalVolumeColumn(t), phoneHidden: true },
   ];
 
   return (
@@ -169,18 +171,19 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               className="py-10"
             />
           ) : (
-            <DataTable
-              {...tableExport.tableProps}
-              columns={columns}
-              rows={state.view.appraisal.rows}
-              rowKey={(row) => row.typeId}
-              label={t('appraisalShare.title')}
-              // Six short numeric columns hang off the item name here, so the
-              // default one-per-line stack turned every item into a card one
-              // line per column — on the one page most likely to be opened from a phone
-              // chat client (#1113, the follow-up #1097 scoped out).
-              stackColumns={2}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                {...tableExport.tableProps}
+                columns={columns}
+                rows={state.view.appraisal.rows}
+                rowKey={(row) => row.typeId}
+                label={t('appraisalShare.title')}
+                // Six numeric columns hang off the item name: a table read across
+                // columns, so it stays a table on a phone (each prices and volume
+                // shed, item pinned) rather than a card per line (§6c Restraint).
+                responsive="table"
+              />
+            </div>
           )}
         </>
       )}

@@ -49,14 +49,16 @@ export function useJournalFilterResult(
  */
 export function useJournalColumnsBuilder(): (
   linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
-  nameFor: (typeId: number) => string
+  nameFor: (typeId: number) => string,
+  miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined
 ) => DataTableColumn<WalletJournalEntry>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   return useCallback(
     (
       linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
-      nameFor: (typeId: number) => string
+      nameFor: (typeId: number) => string,
+      miningTaxHrefFor?: (entry: WalletJournalEntry) => string | undefined
     ): DataTableColumn<WalletJournalEntry>[] => [
       {
         id: 'date',
@@ -69,15 +71,13 @@ export function useJournalColumnsBuilder(): (
         id: 'refType',
         header: t('wallet.refType'),
         className: 'whitespace-nowrap',
-        // Titles the card on a phone: "Bounty prizes" identifies the entry,
-        // where the date column it follows would not.
-        primary: true,
         render: (entry) => humanizeRefType(entry.ref_type),
         sortValue: (entry) => humanizeRefType(entry.ref_type),
       },
       {
         id: 'description',
         header: t('wallet.description'),
+        phoneHidden: true,
         render: (entry) => {
           const transaction = linkFor(entry);
           return (
@@ -85,6 +85,7 @@ export function useJournalColumnsBuilder(): (
               entry={entry}
               transaction={transaction}
               itemName={transaction ? nameFor(transaction.type_id) : ''}
+              miningTaxHref={miningTaxHrefFor?.(entry)}
             />
           );
         },
@@ -103,6 +104,7 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'balance',
         header: t('wallet.balanceCol'),
+        phoneHidden: true,
         align: 'right',
         className: 'tabular-nums text-text-dim',
         render: (entry) =>

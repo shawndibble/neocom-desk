@@ -76,6 +76,7 @@ describe('documentTitleFor', () => {
     '/settings/shortcuts',
     '/settings/faq',
     '/settings/help',
+    '/planetary-industry/advisor',
   ]);
 
   it('gives every feature route a distinct title', () => {

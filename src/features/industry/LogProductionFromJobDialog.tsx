@@ -9,7 +9,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import type { BuildPlanRecord } from '@/db';
 
 interface LogProductionFromJobDialogProps {
@@ -93,7 +97,7 @@ export function LogProductionFromJobDialog({
               <li key={plan.id}>
                 <button
                   type="button"
-                  className={`${tappableRowClassName} w-full px-1 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+                  className={`${tappableRowClassName} w-full px-1 py-2 text-left ${rowInteractiveClassName} ${focusRingInsetClassName}`}
                   onClick={() => onResolved(plan.id)}
                 >
                   {plan.name}

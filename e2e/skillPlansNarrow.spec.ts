@@ -66,7 +66,7 @@ test('plan list: the last plan row is reachable above the fixed tab bar at 390px
   // the character's skills load, so match the name by its start (a word
   // boundary keeps "Plan 4" from matching "Plan 40"), and wait for that line
   // before measuring — it makes the row taller.
-  const lastRow = page.getByRole('button', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) });
+  const lastRow = page.getByRole('link', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) });
   await expect(lastRow).toContainText('Nothing to train');
 
   // Scrolls the page itself, not the list pane, to its end: the fix's whole

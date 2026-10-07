@@ -9,10 +9,9 @@
  * what lets the sentence be a single interpolated i18n string instead of
  * fragments concatenated in code, which no translator could reorder.
  */
+import { HintText } from '@/components/ui/HintText';
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
-import { cx } from '@/lib/cx';
 import { formatIskAuto, formatMarketIsk } from '@/lib/isk';
 import { CopyablePrice } from './CopyablePrice';
 import { orderRowSummary } from './orderRowSummary';
@@ -74,37 +73,26 @@ export function OrderRowSummaryText({
       // otherwise), so this is safe to format unconditionally below.
       // The match clause is the only one whose tone differs from the rest of
       // the sentence — a loss there is the reason not to follow the rival.
-      const matchNode = summary.match && (
-        <span
-          tabIndex={interactive ? 0 : undefined}
-          className={cx(
-            summary.match.kind === 'loss' ? 'text-danger' : 'text-success',
-            interactive && 'cursor-help underline decoration-dotted underline-offset-2',
-            interactive &&
-              (summary.match.kind === 'loss' ? 'decoration-danger/50' : 'decoration-success/50')
-          )}
-        >
-          {parts[parts.length - 1]}
-        </span>
-      );
+      const matchTone = summary.match?.kind === 'loss' ? 'text-danger' : 'text-success';
+      const matchText = parts[parts.length - 1];
       return (
         <span className="text-xs text-text-dim">
           {parts.slice(0, summary.match ? -1 : undefined).join(' · ')}
-          {matchNode && (
+          {summary.match && (
             <>
               {' · '}
               {interactive ? (
-                <Tooltip
+                <HintText
                   content={t('market.orders.rowSummary.matchTooltip', {
                     undercut: formatIskAuto(summary.suggestedPrice ?? summary.rivalPrice),
                     floor: row.floor ? formatIskAuto(row.floor.relist) : '',
                   })}
-                  openOnTap
+                  className={matchTone}
                 >
-                  {matchNode}
-                </Tooltip>
+                  {matchText}
+                </HintText>
               ) : (
-                matchNode
+                <span className={matchTone}>{matchText}</span>
               )}
             </>
           )}

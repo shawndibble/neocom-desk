@@ -72,7 +72,7 @@ export function InjectorFactsPanel({
     return value === null ? (
       t('plans.injectors.noSellOrders', { hub: hub.name })
     ) : (
-      <IskAmount value={value} revealOn="tap" />
+      <IskAmount value={value} />
     );
   };
 

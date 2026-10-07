@@ -1,4 +1,10 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  selectedRowClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -20,30 +26,33 @@ import {
 import {
   Button,
   Caret,
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   EmptyState,
   IconButton,
   IskAmount,
+  isRowOwnEvent,
+  MenuItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
   Panel,
+  RowActionsMenu,
+  RowMoreActions,
   TextInput,
   Tooltip,
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { gripHitAreaClassName } from '@/components/ui/controlStyles';
+import { rowStateClassName } from './planRowStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
+import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { BlueprintPicker } from './BlueprintPicker';
-import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
-import { BuildPlanRowMoreActions } from './BuildPlanRowMoreActions';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -141,7 +150,7 @@ function SortHeader({
             : t('industry.sortBy', { column: label })
         }
         aria-pressed={active}
-        className={`inline-flex items-center gap-px uppercase tracking-widest hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${active ? 'text-text' : ''}`}
+        className={`inline-flex items-center gap-px rounded-xs uppercase tracking-widest hover:text-text ${interactiveClassName} ${focusRingClassName} ${active ? 'text-text' : ''}`}
       >
         {label}
         <Glyph
@@ -232,9 +241,9 @@ function ProfitCell({ profit }: { profit: number | null }) {
   return (
     <span className={`tabular-nums ${iskToneClass(profit)}`}>
       {profit > 0 ? '+' : ''}
-      {/* Tap: this cell is inert — the row's tap belongs to the plan-name
-          button and its context menu beside it. */}
-      <IskAmount value={profit} revealOn="tap" decimals={0} />
+      {/* Tap: the row is tappable, so the tap opens the plan; the exact figure
+          is on hover/focus. */}
+      <IskAmount value={profit} decimals={0} />
     </span>
   );
 }
@@ -391,6 +400,8 @@ function PlanRow({
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
+  // The whole row opens the plan; a hold that became the row menu must not.
+  const guard = useLiftAfterHoldGuard();
   // One id for both roles, the way `useSortable` registers its own: a row is
   // the thing being dragged *and* a target meaning "into whatever group this
   // row is in", which is how an expanded group's body accepts a drop rather
@@ -398,20 +409,76 @@ function PlanRow({
   const dropId = planDropId(plan.id);
   const { setNodeRef: setDropRef } = useDroppable({ id: dropId });
   const { setNodeRef: setDragRef, listeners, isDragging } = useDraggable({ id: dropId });
+  // A drag released over its own row still ends in a click on that row; it
+  // is the drop's, not an open. Stays set until the click has come and gone.
+  const dragged = useRef(false);
+  useEffect(() => {
+    if (isDragging) {
+      dragged.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      dragged.current = false;
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isDragging]);
+
+  // After the menu has closed: its focus hand-back would blur the new field
+  // and cancel the rename straight away.
+  const startRename = () => setTimeout(() => setRenaming(true), 0);
+  const items = (
+    <>
+      <MenuSub>
+        <MenuSubTrigger>{t('industry.moveToGroup')}</MenuSubTrigger>
+        <MenuSubContent>
+          {groups.map((group) => (
+            <MenuItem
+              key={group.id}
+              disabled={plan.buildGroupId === group.id}
+              onSelect={() => onMovePlan(plan.id, group.id)}
+            >
+              {group.name}
+            </MenuItem>
+          ))}
+          {groups.length > 0 && <MenuSeparator />}
+          <MenuItem
+            disabled={plan.buildGroupId === undefined}
+            onSelect={() => onMovePlan(plan.id, null)}
+          >
+            {t('industry.removeFromGroup')}
+          </MenuItem>
+        </MenuSubContent>
+      </MenuSub>
+      <MenuItem onSelect={startRename}>{t('industry.rename')}</MenuItem>
+      <MenuItem onSelect={() => onDuplicate(plan.id)}>{t('industry.duplicate')}</MenuItem>
+      <MenuSeparator />
+      <MenuItem className="text-danger" onSelect={() => onDelete(plan.id)}>
+        {t('industry.delete')}
+      </MenuItem>
+    </>
+  );
 
   return (
-    <li
-      ref={(node) => {
-        setDropRef(node);
-        setDragRef(node);
-      }}
-      className={`flex items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${
-        indented ? 'pl-6' : 'pl-2'
-      } ${active ? 'bg-panel-2' : ''} ${isDragging ? 'opacity-40' : ''} ${
-        dropKind === 'into' ? DROP_INTO_CLASS : dropKind === 'out' ? DROP_OUT_CLASS : ''
-      }`}
-    >
-      {/* No groups yet means every drop is a no-op, and a grab cursor on a row
+    <RowActionsMenu name={plan.name} items={items}>
+      <li
+        ref={(node) => {
+          setDropRef(node);
+          setDragRef(node);
+        }}
+        aria-current={active ? 'true' : undefined}
+        {...guard.handlers}
+        onClick={(event) => {
+          if (guard.swallowClick(event) || dragged.current) return;
+          if (isRowOwnEvent(event)) onSelect(plan.id);
+        }}
+        className={`flex cursor-pointer items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${rowStateClassName(active, dropKind === 'into')} ${
+          indented ? 'pl-6' : 'pl-2'
+        } ${active ? selectedRowClassName : ''} ${isDragging ? 'opacity-40' : ''} ${
+          dropKind === 'into' ? DROP_INTO_CLASS : dropKind === 'out' ? DROP_OUT_CLASS : ''
+        }`}
+      >
+        <RowTappableContext.Provider value>
+          {/* No groups yet means every drop is a no-op, and a grab cursor on a row
           nothing will accept is a lie — so the handle appears with the first
           group. The list still renders inside a DndContext either way, which
           keeps the hooks above unconditional.
@@ -425,109 +492,94 @@ function PlanRow({
           destination this handle does, which is the pointer alternative that
           matters (WCAG 2.5.7).
 
-          The `title` is a pointer-only hint on a pointer-only control rather
-          than a `Tooltip`, which would put it back in the accessibility tree
-          this element is deliberately out of.
+          No tooltip or `title`: either would put it back in the accessibility
+          tree this pointer-only grip is deliberately out of (the cursor is its cue).
 
           `distance: 4` on the sensor and `touch-none` here are both load-
           bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
-      {groups.length > 0 && (
-        // `size-9 md:size-7`: the same touch-tier box `IconButton size="sm"`
-        // gives `GroupHeader`'s Caret toggle. Without it this box stayed a
-        // fixed 28px while the Caret's grew to 36px below `md` (DESIGN.md
-        // §3), so the member row's deliberate nesting indent under its group
-        // (`pl-6` vs the header's `px-2` — 16px by design) shrank to 8px on a
-        // phone instead of matching desktop's own 16px.
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-hidden="true"
-          {...listeners}
-          title={t('industry.dragToGroup')}
-          className="inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7"
-        >
-          <Icon.DragHandle />
-        </button>
-      )}
-      {compareMode && (
-        <Checkbox
-          checked={compareSelected}
-          onChange={() => onToggleCompareSelected(plan.id)}
-          aria-label={t('industry.compareSelectFor', { name: plan.name })}
-        />
-      )}
-      {renaming ? (
-        <RenameField
-          value={plan.name}
-          label={t('industry.rename')}
-          onRename={(name) => onRename(plan.id, name)}
-          onDone={() => setRenaming(false)}
-        />
-      ) : (
-        // Delete stays its own visible button; move-to-group/rename/duplicate
-        // live in the row's context menu, plus this visible "More actions"
-        // button beside the name for keyboard/screen-reader reach (WCAG
-        // 2.1.1, issue #1498) — the same three items, built from the same
-        // callbacks, so the two menus can't drift apart.
-        <>
-          <BuildPlanRowContextMenu
-            plan={plan}
-            groups={groups}
-            onRename={() => setRenaming(true)}
-            onDuplicate={() => onDuplicate(plan.id)}
-            onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
-          >
+          {groups.length > 0 && (
+            // `size-9 md:size-7`: the same touch-tier box `IconButton size="sm"`
+            // gives `GroupHeader`'s Caret toggle. Without it this box stayed a
+            // fixed 28px while the Caret's grew to 36px below `md` (DESIGN.md
+            // §3), so the member row's deliberate nesting indent under its group
+            // (`pl-6` vs the header's `px-2` — 16px by design) shrank to 8px on a
+            // phone instead of matching desktop's own 16px.
             <button
               type="button"
-              onClick={() => onSelect(plan.id)}
-              onDoubleClick={() => setRenaming(true)}
-              className="flex-1 truncate text-left"
-              title={plan.name}
+              tabIndex={-1}
+              aria-hidden="true"
+              {...listeners}
+              data-testid="plan-drag-handle"
+              className={`inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7 ${gripHitAreaClassName}`}
             >
-              {plan.name}
+              <Icon.DragHandle />
             </button>
-          </BuildPlanRowContextMenu>
-          <BuildPlanRowMoreActions
-            plan={plan}
-            groups={groups}
-            onRename={() => setRenaming(true)}
-            onDuplicate={() => onDuplicate(plan.id)}
-            onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
-          />
-        </>
-      )}
-      <span className="w-24 shrink-0 text-right">
-        <ProfitCell profit={stats?.profit ?? null} />
-      </span>
-      <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
-        {stats?.iskPerHour == null ? (
-          '—'
-        ) : (
-          <IskAmount value={stats.iskPerHour} revealOn="tap" decimals={0} />
-        )}
-      </span>
-      <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
-        {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
-      </span>
-      <span className="hidden w-14 shrink-0 justify-end sm:flex">
-        <VerdictTag
-          verdict={stats?.verdict ?? 'unknown'}
-          buildCost={stats?.buildCost}
-          buyCost={stats?.buyCost}
-        />
-      </span>
-      <span className="hidden w-8 shrink-0 text-right sm:block">
-        <RunsCell runs={stats?.runs ?? 0} />
-      </span>
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        label={`${t('industry.delete')} ${plan.name}`}
-        tooltip={t('industry.delete')}
-        tone="danger"
-        onClick={() => onDelete(plan.id)}
-      />
-    </li>
+          )}
+          {compareMode && (
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                checked={compareSelected}
+                onChange={() => onToggleCompareSelected(plan.id)}
+                aria-label={t('industry.compareSelectFor', { name: plan.name })}
+              />
+            </label>
+          )}
+          {renaming ? (
+            <RenameField
+              value={plan.name}
+              label={t('industry.rename')}
+              onRename={(name) => onRename(plan.id, name)}
+              onDone={() => setRenaming(false)}
+            />
+          ) : (
+            // Name click opens the plan, double-click renames; the rest (move to
+            // group, rename, duplicate, delete) is the trailing ⋮, also the row's
+            // right-click menu.
+            <span className="flex min-w-0 flex-1">
+              <Tooltip content={plan.name}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    if (!guard.swallowClick(event)) onSelect(plan.id);
+                  }}
+                  onDoubleClick={() => setRenaming(true)}
+                  className={entityLinkClassName('dt-primary min-w-0 truncate text-left')}
+                >
+                  {plan.name}
+                </button>
+              </Tooltip>
+            </span>
+          )}
+          <span className="w-24 shrink-0 text-right">
+            <ProfitCell profit={stats?.profit ?? null} />
+          </span>
+          <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
+            {stats?.iskPerHour == null ? '—' : <IskAmount value={stats.iskPerHour} decimals={0} />}
+          </span>
+          <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
+            {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
+          </span>
+          <span className="hidden w-14 shrink-0 justify-end sm:flex">
+            <VerdictTag
+              verdict={stats?.verdict ?? 'unknown'}
+              buildCost={stats?.buildCost}
+              buyCost={stats?.buyCost}
+            />
+          </span>
+          <span className="hidden w-8 shrink-0 text-right sm:block">
+            <RunsCell runs={stats?.runs ?? 0} />
+          </span>
+          {/* Unmounted while renaming: closing the menu hands focus back to the ⋮,
+          which would blur the rename field and cancel it. The spacer keeps
+          the stat columns where they are. */}
+          {renaming ? (
+            <span className="w-11 shrink-0 md:w-7" aria-hidden="true" />
+          ) : (
+            <RowMoreActions />
+          )}
+        </RowTappableContext.Provider>
+      </li>
+    </RowActionsMenu>
   );
 }
 
@@ -562,113 +614,116 @@ function GroupHeader({
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
+  const guard = useLiftAfterHoldGuard();
   // A collapsed group renders no member rows at all, so this header is the
   // only rect its group has — the case #627 exists for.
   const { setNodeRef } = useDroppable({ id: groupDropId(group.id) });
 
+  // After the menu has closed: its focus hand-back would blur the new field
+  // and cancel the rename straight away.
+  const startRename = () => setTimeout(() => setRenaming(true), 0);
+  const items = (
+    <>
+      <MenuItem onSelect={startRename}>{t('industry.rename')}</MenuItem>
+      <MenuItem className="text-danger" onSelect={onDelete}>
+        {t('industry.deleteGroup')}
+      </MenuItem>
+    </>
+  );
+
   return (
-    <li
-      ref={setNodeRef}
-      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${
-        active ? 'bg-panel-2' : ''
-      } ${dropActive ? DROP_INTO_CLASS : ''}`}
-    >
-      {/* Compare's checkbox only ever renders on a *visible* row, so a
+    <RowActionsMenu name={group.name} items={items}>
+      <li
+        ref={setNodeRef}
+        aria-current={active ? 'true' : undefined}
+        {...guard.handlers}
+        onClick={(event) => {
+          if (guard.swallowClick(event)) return;
+          if (isRowOwnEvent(event)) onSelect();
+        }}
+        className={`flex cursor-pointer items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${rowStateClassName(active, dropActive)} ${
+          active ? selectedRowClassName : ''
+        } ${dropActive ? DROP_INTO_CLASS : ''}`}
+      >
+        <RowTappableContext.Provider value>
+          {/* Compare's checkbox only ever renders on a *visible* row, so a
           collapsed group's members are unreachable without this — it selects
           every member at once rather than making the pilot expand first. */}
-      {compareMode && (
-        <Checkbox
-          checked={membersSelected === 'all'}
-          ref={(el) => {
-            if (el) el.indeterminate = membersSelected === 'some';
-          }}
-          onChange={() => onToggleAllMembers(membersSelected !== 'all')}
-          aria-label={t('industry.selectGroupMembers', { name: group.name })}
-        />
-      )}
-      <IconButton
-        size="sm"
-        variant="plain"
-        icon={<Caret expanded={expanded} />}
-        label={t('industry.toggleGroup', { name: group.name })}
-        aria-expanded={expanded}
-        onClick={onToggle}
-      />
-      {renaming ? (
-        <RenameField
-          value={group.name}
-          label={t('industry.renameGroup')}
-          onRename={onRename}
-          onDone={() => setRenaming(false)}
-        />
-      ) : (
-        // Rename lives in the context menu, same as a plan row's own name
-        // button — a second always-visible icon here was shifting the Est.
-        // total/Verdict/Runs columns over for every group header. The
-        // one-item "More actions" button beside it is the keyboard/
-        // screen-reader path to that same Rename (WCAG 2.1.1, issue #1498).
-        <>
-          <ContextMenu>
-            <ContextMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={onSelect}
-                onDoubleClick={() => setRenaming(true)}
-                className="flex-1 truncate text-left font-semibold"
-                title={group.name}
-              >
-                {group.name}
-              </button>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem onSelect={() => setRenaming(true)}>
-                {t('industry.rename')}
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <IconButton
-                icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-                label={t('industry.moreActionsLabel', { name: group.name })}
-                variant="plain"
-                size="row"
+          {compareMode && (
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                checked={membersSelected === 'all'}
+                ref={(el) => {
+                  if (el) el.indeterminate = membersSelected === 'some';
+                }}
+                onChange={() => onToggleAllMembers(membersSelected !== 'all')}
+                aria-label={t('industry.selectGroupMembers', { name: group.name })}
               />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                {t('industry.rename')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </>
-      )}
-      <span className="w-24 shrink-0 text-right">
-        <ProfitCell profit={stats?.profit ?? null} />
-      </span>
-      <span className="hidden w-24 shrink-0 lg:block" aria-hidden="true" />
-      <span className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
-      <span className="hidden w-14 shrink-0 justify-end sm:flex">
-        <VerdictTag
-          verdict={stats?.verdict ?? 'unknown'}
-          buildCost={stats?.buildCost}
-          buyCost={stats?.buyCost}
-        />
-      </span>
-      {/* Runs has no group-level meaning — a group aggregates cost, not a
+            </label>
+          )}
+          <IconButton
+            size="sm"
+            variant="plain"
+            icon={<Caret expanded={expanded} />}
+            label={t('industry.toggleGroup', { name: group.name })}
+            aria-expanded={expanded}
+            onClick={onToggle}
+          />
+          {renaming ? (
+            <RenameField
+              value={group.name}
+              label={t('industry.renameGroup')}
+              onRename={onRename}
+              onDone={() => setRenaming(false)}
+            />
+          ) : (
+            // Click opens the group, double-click renames; Rename and Delete are the
+            // trailing ⋮ (also the right-click menu).
+            <span className="flex min-w-0 flex-1">
+              <Tooltip content={group.name}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    if (!guard.swallowClick(event)) onSelect();
+                  }}
+                  onDoubleClick={() => setRenaming(true)}
+                  className={entityLinkClassName(
+                    'dt-primary min-w-0 truncate text-left font-semibold'
+                  )}
+                >
+                  {group.name}
+                </button>
+              </Tooltip>
+            </span>
+          )}
+          <span className="w-24 shrink-0 text-right">
+            <ProfitCell profit={stats?.profit ?? null} />
+          </span>
+          <span className="hidden w-24 shrink-0 lg:block" aria-hidden="true" />
+          <span className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
+          <span className="hidden w-14 shrink-0 justify-end sm:flex">
+            <VerdictTag
+              verdict={stats?.verdict ?? 'unknown'}
+              buildCost={stats?.buildCost}
+              buyCost={stats?.buyCost}
+            />
+          </span>
+          {/* Runs has no group-level meaning — a group aggregates cost, not a
           production history of its own — so this column stays a fixed-width
           blank rather than a second dash competing with the plan rows' real
           one for the reader's attention. */}
-      <span className="hidden w-8 shrink-0 sm:block" aria-hidden="true" />
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        label={`${t('industry.deleteGroup')} ${group.name}`}
-        tooltip={t('industry.deleteGroup')}
-        tone="danger"
-        onClick={onDelete}
-      />
-    </li>
+          <span className="hidden w-8 shrink-0 sm:block" aria-hidden="true" />
+          {/* Unmounted while renaming: closing the menu hands focus back to the ⋮,
+          which would blur the rename field and cancel it. The spacer keeps
+          the stat columns where they are. */}
+          {renaming ? (
+            <span className="w-11 shrink-0 md:w-7" aria-hidden="true" />
+          ) : (
+            <RowMoreActions />
+          )}
+        </RowTappableContext.Provider>
+      </li>
+    </RowActionsMenu>
   );
 }
 
@@ -950,7 +1005,7 @@ export function BuildPlanList({
               <span className="hidden w-8 shrink-0 text-right sm:block">
                 {t('industry.runsColumn')}
               </span>
-              <span className="w-9 shrink-0 md:w-7" aria-hidden="true" />
+              <span className="w-11 shrink-0 md:w-7" aria-hidden="true" />
             </div>
             <ul className="rounded-xs border border-line">
               {/* A group's header and its members are siblings in this one list,

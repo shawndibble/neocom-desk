@@ -22,7 +22,6 @@ import {
   Tabs,
   Toast,
   TypeIcon,
-  RowMoreActions,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -39,7 +38,6 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useFocusHeading } from '@/lib/useFocusHeading';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
@@ -58,6 +56,7 @@ import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
+import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
@@ -170,31 +169,25 @@ function MarketGroupTree({
   function renderItem(item: MarketTypeEntry, itemDepth: number) {
     return (
       <li key={item.typeId}>
-        <ItemContextMenu typeId={item.typeId} itemName={item.name}>
-          {/* The trigger holds the More actions button beside the
-                  item button (buttons don't nest), so both sit inside
-                  the menu. */}
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => onSelect(item.typeId)}
-              style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
-              // Read back on Back-to-finder (issue #1485), to return focus
-              // to the row that opened the item panel — `data-` rather
-              // than an id/ref, since the tree fully unmounts/remounts
-              // whenever a search collapses or re-expands a group.
-              data-tree-item-id={item.typeId}
-              aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-              className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
-                selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-              }`}
-            >
-              <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.name}</span>
-            </button>
-            <RowMoreActions />
-          </div>
-        </ItemContextMenu>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => onSelect(item.typeId)}
+            style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
+            // Read back on Back-to-finder (issue #1485), to return focus
+            // to the row that opened the item panel — `data-` rather
+            // than an id/ref, since the tree fully unmounts/remounts
+            // whenever a search collapses or re-expands a group.
+            data-tree-item-id={item.typeId}
+            aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
+            className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
+              selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
+            }`}
+          >
+            <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.name}</span>
+          </button>
+        </div>
       </li>
     );
   }
@@ -228,7 +221,7 @@ function MarketGroupTree({
           aria-expanded={expandable ? expanded : undefined}
           onClick={() => onToggle(group.id)}
           style={{ paddingLeft: `${depth * 0.75}rem` }}
-          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${
+          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${interactiveClassName} ${focusRingInsetClassName} ${
             expandable ? 'min-h-11 md:min-h-0' : ''
           }`}
         >
@@ -324,6 +317,8 @@ export function Market() {
   }
 
   const compareCount = useCompareSet((state) => state.items.length);
+  const addToCompare = useCompareSet((state) => state.add);
+  const removeFromCompare = useCompareSet((state) => state.remove);
 
   // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
   // as [] rather than requiring an active character — Market Browser itself
@@ -332,7 +327,11 @@ export function Market() {
   // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
   // one Item Detail modal, priced at `orderBookLocation`) and the lazy
   // blueprint catalog behind Build Plan.
-  const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
+  const itemActions = usePageItemActions({
+    activeCharacterId,
+    lazyBlueprints: true,
+    localInfo: true,
+  });
   const {
     items: quickbarItems,
     write: writeQuickbar,
@@ -442,6 +441,10 @@ export function Market() {
   // separate param rather than folded into the key.
   const itemHeadingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
+  const selectedInCompare = useCompareSet((state) =>
+    state.items.some((item) => item.typeId === selectedTypeId)
+  );
+  const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
   // The finder Panel's own root, so Back can look up the tree button the
   // item was opened from without a global `document.querySelector` risking a
@@ -918,6 +921,12 @@ export function Market() {
                 </p>
               )}
 
+              {filterResult?.fuzzy && (
+                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                  {t('market.searchFuzzy')}
+                </p>
+              )}
+
               {filterResult?.capped && (
                 <p className="pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('market.searchCapped', {
@@ -979,6 +988,44 @@ export function Market() {
                 selectedItem &&
                 selectedTypeId !== null && (
                   <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
+                    <IconButton
+                      size="md"
+                      icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
+                      label={t(
+                        selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
+                        {
+                          name: selectedItem.name,
+                        }
+                      )}
+                      tooltip={
+                        activeCharacterId === null
+                          ? t('market.contextMenu.quickbarNoCharacter')
+                          : undefined
+                      }
+                      pressed={selectedPinned}
+                      aria-disabled={activeCharacterId === null || undefined}
+                      openOnTap={activeCharacterId === null}
+                      className="aria-disabled:cursor-default aria-disabled:opacity-40"
+                      onClick={() => {
+                        if (activeCharacterId === null) return;
+                        if (selectedPinned) handleRemoveFromQuickbar(selectedTypeId);
+                        else itemActions.actions.addToQuickbar(selectedTypeId, selectedItem.name);
+                      }}
+                    />
+                    <IconButton
+                      size="md"
+                      icon={<Icon.Compare />}
+                      label={t(
+                        selectedInCompare ? 'market.compare.removeItem' : 'market.compare.addItem',
+                        { name: selectedItem.name }
+                      )}
+                      pressed={selectedInCompare}
+                      onClick={() =>
+                        selectedInCompare
+                          ? removeFromCompare(selectedTypeId)
+                          : addToCompare({ typeId: selectedTypeId, itemName: selectedItem.name })
+                      }
+                    />
                     <ItemPriceAlertBell
                       typeId={selectedTypeId}
                       name={selectedItem.name}
@@ -987,7 +1034,7 @@ export function Market() {
                       onPin={handlePinWithTarget}
                     />
                     <IconButton
-                      size="sm"
+                      size="md"
                       icon={<Icon.Info />}
                       label={t('market.contextMenu.showInfo')}
                       onClick={() =>

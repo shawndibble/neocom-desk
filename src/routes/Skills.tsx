@@ -15,15 +15,22 @@ import {
   StatChip,
   StatChips,
   IconButton,
+  Tooltip,
 } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { SkillInspector } from '@/features/skills/SkillInspector';
-import { SkillRowContextMenu } from '@/features/skills/SkillRowContextMenu';
+import { SkillPlanAdd } from '@/features/skills/SkillPlanAdd';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
@@ -49,7 +56,7 @@ import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
+import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -178,7 +185,7 @@ export function Skills() {
   const training = data?.training ?? null;
   const completedSp = data?.completedSp ?? 0;
   const trainingChip = training && (
-    <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
+    <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
       {t('skills.trainingChip', {
         level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
         time: formatCountdown(training.secondsRemaining),
@@ -254,8 +261,8 @@ export function Skills() {
     [skillsResult]
   );
 
-  // Every plan this row's own context menu can add into (it targets any of
-  // them, not one "current" plan — see `SkillRowContextMenu`), merged by
+  // Every plan this row's own context menu can add into (the inspector's Add
+  // targets one chosen plan; the mark reflects any of them), merged by
   // skill at the highest level any of them asks. Drives the bar's planned
   // mark: without it a skill already queued in a plan looks identical to one
   // that isn't (issue: no indicator anywhere a skill can be added to a plan).
@@ -278,6 +285,16 @@ export function Skills() {
     }
     return levels;
   }, [skillPlans]);
+
+  const selectedSkill = useMemo(
+    () =>
+      selectedSkillTypeID === null
+        ? null
+        : (groups
+            .flatMap((group) => group.skills)
+            .find((skill) => skill.skillTypeID === selectedSkillTypeID) ?? null),
+    [groups, selectedSkillTypeID]
+  );
 
   const inspector = useMemo(() => {
     if (selectedSkillTypeID === null || !catalog) return null;
@@ -447,6 +464,17 @@ export function Skills() {
                 prereqs={inspector.prereqs}
                 unlocks={inspector.unlocks}
                 onClose={() => setSelectedSkillTypeID(null)}
+                planAction={
+                  selectedSkill && (
+                    <SkillPlanAdd
+                      key={selectedSkill.skillTypeID}
+                      characterId={activeCharacterId}
+                      skillTypeID={selectedSkill.skillTypeID}
+                      skillName={selectedSkill.name}
+                      currentLevel={selectedSkill.level}
+                    />
+                  )
+                }
               />
             </div>
           )}
@@ -483,7 +511,7 @@ export function Skills() {
               className="py-8"
             />
           ) : (
-            <TableExportProvider tableExport={skillsExport}>
+            <>
               {groups.map((group) => {
                 if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
                 const expanded = searching || expandedGroups.has(group.groupName);
@@ -504,9 +532,12 @@ export function Skills() {
                         aria-expanded={expanded}
                         disabled={searching}
                         onClick={() => toggleGroup(group.groupName)}
-                        className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:hover:bg-transparent md:min-h-0 ${
-                          expanded ? 'border-b' : ''
-                        }`}
+                        className={cx(
+                          'flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
+                          rowInteractiveClassName,
+                          focusRingInsetClassName,
+                          expanded && 'border-b'
+                        )}
                       >
                         <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                           <Caret expanded={expanded} />
@@ -538,12 +569,18 @@ export function Skills() {
                                     current === skill.skillTypeID ? null : skill.skillTypeID
                                   )
                                 }
-                                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-                                  selected ? 'bg-panel-2' : ''
-                                }`}
+                                className={cx(
+                                  tappableRowClassName,
+                                  'flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs',
+                                  rowInteractiveClassName,
+                                  focusRingInsetClassName,
+                                  selected
+                                    ? selectedRowClassName
+                                    : 'border-l-2 border-l-transparent'
+                                )}
                               >
                                 <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                  <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
+                                  <span className="dt-primary line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
                                     {skill.name}
                                   </span>
                                   {training?.skillTypeID === skill.skillTypeID && trainingChip}
@@ -562,15 +599,13 @@ export function Skills() {
                             );
                             return (
                               <li key={skill.skillTypeID}>
-                                <SkillRowContextMenu
-                                  activeCharacterId={activeCharacterId}
-                                  skillTypeID={skill.skillTypeID}
-                                  skillName={skill.name}
-                                  currentLevel={skill.level}
-                                  tooltipContent={skill.description}
-                                >
-                                  {row}
-                                </SkillRowContextMenu>
+                                {skill.description ? (
+                                  <Tooltip content={skill.description} className="w-full">
+                                    {row}
+                                  </Tooltip>
+                                ) : (
+                                  row
+                                )}
                               </li>
                             );
                           })}
@@ -580,7 +615,7 @@ export function Skills() {
                   </section>
                 );
               })}
-            </TableExportProvider>
+            </>
           )}
         </>
       )}

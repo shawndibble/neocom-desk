@@ -23,6 +23,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { Toast } from '@/components/ui/Toast';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatMarketIsk } from '@/lib/isk';
 import { priceClipboardText } from './priceClipboardText';
@@ -64,7 +65,7 @@ export function CopyablePrice({
           // The 44px touch tier (DESIGN.md §3) on a phone, where the modal's
           // next-step and exit lines are this button alone; no extra height
           // on a pointer, where it sits inside a dense table row.
-          className="inline-flex min-h-11 cursor-copy items-center rounded-xs text-left font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent md:min-h-0"
+          className={`inline-flex min-h-11 cursor-copy items-center rounded-xs text-left font-semibold hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
         >
           {children ?? formatted}
         </button>

@@ -120,4 +120,24 @@ describe('filterMarketTree', () => {
     expect(result?.totalMatches).toBe(0);
     expect(result?.capped).toBe(false);
   });
+
+  describe('when nothing matches exactly', () => {
+    it('falls back to close matches for a typo', () => {
+      const result = filterMarketTree(GROUPS, TYPES, 'rifetr');
+      expect(result?.fuzzy).toBe(true);
+      expect(result?.totalMatches).toBe(1);
+      expect(result?.matchedTypesByGroup.get(2)?.map((t) => t.name)).toEqual(['Rifter']);
+      expect(result?.visibleGroupIds).toEqual(new Set([2, 1]));
+    });
+
+    it('does not use the fallback when a plain match exists', () => {
+      expect(filterMarketTree(GROUPS, TYPES, 'rifte')?.fuzzy).toBe(false);
+    });
+
+    it('stays empty when nothing is close', () => {
+      const result = filterMarketTree(GROUPS, TYPES, 'zzzzzz');
+      expect(result?.fuzzy).toBe(false);
+      expect(result?.totalMatches).toBe(0);
+    });
+  });
 });

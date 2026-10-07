@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -44,6 +45,7 @@ import type {
   RigKind,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
@@ -80,6 +82,7 @@ import {
   volumeForType,
   type BlueprintCatalog,
 } from './blueprintCatalog';
+import { breakEvenRuns } from '@/engine/industry/breakEvenRuns';
 import { planOwnedBlueprints, resolveBuildPlan } from './resolveBuildPlan';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { materialPriceBasisOf } from './priceBasis';
@@ -101,7 +104,6 @@ import {
   materialTableRows,
   shoppingListMaterials,
   subBuildSeconds as computeSubBuildSeconds,
-  type MaterialTableRow,
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
@@ -124,6 +126,7 @@ import { PlanSlotLine } from './PlanSlotLine';
 import { categoryForActivity } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
+import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
@@ -364,6 +367,11 @@ export function BuildPlanDetail({
   // folded on a phone until asked), and the one Calculation Breakdown is
   // owned here so the hero's button and the ledger's "?"s open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
+  // The plan and profit a failed search ran against: the note is stale once either moves.
+  const [noBreakEvenAt, setNoBreakEvenAt] = useState<{
+    plan: BuildPlanRecord;
+    profit: number | null;
+  } | null>(null);
   const isDesktop = useIsDesktop();
   const [costsOpen, setCostsOpen] = useState<boolean | null>(null);
   const costsExpanded = costsOpen ?? isDesktop;
@@ -386,6 +394,7 @@ export function BuildPlanDetail({
     request: number;
     quantity: number;
     jobFee: number;
+    jobId?: number;
   } | null>(null);
   const appliedLogProductionKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -396,7 +405,12 @@ export function BuildPlanDetail({
       ? blueprint.products[0].quantity * pendingLogProduction.runs
       : 0;
     const nextRequest = logRequest + 1;
-    setJobLogSeed({ request: nextRequest, quantity, jobFee: pendingLogProduction.jobFee });
+    setJobLogSeed({
+      request: nextRequest,
+      quantity,
+      jobFee: pendingLogProduction.jobFee,
+      jobId: pendingLogProduction.jobId,
+    });
     setLogRequest(nextRequest);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `logRequest` deliberately omitted: reapplying is gated on `pendingLogProductionKey` changing, not on `logRequest` itself, which this effect also writes
   }, [pendingLogProduction, pendingLogProductionKey, blueprint]);
@@ -573,10 +587,12 @@ export function BuildPlanDetail({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  const resolved = useMemo(
-    () =>
+  // One resolver for the page's own plan and for Break Even's trial run counts,
+  // so a trial can never price a plan differently from what the page shows.
+  const resolveAt = useCallback(
+    (candidate: BuildPlanRecord) =>
       resolveBuildPlan(
-        plan,
+        candidate,
         {
           catalog,
           pi,
@@ -593,7 +609,6 @@ export function BuildPlanDetail({
         { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
       ),
     [
-      plan,
       catalog,
       pi,
       ownedBlueprints,
@@ -609,8 +624,19 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
+  const resolved = useMemo(() => resolveAt(plan), [resolveAt, plan]);
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
+
+  /** Runs at which this plan's profit first reaches zero — buying a BPO is the case it exists for. */
+  const applyBreakEvenRuns = () => {
+    const runs = breakEvenRuns(
+      (trial) => resolveAt({ ...plan, runs: trial }).result?.profit ?? null,
+      plan.runs
+    );
+    setNoBreakEvenAt(runs === null ? { plan, profit: result?.profit ?? null } : null);
+    if (runs !== null) update({ runs });
+  };
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -725,25 +751,14 @@ export function BuildPlanDetail({
   // `MarketWideOpportunitiesPanel` both follow.
   const skillGateCharacterIds = [...characterNames.keys()];
   const accountSkills = useAccountSkillLevels(skillGateCharacterIds);
-  // Materials the most recent Auto Build pass routed to buy specifically for
-  // a skill gate (issue #1231's "and says why") — those rows leave
-  // `visibleMaterials`'s sub-build set, so the marker below must be told
-  // about them separately rather than losing the reason a pilot just saw.
-  const [autoBuildSkillGated, setAutoBuildSkillGated] = useState<
-    ReadonlyMap<number, Extract<SkillGateVerdict, { gated: true }>>
-  >(new Map());
   const skillGates = useMemo(() => {
     const gates = new Map<number, SkillGateVerdict>();
     for (const material of visibleMaterials) {
-      if (material.subBuilds.length === 0) continue;
       const requirements = catalog.byProductTypeID.get(material.typeID)?.blueprint.skills ?? [];
       gates.set(material.typeID, evaluateSkillGate(requirements, accountSkills));
     }
-    for (const [typeID, verdict] of autoBuildSkillGated) {
-      if (!gates.has(typeID)) gates.set(typeID, verdict);
-    }
     return gates;
-  }, [visibleMaterials, catalog, accountSkills, autoBuildSkillGated]);
+  }, [visibleMaterials, catalog, accountSkills]);
 
   // The plan's own top-level product (issue #1231) — the header this same
   // account-wide check used to explicitly skip (see the 2026-09-14 decision
@@ -1048,7 +1063,6 @@ export function BuildPlanDetail({
    */
   function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
-    const gated = new Map<number, Extract<SkillGateVerdict, { gated: true }>>();
     const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
       // Account-wide (issue #1231): a material nobody on the account can
@@ -1059,10 +1073,8 @@ export function BuildPlanDetail({
       runs: plan.runs,
       scope: craftScopeList,
       strategy: options.strategy,
-      onSkillGated: (typeID, verdict) => gated.set(typeID, verdict),
     });
     update({ buildHere: [...picked] });
-    setAutoBuildSkillGated(gated);
   }
 
   /**
@@ -1073,47 +1085,20 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function itemContextMenu(
-    typeId: number,
-    trigger: ReactElement,
-    buildHere?: { onToggle: () => void; building: boolean },
-    onModifyBlueprint?: () => void
-  ) {
+  function itemContextMenu(typeId: number, trigger: ReactElement) {
     return (
       <ItemContextMenu
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onToggleBuildHere={buildHere?.onToggle}
-        buildingHere={buildHere?.building}
-        onModifyBlueprint={onModifyBlueprint}
       >
         {trigger}
       </ItemContextMenu>
     );
   }
 
-  /** The same menu on every other item name the page shows — product heading, revenue and owned-sale rows, the recipe and acquisition modals. */
+  /** The same menu on every other item name the page shows — product heading, the recipe and acquisition modals. */
   const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
-
-  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
-    return itemContextMenu(
-      material.typeID,
-      tr,
-      canBuildHere(material.typeID)
-        ? {
-            onToggle: () => toggleBuildHere(material.typeID),
-            building: material.subBuilds.length > 0,
-          }
-        : undefined,
-      modifyBlueprintFor(material)
-    );
-  }
-
-  /** The blueprint row's own action: the same tier picker its blueprint glyph opens. */
-  function modifyBlueprintFor(material: MaterialTableRow): (() => void) | undefined {
-    return material.acquisitionTier ? () => setAcquisitionPickerTypeId(material.typeID) : undefined;
-  }
 
   /**
    * The visible "More actions" button beside the same menu (WCAG 2.1.1,
@@ -1121,34 +1106,13 @@ export function BuildPlanDetail({
    * renders one of these, built from the identical props so the right-click
    * menu and the button can never list different actions.
    */
-  function itemActionsFor(
-    typeId: number,
-    buildHere?: { onToggle: () => void; building: boolean },
-    onModifyBlueprint?: () => void
-  ): ReactElement {
+  function itemActionsFor(typeId: number): ReactElement {
     return (
       <ItemMoreActions
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onToggleBuildHere={buildHere?.onToggle}
-        buildingHere={buildHere?.building}
-        onModifyBlueprint={onModifyBlueprint}
       />
-    );
-  }
-
-  /** The materials table's own row — same `buildHere` wiring as `materialContextMenu`. */
-  function materialActionsFor(material: MaterialTableRow): ReactElement {
-    return itemActionsFor(
-      material.typeID,
-      canBuildHere(material.typeID)
-        ? {
-            onToggle: () => toggleBuildHere(material.typeID),
-            building: material.subBuilds.length > 0,
-          }
-        : undefined,
-      modifyBlueprintFor(material)
     );
   }
 
@@ -1312,20 +1276,35 @@ export function BuildPlanDetail({
                 </div>
               )}
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.runs')}
-                  <SourcingInput
-                    value={plan.runs}
-                    label={t('industry.runs')}
-                    inputMode="numeric"
-                    widthClassName="w-full"
-                    // Blank/garbage reverts to the last committed value rather than
-                    // snapping to the minimum — clearing the box to retype "10" as
-                    // "100" must not overwrite it with 1 mid-edit.
-                    parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
-                    onCommit={(runs) => update({ runs })}
-                  />
-                </label>
+                <div className="flex items-end gap-2">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs">
+                    {t('industry.runs')}
+                    <SourcingInput
+                      value={plan.runs}
+                      label={t('industry.runs')}
+                      inputMode="numeric"
+                      widthClassName="w-full"
+                      // Blank/garbage reverts to the last committed value rather than
+                      // snapping to the minimum — clearing the box to retype "10" as
+                      // "100" must not overwrite it with 1 mid-edit.
+                      parse={(raw) =>
+                        parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))
+                      }
+                      onCommit={(runs) => update({ runs })}
+                    />
+                  </label>
+                  {pricesReady && result?.profit != null && result.profit < 0 && (
+                    <Button size="sm" onClick={applyBreakEvenRuns}>
+                      {t('industry.breakEvenRuns')}
+                    </Button>
+                  )}
+                </div>
+                {noBreakEvenAt?.plan === plan &&
+                  noBreakEvenAt.profit === (result?.profit ?? null) && (
+                    <p role="status" className="col-span-full text-xs text-text-dim">
+                      {t('industry.breakEvenRunsNone')}
+                    </p>
+                  )}
 
                 {/*
                 ME/TE are no longer pilot-set fields (issue #838): the
@@ -1422,7 +1401,7 @@ export function BuildPlanDetail({
                   {facilityPreset.structure && (
                     <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
                       <span>{t('industry.rigFitLabel')}</span>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {resolveRigFit(plan).map((kind, slot) => (
                           // A slot's position is its identity, not the kind
                           // fitted in it, so the index is a stable key.
@@ -1453,6 +1432,11 @@ export function BuildPlanDetail({
                             </Select>
                           </label>
                         ))}
+                        <RigMatchHelper
+                          facility={plan.facility}
+                          security={plan.security}
+                          onApply={(fit) => update({ rigFit: fit })}
+                        />
                       </div>
                     </div>
                   )}
@@ -1542,12 +1526,17 @@ export function BuildPlanDetail({
                 {activity === 'manufacturing' && (
                   <div className="flex flex-col gap-3 border-t border-line pt-3">
                     <span className="flex items-center gap-2 text-xs">
-                      <Checkbox
-                        id="build-plan-include-reactions"
-                        checked={includeReactions}
-                        onChange={(e) => toggleIncludeReactions(e.target.checked)}
-                      />
-                      <label htmlFor="build-plan-include-reactions">
+                      <label className={touchCheckboxLabelClassName}>
+                        <Checkbox
+                          id="build-plan-include-reactions"
+                          checked={includeReactions}
+                          onChange={(e) => toggleIncludeReactions(e.target.checked)}
+                        />
+                      </label>
+                      <label
+                        htmlFor="build-plan-include-reactions"
+                        className={`inline-flex items-center ${tappableRowClassName}`}
+                      >
                         {t('industry.includeReactions')}
                       </label>
                       <InfoTooltip
@@ -1620,7 +1609,7 @@ export function BuildPlanDetail({
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
                             <span>{t('industry.rigFitLabel')}</span>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               {resolveRigFit({ rigFit: plan.reactionRigFit }).map((kind, slot) => (
                                 <label key={slot} className="flex flex-col gap-1">
                                   <span className="sr-only">
@@ -1653,6 +1642,11 @@ export function BuildPlanDetail({
                                   </Select>
                                 </label>
                               ))}
+                              <RigMatchHelper
+                                facility={plan.reactionFacility ?? 'athanor'}
+                                security={plan.reactionSecurity ?? 'highsec'}
+                                onApply={(fit) => update({ reactionRigFit: fit })}
+                              />
                             </div>
                           </div>
 
@@ -1820,8 +1814,6 @@ export function BuildPlanDetail({
                 onOwnedStockChange={(changes) => changeSourcing(planSourcingPatches(changes))}
                 ref={materialsTable}
                 detection={detection}
-                rowContextMenu={materialContextMenu}
-                rowActions={materialActionsFor}
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
@@ -1979,14 +1971,16 @@ export function BuildPlanDetail({
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}
-              itemMenuFor={itemMenuFor}
-              itemActionsFor={itemActionsFor}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>
         )}
       </div>
 
+      <UnloggedDeliveriesBadge
+        characterId={plan.characterId}
+        blueprintTypeId={plan.blueprintTypeID}
+      />
       <ProductionRunsPanel
         characterId={plan.characterId}
         buildPlanId={plan.id}
@@ -2000,6 +1994,7 @@ export function BuildPlanDetail({
                 // that's ready (falling back to 0 only until pricing is).
                 materialCost: result?.materialCost ?? 0,
                 jobFee: jobLogSeed.jobFee,
+                sourceJobId: jobLogSeed.jobId,
               }
             : result
               ? {

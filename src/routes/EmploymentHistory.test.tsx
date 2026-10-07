@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -8,8 +7,6 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
-import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { App } from '@/app/App';
 
@@ -77,7 +74,6 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
-  configureClipboard(null);
 });
 beforeEach(async () => {
   skillCalls = 0;
@@ -121,9 +117,9 @@ describe('EmploymentHistory', () => {
     expect(rows[2]).toHaveTextContent('365d');
   });
 
-  it('badges the ongoing row when it matches the character record, without linking it', async () => {
+  it('badges the ongoing row when it matches the character record', async () => {
     // A typical user has no grant on /corp and would just be rejected there,
-    // so the ongoing row is a badge, never a link.
+    // so the ongoing row's name opens Show Info (like every row's), never /corp.
     render(<App />);
 
     await screen.findByText('Past Corp');
@@ -131,7 +127,10 @@ describe('EmploymentHistory', () => {
     const rows = screen.getAllByRole('row');
     expect(rows[1]).toHaveTextContent('Current Corp');
     expect(rows[1]).toHaveTextContent('Current');
-    expect(screen.queryByRole('link', { name: 'Current Corp' })).toBeNull();
+    expect(within(rows[1]).getByRole('link', { name: 'Current Corp' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=corporation-200')
+    );
     // The past corp's row gets no badge either.
     expect(rows[2]).not.toHaveTextContent('Current');
   });
@@ -176,7 +175,7 @@ describe('EmploymentHistory', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
-    expect(await screen.findByText('Current Corp', { selector: 'p' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
     // Data age and Refresh belong to this tab's panel, below the tabs.
@@ -272,56 +271,32 @@ describe('EmploymentHistory', () => {
   });
 });
 
-describe('Employment History row context menu (issue #729)', () => {
-  /** Right-clicks a corporation row by its resolved name. */
-  async function openHistoryMenu(name: string) {
-    const row = (await screen.findByText(name)).closest('tr');
-    if (!row) throw new Error(`expected a ${name} row`);
-    row.focus();
+describe('Employment History corporation names (issue #729)', () => {
+  it('links every name to the corporation Show Info, with no ⋮ or row menu', async () => {
+    render(<App />);
+    const row = (await screen.findByText('Past Corp')).closest('tr');
+    if (!row) throw new Error('expected a Past Corp row');
+
+    expect(within(row).getByRole('link', { name: 'Past Corp' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=corporation-100')
+    );
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(row);
-  }
-
-  it('offers Copy Name and Show Info', async () => {
-    render(<App />);
-    await openHistoryMenu('Past Corp');
-
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
   });
 
-  it('Copy Name copies the resolved corporation name to the clipboard', async () => {
-    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-    configureClipboard(clipboardWriteText);
-    render(<App />);
-    await openHistoryMenu('Past Corp');
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-
-    expect(clipboardWriteText).toHaveBeenCalledWith('Past Corp');
-  });
-
-  it('falls back to #id when the row has no resolved name', async () => {
+  it('falls back to #id as the link text when the row has no resolved name', async () => {
     server.use(
       http.post('https://esi.evetech.net/universe/names', () =>
         HttpResponse.json([{ id: 200, name: 'Current Corp', category: 'corporation' }])
       )
     );
-    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
-    configureClipboard(clipboardWriteText);
     render(<App />);
-    await openHistoryMenu('#100');
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
-
-    expect(clipboardWriteText).toHaveBeenCalledWith('#100');
-  });
-
-  it('Show Info opens the shared Public Info Modal on the corporation tab, for a past (non-current) employer', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await openHistoryMenu('Past Corp');
-    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-
-    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'corporation', id: 100 });
+    expect(await screen.findByRole('link', { name: '#100' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=corporation-100')
+    );
   });
 });

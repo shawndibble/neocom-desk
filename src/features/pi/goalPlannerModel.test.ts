@@ -6,11 +6,11 @@ import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/en
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
 import { extractorProgramsFromPins } from './adapters';
 import { colonyBudget } from './colonyBudget';
+import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import { planBest } from '@/engine/pi/planBest';
 import { builtColonyEarnings } from './colonyEarningsModel';
 import type { GoalPlan } from '@/engine/pi/goalTypes';
 import {
-  ASSUMED_UNKNOWN_CUSTOMS,
   DEFAULT_PLANNER_HEADS,
   earningsNow,
   goalPlannerInput,
@@ -162,6 +162,24 @@ describe('plannerColonies', () => {
     expect([...temperate.ratePerEcu.keys()].sort((a, b) => a - b)).toEqual(local);
   });
 
+  it('narrows ratePerEcu to the picked P0s, and ignores an override with none usable', () => {
+    const picked = (richness: ReadonlyMap<number, readonly number[]>) =>
+      plannerColonies(snapshot(), { ...PREFS, richness }).find(
+        (row) => row.planetId === TEMPERATE_ID
+      )!.colony!.ratePerEcu;
+    expect([...picked(new Map([[TEMPERATE_ID, [MICROORGANISMS]]])).keys()]).toEqual([
+      MICROORGANISMS,
+    ]);
+    const full = plannerColonies(snapshot(), PREFS).find((row) => row.planetId === TEMPERATE_ID)!
+      .colony!.ratePerEcu;
+    // The P0 the colony runs today stays rated, so its current layout still scores.
+    expect(
+      [...picked(new Map([[TEMPERATE_ID, [AQUEOUS_LIQUIDS]]])).keys()].sort((a, b) => a - b)
+    ).toEqual([MICROORGANISMS, AQUEOUS_LIQUIDS].sort((a, b) => a - b));
+    expect(picked(new Map([[TEMPERATE_ID, [999_999]]])).size).toBe(full.size);
+    expect(picked(new Map([[OCEANIC_ID, [AQUEOUS_LIQUIDS]]])).size).toBe(full.size);
+  });
+
   it('rates a P0 the colony extracts at its own program re-projected at the restart cadence', () => {
     const temperate = plannerColonies(snapshot(), PREFS).find(
       (row) => row.planetId === TEMPERATE_ID
@@ -267,13 +285,13 @@ describe('plannerColonies', () => {
 });
 
 describe('plannerPolicy', () => {
-  it('runs up to two ECUs, buys only P1 and only when allowed', () => {
-    expect(plannerPolicy({ maxP0Types: 1, buyP1: false })).toMatchObject({
+  it('runs up to two ECUs and buys exactly the tiers the pilot allows', () => {
+    expect(plannerPolicy({ maxP0Types: 1, buyTiers: [] })).toMatchObject({
       maxEcusPerColony: 2,
       maxP0TypesPerColony: 1,
       buyTiers: [],
     });
-    expect(plannerPolicy({ maxP0Types: 2, buyP1: true }).buyTiers).toEqual([1]);
+    expect(plannerPolicy({ maxP0Types: 2, buyTiers: [1, 3] }).buyTiers).toEqual([1, 3]);
   });
 });
 
@@ -287,6 +305,14 @@ describe('priceBooks', () => {
   it('names the types it values at the ask for want of a buy order', () => {
     const books = priceBooks({ prices: { 1: 100, 2: 50, 3: 7 }, buyPrices: { 1: 90 } }, 3);
     expect([...books.valuedAtAsk].sort((a, b) => a - b)).toEqual([2, 3]);
+  });
+
+  it('pays a corp buyback its percent of the bid, ask untouched and no sales tax', () => {
+    const books = priceBooks({ prices: { 1: 100, 2: 50 }, buyPrices: { 1: 90 } }, 3, 80);
+    expect(books.ask).toEqual({ 1: 100, 2: 50 });
+    expect(books.bid[1]).toBeCloseTo(72, 9);
+    expect(books.bid[2]).toBeCloseTo(40, 9);
+    expect(books.salesTaxPct).toBe(0);
   });
 
   it('charges sales tax at the Accounting level, Accounting 0 when unknown', () => {
@@ -311,7 +337,7 @@ describe('planHauling', () => {
       {
         goals: [{ typeId: WATER, unitsPerDay: 24 }],
         colonies,
-        policy: plannerPolicy({ maxP0Types: 2, buyP1: false }),
+        policy: plannerPolicy({ maxP0Types: 2, buyTiers: [] }),
         books: priceBooks(allPriced(), 5),
       },
       pi

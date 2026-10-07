@@ -51,7 +51,7 @@ import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
-import { SkillNameButton } from '@/features/skills/SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
 import { WhatToTrainPrerequisites } from './FittingWhatToTrainPrerequisites';
@@ -381,13 +381,13 @@ function WhatToTrainItem({
         <div className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className="text-text-dim tabular-nums">{rank}</span>
-            <SkillNameButton
-              skillTypeID={row.skillTypeId}
+            <SkillLink
+              typeId={row.skillTypeId}
               planEntries={plan?.entries}
               className="min-w-0 font-semibold"
             >
               {row.name}
-            </SkillNameButton>
+            </SkillLink>
           </span>
           <p className={STAT_DETAIL}>
             {joinDetail([

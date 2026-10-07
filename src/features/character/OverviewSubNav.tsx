@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import type { AppRoutePath } from '@/app/routeScopes';
 import { cx } from '@/lib/cx';
+import { Tooltip } from '@/components/ui';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -26,6 +27,26 @@ const TAB_PATHS = [
   '/employment-history',
 ] as const satisfies readonly AppRoutePath[];
 
+/** The Clones tab; wears the re-auth marker and tooltip when its scope is missing. */
+function ClonesTab({ locked }: { locked: boolean }) {
+  const { t } = useTranslation();
+  const tab = (
+    <NavLink to="/clones" className={subNavClass}>
+      {t('nav.clones')}
+      {locked && <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />}
+    </NavLink>
+  );
+  // A span carries the tooltip: `NavLink`'s class is a function, which Tooltip's
+  // className merge would stringify.
+  return locked ? (
+    <Tooltip content={t('reauth.navLocked')}>
+      <span className="inline-flex">{tab}</span>
+    </Tooltip>
+  ) : (
+    tab
+  );
+}
+
 /**
  * Sub-navigation across the three Character-overview views. Real navigation
  * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
@@ -45,19 +66,10 @@ export function OverviewSubNav() {
         {/*
           The rail used to carry this marker for /clones; the tab has to keep it
           now that the rail no longer lists the route. Informational only, and it
-          rides on `title` rather than extra text so the link stays named
-          "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
+          is a dot inside the link with a tooltip on a wrapper, so the link stays
+          named "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
         */}
-        <NavLink
-          to="/clones"
-          className={subNavClass}
-          title={locked.has('/clones') ? t('reauth.navLocked') : undefined}
-        >
-          {t('nav.clones')}
-          {locked.has('/clones') && (
-            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
-          )}
-        </NavLink>
+        <ClonesTab locked={locked.has('/clones')} />
         <NavLink to="/employment-history" className={subNavClass}>
           {t('nav.employmentHistory')}
         </NavLink>

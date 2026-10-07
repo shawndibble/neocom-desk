@@ -6,15 +6,19 @@
  * state, including the boring one: a card that vanishes when a Character has
  * no colonies is a card you cannot tell from a card that failed to load.
  */
-import { useTranslation } from 'react-i18next';
+import type { ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   IskAmount,
   Panel,
+  RowCaret,
   SEVERITY_LABEL,
   SeverityIcon,
   textActionClassName,
 } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
 import { formatAge } from '@/lib/age';
@@ -32,6 +36,7 @@ import { openOrdersHref } from '@/features/market/openOrdersFilter';
 import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCard';
+import { boardRowLinkClassName } from './boardRowLink';
 import {
   industrySeverity,
   jobSeverity,
@@ -224,6 +229,16 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
                 })
       }
     >
+      {/* Not in `meta`: the title and severity word already fill the header at 1180px. */}
+      {data !== null && data.characterCount > 0 && (
+        <div className="px-3 pt-3">
+          <CharacterScopeReadout
+            scope="all"
+            total={data.characterCount}
+            missing={data.missingCharacterNames}
+          />
+        </div>
+      )}
       <TileRow>
         <NumberTile
           label={t('overview.board.iskUnpaid')}
@@ -233,7 +248,7 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
             ) : data === null || data.unpaidIsk === 0 ? (
               0
             ) : (
-              <IskAmount value={data.unpaidIsk} revealOn="tap" decimals={0} />
+              <IskAmount value={data.unpaidIsk} decimals={0} />
             )
           }
           severity="warning"
@@ -673,11 +688,17 @@ export function PriceAlertsCard({
               <TriageRow
                 key={alert.typeId}
                 severity={alert.crossed ? 'warning' : 'clear'}
-                when={alert.price === null ? UNKNOWN : formatIskCompact(alert.price)}
+                when={
+                  alert.price === null ? UNKNOWN : <IskAmount value={alert.price} decimals={0} />
+                }
+                whenLabel={alert.price === null ? UNKNOWN : formatIskCompact(alert.price)}
                 subject={alert.name}
-                detail={t(`overview.board.priceAlertTarget.${alert.direction}`, {
-                  price: formatIskCompact(alert.targetPrice),
-                })}
+                detail={
+                  <Trans
+                    i18nKey={`overview.board.priceAlertTarget.${alert.direction}`}
+                    components={{ isk: <IskAmount value={alert.targetPrice} decimals={0} /> }}
+                  />
+                }
                 to="/market"
               />
             ))}
@@ -896,7 +917,7 @@ export function AlertsColumn({
           </ul>
         )}
         <p className="mt-auto border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-          <Link to="/alerts" className="hover:text-accent hover:underline">
+          <Link to="/alerts" className={inlineLinkClassName}>
             {hidden > 0
               ? t('overview.board.alertsMore', { count: hidden })
               : t('overview.board.alertsOpen')}
@@ -911,10 +932,7 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
   const { t } = useTranslation();
   return (
     <li className="border-b border-line last:border-b-0">
-      <Link
-        to="/alerts"
-        className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
-      >
+      <Link to="/alerts" className={boardRowLinkClassName}>
         <span className="flex w-10 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums">
           <SeverityIcon severity={group.severity} />
           {group.count}
@@ -928,6 +946,7 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
             })}
           </span>
         </span>
+        <RowCaret />
       </Link>
     </li>
   );
@@ -939,6 +958,7 @@ export interface FoldedDomain {
   key: string;
   domain: string;
   summary: string;
+  summaryNode?: ReactNode;
   severity: DeadlineSeverity | null;
   to: string;
   danger?: boolean;
@@ -968,6 +988,7 @@ export function EverythingElseCard({ domains }: { domains: readonly FoldedDomain
             key={entry.key}
             domain={entry.domain}
             summary={entry.summary}
+            summaryNode={entry.summaryNode}
             severity={entry.severity}
             to={entry.to}
             danger={entry.danger}

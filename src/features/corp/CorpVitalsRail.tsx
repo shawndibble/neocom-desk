@@ -13,7 +13,11 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { IskAmount, Panel, StatChip, StatChips } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { VITALS_WINDOW_DAYS, vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { WalletDivision } from './divisions';
@@ -64,7 +68,19 @@ export function CorpVitalsRail({
   const balanceId = useId();
 
   return (
-    <Panel title={t('corp.vitalsTitle')}>
+    <Panel
+      title={t('corp.vitalsTitle')}
+      meta={
+        // The runway chip reads one wallet only (#2846).
+        <CharacterScopeReadout
+          scope="corp"
+          division={
+            divisions.find((division) => division.division === journalDivision)?.name ??
+            t('corp.vitals.division', { division: journalDivision })
+          }
+        />
+      }
+    >
       <div className="space-y-3">
         {/*
           A plain div, not a `<dl>`: nothing else here reads it as a
@@ -89,7 +105,11 @@ export function CorpVitalsRail({
               <Link
                 key={division.division}
                 to={`/corp/wallet?division=${division.division}`}
-                className="flex items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0 hover:underline"
+                className={cx(
+                  'group flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName
+                )}
                 aria-label={t('corp.vitals.viewInWallet', { division: label })}
                 // The label names where the link goes and so replaces the
                 // row's text — the balance comes back as the description, or
@@ -106,18 +126,20 @@ export function CorpVitalsRail({
                 <span id={`${balanceId}-${division.division}`} className="shrink-0 tabular-nums">
                   {formatIsk(division.balance, 2)}
                 </span>
+                <Icon.Descend
+                  aria-hidden="true"
+                  size={Icon.ICON_SIZE.sm}
+                  className="shrink-0 text-text-faint group-hover:text-accent"
+                />
               </Link>
             );
           })}
         </div>
         <StatChips>
-          <StatChip
-            label={t('corp.vitals.total')}
-            value={<IskAmount value={total} revealOn="tap" />}
-          />
+          <StatChip label={t('corp.vitals.total')} value={<IskAmount value={total} />} />
           <StatChip
             label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-            value={<IskAmount value={net} revealOn="tap" />}
+            value={<IskAmount value={net} />}
             tone={net < 0 ? 'danger' : 'success'}
           />
           <StatChip

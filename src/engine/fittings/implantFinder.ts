@@ -211,7 +211,10 @@ export type ImplantGoalId =
   | 'scanResolution'
   | 'appliedDps'
   | 'weaponRange'
-  | 'signatureRadius';
+  | 'signatureRadius'
+  | 'miningYield'
+  | 'warpSpeed'
+  | 'sensorStrength';
 
 export interface Budget {
   used: number;
@@ -230,7 +233,7 @@ export interface GoalContext {
 }
 
 /** Where a goal sits in the goal list. */
-export type GoalGroup = 'fitting' | 'weapons' | 'tank' | 'navigation';
+export type GoalGroup = 'fitting' | 'weapons' | 'mining' | 'tank' | 'navigation';
 
 export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDisplay } & (
   | { kind: 'budget'; read: (stats: FittingStats) => Budget }
@@ -383,6 +386,30 @@ export const IMPLANT_GOALS: readonly ImplantGoal[] = [
     kind: 'less',
     display: { decimals: 0 },
     read: (s) => s.targeting.signatureRadius,
+  },
+  // m³ an hour from the running miners and mining drones (`mining.ts`); 0 on a fit that mines nothing.
+  {
+    id: 'miningYield',
+    group: 'mining',
+    kind: 'more',
+    display: { decimals: 0 },
+    read: (s) => s.mining.perHour,
+  },
+  // AU/s. Hold sizes and jump range are not goals: no implant or booster moves them.
+  {
+    id: 'warpSpeed',
+    group: 'navigation',
+    kind: 'more',
+    display: { decimals: 2 },
+    read: (s) => s.navigation.warpSpeed,
+  },
+  // Defence against ECM jams.
+  {
+    id: 'sensorStrength',
+    group: 'tank',
+    kind: 'more',
+    display: { decimals: 1 },
+    read: (s) => s.sensor.strength,
   },
 ];
 

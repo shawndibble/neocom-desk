@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { JournalDescriptionCell } from './JournalDescriptionCell';
@@ -51,7 +52,7 @@ describe('JournalDescriptionCell', () => {
     expect(container.textContent).toBe('Complete 3 Jumps');
   });
 
-  it('falls back to a plain label for a daily goal it has no name for', () => {
+  it('falls back to a plain label for a daily goal it has no name for', async () => {
     const { container } = render(
       <MemoryRouter>
         <JournalDescriptionCell
@@ -63,8 +64,9 @@ describe('JournalDescriptionCell', () => {
     );
     expect(container).toHaveTextContent('Daily goal');
     expect(container).not.toHaveTextContent('999');
-    // Kept on hover, so the goal can be named later.
-    expect(screen.getByTitle('Goal id 999')).toBeInTheDocument();
+    // Kept in a tooltip, so the goal can be named later.
+    await userEvent.hover(screen.getByText('Daily goal'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Goal id 999');
   });
 
   it('shows a non-empty reason as a second line', () => {
@@ -154,5 +156,48 @@ describe('JournalDescriptionCell', () => {
     );
     expect(screen.getByText('moon tax Aug')).toBeInTheDocument();
     expect(screen.getByRole('link')).toHaveAttribute('href', '/contracts/history?highlight=7');
+  });
+  it('links a line a pilot tied to a mining tax payment back to that tax row', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'player_donation', description: 'Donation' })}
+          transaction={undefined}
+          itemName=""
+          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /mining tax/i })).toHaveAttribute(
+      'href',
+      '/mining/tax?tax.payment=journal%3A1'
+    );
+  });
+
+  it('makes the memo line the link when a linked line has one', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'player_donation', reason: 'Moon tax 10-05 Ainsan' })}
+          transaction={undefined}
+          itemName=""
+          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Moon tax 10-05 Ainsan/ })).toHaveAttribute(
+      'href',
+      '/mining/tax?tax.payment=journal%3A1'
+    );
+  });
+
+  it('shows no mining tax link for an unlinked line', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell entry={entry()} transaction={undefined} itemName="" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: /mining tax/i })).toBeNull();
   });
 });

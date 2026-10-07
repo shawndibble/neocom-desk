@@ -15,6 +15,7 @@ import { laneForLoad, viewPriority, withEsiLane, type EsiLane } from './lane';
 import { grantHoldsEndpointScope } from './grantScope';
 import { beginCacheMiss, type CacheMissReason } from './cacheMissSignal';
 import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
+import type { EsiEndpointId } from './registry';
 
 export interface CachedResult<T> {
   data: T;
@@ -32,6 +33,14 @@ export interface StatusResult<T> {
   cached: CachedResult<T> | null;
   /** True when the live call failed with 401/403 (or refresh itself failed): re-login is the fix, not a refresh. */
   needsReauth: boolean;
+  /**
+   * The live call failed (5xx, offline, timeout, or no body) and nothing is
+   * cached to fall back on, so `cached: null` means "ESI did not answer", not
+   * "no data". Set only by `loadWithCacheStatus` when `reportFetchFailure` is
+   * passed, and only when true; absent on success, on a warm-cache fallback,
+   * and on an auth failure (`needsReauth` owns that).
+   */
+  fetchFailed?: boolean;
 }
 
 /**
@@ -258,6 +267,12 @@ export const REFRESH_BYPASS_MS = 30_000;
 
 export interface LoadWithCacheStatusOptions {
   /**
+   * The endpoint behind this read, reported with the shell's auth-failure
+   * signal. Lets a page that shows its own banner for it (see
+   * `app/pageOwnsReauth.ts`) keep the shell notice from stacking on top.
+   */
+  authFailureEndpoint?: EsiEndpointId;
+  /**
    * Defaults to `isAuthFailure` (401/403 EsiError, or a failed refresh).
    * Override to narrow: industry/jobs.ts counts only 403, treating a 401 as a
    * generic offline-style failure.
@@ -299,6 +314,11 @@ export interface LoadWithCacheStatusOptions {
 export interface LoadSingleWithCacheOptions extends LoadWithCacheStatusOptions {
   /** Revalidate with the stored ETag; see `conditionalFetch`. */
   conditional?: ConditionalCapture;
+  /**
+   * Set `StatusResult.fetchFailed` when the call failed with nothing cached.
+   * Opt-in so every other caller's result shape stays exactly as it was.
+   */
+  reportFetchFailure?: boolean;
 }
 
 /** `loadPaginatedWithCache[Status]` only. */
@@ -835,7 +855,8 @@ async function loadWithCacheStatusLive<T>(
       // (issue #1521) so a scope never granted at all — the common case a
       // route's own ScopeGate/banner already communicates — does not also
       // paint the shell-wide notice.
-      if (await isWorthReportingToShell(characterId, err)) emitEsiAuthFailure(characterId);
+      if (await isWorthReportingToShell(characterId, err))
+        emitEsiAuthFailure(characterId, options.authFailureEndpoint);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }
@@ -850,7 +871,11 @@ async function loadWithCacheStatusLive<T>(
         },
         needsReauth,
       }
-    : { cached: null, needsReauth };
+    : {
+        cached: null,
+        needsReauth,
+        ...(options.reportFetchFailure && !needsReauth ? { fetchFailed: true } : {}),
+      };
   if (unsent) unsentResults.add(fallback);
   return fallback;
 }
@@ -1155,7 +1180,8 @@ async function loadPaginatedWithCacheStatusLive<T>(
     if (detectAuthFailure(err)) {
       needsReauth = true;
       // Gated by isWorthReportingToShell (issue #1521) — see loadWithCacheStatusLive.
-      if (await isWorthReportingToShell(characterId, err)) emitEsiAuthFailure(characterId);
+      if (await isWorthReportingToShell(characterId, err))
+        emitEsiAuthFailure(characterId, options.authFailureEndpoint);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }

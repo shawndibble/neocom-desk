@@ -141,9 +141,8 @@ describe('loadMiningYieldSnapshot', () => {
     const snapshot = await loadMiningYieldSnapshot();
 
     expect(snapshot.typeVolumes.get(TRADABLE)).toBe(0.1);
-    expect(typeNamesMock.loadTypeNames).toHaveBeenCalledWith(
-      expect.arrayContaining([TRADABLE, 34])
-    );
+    expect(typeNamesMock.loadTypeNames).toHaveBeenCalledWith([34]);
+    expect(typeNamesMock.loadTypeNames).toHaveBeenCalledWith(expect.arrayContaining([TRADABLE]));
     expect(snapshot.rows[0].materialUnitPrices.get(34)).toBe(10);
   });
 

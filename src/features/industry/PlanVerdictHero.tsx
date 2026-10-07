@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import * as Icon from '@/components/ui/icons';
 import type { BuildResult } from '@/engine/industry/types';
 import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
@@ -17,9 +18,9 @@ import { SkillGateMarker } from './SkillGateMarker';
 type PillTone = 'success' | 'warning' | 'muted';
 
 const PILL_TONE: Record<PillTone, string> = {
-  success: 'border-success/50 bg-success/10 text-success',
-  warning: 'border-warning/50 bg-warning/10 text-warning',
-  muted: 'border-line text-text-dim',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  muted: 'text-text-dim',
 };
 
 /**
@@ -37,10 +38,10 @@ export function VerdictPill({
   tone: PillTone;
   children: ReactNode;
 }) {
-  const Glyph = tone === 'warning' ? Icon.Warn : tone === 'success' ? Icon.Done : Icon.Info;
+  const Glyph = tone === 'warning' ? Icon.Warn : tone === 'success' ? Icon.Done : Icon.Tip;
   return (
     <p
-      className={`inline-flex min-h-7 items-center gap-2 rounded-xs border px-2.5 py-1 text-[0.6875rem] font-semibold tracking-widest uppercase ${PILL_TONE[tone]}`}
+      className={`inline-flex min-h-7 items-center gap-2 rounded-xs px-2.5 py-1 text-[0.6875rem] font-semibold tracking-widest uppercase ${PILL_TONE[tone]}`}
     >
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
       <span className="sr-only">{label}</span>
@@ -72,7 +73,7 @@ export function BpcCoverageWarning({
           {' '}
           <button
             type="button"
-            className="underline"
+            className={textActionClassName('inline-flex')}
             onClick={() => onSetRuns(coverage.coveredRuns)}
           >
             {t('industry.bpcCoverageSetRuns', { count: coverage.coveredRuns })}
@@ -232,7 +233,7 @@ export function PlanVerdictHero({
                   // `formatIsk` — their amounts are i18next interpolation
                   // values, which take a string, not a node.
                   <>
-                    <IskAmount value={profit} revealOn="tap" decimals={0} /> ISK
+                    <IskAmount value={profit} decimals={0} /> ISK
                   </>
                 )}
               </p>

@@ -10,7 +10,7 @@ function CurrentLocation() {
 }
 
 describe('ImplantChip', () => {
-  it('clicking navigates to Market filtered to the implant (#405)', () => {
+  it('links to the implant Show info', () => {
     render(
       <MemoryRouter initialEntries={['/skills']}>
         <CurrentLocation />
@@ -18,12 +18,12 @@ describe('ImplantChip', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Ocular Filter - Basic/ }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/market/browser?type=9899');
+    expect(screen.getByTestId('location')).toHaveTextContent('/skills?info=type-9899');
   });
 
-  it('preserves an existing region param when clicked from inside /market', () => {
+  it('keeps the page params when clicked from inside /market', () => {
     render(
       <MemoryRouter initialEntries={['/market?region=10000002']}>
         <CurrentLocation />
@@ -31,10 +31,10 @@ describe('ImplantChip', () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
+    fireEvent.click(screen.getByRole('link', { name: /Ocular Filter - Basic/ }));
 
     expect(screen.getByTestId('location')).toHaveTextContent(
-      '/market/browser?type=9899&region=10000002'
+      '/market?region=10000002&info=type-9899'
     );
   });
 });

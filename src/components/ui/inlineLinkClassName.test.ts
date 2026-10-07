@@ -17,7 +17,7 @@ describe('hand-rolled in-sentence accent links', () => {
   it('none exist outside controlStyles', () => {
     const offenders = ['src/features', 'src/routes', 'src/components']
       .flatMap((dir) => sourceFiles(dir))
-      .filter((file) => !file.endsWith('controlStyles.ts'))
+      .filter((file) => !/(controlStyles|entityLinkClassName).ts$/.test(file))
       .filter((file) =>
         (readFileSync(file, 'utf8').match(/(['"`])(?:(?!\1)[^\n])*\1/g) ?? []).some(
           (str) => hasToken(str, 'text-accent') && hasToken(str, 'underline')

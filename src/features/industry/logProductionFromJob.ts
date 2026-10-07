@@ -17,10 +17,18 @@ import type { ActiveJob } from './jobs';
 export interface JobProductionSeed {
   runs: number;
   jobFee: number;
+  /** ESI `job_id` the run is logged from, stored on the Production Run so Job History can match it exactly. */
+  jobId?: number;
 }
 
-export function jobProductionSeed(job: Pick<ActiveJob, 'runs' | 'cost'>): JobProductionSeed {
-  return { runs: job.runs, jobFee: job.cost ?? 0 };
+export function jobProductionSeed(
+  job: Pick<ActiveJob, 'runs' | 'cost'> & Partial<Pick<ActiveJob, 'job_id'>>
+): JobProductionSeed {
+  return {
+    runs: job.runs,
+    jobFee: job.cost ?? 0,
+    ...(job.job_id !== undefined && { jobId: job.job_id }),
+  };
 }
 
 /** The character's own Build Plans that build this job's blueprint — the candidates "Log production…" resolves against. */

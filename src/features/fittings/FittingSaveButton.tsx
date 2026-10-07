@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -6,8 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Tooltip,
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
+import { isApplePlatform, modChordDisplayKey } from '@/lib/shortcuts';
+import { useChord } from '@/lib/useChord';
 
 interface FittingSaveButtonProps {
   /** Save (or update) to My Fittings — the button itself. */
@@ -40,17 +44,31 @@ export function FittingSaveButton({
   saveToEveBlockedReason,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
+  const apple = isApplePlatform();
+  // Ctrl/Cmd+S saves, Ctrl/Cmd+Shift+S saves a copy — in any field too. Both
+  // always swallow the browser's own "save page", even while Save is off.
+  useChord('s', onSave, { enabled: canSave });
+  useChord('s', onSaveAsNew, { shift: true, enabled: canSave && updating });
+  const withReason = (button: ReactElement<{ className?: string }>) =>
+    !canSave && saveBlockedReason ? (
+      <Tooltip content={saveBlockedReason}>{button}</Tooltip>
+    ) : (
+      <Tooltip content={modChordDisplayKey(apple, 'S')}>{button}</Tooltip>
+    );
   return (
     <div className="flex">
-      <Button
-        variant="primary"
-        disabled={!canSave}
-        title={saveBlockedReason}
-        onClick={onSave}
-        className="rounded-r-none"
-      >
-        {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
-      </Button>
+      {/* `aria-disabled`, not the native attribute, so the reason stays reachable. */}
+      {withReason(
+        <Button
+          variant="primary"
+          aria-disabled={!canSave || undefined}
+          aria-keyshortcuts={apple ? 'Meta+S' : 'Control+S'}
+          onClick={onSave}
+          className="rounded-r-none"
+        >
+          {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
+        </Button>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -66,6 +84,9 @@ export function FittingSaveButton({
             <>
               <DropdownMenuItem disabled={!canSave} onSelect={onSaveAsNew}>
                 {t('fittings.myFittings.saveAsNew')}
+                <span className="ml-auto pl-4 text-text-dim">
+                  {modChordDisplayKey(apple, 'S', { shift: true })}
+                </span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>

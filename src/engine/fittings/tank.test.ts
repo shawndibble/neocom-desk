@@ -198,6 +198,13 @@ describe('capacitorStatusAtDrain', () => {
     });
   });
 
+  it('matches a worked example: a 10 GJ/s drain settles at 52.36%', () => {
+    // Load 10 / 12.5 = 0.2; √s = (1 + √0.2) / 2 = 0.72361; s = 0.5236.
+    const status = capacitorStatusAtDrain(1000, 200, 10);
+    expect(status.stable).toBe(true);
+    expect(status).toEqual({ stable: true, stablePercentage: expect.closeTo(52.36, 2) });
+  });
+
   it('is stable at 100% with no net drain, and exactly at 25% at peak', () => {
     expect(capacitorStatusAtDrain(capacity, recharge, -5)).toEqual({
       stable: true,

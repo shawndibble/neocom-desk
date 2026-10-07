@@ -101,7 +101,7 @@ test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari 
   await page.getByPlaceholder('Search skills…').fill('Social');
   await page.getByRole('button', { name: /^Social/ }).click();
   await page.getByRole('button', { name: 'Level I', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove Social' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'More actions for Social' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Shortest first' }).click();

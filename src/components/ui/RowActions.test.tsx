@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import {
   MenuItem,
+  MenuSeparator,
   MenuSub,
   MenuSubContent,
   MenuSubTrigger,
@@ -177,4 +178,141 @@ describe('RowActions submenus', () => {
     expect(await screen.findByRole('menuitem', { name: 'Scourge Heavy Missile' })).toBeVisible();
     expect(screen.getAllByRole('menu')).toHaveLength(2);
   });
+});
+
+let seq = 0;
+const uniqueName = () => `Tritanium ${seq++}`;
+
+describe('restraint: a row menu needs at least two real actions (DESIGN.md §6c)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('does not count separators as actions', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <RowActionsMenu
+        name={uniqueName()}
+        items={
+          <>
+            <MenuItem>Show info</MenuItem>
+            <MenuSeparator />
+            {false}
+          </>
+        }
+      >
+        <div>Tritanium</div>
+      </RowActionsMenu>
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('one real action'));
+  });
+
+  it('warns in dev for a one-action menu', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <RowActionsMenu name={uniqueName()} items={<MenuItem>Show info</MenuItem>}>
+        <div>Tritanium</div>
+      </RowActionsMenu>
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('one real action'));
+  });
+
+  it('stays quiet for two actions', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <RowActionsMenu
+        name={uniqueName()}
+        items={
+          <>
+            <MenuItem>Rename</MenuItem>
+            <MenuItem>Duplicate</MenuItem>
+          </>
+        }
+      >
+        <div>
+          Tritanium
+          <RowMoreActions />
+        </div>
+      </RowActionsMenu>
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns once per row name, not per render', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ui = (
+      <RowActionsMenu name="Once" items={<MenuItem>Show info</MenuItem>}>
+        <div>Once</div>
+      </RowActionsMenu>
+    );
+    const { rerender } = render(ui);
+    rerender(ui);
+    render(ui);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not warn on a lone submenu', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <RowActionsMenu
+        name={uniqueName()}
+        items={
+          <MenuSub>
+            <MenuSubTrigger>Load</MenuSubTrigger>
+            <MenuSubContent>
+              <MenuItem>Into module</MenuItem>
+            </MenuSubContent>
+          </MenuSub>
+        }
+      >
+        <div>Row</div>
+      </RowActionsMenu>
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (DESIGN.md §6c "Entities")', () => {
+  function LinkRow() {
+    return (
+      <RowActionsMenu
+        name="Plasmoids"
+        linksKeepBrowserMenu
+        items={
+          <>
+            <MenuItem>Show info</MenuItem>
+            <MenuItem>View in Market</MenuItem>
+          </>
+        }
+      >
+        <div>
+          <a href="/planetary-industry/map?product=2389">Plasmoids</a>
+          <input aria-label="Units per day" />
+          <span>row body</span>
+        </div>
+      </RowActionsMenu>
+    );
+  }
+
+  it('opens the row menu on a right-click on the row body', async () => {
+    render(<LinkRow />);
+    fireEvent.contextMenu(screen.getByText('row body'));
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it('leaves a right-click on the link to the browser', () => {
+    render(<LinkRow />);
+    const link = screen.getByRole('link', { name: 'Plasmoids' });
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    link.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+  it('leaves a right-click in a text field to the browser (paste, select)', () => {
+    render(<LinkRow />);
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    screen.getByRole('textbox', { name: 'Units per day' }).dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+
+  // Touch-and-hold is checked in the browser: jsdom's pointer events carry no pointerType.
 });

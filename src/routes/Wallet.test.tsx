@@ -11,6 +11,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -83,10 +84,25 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one. A worker's first
+  // `App` render (compiling the lazy Layout and route chunks, warming jsdom
+  // and React) took seconds under parallel load and landed on whichever test
+  // ran first, tipping it past its findBy / test timeout. Done here under the
+  // hook's own budget, as IndustryPlanPage.test.tsx does.
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadWallet()]);
+  await seed();
+  const { unmount } = render(<App />);
+  // Wait for real content, not just the shell: the first data load (Dexie, MSW,
+  // the ESI cache) is part of the cold cost too.
+  await screen.findByText(/4,500\.00/, {}, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(async () => {
+async function seed() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -105,7 +121,9 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/wallet');
-});
+}
+
+beforeEach(seed);
 
 describe('Wallet', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
@@ -123,15 +141,17 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
-  it("links each loyalty row's corporation name to its LP Store", async () => {
+  it("links each loyalty row's corporation name to the LP Store, with a trailing caret and no store column", async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
-    // A real link, not just a row click — a screen reader or keyboard user
-    // reaches the LP Store by name.
+    // A real link, not just a row click: a keyboard or screen-reader user
+    // reaches the LP Store without the row. Not a Show Info link any more.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
       'href',
       '/market/lp-store/1000167'
     );
+    expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open LP Store/ })).not.toBeInTheDocument();
   });
 
   it('offers the LP Store picker even when the Character holds no LP anywhere (issue #2321)', async () => {
@@ -145,13 +165,13 @@ describe('Wallet', () => {
     expect(await screen.findByRole('button', { name: /LP Store corporation/ })).toBeInTheDocument();
   });
 
-  it('opens a Copy Name / Show Info menu on a loyalty row right-click', async () => {
+  it('has no row menu or More actions button on a loyalty row: the name and row open the store', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
     const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(row);
-    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
   });
 
   it('explains EverMarks with an info tooltip beside the label', async () => {
@@ -204,7 +224,7 @@ describe('Wallet', () => {
     expect(screen.getByText('Donation')).toBeInTheDocument();
   });
 
-  it('names the item a market transaction line bought, linked to its Market listing', async () => {
+  it('names the item a market transaction line bought, linked to its Show info', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
         HttpResponse.json([
@@ -239,8 +259,7 @@ describe('Wallet', () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
     const link = await screen.findByRole('link', { name: /Tritanium/ });
-    expect(link.getAttribute('href')).toContain('/market/browser?');
-    expect(link.getAttribute('href')).toContain('34');
+    expect(link.getAttribute('href')).toContain('info=type-34');
     // The bounty line has no fill behind it, so it names no item.
     const bountyRow = document.querySelector('[data-row-key="1"]') as HTMLElement;
     expect(within(bountyRow).queryByRole('link')).not.toBeInTheDocument();
@@ -266,6 +285,12 @@ describe('Wallet', () => {
     expect(link).toHaveAttribute('href', '/market/history/transactions');
     // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');
+  });
+
+  it('says the Journal reads one Character (issue #2846)', async () => {
+    window.history.pushState({}, '', '/wallet/journal');
+    render(<App />);
+    expect(await screen.findByText('Pilot One only')).toBeInTheDocument();
   });
 
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
@@ -415,7 +440,7 @@ describe('Wallet', () => {
     expect(
       screen.getByText('Clear the search or reset the filters above to see every entry.')
     ).toBeInTheDocument();
-    expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/try again shortly/i)).not.toBeInTheDocument();
   });
 
   it('offers Reset filters on the filtered-empty journal, and restores every entry', async () => {
@@ -475,6 +500,46 @@ describe('Wallet', () => {
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
+  });
+
+  it('shows the re-login banner, not the empty state, when the journal scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
+    expect(screen.queryByText('No journal entries cached')).not.toBeInTheDocument();
+  });
+
+  it('shows no re-login banner when the journal loads normally', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
+  });
+
+  it('shows the offline notice and cached rows, no banner, when the journal fails offline', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:journal',
+      value: journalPage1,
+      fetchedAt: STALE_FETCHED_AT,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.error()
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
   });
 
   /**
@@ -572,7 +637,7 @@ describe('Wallet', () => {
       const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
       expect(balanceHeader).not.toBeNull();
       await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
@@ -580,7 +645,7 @@ describe('Wallet', () => {
         await screen.findByRole('heading', { name: 'Balance by character' })
       ).closest('header');
       expect(
-        within(wideHeader!).getByRole('button', { name: 'All characters' })
+        within(wideHeader!).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
     });
 
@@ -600,7 +665,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
@@ -614,7 +679,7 @@ describe('Wallet', () => {
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
       render(<App />);
 
-      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /^All characters/ })).toBeInTheDocument();
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
@@ -635,7 +700,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // All three selected: Pilot Three's skipped notice shows.
       expect(
@@ -645,7 +710,7 @@ describe('Wallet', () => {
       // Narrow the filter back to "This character" — the notice list must
       // follow the same filter the balance rows do (issue #607 CodeRabbit
       // review), not just keep listing every skipped character regardless.
-      await user.click(screen.getByRole('button', { name: 'All characters' }));
+      await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
       expect(

@@ -12,6 +12,7 @@
  *
  * Priced at the **buy** order for the day the ore was mined, of the ore's
  * **Compressed** counterpart when the SDE has one (`loadCompressedOreTypeIds`)
+ * and the Ore Form setting is on (`oreForm.ts`, default; off prices the raw type)
  * — a corp valuing what got mined values it the way it would actually turn
  * that ore into ISK: sell into buy orders, and compressed ore is generally
  * the more liquid, more commonly traded form even though the personal mining
@@ -25,6 +26,7 @@
 import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadCompressedOreTypeIds } from '@/sde/loadSde';
+import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 import { loadPriceSnapshots } from './priceSnapshots';
 import {
@@ -82,14 +84,16 @@ async function resolvePricesForHubAcrossDates(
   characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
-  dates: readonly string[]
+  dates: readonly string[],
+  compressed: boolean
 ): Promise<DatedHubResult> {
   const unique = [...new Set(typeIds)];
   const byDate = new Map<string, UnitPrices>();
   if (unique.length === 0 || dates.length === 0) return { byDate };
 
   const compressedByRaw = await loadCompressedOreTypeIds();
-  const pricedTypeId = (typeId: number): number => compressedByRaw[String(typeId)] ?? typeId;
+  const pricedTypeId = (typeId: number): number =>
+    oreFormTypeId(typeId, compressedByRaw, compressed);
   const pricingTypeIds = [...new Set(unique.map(pricedTypeId))];
 
   const sortedDates = [...dates].sort();
@@ -155,9 +159,16 @@ export async function loadUnitPricesOnDate(
   characterId: number,
   typeIds: readonly number[],
   hub: TradeHub,
-  date: string
+  date: string,
+  compressed = true
 ): Promise<UnitPrices> {
-  const { byDate } = await resolvePricesForHubAcrossDates(characterId, typeIds, hub, [date]);
+  const { byDate } = await resolvePricesForHubAcrossDates(
+    characterId,
+    typeIds,
+    hub,
+    [date],
+    compressed
+  );
   return byDate.get(date) ?? { prices: new Map(), unpriced: new Set(), sellFallback: new Set() };
 }
 
@@ -231,7 +242,8 @@ export async function loadDatedUnitPricesByHub(
   characterId: number,
   typeIds: readonly number[],
   hubIds: Iterable<string | undefined>,
-  dates: readonly string[]
+  dates: readonly string[],
+  compressed = true
 ): Promise<DatedUnitPrices> {
   const hubs = new Map<TradeHub['id'], TradeHub>([[DEFAULT_TRADE_HUB.id, DEFAULT_TRADE_HUB]]);
   for (const hubId of hubIds) {
@@ -242,7 +254,10 @@ export async function loadDatedUnitPricesByHub(
   const loaded = await Promise.all(
     [...hubs.values()].map(
       async (hub) =>
-        [hub.id, await resolvePricesForHubAcrossDates(characterId, typeIds, hub, dates)] as const
+        [
+          hub.id,
+          await resolvePricesForHubAcrossDates(characterId, typeIds, hub, dates, compressed),
+        ] as const
     )
   );
 

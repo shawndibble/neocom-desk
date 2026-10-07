@@ -1,3 +1,4 @@
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
@@ -6,6 +7,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import {
+  Button,
   DataAgeBadge,
   LogoMark,
   Modal,
@@ -18,6 +20,12 @@ import {
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
+import {
+  disabledClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import {
   AllCharacters,
   Clones,
@@ -524,7 +532,7 @@ export function Login() {
                   <span className="flex-1 basis-64 text-sm text-text-dim">
                     {t(`login.features.${key}.desc`)}
                   </span>
-                  <span className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
+                  <span className="rounded-xs bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
                     {t(`login.features.${key}.tag`)}
                   </span>
                 </div>
@@ -567,28 +575,18 @@ export function Login() {
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
         <span>{t('login.footerOffline')}</span>
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-text hover:underline"
-        >
+        <ExternalLink href={REPO_URL} variant="quiet">
           {t('login.footerOpenSource')}
-        </a>
-        <a href="/privacy.html" className="hover:text-text hover:underline">
+        </ExternalLink>
+        <a href="/privacy.html" className={FOOTER_LINK}>
           {t('login.footerPrivacy')}
         </a>
-        <a href="/data-credit.html" className="hover:text-text hover:underline">
+        <a href="/data-credit.html" className={FOOTER_LINK}>
           {t('login.footerDataCredit')}
         </a>
-        <a
-          href={DISCORD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-text hover:underline"
-        >
+        <ExternalLink href={DISCORD_URL} variant="quiet">
           {t('login.footerDiscord')}
-        </a>
+        </ExternalLink>
       </footer>
     </main>
   );
@@ -641,7 +639,7 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
         type="button"
         onClick={onOpen}
         aria-label={t('login.screenshotEnlarge', { alt })}
-        className="block w-full cursor-zoom-in rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className={cx('block w-full cursor-zoom-in rounded-xs', focusRingClassName)}
       >
         <img
           src={screenshotSrc(shot)}
@@ -650,7 +648,10 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
           height={shot.size.height}
           loading="lazy"
           decoding="async"
-          className="h-auto w-full rounded-xs border border-line transition-colors hover:border-accent"
+          className={cx(
+            'h-auto w-full rounded-xs border border-line hover:border-accent',
+            interactiveClassName
+          )}
         />
       </button>
       <figcaption className="mt-2 text-sm text-text-dim">{caption}</figcaption>
@@ -658,17 +659,20 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
   );
 }
 
+/** A same-origin footer link: `ExternalLink`'s quiet look without the new-tab icon (our own pages open in the same tab). */
+const FOOTER_LINK = cx(
+  'rounded-xs underline-offset-2 hover:text-text hover:underline',
+  interactiveClassName,
+  focusRingClassName
+);
+
 /** Opens the Customize permissions dialog — always right under a "Log in" button, never a substitute for one. */
 function CustomizeLink({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-xs text-text-dim underline decoration-line hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
+    <Button size="sm" onClick={onClick}>
       {t('permissions.customize.linkLabel')}
-    </button>
+    </Button>
   );
 }
 
@@ -687,7 +691,14 @@ function SsoButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40"
+      // CCP's SSO button is black on any theme, so it stays hand-built; it
+      // takes the shared interaction recipe instead of a Button variant.
+      className={cx(
+        'inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white hover:border-accent active:border-accent-dim',
+        interactiveClassName,
+        focusRingClassName,
+        disabledClassName
+      )}
     >
       {pending ? (
         <Spinner size="sm" label={t('common.loading')} />

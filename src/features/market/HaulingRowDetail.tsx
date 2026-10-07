@@ -24,9 +24,12 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { maxBuyPrice } from '@/engine/market/haulingPlan';
 import { formatIsk, formatMarketIsk } from '@/lib/isk';
+import { SystemLink } from '@/features/entities';
 import { MarketItemLink } from './MarketItemLink';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
@@ -89,6 +92,7 @@ function OrdersDisclosure({
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
+        <Caret expanded={open} />
         {open ? hideLabel : showLabel}
       </Button>
       <div className={open ? undefined : 'max-lg:hidden'}>{children}</div>
@@ -143,14 +147,19 @@ export function HaulingRowDetail({ row, loadNote }: HaulingRowDetailProps) {
 /** The item in the Market Browser at the destination hub — its full order book and price history. */
 function MarketLink({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
+  // The row's click expands this detail, so the row's hub and item names are
+  // plain text there (DESIGN.md §6c); their links live here.
   return (
-    <MarketItemLink
-      typeId={row.typeId}
-      hubId={row.toHub.id}
-      className="self-start text-xs text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-    >
-      {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
-    </MarketItemLink>
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={inlineLinkClassName}>
+        {t('market.hauling.detail.openInMarket', { hub: row.toHub.systemName })}
+      </MarketItemLink>
+      {[row.fromHub, row.toHub].map((hub) => (
+        <SystemLink key={hub.id} systemId={hub.systemId} className={inlineLinkClassName}>
+          {t('market.hauling.detail.routeSafety', { hub: hub.systemName })}
+        </SystemLink>
+      ))}
+    </p>
   );
 }
 

@@ -7,7 +7,7 @@ import { piTier } from '../chain';
 import type { DemandLine, DemandSource, Goal, GoalPlan } from '../goalTypes';
 import type { ExtractionProblem } from './extraction';
 import type { GoalTriage } from './triage';
-import { EPSILON, expandInto, factoriesFor, perHour } from './shared';
+import { EPSILON, chainRates, expandInto, factoriesFor, perHour } from './shared';
 
 export function demandLines(args: {
   problem: ExtractionProblem;
@@ -103,6 +103,30 @@ export function demandLines(args: {
       madeFraction: 0,
     });
   }
+  // What the plan buys of a P2+ the goals' chains need: the line says so, and
+  // sizes the type at what is made and bought together. Nothing under it is
+  // demanded unless something else makes it.
+  const boughtFull = new Map<number, number>();
+  for (const g of problem.plannedHigh) {
+    for (const [typeId, units] of chainRates(g, pi).bought) {
+      boughtFull.set(typeId, (boughtFull.get(typeId) ?? 0) + units);
+    }
+  }
+  for (const [typeId, bought] of boughtFull) {
+    const made = madeHighRates.get(typeId) ?? 0;
+    const at = lines.findIndex((l) => l.typeId === typeId && l.source !== 'blocked');
+    const total = (at >= 0 ? lines[at].unitsPerHour : 0) + bought;
+    const line: DemandLine = {
+      typeId,
+      tier: tierOf(typeId),
+      unitsPerHour: total,
+      factories: factoriesFor(typeId, total, pi),
+      source: 'bought',
+      madeFraction: Math.min(1, made / total),
+    };
+    if (at >= 0) lines[at] = line;
+    else lines.push(line);
+  }
   const blockedLast = (l: DemandLine) => (l.source === 'blocked' ? 1 : 0);
   lines.sort((a, b) => b.tier - a.tier || a.typeId - b.typeId || blockedLast(a) - blockedLast(b));
   return lines;
@@ -118,6 +142,8 @@ export function achievedOf(args: {
   pi: PiData;
 }): GoalPlan['achieved'] {
   const { goals, dead, boughtOutright, highFraction, p1GoalReach, pi } = args;
+  // The part of a goal bought outright (a budget gap bought at its own tier).
+  const share = (g: Goal) => g.buyShare?.get(g.typeId) ?? 0;
   return goals.map((g) => {
     const target = perHour(g);
     const unitsPerHour = boughtOutright.has(g)
@@ -125,7 +151,7 @@ export function achievedOf(args: {
       : dead.has(g)
         ? 0
         : piTier(g.typeId, pi) >= 2
-          ? target * (highFraction.get(g.typeId) ?? 0)
+          ? target * (share(g) + (1 - share(g)) * (highFraction.get(g.typeId) ?? 0))
           : (p1GoalReach.get(g.typeId) ?? 0);
     return { typeId: g.typeId, unitsPerHour, fraction: unitsPerHour / target };
   });

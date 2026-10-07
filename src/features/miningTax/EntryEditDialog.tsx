@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -10,10 +11,8 @@ import {
   SelectValue,
   IskInput,
   TextInput,
-  TypeIcon,
 } from '@/components/ui';
 import type { PayeeRecord } from '@/db';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -153,7 +152,7 @@ export function EntryEditDialog({
             date: formatDateRange(current.map((m) => m.assignment.date)),
             system: systemName,
           })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
         </span>
       }
     >
@@ -231,9 +230,9 @@ export function EntryEditDialog({
                   const fallback = Math.round(lineDefaults.get(line.typeId) ?? 0);
                   return (
                     <li key={line.typeId} className="flex items-center gap-1.5 py-1.5 text-xs">
-                      <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                      <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">
-                        <MarketItemLink typeId={line.typeId}>{name}</MarketItemLink>
+                        <OreLink typeId={line.typeId}>{name}</OreLink>
                         <span className="ml-1.5 text-text-dim tabular-nums">
                           {line.quantity.toLocaleString()}
                         </span>

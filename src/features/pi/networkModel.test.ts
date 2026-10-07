@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import type { PlanetAdvice } from './advisorModel';
+import type { PlanetAdvice } from './systemPlanetModel';
 import { colonyNetwork, networkColonies } from './networkModel';
 import { CUSTOMS_TAXABLE_VALUE, piTier } from '@/engine/pi/chain';
 

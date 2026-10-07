@@ -5,7 +5,7 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -41,27 +41,10 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
-  /**
-   * Switches this material between being bought and being produced in the
-   * Build Plan the row belongs to — the same toggle a Build Plan's own
-   * materials table offers inline for a row something here can manufacture.
-   * Present only from that table, and only on a material with a recipe;
-   * omitted everywhere else the menu appears, and on a row that only exists
-   * because another build already introduced it (one level deep,
-   * docs/context/decisions).
-   */
-  onToggleBuildHere?: () => void;
-  /** Picks the toggle's label. Meaningless without `onToggleBuildHere`. */
-  buildingHere?: boolean;
-  /**
-   * Opens the Build Plan's blueprint tier picker, to swap the blueprint or
-   * change its ME/TE. Present only on a Build Plan's blueprint row, where it
-   * takes the Build Plan entry's place — a blueprint has no blueprint of its
-   * own, so that entry could only ever say "No blueprint options".
-   */
-  onModifyBlueprint?: () => void;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
+  /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
+  linksKeepBrowserMenu?: boolean;
   children: ReactElement;
 }
 
@@ -105,6 +88,49 @@ export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
 }
 
 /**
+ * "Build Plan" and "View blueprint in Market" for an item — reused as
+ * `ShowInfoMenuItem` is, by menus that aren't item menus (the Fittings
+ * editor's). Both go off while nothing produces the item; the lazy blueprint
+ * catalog loads when the entries first render, i.e. as the menu opens.
+ */
+export function BuildPlanMenuItems({ typeId }: { typeId: number }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { blueprintFor, requestBlueprints } = useItemActions();
+  useEffect(() => requestBlueprints(), [requestBlueprints]);
+  const blueprintTypeID = blueprintFor(typeId);
+  const buildPlanLabel =
+    blueprintTypeID === undefined
+      ? t('industry.contextMenu.buildPlanChecking')
+      : blueprintTypeID === null
+        ? t('industry.contextMenu.noBlueprintOptions')
+        : t('industry.contextMenu.buildPlan');
+  return (
+    <>
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+        }}
+      >
+        {buildPlanLabel}
+      </MenuItem>
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (!blueprintTypeID) return;
+          const params = marketLinkParams(blueprintTypeID, location.search);
+          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+        }}
+      >
+        {t('market.contextMenu.viewBlueprintInMarket')}
+      </MenuItem>
+    </>
+  );
+}
+
+/**
  * The item menu's entries, shared by `ItemContextMenu` (right-click, and the
  * row's `RowMoreActions` button it publishes to) and `ItemMoreActions` (a
  * standalone button, issue #1498) — one list, so none of them can drift.
@@ -131,9 +157,6 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
     planProductTypeID,
     onCompareVariations,
     onViewInIndustryAsMaterial,
-    onToggleBuildHere,
-    buildingHere,
-    onModifyBlueprint,
     extraItems,
   } = props;
   const { t } = useTranslation();
@@ -180,33 +203,18 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
       <MenuItem onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
       </MenuItem>
-      {onModifyBlueprint ? (
-        <MenuItem onSelect={onModifyBlueprint}>
-          {t('industry.contextMenu.modifyBlueprint')}
-        </MenuItem>
-      ) : (
-        <MenuItem
-          disabled={!blueprintTypeID}
-          onSelect={() => {
-            if (blueprintTypeID)
-              navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
-          }}
-        >
-          {buildPlanLabel}
-        </MenuItem>
-      )}
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (blueprintTypeID)
+            navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
+        }}
+      >
+        {buildPlanLabel}
+      </MenuItem>
       {onViewInIndustryAsMaterial && (
         <MenuItem onSelect={onViewInIndustryAsMaterial}>
           {t('market.contextMenu.viewInIndustryAsMaterial')}
-        </MenuItem>
-      )}
-      {onToggleBuildHere && (
-        <MenuItem onSelect={onToggleBuildHere}>
-          {t(
-            buildingHere
-              ? 'market.contextMenu.buyInsteadOfBuilding'
-              : 'market.contextMenu.addMaterialComponents'
-          )}
         </MenuItem>
       )}
       {piPlannable && (
@@ -225,7 +233,7 @@ function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): Rea
  * 2.1.1, issue #1497).
  */
 export function ItemContextMenu(props: ItemContextMenuProps) {
-  const { typeId, itemName, children } = props;
+  const { typeId, itemName, linksKeepBrowserMenu, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const items = useItemMenuItems(props, () => setAlertOpen(true));
   const { requestBlueprints } = useItemActions();
@@ -235,6 +243,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
       <RowActionsMenu
         name={itemName}
         items={items}
+        linksKeepBrowserMenu={linksKeepBrowserMenu}
         onOpenChange={(open) => {
           if (open) requestBlueprints();
         }}

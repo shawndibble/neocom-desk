@@ -10,7 +10,14 @@ import {
   Tooltip,
   TypeIcon,
 } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  gripHitAreaClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { ItemInfoLink } from '@/features/entities';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -46,7 +53,6 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { ListChargePicker } from './ListChargePicker';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
 import {
-  CargoMenuItems,
   DroneMenuItems,
   EmptySlotMenuItems,
   FittingItemMenu,
@@ -143,20 +149,17 @@ export interface ModuleRowProps extends EditContext {
 }
 
 /**
- * A fitted item's name: the way into its info, when the page has Item
+ * A fitted item's name: a link to its Show info, when the page has Item
  * Actions (a shared-fitting preview renders no provider, and stays a span).
+ * View in Market is in the row's ⋮ menu.
  */
 function SlotName({ typeId, name }: { typeId: number; name: string }) {
   const actions = useOptionalItemActions();
   if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
-    <button
-      type="button"
-      className={`${SLOT_NAME_CLASS} ${tappableRowClassName} cursor-pointer text-accent underline-offset-2 hover:underline`}
-      onClick={() => actions.showInfo(typeId, name)}
-    >
+    <ItemInfoLink typeId={typeId} className={`${SLOT_NAME_CLASS} ${tappableRowClassName}`}>
       {name}
-    </button>
+    </ItemInfoLink>
   );
 }
 
@@ -328,10 +331,9 @@ function SlotCard({
               draggable
               role="img"
               aria-label={grip.label}
-              title={grip.label}
               onDragStart={(event) => startFittingDrag(event, grip.payload)}
               onDragEnd={endFittingDrag}
-              className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing"
+              className={`flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing ${gripHitAreaClassName}`}
             >
               <DragHandle aria-hidden />
             </span>
@@ -455,7 +457,11 @@ function LaunchSquares({
             onClick={() => {
               if (!blocked) onLaunch(count === inSpace ? count - 1 : count);
             }}
-            className="group flex size-11 items-center justify-center aria-disabled:cursor-not-allowed md:size-6"
+            className={cx(
+              'group flex size-11 items-center justify-center rounded-xs aria-disabled:cursor-not-allowed md:size-6',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <span
               className={`size-3.5 rounded-xs border ${lit ? 'border-accent bg-accent' : blocked ? 'border-line-bright opacity-40' : 'border-line-bright group-hover:border-accent'}`}
@@ -504,7 +510,7 @@ function AddSlotButton({
 
 /**
  * An empty List slot: tap to add there, drop a module on it. With the
- * editor's actions it has the Ring's empty-slot menu too (Add module ▸,
+ * editor's actions it has the Ring's empty-slot menu too (Add module,
  * Paste, Fill rack), on right-click, touch-and-hold or its ⋮.
  */
 function EmptySlot({
@@ -873,7 +879,7 @@ export function FittingRackList({
 
 /**
  * The cargo hold: how full it is, each item with its count — a charge drags
- * onto the modules that take it, and its menu loads it — and "Add cargo".
+ * onto the modules that take it (or loads from a module's own menu) — and "Add cargo".
  * An Add panel item or charge dropped on it goes in the hold.
  * The List's Cargo section; the Ring shows the same items as tiles.
  */
@@ -906,7 +912,6 @@ export function CargoSection({
         return (
           <SlotCard
             key={item.typeId}
-            menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
             grip={
               draggable && actions
                 ? (() => {

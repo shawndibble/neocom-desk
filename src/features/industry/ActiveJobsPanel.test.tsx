@@ -12,7 +12,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import * as corpJobsModule from './corpJobs';
-import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -57,6 +57,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.industryJobHistory.clear();
+  await db.productionRuns.clear();
   // Module-scope singleton: a value left over from a previous test would
   // make the cross-character block's assertions pass or fail for the wrong
   // reason (`Settings.test.tsx`'s precedent).
@@ -460,7 +462,7 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
   });
 });
 
-describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
+describe('ActiveJobsPanel: filters (#409)', () => {
   function manufacturingJob(overrides: Record<string, unknown> = {}) {
     return {
       job_id: 1,
@@ -477,69 +479,8 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     };
   }
 
-  it('offers Add to Quickbar, View in Market, and Build Plan on a job row, keyed off its product', async () => {
+  it('has no row menu or More-actions button on a job row', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
-    const actions = fakeItemActions();
-
-    render(
-      <MemoryRouter>
-        <FakeItemActions actions={actions}>
-          <ActiveJobsPanel characterId={CHAR_ID} />
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-
-    await expandJobs();
-
-    // The row itself still shows the blueprint's name (unchanged); the context
-    // menu it opens targets the job's product typeID.
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-
-    const quickbarItem = await screen.findByText('Add to Quickbar');
-    expect(screen.getByText('View in Market')).toBeInTheDocument();
-
-    fireEvent.click(quickbarItem);
-    // The job's product (200 -> Widget Beta), not its blueprint (100 -> Widget Alpha).
-    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
-  });
-
-  it('gives a job row a visible "More actions" button with the same items as the right-click menu (issue #1498)', async () => {
-    server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter>
-        <FakeItemActions>
-          <ActiveJobsPanel characterId={CHAR_ID} />
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-
-    await expandJobs(user);
-
-    // menuTypeId resolves to the job's product (200 -> Widget Beta), same as
-    // the row's right-click menu.
-    const moreActionsButton = screen.getByRole('button', { name: 'More actions for Widget Beta' });
-    await user.click(moreActionsButton);
-    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
-    await user.keyboard('{Escape}');
-
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    const contextItems = await screen
-      .findAllByRole('menuitem')
-      .then((els) => els.map((el) => el.textContent));
-
-    expect(buttonItems).toEqual(contextItems);
-  });
-
-  it('disables the Build Plan action for a job with no product (research/copying/invention)', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([manufacturingJob({ activity_id: 5, product_type_id: undefined })])
-      )
-    );
 
     render(
       <MemoryRouter>
@@ -553,7 +494,8 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     const row = screen.getByText('Widget Alpha').closest('tr')!;
     fireEvent.contextMenu(row);
 
-    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
   });
 
   it('filters jobs by activity-type chip', async () => {
@@ -908,15 +850,13 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   });
 
-  it('offers "Log production…" for a done manufacturing job with a product', async () => {
+  it('shows a "Log production…" button for a done manufacturing job with a product', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
 
-    expect(await screen.findByText('Log production…')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log production…' })).toBeInTheDocument();
   });
 
   it('omits "Log production…" for a still-running job', async () => {
@@ -930,11 +870,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
+    await screen.findByText('Widget Alpha');
 
-    await screen.findByText('Add to Quickbar');
-    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
   });
 
   it('omits "Log production…" for a done job with no product (research/copying/invention)', async () => {
@@ -946,11 +884,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     renderPanel(() => {});
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
+    await screen.findByText('Widget Alpha');
 
-    await screen.findByText('Add to Quickbar');
-    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
   });
 
   it('navigates straight to the single matching plan, seeded with the job’s runs and cost', async () => {
@@ -963,12 +899,12 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-1'));
-    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+    expect(location?.state).toEqual({
+      logProductionFromJob: { runs: 3, jobFee: 5000, jobId: 1 },
+    });
   });
 
   it('offers to create a Build Plan when none builds the job’s blueprint yet, then navigates to it once created', async () => {
@@ -979,15 +915,15 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     expect(await screen.findByText('No build plan for Widget Beta')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
 
     await waitFor(() => expect(location?.pathname).toMatch(/^\/industry\/plans\/.+/));
-    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+    expect(location?.state).toEqual({
+      logProductionFromJob: { runs: 3, jobFee: 5000, jobId: 1 },
+    });
     const created = await db.buildPlans.toArray();
     expect(created).toHaveLength(1);
     expect(created[0].blueprintTypeID).toBe(100);
@@ -1006,9 +942,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     expect(await screen.findByText('Log production against which plan?')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Plan B'));
@@ -1068,9 +1002,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    const row = screen.getByText('Widget Alpha').closest('tr')!;
-    fireEvent.contextMenu(row);
-    fireEvent.click(await screen.findByText('Log production…'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
     // Flush every pending React update (including router transitions): with
@@ -1674,5 +1606,133 @@ describe('ActiveJobsPanel: corp jobs by installer (issue #2302)', () => {
 
     expect(await screen.findByText('None')).toBeInTheDocument();
     expect(screen.queryByText(/Factory Manager/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ActiveJobsPanel: Job History (#2866)', () => {
+  function esiJob(overrides: Record<string, unknown> = {}) {
+    return {
+      job_id: 1,
+      activity_id: 1,
+      blueprint_type_id: 100,
+      product_type_id: 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 3,
+      cost: 5000,
+      start_date: new Date(NOW.getTime() - 240 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() - 120 * 60_000).toISOString(),
+      status: 'delivered',
+      ...overrides,
+    };
+  }
+
+  const RUNNING = esiJob({
+    job_id: 2,
+    blueprint_type_id: 300,
+    product_type_id: undefined,
+    activity_id: 4,
+    status: 'active',
+    end_date: new Date(NOW.getTime() + 60 * 60_000).toISOString(),
+  });
+
+  function renderPanel() {
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await db.buildPlans.clear();
+  });
+
+  async function openHistory() {
+    fireEvent.click(await screen.findByRole('button', { name: 'History' }));
+  }
+
+  it('switches between Active and History; a delivered job never counts as running or done', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+
+    expect(await screen.findByText('1 running · 0 done')).toBeInTheDocument();
+    await expandJobs();
+    expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Alpha')).not.toBeInTheDocument();
+
+    await openHistory();
+
+    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }));
+    expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+  });
+
+  it('says how many delivered jobs are unlogged while the panel is folded', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+
+    expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
+  });
+
+  it('tints an unlogged row and offers Log production', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    renderPanel();
+    await openHistory();
+
+    const button = await screen.findByRole('button', { name: 'Log production…' });
+    expect(button.closest('tr')).toHaveClass('bg-warning/10');
+    expect(screen.queryByText('Logged')).not.toBeInTheDocument();
+  });
+
+  it('marks a logged row with a badge and a link to its plan, and offers no Log production', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    await db.buildPlans.add({
+      id: 'plan-1',
+      characterId: CHAR_ID,
+      name: 'A plan',
+      blueprintTypeID: 100,
+      runs: 1,
+      me: 0,
+      te: 0,
+    } as unknown as BuildPlanRecord);
+    await db.productionRuns.add({
+      id: 'run-1',
+      characterId: CHAR_ID,
+      buildPlanId: 'plan-1',
+      productTypeID: 200,
+      quantity: 3,
+      materialCost: 0,
+      jobFee: 5000,
+      totalCost: 5000,
+      loggedAt: NOW.getTime(),
+      updatedAt: NOW.getTime(),
+      sourceJobId: 1,
+    });
+    renderPanel();
+    await openHistory();
+
+    expect(await screen.findByText('Logged')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'View plan' })).toHaveAttribute(
+      'href',
+      '/industry/plans/plan-1'
+    );
+    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/delivered, not logged/)).not.toBeInTheDocument();
+  });
+
+  it('keeps a delivered job listed after ESI stops returning it', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
+    renderPanel();
+    await openHistory();
+    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+
+    expect((await db.industryJobHistory.get(CHAR_ID))?.jobs.map((j) => j.job_id)).toEqual([1]);
   });
 });

@@ -120,7 +120,7 @@ async function openSub(name: RegExp | string) {
   fireEvent.keyDown(trigger, { key: 'ArrowRight' });
 }
 
-describe('Change charge (all N) ▸ — the Charge Picker as a menu', () => {
+describe('Change charge (all N) — the Charge Picker as a menu', () => {
   it('loads a quick pick into every gun of the type', async () => {
     const actions = renderMenu();
     await openSub('Change charge (all 2)');

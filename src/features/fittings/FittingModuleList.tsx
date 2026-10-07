@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
+import { ItemInfoLink } from '@/features/entities';
 import { FITTING_SLOT_KINDS, type Fitting } from '@/engine/fittings/types';
 
 interface FittingModuleListProps {
@@ -7,6 +8,8 @@ interface FittingModuleListProps {
   typeName: (typeId: number) => string;
   /** Given: the list sits in a titled Panel. Absent: bare, for a caller that frames it itself. */
   title?: string;
+  /** Names link to the Market browser. Needs a Router; off for the logged-out share page. */
+  linkNames?: boolean;
 }
 
 /**
@@ -14,8 +17,15 @@ interface FittingModuleListProps {
  * Link's read-only view shows it beside `FittingRing`'s icons; Pilot Lookup
  * shows a killmail victim's fit with it. Null for an empty Fitting.
  */
-export function FittingModuleList({ fitting, typeName, title }: FittingModuleListProps) {
+export function FittingModuleList({
+  fitting,
+  typeName,
+  title,
+  linkNames = false,
+}: FittingModuleListProps) {
   const { t } = useTranslation();
+  const name = (typeId: number) =>
+    linkNames ? <ItemInfoLink typeId={typeId}>{typeName(typeId)}</ItemInfoLink> : typeName(typeId);
 
   const groups = FITTING_SLOT_KINDS.map((rack) => ({
     rack,
@@ -36,8 +46,8 @@ export function FittingModuleList({ fitting, typeName, title }: FittingModuleLis
           <ul>
             {modules.map((module, index) => (
               <li key={index}>
-                {typeName(module.typeId)}
-                {module.chargeTypeId !== undefined && ` — ${typeName(module.chargeTypeId)}`}
+                {name(module.typeId)}
+                {module.chargeTypeId !== undefined && <> — {name(module.chargeTypeId)}</>}
               </li>
             ))}
           </ul>
@@ -51,7 +61,7 @@ export function FittingModuleList({ fitting, typeName, title }: FittingModuleLis
           <ul>
             {fitting.drones.map((drone, index) => (
               <li key={index}>
-                {typeName(drone.typeId)} x{drone.quantity}
+                {name(drone.typeId)} x{drone.quantity}
               </li>
             ))}
           </ul>
@@ -65,7 +75,7 @@ export function FittingModuleList({ fitting, typeName, title }: FittingModuleLis
           <ul>
             {fitting.cargo.map((item, index) => (
               <li key={index}>
-                {typeName(item.typeId)} x{item.quantity}
+                {name(item.typeId)} x{item.quantity}
               </li>
             ))}
           </ul>

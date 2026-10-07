@@ -29,12 +29,14 @@ let analyticsPromise: Promise<Analytics | null> | undefined;
 
 async function loadAnalytics(): Promise<Analytics | null> {
   if (!isAnalyticsConfigured()) return null;
-  const [{ getAnalytics, isSupported }, { getFirebaseApp }] = await Promise.all([
+  const [{ initializeAnalytics, isSupported }, { getFirebaseApp }] = await Promise.all([
     import('firebase/analytics'),
     import('@/sync/firebaseCore'),
   ]);
   if (!(await isSupported())) return null;
-  return getAnalytics(getFirebaseApp());
+  // Firebase's default config also emits its own initial `page_view` with the
+  // full URL; `AnalyticsPageViewTracker` is the only source we want.
+  return initializeAnalytics(getFirebaseApp(), { config: { send_page_view: false } });
 }
 
 /**
@@ -48,6 +50,11 @@ function getAnalyticsInstance(): Promise<Analytics | null> {
     throw error;
   });
   return analyticsPromise;
+}
+
+/** Origin + pathname only: query strings and fragments can carry pilot names or searches. */
+export function pageLocationFor(location: Pick<Location, 'origin' | 'pathname'>): string {
+  return location.origin + location.pathname;
 }
 
 /**
@@ -68,6 +75,6 @@ export async function trackPageView(pagePath: string, pageTitle?: string): Promi
   logEvent(analytics, 'page_view', {
     page_path: pagePath,
     page_title: pageTitle,
-    page_location: window.location.href,
+    page_location: pageLocationFor(window.location),
   });
 }

@@ -1,3 +1,4 @@
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
   Fragment,
@@ -31,16 +32,16 @@ import {
   SelectValue,
   TextInput,
   Tooltip,
-  iconButtonClassName,
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
+import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import { findRemovalBlockers, planEntryKey } from '@/engine/plan';
-import { openSkillDetailModal } from '@/stores/skillDetailModal';
+import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import {
   milestoneKey,
   milestoneStates,
@@ -99,7 +100,11 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
-import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
+import {
+  evaluateOptimizationBadge,
+  remapSavingsShrank,
+  toOptimizationBadge,
+} from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
@@ -159,7 +164,6 @@ import { ImportClipboardDialog } from './ImportClipboardDialog';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
-import { buildMarketGroupParams } from '@/engine/market/urlState';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -499,19 +503,7 @@ export function PlanEditor({
 
   /** A cross-link into Market Browser, landed pre-expanded to the given category. */
   function marketGroupLink(label: string, marketGroupId: number) {
-    return (
-      <IconButton
-        icon={<Icon.Market size={Icon.ICON_SIZE.sm} />}
-        label={label}
-        onClick={() =>
-          navigate(
-            `/market/browser?${new URLSearchParams(buildMarketGroupParams(marketGroupId)).toString()}`
-          )
-        }
-        size="sm"
-        variant="plain"
-      />
-    );
+    return <MarketGroupLink groupId={marketGroupId} label={label} />;
   }
 
   const stepLabel = (step: PlanStep): string =>
@@ -555,10 +547,11 @@ export function PlanEditor({
     [removalBlockers, nameFor, t]
   );
 
-  /** A row's skill name opens the shared Skill Detail modal, carrying this plan's own (possibly unsaved) entries so a prereq already staged here reads "Planned". */
-  const handleOpenSkillDetail = useCallback(
-    (skillTypeID: number) => openSkillDetailModal(skillTypeID, { planEntries: editable.entries }),
-    [editable.entries]
+  /** A row's skill name is a link to the shared Skill Detail modal; as it is clicked this plan's own (possibly unsaved) entries are staged for it, so a prereq already staged here reads "Planned". */
+  const stageSkillPlanEntries = useSkillDetailModalStore((state) => state.stage);
+  const handleStageSkillDetail = useCallback(
+    (skillTypeID: number) => stageSkillPlanEntries(skillTypeID, editable.entries),
+    [editable.entries, stageSkillPlanEntries]
   );
 
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
@@ -623,7 +616,7 @@ export function PlanEditor({
   // The what-if chip's "vs current" figure: one more pass of the same costing
   // against the clone's real implants, run only while the lens is hypothetical.
   const hypotheticalLens = isHypotheticalLens(whatIf);
-  const currentLensTotalSeconds = useMemo(
+  const currentLensSchedule = useMemo(
     () =>
       hypotheticalLens
         ? schedulePlan(
@@ -645,7 +638,7 @@ export function PlanEditor({
               cloneState,
             },
             loadedAtMs
-          ).totalSeconds
+          )
         : null,
     [
       hypotheticalLens,
@@ -664,6 +657,7 @@ export function PlanEditor({
       loadedAtMs,
     ]
   );
+  const currentLensTotalSeconds = currentLensSchedule?.totalSeconds ?? null;
   const {
     scheduled,
     entryBoundaries,
@@ -870,6 +864,37 @@ export function PlanEditor({
     catalog,
     attributes,
     effectiveImplants,
+    cloneState,
+    timedRemap,
+  ]);
+
+  // The remap saving the header would show on the clone's real implants, so a
+  // what-if lens that shrinks it can say why (`remapSavingsShrank`). Mirrors
+  // `headerBadge`'s two Booster-blind paths; with a Booster active there is no
+  // live figure on either side, so no comparison.
+  const realLensSavingsSeconds = useMemo(() => {
+    if (!currentLensSchedule || activeBoosters.length > 0) return null;
+    const { markersResult, scheduled: realScheduled } = currentLensSchedule;
+    if (markersResult && markerVerdict(markersResult).kind !== 'markersAtEnd') {
+      return markersResult.savingsSeconds;
+    }
+    if (requestedRemapCount <= 0) return null;
+    return (
+      evaluateOptimizationBadge(realScheduled, catalog.engineSkills, {
+        remapCount: requestedRemapCount,
+        currentAttributes: attributes,
+        implants,
+        cloneState,
+        timedRemap: timedRemap ?? undefined,
+      })?.savingsSeconds ?? null
+    );
+  }, [
+    currentLensSchedule,
+    activeBoosters,
+    requestedRemapCount,
+    catalog,
+    attributes,
+    implants,
     cloneState,
     timedRemap,
   ]);
@@ -1633,7 +1658,7 @@ export function PlanEditor({
   }[] = [
     {
       key: 'for-me',
-      label: t('plans.optimizeForMe'),
+      label: t('plans.optimizeForMeItem'),
       hint: t('plans.optimizeForMeHint'),
       disabled: scheduled.length === 0,
       onSelect: handleOptimizeForMe,
@@ -1838,7 +1863,7 @@ export function PlanEditor({
             </p>
           )}
 
-          <label className="flex items-center gap-1.5">
+          <label className={`flex items-center gap-1.5 ${tappableRowClassName}`}>
             <Checkbox
               checked={cloneState === 'alpha'}
               disabled={!cloneStatesHydrated}
@@ -2011,6 +2036,10 @@ export function PlanEditor({
                 }
               : null
           }
+          savingsShrankWithImplants={remapSavingsShrank(
+            headerBadge?.savingsSeconds ?? null,
+            realLensSavingsSeconds
+          )}
           trainedKnown={trainedSkillsKnown}
           name={plan.name}
           onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
@@ -2027,18 +2056,16 @@ export function PlanEditor({
             {orphanedMilestones.map((status) => (
               <span
                 key={status.milestone.id}
-                className="inline-flex items-center gap-1.5 rounded-xs border border-warning/60 px-1.5 py-0.5 text-warning"
+                className="inline-flex items-center gap-1.5 text-warning"
               >
                 {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
-                <button
-                  type="button"
-                  // Matches the entry rows' own remove button.
-                  className={iconButtonClassName({ size: 'sm', tone: 'danger' })}
+                <IconButton
+                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                  label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
                   onClick={() => handleRemoveMilestone(status.milestone.id)}
-                  aria-label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
-                >
-                  <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                </button>
+                  size="sm"
+                  tone="danger"
+                />
               </span>
             ))}
           </div>
@@ -2134,7 +2161,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
-                onOpenSkillDetail={handleOpenSkillDetail}
+                onStageSkillDetail={handleStageSkillDetail}
                 removalBlockedReason={removalBlockedReason}
                 pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}

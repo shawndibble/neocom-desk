@@ -19,10 +19,14 @@ describe('chart tooltip shell', () => {
     expect(chartFiles.length).toBeGreaterThanOrEqual(5);
   });
 
-  it.each(chartFiles)('%s uses the shared popover shell, not an inline style', (path) => {
-    const source = readFileSync(path, 'utf8');
-    expect(source).toContain('shadow-black/50');
-    expect(source).not.toContain('tooltipContentStyle');
-    expect(source).not.toContain('contentStyle=');
-  });
+  it.each(chartFiles)(
+    '%s uses ChartTooltipShell, not an inline style or its own bubble',
+    (path) => {
+      const source = readFileSync(path, 'utf8');
+      expect(source).toContain('<ChartTooltipShell>');
+      expect(source).not.toContain('shadow-black/50');
+      expect(source).not.toContain('tooltipContentStyle');
+      expect(source).not.toContain('contentStyle=');
+    }
+  );
 });

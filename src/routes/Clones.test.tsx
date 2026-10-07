@@ -155,21 +155,21 @@ describe('Clones', () => {
     expect(screen.getByText(/Until/)).toBeInTheDocument();
   });
 
-  it('links each implant name to its Market listing, unlike the plain-text empty state', async () => {
+  it('links each implant name to its Show info, unlike the plain-text empty state', async () => {
     render(<App />);
     expect(
       await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' })
-    ).toHaveAttribute('href', '/market/browser?type=19540');
+    ).toHaveAttribute('href', '/clones?info=type-19540');
     expect(screen.getByText('No implants')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'No implants' })).not.toBeInTheDocument();
   });
 
-  it('shows an implant description tooltip on hover, still linking to Market', async () => {
+  it('shows an implant description tooltip on hover, still linking to Show info', async () => {
     render(<App />);
     const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
     fireEvent.pointerMove(link);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('+4 Willpower bonus');
-    expect(link).toHaveAttribute('href', '/market/browser?type=19540');
+    expect(link).toHaveAttribute('href', '/clones?info=type-19540');
   });
 
   it('surfaces the home station and last jump-clone-change date', async () => {
@@ -275,7 +275,8 @@ describe('Clones', () => {
     // Identity, corp/alliance and SP: identical to /overview, so nothing above
     // the tabs moves as you switch between them.
     expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
-    expect(await screen.findByText('Test Corp / Test Alliance')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Test Corp' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Test Alliance' })).toBeInTheDocument();
     expect(await screen.findByText('135,765')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Clones' })).not.toBeInTheDocument();
   });

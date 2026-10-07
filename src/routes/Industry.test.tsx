@@ -285,20 +285,19 @@ describe('Industry: Build Plan CRUD', () => {
     // a `?product=` deep link, is for).
     expect(window.location.pathname).toBe('/industry/plans');
 
-    // Rename/duplicate/move-to-group live behind the row's context menu now
-    // (#767) — only Delete stays a visible button.
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    // Move-to-group, rename, duplicate and delete are the row's one trailing
+    // ⋮ (also its right-click menu).
+    const rifterRow = screen.getByRole('button', { name: 'Rifter' }).closest('li')!;
+    await user.click(within(rifterRow).getByRole('button', { name: 'More actions for Rifter' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
-    const renameInput = screen.getByRole('textbox', { name: 'Rename' });
+    const renameInput = await screen.findByRole('textbox', { name: 'Rename' });
     await user.clear(renameInput);
     await user.type(renameInput, 'Rifter run{Enter}');
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
 
     const row = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
-    // The row action names the plan for a screen reader, but the bubble a
-    // pointer user sees is the bare verb — they can already see the row.
-    fireEvent.pointerMove(within(row).getByRole('button', { name: 'Delete Rifter run' }));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/);
+    // No standalone Delete button: it is a danger item in the ⋮.
+    expect(within(row).queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
 
     fireEvent.contextMenu(within(row).getByRole('button', { name: 'Rifter run' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
@@ -308,7 +307,36 @@ describe('Industry: Build Plan CRUD', () => {
     expect(window.location.pathname).toBe('/industry/plans');
 
     const originalRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
-    await user.click(within(originalRow).getByRole('button', { name: 'Delete Rifter run' }));
+    await user.click(
+      within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    // Nothing is deleted until the confirm modal (which names the plan) is accepted.
+    let confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    expect(within(confirm).getByText(/"Rifter run"/)).toBeInTheDocument();
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+    );
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+    await user.click(
+      within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const escDialog = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    // The menu's close can leave focus outside the dialog; Escape needs it inside.
+    within(escDialog).getByRole('button', { name: 'Cancel' }).focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+    );
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+    await user.click(
+      within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    await user.click(within(confirm).getByRole('button', { name: 'Delete' }));
     // handleDelete is fire-and-forget from the click handler (Industry.tsx),
     // so wait for the live-query-driven UI to drop the row before reading
     // Dexie directly — otherwise the read can race the still-in-flight

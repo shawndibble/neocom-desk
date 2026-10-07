@@ -34,7 +34,7 @@ export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadP
         count: queuedLevels.length,
         date: formatLocalDate(new Date(startMs)),
       })}
-      trailing={fetchedAt ? <DataAgeBadge date={fetchedAt} /> : undefined}
+      trailing={fetchedAt ? <DataAgeBadge date={fetchedAt} tooltip={false} /> : undefined}
     >
       {queuedLevels.map((e) => (
         <div key={e.queue_position} className="px-2.5 py-1 text-xs text-text-dim">

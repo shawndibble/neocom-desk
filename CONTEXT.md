@@ -92,6 +92,7 @@ here — they go one per file in `docs/context/decisions/`.
   change, the space the optimizer searches, and the input `computeSchedule`
   and `placeRemaps` expect. Distinct from the _effective_ values ESI reports,
   which fold in implants and any cerebral accelerator on top.
+- **Bigger chain**: a P3 or P4 that Plan recommends making across several of the pilot's planets, in its own "Bigger chains" section under "Make more from my planets". It appears only when the pilot opted in to **Haul between planets**. It is limited to the planet types they already run, laid out on their colonies or on new planets in free slots, and recommended only when it beats the same number of planets on their best one-planet picks. It never enters a pick, a **Quick win** or a total. Its what-if (planet types they do not run, added: one at a time on Plan, the ticked set on the Map) is decisions 20261006-162120 and 20261006-210121. Distinct from a **Chain estimate**, the bare figure shown for every P3/P4 everywhere. See decision 20261006-154532.
 - **Blueprint Acquisition**: A Build Plan materials-table row — the
   blueprint's own type ID, distinct from the product's — priced whenever a
   buildable node (the top-level plan or any nested sub-build) isn't fully
@@ -368,6 +369,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status: these are what every profitable route funnels through, and Uedama and Balle both show as ordinary 0.5 systems. An explicit list rather than a derived rule, because the map does not imply it. An endpoint in one is marked on the row; a route _through_ one is named in the haul detail, which is the only place the path is worked out. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract one or two P0 types and refine them to P1 on the spot, host the P2+ factories, or sit idle — fitted against that colony's own CPU/Powergrid. Measured against the **Baseline**: every colony selling the best P1 it can make by itself. The plan's **Lift** is its net ISK minus the Baseline, so extracted P0 is never priced at zero and a plan that earns less than doing nothing clever says so. What it cannot cover is a **Shortfall**, of one of two kinds that call for different fixes: a **Type gap** (no enabled colony's planet type yields that P0 — add a planet of a listed type) and a **Budget gap** (colonies that could yield it are full — re-target one, or buy). Its output is a change list against what each colony runs today (keep / re-target / convert to factory), never a fresh layout.
+- **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add, at the one-planet ranking's own assumptions (rate, Command Center level, link cost, customs, sell market). Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, picks or totals, except in Plan's opt-in **Bigger chain** section, which compares it with the one-planet pick on as many free slots. See decisions 20261006-095530 and 20261006-154532.
 - **Going Rate**: the median reward per m³ per jump across every outstanding public courier contract — the market's own price for hauling, computed from the snapshot with nothing typed in. A haul's pay is shown as a multiple of it, and one at or above 8x is flagged, a threshold set to clear ordinary small-parcel work (~3.6x) while still catching the cheapest documented bait (~20x). States a figure, never a verdict: the app cannot value a courier contract's cargo or read intent. Unavailable rather than guessed where a haul has no distance or no stated volume, or where the corpus is too small for a median to mean anything.
 - **Group Owned Overlay**: A **Build Group**'s own "I own this" ledger —
   manual entry or ESI-asset auto-detection with a location scope, the same
@@ -399,6 +401,7 @@ here — they go one per file in `docs/context/decisions/`.
   at which profit is exactly zero — is always a Net figure, since it answers
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
+- **Haul between planets**: the PI setting "I will haul between my planets" (`piSettings.haulBetweenPlanets`). It is off by default, and frequent hauls are never assumed. Turning it on is the pilot's opt-in to **Bigger chain** recommendations on Plan. It changes nothing else. See decision 20261006-154532.
 - **High-Tech Production Plant**: The planetary pin that makes a P3 from two P2s. The tier above an **Advanced Industry Facility**, and the reason the Advisor will not offer one to a pilot whose colonies make no P2: it has nothing to put in it unless the P2s are bought at a hub and hauled in.
 - **Implant Finder**: The "Find by goal" tab of a **Fitting**'s Implants & boosters window: the pilot picks what they want better — CPU, powergrid, missiles, speed and so on — and is shown every implant and combat booster that moves it on this Fitting, each grade with its effect and where to get it (a **Trade Hub**'s sell orders, or an **LP Store** offer checked against the pilot's LP and turn-ins), plus the cheapest ways back under CPU or powergrid when the Fitting is over. Distinct from **What-If Implants**, which are a Skill Plan's assumed attribute bonuses. See `docs/context/decisions/20261002-194757-implant-finder-finds-implants-by-trying-them-on.md` and `docs/context/decisions/20261002-231614-implant-finder-prices-lp-store-offers-and-searches.md`.
 - **In-game Fitting**: A **Fitting** as the game stores it on one Character, read and written through ESI. Never copied into the app's own storage — opening one loads it like any other source. Carries less than a Fitting can: no module offline/overheat state, no binding of a charge to a particular module, no implants. The game has no edit, so saving a changed Fitting back replaces the In-game Fitting with a new one. Corporation fittings are not In-game Fittings in this sense: ESI does not expose them, and they reach the app only as an exported file that is **Load**ed.
@@ -432,7 +435,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Item Actions**: What an item menu can do on the page it's on — add to the
   Quickbar, find the blueprint behind Build Plan, and open the page's one
   Item Detail (Show info). One set per page, shared by every item menu on it
-  (issue #2041).
+  (issue #2041). Show info is also URL-backed (`?info=type-<id>`), so an
+  item name anywhere can open it without a page-owned host.
 - **ISK/jump**: What a public courier haul pays per stargate jump of the trip
   it asks for — reward divided by the jump count, and the figure the Courier
   board ranks on (issue #943). A hauler's cost is the trip, and the trip is
@@ -540,8 +544,8 @@ here — they go one per file in `docs/context/decisions/`.
   engine's `shortest`/`prefer-highsec`/`avoid-highsec`, and ESI's
   `Shorter`/`Safer`/`LessSecure` (mapped in `features/route/esiRoute.ts`). The
   pilot's default lives in **Travel Settings**; a page with its own picker
-  (Courier, Route Safety, Thera, Assets) opens on it and overrides it for that
-  view only.
+  (Courier, Thera, Assets) opens on it and overrides it for that view only.
+  Route Safety's picker is the default itself: choosing there saves it.
 - **Travel Settings**: The in-game autopilot's route options, for planning —
   the default **Route Preference**, the security penalty (0–100, the game's
   slider, default 50), and what to avoid: the **Avoided Systems** (switchable
@@ -716,6 +720,10 @@ here — they go one per file in `docs/context/decisions/`.
   `expiringOrStale`, `outbid`, `healthy`, in that precedence. Each order is
   filed under exactly one — its worst — for grouping, while filters match
   against every problem an order has, since those can overlap.
+- **Ore Form**: Whether mining ore, moon ore and ice are valued and named as
+  their Compressed or Raw type. A synced setting, Compressed by default. A
+  type with no Compressed counterpart is always Raw. Applies to Unassigned
+  and Outstanding rows only; Paid rows keep the ISK they were paid at.
 - **Reprocessing Yield**: What one type breaks down into when refined, baked
   from the SDE into `public/data/reprocessing.json` (issue #537). Quantities
   are per portion size, not per unit, so a part portion refines into
@@ -765,6 +773,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   together both stay valid; whichever SSO returns is the one that completes.
   Bounded by a TTL, enforced when it is redeemed as well as when a later login
   prunes, and by a maximum count — so an abandoned one is forgotten.
+- **PI Product Detail**: What a product or item name on the Planetary Industry
+  tabs (Plan, Map, Colonies) opens: the Map tab with that product's drawer open,
+  addressed by `?product=<typeId>`. How to make it (factory, planet types,
+  inputs, the chain) and why or why not (the model's one-planet figure, hauling
+  load, what the pilot's colonies already make). Market and Show info sit in it,
+  or in the row's ⋮. The §6c "Entities" override for PI.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer
@@ -904,6 +918,15 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Traded Volume**: Units of an item that changed hands in a Region on one
   day (ESI's `volume`). Not the item's cargo volume in m³ — the collision is
   EVE's, and this glossary keeps both words only because ESI does.
+- **Quick win**: An in-place fix to a PI colony the pilot already runs, such as
+  restarting a slowing extractor, adding a missing head, hauling before a
+  launchpad fills, or repointing an idle factory. It adds to today's income
+  without changing what the colony makes, except a storage win, whose figure
+  is a saving that no total adds. A colony's spare room is spent by one kind
+  of Quick win. The PI Plan tab lists the Quick wins before any rebuild and quotes a rebuild's gain on top of them, keeping
+  ADR 0012's split between tuning today's extraction and re-planning it.
+  Ranked by ISK/day per minute of in-game work.
+- **Sell market**: Where a pilot's PI output is sold, and so what every PI ISK figure is priced at: a trade hub's buy orders (less sales tax), or the pilot's corp buyback at a percentage of the hub's price (no sales tax, collected at home so no route to market). Customs is paid at the colony's own office either way. One sell market is applied to Plan, Map and Colonies together, so they quote identical figures.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
   column. Replaces the pin-to-compare grid; comparing lives in the **Compare**
   drawer over the separate **Compare Set**.
@@ -1060,7 +1083,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   condition shows up: the Overview PI card, the Colonies attention chip and
   colony row state, and the Characters table's PI column. Distinct from
   **Idle**, which names an unfed facility with nothing feeding it (the
-  Advisor's `piAdvisor.summaryChipIdle`) — a Stopped program has nothing left
+  retired Advisor's idle chip) — a Stopped program has nothing left
   to run, an Idle facility has something to run and no input for it. One word
   per condition, not shared.
 - **Sustained Extraction Rate**: An extractor program's whole output averaged
@@ -1112,6 +1135,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Any hub**: A **Hauling Opportunities** From or To choice (`from=any` / `to=any`, `ANY_HUB` in code) that scans every other **Trade Hub** for that end and keeps each item on its single best lane; a Hub column names the hub each row uses. Allowed at one end only. A **Trip Plan** made with From on Any can buy at several hubs.
 - **Cargo Space**: The holds a hauler can fill, each with its own m³, chosen once per device as a ship's base holds, a saved **Fitting**'s exact holds or a typed number. A ship's general hold is its cargo hold plus its fleet hangar (a Deep Space Transport carries most of its load in the hangar), which take anything; beside it sit any **Specialised Holds** the ship has. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
 - **Specialised Hold**: A ship hold that takes only certain contents, such as an ammo, planetary commodities, command center, mineral, gas, mining, ice, fuel or infrastructure hold, as opposed to the general hold (cargo hold plus fleet hangar). Which holds count and what each accepts: `docs/context/decisions/20261004-101406-cargo-space-counts-specialised-holds-whose-contents-fit.md`.
+- **Consolidation Plan**: What each Character would have to move to bring their loose stock (not assembled, not inside a container or ship) to one destination station: per-Character packaged m3, trips against the saved **Cargo Space**, and a **Route Safety** link. A volume estimate, never a safety verdict (`planConsolidation` in `src/engine/assets/consolidation.ts`).
 - **Trip Plan**: The suggested load for one trip's **Cargo Space** on one route (with **Any hub** at one end, each item on its own lane): a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
 - **Training Progress**: How much SP a Character has already banked toward
   the level it is training _right now_. Distinct from **Trained Skills**,

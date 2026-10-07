@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
+  Caret,
   FilterChip,
   Select,
   SelectContent,
@@ -10,6 +11,7 @@ import {
   SelectValue,
   TypeIcon,
 } from '@/components/ui';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import {
@@ -37,6 +39,7 @@ import {
 import type { WeaponChargeGroup } from './useChargeChoices';
 import { ChargeChart } from './ChargeChart';
 import { formatIsk } from './chargeFormat';
+import { chargeRowClassName } from './chargeRowStyle';
 import { pickerDistance, type ChargePickerSettings, type ChargeView } from './chargePickerSettings';
 
 const km = (metres: number) => Math.round(metres / 1000);
@@ -221,7 +224,13 @@ function rowLabel(t: TFunction, c: ChargeChoice, distance: number | null): strin
         ? t('fittings.chargePicker.noPrice')
         : t('fittings.chargePicker.isk', { isk: formatIsk(c.price) }),
   });
-  return c.skillMissing ? `${label}. ${t('fittings.chargePicker.needsSkill')}` : label;
+  const lasts =
+    c.price !== null && iskPerMinute(c) === null
+      ? `. ${t('fittings.chargePicker.lastsTitle')}`
+      : '';
+  return c.skillMissing
+    ? `${label}${lasts}. ${t('fittings.chargePicker.needsSkill')}`
+    : `${label}${lasts}`;
 }
 
 function signedPct(value: number): string {
@@ -260,7 +269,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
             <TypeIcon typeId={loaded.typeId} size={32} width={20} height={20} />
             <span className="min-w-0 truncate">
               {t('fittings.chargePicker.loaded')}{' '}
-              <span className="font-semibold text-accent">{chargeShortName(loaded)}</span>
+              <span className="font-semibold">{chargeShortName(loaded)}</span>
             </span>
             <span className="ml-auto shrink-0 text-text-dim tabular-nums">
               {t('fittings.chargePicker.dps', { value: Math.round(loaded.dps) })} ·{' '}
@@ -274,7 +283,7 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
 
       {picks && (
         <div
-          className="bg-panel-2 py-0.5"
+          className="border-y border-line py-0.5"
           role="group"
           aria-label={t('fittings.chargePicker.picks')}
         >
@@ -291,22 +300,16 @@ export function ChargePickerGroup({ group, settings, onLoad, wrapRow, pricesLoad
                 type="button"
                 disabled={!onLoad}
                 onClick={() => onLoad?.(choice.typeId)}
-                className={cx(
-                  'grid w-full grid-cols-[5.5rem_minmax(0,1fr)_auto] items-baseline gap-2 border-l-2 px-2 py-1 text-left hover:bg-panel',
-                  group.loaded.has(choice.typeId) ? 'border-accent' : 'border-transparent'
+                aria-pressed={group.loaded.has(choice.typeId)}
+                className={chargeRowClassName(
+                  group.loaded.has(choice.typeId),
+                  'grid w-full grid-cols-[5.5rem_minmax(0,1fr)_auto] items-baseline gap-2 px-2 py-1 text-left'
                 )}
               >
                 <span className="text-[0.6875rem] text-text-dim">
                   {t(`fittings.chargePicker.${key}`)}
                 </span>
-                <span
-                  className={cx(
-                    'truncate text-xs font-semibold',
-                    group.loaded.has(choice.typeId) && 'text-accent'
-                  )}
-                >
-                  {chargeShortName(choice)}
-                </span>
+                <span className="truncate text-xs font-semibold">{chargeShortName(choice)}</span>
                 <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
                   {key === 'maxDamage'
                     ? t(
@@ -448,12 +451,13 @@ function TypeList({
             .filter(Boolean)
             .join(', ')}
           onClick={() => setOpen(isOpen ? null : g.baseTypeId)}
-          className={cx(
-            'grid w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-l-2 px-1.5 py-1.5 text-left hover:bg-panel-2',
-            hasLoaded ? 'border-accent' : 'border-transparent'
+          className={chargeRowClassName(
+            hasLoaded,
+            'grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 px-1.5 py-1.5 text-left'
           )}
         >
-          <span className="row-span-2 self-start">
+          <span className="row-span-2 flex items-center gap-1 self-start">
+            <Caret expanded={isOpen} />
             <TypeIcon typeId={rep.typeId} size={32} width={20} height={20} />
           </span>
           <span className="flex min-w-0 items-baseline gap-1.5 text-xs font-semibold">
@@ -582,7 +586,7 @@ function TypeDetail({
         )}
       </div>
       <div className="text-[0.6875rem]">
-        <div className="grid grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.6rem] gap-0.5 pb-1 text-text-dim">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.4rem_3.6rem_4rem] gap-0.5 pb-1 text-text-dim">
           <span>{t('fittings.chargePicker.colTier')}</span>
           <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
           <span className="text-right">{t('fittings.chargePicker.colIsk')}</span>
@@ -604,27 +608,23 @@ function TypeDetail({
                   onClick={() => onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
                   aria-label={rowLabel(t, c, distance)}
-                  className={cx(
-                    'grid w-full grid-cols-[minmax(0,1fr)_2.4rem_3rem_3.6rem] gap-0.5 border-t border-line py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
-                    (worse || c.skillMissing) && 'opacity-50'
+                  className={chargeRowClassName(
+                    isLoaded,
+                    cx(
+                      'grid w-full grid-cols-[minmax(0,1fr)_2.4rem_3.6rem_4rem] gap-0.5 border-t border-line py-1 text-left tabular-nums',
+                      (worse || c.skillMissing) && 'opacity-50'
+                    )
                   )}
                 >
-                  <span className={cx('truncate', isLoaded && 'text-accent')}>
-                    {isLoaded && '● '}
+                  <span className="truncate">
                     {tierLabel(t, c)}
+                    {isLoaded && ` · ${t('fittings.add.loaded')}`}
                     {c.cargo > 0 &&
                       ` · ${t('fittings.chargePicker.inCargo', { count: formatCompactNumber(c.cargo) })}`}
                   </span>
                   <span className="text-right">{Math.round(chargeScore(c, distance))}</span>
                   <span className="text-right">{c.price === null ? '—' : formatIsk(c.price)}</span>
-                  <span
-                    className={cx('text-right', pricey && 'text-warning')}
-                    title={
-                      c.price !== null && perMin === null
-                        ? t('fittings.chargePicker.lastsTitle')
-                        : undefined
-                    }
-                  >
+                  <span className={cx('text-right', pricey && 'text-warning')}>
                     {perMin === null ? '—' : formatIsk(perMin)}
                     {/* Colour is never the only signal (DESIGN.md §7). */}
                     {pricey && <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>}
@@ -682,15 +682,17 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
               type="button"
               aria-expanded={isOpen}
               onClick={() => setOpen(isOpen ? null : g.key)}
-              className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 px-1.5 py-1.5 text-left hover:bg-panel-2"
+              className={cx(
+                'grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 px-1.5 py-1.5 text-left',
+                rowInteractiveClassName,
+                focusRingInsetClassName
+              )}
             >
-              <span className="flex min-w-0 items-baseline gap-1.5 text-xs font-semibold">
-                <span aria-hidden="true" className="text-text-dim">
-                  {isOpen ? '▾' : '▸'}
-                </span>
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-semibold">
+                <Caret expanded={isOpen} />
                 <span className="truncate">{name}</span>
                 {hasLoaded && (
-                  <span className="shrink-0 text-[0.6875rem] text-accent">
+                  <span className="shrink-0 text-[0.6875rem] text-success">
                     {t('fittings.chargePicker.loadedTag')}
                   </span>
                 )}
@@ -706,7 +708,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
             </button>
             {isOpen && (
               <div className="pb-1">
-                <div className="grid grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.4rem] gap-1.5 py-0.5 pr-1.5 pl-3.5 text-[0.6875rem] text-text-dim">
+                <div className="grid grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.8rem] gap-1.5 py-0.5 pr-1.5 pl-3.5 text-[0.6875rem] text-text-dim">
                   <span>{t('fittings.chargePicker.colCargo')}</span>
                   <span>{t('fittings.chargePicker.colRange')}</span>
                   <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
@@ -735,18 +737,21 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           onClick={() => onLoad?.(c.typeId)}
                           aria-pressed={isLoaded}
                           aria-label={rowLabel(t, c, distance)}
-                          className={cx(
-                            'grid w-full grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.4rem] items-center gap-1.5 border-l-2 py-1.5 pr-1.5 pl-3 text-left text-[0.6875rem] tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
-                            isLoaded ? 'border-accent text-accent' : 'border-transparent',
-                            distance !== null &&
-                              !c.skillMissing &&
-                              score < groupBest * WEAK_SHARE &&
-                              'opacity-45',
-                            (c.skillMissing || (!allWorse && worse[i] !== null)) && 'opacity-50'
+                          className={chargeRowClassName(
+                            isLoaded,
+                            cx(
+                              'grid w-full grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.8rem] items-center gap-1.5 py-1.5 pr-1.5 pl-3 text-left text-[0.6875rem] tabular-nums',
+                              distance !== null &&
+                                !c.skillMissing &&
+                                score < groupBest * WEAK_SHARE &&
+                                'opacity-45',
+                              (c.skillMissing || (!allWorse && worse[i] !== null)) && 'opacity-50'
+                            )
                           )}
                         >
                           <span className="truncate">
                             {chargeLabel(c.baseName)}
+                            {isLoaded && ` · ${t('fittings.add.loaded')}`}
                             {c.cargo > 0 && <span className="text-text-dim"> ●</span>}
                           </span>
                           <RangeBar choice={c} maxReach={maxReach} distance={distance} />

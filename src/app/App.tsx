@@ -23,6 +23,7 @@ import { preloadedLazy } from './preloadedLazy';
 import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
 import { DocumentTitleTracker } from './DocumentTitleTracker';
+import { StaleStoresReloader } from './StaleStoresReloader';
 import { ReloadPrompt } from './ReloadPrompt';
 import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
@@ -38,6 +39,8 @@ import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
+import { EntityInfoRoute } from '@/features/entities';
+import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
@@ -181,6 +184,8 @@ const ROUTE_ELEMENTS = {
   '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
+  // The Advisor tab retired; the old path redirects for good.
+  '/planetary-industry/advisor': <LegacyPathRedirect />,
   '/employment-history': <EmploymentHistory />,
   '/corp': <Corp />,
   '/corp/members': <CorpMembers />,
@@ -329,6 +334,7 @@ export function App() {
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
         <DocumentTitleTracker />
+        <StaleStoresReloader />
         <Suspense fallback={<RouteFallback />}>
           <SentryRoutes>
             <Route path="/" element={<Root />} />
@@ -370,8 +376,10 @@ export function App() {
           </SentryRoutes>
         </Suspense>
         <ReloadPrompt />
+        <EntityInfoRoute />
         <PublicInfoModal />
         <SkillDetailModal />
+        <ItemInfoModal />
         <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>

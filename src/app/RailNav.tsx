@@ -1,10 +1,16 @@
 import { Fragment, memo, useCallback, useId, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton } from '@/components/ui';
+import { Button, IconButton, Tooltip } from '@/components/ui';
 import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useActiveCorporationId } from '@/features/corp/owner';
@@ -40,7 +46,11 @@ function GoToButton() {
       type="button"
       onClick={() => useCommandPalette.getState().show()}
       aria-keyshortcuts={APPLE ? 'Meta+K' : 'Control+K'}
-      className="mx-2 mt-2 flex min-h-8 items-center gap-2 rounded-xs border border-line-bright bg-panel-2 px-2 text-xs text-text-dim transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      className={cx(
+        'mx-2 mt-2 flex min-h-8 items-center gap-2 rounded-xs border border-line-bright bg-panel-2 px-2 text-xs text-text-dim hover:text-text active:bg-panel',
+        interactiveClassName,
+        focusRingClassName
+      )}
     >
       <Icon.GoTo aria-hidden="true" size={Icon.ICON_SIZE.sm} />
       <span>{t('nav.goTo')}</span>
@@ -128,28 +138,33 @@ const RailPage = memo(function RailPage({
           {shownViews.map((view) => {
             const viewHidden = hidden.has(view.path);
             const active = view.path === activeViewPath;
+            const link = (
+              <Link
+                to={view.path}
+                aria-current={active ? 'page' : undefined}
+                data-locked={view.locked ? 'true' : undefined}
+                className={cx(
+                  '-ml-px flex min-h-7 min-w-0 flex-1 items-center gap-1.5 border-l py-1 pr-1 pl-3 text-xs',
+                  interactiveClassName,
+                  focusRingInsetClassName,
+                  active
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text-dim hover:text-text active:bg-panel-2',
+                  viewHidden && 'line-through opacity-60'
+                )}
+              >
+                <span className="min-w-0 truncate">{view.label}</span>
+                {view.locked && (
+                  <span
+                    aria-hidden="true"
+                    className="ml-auto size-1.5 shrink-0 rounded-full bg-warning"
+                  />
+                )}
+              </Link>
+            );
             return (
               <li key={view.path} className="flex items-center">
-                <Link
-                  to={view.path}
-                  aria-current={active ? 'page' : undefined}
-                  title={view.locked ? t('reauth.navLocked') : undefined}
-                  className={cx(
-                    '-ml-px flex min-h-7 min-w-0 flex-1 items-center gap-1.5 border-l py-1 pr-1 pl-3 text-xs transition-colors',
-                    active
-                      ? 'border-accent text-accent'
-                      : 'border-transparent text-text-dim hover:text-text',
-                    viewHidden && 'line-through opacity-60'
-                  )}
-                >
-                  <span className="min-w-0 truncate">{view.label}</span>
-                  {view.locked && (
-                    <span
-                      aria-hidden="true"
-                      className="ml-auto size-1.5 shrink-0 rounded-full bg-warning"
-                    />
-                  )}
-                </Link>
+                {view.locked ? <Tooltip content={t('reauth.navLocked')}>{link}</Tooltip> : link}
                 {editing && (
                   <NavHideToggle path={view.path} label={view.label} hidden={viewHidden} />
                 )}
@@ -267,7 +282,11 @@ const RailNavBody = memo(function RailNavBody({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="mt-3 flex min-h-7 items-center gap-1.5 rounded-xs px-2 text-left text-[0.6875rem] text-text-dim transition-colors hover:bg-panel-2 hover:text-text"
+            className={cx(
+              'mt-3 flex min-h-7 items-center gap-1.5 rounded-xs px-2 text-left text-[0.6875rem] text-text-dim hover:text-text',
+              rowInteractiveClassName,
+              focusRingClassName
+            )}
           >
             <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
             {hiddenCount > 0 ? t('nav.hiddenCount', { count: hiddenCount }) : t('nav.editRail')}

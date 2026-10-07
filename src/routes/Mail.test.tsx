@@ -10,8 +10,11 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
+import { useMailScope } from '@/features/character/mailScopePref';
+import { resetMailRefreshThrottle } from '@/features/character/mailAll';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 
 /**
  * jsdom's `matchMedia` stub (`vitest.setup.dom.ts`) never matches, which
@@ -124,14 +127,29 @@ const server = setupServer(
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one. A worker's first
+  // `App` render (compiling the lazy Layout and route chunks, warming jsdom
+  // and React) took seconds under parallel load and landed on whichever test
+  // ran first, tipping it past its findBy / test timeout. Done here under the
+  // hook's own budget, as IndustryPlanPage.test.tsx does.
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadMail()]);
+  await seed();
+  const { unmount } = render(<App />);
+  // Wait for real content, not just the shell: the first data load (Dexie, MSW,
+  // the ESI cache) is part of the cold cost too.
+  await screen.findByText('Fleet up!', {}, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
   restoreMatchMedia?.();
   restoreMatchMedia = undefined;
 });
-beforeEach(async () => {
+async function seed() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -142,6 +160,8 @@ beforeEach(async () => {
   // Module-scoped store: without this the folder selection one test makes
   // leaks into the next, and `hydrate` short-circuits on `hydrated`.
   useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
+  useMailScope.setState({ value: 'current', hydrated: false });
+  resetMailRefreshThrottle();
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -153,7 +173,9 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/mail');
-});
+}
+
+beforeEach(seed);
 
 describe('Mail', () => {
   it('lists headers newest first with resolved sender names', async () => {
@@ -268,7 +290,7 @@ describe('Mail', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByText('Fleet up!'));
-    const senderButton = await screen.findByRole('button', { name: 'Fleet Commander' });
+    const senderButton = await screen.findByRole('link', { name: 'Fleet Commander' });
     await user.click(senderButton);
 
     const dialog = await screen.findByRole('dialog');
@@ -915,7 +937,7 @@ describe('Mail', () => {
     expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Fleet Announcements/ })).not.toBeInTheDocument();
 
-    const recipientButton = await screen.findByRole('button', { name: 'Corp Recruiter' });
+    const recipientButton = await screen.findByRole('link', { name: 'Corp Recruiter' });
     await user.click(recipientButton);
 
     const dialog = await screen.findByRole('dialog');
@@ -971,5 +993,143 @@ describe('Mail', () => {
     render(<App />);
     await screen.findByText('Second pilot mail');
     await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  describe('All characters (issue #2867)', () => {
+    const secondLabels = {
+      labels: [
+        { label_id: 1, name: 'Inbox', unread_count: 4 },
+        { label_id: 2, name: 'Sent', unread_count: 0 },
+        { label_id: 3, name: 'Corp', unread_count: 0 },
+        { label_id: 4, name: 'Alliance', unread_count: 0 },
+      ],
+      total_unread_count: 4,
+    };
+
+    function serveSecondCharacter() {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail`, () =>
+          HttpResponse.json([
+            {
+              mail_id: 1,
+              from: 90000002,
+              subject: 'Second pilot mail',
+              timestamp: '2026-08-03T00:00:00Z',
+              is_read: false,
+              labels: [1],
+            },
+          ])
+        ),
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/labels`, () =>
+          HttpResponse.json(secondLabels)
+        ),
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/1`, () =>
+          HttpResponse.json({
+            from: 90000002,
+            subject: 'Second pilot mail',
+            body: 'Body for the second pilot.',
+            read: false,
+            recipients: [],
+          })
+        )
+      );
+    }
+
+    it('merges every Character newest first and tags each row with its owner', async () => {
+      await addSecondCharacter();
+      serveSecondCharacter();
+      window.history.pushState({}, '', '/mail?scope=all');
+      render(<App />);
+      const second = await screen.findByText('Second pilot mail');
+      const first = await screen.findByText('Fleet up!');
+      // 08-03 (Pilot Two) sits above 08-02 (Pilot One).
+      expect(second.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        within(second.closest('li') as HTMLElement).getByText('Pilot Two')
+      ).toBeInTheDocument();
+      expect(within(first.closest('li') as HTMLElement).getByText('Pilot One')).toBeInTheDocument();
+    });
+
+    it('sums each folder chip across Characters and lists unread per Character in the menu', async () => {
+      await addSecondCharacter();
+      serveSecondCharacter();
+      window.history.pushState({}, '', '/mail?scope=all');
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByText('Second pilot mail');
+      const group = screen.getByRole('group', { name: 'Mail folders' });
+      // 1 (Pilot One) + 4 (Pilot Two).
+      expect(within(group).getByRole('button', { name: 'Inbox 5 unread' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^All characters/ }));
+      expect(await screen.findByText('Pilot One · 3 unread')).toBeInTheDocument();
+      expect(screen.getByText('Pilot Two · 4 unread')).toBeInTheDocument();
+    });
+
+    it("opens, marks read and replies as the mail's owner", async () => {
+      await addSecondCharacter();
+      serveSecondCharacter();
+      const putUrls: string[] = [];
+      server.use(
+        http.put('https://esi.evetech.net/characters/:characterId/mail/:mailId/', ({ request }) => {
+          putUrls.push(new URL(request.url).pathname);
+          return new HttpResponse(null, { status: 204 });
+        })
+      );
+      window.history.pushState({}, '', '/mail?scope=all');
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByText('Second pilot mail'));
+      expect(await screen.findByText('Body for the second pilot.')).toBeInTheDocument();
+      expect(screen.getByText('For Pilot Two')).toBeInTheDocument();
+      await waitFor(() => expect(putUrls).toEqual([`/characters/${CHAR_ID_2}/mail/1/`]));
+
+      // Same `mail_id` 1 in Pilot One's mailbox is a different mail, not a selection twin.
+      const ownRow = screen.getByText('Fleet up!').closest('li') as HTMLElement;
+      expect(ownRow.querySelector('[aria-current="true"]')).toBeNull();
+
+      const posts: unknown[] = [];
+      server.use(
+        http.post(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/`, async ({ request }) => {
+          posts.push(await request.json());
+          return HttpResponse.json(77);
+        })
+      );
+      await user.click(screen.getByRole('button', { name: 'Reply' }));
+      await user.click(await screen.findByRole('button', { name: /send/i }));
+      await waitFor(() => expect(posts).toHaveLength(1));
+    });
+
+    it('names a Character left out in an "N of M" readout', async () => {
+      await addSecondCharacter();
+      serveSecondCharacter();
+      await db.characters.put({
+        characterId: 93,
+        name: 'Pilot Three',
+        ownerHash: 'oh3',
+        addedAt: 3,
+      });
+      await db.tokens.put({
+        characterId: 93,
+        accessToken: 'a3',
+        refreshToken: 'r3',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: [],
+      });
+      window.history.pushState({}, '', '/mail?scope=all');
+      render(<App />);
+      await screen.findByText('Second pilot mail');
+      expect(
+        screen.getByRole('group', { name: /All characters · 2 of 3\. Not included: Pilot Three/ })
+      ).toBeInTheDocument();
+    });
+
+    it('is unchanged with one Character: no scope control, no owner chips', async () => {
+      window.history.pushState({}, '', '/mail?scope=all');
+      render(<App />);
+      const row = (await screen.findByText('Fleet up!')).closest('li') as HTMLElement;
+      expect(screen.queryByRole('button', { name: /characters/i })).not.toBeInTheDocument();
+      expect(within(row).queryByText('Pilot One')).not.toBeInTheDocument();
+    });
   });
 });

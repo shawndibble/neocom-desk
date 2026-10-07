@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -64,12 +65,14 @@ describe('OverviewSubNav', () => {
     renderSubNav();
 
     const nav = screen.getByRole('navigation', { name: 'Overview' });
-    await waitFor(() =>
-      expect(within(nav).getByRole('link', { name: 'Clones' })).toHaveAttribute(
-        'title',
-        'Needs a new login'
-      )
-    );
+    // The tab remounts inside its Tooltip once the lock resolves, so re-query.
+    const clonesLink = () => within(nav).getByRole('link', { name: 'Clones' });
+    await waitFor(() => expect(clonesLink().querySelector('.bg-warning')).toBeInTheDocument());
+    const clones = clonesLink();
+    // A Tooltip, not a native title: it reaches keyboard and touch users.
+    expect(clones).not.toHaveAttribute('title');
+    await userEvent.hover(clones);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a new login');
     // Informational only, exactly as in the rail — the link still navigates
     // and /clones' ScopeGate is where the explanation lives.
     expect(within(nav).getByRole('link', { name: 'Clones' })).toHaveAttribute('href', '/clones');

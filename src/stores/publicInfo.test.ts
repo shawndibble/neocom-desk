@@ -94,6 +94,8 @@ describe('usePublicInfo', () => {
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toEqual({
       corporationName: 'Test Corp',
       allianceName: 'Test Alliance',
+      corporationId: 1001,
+      allianceId: 2001,
     });
   });
 
@@ -102,6 +104,8 @@ describe('usePublicInfo', () => {
     expect(usePublicInfo.getState().byCharacterId[92]).toEqual({
       corporationName: 'Test Corp',
       allianceName: null,
+      corporationId: 1001,
+      allianceId: undefined,
     });
   });
 
@@ -133,10 +137,14 @@ describe('usePublicInfo.loadMany', () => {
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toEqual({
       corporationName: 'Test Corp',
       allianceName: 'Test Alliance',
+      corporationId: 1001,
+      allianceId: 2001,
     });
     expect(usePublicInfo.getState().byCharacterId[92]).toEqual({
       corporationName: 'Test Corp',
       allianceName: null,
+      corporationId: 1001,
+      allianceId: undefined,
     });
     expect(affiliationRequests).toBe(1);
     expect(namesRequests).toBe(1);
@@ -165,6 +173,8 @@ describe('usePublicInfo.loadMany', () => {
     expect(usePublicInfo.getState().byCharacterId[92]).toEqual({
       corporationName: 'Test Corp',
       allianceName: null,
+      corporationId: 1001,
+      allianceId: undefined,
     });
   });
 

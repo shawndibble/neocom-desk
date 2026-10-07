@@ -7,10 +7,11 @@ import { Panel } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { Shortfall } from '@/engine/pi/goalTypes';
-import { commodityName, formatUnits } from '../goalPlannerFormat';
-import { piAdvisorHref } from '../piPlanLink';
+import { formatUnits } from '../goalPlannerFormat';
+import { PI_MAP_HREF } from '../piPlanLink';
 import type { ShortfallHint } from '../goalPlanView';
 import { ColonyLink } from './ColonyLink';
+import { ProductSentence } from './ProductSentence';
 import { limitsText, planetTypesText, type PlanNames } from './format';
 
 function ColonyNames({ ids, names }: { ids: readonly number[]; names: PlanNames }) {
@@ -30,7 +31,6 @@ function shortfallText(
   shortfall: Shortfall,
   hint: ShortfallHint,
   names: PlanNames,
-  advisorSystem: number | undefined,
   t: TFunction
 ): ReactNode {
   const { pi } = names;
@@ -38,20 +38,27 @@ function shortfallText(
     case 'type-gap':
       return (
         <>
-          {t(hint?.kind === 'switched-off' ? 'piPlan.shortTypeGapEnabled' : 'piPlan.shortTypeGap', {
-            types: planetTypesText(shortfall.fixPlanetTypes, t),
-            p0: commodityName(shortfall.p0TypeId, pi),
-            p1: commodityName(shortfall.p1TypeId, pi),
-            p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
-            p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
-          })}{' '}
+          <ProductSentence
+            text={t(
+              hint?.kind === 'switched-off' ? 'piPlan.shortTypeGapEnabled' : 'piPlan.shortTypeGap',
+              {
+                types: planetTypesText(shortfall.fixPlanetTypes, t),
+                p0: '{p0}',
+                p1: '{p1}',
+                p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
+                p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
+              }
+            )}
+            products={{ p0: shortfall.p0TypeId, p1: shortfall.p1TypeId }}
+            pi={pi}
+          />{' '}
           {hint?.kind === 'switched-off' ? (
             <>
               {t('piPlan.shortSwitchedOff')} <ColonyNames ids={hint.planetIds} names={names} />.
             </>
           ) : (
-            <Link className={inlineLinkClassName} to={piAdvisorHref(advisorSystem)}>
-              {t('piPlan.openAdvisor')}
+            <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+              {t('piPlan.openMap')}
             </Link>
           )}
         </>
@@ -59,24 +66,36 @@ function shortfallText(
     case 'budget-gap':
       return (
         <>
-          {t('piPlan.shortBudgetGap', {
-            p0: commodityName(shortfall.p0TypeId, pi),
-            p1: commodityName(shortfall.p1TypeId, pi),
-            p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
-            p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
-          })}{' '}
+          <ProductSentence
+            text={t('piPlan.shortBudgetGap', {
+              p0: '{p0}',
+              p1: '{p1}',
+              p1Rate: formatUnits(Math.round(shortfall.p1UnitsPerHour)),
+              p0Rate: formatUnits(Math.round(shortfall.unitsPerHour)),
+            })}
+            products={{ p0: shortfall.p0TypeId, p1: shortfall.p1TypeId }}
+            pi={pi}
+          />{' '}
           {hint?.kind === 'retarget' ? (
             <>
-              {t('piPlan.shortRetarget', { p0: commodityName(shortfall.p0TypeId, pi) })}{' '}
+              <ProductSentence
+                text={t('piPlan.shortRetarget', { p0: '{p0}' })}
+                products={{ p0: shortfall.p0TypeId }}
+                pi={pi}
+              />{' '}
               <ColonyNames ids={hint.planetIds} names={names} />.
             </>
           ) : (
-            t('piPlan.shortBuy', { p1: commodityName(shortfall.p1TypeId, pi) })
+            <ProductSentence
+              text={t('piPlan.shortBuy', { p1: '{p1}' })}
+              products={{ p1: shortfall.p1TypeId }}
+              pi={pi}
+            />
           )}
         </>
       );
     case 'no-factory-host':
-      return t('piPlan.shortNoHost', { facility: t(`piAdvisor.pinKind.${shortfall.facility}`) });
+      return t('piPlan.shortNoHost', { facility: t(`piShared.pinKind.${shortfall.facility}`) });
     case 'host-over-budget':
       return (
         <>
@@ -91,12 +110,10 @@ export function Shortfalls({
   shortfalls,
   hints,
   names,
-  advisorSystem,
 }: {
   shortfalls: readonly Shortfall[];
   hints: readonly ShortfallHint[];
   names: PlanNames;
-  advisorSystem: number | undefined;
 }) {
   const { t } = useTranslation();
   if (shortfalls.length === 0) return null;
@@ -110,7 +127,7 @@ export function Shortfalls({
               size={Icon.ICON_SIZE.sm}
               className="mt-px shrink-0 text-warning"
             />
-            <span>{shortfallText(shortfall, hints[i] ?? null, names, advisorSystem, t)}</span>
+            <span>{shortfallText(shortfall, hints[i] ?? null, names, t)}</span>
           </li>
         ))}
       </ul>
