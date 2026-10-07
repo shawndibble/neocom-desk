@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, TextInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
+import { GrantNote } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import type { GroupMember } from './groupRows';
 import { settle } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
+import { missingPaymentEndpoints, type MadePaymentSources } from './madePayments';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
@@ -22,6 +24,8 @@ interface LinkWalletPaymentDialogProps {
   owed: readonly GroupMember[];
   /** Made Payments no Assignment records yet. */
   candidates: readonly MadePayment[];
+  /** How each tracked Character's payment reads went; a skipped one gets a Grant note. */
+  paymentSources?: readonly MadePaymentSources[];
   systemNames: ReadonlyMap<number, string>;
   onLinked: () => void;
 }
@@ -58,11 +62,27 @@ export function LinkWalletPaymentDialog({
   payee,
   owed,
   candidates,
+  paymentSources = [],
   systemNames,
   onLinked,
 }: LinkWalletPaymentDialogProps) {
   const { t } = useTranslation();
   const owedTotal = owed.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+
+  // One note per Character who mined an owed entry and lacks a Permission —
+  // the same Characters whose payments the candidate list draws from.
+  const grantGaps = [
+    ...new Map(owed.map((m) => [m.row.characterId, m.row.characterName])).entries(),
+  ]
+    .map(([characterId, characterName]) => {
+      const sources = paymentSources.find((s) => s.characterId === characterId);
+      return {
+        characterId,
+        characterName,
+        endpoints: sources ? missingPaymentEndpoints(sources) : [],
+      };
+    })
+    .filter((gap) => gap.endpoints.length > 0);
 
   // A lone exact match for the whole balance is the obvious pick.
   // Only the first render's pick; later prop changes don't move the selection.
@@ -184,6 +204,28 @@ export function LinkWalletPaymentDialog({
         <p className="text-xs text-text-dim">
           {t('miningTax.linkWallet.subtitle', { payee: payee.name, count: owed.length })}
         </p>
+
+        {grantGaps.map((gap) => (
+          <GrantNote
+            key={gap.characterId}
+            characterId={gap.characterId}
+            characterName={gap.characterName}
+            endpoints={gap.endpoints}
+            title={t('miningTax.linkWallet.grantTitle')}
+            hint={t('miningTax.linkWallet.grantHint', {
+              what: gap.endpoints
+                .map((e) =>
+                  t(
+                    e === 'getCharacterWalletJournal'
+                      ? 'miningTax.linkWallet.grantJournal'
+                      : 'miningTax.linkWallet.grantContracts'
+                  )
+                )
+                .join(` ${t('miningTax.linkWallet.grantAnd')} `),
+            })}
+            actionLabel={t('miningTax.linkWallet.grantAction')}
+          />
+        ))}
 
         {candidates.length === 0 ? (
           <p className="rounded-xs border border-line bg-panel-2 px-3 py-4 text-xs text-text-dim">
