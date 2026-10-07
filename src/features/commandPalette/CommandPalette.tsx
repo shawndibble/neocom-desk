@@ -284,14 +284,10 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   <div
                     id={headingId}
                     role="presentation"
-                    className="px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase"
+                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase"
                   >
                     {t(group.provider.labelKey)}
-                    {group.provider.scope && (
-                      <span className="ml-2">
-                        <CharacterScopeReadout {...group.provider.scope} />
-                      </span>
-                    )}
+                    {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
                   </div>
                   {group.status === 'error' ? (
                     <div className="px-2 py-1.5 text-sm text-danger">

@@ -132,7 +132,7 @@ export async function loadPaletteAssetsScope(): Promise<PaletteAssetsScope> {
   const holders = characters.filter((character) => granted.has(character.characterId));
   const rows =
     holders.length === 0
-      ? new Map()
+      ? new Map<number, unknown>()
       : await readCachedRows<CharacterAsset[]>(
           holders.map((character) => character.characterId),
           ASSETS_KEY

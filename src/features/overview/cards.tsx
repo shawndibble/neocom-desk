@@ -6,10 +6,10 @@
  * state, including the boring one: a card that vanishes when a Character has
  * no colonies is a card you cannot tell from a card that failed to load.
  */
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   IskAmount,
   Panel,
@@ -210,7 +210,11 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
       meta={
         <>
           {data !== null && data.characterCount > 0 && (
-            <CharacterScopeReadout scope="all" total={data.characterCount} />
+            <CharacterScopeReadout
+              scope="all"
+              total={data.characterCount}
+              missing={data.missingCharacterNames}
+            />
           )}
           <SeverityWord
             severity={miningTaxSeverity(data)}

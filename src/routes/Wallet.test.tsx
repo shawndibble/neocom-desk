@@ -290,7 +290,7 @@ describe('Wallet', () => {
   it('says the Journal reads one Character (issue #2846)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    expect(await screen.findByText(/ only$/)).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One only')).toBeInTheDocument();
   });
 
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {

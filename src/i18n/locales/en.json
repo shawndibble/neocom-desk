@@ -3200,8 +3200,7 @@
     },
     "filter": {
       "thisCharacter": "This character",
-      "allCharacters": "All characters",
-      "allCharactersCount": "All characters · {{count}}"
+      "allCharacters": "All characters"
     }
   },
   "characters": {

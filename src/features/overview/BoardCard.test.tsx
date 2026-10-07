@@ -42,11 +42,32 @@ describe('MiningTaxCard scope', () => {
             needsReauth: false,
             fetchedAt: null,
             characterCount: 3,
+            missingCharacterNames: [],
           }}
         />
       </MemoryRouter>
     );
     expect(screen.getByText('All characters · 3')).toBeInTheDocument();
+  });
+
+  it('shows N of M when a Character needs re-auth', () => {
+    render(
+      <MemoryRouter>
+        <MiningTaxCard
+          data={{
+            unpaidIsk: 0,
+            payeeCount: 0,
+            unassignedCount: 0,
+            oldestUnpaidDays: null,
+            needsReauth: true,
+            fetchedAt: null,
+            characterCount: 4,
+            missingCharacterNames: ['Bex Roan'],
+          }}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('All characters · 3 of 4')).toBeInTheDocument();
   });
 });
 

@@ -139,7 +139,7 @@ export function CharacterFilterControl({
   const allLabel =
     characterCount === undefined
       ? t('character.filter.allCharacters')
-      : t('character.filter.allCharactersCount', { count: characterCount });
+      : t('character.scope.all', { count: characterCount });
   const label = isAll ? allLabel : t('character.filter.thisCharacter');
   const options = (
     <DropdownMenuContent align="start" className="w-48">

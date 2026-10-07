@@ -42,6 +42,8 @@ export function CharacterScopeReadout(props: CharacterScopeReadoutProps) {
   const readout = (
     <span
       tabIndex={hint ? 0 : undefined}
+      role={hint ? 'group' : undefined}
+      aria-label={hint ? `${label}. ${hint}` : undefined}
       className="inline-flex shrink-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
     >
       {glyph}

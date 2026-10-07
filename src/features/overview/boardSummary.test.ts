@@ -91,6 +91,7 @@ function miningData(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoard
     needsReauth: false,
     fetchedAt: null,
     characterCount: 1,
+    missingCharacterNames: [],
     ...overrides,
   };
 }

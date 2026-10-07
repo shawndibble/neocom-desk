@@ -10,10 +10,10 @@
  * Station Manager who is not an Accountant simply has no rail: no error, no
  * empty state, nothing (CONTEXT.md round 35, AC3).
  */
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { IskAmount, Panel, StatChip, StatChips } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
