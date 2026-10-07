@@ -133,6 +133,48 @@ describe('reprocessingYield', () => {
     expect(result.outputs).toContainEqual({ typeId: PYERITE, quantity: 101 });
   });
 
+  describe('multi-batch rounding, pinned to an in-game capture (issue #2876)', () => {
+    // Compressed Scordite: portion 100, Tritanium 150 and Pyerite 110 per
+    // portion. The game showed 76.4% yield and returned 114/84 for 100 units
+    // and 343/252 for 300 units in one go.
+    const SCORDITE = {
+      portionSize: 100,
+      materials: [
+        { typeId: TRITANIUM, quantity: 150 },
+        { typeId: PYERITE, quantity: 110 },
+      ],
+      efficiency: 0.764,
+    };
+
+    it('returns the one-batch capture, with no leftover units', () => {
+      const result = reprocessingYield({ ...SCORDITE, units: 100 });
+      expect(result.outputs).toEqual([
+        { typeId: TRITANIUM, quantity: 114 },
+        { typeId: PYERITE, quantity: 84 },
+      ]);
+      expect(result.unitsLeftOver).toBe(0);
+    });
+
+    it('floors once over the whole stack, not per batch', () => {
+      // floor(150 x 3 x 0.764) = floor(343.8) = 343. A per-batch floor would
+      // give 3 x floor(114.6) = 342; round-to-nearest would give 344.
+      const result = reprocessingYield({ ...SCORDITE, units: 300 });
+      expect(result.outputs).toEqual([
+        { typeId: TRITANIUM, quantity: 343 },
+        { typeId: PYERITE, quantity: 252 },
+      ]);
+    });
+
+    it('refines whole batches only: 250 units is 200 units plus 50 left over', () => {
+      const two = reprocessingYield({ ...SCORDITE, units: 200 });
+      const result = reprocessingYield({ ...SCORDITE, units: 250 });
+      expect(result.outputs).toEqual(two.outputs);
+      expect(result.batches).toBe(2);
+      expect(result.unitsRefined).toBe(200);
+      expect(result.unitsLeftOver).toBe(50);
+    });
+  });
+
   it('drops a material that floors to zero rather than listing an empty line', () => {
     const result = reprocessingYield({
       portionSize: 1,
