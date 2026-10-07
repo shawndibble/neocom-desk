@@ -34,9 +34,9 @@ import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { ContractIdentity } from '@/features/character/ContractIdentity';
-import { CharacterLink } from '@/features/entities';
+import { CharacterLink, CorporationLink } from '@/features/entities';
 import { ContractReceiverLink } from '@/features/character/ContractReceiverLink';
-import { contractReceiver } from '@/features/character/contractCounterparty';
+import { contractIssuer, contractReceiver } from '@/features/character/contractCounterparty';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
@@ -62,7 +62,7 @@ import {
   type ContractSearchStatus,
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
-import { resolveNames } from '@/features/character/names';
+import { resolveCategories, resolveNames, type NameCategory } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
 import { formatCountdown } from '@/lib/duration';
@@ -86,6 +86,8 @@ interface Snapshot {
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   contractsTruncated: boolean;
   issuerNames: Map<number, string>;
+  /** Entity kind of each receiver, so a corp that took a public contract links as a corp. */
+  receiverCategories: Map<number, NameCategory>;
   /**
    * This character's own contact list, indexed once per snapshot. Empty
    * (never missing) when the contacts scope isn't granted — a stranger's tag
@@ -111,6 +113,7 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_CATEGORIES: ReadonlyMap<number, NameCategory> = new Map();
 const NO_STANDING_INDEX: ContactStandingIndex = new Map();
 const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 
@@ -171,14 +174,19 @@ async function loadContractsSnapshot(
   const contractsTruncated = contractsResult?.truncated ?? false;
   // Already superseded: skip the name/standing lookups, their results would be discarded.
   const contracts = signal.cancelled ? [] : (contractsResult?.data ?? []);
-  const issuerIds = contracts.map((c) => c.issuer_id);
-  // Receivers share the name map; only character receivers have affiliations.
-  const receivers = contracts.flatMap((c) => contractReceiver(c, characterId) ?? []);
+  const issuers = contracts.map(contractIssuer);
+  // Receivers share the name map; their kind comes from the resolved category.
+  const receiverIds = contracts.flatMap((c) => contractReceiver(c, characterId)?.id ?? []);
+  const receiverCategories = await resolveCategories(receiverIds);
+  const receivers = contracts.flatMap(
+    (c) => contractReceiver(c, characterId, receiverCategories) ?? []
+  );
+  // Only characters have affiliations/standings.
   const [issuerNames, contactsStatus, issuerAffiliations] = await Promise.all([
-    resolveNames([...issuerIds, ...receivers.map((r) => r.id)]),
+    resolveNames([...issuers.map((i) => i.id), ...receivers.map((r) => r.id)]),
     signal.cancelled ? Promise.resolve(null) : loadContacts(characterId),
     resolveAffiliations([
-      ...issuerIds,
+      ...issuers.filter((i) => i.kind === 'character').map((i) => i.id),
       ...receivers.filter((r) => r.kind === 'character').map((r) => r.id),
     ]),
   ]);
@@ -188,6 +196,7 @@ async function loadContractsSnapshot(
     contractsNeedsReauth,
     contractsTruncated,
     issuerNames,
+    receiverCategories,
     standingIndex,
     issuerAffiliations,
   };
@@ -299,6 +308,7 @@ export function Contracts() {
   const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
   const contractsTruncated = data?.contractsTruncated ?? false;
   const issuerNames = data?.issuerNames ?? NO_NAMES;
+  const receiverCategories = data?.receiverCategories ?? NO_CATEGORIES;
   const standingIndex = data?.standingIndex ?? NO_STANDING_INDEX;
   const issuerAffiliations = data?.issuerAffiliations ?? NO_AFFILIATIONS;
 
@@ -387,8 +397,10 @@ export function Contracts() {
   // `CONTRACTS_HISTORY_COLUMN_IDS`' own order.
   const receiverFor = useCallback(
     (contract: Contract) =>
-      activeCharacterId === null ? null : contractReceiver(contract, activeCharacterId),
-    [activeCharacterId]
+      activeCharacterId === null
+        ? null
+        : contractReceiver(contract, activeCharacterId, receiverCategories),
+    [activeCharacterId, receiverCategories]
   );
   const optionalHistoryColumns = useMemo<
     Record<ContractsHistoryColumnId, DataTableColumn<Contract>>
@@ -405,17 +417,32 @@ export function Contracts() {
       issuer: {
         id: 'issuer',
         header: t('contracts.issuer'),
-        sortValue: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
-        render: (contract) => (
-          <span className="inline-flex items-center gap-1.5">
-            <CharacterLink id={contract.issuer_id} className="text-left">
-              {issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
-            </CharacterLink>
-            <StandingTag
-              standing={characterStanding(standingIndex, contract.issuer_id, issuerAffiliations)}
-            />
-          </span>
-        ),
+        sortValue: (contract) => {
+          const { id } = contractIssuer(contract);
+          return issuerNames.get(id) ?? `#${id}`;
+        },
+        render: (contract) => {
+          const issuer = contractIssuer(contract);
+          const name = issuerNames.get(issuer.id) ?? `#${issuer.id}`;
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              {issuer.kind === 'corporation' ? (
+                <CorporationLink id={issuer.id} className="text-left">
+                  {name}
+                </CorporationLink>
+              ) : (
+                <CharacterLink id={issuer.id} className="text-left">
+                  {name}
+                </CharacterLink>
+              )}
+              {issuer.kind === 'character' && (
+                <StandingTag
+                  standing={characterStanding(standingIndex, issuer.id, issuerAffiliations)}
+                />
+              )}
+            </span>
+          );
+        },
       },
       receiver: {
         id: 'receiver',
@@ -695,13 +722,14 @@ export function Contracts() {
           characterId={activeCharacterId}
           contract={selectedContract}
           issuerName={
-            issuerNames.get(selectedContract.issuer_id) ?? `#${selectedContract.issuer_id}`
+            issuerNames.get(contractIssuer(selectedContract).id) ??
+            `#${contractIssuer(selectedContract).id}`
           }
-          issuerStanding={characterStanding(
-            standingIndex,
-            selectedContract.issuer_id,
-            issuerAffiliations
-          )}
+          issuerStanding={
+            contractIssuer(selectedContract).kind === 'character'
+              ? characterStanding(standingIndex, selectedContract.issuer_id, issuerAffiliations)
+              : null
+          }
           receiver={modalReceiver}
           receiverName={modalReceiverName}
           receiverStanding={

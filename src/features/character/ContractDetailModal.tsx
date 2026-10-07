@@ -40,10 +40,10 @@ import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { CharacterLink } from '@/features/entities';
+import { CharacterLink, CorporationLink } from '@/features/entities';
 import { StandingTag } from './StandingTag';
 import { ContractReceiverLink } from './ContractReceiverLink';
-import type { ContractReceiver } from './contractCounterparty';
+import { contractIssuer, type ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -92,6 +92,7 @@ export function ContractDetailModal({
   onClose,
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
+  const issuer = contractIssuer(contract);
   const timeZone = useTimeZone();
   const deliverByMs = courierDeliveryDeadlineMs(contract);
   const hubId = useMarketHub((s) => s.value);
@@ -214,7 +215,11 @@ export function ContractDetailModal({
 
             <dt className="text-text-dim uppercase">{t('contracts.detailIssuedBy')}</dt>
             <dd className="flex items-center gap-1.5">
-              <CharacterLink id={contract.issuer_id}>{issuerName}</CharacterLink>
+              {issuer.kind === 'corporation' ? (
+                <CorporationLink id={issuer.id}>{issuerName}</CorporationLink>
+              ) : (
+                <CharacterLink id={issuer.id}>{issuerName}</CharacterLink>
+              )}
               <StandingTag standing={issuerStanding} />
             </dd>
 

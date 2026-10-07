@@ -1,5 +1,5 @@
 import type { Contract } from '@/esi/endpoints';
-import { contractReceiver } from './contractCounterparty';
+import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
 
 /**
@@ -36,7 +36,7 @@ export function filterContracts(
     if (filter.status !== null && contract.status !== filter.status) return false;
     if (filter.type !== null && contract.type !== filter.type) return false;
     if (text !== '') {
-      const issuerName = issuerNames.get(contract.issuer_id) ?? '';
+      const issuerName = issuerNames.get(contractIssuer(contract).id) ?? '';
       const receiver = selfId === undefined ? null : contractReceiver(contract, selfId);
       const receiverName = receiver ? (issuerNames.get(receiver.id) ?? '') : '';
       const title = contract.title ?? '';
