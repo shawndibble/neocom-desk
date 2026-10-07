@@ -53,6 +53,10 @@ describe('salesTax', () => {
     expect(salesTax(1_000_000, 5)).toBeCloseTo(33_750, 6);
     expect(salesTax(0, 5)).toBe(0);
   });
+
+  it('Accounting III: 7.5% x (1 - 0.33) = 5.025%', () => {
+    expect(salesTax(10_000_000, 3)).toBeCloseTo(502_500, 6);
+  });
 });
 
 describe('brokerFee', () => {

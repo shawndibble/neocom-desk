@@ -336,9 +336,10 @@ export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<Sec
  * needed — `RIG_SLOT_COUNT` is the most a structure can fit.
  *
  * Source: EVE University wiki "Stacking penalties" — CCP's general module
- * formula `multiplier(i) = e^(-(i / 2.67805)^2)` for the i-th strongest
- * module (0-indexed) in a penalty group, rounded to 3 decimals: 1, 0.869,
- * 0.571 for i = 0, 1, 2.
+ * formula `multiplier(i) = e^(-(i / 2.67)^2)` for the i-th strongest module
+ * (0-indexed) in a penalty group: 1, 0.86912, 0.57058, rounded to 3
+ * decimals: 1, 0.869, 0.571 for i = 0, 1, 2. The constant 2.67805 would give
+ * 0.86985 / 0.57251, which do not round to the table values.
  */
 const STACKING_PENALTY_MULTIPLIERS: readonly number[] = [1, 0.869, 0.571];
 
