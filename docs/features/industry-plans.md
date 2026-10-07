@@ -41,7 +41,7 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
 | Costs & revenue ledger | `ResultsSummary.tsx` (collapsible) | Job fee disclosure, tax, broker, net/gross toggle, break-even, use-or-sell |
 | Calculation Breakdown modal | `CalculationBreakdown.tsx` | Rule + live values per figure |
 | Production Runs panel | `ProductionRunsPanel.tsx` | Log Production, edit, link sales, watch orders, CSV |
-| Log production from Active Jobs | `IndustryPlanPage.tsx:55`, `BuildPlanDetail.tsx:398` | Router state seeds Log Production form |
+| Log production from Active Jobs | `IndustryPlanPage.tsx:59-66`, `BuildPlanDetail.tsx:398` | Router state seeds Log Production form |
 | Group page | `/industry/groups/:id` `BuildGroupPanel.tsx` | Verdict band, Auto Build, Retarget, copy list (per hub), Members, Crafted, Materials + owned overlay |
 | Retarget group dialog | `RetargetGroupDialog.tsx` | Two-step bulk write of hub/facility/security/system |
 | Auto Build (group) | `AutoBuildControl.tsx` | Strategy select + Apply... confirm; per-member |
@@ -76,14 +76,14 @@ Prior docs this expands: ADR 0006 (`docs/adr/0006-build-plan-dual-verdict-and-pr
 
 ## 3. Build Plans tab (`/industry/plans`)
 
-Host: `src/routes/Industry.tsx` (Plans branch `Industry.tsx:652`). Chrome above the list: `PageHeader` "Industry" + gear (IndustrySettingsForm), Active Jobs panel, blueprints reauth banner, 4-tab strip (`IndustryHeader.tsx`).
+Host: `src/routes/Industry.tsx` (Plans branch `Industry.tsx:653`). Chrome above the list: `PageHeader` "Industry" + gear (IndustrySettingsForm), Active Jobs panel, blueprints reauth banner, 4-tab strip (`IndustryHeader.tsx`).
 
 ### 3.1 States
 - Loading: spinner until plans, catalog, `buildGroupsHydrated`, `expandedGroupsHydrated` (`Industry.tsx:573`).
 - Empty (no plans, no groups): EmptyState "No build plans yet / Create a plan to price out a manufacturing job" (`BuildPlanList.tsx:946`). Picker + toolbar still shown. Empty group with no plans shows only its header.
 - Plans exist: `AssumesBaseStandingsNote` above the picker (broker fee at 0 standing hint, `Industry.tsx:654`).
 - Per-row figures loading, unpriceable or errored: all render "—" / Unknown tag (no distinct loading cell). `useComparedBuildResults` placeholder rows.
-- Compare mode with <2 checked and "Compare" pressed: EmptyState "Select at least 2 plans" + hint "Check 2 or more build plans..." + Done (`Industry.tsx:641`).
+- Compare mode with <2 checked and "Compare" pressed: EmptyState "Select at least 2 plans" + hint "Check 2 or more build plans..." + Done (`Industry.tsx:642`).
 
 ### 3.2 Toolbar (Panel actions, `BuildPlanList.tsx:898-940`)
 - Normal: Import a fit (clipboard icon, `fitImportOpen`), Create group (BuildGroup icon), Compare (icon, only when >1 plan). Icon-only to fit a phone (#626 comment).
@@ -228,9 +228,9 @@ Opened by "Change tier" / "Find blueprint" on a Blueprint row (top-level plan or
 - Each row: ME/TE, runs, price, per-run price, "Cheapest" tag, "Use this blueprint" (selected tag on current pick); sections truncate with "Showing X of Y".
 - Pick writes `acquisitionTierOverride` (+ `overridePrice` unless owned) on the blueprint's own `materialSourcing`; on the top-level plan also sets plan runs to the pick's coverage (`runsForPickedRow`, `onPickRuns`).
 - Loading spinners delayed 200 ms; each section has loading / unavailable / empty copy.
-- Engine: cheapest total-cost tier (owned vs buy, BPO vs BPC, extend by buying), `purchasedRuns` credited back for later nodes using the same blueprint; reaction nodes consider BPO only; far-region contracts are last resort.
+- Engine: cheapest total-cost tier (owned vs buy, BPO vs BPC, extend by buying), `purchasedRuns` credited back for later nodes using the same blueprint; reaction nodes get no BPC contract offers (formulas cannot be copied; BPC Sourcing never searched); far-region contracts are last resort.
 
-### 6.8 Costs & revenue panel (`ResultsSummary.tsx`, collapsible, open by default from `xl`/desktop, folded on phone)
+### 6.8 Costs & revenue panel (`ResultsSummary.tsx`, collapsible, open by default at desktop width (`useIsDesktop`, 64rem), folded below it; pilot toggle overrides)
 Folded summary: Total cost, Revenue, Net profit (full-precision `formatIsk`, #948). Header ⓘ ("Calculations?", `breakdownTrigger`) opens Calculation Breakdown.
 Open:
 - Warnings: unpriced materials count; product unpriced (Market link).
@@ -245,9 +245,9 @@ Open:
 Sections: Prices (materials basis, ore/owned/built rules, product), Materials (ME formula, reaction has none, formula with live material cost), Job fee (cost index + system, formula lines, total cost formula), Revenue (qty x price, assumption, tax/broker % from Accounting, Broker Relations, standings, formula), Profit (net/gross/ISK per hour), Break-even (formula, 100 ISK floor), Use or sell, Verdicts (Acquisition vs Sale). Tax/broker % read from `engine/industry/fees` (same source as result). `Section`/`Formula` also reused by `RealizedProfitBreakdown.tsx` for Production Runs.
 
 ### 6.10 Production Runs panel (`ProductionRunsPanel.tsx`, `productionRunColumns.tsx`, `productionRunSummary.ts`, `SaleLinkingControls.tsx`)
-Collapsible panel (closed by default) "Production Runs", rollup in header ("N runs - profit - open"), `TableActionsMenu` CSV (`build-plan-runs`), Log Production button.
+Panel "Production Runs", collapsible only once a run exists (folded by default then; with no runs it shows the empty state open), rollup in header ("N runs - profit - open"), `TableActionsMenu` CSV (`build-plan-runs`), Log Production button.
 - Log Production modal (hero button, panel button, or Active Jobs seed): Quantity, Material cost, Job fee (`SourcingInput`s, no validation: blank = 0), live Total cost, Save. Defaults = plan's live quantity/material cost/job fee, or a job seed (job runs x yield, job fee; material cost stays the plan's estimate). Writes `productionRuns` (Dexie), `scheduleSync`.
-- Table columns: Logged, Quantity, Total cost, Realized revenue, Realized profit (with `RealizedProfitBreakdown`), Sold, Status (new / open / closed), actions (Sold split button: link past sale, watch open order, manual sale; Edit). Empty state `industry.productionRunsEmptyTitle/Hint`.
+- Table columns: Logged, Quantity, Total cost, Qty sold ("sold / made"), Realized profit (with `RealizedProfitBreakdown`; no separate revenue column), Status (new / open / closed), actions (Sold split button: link past sale, watch open order, manual sale; Edit). Empty state `industry.productionRunsEmptyTitle/Hint`.
 - Edit run modal: same three fields, linked sales + watched orders lists with unlink / unwatch icons, "Delete run" danger button (no confirm in this modal; a confirm modal exists in `SaleLinkingControls.tsx:268` for the other path).
 - Realized profit (`engine/industry/realizedProfit.ts`): confirmed sales only; sales tax on all, broker only on watched-order revenue. Full Records view: other doc.
 
@@ -264,7 +264,7 @@ Collapsible panel (closed by default) "Production Runs", rollup in header ("N ru
 `SkillGateMarker.tsx`: chip naming the missing skill (or "N skills"); popover for the closest Character: each missing skill (modal link), training time, Add to Skill Plan. Shown on the hero, built rows, and bought rows where advice says build; account-wide (any Character can install passes). No "can build" positive state.
 
 ### 6.14 Log production from Active Jobs (`LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts`)
-Row action in Active Jobs resolves the job's blueprint to the Character's plans: one match navigates straight to that plan page with router state `logProductionFromJob` (runs, job fee); none opens a dialog "Create plan" (`createBuildPlanForJob`, failure alert); many opens a picker. `IndustryPlanPage.tsx:55-66` strips state after read (keyed on `location.key`); `BuildPlanDetail.tsx:398` opens the Log Production form prefilled.
+Row action in Active Jobs resolves the job's blueprint to the Character's plans: one match navigates straight to that plan page with router state `logProductionFromJob` (runs, job fee); none opens a dialog "Create plan" (`createBuildPlanForJob`, failure alert); many opens a picker. `IndustryPlanPage.tsx:59-66` strips state after read (keyed on `location.key`); `BuildPlanDetail.tsx:398` opens the Log Production form prefilled.
 
 ## 7. Dialogs and modals index
 
@@ -353,14 +353,14 @@ Materials (`materials.ts:42-45`)
 - `mod = (1 - ME/100) x (1 - structure%/100) x (1 - rig%/100)` (`materials.ts:38`). Rigs apply only when `facility.structure` is true (NPC station gets 0). ME range 0..10 else `RangeError` (adapter clamps first). Example: 10 runs, base 1000, ME10, Raitaru (1%), no rig: mod 0.891, qty 8,910. Nullsec ME T2 rig adds `2.4 x 2.1 = 5.04%`: mod 0.8461.
 - Rig bonuses (`types.ts` RIG_KIND_BONUS): ME T1 2, ME T2 2.4, TE T1 20, TE T2 24 (percent). Multiple same-type rigs: sorted strongest first, stacking-penalty multipliers 1 / 0.869 / 0.571 (`STACKING_PENALTY_MULTIPLIERS`), then x security multiplier. Two ME T2 rigs: `2.4 + 2.4 x 0.869 = 4.4856`. Security multiplier manufacturing: high 1, low 1.9, null 2.1; reactions: high 1, low 1, null 1.1 (`types.ts` RIG_SECURITY_MULTIPLIER / REACTION_RIG_SECURITY_MULTIPLIER). Wormhole = null band. Legacy single-tier `rigLevel` still resolves via `resolveRigFit`.
 - Facility presets (`types.ts:216-275`): NPC station mat 0 / time 0 / cost 0 / tax 0.25%; Raitaru 1 / 15 / 3; Azbel 1 / 20 / 4; Sotiyo 1 / 30 / 5 (tax default 0, user-entered); Athanor 0/0/0; Tatara time 25 only. Citadels absent: not industry-capable (`FACILITY_KIND_BY_STRUCTURE_TYPE_ID`: 35825/6/7 Raitaru/Azbel/Sotiyo, 35835/6 Athanor/Tatara).
-- ME 0 for reactions always (`computeBuildPlan.ts:104-107`); TE likewise. Sub-builds of manufacturing nodes use the owned/assumed ME of that blueprint (`recipe.me`), or the Blueprint Acquisition tier's ME when one resolves; reaction nodes ME 0.
+- ME 0 for reactions always (`computeBuildPlan.ts:108-110`); TE likewise. Sub-builds of manufacturing nodes use the owned/assumed ME of that blueprint (`recipe.me`), or the Blueprint Acquisition tier's ME when one resolves; reaction nodes ME 0.
 
 Job fee (`jobCost.ts:32-53`)
 - `EIV = runs x sum(baseQty_ME0 x ESI adjusted_price)`; missing adjusted price counts 0 (`jobCost.ts:19-29`). ME does not reduce EIV. Cost index is a fraction (2.72% = 0.0272) from `/industry/systems` for the build system, else the hub's system (decision `20260905-000835`).
 - `fee = EIV x costIndex x (1 - jobCostBonus%) + EIV x 4% (SCC) + EIV x facilityTax%`. Structure bonus hits only the index term. Worked: EIV 10,000,000, index 0.0272, Raitaru, tax 0: 263,840 + 400,000 + 0 = 663,840. NPC at same numbers: 272,000 + 400,000 + 25,000 = 697,000. Facility tax is the typed percent for structures, ignored for NPC (`computeBuildPlan.ts:111`). Alpha clone tax ignored.
 - Sub-job fees: each nested job pays its own fee at its own `runs` (sized by `sizeRuns`) and its own EIV; rolled into `sub.totalFees`, and into the parent's `materialCost` via the unit cost (so `buildVsBuy.totalCost = materialCost + top-level fee` already includes every sub-job fee, `buildVsBuy.ts:104-105`). Reaction nodes use the Reaction Location context (`reactionCtx`) with its own index, tax, rigs.
 
-Time (`time.ts:27-47`, `characterModifiers.ts:95-136`)
+Time (`time.ts:13-47`, `characterModifiers.ts:95-136`)
 - `seconds = base x runs x (1-TE/100) x (1-facilityTime%) x (1-rigTE%) x characterMult`. TE 0..20.
 - Character mult, manufacturing: Industry 4%/level x Advanced Industry 3%/level x each blueprint-listed science skill (1%/level, Mutagenic Stabilization 2%, `types.ts:422`) x BX-80x implant (BX-801 1%, 802 2%, 804 4%). All multiplicative. Reactions: Reactions skill 4%/level only; no Industry, science or BX. Missing skills/implants scope: treated as 0 (note `ImplantsAssumedNote`).
 - Sub-job time: quoted at TE 0 (`subBuild.ts` passes `0`); `resolvedSubBuildSeconds` adds every nested job serially (no parallelism, no slot model in the sum). The footnote says sub-jobs add this before the main run can start.
@@ -370,7 +370,7 @@ Fees on revenue (`fees.ts`)
 - Sales tax % = `7.5 x (1 - 0.11 x Accounting)`: 3.375% at V. Broker % = `3 - 0.3 x BrokerRelations - 0.03 x factionStanding - 0.02 x corpStanding`, floored at 0, min 100 ISK per order (`brokerFee`, `fees.ts:61-70`; `value <= 0` -> 0). Levels must be integer 0..5. Standings arrive pre-resolved for the Trade Hub's NPC owner (#1238); absent = 0, shown by `AssumesBaseStandingsNote`.
 - Break-even price per unit (`fees.ts:133-150`): `cost / (1 - (tax% + broker%)/100) / qty`; if that implies a broker fee under 100 ISK it re-solves as `(cost + 100) / (1 - tax%/100)` (the floor). Null when qty <= 0. Relist break-even uses the discounted broker rate (50% + 6%/level Advanced Broker Relations; 80% at V): a Market-side helper, not on the plan page.
 
-Verdicts (`buildVsBuy.ts:107-151`)
+Verdicts (`buildVsBuy.ts:107-154`)
 - `revenue = productQty x runs x hubLowestSell` (product always from `hubPrices`, never the material price basis). `profit = revenue - tax - broker - totalCost`; `grossProfit = revenue - totalCost`; `margin = profit/revenue` (null at revenue 0); `recommendation = totalCost <= revenue ? build : buy` (ties go to build; no fees in it). `buyCost == revenue`: "what buying the product outright costs" equals its sell value by construction.
 - Unpriceable: any unpriced leaf (at any depth) OR product unpriced -> profit, margin, ISK/h, gross*, recommendation all null/'unknown'; `breakEvenPrice` still computed. A built material whose subtree is poisoned reports its blocking leaf typeIDs via `unpricedLeafTypeIds`.
 - Dual verdict (ADR 0006): Acquisition Verdict = `recommendation` (gross, "no market-selling fees apply since nothing is sold"); Sale Profitability = `profit` sign (net). They can disagree: totalCost <= revenue (build) while net profit < 0 when tax+broker exceed the margin. Gross/net toggle covers Profit, Margin, ISK/h; Break-even stays net.
@@ -420,7 +420,7 @@ Verdicts (`buildVsBuy.ts:107-151`)
 
 ## 14. Responsive behavior
 - List: Profit + name always; Verdict/Runs from `sm`; ISK/h + Margin from `lg`; toolbar icon-only; drag handle size-9 on touch.
-- Plan page: Hero row wraps (`xl` joins button column); Costs panel sits beside Materials from `xl` (Volume column hidden between `xl` and `2xl`); below `xl` stacked; Costs folded by default on phone; Materials switches to the phone ledger below the phone breakpoint; Setup is a fold; inputs 2-3 col grid; rigs wrap.
+- Plan page: Hero row wraps (`xl` joins button column); Costs panel sits beside Materials from `xl` (Volume column hidden between `xl` and `2xl`); below `xl` stacked; Costs folded by default below 64rem (`useIsDesktop`, not only phones); Materials switches to the phone ledger below the phone breakpoint; Setup is a fold; inputs 2-3 col grid; rigs wrap.
 - Group page: two columns from `lg`; Materials table drops Volume and Owned columns on phone (`phoneHidden`) and scrolls sideways; so Group Owned Overlay entry is not available on phone (only via Use all).
 - Compare: scrolls sideways, plan pinned.
 - Touch: row long-press = menu (`useLiftAfterHoldGuard`); info/tooltips use `openOnTap` where the row tap is otherwise inert.
@@ -472,11 +472,11 @@ Cross-cutting
 8. What does an unpriced material do? It poisons: `unitCost` null up the tree, profit/margin/ISK-h/recommendation null, plan "Unknown" (`materialResolution.ts:323-331`, `buildVsBuy.ts:110,133`). Never costed as zero. Lists show "-"/Unknown; the Costs panel counts unpriced materials.
 9. How does owned stock interact with sub-builds? One shared pool per plan resolution; first branch claims, later branches see the rest (`materialResolution.ts:162-175`). Owned is deducted before deciding to build, so only the remainder is sized into runs. On groups, member trees re-resolve with owned stripped and a Group Owned Overlay nets once (`groupRollup.ts`, `computeGroupResult`).
 10. Why can a sub-build cost differ from the make-or-buy glyph's quote? The glyph is one level deep at hub prices, TE 0, inputs bought (`makeOrBuy.ts:1-8`). The plan resolves recursively, with owned stock, per-material overrides, acquisition tiers. Savings in the tooltip are `|buy-make| x remaining` (`:310`).
-11. How does Blueprint Acquisition choose? Cost-minimization over tiers: each owned tier and each purchasable tier, `materialCost(ME) + whole-copy shortfall x price`; strictly cheapest wins; BPO owned covers infinite runs but still competes (`blueprintAcquisition.ts:215-405`). Barter (price 0), multi-type, malformed offers dropped (`usableOffers`). Reaction nodes: BPO only. Cost can be hidden by Count blueprint cost = off, tier unchanged (decision `20260911-150427`).
+11. How does Blueprint Acquisition choose? Cost-minimization over tiers: each owned tier and each purchasable tier, `materialCost(ME) + whole-copy shortfall x price`; strictly cheapest wins; BPO owned covers infinite runs but still competes (`blueprintAcquisition.ts:182-405`). Barter (price 0), multi-type, malformed offers dropped (`usableOffers`). Reaction nodes: no BPC contract offers. Cost can be hidden by Count blueprint cost = off, tier unchanged (decision `20260911-150427`).
 12. How does Break-even runs work and when does it fail? Doubles from current runs to 1,000,000 then bisects (`breakEvenRuns.ts:14-47`). Can miss a pocket between doublings and returns "no break even" if none; the message renders without the `{{max}}` value (gap).
 13. What is the break-even price and why is it always net? `cost / (1 - tax% - broker%)/qty` with a 100 ISK broker floor re-solve (`fees.ts:133-150`). ADR 0006: it answers "at what price do I stop losing ISK", true only after sale fees.
 14. Why does Auto Build overwrite hand picks, and is group Auto Build undoable? It rewrites `buildHere` for the whole tree (single: immediately; group: confirm via "Apply...") and saves `autoBuildDefault` (`autoBuildGroup.ts`, decisions `20260910-225348`, `20260910-220447`). No undo and no preview (gap). Skill-gated materials always become buy.
-15. How is job time computed and what is missing? `base x runs x (1-TE) x (1-facility) x (1-rig) x Industry(4%/lvl) x AdvIndustry(3%/lvl) x science(1%/lvl) x BX-80x` (reactions: Reactions 4%/lvl only) (`time.ts:27-47`, `characterModifiers.ts:112-136`). Sub-jobs TE 0, summed serially, no slot parallelism; implants unknown without clones scope (`ImplantsAssumedNote`).
+15. How is job time computed and what is missing? `base x runs x (1-TE) x (1-facility) x (1-rig) x Industry(4%/lvl) x AdvIndustry(3%/lvl) x science(1%/lvl) x BX-80x` (reactions: Reactions 4%/lvl only) (`time.ts:13-47`, `characterModifiers.ts:112-136`). Sub-jobs TE 0, summed serially, no slot parallelism; implants unknown without clones scope (`ImplantsAssumedNote`).
 16. Does a Build Plan model refining? No. Reprocessing is a separate engine (Open Orders exits, Appraisal, mining-tax valuation); formula and rules in section 13.1 (`reprocessing.ts:68-127`; decision `20260906-180034`).
 17. What persists where? Plans in Dexie `buildPlans`, synced as Editable Data; group names/order/snapshot/overlay/autoBuildDefault in synced setting `sync.industryBuildGroups`; membership on the plan; expanded groups, sort, ticks, gross/net, use-or-sell basis are local (device or component state); refresh tokens Dexie only (`db/index.ts:240`, `buildPlanStore.ts`, `buildGroups.ts`).
 18. What happens when ESI scopes are missing? Blueprints scope: reauth banner, no owned tiers (assumed ME); assets: no owned detection; standings: base-standing note, broker at 0 standing; implants: note; search/structures scope: picker hint + "Log in again", typed Override still works; corp assets need Director role (chip disabled with tooltip). All routes ungated (`routeScopes.ts:97,118,119`).

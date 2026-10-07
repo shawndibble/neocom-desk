@@ -94,14 +94,14 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 5. Why is Alerts a non-reorderable column? Different volume class, device-wide (`Overview.tsx:461-466`, `cardOrder.ts`).
 6. Phone layout? Two full cards in pilot order, rest folded; no severity reshuffle.
 7. How does Orders stay cheap? Shared snapshot, no deep competition inputs, filter to active Character (`Overview.tsx:324-356`).
-8. Which card is not per-Character? Mining tax (`boardData.ts:149`).
+8. Which card is not per-Character? Mining tax (`features/overview/boardData.ts:149`).
 9. How is hide/order synced? `createSyncedSetting`; keys above.
 10. Idle-queue warning vs alert? Strip mirrors `characterNotTraining` mute so the two never disagree (#1731).
 11. No active Character? Redirect to `/characters` (`Overview.tsx:399`).
 
 ## Observed gaps
 
-- Mining tax card is all-Character but the header comment lists only alerts/structures/moon as exceptions (`boardData.ts:149`, `Overview.tsx:26`).
+- Mining tax card is all-Character but the header comment lists only alerts/structures/moon as exceptions (`features/overview/boardData.ts:149`, `Overview.tsx:26`).
 - Rows capped at `ROW_LIMIT = 4` (`cards.tsx:80`) and alerts at 7 groups (`cards.tsx:876`); overflow is only a link.
 - Hidden cards still fetch on load and refresh (`Overview.tsx:752`).
 - SP extraction card has `loading: false` always.

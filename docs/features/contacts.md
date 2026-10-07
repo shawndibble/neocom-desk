@@ -22,7 +22,7 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
 | Fetch all characters | Button on Across view: live refetch of each Character's contacts | `:577` |
 | Row click | Opens Public Info modal (character/corp/alliance); faction unclickable | `onRowClick` |
 | CSV export | Visible rows of the active view; `-partial` suffix when truncated | `contactsCsv.ts` |
-| Refresh + Data Age | Header | `Contacts.tsx:1060` |
+| Refresh + Data Age | Header | `Contacts.tsx:1077,1104` |
 | Reauth banner | Contacts scope missing/revoked | `GrantBanner` |
 
 ## Routing and view selection

@@ -23,7 +23,7 @@ All paths under `src/features/fittings/` unless stated.
 - Tabs are path segments (ADR 0015, `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`). `SHIPS_TABS` (`shipsTabs.ts`, base `/ships`): `fittings` (default, first), `tree`, and standalone `fittings/edit` (the editor; not in the bar). Unknown segment -> default tab (`Ships.test.tsx:103`).
   - `/ships` and `/ships/fittings`: Fittings Start screen.
   - `/ships/fittings/edit`: editor, same mounted `<Fittings />` as the library so state carries across the navigation (`Ships.tsx`, `Ships.test.tsx:72`).
-  - `/ships/fittings/compare`: ordinary nested route (`src/app/App.tsx:171`), shares no state.
+  - `/ships/fittings/compare`: ordinary nested route (`src/app/App.tsx:172`), shares no state.
   - `/ships/tree`: Ship Tree. Only query param: `?faction=<int>` (`intParam(DEFAULT_FACTION_ID, {min: 0})`, `ShipTreeTab.tsx:31`). Default faction Caldari (`shipTreeModel.ts:25`). Unknown/missing id -> `resolveFactionID` falls back to Caldari (test `ShipTreeTab.test.tsx:176`).
 - Nav: `progression` group, `mobileTab: true`, `gating: 'scope'` but route requirement `UNGATED` (`src/app/navDestinations.ts:165`, `src/app/routeScopes.ts:107`): no ESI scope needed to open; Tree works with no Character.
 - Header: `Ships` draws `PageHeader` + `ShipsTabBar` for the Tree tab only; `Fittings` draws its own header and tab bar on its Start screen only (an open Fitting shows neither). Header title is `nav.ships` on both tabs.
@@ -57,12 +57,12 @@ Scopes: none gate the page. Skills/attributes/implants reads are the Skills area
 - Class rules (`rules.ts`): `classUnlocked` = every class prereq for this faction trained (displayed or not; lights the class and its connector lines). `classNeedsOmega` = any class prereq level > the skill's Alpha max (cap 0 = Alphas cannot train it); drives the gold Omega marks. `parentEmpires` = for a pirate faction class with exactly two displayed empire prereqs, returns [bottom, top] sorted by descending faction id (Caldari above Gallente as in game); [] for empires, ORE, others.
 - Tech marks (`techMark`, `shipTreeModel.ts:90`): T3 (`techLevel >= 3`, red III), T2 (orange II), else faction/Navy ◇ when `metaLevel >= 6` or the class is a stacked class or the faction is a pirate faction; shown always, independent of mastery.
 - Flyable count per faction = hulls with `canFly` / total hulls (`flyableCount`).
-- Status gating (`useShipTreeData.ts:74`): with a Character, no statuses are computed until its trained skills have been read (`trainedSkillsKnown`); until then everything renders dim rather than guessing. With no Character, statuses compute against zero trained skills (everything dim) and clone = Omega.
+- Status gating (`useShipTreeData.ts:84-87`): with a Character, no statuses are computed until its trained skills have been read (`trainedSkillsKnown`); until then everything renders dim rather than guessing. With no Character, statuses compute against zero trained skills (everything dim) and clone = Omega.
 - Time `now` is captured once at mount (`useState(() => new Date())`), so "time to fly" does not tick.
 
 ## 4. Ship Tree tab
 
-States (`ShipTreeTab.tsx`): loading spinner `ships.tree.loading`; failed (tree or catalog) `EmptyState` `ships.tree.loadFailed` + "Check your connection, then reload the page"; no Character: banner `ships.tree.noCharacter` ("every hull shows as untrained"), tree still drawn dim; credit footer (`ships.tree.credit`, CCP art via EVE University wiki). Masteries failing to load is swallowed (`useShipTreeData.ts:60`): the tree reads, badges are just empty, no notice.
+States (`ShipTreeTab.tsx`): loading spinner `ships.tree.loading`; failed (tree or catalog) `EmptyState` `ships.tree.loadFailed` + "Check your connection, then reload the page"; no Character: banner `ships.tree.noCharacter` ("every hull shows as untrained"), tree still drawn dim; credit footer (`ships.tree.credit`, CCP art via EVE University wiki). Masteries failing to load is swallowed (`useShipTreeData.ts:70-71`): the tree reads, badges are just empty, no notice.
 
 View switch (`SegmentedControl`, label "Ship tree view"): Map | Ladder. Default Map on desktop, Ladder on phone (`resolveShipTreeView`, `shipTreeViewPreference.ts`); choice stored per device and never in the URL. On phone, or whenever view is Ladder, `FactionBar` shows above the view; on the desktop Map the faction picker is the in-canvas grid.
 
@@ -79,7 +79,7 @@ View switch (`SegmentedControl`, label "Ship tree view"): Map | Ladder. Default 
 ### Ladder (`ShipTreeLadder.tsx`)
 The same tree read top to bottom. Each main-lane class is a collapsible `<details>` section (top level open by default, nested classes closed; `ladderSections`/`isNested` nest branch, capital and drop lanes under their parent). Per section: icon, name, "flyable of total", Omega chip where the Map would draw an Omega (test `ShipTreeTab.test.tsx:259` asserts they match), "Needs:" skill chips (displayed class skills with "have N"), hull list with tone/tech/mastery.
 - Filter box "Search this faction..." (substring on hull names, current faction only); "Only ones I can fly" checkbox (`canFly === true`). Both are local state, lost on faction switch/reload.
-- While a filter is active every section with a match is forced open and manual collapse is ignored (`open={searching || userOpen}`, `ShipTreeLadder.tsx:191`), restored when cleared (test `:279`). Sections with no visible hull or descendant are hidden.
+- While a filter is active every section with a match is forced open and manual collapse is ignored (`open={searching || userOpen}`, `ShipTreeLadder.tsx:191`), restored when cleared (test `:279`, same file). Sections with no visible hull or descendant are hidden.
 - "Other factions:" chip row while filtering: matches from other factions (`searchHulls` over hulls of other factions); tap switches faction and opens that hull (test `:319`). Empty: "No hulls match."
 - No zoom in Ladder by decision (`20260927-100237`).
 
@@ -132,7 +132,7 @@ Resolves the hull's blueprint via `planTargetForItem`. Spinner while the baked c
 
 ## 8. Observed gaps
 - Selected hull, Ladder filter and only-flyable are not in the URL; a Ship Info window cannot be linked (only `?faction=`).
-- Masteries and owned-blueprint load failures are swallowed (`useShipTreeData.ts:60`, `BlueprintTab.tsx:36`): badges vanish or "own" text is absent with no notice.
+- Masteries and owned-blueprint load failures are swallowed (`useShipTreeData.ts:70-71`, `BlueprintTab.tsx:57`): badges vanish or "own" text is absent with no notice.
 - `secondsToFly` ignores Alpha caps (`status.ts`): an Alpha pilot is shown a finite time for a hull needing Omega-only levels; Omega marks exist only at class level.
 - "Time to fly" and `now` are fixed at mount; no refresh control on the tab, so statuses lag until the Skills data refreshes elsewhere.
 - Ship Tree has no sort, no export/CSV, no "flyable now" aggregate across factions; Ladder filter is faction-local and not remembered.

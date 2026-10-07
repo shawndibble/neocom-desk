@@ -270,7 +270,7 @@ Behaviour:
 - Permissions: no scope needed. A Character is optional (skills, plans).
 - Persistence: none of its own; price location from device-local hub and location mode settings (shared with Market); Add to Plan writes a Skill Plan (synced).
 
-Interview Qs: **Why does Show info keep working offline?** It does not fully: type data and prices need ESI; Used-in and PI do (SDE). `ItemDetailModal.tsx:260-266`. **Which price does it show?** Best sell/buy from the Order Book at the saved hub/region, not the average price Assets values with. `:142,173`. **Why does Open in Market not show on the Market page?** It would link to the page already open. `:60-66`.
+Interview Qs: **Why does Show info keep working offline?** It does not fully: type data and prices need ESI; Used-in and PI do (SDE). `ItemDetailModal.tsx:260-266`. **Which price does it show?** Best sell/buy from the Order Book at the saved hub/region, not the average price Assets values with. `:142,173`. **Why does Open in Market not show on the Market page?** It would link to the page already open. `:129,248`.
 
 ## Corp assets: the shared surface (`/corp/assets`)
 

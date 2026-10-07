@@ -129,7 +129,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 | Stats parse | non-object / array = failure; `error == "Invalid type or id"` = no-history; any other error = failure; kills = `shipsDestroyed`, losses = `shipsLost`, missing counts = 0; both 0 = no-history | `zkillboard.ts:166` |
 | ISK efficiency | `iskDestroyed / (iskDestroyed + iskLost)`; null (shown "—") if no ISK moved | `zkillboard.ts:184` |
 | Ratios | zKillboard's own `dangerRatio` / `gangRatio`, null if not finite; clamped 0-100, rounded; lean high > 50, low < 50, even == 50 | `ZkillStatsSection.tsx:233` |
-| Top ships | `topAllTime` bucket `type == ship`, first 5 (`PILOT_TOP_SHIPS`), bar width = kills / max kills | `zkillboard.ts:101,132` |
+| Top ships | `topAllTime` bucket `type == ship`, first 5 (`PILOT_TOP_SHIPS`), bar width = kills / max kills | `zkillboard.ts:101,141` |
 | Recent list | kills + losses lists merged, sorted by killmail id desc (ids rise with time), first 25 (`PILOT_KILLMAIL_LIMIT`); entries lacking id or hash dropped | `zkillboard.ts:341` |
 | Final blow | attacker flagged `final_blow`, else first listed; party label = pilot, else corporation, else NPC ship type name, else "—" | `zkillboard.ts:283`, `PilotKillmailsSection.tsx:194` |
 | Row columns | Kill/Loss tag, timestamp (user time zone), VICTIM's hull icon + name (the hull that died, on kills too), system, party (Victim on kills, Final blow on losses), total value `formatIskCompact` | `PilotKillmailsSection.tsx:204-260` |

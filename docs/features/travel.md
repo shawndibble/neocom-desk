@@ -64,7 +64,7 @@ Principle in every scope decision: conditions, never verdicts (`20260912-172628`
 
 Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, Route rules) + route from `xl` (1280); below that rail dissolves so order is Stops, route, Route rules (#2591). `PageHeader` shows `DataAgeBadge` of the ESI activity fetch when a route is drawn.
 
-### Link parameters (`src/features/travel/routeSafetyLink.ts:60`)
+### Link parameters (`src/features/travel/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
 | Param | Meaning |
 |---|---|
@@ -187,7 +187,7 @@ Opened from rules panel "Manage" (mode `search`), Via Ansiblex box ("find" `sear
 
 Components `TheraTab.tsx`, `TheraFilters.tsx`, `TheraTable.tsx`, `useTheraConnections.ts`. `PageHeader` shows `DataAgeBadge` (EVE-Scout list age).
 
-Link params (`TheraTab.tsx:51`): `origin` (absent = Current System), `pref`, `hub` (all/thera/turnur), `space` (kspace default, highsec, lowsec, nullsec, wormhole; unknown value e.g. old `all` falls back to kspace), `size` (any/small/medium/large/xlarge/capital). Origin changes `push` history.
+Link params (`TheraTab.tsx:52`): `origin` (absent = Current System), `pref`, `hub` (all/thera/turnur), `space` (kspace default, highsec, lowsec, nullsec, wormhole; unknown value e.g. old `all` falls back to kspace), `size` (any/small/medium/large/xlarge/capital). Origin changes `push` history.
 
 Filters (content-sized selects in one row, desktop): From (SolarSystemPicker), Hub (with per-hub counts that follow other filters), Exit, Fits, Route Preference (`PreferenceField`). Phone: From on own labelled line; other four become chips opening radio menus, accent when off default. "Reset filters" in empty state when any filter off default (origin and preference stay).
 
@@ -317,7 +317,7 @@ Search (`jumpRoute.ts:249`): Dijkstra with a binary heap; stargates relaxed befo
 ### Holes and Ansiblex in the graph
 
 - `routeHoles` (`routeHoles.ts:33`): keep hub match, `maxShipSize` known and >= chosen rank, `remainingMs > 0 and >= minLife`. Hole with unknown size is excluded. `holeNetwork` makes one edge exit<->hub per hole and marks each used hub free.
-- Cost: entering a free hub over an extra edge costs 1 (`stepCostFor`, `jumpRoute.ts:143`), plus avoid penalty; every other landing (exit system, the hub when entered by gate, bridge landings) uses the normal step cost. Gate always beats a hole/bridge on the same pair, both in search order and in step tagging (`routeSafetyTrip.ts:256`, decision `20261004-122315`).
+- Cost: entering a free hub over an extra edge costs 1 (`stepCostFor`, `jumpRoute.ts:143`), plus avoid penalty; every other landing (exit system, the hub when entered by gate, bridge landings) uses the normal step cost. Gate always beats a hole/bridge on the same pair, both in search order and in step tagging (`src/engine/route/routeSafetyTrip.ts:256`, decision `20261004-122315`).
 - Ansiblex (`ansiblex.ts`): name `SYS1 » SYS2 [- label]` (first spaced ` - ` ends far system so `1DQ1-A` survives); only known-space nullsec ends (`securityBand == nullsec`, not J-space); same-system, unknown and not-nullsec lines are errors with line numbers; pair deduped either direction. Search term `" » "` (ESI needs >= 3 chars; substring match). Found structure accepted only when `type_id` is 35841 (or absent), the name parses, and the name's near system equals ESI's `solar_system_id`. Bridges are two-way edges, never free.
 
 ### Trip assembly and row facts (`routeSafety.ts`, `routeSafetyTrip.ts`)
@@ -346,7 +346,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 
 ## Thera / Turnur formulas (`theraConnections.ts`)
 
-- Source rows: EVE-Scout `signature_type == wormhole`, `out_system_id` must be Thera 31000005 or Turnur 30002086; needs exit system id, parseable `expires_at`, id; `out_*` = hub side, `in_*` = exit side (`eveScout.ts:59`). Unknown ship size stays null (filtered out when a Fits filter is set; excluded from routing).
+- Source rows: EVE-Scout `signature_type == wormhole`, `out_system_id` must be Thera 31000005 or Turnur 30002086; needs exit system id, parseable `expires_at`, id; `out_*` = hub side, `in_*` = exit side (`src/lib/eveScout.ts:59`). Unknown ship size stays null (filtered out when a Fits filter is set; excluded from routing).
 - Row build: collapsed (`expiresAt <= now`) dropped; `lifeWarning = remaining <= 2 h` (`LIFE_WARNING_MS`, `:79`); clock ticks every 60 s.
 - Exit band precedence (`exitSpaceOf`, `:99`): feed class `cN` -> wormhole; name `J######` -> wormhole; else if snapshot security known -> `classifySpace` (shown-security band); else feed class `hs/ls/ns`; else null (K-space but under no single band).
 - Jumps (`jumpsTo`, `:108`): wormhole exit = no-route always; else origin sweep: reachable = known; absent = no-route; unreadable graph = unknown; no origin = no-origin. The sweep uses saved Travel rules but not holes/bridges (`localJumpDistances(originId, rules)`), because gate distance is measured before taking the hole.
@@ -362,8 +362,8 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 | Avoided Systems ids | synced `sync.avoidedSystems` (ids only) | yes |
 | Hole settings (4 keys) | synced | yes |
 | Use jump bridges | local setting `routeBridges` | no |
-| Ansiblex list | Dexie `ansiblexGates` (`db/index.ts:1445`), keyed `search:<structureId>` or `paste:<pair>` | never (private structure access; not logged) |
-| Picked Current System | local setting `currentSystemPicks`, per Character; applies until the game reports a different system than when picked (`jumpRange.ts:75`) | no |
+| Ansiblex list | Dexie `ansiblexGates` (`src/db/index.ts:1445`), keyed `search:<structureId>` or `paste:<pair>` | never (private structure access; not logged) |
+| Picked Current System | local setting `currentSystemPicks`, per Character; applies until the game reports a different system than when picked (`src/engine/route/jumpRange.ts:75`, `src/features/route/currentSystem.ts:36`) | no |
 | From, Stops, order flags, pins, per-view overrides | URL query | via link only |
 | ESI kills/jumps feeds | Dexie cache, `GLOBAL_CACHE_CHARACTER_ID`, ETag conditional | no |
 | zKillboard, EVE-Scout | memory only | no |
@@ -402,7 +402,7 @@ Sequence = each leg's end Stop in flying order (optimized order, plus home with 
 
 | Feature | Scope | Missing grant |
 |---|---|---|
-| Route, Thera, strip, kills | none (public ESI, zKillboard, EVE-Scout) | n/a; page still needs a signed-in Character (`Travel.tsx:40`) |
+| Route, Thera, strip, kills | none (public ESI, zKillboard, EVE-Scout) | n/a; page still needs an active Character (`Travel.tsx:36`, else redirects to `/characters`) |
 | Current System (default From) | `esi-location.read_location.v1` (group characterDetails) | 403 not treated as auth failure; user picks a system by hand |
 | Set waypoints | `esi-ui.write_waypoint.v1` (Permission "Autopilot waypoints", default-on) | button `aria-disabled` + tooltip; GrantBanner with Grant for chosen Character |
 | Ansiblex find | `esi-search.search_structures.v1` + `esi-universe.read_structures.v1` | Character shows "needs grant" + Grant; never searched; paste works |

@@ -10,8 +10,7 @@ Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device
 | Dismiss one / type / all | `feedSync.ts dismissFeedEntriesAndSync` |
 | Row click-through | `notificationUrlForSubject` (`notificationClick.ts`) |
 | Unread badge (rail, app icon) | `useUnreadAlertCount.ts`, `appBadge.ts` |
-| Preferences UI | `NotificationsPanel.tsx` |
-| Delivery: poller, web push, scheduled projection | `foregroundPoller.ts`, `webPush.ts`, `pushHandler.ts`, `projection*.ts` |
+| Delivery, preferences | `notifications.md` |
 
 ## Purpose and user goal
 
@@ -32,7 +31,7 @@ See everything that fired, including for Characters you were not looking at (`Al
 - Dexie `notificationFeed` rows: Occurrence Key id, `characterId`, `eventId`, optional `eveType`, `subjectId/typeId`, title, body, `firedAt`, `dismissedAt`. Dismiss is a flag; merge keeps max `dismissedAt`, min `firedAt` (`mergeFeedRecord`).
 - Cap 300 local rows (`NOTIFICATION_FEED_LIMIT`); sync window 30 days / 100 rows (`FEED_SYNC_WINDOW_MS`, `FEED_SYNC_WINDOW_MAX_ROWS`, `feed.ts:55-61`), equal to the backend purge constant. Dismissals push on dismiss (`feedSync.ts`; decision `20260912-125743-alert-dismissals-push-on-dismiss-a-visible-tab.md`); the service worker cannot sync.
 - Removing a Character deletes its rows and refreshes the badge (`removeCharacter.ts`).
-- Preferences: master switch, browser channel, browser half of toggles device-local; feed half and all thresholds sync as one key, last-write-wins (`syncedPreferences.ts`; concurrent edits to different Characters on two devices can clobber).
+- Preferences (master switch, channels, thresholds): `notifications.md`.
 
 ## States
 
@@ -46,33 +45,7 @@ Page needs none. Each event is polled only when its scope is granted (`hasEventS
 
 Group order: severity worst first, then newest fire (`compareGroups`). Severity per type (`alertGroups.ts`): critical = structure under attack/shields or armor lost/destroyed, orbital attacked/reinforced, corp kicked; warning = fuel/reagents, power, services offline, bills, war declared, `characterNotTraining`, `skillQueueEnding`, `structureFuelLow`, `corpWalletThreshold`, `planetaryExtractorExpiring`, `courierDeliveryDue`, `contractFailed`, `marketOrderUndercut`; watch = skill level done, industry job, clone jump ready, SP extraction, planetary extraction done, contract accepted, calendar, new mail, corp member joined/left, corp industry job; clear = market order filled, wallet changed, price alert, contract completed. Unlisted types floor at watch.
 
-Event catalog (`events.ts`, 25 events; default channels both = device + feed, or feedOnly):
-
-| Event | Default | Scope / gate |
-|---|---|---|
-| skillLevelComplete, characterNotTraining, skillQueueEnding (lead time) | both | `esi-skills.read_skillqueue.v1` |
-| spExtractionReady (opt-in setting) | both | `esi-skills.read_skills.v1` |
-| industryJobComplete | both | `esi-industry.read_character_jobs.v1` |
-| cloneJumpReady | both | `esi-clones.read_clones.v1` |
-| newMail | both | `esi-mail.read_mail.v1` |
-| planetaryExtractionDone, planetaryExtractorExpiring (lead time) | both | `esi-planets.manage_planets.v1` |
-| marketOrderFilled | feedOnly | `esi-markets.read_character_orders.v1` |
-| marketOrderUndercut (station only) | both | orders |
-| newCalendarEvent, calendarEventStarting | both | `esi-calendar.read_calendar_events.v1` |
-| contractAccepted, courierDeliveryDue (lead time) | both | `esi-contracts.read_character_contracts.v1` |
-| contractCompleted, contractFailed | feedOnly | contracts |
-| walletBalanceChanged (threshold) | feedOnly | `esi-wallet.read_character_wallet.v1` |
-| eveNotification (per-type, families Structures, War, Corp Governance, Bills, Moon Mining, PI) | both | `esi-characters.read_notifications.v1` |
-| structureFuelLow (days) | both | `esi-corporations.read_structures.v1` + `canReadStructures` |
-| corpIndustryJobReady, corpMemberJoined/Left, corpWalletThreshold (floor, ceiling) | both | corp scopes + `canReadIndustry/Members/Wallet` |
-| priceAlertTriggered | both | none |
-
-Delivery:
-- Foreground Poller: `POLL_INTERVAL_MS = 5 * 60 * 1000` (`foregroundPoller.ts:59`), first poll 10 s after mount (`:67`), only while the tab is visible; one fetch per data domain per Character, diffs from `engine/notificationDiffs.ts` via `pollDomains.ts`, background ESI lane (issue #2271). Decision `20260903-155950-the-corp-ops-board.md:27` says the notification feed "refreshes on a ten-minute cadence"; code is 5 minutes, so the decision text is out of date (it only uses the cadence to argue short shield timers belong to the feed, not the hourly-cached board).
-- Scheduled Push: events with a known future time projected up to 72 h and uploaded (`projectionRebuild.ts`, `projectionUpload.ts`, `registerDevice`); SW `pushHandler.ts` always shows a notification (WebKit revokes otherwise) and writes the feed row by Occurrence Key so the poller does not duplicate. Upload skipped when unchanged (#2265).
-- Permission explainer `NotificationPermissionPrompt.tsx`: once per device, mounted in `Layout`, waits until the first screen is left (`firstScreen.ts`, #1788); Enable makes the single `requestPermission()` call (+ `webPush.ts`).
-
-Settings > Notifications: renders by live permission (denied: blocked notice, Android Play variant has "Open notification settings"; iOS uninstalled: install notice; default: "Turn on device notifications"); master and channel switches; search; "All Characters" one-time broadcast section (`AllCharactersNotificationSection.tsx`); per-Character collapsible virtualized sections with Device/Alerts columns, select-all per column and EVE family; thresholds (`eventThresholds.ts`): extractor lead, courier lead, skill-queue lead (hours), fuel days, corp wallet floor/ceiling, wallet-change minimum (accepts `10.5m`).
+Event catalog, Foreground Poller, Scheduled Push, permission explainer and Settings > Notifications panel: see `notifications.md` (single source). Poll interval is 5 min (`foregroundPoller.ts:59`), first poll 10 s after mount.
 
 ## Decisions
 
@@ -85,8 +58,7 @@ Settings > Notifications: renders by live permission (denied: blocked notice, An
 - `alertGroups.test.ts`: keying (eveType vs eventId), count, severity sort then newest tie-break, entries newest-first, characterIds, structure loss above bill, filled order/price alert = news, undercut = fault.
 - `feed.test.ts`: cap trims oldest; sync window 30 days inclusive boundary, 100 row cap; same occurrence twice = one row; earliest `firedAt` wins whichever observer arrives first; a just-written back-dated row is not trimmed.
 - `feedSync.test.ts`: dismiss locally and push once per Character; nothing for empty dismissal.
-- `foregroundPoller.test.ts`: no-op with master off or no channel; skips Characters without scope or with all events off; first poll stores a baseline and fires nothing; fires on transition (not training); failed fetch does not save state; loads in background ESI lane.
-- `pushHandler.test.ts`: payload parsing returns null for malformed JSON, bad characterId, unknown eventId, missing key/title; carries eveType and fireAt. `notificationClick.test.ts`: opens only when none open, focuses and navigates existing window, ignores other origins, never rejects.
+- Poller, push handler and click tests: `notifications.md`.
 
 ## Interview Q&A
 
@@ -95,13 +67,10 @@ Settings > Notifications: renders by live permission (denied: blocked notice, An
 3. Order and severity? Severity then newest; unlisted floors at watch because filing unknowns as clear is the wrong failure.
 4. Why can you un-mute here? A feed row's mute is one-way from a vanishing row (`Alerts.tsx:163-168`); group muted only if muted for all its Characters.
 5. Cross-device dismissal? `dismissedAt` max-merge + push on dismiss.
-6. Push vs poller duplicate? Shared Occurrence Key; push writes first.
-7. Retention? 300 local, 30 d / 100 rows synced.
-8. Channel off? Banner; rows stay; badge uses the same visibility rule.
-9. Tapping an alt's alert? `?character=` + `AlertCharacterSwitch`.
-10. Why approximate fill time? Poll noticed it; wallet transactions give the exact time hourly.
-11. Closed-app events? Only time-known ones via 72 h projection.
-12. Poll interval? 5 min (`foregroundPoller.ts:59`); the corp-ops decision's "ten-minute" is stale.
+6. Retention? 300 local, 30 d / 100 rows synced.
+7. Channel off? Banner; rows stay; badge uses the same visibility rule.
+8. Tapping an alt's alert? `?character=` + `AlertCharacterSwitch`.
+9. Why approximate fill time? Poll noticed it; wallet transactions give the exact time hourly.
 
 ## Observed gaps
 
@@ -109,7 +78,7 @@ Settings > Notifications: renders by live permission (denied: blocked notice, An
 - Settings feed copy still says Overview: `en.json:7726` `feedChannelLabel` "Overview notifications", `:7727` "A dismissible list on the Overview page", `:7734,7744,7752,7766` toggle labels; `appBadge.ts:2,23` "Overview feed". The feed lives on `/alerts`.
 - Decision `20260903-155950-the-corp-ops-board.md:27` says ten minutes; poller is 5 minutes.
 - No date filter, sort control, "dismiss older than", or undismiss.
-- Corp, fill and undercut events are foreground-only; the Alerts page itself does not say so.
+- Corp, fill and undercut events are foreground-only; the Alerts page does not say so.
 - Retention (300) not user-configurable.
 
 ## Improvement ideas
