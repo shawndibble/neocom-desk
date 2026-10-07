@@ -265,7 +265,7 @@ Open:
 - Net / Gross toggle (FilterChips, local state, default Net; ADR 0006): Profit, Margin, ISK/h (tooltip). Hero always shows net.
 - Break-even price (net, ⓘ opens breakdown) and current market price.
 - Use or sell (only with owned stock): basis toggle Sell now (buy orders, sales tax only) / Sell order (sell side, tax + broker, 100 ISK min per stack), net from selling, build profit (always net), verdict line, per-material disclosure table (Material, Owned, Unit price, Net; sortable; CSV). Blueprint Acquisition row excluded from sale.
-- Unavailable (offline / live adjusted prices or cost index failed): EmptyState "Reconnect to fetch total job cost, profit..." (materials + time still show).
+- Unavailable (offline / live adjusted prices or cost index failed): EmptyState "Couldn't load total job cost, profit..." (materials + time still show).
 
 ### 6.9 Calculation Breakdown modal (`CalculationBreakdown.tsx`)
 

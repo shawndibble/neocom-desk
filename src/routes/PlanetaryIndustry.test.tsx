@@ -1024,7 +1024,9 @@ describe('PlanetaryIndustry', () => {
         expect(await screen.findByText(NOTICE, {}, { timeout: 15_000 })).toBeInTheDocument();
         expect(screen.queryByText('No colonies yet')).toBeNull();
         expect(screen.queryByText(/no colonies yet/i)).toBeNull();
-        expect(screen.queryByText(/Reconnect/)).toBeNull();
+        expect(
+          screen.queryByText(/Couldn't load this character's planetary colonies yet/)
+        ).toBeNull();
         if (_tab === 'map') {
           expect(await screen.findByRole('group', { name: /^Planet map/ })).toBeInTheDocument();
         }
