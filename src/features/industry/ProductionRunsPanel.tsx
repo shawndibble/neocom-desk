@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type ProductionRunRecord } from '@/db';
@@ -13,6 +13,7 @@ import {
   CollapsiblePanel,
   DataTable,
   EmptyState,
+  FieldError,
   IconButton,
   Modal,
 } from '@/components/ui';
@@ -35,6 +36,7 @@ import {
   statusColumn,
   totalCostColumn,
 } from './productionRunColumns';
+import { validateProductionRunInput, type ProductionRunInput } from './productionRunInput';
 import { SaleLinkingModals } from './SaleLinkingControls';
 import { useSaleLinking } from './useSaleLinking';
 import { formatIsk } from '@/lib/isk';
@@ -156,11 +158,8 @@ export function ProductionRunsPanel({
     open: rollup.openCount,
   });
 
-  async function saveProductionRun(form: RunForm) {
+  async function saveProductionRun({ quantity, materialCost, jobFee }: ProductionRunInput) {
     if (productTypeID === null) return;
-    const quantity = unmaskNumber(form.quantity) ?? 0;
-    const materialCost = unmaskNumber(form.materialCost) ?? 0;
-    const jobFee = unmaskNumber(form.jobFee) ?? 0;
     const now = Date.now();
     await db.productionRuns.add({
       id: crypto.randomUUID(),
@@ -182,11 +181,8 @@ export function ProductionRunsPanel({
     setEditingRunId(run.id);
   }
 
-  async function saveEdit(editForm: RunForm) {
+  async function saveEdit({ quantity, materialCost, jobFee }: ProductionRunInput) {
     if (!editingRow) return;
-    const quantity = unmaskNumber(editForm.quantity) ?? editingRow.run.quantity;
-    const materialCost = unmaskNumber(editForm.materialCost) ?? editingRow.run.materialCost;
-    const jobFee = unmaskNumber(editForm.jobFee) ?? editingRow.run.jobFee;
     await db.productionRuns.put({
       ...editingRow.run,
       quantity,
@@ -289,7 +285,7 @@ export function ProductionRunsPanel({
             key={logRequest}
             hint={t('industry.logProductionHint', { name: productName })}
             initial={defaults}
-            onSubmit={(form) => void saveProductionRun(form)}
+            onSubmit={(input) => void saveProductionRun(input)}
             submitLabel={t('industry.saveProductionRun')}
           />
         )}
@@ -305,7 +301,7 @@ export function ProductionRunsPanel({
             <ProductionRunForm
               key={editingRow.run.id}
               initial={editingRow.run}
-              onSubmit={(form) => void saveEdit(form)}
+              onSubmit={(input) => void saveEdit(input)}
               submitLabel={t('industry.saveProductionRun')}
             />
             {(editingRow.saleLinks.length > 0 || editingRow.orderWatches.length > 0) && (
@@ -386,7 +382,8 @@ interface ProductionRunFormProps {
    * inside the state initializer, keeps that work out of the panel's render.
    */
   initial: Pick<ProductionRunRecord, 'quantity' | 'materialCost' | 'jobFee'> | null;
-  onSubmit: (form: RunForm) => void;
+  /** Called only with input that passed validation; a blank field arrives as 0. */
+  onSubmit: (input: ProductionRunInput) => void;
   submitLabel: string;
 }
 
@@ -394,8 +391,24 @@ interface ProductionRunFormProps {
 function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionRunFormProps) {
   const [form, onChange] = useState<RunForm>(() => (initial ? runForm(initial) : EMPTY_FORM));
   const { t } = useTranslation();
-  const materialCost = unmaskNumber(form.materialCost) ?? 0;
-  const jobFee = unmaskNumber(form.jobFee) ?? 0;
+  const [attempted, setAttempted] = useState(false);
+  const quantityErrorId = useId();
+  const costErrorId = useId();
+  const input: ProductionRunInput = {
+    quantity: unmaskNumber(form.quantity) ?? 0,
+    materialCost: unmaskNumber(form.materialCost) ?? 0,
+    jobFee: unmaskNumber(form.jobFee) ?? 0,
+  };
+  const { materialCost, jobFee } = input;
+  // Shown only after a refused save, then live: an error clears the moment its value is fixed.
+  const errors = attempted ? validateProductionRunInput(input) : {};
+
+  function submit() {
+    setAttempted(true);
+    const found = validateProductionRunInput(input);
+    if (found.quantity || found.cost) return;
+    onSubmit(input);
+  }
 
   return (
     <div className="space-y-4">
@@ -408,11 +421,16 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
             label={t('industry.quantity')}
             inputMode="numeric"
             widthClassName="w-full"
+            invalid={errors.quantity}
+            describedBy={errors.quantity ? quantityErrorId : undefined}
             parse={(raw) => unmaskNumber(raw)}
             onCommit={(value) =>
               onChange({ ...form, quantity: value === undefined ? '' : String(value) })
             }
           />
+          {errors.quantity && (
+            <FieldError id={quantityErrorId}>{t('industry.productionRunQuantityError')}</FieldError>
+          )}
         </label>
         <label className="flex flex-col gap-1 text-xs">
           {t('industry.materialCost')}
@@ -421,6 +439,8 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
             label={t('industry.materialCost')}
             inputMode="numeric"
             widthClassName="w-full"
+            invalid={errors.cost}
+            describedBy={errors.cost ? costErrorId : undefined}
             parse={(raw) => unmaskNumber(raw)}
             onCommit={(value) =>
               onChange({ ...form, materialCost: value === undefined ? '' : String(value) })
@@ -434,6 +454,8 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
             label={t('industry.jobFee')}
             inputMode="numeric"
             widthClassName="w-full"
+            invalid={errors.cost}
+            describedBy={errors.cost ? costErrorId : undefined}
             parse={(raw) => unmaskNumber(raw)}
             onCommit={(value) =>
               onChange({ ...form, jobFee: value === undefined ? '' : String(value) })
@@ -441,6 +463,9 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
           />
         </label>
       </div>
+      {errors.cost && (
+        <FieldError id={costErrorId}>{t('industry.productionRunCostError')}</FieldError>
+      )}
       <div className="flex items-center justify-between gap-2 rounded-xs border border-line px-2.5 py-1.5 text-[0.6875rem]">
         <span className="font-semibold tracking-widest text-text-dim uppercase">
           {t('industry.totalCost')}
@@ -449,7 +474,7 @@ function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionR
           {formatIsk(materialCost + jobFee)}
         </span>
       </div>
-      <Button variant="primary" onClick={() => onSubmit(form)} className="w-full justify-center">
+      <Button variant="primary" onClick={submit} className="w-full justify-center">
         {submitLabel}
       </Button>
     </div>
