@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -12,6 +12,9 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { resetShareLinksForTests } from '@/features/share/shareStore';
 import { AppraisalPanel } from './AppraisalPanel';
+import { DEFAULT_APPRAISAL_OWNED_PREF, useAppraisalOwnedPref } from './appraisalOwnedPref';
+import { useRecentAppraisals } from './appraisalRecent';
+import { useHaulingCargo } from './haulingCargo';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { AppraisalController } from './useAppraisal';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
@@ -31,6 +34,8 @@ vi.mock('firebase/firestore/lite', () => ({
   Timestamp: { fromMillis: (millis: number) => ({ millis }) },
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+const loadAllCharactersAssets = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/assets', () => ({ loadAllCharactersAssets }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:7') }));
 
 function controller(overrides: Partial<AppraisalController> = {}): AppraisalController {
@@ -823,7 +828,12 @@ describe('AppraisalPanel — Copy sell list', () => {
   });
 
   function copyButton() {
-    return screen.getByRole('button', { name: 'Copy sell list' });
+    return screen.getByRole('button', { name: 'Copy' });
+  }
+
+  async function copySellList() {
+    await userEvent.click(copyButton());
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy sell list' }));
   }
 
   it('disables the button with nobody to undercut', () => {
@@ -841,7 +851,7 @@ describe('AppraisalPanel — Copy sell list', () => {
       written.push(text);
     });
     renderPanel({ controller: controller({ result: SELL_LIST_OUTCOME }) });
-    await userEvent.click(copyButton());
+    await copySellList();
     expect(written).toEqual(['Damage Control II\t511900\nCivilian Gatling Railgun\t999.90']);
     configureClipboard(null);
   });
@@ -1034,5 +1044,167 @@ describe('AppraisalPanel — the row as an item', () => {
       expect(written).toEqual(['1,386,400']);
       expect(await screen.findByRole('status')).toHaveTextContent('Copied to clipboard');
     });
+  });
+});
+
+describe('AppraisalPanel — shopping list (#2868)', () => {
+  const LIST_OUTCOME = outcome({
+    appraisal: {
+      ...APPRAISAL,
+      items: [
+        { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
+        { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
+      ],
+    },
+  });
+
+  async function seedAssetsGrant() {
+    await db.tokens.put({
+      characterId: 1,
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 60_000,
+      scopes: [ESI_REGISTRY.getCharacterAssets.scope],
+    });
+  }
+
+  beforeEach(() => {
+    useAppraisalOwnedPref.setState({ value: DEFAULT_APPRAISAL_OWNED_PREF, hydrated: true });
+    useRecentAppraisals.setState({ value: [], hydrated: true });
+    useHaulingCargo.setState({ value: null, hydrated: true });
+  });
+
+  afterEach(async () => {
+    configureClipboard(null);
+    await db.tokens.clear();
+    await db.settings.clear();
+  });
+
+  it("groups the header figures under You get / It's worth / Cargo", () => {
+    renderPanel({
+      controller: controller({
+        result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
+      }),
+    });
+    const youGet = screen.getByRole('region', { name: 'You get' });
+    expect(within(youGet).getByText('You receive, selling now')).toBeInTheDocument();
+    expect(within(youGet).getByText('You receive, listing')).toBeInTheDocument();
+    const worth = screen.getByRole('region', { name: "It's worth" });
+    for (const label of ['Sell total', 'Buy total', 'Spread']) {
+      expect(within(worth).getByText(label)).toBeInTheDocument();
+    }
+    const cargo = screen.getByRole('region', { name: 'Cargo' });
+    expect(within(cargo).getByText('Total volume')).toBeInTheDocument();
+    expect(within(cargo).getByText('Items')).toBeInTheDocument();
+  });
+
+  it('offers both copy actions in one menu', async () => {
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(await screen.findByRole('menuitem', { name: 'Copy sell list' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy multibuy' })).toBeInTheDocument();
+  });
+
+  it('copies the full multibuy when nothing is subtracted', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy multibuy' }));
+    expect(written).toEqual(['Damage Control II\t3\nCivilian Gatling Railgun\t4']);
+  });
+
+  it('remembers the Minus owned checkbox', async () => {
+    await seedAssetsGrant();
+    loadAllCharactersAssets.mockResolvedValue({ entries: [], skipped: [] });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    const box = await screen.findByRole('checkbox', { name: 'Minus what I own' });
+    await waitFor(() => expect(box).toBeEnabled());
+    await userEvent.click(box);
+    await waitFor(async () =>
+      expect((await db.settings.get('appraisalMinusOwned'))?.value).toMatchObject({ enabled: true })
+    );
+  });
+
+  it('disables Minus owned with a grant note without the assets permission', async () => {
+    await db.tokens.put({
+      characterId: 1,
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 60_000,
+      scopes: [],
+    });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Minus what I own' })).toBeDisabled();
+  });
+
+  it('shows Need with owned beneath, dims covered lines, and copies net quantities', async () => {
+    await seedAssetsGrant();
+    useAppraisalOwnedPref.setState({ value: { enabled: true, stationId: null }, hydrated: true });
+    loadAllCharactersAssets.mockResolvedValue({
+      entries: [
+        {
+          characterId: 1,
+          name: 'A',
+          truncated: false,
+          assets: [
+            {
+              type_id: 2048,
+              quantity: 1,
+              location_id: TRADE_HUBS[0].stationId,
+              location_type: 'station',
+            },
+            {
+              type_id: 999,
+              quantity: 9,
+              location_id: TRADE_HUBS[0].stationId,
+              location_type: 'station',
+            },
+          ],
+        },
+      ],
+      skipped: [],
+    });
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
+    expect(await screen.findByRole('columnheader', { name: 'Need' })).toBeInTheDocument();
+    expect(screen.getByText(/Minus owned ·/)).toBeInTheDocument();
+    const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+    expect(covered).toHaveClass('opacity-50');
+    expect(within(covered).getByText('4 owned')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy multibuy' }));
+    expect(written).toEqual(['Damage Control II\t2']);
+  });
+
+  it('reloads a Recent paste', async () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5\nPyerite 3', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    const appraiseText = vi.fn();
+    renderPanel({ controller: controller({ appraiseText }) });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Recent' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Tritanium, Pyerite/ }));
+    expect(appraiseText).toHaveBeenCalledWith('Tritanium 5\nPyerite 3');
+  });
+
+  it('shows the hold bar only once a Cargo Space is set', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.queryByTestId('hold-bar')).not.toBeInTheDocument();
+    cleanup();
+    useHaulingCargo.setState({
+      value: { label: 'Charon', holds: [{ kind: 'general', capacityM3: 1_000 }] },
+      hydrated: true,
+    });
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByTestId('hold-bar')).toHaveTextContent('1,255.5 of 1,000 m³');
+    expect(screen.getByText('Does not fit in one trip.')).toBeInTheDocument();
   });
 });

@@ -18,15 +18,24 @@ import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Checkbox,
   ColumnPickerMenu,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   IconButton,
   IskAmount,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
-  StatChips,
   TextArea,
   TextInput,
   type DataTableColumn,
@@ -38,6 +47,10 @@ import { Caret } from '@/components/ui/Disclosure';
 import { HintText } from '@/components/ui/HintText';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { GrantNote } from '@/app/GrantNote';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
+import { formatAge } from '@/lib/age';
 import {
   appraisalNet,
   lpBeatsMarket,
@@ -51,30 +64,39 @@ import {
   MAX_SNAPSHOT_ITEMS,
 } from '@/engine/market/appraisalSnapshot';
 import type { ResolvedStandings } from '@/engine/market/standings';
+import type { EsiEndpointId } from '@/esi/registry';
 
 import { isSyncConfigured } from '@/app/syncStatus';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
-import { iskToneClass } from '@/features/character/format';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
-import type { TradeHub } from '@/market/hubs';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
   APPRAISAL_COLUMN_IDS,
   useVisibleAppraisalColumns,
   type AppraisalColumnId,
 } from './appraisalColumns';
 import { appraisalCsvColumns } from './appraisalCsv';
+import { appraisalMultibuyText } from './appraisalMultibuyText';
+import { useAppraisalOwnedPref } from './appraisalOwnedPref';
+import { recentLabel, useRecentAppraisals } from './appraisalRecent';
 import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
+import { AppraisalHeaderStats } from './AppraisalHeaderStats';
+import { AppraisalHoldBar } from './AppraisalHoldBar';
+import { useHaulingCargo } from './haulingCargo';
+import { useOwnedAtStation } from './useOwnedAtStation';
 import { appraisalVolumeColumn } from './appraisalVolume';
-import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { formatVolume } from './format';
-import { FullIskTotal } from './FullIskTotal';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import { isValidPricePercent, MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
 import type { AppraisalController } from './useAppraisal';
+
+const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
+
+type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
 
 interface AppraisalPanelProps {
   controller: AppraisalController;
@@ -167,7 +189,30 @@ export function AppraisalPanel({
     setShare({ status: 'idle' });
   }
   const [sellListCopied, setSellListCopied] = useState(false);
+  const [multibuyCopied, setMultibuyCopied] = useState(false);
   const hubName = hub.systemName;
+
+  // Ages in the Recent list are read against when the panel opened.
+  const [openedAt] = useState(Date.now);
+  const recent = useRecentAppraisals((state) => state.value);
+  const hydrateRecent = useRecentAppraisals((state) => state.hydrate);
+  const setRecent = useRecentAppraisals((state) => state.setValue);
+  const ownedPref = useAppraisalOwnedPref((state) => state.value);
+  const hydrateOwnedPref = useAppraisalOwnedPref((state) => state.hydrate);
+  const setOwnedPref = useAppraisalOwnedPref((state) => state.setValue);
+  const cargo = useHaulingCargo((state) => state.value);
+  const hydrateCargo = useHaulingCargo((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRecent();
+    void hydrateOwnedPref();
+    void hydrateCargo();
+  }, [hydrateRecent, hydrateOwnedPref, hydrateCargo]);
+
+  const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
+  const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
+  const ownedStationId = ownedPref.stationId ?? hub.stationId;
+  const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
+  const { owned } = useOwnedAtStation(minusOwned, ownedStationId);
 
   const visibleColumns = useVisibleAppraisalColumns((state) => state.value);
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
@@ -246,6 +291,23 @@ export function AppraisalPanel({
     }
   }
 
+  const multibuyItems = useMemo(() => {
+    const items = result?.appraisal.items ?? [];
+    return owned ? subtractOwned(items, owned) : items;
+  }, [result, owned]);
+  const canCopyMultibuy = appraisalMultibuyText(multibuyItems) !== '';
+
+  async function handleCopyMultibuy() {
+    if (!canCopyMultibuy) return;
+    setMultibuyCopied(false);
+    try {
+      await writeToClipboard(appraisalMultibuyText(multibuyItems));
+      setMultibuyCopied(true);
+    } catch {
+      setMultibuyCopied(false);
+    }
+  }
+
   /*
    * The percent field is a string while it is being typed. Committing on every
    * keystroke would fight the typist: clearing the box to retype "90" sends an
@@ -271,15 +333,25 @@ export function AppraisalPanel({
     if (next.trim() !== '' && isValidPricePercent(parsed)) onPricePercentChange(parsed);
   }
 
-  const columns: DataTableColumn<AppraisalRow>[] = [
+  const columns: DataTableColumn<OwnedRow>[] = [
     {
       id: 'quantity',
-      header: t('market.appraisal.columnQuantity'),
+      header: owned ? t('market.appraisal.columnNeed') : t('market.appraisal.columnQuantity'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
-      render: (row) => formatVolume(row.quantity),
-      sortValue: (row) => row.quantity,
+      render: (row) =>
+        row.need !== undefined ? (
+          <span>
+            {formatVolume(row.need)}
+            <span className="block text-[0.625rem] text-text-dim">
+              {t('market.appraisal.ownedBeneath', { qty: formatVolume(row.owned ?? 0) })}
+            </span>
+          </span>
+        ) : (
+          formatVolume(row.quantity)
+        ),
+      sortValue: (row) => row.need ?? row.quantity,
     },
     {
       id: 'item',
@@ -295,7 +367,16 @@ export function AppraisalPanel({
     },
   ];
 
-  const rows = result?.appraisal.rows ?? [];
+  const rows = useMemo(() => result?.appraisal.rows ?? [], [result]);
+  // Fully covered lines sink to the bottom (stable otherwise) and render dim.
+  const tableRows: OwnedRow[] = useMemo(() => {
+    if (!owned) return rows;
+    const withOwned: OwnedRow[] = subtractOwned(rows, owned);
+    return [
+      ...withOwned.filter((r) => (r.need ?? 0) > 0),
+      ...withOwned.filter((r) => r.need === 0),
+    ];
+  }, [rows, owned]);
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
   const totals = result?.appraisal.totals;
@@ -331,7 +412,7 @@ export function AppraisalPanel({
   // Refine and LP store still only ever enter `availableColumns` when the
   // data backing them exists — a picker toggle for a column with nothing to
   // show would just be a lie.
-  const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<AppraisalRow>> = {
+  const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<OwnedRow>> = {
     buyEach: {
       id: 'buyEach',
       header: t('market.appraisal.columnBuyEach'),
@@ -451,7 +532,7 @@ export function AppraisalPanel({
   // The Item Detail modal (Market's `ItemActionsProvider`) and `CompareDrawer`
   // sit outside Market's section guards, so Show Info and Add to Compare work
   // from this tab without a second copy of either.
-  function rowContextMenu(row: AppraisalRow, tr: ReactElement) {
+  function rowContextMenu(row: OwnedRow, tr: ReactElement) {
     return (
       <ItemContextMenu typeId={row.typeId} itemName={row.name}>
         {tr}
@@ -516,6 +597,46 @@ export function AppraisalPanel({
             <span className="text-xs text-text-dim">{t('market.appraisal.pricePercentHint')}</span>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <label className="flex min-h-9 items-center gap-2 text-xs">
+              <Checkbox
+                checked={minusOwned}
+                disabled={lacksAssets || characterId === null}
+                onChange={(event) =>
+                  void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
+                }
+              />
+              {t('market.appraisal.minusOwned')}
+            </label>
+            {ownedPref.enabled && !lacksAssets && characterId !== null && (
+              <Select
+                value={String(ownedStationId)}
+                onValueChange={(value) =>
+                  void setOwnedPref({ ...ownedPref, stationId: Number(value) })
+                }
+              >
+                <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRADE_HUBS.map((h) => (
+                    <SelectItem key={h.id} value={String(h.stationId)}>
+                      {h.systemName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {lacksAssets && (
+              <GrantNote
+                endpoints={ASSETS_ENDPOINTS}
+                title={t('market.appraisal.minusOwnedGrantTitle')}
+                hint={t('market.appraisal.minusOwnedGrantHint')}
+                actionLabel={t('market.appraisal.minusOwnedGrantAction')}
+              />
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
@@ -529,6 +650,51 @@ export function AppraisalPanel({
               {t('market.appraisal.clear')}
             </Button>
           </div>
+
+          {recent.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <label
+                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  htmlFor="market-appraisal-recent"
+                >
+                  {t('market.appraisal.recent')}
+                </label>
+                <Select
+                  value=""
+                  onValueChange={(value) =>
+                    controller.appraiseText(recent[Number(value)]?.text ?? '')
+                  }
+                >
+                  <SelectTrigger size="sm" id="market-appraisal-recent" className="min-w-0 flex-1">
+                    <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recent.map((entry, index) => {
+                      const { names, more } = recentLabel(entry.text);
+                      return (
+                        <SelectItem key={entry.text} value={String(index)}>
+                          {t(
+                            more > 0
+                              ? 'market.appraisal.recentLabelMore'
+                              : 'market.appraisal.recentLabel',
+                            {
+                              names: names.join(', '),
+                              count: more,
+                              age: formatAge(openedAt - entry.savedAt, t),
+                            }
+                          )}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
+                {t('market.appraisal.clearRecent')}
+              </Button>
+            </div>
+          )}
 
           {unmatched.length > 0 && (
             <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
@@ -595,18 +761,36 @@ export function AppraisalPanel({
                 }
                 onClick={() => void handleShare()}
               />
-              <IconButton
-                size="sm"
-                icon={sellListCopied ? <Icon.Done /> : <Icon.CopyToClipboard />}
-                label={t('market.appraisal.copySellList')}
-                tooltip={
-                  sellListCopied
-                    ? t('market.appraisal.sellListCopied')
-                    : t('market.appraisal.sellListHelp', { hub: hubName })
-                }
-                disabled={!canCopySellList}
-                onClick={() => void handleCopySellList()}
-              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton
+                    size="sm"
+                    icon={
+                      sellListCopied || multibuyCopied ? <Icon.Done /> : <Icon.CopyToClipboard />
+                    }
+                    label={t('market.appraisal.copyMenu')}
+                    disabled={!canCopySellList && !canCopyMultibuy}
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    disabled={!canCopySellList}
+                    onSelect={() => void handleCopySellList()}
+                  >
+                    {sellListCopied
+                      ? t('market.appraisal.sellListCopied')
+                      : t('market.appraisal.copySellList')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!canCopyMultibuy}
+                    onSelect={() => void handleCopyMultibuy()}
+                  >
+                    {multibuyCopied
+                      ? t('market.appraisal.multibuyCopied')
+                      : t('market.appraisal.copyMultibuy')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <TableActionsMenu
                 name={t('market.appraisal.resultTitle')}
                 tableExport={tableExport}
@@ -660,77 +844,23 @@ export function AppraisalPanel({
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                <StatChips>
-                  <StatChip
-                    label={t('market.appraisal.sellTotal')}
-                    value={<FullIskTotal value={totals.sell} />}
-                    tone="accent"
-                    tooltip={t('market.appraisal.sellTotalHelp')}
-                  />
-                  <StatChip
-                    label={t('market.appraisal.buyTotal')}
-                    value={<FullIskTotal value={totals.buy} />}
-                    tooltip={t('market.appraisal.buyTotalHelp')}
-                  />
-                  {net && (
-                    <StatChip
-                      label={t('market.appraisal.instantNet')}
-                      value={
-                        <span className={iskToneClass(net.instantNet)}>
-                          <IskAmount value={net.instantNet} decimals={0} />
-                        </span>
-                      }
-                      tooltip={t('market.appraisal.instantNetHelp', {
-                        tax: net.salesTaxPct.toFixed(2),
-                      })}
-                    />
-                  )}
-                  {net && (
-                    <StatChip
-                      label={t('market.appraisal.listNet')}
-                      value={
-                        <span className={iskToneClass(net.listNet)}>
-                          <IskAmount value={net.listNet} decimals={0} />
-                        </span>
-                      }
-                      tooltip={t('market.appraisal.listNetHelp', {
-                        tax: net.salesTaxPct.toFixed(2),
-                        broker: net.brokerFeePct.toFixed(2),
-                      })}
-                    />
-                  )}
-                  <StatChip
-                    label={t('market.appraisal.spread')}
-                    value={
-                      <span className={iskToneClass(totals.spread)}>
-                        <IskAmount value={totals.spread} decimals={0} />
-                      </span>
-                    }
-                  />
-                  {hasRefine && (
-                    <StatChip
-                      label={t('market.appraisal.refineTotal')}
-                      value={<IskAmount value={totals.refine} decimals={0} />}
-                      tooltip={
-                        implantBonusPct > 0
-                          ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
-                          : t('market.appraisal.refineTotalHelp')
-                      }
-                    />
-                  )}
-                  {hasLpOption && (
-                    <StatChip
-                      label={t('market.appraisal.cheapestBuy')}
-                      value={<IskAmount value={totals.cheapestBuy} decimals={0} />}
-                      tone="accent"
-                      tooltip={t('market.appraisal.cheapestBuyHelp')}
-                    />
-                  )}
-                  <AppraisalVolumeChip totals={totals} />
-                  <StatChip label={t('market.appraisal.items')} value={rows.length} />
-                </StatChips>
+                {minusOwned && (
+                  <span className="w-full text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                    {t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName })}
+                  </span>
+                )}
+                <AppraisalHeaderStats
+                  totals={totals}
+                  net={net}
+                  itemCount={rows.length}
+                  showRefine={hasRefine}
+                  showCheapest={hasLpOption}
+                  implantBonusPct={implantBonusPct}
+                />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
+
+              {cargo !== null && <AppraisalHoldBar totals={totals} cargo={cargo} />}
 
               {net && pricePercent !== 100 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
@@ -770,7 +900,8 @@ export function AppraisalPanel({
               <DataTable
                 {...tableExport.tableProps}
                 columns={columns}
-                rows={rows}
+                rows={tableRows}
+                rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
                 rowKey={(row) => row.typeId}
                 label={t('market.appraisal.resultTitle')}
                 className="pb-1"
