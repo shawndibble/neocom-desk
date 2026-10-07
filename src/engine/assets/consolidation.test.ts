@@ -37,6 +37,7 @@ describe('planConsolidation', () => {
     const result = plan([
       asset({ itemId: 1, isSingleton: true }),
       asset({ itemId: 2, locationType: 'item', locationId: 99 }),
+      asset({ itemId: 3, locationType: 'solar_system', locationId: 30000142 }),
     ]);
     expect(result.perCharacter).toEqual([]);
   });

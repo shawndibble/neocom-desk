@@ -83,12 +83,16 @@ export function ConsolidationPanel() {
       loaded.fanned.entries.map(
         async (e) => [e.characterId, await loadCharacterSolarSystemId(e.characterId)] as const
       )
-    ).then((pairs) => {
-      if (!live) return;
-      const next = new Map<number, number>();
-      for (const [id, system] of pairs) if (system !== null) next.set(id, system);
-      setFromSystems(next);
-    });
+    )
+      .then((pairs) => {
+        if (!live) return;
+        const next = new Map<number, number>();
+        for (const [id, system] of pairs) if (system !== null) next.set(id, system);
+        setFromSystems(next);
+      })
+      .catch(() => {
+        // Route links then open without a start system; nothing else depends on it.
+      });
     return () => {
       live = false;
     };

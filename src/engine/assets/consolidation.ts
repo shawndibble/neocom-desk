@@ -60,7 +60,8 @@ export function planConsolidation(input: {
   for (const { characterId, name, assets } of input.characters) {
     const quantities = new Map<number, number>();
     for (const a of assets) {
-      if (a.isSingleton || a.locationType === 'item') continue;
+      // Hangar stock only: not assembled, not in a container/ship, not in space.
+      if (a.isSingleton || a.locationType === 'item' || a.locationType === 'solar_system') continue;
       if (a.locationId === input.destinationLocationId) continue;
       quantities.set(a.typeId, (quantities.get(a.typeId) ?? 0) + a.quantity);
     }
