@@ -13,6 +13,12 @@ vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions }));
 const loadOrders = vi.hoisted(() => vi.fn());
 vi.mock('@/features/character/orders', () => ({ loadOrders }));
 
+const scheduleSync = vi.hoisted(() => vi.fn());
+vi.mock('@/sync', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sync')>()),
+  scheduleSync,
+}));
+
 const CHARACTER_ID = 1;
 const BUILD_PLAN_ID = 'plan-1';
 const PRODUCT_TYPE_ID = 587;
@@ -74,6 +80,7 @@ beforeEach(async () => {
   await db.productionOrderWatches.clear();
   loadWalletTransactions.mockReset().mockResolvedValue(null);
   loadOrders.mockReset().mockResolvedValue({ cached: null, needsReauth: false });
+  scheduleSync.mockReset();
 });
 
 function renderPanel(defaults: { quantity: number; materialCost: number; jobFee: number } | null) {
@@ -497,5 +504,143 @@ describe('ProductionRunsPanel', () => {
     );
 
     expect(await screen.findByRole('button', { name: 'Save run' })).toBeVisible();
+  });
+});
+
+describe('ProductionRunsPanel input validation', () => {
+  const DEFAULTS = { quantity: 10, materialCost: 500_000, jobFee: 50_000 };
+
+  async function openLog(user: ReturnType<typeof userEvent.setup>) {
+    renderPanel(DEFAULTS);
+    await user.click(screen.getByRole('button', { name: 'Log Production' }));
+    return screen.findByRole('dialog', { name: 'Log Production' });
+  }
+
+  async function openEditDialog(user: ReturnType<typeof userEvent.setup>) {
+    await addRun();
+    renderPanel(null);
+    await expandRuns(user);
+    await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
+    return screen.findByRole('dialog', { name: 'Edit production run' });
+  }
+
+  async function blank(
+    user: ReturnType<typeof userEvent.setup>,
+    dialog: HTMLElement,
+    label: string
+  ) {
+    await user.clear(within(dialog).getByLabelText(label));
+    await user.tab();
+  }
+
+  async function save(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
+    await user.click(within(dialog).getByRole('button', { name: 'Save run' }));
+  }
+
+  it('log: refuses a blank Quantity, writes nothing, stays open with the error', async () => {
+    const user = userEvent.setup();
+    const dialog = await openLog(user);
+    await blank(user, dialog, 'Qty');
+    await save(user, dialog);
+
+    const qty = within(dialog).getByLabelText('Qty');
+    expect(qty.getAttribute('aria-invalid')).toBe('true');
+    expect(within(dialog).getByRole('alert').id).toBe(qty.getAttribute('aria-describedby'));
+    expect(await db.productionRuns.count()).toBe(0);
+    expect(scheduleSync).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Log Production' })).toBeTruthy();
+  });
+
+  it('log: clears the Quantity error once the value is valid', async () => {
+    const user = userEvent.setup();
+    const dialog = await openLog(user);
+    await blank(user, dialog, 'Qty');
+    await save(user, dialog);
+    expect(within(dialog).getByRole('alert')).toBeTruthy();
+
+    await user.type(within(dialog).getByLabelText('Qty'), '3');
+    await user.tab();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+  });
+
+  it('log: refuses when both costs are cleared', async () => {
+    const user = userEvent.setup();
+    const dialog = await openLog(user);
+    await blank(user, dialog, 'Material cost');
+    await blank(user, dialog, 'Total job cost');
+    await save(user, dialog);
+
+    expect(within(dialog).getByLabelText('Material cost').getAttribute('aria-invalid')).toBe(
+      'true'
+    );
+    expect(within(dialog).getByLabelText('Total job cost').getAttribute('aria-invalid')).toBe(
+      'true'
+    );
+    expect(await db.productionRuns.count()).toBe(0);
+    expect(scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('log: saves when only one cost is cleared', async () => {
+    const user = userEvent.setup();
+    const dialog = await openLog(user);
+    await blank(user, dialog, 'Material cost');
+    await save(user, dialog);
+
+    await waitFor(async () => {
+      expect(await db.productionRuns.count()).toBe(1);
+    });
+    const [run] = await db.productionRuns.toArray();
+    expect(run).toMatchObject({ materialCost: 0, jobFee: 50_000, totalCost: 50_000 });
+    expect(scheduleSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('edit: refuses a blank Quantity instead of keeping the old value', async () => {
+    const user = userEvent.setup();
+    const dialog = await openEditDialog(user);
+    await blank(user, dialog, 'Qty');
+    await save(user, dialog);
+
+    expect(within(dialog).getByLabelText('Qty').getAttribute('aria-invalid')).toBe('true');
+    expect((await db.productionRuns.get('run-1'))?.quantity).toBe(5);
+    expect(scheduleSync).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Edit production run' })).toBeTruthy();
+  });
+
+  it('edit: refuses when both costs are cleared; Cancel leaves the run unchanged', async () => {
+    const user = userEvent.setup();
+    const dialog = await openEditDialog(user);
+    await blank(user, dialog, 'Material cost');
+    await blank(user, dialog, 'Total job cost');
+    await save(user, dialog);
+
+    expect(within(dialog).getByLabelText('Material cost').getAttribute('aria-invalid')).toBe(
+      'true'
+    );
+    expect(scheduleSync).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Edit production run' })).toBeNull();
+    });
+    expect(await db.productionRuns.get('run-1')).toMatchObject({
+      quantity: 5,
+      materialCost: 300_000,
+      jobFee: 20_000,
+      totalCost: 320_000,
+    });
+  });
+
+  it('edit: saves when only one cost is cleared', async () => {
+    const user = userEvent.setup();
+    const dialog = await openEditDialog(user);
+    await blank(user, dialog, 'Total job cost');
+    await save(user, dialog);
+
+    await waitFor(async () => {
+      expect(await db.productionRuns.get('run-1')).toMatchObject({
+        jobFee: 0,
+        totalCost: 300_000,
+      });
+    });
   });
 });

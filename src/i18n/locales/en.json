@@ -2458,6 +2458,8 @@
     "logProduction": "Log Production",
     "logProductionHint": "Snapshot this batch's cost so it can be compared against what {{name}} actually sells for. Editable now, not re-derived later.",
     "saveProductionRun": "Save run",
+    "productionRunQuantityError": "Enter a quantity greater than 0.",
+    "productionRunCostError": "Enter a material cost or a job fee greater than 0.",
     "editProductionRun": "Edit production run",
     "productionRunColumnLogged": "Logged",
     "productionRunColumnSold": "Qty sold",

@@ -108,7 +108,11 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(sheet).toBeHidden();
     await page.waitForLoadState('load');
 
-    await page.reload();
+    // The Back pop is a same-document navigation `load` can't see, so on a
+    // slow runner it can still be in flight; retry the reload until it lands.
+    await expect(async () => {
+      await page.reload();
+    }).toPass();
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
