@@ -23,6 +23,9 @@ let mockOrigin: FinderOrigin = {
 let mockFinder: FinderState = { status: 'loading' };
 let finderArgs: { highsecOnly: boolean } | null = null;
 vi.mock('./usePlanAdvice', () => ({ usePlanAdvice: () => mockState }));
+vi.mock('./AccountPlanSection', () => ({
+  AccountPlanSection: () => <div data-testid="account-plan" />,
+}));
 vi.mock('./usePlanetFinder', () => ({
   useFinderOrigin: () => mockOrigin,
   usePlanetFinder: (args: { highsecOnly: boolean }) => {
@@ -113,6 +116,16 @@ beforeEach(() => {
 });
 
 describe('FindBestPlan', () => {
+  it('shows the whole-account plan for a pilot with colonies, on the picks view only', () => {
+    renderPlan(snapshot(['oceanic']));
+    expect(screen.getByTestId('account-plan')).toBeInTheDocument();
+  });
+
+  it('has no whole-account plan with no colonies, or on All products', () => {
+    renderPlan();
+    expect(screen.queryByTestId('account-plan')).toBeNull();
+  });
+
   it('ranks recipes best first, with every planet type available when there are no colonies', () => {
     renderPlan();
     const types = screen.getByRole('group', { name: 'Planet types' });

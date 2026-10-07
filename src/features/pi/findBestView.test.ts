@@ -6,13 +6,11 @@ import type { PlanetType } from '@/engine/pi/goalTypes';
 import type { RecipeRow } from '@/engine/pi/planRecipes';
 import {
   buildAllProducts,
-  buildChainPicks,
   buildFindBestView,
   defaultHighsecOnly,
   needsSkyhookNote,
   type FindBestInput,
 } from './findBestView';
-import type { ChainEstimateView } from './chainEstimateModel';
 import { planetTypesOf } from './productPlanets';
 
 const pi = JSON.parse(
@@ -252,53 +250,5 @@ describe('buildAllProducts', () => {
     expect(silicon(without)?.reachable).toBe(false);
     const withLava = buildAllProducts({ ...colonies, whatIf: new Set<PlanetType>(['lava']) }, pi);
     expect(silicon(withLava)).toMatchObject({ reachable: true, isNew: true });
-  });
-});
-
-describe('buildChainPicks', () => {
-  const ROBOTICS = 9848; // P3
-  const NANO_FACTORY = 2869; // P4
-  const view = (typeId: number, iskPerDay: number): ChainEstimateView => ({
-    typeId,
-    iskPerDay,
-    unitsPerDay: 1,
-    planets: ['lava', 'barren'],
-    hostType: 'barren',
-    m3PerWeek: 10,
-    m3PerHaul: 10,
-    haulDays: 7,
-    ccLevel: 5,
-    ccAssumed: false,
-    rateSource: 'measured',
-    headsPerExtractor: 10,
-    ratePerHour: 1000,
-  });
-  const base = {
-    colonyTypes: [] as PlanetType[],
-    off: new Set<PlanetType>(),
-    whatIf: new Set<PlanetType>(),
-  };
-
-  it('ranks priced P3/P4 by ISK a day, best first, and counts the unpriced', () => {
-    const estimates = new Map([
-      [ROBOTICS, view(ROBOTICS, 5)],
-      [NANO_FACTORY, view(NANO_FACTORY, 50)],
-    ]);
-    const picks = buildChainPicks(base, pi, (id) => estimates.get(id) ?? null);
-    expect(picks.rows.map((r) => r.typeId).slice(0, 2)).toEqual([NANO_FACTORY, ROBOTICS]);
-    expect(picks.rows[0].tier).toBe(4);
-    expect(picks.pending).toBe(0);
-  });
-
-  it('counts products still being priced as pending, not as rows', () => {
-    const picks = buildChainPicks(base, pi, () => undefined);
-    expect(picks.rows).toEqual([]);
-    expect(picks.pending).toBeGreaterThan(0);
-  });
-
-  it("drops products the pilot's planet types cannot reach", () => {
-    const picks = buildChainPicks({ ...base, colonyTypes: ['lava'] }, pi, (id) => view(id, 10));
-    const all = buildChainPicks(base, pi, (id) => view(id, 10));
-    expect(picks.rows.length).toBeLessThan(all.rows.length);
   });
 });
