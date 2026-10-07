@@ -287,6 +287,12 @@ describe('Wallet', () => {
     expect(link).toHaveClass('text-accent');
   });
 
+  it('says the Journal reads one Character (issue #2846)', async () => {
+    window.history.pushState({}, '', '/wallet/journal');
+    render(<App />);
+    expect(await screen.findByText('Pilot One only')).toBeInTheDocument();
+  });
+
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
@@ -631,7 +637,7 @@ describe('Wallet', () => {
       const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
       expect(balanceHeader).not.toBeNull();
       await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
@@ -639,7 +645,7 @@ describe('Wallet', () => {
         await screen.findByRole('heading', { name: 'Balance by character' })
       ).closest('header');
       expect(
-        within(wideHeader!).getByRole('button', { name: 'All characters' })
+        within(wideHeader!).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
     });
 
@@ -659,7 +665,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
@@ -673,7 +679,7 @@ describe('Wallet', () => {
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
       render(<App />);
 
-      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /^All characters/ })).toBeInTheDocument();
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
@@ -694,7 +700,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // All three selected: Pilot Three's skipped notice shows.
       expect(
@@ -704,7 +710,7 @@ describe('Wallet', () => {
       // Narrow the filter back to "This character" — the notice list must
       // follow the same filter the balance rows do (issue #607 CodeRabbit
       // review), not just keep listing every skipped character regardless.
-      await user.click(screen.getByRole('button', { name: 'All characters' }));
+      await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
       expect(

@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   IskAmount,
   Panel,
@@ -228,6 +229,16 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
                 })
       }
     >
+      {/* Not in `meta`: the title and severity word already fill the header at 1180px. */}
+      {data !== null && data.characterCount > 0 && (
+        <div className="px-3 pt-3">
+          <CharacterScopeReadout
+            scope="all"
+            total={data.characterCount}
+            missing={data.missingCharacterNames}
+          />
+        </div>
+      )}
       <TileRow>
         <NumberTile
           label={t('overview.board.iskUnpaid')}

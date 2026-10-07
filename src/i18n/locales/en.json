@@ -3191,6 +3191,13 @@
     "retry": "Try again"
   },
   "character": {
+    "scope": {
+      "all": "All characters · {{count}}",
+      "allPartial": "All characters · {{covered}} of {{total}}",
+      "one": "{{name}} only",
+      "corp": "Corp · {{division}}",
+      "missing": "Not included: {{names}}"
+    },
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters"

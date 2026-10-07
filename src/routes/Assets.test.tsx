@@ -1248,11 +1248,11 @@ describe('cross-character search (issue #85)', () => {
 
   async function selectAllCharacters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
   }
 
   async function selectThisCharacter(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'All characters' }));
+    await user.click(screen.getByRole('button', { name: /^All characters/ }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'This character' }));
   }
 
@@ -1322,7 +1322,7 @@ describe('cross-character search (issue #85)', () => {
       await within(panel).findByText('Rifter');
 
       await user.click(within(panel).getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       await waitFor(() =>
         expect(
@@ -2015,7 +2015,7 @@ describe('view state in the URL (issue #1306)', () => {
     await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^All characters/ })).toBeInTheDocument();
     expect(window.location.search).toBe('');
   });
 
@@ -2036,7 +2036,7 @@ describe('view state in the URL (issue #1306)', () => {
     await screen.findByText(JITA);
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
     await waitFor(() => expect(window.location.search).toBe('?chars=all'));
     expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBeUndefined();

@@ -57,6 +57,13 @@ function renderRail(overrides: Partial<Parameters<typeof CorpVitalsRail>[0]> = {
   );
 }
 
+describe('CorpVitalsRail scope readout', () => {
+  it('says the runway reads one division', () => {
+    renderRail();
+    expect(screen.getByText('Corp · Master Wallet')).toBeInTheDocument();
+  });
+});
+
 describe('CorpVitalsRail runway', () => {
   it('divides the journal division’s own balance by its own spending', () => {
     renderRail();
