@@ -12,7 +12,6 @@ import {
   buildSnapshotRow,
   snapshotId,
   utcDay,
-  type NetWorthSnapshotRow,
   type SnapshotInputs,
 } from '@/engine/netWorth/snapshot';
 import { loadCharacterAssets } from '@/features/character/assets';
@@ -56,6 +55,8 @@ export const liveSources: SnapshotSources = {
       loadCharacterAssets(characterId),
       loadOrders(characterId),
     ]);
+    // A permission revoked since the grant check: the cached copy is not today's number.
+    if (wallet.needsReauth || assets.needsReauth || orders.needsReauth) return null;
     const hubId = await hubIdSetting();
     const assetList = assets.cached?.data ?? null;
     const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
@@ -72,6 +73,8 @@ export const liveSources: SnapshotSources = {
       const price = hubPrices.get(id)?.sellMin ?? averages.get(id);
       if (price !== undefined && price !== null) priceByTypeId.set(id, price);
     }
+    // Both price sources down: a near-zero asset value would be frozen into the day.
+    if (typeIds.length > 0 && priceByTypeId.size === 0) return null;
     return {
       hubId,
       wallet: wallet.cached?.data ?? null,
@@ -85,11 +88,6 @@ export const liveSources: SnapshotSources = {
 
 export type SnapshotOutcome = 'written' | 'already-recorded' | 'skipped';
 
-/** Store `row`; a second write for the same Character and day replaces the first. */
-export async function putSnapshot(row: NetWorthSnapshotRow): Promise<void> {
-  await db.netWorthSnapshots.put(row);
-}
-
 async function recordOne(
   characterId: number,
   sources: SnapshotSources,
@@ -102,7 +100,7 @@ async function recordOne(
   if (!fetched) return 'skipped';
   const row = buildSnapshotRow({ ...fetched, characterId, now });
   if (!row) return 'skipped';
-  await putSnapshot(row);
+  await db.netWorthSnapshots.put(row);
   scheduleSync(characterId);
   return 'written';
 }

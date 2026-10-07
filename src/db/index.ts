@@ -818,6 +818,28 @@ export interface ProductionRunRecord {
 }
 
 /**
+ * One Character's net worth on one UTC day (issue #2865): numbers only, never
+ * tokens. Synced as Editable Data; last write wins per id.
+ */
+export interface NetWorthSnapshotRecord {
+  /** `${characterId}:${day}` */
+  id: string;
+  characterId: number;
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: string;
+  wallet: number;
+  /** Assets priced at `hubId` that day, PLEX stacks removed. */
+  assetValue: number;
+  /** Hangar PLEX × the global PLEX price. */
+  plexValue: number;
+  /** Escrow held by open buy orders. */
+  escrow: number;
+  hubId: string;
+  /** Epoch ms of the write. */
+  updatedAt: number;
+}
+
+/**
  * One past wallet sale linked to a Production Run's output ("Link Past
  * Sale", issue #525) — a picker over the character's already-cached
  * `WalletTransaction[]` (`features/character/wallet.ts`), never a new ESI
@@ -843,28 +865,6 @@ export interface ProductionRunRecord {
  * a manual entry has no cross-device double-count risk to begin with, since
  * nothing else could ever independently produce the same one.
  */
-/**
- * One Character's net worth on one UTC day (issue #2865): numbers only, never
- * tokens. Synced as Editable Data; last write wins per id.
- */
-export interface NetWorthSnapshotRecord {
-  /** `${characterId}:${day}` */
-  id: string;
-  characterId: number;
-  /** UTC calendar day, `YYYY-MM-DD`. */
-  day: string;
-  wallet: number;
-  /** Assets priced at `hubId` that day, PLEX stacks removed. */
-  assetValue: number;
-  /** Hangar PLEX × the global PLEX price. */
-  plexValue: number;
-  /** Escrow held by open buy orders. */
-  escrow: number;
-  hubId: string;
-  /** Epoch ms of the write. */
-  updatedAt: number;
-}
-
 export interface ProductionSaleLinkRecord {
   /** `${characterId}:txn:${transactionId}` for a linked sale, `${characterId}:manual:${uuid}` for a manual one. */
   id: string;
