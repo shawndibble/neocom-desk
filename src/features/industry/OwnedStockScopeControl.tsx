@@ -11,6 +11,7 @@ import {
   type MultiSelectGroup,
 } from '@/components/ui';
 import {
+  collectStockContainers,
   collectStockLocations,
   ownedStockLocationKey,
   type DetectedOwnedStockMap,
@@ -68,6 +69,11 @@ export function OwnedStockScopeControl({
   const locations = useMemo(() => collectStockLocations(detectedStock), [detectedStock]);
   const mode = scope?.mode ?? 'everywhere';
   const selected = useMemo(() => (scope?.mode === 'selected' ? scope.locations : []), [scope]);
+  const containers = useMemo(() => collectStockContainers(detectedStock), [detectedStock]);
+  const excludedContainers = useMemo(
+    () => (scope?.mode === 'selected' ? (scope.excludedContainers ?? []) : []),
+    [scope]
+  );
   const selectedKeys = useMemo(() => new Set(selected.map(ownedStockLocationKey)), [selected]);
   const byKey = useMemo(
     () => new Map(locations.map((location) => [ownedStockLocationKey(location), location])),
@@ -92,8 +98,36 @@ export function OwnedStockScopeControl({
     const next = selectedKeys.has(key)
       ? selected.filter((l) => ownedStockLocationKey(l) !== key)
       : [...selected, location];
-    onChange({ mode: 'selected', locations: next });
+    onChange({
+      mode: 'selected',
+      locations: next,
+      ...(excludedContainers.length > 0 ? { excludedContainers } : {}),
+    });
   }
+
+  function toggleContainer(containerId: number) {
+    const next = excludedContainers.includes(containerId)
+      ? excludedContainers.filter((id) => id !== containerId)
+      : [...excludedContainers, containerId];
+    onChange({
+      mode: 'selected',
+      locations: selected,
+      ...(next.length > 0 ? { excludedContainers: next } : {}),
+    });
+  }
+
+  // Only containers at a still-selected location are worth listing: excluding
+  // one at a location that is already out of scope would change nothing.
+  const containerOptions = containers
+    .filter((c) => selectedKeys.has(ownedStockLocationKey(c)))
+    .map((c) => ({
+      id: String(c.containerId),
+      label: t('industry.ownedStockScopeContainerOption', {
+        id: c.containerId,
+        owner: ownerNameFor(c),
+        location: detection.locationLabelFor(c),
+      }),
+    }));
 
   // Grouped only once a corp placement actually exists (issue #798): a plan
   // with no Corp Assets contribution shows the same flat, ungrouped list it
@@ -182,6 +216,22 @@ export function OwnedStockScopeControl({
             noResultsLabel={t('industry.ownedStockScopeNoResults')}
           />
         ))}
+      {mode === 'selected' && containerOptions.length > 0 && (
+        <MultiSelect
+          trigger={
+            <Button size="sm">
+              {t('industry.ownedStockScopeExcludedContainersCount', {
+                count: excludedContainers.length,
+              })}
+            </Button>
+          }
+          groups={[{ label: '', options: containerOptions }]}
+          selected={new Set(excludedContainers.map(String))}
+          onToggle={(id) => toggleContainer(Number(id))}
+          searchPlaceholder={t('industry.ownedStockScopeSearchPlaceholder')}
+          noResultsLabel={t('industry.ownedStockScopeNoResults')}
+        />
+      )}
     </>
   );
 }

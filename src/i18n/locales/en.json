@@ -2234,6 +2234,8 @@
     "ownedStockScopeSelected": "Selected locations",
     "ownedStockScopeNoLocations": "No detected owned stock yet to choose locations from.",
     "ownedStockScopeSelectedCount": "{{count}} selected",
+    "ownedStockScopeExcludedContainersCount": "{{count}} containers excluded",
+    "ownedStockScopeContainerOption": "Container #{{id}} — {{owner}}, {{location}}",
     "ownedStockScopeSearchPlaceholder": "Search locations…",
     "ownedStockScopeNoResults": "No matching locations",
     "ownedStockScopeGroupPersonal": "Personal",
