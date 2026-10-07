@@ -120,10 +120,27 @@ type ShareState =
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
 
-/** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
-function comparisonCell(total: ReactNode, highlighted: boolean, suffix?: ReactElement | false) {
+/** Refine wins only because the leftover units sell on top; the refine total alone is below buy total. */
+function leftoverTipsRefine(row: AppraisalRow) {
   return (
-    <span className={highlighted ? 'font-semibold text-accent' : undefined}>
+    refineBeatsSellAsIs(row) &&
+    (row.refineUnitsLeftOver ?? 0) > 0 &&
+    row.refineTotal !== undefined &&
+    row.buyTotal !== null &&
+    row.refineTotal <= row.buyTotal
+  );
+}
+
+/** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
+function comparisonCell(
+  total: ReactNode,
+  highlighted: boolean,
+  suffix?: ReactElement | false,
+  prefix?: ReactElement | false
+) {
+  return (
+    <span className={highlighted ? 'font-semibold text-isk-pos' : undefined}>
+      {prefix}
       {total}
       {suffix}
     </span>
@@ -368,6 +385,19 @@ export function AppraisalPanel({
                   className="ml-0.5 text-warning"
                 >
                   *
+                </HintText>
+              ),
+              // Left of the number, so the right-aligned digits stay in line down the column.
+              leftoverTipsRefine(row) && (
+                <HintText
+                  content={t('market.appraisal.refineLeftoverHint', {
+                    count: row.refineUnitsLeftOver,
+                    isk: formatIskAuto((row.refineUnitsLeftOver ?? 0) * (row.buyEach ?? 0)),
+                    buyTotal: formatIskAuto(row.buyTotal ?? 0),
+                  })}
+                  className="mr-1 text-warning"
+                >
+                  !
                 </HintText>
               )
             ),
