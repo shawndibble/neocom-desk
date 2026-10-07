@@ -39,10 +39,10 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
           <div className="flex flex-col gap-3 text-xs">
             <p>{t('industry.rigMatch.steps')}</p>
             <img
-              src="/images/industry/rig-match-tooltips.webp"
+              src="/images/industry/rig-match-where.webp"
               alt={t('industry.rigMatch.imageAlt')}
-              width={942}
-              height={444}
+              width={992}
+              height={930}
               className="w-full rounded border border-line"
             />
             <p className="text-text-dim">
