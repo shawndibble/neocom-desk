@@ -24,7 +24,7 @@ _Recorded 2026-09-03._
   caches corp data for about an hour. Multi-day clocks are honest at that
   window; a twelve-minute shield timer is not, and the board says "Under 1h"
   rather than a figure it cannot stand behind. That class of alert belongs to
-  the notification feed, which refreshes on a ten-minute cadence. The
+  the notification feed, which refreshes on a five-minute cadence. The
   `DataAgeBadge` states the hourly cache in its tooltip rather than leaving the
   amber tone to read as a fault.
 - **"Cannot read" and "nothing due" are different answers and must look

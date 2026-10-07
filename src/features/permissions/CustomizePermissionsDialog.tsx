@@ -8,7 +8,7 @@
  * user-facing rows (skills & skill queue, structure lookup) rather than
  * `CORE_GRANT`'s four raw scope names, which this dialog never shows
  * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
- * Below it, all 13 Permissions in a two-column checklist that collapses to one
+ * Below it, all 15 Permissions in a two-column checklist that collapses to one
  * at phone width, Corporation and Structure markets tagged "opt-in" and
  * unchecked by default.
  *
