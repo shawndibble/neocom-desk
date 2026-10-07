@@ -8681,6 +8681,8 @@
     },
     "chokepoint": "Gank Chokepoint",
     "chokepointHint": "One of the systems haulers are most often killed in, as named by the community. A property of traffic, not of security status.",
+    "lawless": "Lawless",
+    "lawlessHint": "CCP lists this system as lawless: an insurgency has pushed its corruption to the top stage. A condition right now, not a forecast. Refreshed about every 10 minutes.",
     "summary": {
       "label": "Route summary",
       "jumps_one": "{{count}} jump",
