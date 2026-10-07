@@ -531,20 +531,6 @@ describe('Alerts', () => {
       });
     });
 
-    it('dismisses only the alerts the search leaves on screen', async () => {
-      await db.notificationFeed.put(entry({ id: 'a' }));
-      await db.notificationFeed.put(entry({ id: 'b', eventId: 'skillComplete', title: 'Skill' }));
-      renderPage();
-
-      await userEvent.type(await screen.findByLabelText('Search alerts'), 'skill');
-      await userEvent.click(await screen.findByRole('button', { name: 'Dismiss all' }));
-
-      await waitFor(async () => {
-        expect((await db.notificationFeed.get('b'))?.dismissedAt).toBeDefined();
-      });
-      expect((await db.notificationFeed.get('a'))?.dismissedAt).toBeUndefined();
-    });
-
     it('hides the dismiss control when there is nothing live to dismiss', async () => {
       renderPage();
 

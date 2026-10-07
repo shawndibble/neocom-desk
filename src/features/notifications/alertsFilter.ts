@@ -13,7 +13,6 @@
  *
  * Pure: no fetch/DOM/Dexie, no clock.
  */
-import type { NotificationFeedRecord } from '@/db';
 import type { DeadlineSeverity } from '@/engine/severity';
 import type { AlertTypeGroup } from './alertGroups';
 
@@ -69,19 +68,6 @@ export function filterAlertGroups(
     if (query.length > 0 && !matchesQuery(group, query)) return false;
     return true;
   });
-}
-
-/**
- * Entries "Dismiss all" acts on: those of the groups on screen, minus muted
- * groups a chip reveals. Groups the filter hides stay untouched.
- */
-export function dismissAllEntries(
-  groups: readonly DisplayAlertGroup[],
-  filter: AlertsFilter
-): NotificationFeedRecord[] {
-  return filterAlertGroups(groups, filter)
-    .filter((group) => !group.muted)
-    .flatMap((group) => group.entries);
 }
 
 /** How many filters are set away from their default — badges the narrow-width trigger. */
