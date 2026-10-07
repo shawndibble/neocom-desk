@@ -17,7 +17,7 @@ import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { chunkDocId } from './chunkedSnapshot';
+import { CHUNK_READ_CONCURRENCY, chunkDocId } from './chunkedSnapshot';
 
 const INDEX_COLLECTION = 'publicContractOffersIndex';
 const INDEX_DOC = 'types';
@@ -25,7 +25,6 @@ const OFFERS_COLLECTION = 'publicContractOffers';
 const INDEX_CACHE_KEY = 'publicContractOffersIndex';
 /** Same cadence as the chunks it describes (`publicContractOffers.ts`). */
 const STALE_AFTER_MS = 30 * 60_000;
-const CHUNK_READ_CONCURRENCY = 6;
 
 /** `[count, cheapest, firstChunk, lastChunk]`, as `functions/src/publicContracts.ts` writes it. */
 type RawEntry = [count: number, cheapest: number | null, firstChunk: number, lastChunk: number];
@@ -91,6 +90,11 @@ function readChunk(index: OfferIndex, chunk: number): Promise<PublicContractOffe
   const key = `${index.lastSyncedAt}:${chunk}`;
   let pending = chunkMemo.get(key);
   if (!pending) {
+    // Chunks of an older publish can never be asked for again; keep the memo
+    // to the current one so a long session does not accumulate them.
+    for (const memoKey of chunkMemo.keys()) {
+      if (!memoKey.startsWith(`${index.lastSyncedAt}:`)) chunkMemo.delete(memoKey);
+    }
     pending = getDoc(doc(getSyncFirestore(), OFFERS_COLLECTION, chunkDocId(chunk))).then((snap) => {
       const data = snap.data() as
         { rows?: PublicContractOfferRow[]; publishedAt?: number } | undefined;

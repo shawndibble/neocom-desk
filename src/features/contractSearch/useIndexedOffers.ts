@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { onCacheRevalidated } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import {
   loadOfferIndex,
@@ -19,20 +20,36 @@ const MAX_EARLY_CHUNKS = 12;
 /** Typing re-ranks the matching types on every keystroke; read once the box has settled. */
 const SETTLE_MS = 150;
 
-/** The index, once read. `null` until then, and for good when none is published. */
+/**
+ * The index, once read. `null` until then, and for good when none is
+ * published. A stale cached index is served at once and refreshed behind it;
+ * when that refresh lands the index is read again, because after a publish
+ * every chunk's stamp disagrees with the stale one and every early read would
+ * quietly fall back to the full download.
+ */
 export function useOfferIndex(characterId: number | null, enabled: boolean): OfferIndex | null {
   const [index, setIndex] = useState<OfferIndex | null>(null);
   useEffect(() => {
     if (!enabled || characterId === null || !isSyncConfigured()) return;
     let cancelled = false;
-    void loadOfferIndex(characterId).then((loaded) => {
-      if (!cancelled) setIndex(loaded);
-    });
+    const read = () => {
+      void loadOfferIndex(characterId).then((loaded) => {
+        if (!cancelled) setIndex((current) => (sameIndex(current, loaded) ? current : loaded));
+      });
+    };
+    read();
+    const unsubscribe = onCacheRevalidated(read);
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [characterId, enabled]);
   return index;
+}
+
+/** Same publish, same index: keeps the identity stable so nothing downstream recomputes. */
+function sameIndex(a: OfferIndex | null, b: OfferIndex | null): boolean {
+  return a?.lastSyncedAt === b?.lastSyncedAt;
 }
 
 function chunkSpan(index: OfferIndex, typeIds: ReadonlySet<number>): number {
@@ -45,14 +62,10 @@ function chunkSpan(index: OfferIndex, typeIds: ReadonlySet<number>): number {
   return chunks.size;
 }
 
-export interface EarlyOffers {
-  /** The searched types' offers, or `null` when none were read (not applicable, failed, or still pending). */
-  rows: readonly PublicContractOfferRow[] | null;
-  /** A read for the current search is in flight — a reason to show a spinner rather than "no matches". */
-  pending: boolean;
-}
+/** The searched types' offers, or `null` when none were read (not applicable, failed, or still pending). */
+export type EarlyOffers = { rows: readonly PublicContractOfferRow[] | null };
 
-const NONE: EarlyOffers = { rows: null, pending: false };
+const NONE: EarlyOffers = { rows: null };
 
 export function useEarlyOffers(
   index: OfferIndex | null,
@@ -88,6 +101,6 @@ export function useEarlyOffers(
   }, [key, characterId]);
 
   if (key === null) return NONE;
-  if (answer?.key !== key) return { rows: null, pending: true };
-  return { rows: answer.rows, pending: false };
+  if (answer?.key !== key) return NONE;
+  return { rows: answer.rows };
 }

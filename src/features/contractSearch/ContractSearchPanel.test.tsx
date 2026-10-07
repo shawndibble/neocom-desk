@@ -2084,6 +2084,21 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       expect(await bodyRows()).toHaveLength(2);
     });
 
+    it('does not call a typed query unmatched while the item names are still unknown', async () => {
+      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+      loadPublicContractOffers.mockReturnValue(offers.promise);
+      loadOfferIndex.mockResolvedValue(null);
+      renderWithRouter(['/?items.q=trit']);
+
+      expect(
+        await screen.findByText('Loading public contracts, this may take a moment.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('No public contracts match your filters.')).not.toBeInTheDocument();
+
+      offers.settle(cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION]));
+      expect(await bodyRows()).toHaveLength(2);
+    });
+
     it('waits for the full snapshot on a search that names no item', async () => {
       const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
       loadPublicContractOffers.mockReturnValue(offers.promise);

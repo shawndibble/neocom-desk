@@ -82,7 +82,7 @@ export function chunkDocId(index: number): string {
 }
 
 /** How many chunk docs are in flight at once: enough to hide round-trip latency, few enough not to starve the page's other requests. */
-const CHUNK_READ_CONCURRENCY = 6;
+export const CHUNK_READ_CONCURRENCY = 6;
 
 /**
  * How far a snapshot's chunk download has got, per cache key. A store beside

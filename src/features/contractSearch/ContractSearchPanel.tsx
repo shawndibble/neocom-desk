@@ -549,8 +549,12 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
    * and no early read answered. A query that matched no listed type needs no
    * rows at all, so it is not waiting on any.
    */
+  // "Matched nothing" is only knowable once every listed type has a name to
+  // rank against: with no index yet (loading, unpublished, rules not deployed)
+  // or names still resolving, an empty set means "not known", not "no match".
+  const typesKnown = offerIndex !== null && !namingTypes;
   const awaitingRows =
-    !haveFull && early.rows === null && !(typeIds !== null && typeIds.size === 0);
+    !haveFull && early.rows === null && !(typesKnown && typeIds !== null && typeIds.size === 0);
 
   const { value: endpoints } = useCourierEndpoints(courierRows);
   // Synchronous, so the haul list never empties while its ends are being
