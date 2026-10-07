@@ -2583,6 +2583,8 @@
     "renameGroup": "Rename group",
     "deleteGroup": "Delete group",
     "deleteGroupConfirm": "Delete this group? All build plans in it will also be deleted.",
+    "deletePlan": "Delete build plan",
+    "deletePlanConfirm": "Delete \"{{name}}\"? This cannot be undone.",
     "toggleGroup": "Show or hide the plans in {{name}}",
     "moveToGroup": "Move to group",
     "removeFromGroup": "No group",
