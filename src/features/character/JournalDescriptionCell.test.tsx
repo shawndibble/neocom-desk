@@ -157,4 +157,29 @@ describe('JournalDescriptionCell', () => {
     expect(screen.getByText('moon tax Aug')).toBeInTheDocument();
     expect(screen.getByRole('link')).toHaveAttribute('href', '/contracts/history?highlight=7');
   });
+  it('links a line a pilot tied to a mining tax payment back to that tax row', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell
+          entry={entry({ ref_type: 'player_donation', description: 'Donation' })}
+          transaction={undefined}
+          itemName=""
+          miningTaxHref="/mining/tax?tax.payment=journal%3A1"
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /mining tax/i })).toHaveAttribute(
+      'href',
+      '/mining/tax?tax.payment=journal%3A1'
+    );
+  });
+
+  it('shows no mining tax link for an unlinked line', () => {
+    render(
+      <MemoryRouter>
+        <JournalDescriptionCell entry={entry()} transaction={undefined} itemName="" />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('link', { name: /mining tax/i })).toBeNull();
+  });
 });

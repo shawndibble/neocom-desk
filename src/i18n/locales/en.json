@@ -3654,6 +3654,7 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
+    "journalMiningTaxLink": "Mining tax →",
     "dailyGoal": "Daily goal",
     "dailyGoalIdTitle": "Goal id {{id}}",
     "dailyGoalNames": {

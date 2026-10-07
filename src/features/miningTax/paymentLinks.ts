@@ -126,7 +126,7 @@ export function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPa
 }
 
 /** The journal and contract ids some Assignment already records a payment against. */
-function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
+export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
   const journal = new Set<number>();
   const contract = new Set<number>();
   for (const a of assignments) {
