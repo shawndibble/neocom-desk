@@ -19,7 +19,8 @@
  * or offline — simply gets no suggestions rather than an error.
  */
 import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
-import { loadWalletJournal } from '@/features/character/wallet';
+import type { EsiEndpointId } from '@/esi/registry';
+import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadContracts } from '@/features/character/contracts';
 import { humanizeRefType } from '@/features/character/format';
 import { resolveNames } from '@/features/character/names';
@@ -88,33 +89,74 @@ function fromContracts(contracts: readonly Contract[], characterId: number): Mad
     }));
 }
 
+/** How one read went: fine, never attempted for want of a Permission, or hit some other error. */
+export type MadePaymentSourceStatus = 'ok' | 'skipped-no-permission' | 'failed';
+
+export interface MadePaymentSources {
+  characterId: number;
+  journal: MadePaymentSourceStatus;
+  contracts: MadePaymentSourceStatus;
+}
+
+export interface MadePaymentsResult {
+  payments: MadePayment[];
+  sources: MadePaymentSources[];
+}
+
+/** The endpoints a Character's skipped sources need granted — what a Grant note asks for. */
+export function missingPaymentEndpoints(sources: MadePaymentSources): EsiEndpointId[] {
+  return [
+    ...(sources.journal === 'skipped-no-permission' ? ['getCharacterWalletJournal' as const] : []),
+    ...(sources.contracts === 'skipped-no-permission' ? ['getCharacterContracts' as const] : []),
+  ];
+}
+
 /**
  * Every payment the given characters have made recently, newest first, with
- * recipient names resolved so a suggestion can say who the ISK went to.
+ * recipient names resolved so a suggestion can say who the ISK went to, plus
+ * per-character source statuses so the UI can tell a missing Permission from
+ * "nothing found" and from a transient error.
  *
  * Never rejects: a failed or unauthorized read for one character contributes
  * nothing and leaves the rest intact.
  */
-export async function loadMadePayments(characterIds: readonly number[]): Promise<MadePayment[]> {
+export async function loadMadePaymentsWithStatus(
+  characterIds: readonly number[]
+): Promise<MadePaymentsResult> {
   const perCharacter = await Promise.all(
     characterIds.map(async (characterId) => {
       const [journal, contracts] = await Promise.all([
-        loadWalletJournal(characterId).catch(() => null),
+        loadWalletJournalWithStatus(characterId).catch(() => null),
         loadContracts(characterId).catch(() => null),
       ]);
-      return [
-        ...fromJournal(journal?.data ?? [], characterId),
-        ...fromContracts(contracts?.cached?.data ?? [], characterId),
-      ];
+      const status = (read: { needsReauth: boolean } | null): MadePaymentSourceStatus =>
+        read === null ? 'failed' : read.needsReauth ? 'skipped-no-permission' : 'ok';
+      return {
+        payments: [
+          ...fromJournal(journal?.cached?.data ?? [], characterId),
+          ...fromContracts(contracts?.cached?.data ?? [], characterId),
+        ],
+        sources: { characterId, journal: status(journal), contracts: status(contracts) },
+      };
     })
   );
 
-  const payments = perCharacter.flat().sort((a, b) => b.date.localeCompare(a.date));
+  const payments = perCharacter
+    .flatMap((c) => c.payments)
+    .sort((a, b) => b.date.localeCompare(a.date));
   const names = await resolveNames(
     payments.map((p) => p.counterpartyId).filter((id): id is number => id !== undefined)
   );
-  return payments.map((payment) => {
-    const name = payment.counterpartyId ? names.get(payment.counterpartyId) : undefined;
-    return name === undefined ? payment : { ...payment, counterpartyName: name };
-  });
+  return {
+    payments: payments.map((payment) => {
+      const name = payment.counterpartyId ? names.get(payment.counterpartyId) : undefined;
+      return name === undefined ? payment : { ...payment, counterpartyName: name };
+    }),
+    sources: perCharacter.map((c) => c.sources),
+  };
+}
+
+/** Just the payments, for callers that don't care why a list is short. */
+export async function loadMadePayments(characterIds: readonly number[]): Promise<MadePayment[]> {
+  return (await loadMadePaymentsWithStatus(characterIds)).payments;
 }

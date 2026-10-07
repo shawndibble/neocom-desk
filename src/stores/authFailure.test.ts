@@ -5,7 +5,7 @@ import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 const CHARACTER_ID = 5;
 
 beforeEach(() => {
-  useAuthFailure.setState({ failure: null });
+  useAuthFailure.setState({ failure: null, needsLogin: [] });
 });
 
 describe('useAuthFailure', () => {
@@ -82,5 +82,39 @@ describe('subscribeToEsiAuthFailures', () => {
     useAuthFailure.setState({ failure: null });
     emitEsiAuthFailure(42);
     expect(useAuthFailure.getState().failure).toBeNull();
+  });
+
+  describe('needsLogin', () => {
+    it('survives dismissing the failure that triggered the redirect', () => {
+      useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      useAuthFailure.getState().dismiss();
+      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+    });
+
+    it('does not record the same character twice', () => {
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+    });
+
+    it('clears on a successful token refresh, for that character only', () => {
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID + 1);
+      useAuthFailure.getState().clearFor(CHARACTER_ID, 'token');
+      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID + 1]);
+    });
+
+    it('survives a request-kind clear, which says nothing about the grant', () => {
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      useAuthFailure.getState().clearFor(CHARACTER_ID, 'request');
+      expect(useAuthFailure.getState().needsLogin).toEqual([CHARACTER_ID]);
+    });
+
+    it('clears on explicit dismiss', () => {
+      useAuthFailure.getState().markNeedsLogin(CHARACTER_ID);
+      useAuthFailure.getState().dismissNeedsLogin(CHARACTER_ID);
+      expect(useAuthFailure.getState().needsLogin).toEqual([]);
+    });
   });
 });

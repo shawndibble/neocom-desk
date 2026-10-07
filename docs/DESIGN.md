@@ -870,6 +870,16 @@ Retired meanings, each with its replacement:
 | A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text |
 | `textActionClassName` that navigates or opens a modal | It performs an action; navigation is a link or a row                             |
 
+### Scope readout
+
+A surface that reads more than the active Character says so on screen, in one
+form with two looks. **Choosable:** the Character filter, whose "All" label
+carries the count ("All characters · 4"). **Fixed:** `CharacterScopeReadout`,
+an unboxed micro-label with the same icon and words — "All characters · 4",
+"Aria Vale only", "Corp · Master Wallet". When a read leaves Characters out it
+says "All characters · 3 of 4" with a warning icon, and its tooltip names who
+is missing. Never clickable; if the pilot can change the scope, use the filter.
+
 ### Entities
 
 - **Look:** every clickable entity name is accent at rest, underlined on

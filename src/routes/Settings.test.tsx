@@ -24,6 +24,7 @@ import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projection
 import { App } from '@/app/App';
 import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
+import { consumeStaleStores } from '@/app/staleStoresReload';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import {
@@ -1545,6 +1546,10 @@ describe('Reset saved view preferences', () => {
     expect(await db.settings.get('overviewGroups')).toBeDefined();
     expect(await db.settings.get('characters.starred')).toBeDefined();
     expect(await db.settings.get(ACTIVE_CHARACTER_KEY)).toBeDefined();
+    // The confirmation must stay readable: the reload waits for leaving Settings.
+    expect(await screen.findByText('View preferences reset.')).toBeInTheDocument();
+    expect(reloadSpy).not.toHaveBeenCalled();
+    consumeStaleStores();
   });
 });
 

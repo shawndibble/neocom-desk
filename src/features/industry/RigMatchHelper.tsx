@@ -1,18 +1,14 @@
 /**
- * "Match from in-game numbers": the pilot reads the Manufacturing (or
- * Reactions) bonuses off a structure's Services tab, types them in, and picks
+ * "Match from in-game numbers": the pilot reads the Structure Role
+ * Bonus off the Industry window's material and job-duration tooltips, types
+ * them in, and picks
  * the rig fit that produces them. ESI never exposes a structure's rigs, so
  * this is the only way to fill a fit in without knowing it by heart.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
-import {
-  FACILITY_PRESETS,
-  type FacilityKind,
-  type RigFit,
-  type SecurityBand,
-} from '@/engine/industry/types';
+import type { FacilityKind, RigFit, SecurityBand } from '@/engine/industry/types';
 import { matchRigFits, parseReadingPct } from '@/engine/industry/rigMatch';
 import { rigFitSummaryLabel } from './rigFitLabels';
 
@@ -28,10 +24,6 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
   const [meText, setMeText] = useState('');
   const [teText, setTeText] = useState('');
 
-  const service =
-    FACILITY_PRESETS[facility].activity === 'reaction'
-      ? t('industry.rigMatch.serviceReaction')
-      : t('industry.rigMatch.serviceManufacturing');
   const me = parseReadingPct(meText);
   const te = parseReadingPct(teText);
   const matches =
@@ -45,7 +37,14 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
       {open && (
         <Modal open onClose={() => setOpen(false)} title={t('industry.rigMatch.title')}>
           <div className="flex flex-col gap-3 text-xs">
-            <p>{t('industry.rigMatch.steps', { service })}</p>
+            <p>{t('industry.rigMatch.steps')}</p>
+            <img
+              src="/images/industry/rig-match-where.webp"
+              alt={t('industry.rigMatch.imageAlt')}
+              width={992}
+              height={930}
+              className="w-full rounded border border-line"
+            />
             <p className="text-text-dim">
               {t('industry.rigMatch.using', { security: t(`industry.${security}`) })}
             </p>
@@ -70,7 +69,7 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
               </label>
             </div>
             {matches !== null && matches.length === 0 && (
-              <p className="text-warning">{t('industry.rigMatch.noMatch', { service })}</p>
+              <p className="text-warning">{t('industry.rigMatch.noMatch')}</p>
             )}
             {matches !== null && matches.length > 1 && (
               <p className="text-text-dim">{t('industry.rigMatch.ambiguous')}</p>

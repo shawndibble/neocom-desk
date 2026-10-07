@@ -33,6 +33,12 @@ import {
 } from './purgeStaleAccounts.js';
 import { streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
+  INSURGENCY_URL,
+  LAWLESS_SYSTEMS_DOC,
+  SYSTEM_CONDITIONS_COLLECTION,
+  parseLawlessSystemIds,
+} from './lawlessSystems.js';
+import {
   ADAM4EVE_MIN_REQUEST_GAP_MS,
   ADAM4EVE_TYPE_CHUNK_SIZE,
   BACKFILL_HUB,
@@ -636,6 +642,41 @@ export const captureMiningPriceSnapshot = onSchedule(
     }
   }
 );
+
+/**
+ * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
+ * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
+ * 10 minutes (its own cache window) and stores the lawless system ids for the
+ * app to read. A failed fetch writes nothing: the doc just ages, and the app
+ * hides the badge once `updatedAt` passes its staleness limit.
+ *
+ * Another Cloud Scheduler job past the free three, like the jobs above.
+ */
+export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, async () => {
+  const response = await fetch(INSURGENCY_URL, {
+    headers: {
+      'User-Agent': MARKET_HISTORY_USER_AGENT,
+      'X-User-Agent': MARKET_HISTORY_USER_AGENT,
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) {
+    logWarn('lawless systems fetch failed', { status: response.status });
+    return;
+  }
+  const body: unknown = await response.json().catch(() => null);
+  // A changed or broken body is not "nothing lawless": write nothing, let the doc age.
+  if (!Array.isArray(body)) {
+    logWarn('lawless systems body was not a list');
+    return;
+  }
+  const systemIds = parseLawlessSystemIds(body);
+  await getFirestore()
+    .collection(SYSTEM_CONDITIONS_COLLECTION)
+    .doc(LAWLESS_SYSTEMS_DOC)
+    .set({ systemIds, updatedAt: Date.now() });
+  logInfo('lawless systems sync', { count: systemIds.length });
+});
 
 export const syncPublicContractOffers = onSchedule(
   { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },

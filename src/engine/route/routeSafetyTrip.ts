@@ -211,6 +211,8 @@ export interface RouteSafetyTripInput {
   regionNames: ReadonlyMap<number, string>;
   /** `null` while the feeds load. */
   activity: RouteSafetyActivity | null;
+  /** Systems under a lawless insurgency now; leave out while there is no fresh list. */
+  lawless?: ReadonlySet<number>;
 }
 
 export type RouteSafetyAssembly =
@@ -299,6 +301,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
     regionNames: input.regionNames,
     kills: activity?.kills ?? null,
     jumps: activity?.jumps ?? null,
+    lawless: input.lawless,
   };
   const tagRows = (systems: readonly number[]): RouteSafetyTripRow[] => {
     const steps = stepsOn(systems);

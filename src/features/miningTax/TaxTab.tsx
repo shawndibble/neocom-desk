@@ -109,7 +109,10 @@ import {
 } from '@/features/miningTax/selection';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
-import { loadMadePayments } from '@/features/miningTax/madePayments';
+import {
+  loadMadePaymentsWithStatus,
+  type MadePaymentSources,
+} from '@/features/miningTax/madePayments';
 import {
   autoMatchRecordedPayments,
   suggestLinks,
@@ -576,6 +579,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
    * resolves, and re-runs on `refresh()` so a just-linked payment drops off.
    */
   const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
+  const [paymentSources, setPaymentSources] = useState<MadePaymentSources[]>([]);
   /**
    * Keyed on the character roster, never on `data`. `useRouteSnapshot`
    * re-runs its loader on `onCacheRevalidated`, which is a *global* signal —
@@ -591,8 +595,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   useEffect(() => {
     if (trackedCharacterIds === '') return;
     let cancelled = false;
-    void loadMadePayments(trackedCharacterIds.split(',').map(Number)).then((payments) => {
-      if (!cancelled) setMadePayments(payments);
+    void loadMadePaymentsWithStatus(trackedCharacterIds.split(',').map(Number)).then((result) => {
+      if (cancelled) return;
+      setMadePayments(result.payments);
+      setPaymentSources(result.sources);
     });
     return () => {
       cancelled = true;
@@ -2205,6 +2211,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           payee={linkWalletPayee}
           owed={linkWalletOwed}
           candidates={linkWalletCandidates}
+          paymentSources={paymentSources}
           systemNames={data.systemNames}
           onLinked={() => {
             setSelection(new Set());

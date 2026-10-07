@@ -133,7 +133,7 @@ Behaviors:
 - CSV columns: Group, Skill, Level, Skill points (`skillsCsv.ts`); empty while skills scope needs re-auth.
 - Inspector: description, Prerequisites, Unlocks (`skillRequirements.ts`), Close, "Add to Skill Plan" via `SkillPlanAdd` (adds the next level into the target plan; "Already at level 5" at max; "In plan" when covered; Undo; `TargetPlanPicker` "Adding to" select; creates a plan when none exists - "Create plan and add"). Selection scrolls into view, clears on Character switch.
 - Unknown SP renders "Unknown" (queue credited a level without `level_end_sp`).
-- States: Spinner; load failure "Couldn't load" EmptyState; skills scope missing/401/403 -> `GrantBanner` "Log in again to see skills" with re-auth action; no cache -> "No skill data cached / Reconnect to fetch..."; stale cache -> "Showing cached data" label; no search match -> "No skills match your search."
+- States: Spinner; load failure "Couldn't load" EmptyState; skills scope missing/401/403 -> `GrantBanner` "Log in again to see skills" with re-auth action; no cache -> "No skill data cached / Couldn't load..."; stale cache -> "Showing cached data" label; no search match -> "No skills match your search."
 - Scope: reads skills, skill queue (skipped without scope, `skipQueueWithoutScope`), attributes, implants; panel-level degrade, route ungated.
 
 ---
