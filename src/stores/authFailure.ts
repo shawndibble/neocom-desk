@@ -27,6 +27,13 @@ export interface AuthFailure {
 
 interface AuthFailureState {
   failure: AuthFailure | null;
+  /**
+   * Characters whose dead grant sent the player away. Outlives `failure`, which
+   * the redirect consumes, so the page they land on can still say why.
+   */
+  needsLogin: number[];
+  markNeedsLogin: (characterId: number) => void;
+  dismissNeedsLogin: (characterId: number) => void;
   reportTokenFailure: (characterId: number) => void;
   reportRequestFailure: (characterId: number, endpointId?: EsiEndpointId) => void;
   dismiss: () => void;
@@ -34,7 +41,8 @@ interface AuthFailureState {
    * Drop a stale failure — on character switch, or once the grant works again.
    * `kind` narrows what counts as stale: a fresh access token proves the
    * refresh grant is alive but says nothing about a scope a previous read was
-   * refused for, so it must not clear a `'request'` failure.
+   * refused for, so it must not clear a `'request'` failure. A `'token'`
+   * clear also drops the needs-login mark: the grant works again.
    */
   clearFor: (characterId: number, kind?: AuthFailureKind) => void;
 }
@@ -46,6 +54,17 @@ function outranks(next: AuthFailureKind, current: AuthFailure | null): boolean {
 
 export const useAuthFailure = create<AuthFailureState>((set, get) => ({
   failure: null,
+  needsLogin: [],
+  markNeedsLogin: (characterId) => {
+    set((state) =>
+      state.needsLogin.includes(characterId)
+        ? state
+        : { needsLogin: [...state.needsLogin, characterId] }
+    );
+  },
+  dismissNeedsLogin: (characterId) => {
+    set((state) => ({ needsLogin: state.needsLogin.filter((id) => id !== characterId) }));
+  },
   reportTokenFailure: (characterId) => {
     set({ failure: { characterId, kind: 'token' } });
   },
@@ -57,6 +76,7 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
     set({ failure: null });
   },
   clearFor: (characterId, kind) => {
+    if (kind === undefined || kind === 'token') get().dismissNeedsLogin(characterId);
     const { failure } = get();
     if (!failure || failure.characterId !== characterId) return;
     if (kind !== undefined && failure.kind !== kind) return;
