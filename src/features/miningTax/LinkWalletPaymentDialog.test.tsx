@@ -7,6 +7,11 @@ import type { LedgerActionResult } from './ledgerActions';
 import type { GroupMember } from './groupRows';
 import type { MadePayment } from './paymentLinks';
 import { LinkWalletPaymentDialog } from './LinkWalletPaymentDialog';
+import type { MadePaymentSources } from './madePayments';
+import { db } from '@/db';
+import { beginEveLogin } from '@/app/loginFlow';
+
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
 const rememberPayeeEntity = vi.fn<(...args: unknown[]) => Promise<void>>();
@@ -22,7 +27,7 @@ const PAYEE = { id: 'p-1', characterId: 1, name: 'Moon Corp', defaultTaxPct: 10 
 function member(id: string, date: string, taxOwed: number): GroupMember {
   return {
     assignment: { id, date, solarSystemId: 30000142, taxOwed } as MiningTaxAssignmentRecord,
-    row: { characterName: 'Pilot One' },
+    row: { characterId: 1, characterName: 'Pilot One' },
   } as unknown as GroupMember;
 }
 
@@ -57,7 +62,10 @@ const IN_KIND: MadePayment = {
   label: 'Ore',
 };
 
-function renderDialog(candidates: readonly MadePayment[] = [DONATION, IN_KIND]) {
+function renderDialog(
+  candidates: readonly MadePayment[] = [DONATION, IN_KIND],
+  paymentSources?: readonly MadePaymentSources[]
+) {
   const onLinked = vi.fn();
   const onClose = vi.fn();
   render(
@@ -67,6 +75,7 @@ function renderDialog(candidates: readonly MadePayment[] = [DONATION, IN_KIND]) 
       payee={PAYEE}
       owed={OWED}
       candidates={candidates}
+      paymentSources={paymentSources}
       systemNames={new Map([[30000142, 'Jita']])}
       onLinked={onLinked}
     />
@@ -175,5 +184,37 @@ describe('LinkWalletPaymentDialog', () => {
       contractLinks: [{ refId: 5, source: 'manual' }],
     });
     expect(rememberPayeeEntity).not.toHaveBeenCalled();
+  });
+});
+
+describe('LinkWalletPaymentDialog grant note', () => {
+  const SOURCES = (over: Partial<MadePaymentSources>): MadePaymentSources[] => [
+    { characterId: 1, journal: 'ok', contracts: 'ok', ...over },
+  ];
+
+  beforeEach(async () => {
+    await db.tokens.clear();
+    vi.mocked(beginEveLogin).mockClear();
+  });
+
+  it('offers the grant when the journal permission is missing', async () => {
+    renderDialog([], SOURCES({ journal: 'skipped-no-permission' }));
+
+    expect(await screen.findByText(/Some payments can’t be seen/)).toBeInTheDocument();
+    expect(screen.getByText(/the wallet journal/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
+  });
+
+  it('shows nothing when both permissions loaded', async () => {
+    renderDialog([], SOURCES({}));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByText(/Some payments can’t be seen/)).toBeNull();
+  });
+
+  it('shows nothing for a transient failure', async () => {
+    renderDialog([], SOURCES({ journal: 'failed' }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByText(/Some payments can’t be seen/)).toBeNull();
   });
 });

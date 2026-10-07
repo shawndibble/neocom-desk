@@ -4100,7 +4100,13 @@
       "confirm_one": "Mark {{count}} paid with this payment",
       "confirm_other": "Mark {{count}} paid with this payment",
       "empty": "No unlinked wallet payments found. Payments appear here once ESI shows them in your wallet journal.",
-      "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this."
+      "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this.",
+      "grantTitle": "Some payments can’t be seen",
+      "grantHint": "No access to {{what}}, so those payments can’t be suggested here.",
+      "grantJournal": "the wallet journal",
+      "grantContracts": "contracts",
+      "grantAnd": "or",
+      "grantAction": "Grant access"
     },
     "attention": {
       "title_one": "{{count}} thing needs attention",
