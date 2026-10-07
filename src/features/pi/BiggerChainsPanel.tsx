@@ -24,7 +24,7 @@ import {
   biggerChainsView,
   cardPlanetCount,
   whatIfChainsOf,
-  WHAT_IF_PLANET_ID,
+  isWhatIfPlanetId,
   type BiggerChainCard,
 } from './biggerChainsModel';
 import { chainAssumptions, planetTypeList } from './chainEstimateText';
@@ -70,7 +70,7 @@ function ChainSentence({
               {/* A what-if planet reads last: "Gas I, Gas II and a new Lava planet". */}
               {listFormat.format(
                 [...card.planetIds]
-                  .sort((a, b) => Number(a === WHAT_IF_PLANET_ID) - Number(b === WHAT_IF_PLANET_ID))
+                  .sort((a, b) => Number(isWhatIfPlanetId(a)) - Number(isWhatIfPlanetId(b)))
                   .map(names.of)
               )}
             </b>
@@ -138,7 +138,7 @@ function Legs({ card, names }: { card: BiggerChainCard; names: Names }) {
       {card.legs
         .map((leg) =>
           t(
-            leg.from === WHAT_IF_PLANET_ID || leg.to === WHAT_IF_PLANET_ID
+            isWhatIfPlanetId(leg.from) || isWhatIfPlanetId(leg.to)
               ? 'piPlan.chains.legNew'
               : leg.jumps === null
                 ? 'piPlan.chains.legUnknown'
@@ -227,14 +227,14 @@ function ChainCard({
 }
 
 /** Planet and product names, a what-if planet included ("a new Barren planet"). */
-function useNames(advice: PlanAdvice, pi: PiData, whatIfType: PlanetType | null): Names {
+function useNames(advice: PlanAdvice, pi: PiData, whatIfTypes: readonly PlanetType[]): Names {
   const { t } = useTranslation();
   const byId = new Map(advice.colonies.map((colony) => [colony.planetId, colony]));
   const type = (planet: string) => t(`pi.planetType.${planet}`);
   return {
     of: (id) =>
-      id === WHAT_IF_PLANET_ID && whatIfType
-        ? t('piPlan.chains.newPlanet', { type: type(whatIfType) })
+      isWhatIfPlanetId(id) && whatIfTypes[-id - 1]
+        ? t('piPlan.chains.newPlanet', { type: type(whatIfTypes[-id - 1]) })
         : (byId.get(id)?.name ?? t('pi.planetLabel', { id })),
     type,
     product: (typeId) => pi.schematics[String(typeId)]?.name ?? `#${typeId}`,
@@ -242,42 +242,45 @@ function useNames(advice: PlanAdvice, pi: PiData, whatIfType: PlanetType | null)
 }
 
 /** What a card's figure assumes, the what-if planet's own assumptions included. */
-function useAssumptions(advice: PlanAdvice, whatIfType: PlanetType | null) {
+function useAssumptions(advice: PlanAdvice, whatIfTypes: readonly PlanetType[]) {
   const { t } = useTranslation();
   const basis = advice.chainBasis;
   const onColonies = t('piPlan.chains.assumesColonies', { count: basis.haulDays });
-  const added = whatIfType
-    ? t('piPlan.chains.assumesWhatIf', {
-        type: t(`pi.planetType.${whatIfType}`),
-        level: basis.ccLevel,
-        heads: basis.headsPerExtractor,
-        rate: Math.round(basis.ratePerHour).toLocaleString('en'),
-      })
-    : null;
+  const added =
+    whatIfTypes.length > 0
+      ? t('piPlan.chains.assumesWhatIf', {
+          type: listFormat.format(whatIfTypes.map((type) => t(`pi.planetType.${type}`))),
+          count: whatIfTypes.length,
+          level: basis.ccLevel,
+          heads: basis.headsPerExtractor,
+          rate: Math.round(basis.ratePerHour).toLocaleString('en'),
+        })
+      : null;
   return (card: BiggerChainCard) =>
     card.kind === 'new-planets'
       ? chainAssumptions(t, card.estimate)
-      : added && card.planetIds.includes(WHAT_IF_PLANET_ID)
+      : added && card.planetIds.some(isWhatIfPlanetId)
         ? `${onColonies} ${added}`
         : onColonies;
 }
 
-/** The chains one what-if planet type makes possible, drawn as Bigger chains cards. */
+/** The chains what-if planet types make possible together, drawn as Bigger chains cards. */
 export function WhatIfChainCards({
-  type,
+  types,
   cards,
   advice,
   pi,
   stacked = false,
 }: {
-  type: PlanetType;
+  /** Sorted, as `whatIfTypesOf` gives them: the order their planet ids are given in. */
+  types: readonly PlanetType[];
   cards: readonly BiggerChainCard[];
   advice: PlanAdvice;
   pi: PiData;
   stacked?: boolean;
 }) {
-  const names = useNames(advice, pi, type);
-  const assumptionsOf = useAssumptions(advice, type);
+  const names = useNames(advice, pi, types);
+  const assumptionsOf = useAssumptions(advice, types);
   return (
     <ul className="divide-y divide-line">
       {cards.map((card) => (
@@ -343,10 +346,10 @@ function WhatIfSection({
         {noSlot ? t('piPlan.chains.whatIfNoSlot') : t('piPlan.chains.whatIfIntro')}
       </p>
       {rows.map((row) => (
-        <div key={row.type} className="border-t border-line">
+        <div key={row.key} className="border-t border-line">
           <Disclosure
             label={t('piPlan.chains.whatIfRow', {
-              aType: withArticle(t(`pi.planetType.${row.type}`)),
+              aType: withArticle(t(`pi.planetType.${row.types[0]}`)),
               count: row.cards.length,
             })}
             trailing={
@@ -355,11 +358,11 @@ function WhatIfSection({
                 {t('piPlan.make.perDay')}
               </>
             }
-            expanded={open.has(row.type)}
-            onToggle={() => toggle(row.type)}
+            expanded={open.has(row.types[0])}
+            onToggle={() => toggle(row.types[0])}
           >
-            {open.has(row.type) && (
-              <WhatIfChainCards type={row.type} cards={row.cards} advice={advice} pi={pi} />
+            {open.has(row.types[0]) && (
+              <WhatIfChainCards types={row.types} cards={row.cards} advice={advice} pi={pi} />
             )}
           </Disclosure>
         </div>
@@ -400,9 +403,9 @@ export function BiggerChainsPanel({ advice, pi }: { advice: PlanAdvice; pi: PiDa
       }),
     [state.estimates, afterRebuildPerDay, advice.slots, haulDays]
   );
-  const names = useNames(advice, pi, null);
+  const names = useNames(advice, pi, NO_TYPES);
   const free = advice.slots.free;
-  const assumptionsOf = useAssumptions(advice, null);
+  const assumptionsOf = useAssumptions(advice, NO_TYPES);
   const priced = view.recommended.length + view.others.length;
   const renderCards = (cards: readonly BiggerChainCard[]) => (
     <ul className="divide-y divide-line">

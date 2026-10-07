@@ -16,6 +16,10 @@ import {
   whatIfChainCandidates,
   whatIfChainsView,
   WHAT_IF_PLANET_ID,
+  isWhatIfPlanetId,
+  whatIfKey,
+  whatIfPlanetId,
+  whatIfTypesOf,
   type ColonyChainEstimate,
 } from './biggerChainsModel';
 
@@ -316,25 +320,25 @@ describe('biggerChainsView', () => {
 
 describe('whatIfChainCandidates', () => {
   it('offers the chains a planet type would make possible, never one the pilot can already make', () => {
-    const added = whatIfChainCandidates(TWO_GAS, 'plasma', pi);
+    const added = whatIfChainCandidates(TWO_GAS, ['plasma'], pi);
     // Every metal Robotics needs comes off a Plasma planet.
     expect(added).toContain(ROBOTICS);
-    expect(whatIfChainCandidates(TWO_GAS, 'lava', pi)).toContain(CAMERA_DRONES);
+    expect(whatIfChainCandidates(TWO_GAS, ['lava'], pi)).toContain(CAMERA_DRONES);
     // Condensates are already a Bigger chain on Gas alone: nothing new.
     expect(added).not.toContain(CONDENSATES);
     expect(added.some((id) => biggerChainCandidates(TWO_GAS, pi).includes(id))).toBe(false);
   });
 
   it('offers nothing for a type the pilot already runs, or with no colonies', () => {
-    expect(whatIfChainCandidates(TWO_GAS, 'gas', pi)).toEqual([]);
-    expect(whatIfChainCandidates([], 'plasma', pi)).toEqual([]);
+    expect(whatIfChainCandidates(TWO_GAS, ['gas'], pi)).toEqual([]);
+    expect(whatIfChainCandidates([], ['plasma'], pi)).toEqual([]);
   });
 });
 
 describe('estimateOnColoniesWith', () => {
   it('runs the chain on the pilot’s colonies plus one new planet of the type, whose distance is unknown', () => {
     const jumps = (from: number, to: number | 'hub') => (to === 'hub' ? 9 : from === to ? 0 : 2);
-    const result = estimateOnColoniesWith(CAMERA_DRONES, 'lava', TWO_GAS, 1, basis(), jumps, pi);
+    const result = estimateOnColoniesWith(CAMERA_DRONES, ['lava'], TWO_GAS, 1, basis(), jumps, pi);
     if (!result) throw new Error('expected an estimate');
     expect(result.planetIds).toEqual([WHAT_IF_PLANET_ID, 1, 2]);
     expect(result.iskPerDay).toBeGreaterThan(0);
@@ -348,25 +352,89 @@ describe('estimateOnColoniesWith', () => {
 
   it('gives none without a free planet slot for the new planet', () => {
     expect(
-      estimateOnColoniesWith(CAMERA_DRONES, 'lava', TWO_GAS, 0, basis(), undefined, pi)
+      estimateOnColoniesWith(CAMERA_DRONES, ['lava'], TWO_GAS, 0, basis(), undefined, pi)
     ).toBeNull();
+  });
+});
+
+describe('several what-if planets at once', () => {
+  it('names each added planet by its own negative id, the first being WHAT_IF_PLANET_ID', () => {
+    expect(whatIfPlanetId(0)).toBe(WHAT_IF_PLANET_ID);
+    expect(whatIfPlanetId(1)).toBe(-2);
+    expect(isWhatIfPlanetId(-2)).toBe(true);
+    expect(isWhatIfPlanetId(1)).toBe(false);
+  });
+
+  it('keys a set by its sorted types, so a single type keys as itself', () => {
+    expect(whatIfKey('lava')).toBe('lava');
+    expect(whatIfKey(['plasma', 'lava'])).toBe('lava+plasma');
+    expect(whatIfTypesOf('lava+plasma')).toEqual(['lava', 'plasma']);
+  });
+
+  it('offers what the whole set makes possible: a chain needing two added types', () => {
+    // Condensates need nothing added; Robotics' metals come off Lava and Plasma but not Gas.
+    const both = whatIfChainCandidates(TWO_GAS, ['lava', 'plasma'], pi);
+    expect(both).toEqual(
+      expect.arrayContaining([
+        ...whatIfChainCandidates(TWO_GAS, ['lava'], pi),
+        ...whatIfChainCandidates(TWO_GAS, ['plasma'], pi),
+      ])
+    );
+    expect(both.some((id) => biggerChainCandidates(TWO_GAS, pi).includes(id))).toBe(false);
+  });
+
+  it('skips a type the pilot already runs', () => {
+    expect(whatIfChainCandidates(TWO_GAS, ['gas', 'lava'], pi)).toEqual(
+      whatIfChainCandidates(TWO_GAS, ['lava'], pi)
+    );
+    expect(whatIfChainCandidates(TWO_GAS, ['gas'], pi)).toEqual([]);
+  });
+
+  it('needs a free slot for every added planet, and puts each on the colonies', () => {
+    const jumps = (from: number, to: number | 'hub') => (to === 'hub' ? 9 : from === to ? 0 : 2);
+    expect(
+      estimateOnColoniesWith(ROBOTICS, ['lava', 'plasma'], TWO_GAS, 1, basis(), jumps, pi)
+    ).toBeNull();
+    const result = estimateOnColoniesWith(
+      ROBOTICS,
+      ['lava', 'plasma'],
+      TWO_GAS,
+      2,
+      basis(),
+      jumps,
+      pi
+    );
+    if (!result) throw new Error('expected an estimate');
+    expect(result.planetIds.some(isWhatIfPlanetId)).toBe(true);
+    for (const leg of result.legs) {
+      if (isWhatIfPlanetId(leg.from) || isWhatIfPlanetId(leg.to)) expect(leg.jumps).toBeNull();
+    }
+  });
+
+  it('lays a chain on new planets that uses at least one added type, within the free slots for all', () => {
+    expect(
+      estimateOnNewPlanetsWith(ROBOTICS, ['lava', 'plasma'], ['gas'], 1, basis(), pi)
+    ).toBeNull();
+    const view = estimateOnNewPlanetsWith(ROBOTICS, ['lava', 'plasma'], ['gas'], 6, basis(), pi);
+    if (!view) throw new Error('expected an estimate');
+    expect(view.planets.some((type) => type === 'lava' || type === 'plasma')).toBe(true);
   });
 });
 
 describe('estimateOnNewPlanetsWith', () => {
   it('lays the chain on new planets of the pilot’s types and the added one, within their free slots', () => {
-    const view = estimateOnNewPlanetsWith(ROBOTICS, 'plasma', ['gas'], 6, basis(), pi);
+    const view = estimateOnNewPlanetsWith(ROBOTICS, ['plasma'], ['gas'], 6, basis(), pi);
     if (!view) throw new Error('expected an estimate');
     expect(view.planets).toContain('plasma');
     expect(view.planets.every((type) => type === 'gas' || type === 'plasma')).toBe(true);
   });
 
   it('gives none when the layout never uses the added type', () => {
-    expect(estimateOnNewPlanetsWith(CONDENSATES, 'plasma', ['gas'], 6, basis(), pi)).toBeNull();
+    expect(estimateOnNewPlanetsWith(CONDENSATES, ['plasma'], ['gas'], 6, basis(), pi)).toBeNull();
   });
 
   it('gives none when the chain needs more planets than are free', () => {
-    expect(estimateOnNewPlanetsWith(ROBOTICS, 'plasma', ['gas'], 0, basis(), pi)).toBeNull();
+    expect(estimateOnNewPlanetsWith(ROBOTICS, ['plasma'], ['gas'], 0, basis(), pi)).toBeNull();
   });
 });
 
@@ -389,7 +457,8 @@ describe('whatIfChainsView', () => {
       haulDays: 7,
     });
     expect(rows).toHaveLength(1);
-    expect(rows[0].type).toBe('plasma');
+    expect(rows[0].types).toEqual(['plasma']);
+    expect(rows[0].key).toBe('plasma');
     const card = rows[0].cards[0];
     expect(card.versusPerDay).toBe(1_800_000);
     expect(card.gainPerDay).toBe(1_200_000);
@@ -410,7 +479,7 @@ describe('whatIfChainsView', () => {
       slots: { free: 1, gainPerPlanetPerDay: 800_000 },
       haulDays: 7,
     });
-    expect(rows.map((row) => row.type)).toEqual(['plasma']);
+    expect(rows.map((row) => row.key)).toEqual(['plasma']);
     expect(rows[0].cards[0].verdict).toBe('short');
   });
 
@@ -428,6 +497,6 @@ describe('whatIfChainsView', () => {
       slots: { free: 1, gainPerPlanetPerDay: 0 },
       haulDays: 7,
     });
-    expect(rows.map((row) => row.type)).toEqual(['plasma', 'lava']);
+    expect(rows.map((row) => row.key)).toEqual(['plasma', 'lava']);
   });
 });

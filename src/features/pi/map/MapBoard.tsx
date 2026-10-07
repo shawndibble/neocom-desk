@@ -77,10 +77,10 @@ export interface MapBoardProps {
   litIds: ReadonlySet<number>;
   /** Products a what-if planet (hovered, focused or open in the detail panel) would unlock. */
   newIds: ReadonlySet<number>;
-  /** The planet type being tried, for the pink marker under it. */
-  whatIfType: PlanetType | null;
-  /** True while the what-if is the open detail panel (the planet toggle reads as pressed). */
-  whatIfOpen: boolean;
+  /** The what-if planet types shown (the ticked set, or the one hovered); none the pilot has. */
+  whatIfTypes: ReadonlySet<PlanetType>;
+  /** The what-if types ticked, which the planet toggles read as pressed (a hovered one is not). */
+  whatIfTicked: ReadonlySet<PlanetType>;
   trace: Trace | null;
   /** Fade everything off the trace: only once the pilot traced something themselves. */
   dimOthers: boolean;
@@ -210,7 +210,7 @@ export function MapBoard(props: MapBoardProps) {
         const key = `${type}>${raw.typeId}`;
         if (tracePlanetEdges.has(key)) {
           top.push({ d: curve(a, b), cls: 'stroke-warning stroke-2' });
-        } else if (newIds.has(raw.typeId) && props.whatIfType === type) {
+        } else if (newIds.has(raw.typeId) && props.whatIfTypes.has(type)) {
           mid.push({ d: curve(a, b), cls: 'stroke-map-whatif/50 stroke-[1.2]' });
         } else if (ticked.has(type) && litIds.has(raw.typeId) && !quiet) {
           base.push({ d: curve(a, b), cls: 'stroke-line-bright/30' });
@@ -219,7 +219,7 @@ export function MapBoard(props: MapBoardProps) {
     }
     setWires([...base, ...mid, ...top]);
     setSize({ w: origin.width, h: origin.height });
-  }, [graph, litIds, newIds, ticked, trace, dimOthers, props.whatIfType, visible, layoutVersion]);
+  }, [graph, litIds, newIds, ticked, trace, dimOthers, props.whatIfTypes, visible, layoutVersion]);
 
   // --- Roving focus --------------------------------------------------------
   function move(key: Key, event: KeyboardEvent<HTMLElement>) {
@@ -328,7 +328,7 @@ export function MapBoard(props: MapBoardProps) {
                   pressed={
                     props.noColonies || owned.has(type)
                       ? ticked.has(type)
-                      : props.whatIfOpen && props.whatIfType === type
+                      : props.whatIfTicked.has(type)
                   }
                   names={props.colonyNames.get(type) ?? []}
                   ranks={props.pickPlanets.get(type) ?? []}
@@ -341,7 +341,7 @@ export function MapBoard(props: MapBoardProps) {
                   onClick={() => props.onPlanet(type)}
                   onPreview={props.onPreview}
                   needed={props.needTypes.has(type)}
-                  whatIf={props.whatIfType === type && !owned.has(type) && !props.noColonies}
+                  whatIf={props.whatIfTypes.has(type) && !owned.has(type) && !props.noColonies}
                 />
               </li>
             ))}
@@ -401,7 +401,11 @@ export function MapBoard(props: MapBoardProps) {
                 ]
                   .filter(Boolean)
                   .join('\n');
-                const unlockedBy = isNew ? props.whatIfType : null;
+                const unlockedBy = isNew
+                  ? [...props.whatIfTypes].filter(
+                      (type) => product.tier > 0 || product.hosts.includes(type)
+                    )
+                  : [];
                 const chainIsk = tileChainIsk(figure);
                 return (
                   <li key={product.typeId} className="relative flex-none">

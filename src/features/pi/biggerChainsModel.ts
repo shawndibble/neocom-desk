@@ -20,13 +20,14 @@
  * rebuild, or a free slot each at the best one-planet recipe (the slot nudge's
  * own figure). A side with no figure is no comparison, never a win.
  *
- * **What if I add a planet?** One planet type the pilot does not run, at a
- * time (as the one-planet what-if does): the chains it would make possible,
- * in the same two layouts with that type added. On their colonies, it is one
- * new planet beside them (`WHAT_IF_PLANET_ID`, no distance known yet); on new
- * planets, the added type must be one of them. Either way the new planet takes
- * a free slot, and is compared with a free slot at the best one-planet recipe.
- * Never recommended: these are facts about a planet they do not have.
+ * **What if I add a planet?** One or several planet types the pilot does not
+ * run (Plan: one at a time; the Map: whatever is ticked, priced as one set):
+ * the chains they would make possible, in the same two layouts with those
+ * types added. On their colonies, each is a new planet beside them
+ * (`whatIfPlanetId`, no distance known yet); on new planets, the chain must
+ * use at least one of the added types. Either way every added planet takes a
+ * free slot, and each is compared with a free slot at the best one-planet
+ * recipe. Never recommended: these are facts about planets they do not have.
  *
  * Pure: colonies, assumptions, jumps and prices are parameters.
  */
@@ -98,64 +99,83 @@ function candidatesFor(
   });
 }
 
-/** The planet id a what-if planet takes beside the pilot's colonies: no real planet's id is negative. */
+/** The planet id the first what-if planet takes beside the pilot's colonies: no real planet's id is negative. */
 export const WHAT_IF_PLANET_ID = -1;
+
+/** The id of the `index`th what-if planet (0-based): -1, -2, … */
+export const whatIfPlanetId = (index: number) => -(index + 1);
+
+export const isWhatIfPlanetId = (id: number) => id < 0;
+
+/** A set of what-if types as one cache key: sorted, so a single type is its own key. */
+export function whatIfKey(types: PlanetType | readonly PlanetType[]): string {
+  return typeof types === 'string' ? types : [...new Set(types)].sort().join('+');
+}
+
+/** The types a `whatIfKey` names, sorted: the order their planet ids are given in. */
+export function whatIfTypesOf(key: string): PlanetType[] {
+  return key === '' ? [] : (key.split('+') as PlanetType[]);
+}
 
 const rawsOn = (type: PlanetType, pi: PiData) =>
   localResourcesFor(type, pi).map((raw) => raw.typeID);
 
-/** The P3s and P4s a planet of `type` would add: buildable with it, not without. None for a type they run. */
+/** The P3s and P4s planets of `types` would add: buildable with them, not without. A type they run adds nothing. */
 export function whatIfChainCandidates(
   colonies: readonly PlannerColony[],
-  type: PlanetType,
+  types: readonly PlanetType[],
   pi: PiData
 ): number[] {
-  if (colonies.length === 0 || colonies.some((colony) => colony.planetType === type)) return [];
+  const owned = new Set(colonies.map((colony) => colony.planetType));
+  const added = [...new Set(types)].filter((type) => !owned.has(type));
+  if (colonies.length === 0 || added.length === 0) return [];
   const base = new Set(biggerChainCandidates(colonies, pi));
   const yielded = new Set([
     ...colonies.flatMap((colony) => [...colony.ratePerEcu.keys()]),
-    ...rawsOn(type, pi),
+    ...added.flatMap((type) => rawsOn(type, pi)),
   ]);
-  const types = [...new Set([...colonies.map((colony) => colony.planetType), type])];
-  return candidatesFor(yielded, types, pi).filter((typeId) => !base.has(typeId));
+  return candidatesFor(yielded, [...owned, ...added], pi).filter((typeId) => !base.has(typeId));
 }
 
 /**
- * The chain on the pilot's colonies plus one new planet of `type` (at the
- * ranking's assumptions, no distance known), or null: no free slot for it, no
- * figure, or a plan that leaves the new planet out.
+ * The chain on the pilot's colonies plus one new planet of each of `types` (at
+ * the ranking's assumptions, no distance known), or null: not a free slot for
+ * each, no figure, or a plan that leaves every new planet out.
  */
 export function estimateOnColoniesWith(
   typeId: number,
-  type: PlanetType,
+  types: readonly PlanetType[],
   colonies: readonly PlannerColony[],
   freeSlots: number,
   basis: ChainBasis,
   jumps: JumpsFn | undefined,
   pi: PiData
 ): ColonyChainEstimate | null {
-  if (freeSlots < 1) return null;
-  const added = newPlanetColony(WHAT_IF_PLANET_ID, type, rawsOn(type, pi), basis);
-  // The new planet has no system yet: every route to it is unknown, never zero.
+  if (types.length === 0 || freeSlots < types.length) return null;
+  const added = types.map((type, index) =>
+    newPlanetColony(whatIfPlanetId(index), type, rawsOn(type, pi), basis)
+  );
+  // A new planet has no system yet: every route to it is unknown, never zero.
   const withUnknown: JumpsFn | undefined = jumps
     ? (from, to) =>
-        from === WHAT_IF_PLANET_ID || to === WHAT_IF_PLANET_ID ? null : jumps(from, to)
+        isWhatIfPlanetId(from) || (to !== 'hub' && isWhatIfPlanetId(to)) ? null : jumps(from, to)
     : undefined;
-  const result = estimateOnColonies(typeId, [...colonies, added], basis, withUnknown, pi);
-  return result?.planetIds.includes(WHAT_IF_PLANET_ID) ? result : null;
+  const result = estimateOnColonies(typeId, [...colonies, ...added], basis, withUnknown, pi);
+  return result?.planetIds.some(isWhatIfPlanetId) ? result : null;
 }
 
-/** The chain on new planets of the pilot's types and `type`, or null: it fits no free slots, or leaves `type` out. */
+/** The chain on new planets of the pilot's types and `added`, or null: it fits no free slots for all of them, or leaves every one out. */
 export function estimateOnNewPlanetsWith(
   typeId: number,
-  type: PlanetType,
+  added: readonly PlanetType[],
   types: readonly PlanetType[],
   freeSlots: number,
   basis: ChainBasis,
   pi: PiData
 ): ChainEstimateView | null {
-  const view = estimateOnNewPlanets(typeId, [...types, type], freeSlots, basis, pi);
-  return view?.planets.includes(type) ? view : null;
+  if (added.length === 0 || freeSlots < added.length) return null;
+  const view = estimateOnNewPlanets(typeId, [...types, ...added], freeSlots, basis, pi);
+  return view?.planets.some((type) => added.includes(type)) ? view : null;
 }
 
 /** The chain on the pilot's colonies, or null: no price, or no plan that makes it in full. */
@@ -335,8 +355,10 @@ export function cardPlanetCount(card: BiggerChainCard): number {
 }
 
 export interface WhatIfChainsRow {
-  /** The planet type added. */
-  type: PlanetType;
+  /** `whatIfKey` of the planet types added. */
+  key: string;
+  /** The planet types added, sorted: the order their planet ids are given in. */
+  types: PlanetType[];
   /** Every chain it makes possible with a figure, best first. */
   cards: BiggerChainCard[];
 }
@@ -344,7 +366,7 @@ export interface WhatIfChainsRow {
 /** `whatIfChainsView` over Plan's own figures: the same comparison on Plan and the Map. */
 export function whatIfChainsOf(
   advice: Pick<PlanAdvice, 'colonies' | 'slots' | 'chainBasis'>,
-  byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>
+  byType: ReadonlyMap<string, ReadonlyMap<number, BiggerChainEstimates>>
 ): WhatIfChainsRow[] {
   return whatIfChainsView({
     byType,
@@ -357,22 +379,25 @@ export function whatIfChainsOf(
 }
 
 /**
- * One row per planet type that makes a chain possible, the type whose best
- * chain gains most first. The new planet is compared with a free slot at the
- * best one-planet recipe, as a chain on new planets is.
+ * One row per set of planet types (a `whatIfKey`) that makes a chain possible,
+ * the set whose best chain gains most first. Each new planet is compared with a
+ * free slot at the best one-planet recipe, as a chain on new planets is.
  */
 export function whatIfChainsView(
   input: Omit<BiggerChainsInput, 'estimates'> & {
-    byType: ReadonlyMap<PlanetType, ReadonlyMap<number, BiggerChainEstimates>>;
+    byType: ReadonlyMap<string, ReadonlyMap<number, BiggerChainEstimates>>;
   }
 ): WhatIfChainsRow[] {
-  const afterRebuildPerDay = new Map(input.afterRebuildPerDay);
-  afterRebuildPerDay.set(WHAT_IF_PLANET_ID, input.slots.gainPerPlanetPerDay);
   const rows: WhatIfChainsRow[] = [];
-  for (const [type, estimates] of input.byType) {
+  for (const [key, estimates] of input.byType) {
+    const types = whatIfTypesOf(key);
+    const afterRebuildPerDay = new Map(input.afterRebuildPerDay);
+    types.forEach((_, index) =>
+      afterRebuildPerDay.set(whatIfPlanetId(index), input.slots.gainPerPlanetPerDay)
+    );
     const view = biggerChainsView({ ...input, estimates, afterRebuildPerDay });
     const cards = [...view.recommended, ...view.others];
-    if (cards.length > 0) rows.push({ type, cards });
+    if (cards.length > 0) rows.push({ key, types, cards });
   }
-  return rows.sort((a, b) => better(a.cards[0], b.cards[0]) || a.type.localeCompare(b.type));
+  return rows.sort((a, b) => better(a.cards[0], b.cards[0]) || a.key.localeCompare(b.key));
 }

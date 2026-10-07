@@ -63,7 +63,7 @@ describe('canMake', () => {
 describe('unlockedBy', () => {
   it('lists what a planet type adds over the ticked ones, and counts only products', () => {
     const ticked = set('barren', 'temperate');
-    const added = unlockedBy(graph, 'lava', ticked);
+    const added = unlockedBy(graph, set('lava'), ticked);
     expect(added.productIds.every((pid) => graph.byId.get(pid)!.tier >= 1)).toBe(true);
     expect(added.productIds.every((pid) => !canMake(graph, pid, ticked))).toBe(true);
     expect(
@@ -74,8 +74,27 @@ describe('unlockedBy', () => {
     expect(added.highlight.size).toBeGreaterThan(added.productIds.length);
   });
 
+  it('adds what the whole set makes possible together, which one type alone does not', () => {
+    const ticked = set('barren');
+    const both = unlockedBy(graph, set('lava', 'gas'), ticked);
+    const lava = unlockedBy(graph, set('lava'), ticked);
+    const gas = unlockedBy(graph, set('gas'), ticked);
+    for (const pid of [...lava.productIds, ...gas.productIds]) {
+      expect(both.productIds).toContain(pid);
+    }
+    expect(both.productIds.length).toBeGreaterThanOrEqual(lava.productIds.length);
+    expect(both.productIds.every((pid) => !canMake(graph, pid, ticked))).toBe(true);
+  });
+
+  it('leaves out a type already ticked from the set', () => {
+    const ticked = set('barren', 'temperate');
+    expect(unlockedBy(graph, set('barren', 'lava'), ticked).productIds).toEqual(
+      unlockedBy(graph, set('lava'), ticked).productIds
+    );
+  });
+
   it('adds nothing when the type is already ticked', () => {
-    expect(unlockedBy(graph, 'barren', set('barren')).productIds).toEqual([]);
+    expect(unlockedBy(graph, set('barren'), set('barren')).productIds).toEqual([]);
   });
 });
 
@@ -223,7 +242,7 @@ describe('unlockedRecipe', () => {
   it('is the best recipe only the new planet type can host, priced for that type', () => {
     const base = buildPlanAdvice(adviceInput('lean'));
     const whatIf = buildPlanAdvice(adviceInput('lean', { whatIfTypes: ['lava'] }));
-    const best = unlockedRecipe(whatIf, 'lava', ['temperate']);
+    const best = unlockedRecipe(whatIf, set('lava'), ['temperate']);
     expect(best).not.toBeNull();
     expect(best!.useType).toBe('lava');
     expect(best!.hostTypes).toContain('lava');
@@ -237,6 +256,18 @@ describe('unlockedRecipe', () => {
         expect(r.iskPerDay).toBeLessThanOrEqual(best!.iskPerDay);
       }
     }
+  });
+});
+
+describe('unlockedRecipe over a set', () => {
+  it('takes a recipe hosted by any added type, never one an owned type hosts', () => {
+    const whatIf = buildPlanAdvice(adviceInput('lean', { whatIfTypes: ['lava', 'plasma'] }));
+    const best = unlockedRecipe(whatIf, set('lava', 'plasma'), ['temperate']);
+    expect(best).not.toBeNull();
+    expect(best!.hostTypes.some((h) => h === 'lava' || h === 'plasma')).toBe(true);
+    expect(best!.hostTypes).not.toContain('temperate');
+    const alone = unlockedRecipe(whatIf, set('lava'), ['temperate']);
+    expect(best!.iskPerDay).toBeGreaterThanOrEqual(alone?.iskPerDay ?? 0);
   });
 });
 
