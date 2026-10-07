@@ -20,6 +20,7 @@ export function AccountPlanSection({ advice, pi }: { advice: PlanAdvice; pi: PiD
     <AccountPlanPanel
       view={view}
       pending={account.pending}
+      failed={account.failed}
       advice={advice}
       pi={pi}
       haul={haul}

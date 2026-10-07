@@ -30,7 +30,7 @@ const plan = (groups: AccountGroup[]): AccountPlan => ({
 });
 
 describe('accountView', () => {
-  it('lists chains that gain, biggest gain first, and leaves the rest staying put', () => {
+  it('lists every product group, biggest gain first, and leaves the rest staying put', () => {
     const view = accountView(
       plan([
         group([1, 2], 100, 1_000_000, 1_500_000),
@@ -40,11 +40,5 @@ describe('accountView', () => {
     );
     expect(view.changes.map((g) => g.typeId)).toEqual([200, 100]);
     expect(view.stays.map((g) => g.planetIds)).toEqual([[3]]);
-  });
-
-  it('treats a gain inside the solver tolerance as the same plan', () => {
-    const view = accountView(plan([group([1, 2], 100, 1_000_000, 1_020_000)]));
-    expect(view.changes).toEqual([]);
-    expect(view.stays).toHaveLength(1);
   });
 });

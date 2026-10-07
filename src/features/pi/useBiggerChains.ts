@@ -66,7 +66,7 @@ export function resetBiggerChains(): void {
 }
 
 /** The solver reads these fields; `ratePerEcu` is a Map, so it is spelled out. */
-function coloniesKey(colonies: readonly PlannerColony[]): string {
+export function coloniesKey(colonies: readonly PlannerColony[]): string {
   return JSON.stringify(
     colonies.map((c) => [
       c.planetId,

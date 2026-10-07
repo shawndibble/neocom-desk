@@ -133,4 +133,18 @@ describe('planAccount', () => {
     expect(chain?.planetIds).toEqual([1]);
     expect(buying.buyGainPerDay).toBeGreaterThan(0);
   });
+
+  it('leaves a colony with no own figure out of the search, never crediting its whole output as gain', () => {
+    const colonies = [colony(1, 'gas', GAS_RAWS), colony(2, 'gas', GAS_RAWS)];
+    const plan = run({
+      colonies,
+      haul: true,
+      candidates: [CONDENSATES],
+      books: priced({ [CONDENSATES]: 5_000_000 }),
+      soloPerDay: new Map([[2, null]]),
+    });
+    expect(plan.unknownPlanetIds).toEqual([2]);
+    expect(plan.groups.every((g) => g.typeId === null)).toBe(true);
+    expect(plan.haulGainPerDay).toBe(0);
+  });
 });

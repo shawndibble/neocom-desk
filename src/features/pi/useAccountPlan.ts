@@ -10,18 +10,21 @@ import { planAccount, type AccountPlan } from '@/engine/pi/accountPlan';
 import type { PiTier } from '@/engine/pi/types';
 import { accountCandidates } from './accountPlanModel';
 import { chainPricing } from './chainEstimateModel';
+import { chainBasisKey } from './useChainEstimates';
 import { plannerPolicy } from './goalPlannerModel';
 import type { PlanAdvice } from './planAdviceModel';
 import { SLICE_MS } from './runSliced';
-import { useChainInputs } from './useBiggerChains';
+import { coloniesKey, useChainInputs } from './useBiggerChains';
 
 export interface AccountPlanState {
   plan: AccountPlan | null;
+  /** The planner threw: no plan will come for these inputs. */
+  failed: boolean;
   /** Still planning (or still counting jumps). */
   pending: boolean;
 }
 
-let cached: { key: string; plan: AccountPlan } | null = null;
+let cached: { key: string; plan: AccountPlan | null } | null = null;
 
 /** Test seam: forget the last plan. */
 export function resetAccountPlan(): void {
@@ -48,18 +51,20 @@ export function useAccountPlan(
       accountCandidates(colonies, pi, advice.chainBasis.books.revenuePrices, buyTiers.length > 0),
     [colonies, pi, advice.chainBasis, buyTiers]
   );
-  // Without hauling there are no distances to wait for, so the key stands on its own.
+  // The colonies and assumptions the solver reads, and the SDE it reads them from. Without
+  // hauling there are no distances to wait for, so the jump key is left out.
   const key = useMemo(() => {
     if (haul && inputsKey === null) return null;
     return JSON.stringify([
-      haul ? inputsKey : advice.chainBasis,
+      chainBasisKey(advice.chainBasis, pi),
+      coloniesKey(colonies),
+      haul ? inputsKey : null,
       haul,
       buyTiers,
       candidates,
       [...soloPerDay],
-      colonies.map((c) => c.planetId),
     ]);
-  }, [haul, inputsKey, advice.chainBasis, buyTiers, candidates, soloPerDay, colonies]);
+  }, [haul, inputsKey, advice.chainBasis, pi, buyTiers, candidates, soloPerDay, colonies]);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -77,13 +82,19 @@ export function useAccountPlan(
     let timer: ReturnType<typeof setTimeout> | undefined;
     const slice = () => {
       const start = performance.now();
-      while (performance.now() - start < SLICE_MS) {
-        const next = steps.next();
-        if (next.done) {
-          cached = { key, plan: next.value };
-          setVersion((v) => v + 1);
-          return;
+      try {
+        while (performance.now() - start < SLICE_MS) {
+          const next = steps.next();
+          if (next.done) {
+            cached = { key, plan: next.value };
+            setVersion((v) => v + 1);
+            return;
+          }
         }
+      } catch {
+        cached = { key, plan: null };
+        setVersion((v) => v + 1);
+        return;
       }
       timer = setTimeout(slice, 0);
     };
@@ -95,7 +106,11 @@ export function useAccountPlan(
 
   return useMemo(() => {
     void version;
-    const plan = key !== null && cached?.key === key ? cached.plan : null;
-    return { plan, pending: plan === null };
+    const done = key !== null && cached?.key === key ? cached : null;
+    return {
+      plan: done?.plan ?? null,
+      failed: done !== null && done.plan === null,
+      pending: done === null,
+    };
   }, [key, version]);
 }

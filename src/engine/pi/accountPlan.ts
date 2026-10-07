@@ -119,15 +119,13 @@ interface Chain {
 }
 
 /** The chain over `colonies`, and only the colonies it uses; null with no plan or no price. */
-export function chainOnColonies(
+function chainOnColonies(
   typeId: number,
   colonies: readonly PlannerColony[],
-  policy: PlannerPolicy,
-  books: PriceBooks,
-  jumps: JumpsFn | undefined,
   allowBuy: boolean,
-  pi: PiData
+  ctx: Pick<AccountPlanInput, 'policy' | 'books' | 'jumps' | 'pi'>
 ): Chain | null {
+  const { policy, books, jumps, pi } = ctx;
   const result = estimateChain(
     { typeId, colonies, policy, books, allowBuy, ...(jumps ? { jumps } : {}) },
     pi
@@ -167,58 +165,95 @@ export function chainOnColonies(
 
 const sum = (ids: readonly number[], figure: ReadonlyMap<number, number>) =>
   ids.reduce((total, id) => total + (figure.get(id) ?? 0), 0);
+const totalOf = (figure: ReadonlyMap<number, number>) =>
+  [...figure.values()].reduce((a, b) => a + b, 0);
+
+function groupOf(chain: Chain, apartPerDay: number): AccountGroup {
+  return {
+    typeId: chain.typeId,
+    planetIds: chain.planetIds,
+    iskPerDay: chain.iskPerDay,
+    apartPerDay,
+    gainPerDay: chain.iskPerDay - apartPerDay,
+    unitsPerDay: chain.unitsPerDay,
+    hostId: chain.hostId,
+    m3PerWeek: chain.m3PerWeek,
+    legs: chain.legs,
+    buys: chain.buys,
+  };
+}
+
+function aloneGroup(planetId: number, perDay: number): AccountGroup {
+  return {
+    typeId: null,
+    planetIds: [planetId],
+    iskPerDay: perDay,
+    apartPerDay: perDay,
+    gainPerDay: 0,
+    unitsPerDay: 0,
+    hostId: null,
+    m3PerWeek: 0,
+    legs: [],
+    buys: false,
+  };
+}
 
 export function* planAccount(
   input: AccountPlanInput
 ): Generator<AccountProgress, AccountPlan, void> {
   const { colonies, policy, books, jumps, candidates, pi } = input;
+  const ctx = { policy, books, jumps, pi };
   const buying = policy.buyTiers.length > 0;
 
   // Stage 1: each colony on its own best pick.
   const baseline = baselineTotal(colonies, pi, policy, books, jumps);
+  const ownFigure = (c: PlannerColony): number | null => {
+    const given = input.soloPerDay?.get(c.planetId);
+    if (given !== undefined) return given;
+    const own = baseline.perColony.get(c.planetId);
+    if (own?.status === 'ok') return own.iskPerHour * HOURS_PER_DAY;
+    // Nothing fits earns nothing, which is a figure; an unpriced P1 is not.
+    return own?.status === 'nothing-fits' ? 0 : null;
+  };
   const unknown: number[] = [];
   const apart = new Map<number, number>();
   for (const c of colonies) {
-    const given = input.soloPerDay?.get(c.planetId);
-    const own = baseline.perColony.get(c.planetId);
-    const figure =
-      given !== undefined && given !== null
-        ? given
-        : given === undefined && own?.status === 'ok'
-          ? own.iskPerHour * HOURS_PER_DAY
-          : null;
+    const figure = ownFigure(c);
     if (figure === null) unknown.push(c.planetId);
-    apart.set(c.planetId, figure ?? 0);
+    else apart.set(c.planetId, figure);
   }
-  const apartTotal = [...apart.values()].reduce((a, b) => a + b, 0);
+  const apartTotal = totalOf(apart);
+  // A colony with no own figure has nothing to compare a chain against: it is
+  // left out of the search, never counted as earning zero and so "gaining" all it makes.
+  const known = colonies.filter((c) => apart.has(c.planetId));
 
   // Stage 2: one colony alone, buying inputs. The best of that and apart.
   const solo = new Map<number, Chain>();
   const soloFigure = new Map(apart);
   if (buying) {
-    for (const c of colonies) {
+    for (const c of known) {
       for (const typeId of candidates) {
-        const chain = chainOnColonies(typeId, [c], policy, books, jumps, true, pi);
+        const chain = chainOnColonies(typeId, [c], true, ctx);
         yield { stage: 'buying', typeId };
-        if (chain && chain.iskPerDay > (soloFigure.get(c.planetId) ?? 0)) {
+        if (chain && chain.iskPerDay > soloFigure.get(c.planetId)!) {
           solo.set(c.planetId, chain);
           soloFigure.set(c.planetId, chain.iskPerDay);
         }
       }
     }
   }
-  const afterBuying = [...soloFigure.values()].reduce((a, b) => a + b, 0);
+  const afterBuying = totalOf(soloFigure);
 
   // Stage 3: chains across colonies, biggest gain first.
   const taken: Chain[] = [];
   const locked = new Set<number>();
   if (input.haul) {
     for (;;) {
-      const free = colonies.filter((c) => !locked.has(c.planetId));
+      const free = known.filter((c) => !locked.has(c.planetId));
       if (free.length < 2) break;
       let best: { chain: Chain; gain: number } | null = null;
       for (const typeId of candidates) {
-        const chain = chainOnColonies(typeId, free, policy, books, jumps, buying, pi);
+        const chain = chainOnColonies(typeId, free, buying, ctx);
         yield { stage: 'hauling', typeId };
         if (!chain || chain.planetIds.length < 2) continue;
         const gain = chain.iskPerDay - sum(chain.planetIds, soloFigure);
@@ -230,51 +265,15 @@ export function* planAccount(
     }
   }
 
-  const groups: AccountGroup[] = taken.map((chain) => {
-    const apartPerDay = sum(chain.planetIds, soloFigure);
-    return {
-      typeId: chain.typeId,
-      planetIds: chain.planetIds,
-      iskPerDay: chain.iskPerDay,
-      apartPerDay,
-      gainPerDay: chain.iskPerDay - apartPerDay,
-      unitsPerDay: chain.unitsPerDay,
-      hostId: chain.hostId,
-      m3PerWeek: chain.m3PerWeek,
-      legs: chain.legs,
-      buys: chain.buys,
-    };
-  });
+  const groups: AccountGroup[] = taken.map((chain) =>
+    groupOf(chain, sum(chain.planetIds, soloFigure))
+  );
   for (const c of colonies) {
     if (locked.has(c.planetId)) continue;
     const chain = solo.get(c.planetId);
     const own = apart.get(c.planetId) ?? 0;
     groups.push(
-      chain
-        ? {
-            typeId: chain.typeId,
-            planetIds: [c.planetId],
-            iskPerDay: chain.iskPerDay,
-            apartPerDay: own,
-            gainPerDay: chain.iskPerDay - own,
-            unitsPerDay: chain.unitsPerDay,
-            hostId: chain.hostId,
-            m3PerWeek: chain.m3PerWeek,
-            legs: [],
-            buys: chain.buys,
-          }
-        : {
-            typeId: null,
-            planetIds: [c.planetId],
-            iskPerDay: own,
-            apartPerDay: own,
-            gainPerDay: 0,
-            unitsPerDay: 0,
-            hostId: null,
-            m3PerWeek: 0,
-            legs: [],
-            buys: false,
-          }
+      chain ? groupOf({ ...chain, planetIds: [c.planetId] }, own) : aloneGroup(c.planetId, own)
     );
   }
   groups.sort((a, b) => b.iskPerDay - a.iskPerDay || a.planetIds[0] - b.planetIds[0]);

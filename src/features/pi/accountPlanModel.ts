@@ -15,7 +15,7 @@ import { chainHostTypes } from './chainEstimateModel';
 import { rawInputsOf } from './productPlanets';
 
 /** Products tried per tier (P2, P3, P4). */
-export const CANDIDATES_PER_TIER = 4;
+const CANDIDATES_PER_TIER = 4;
 
 /**
  * P2, P3 and P4 the colonies could make, best price first within each tier. Without
@@ -45,26 +45,30 @@ export function accountCandidates(
   );
 }
 
+/** A group that changes what its colonies do: it makes a product. */
+export type AccountChange = AccountGroup & { typeId: number };
+
 export interface AccountView {
-  /** Groups that change what a colony does, biggest gain first. */
-  changes: AccountGroup[];
+  /** Groups that make a product, biggest gain first. The engine takes none without a gain. */
+  changes: AccountChange[];
   /** Colonies left on their own best pick. */
   stays: AccountGroup[];
   totalPerDay: number;
   apartTotalPerDay: number;
   buyGainPerDay: number;
   haulGainPerDay: number;
+  /** Colonies with no one-planet figure: left out of the plan and the totals. */
   unknownCount: number;
 }
 
-/** A group whose gain is under this share of its apart figure is the same plan: the solver's own tolerance. */
-const SAME_PLAN_SHARE = 0.05;
-
 export function accountView(plan: AccountPlan): AccountView {
-  const changes = plan.groups
-    .filter((g) => g.typeId !== null && g.gainPerDay > g.apartPerDay * SAME_PLAN_SHARE)
-    .sort((a, b) => b.gainPerDay - a.gainPerDay || a.planetIds[0] - b.planetIds[0]);
-  const stays = plan.groups.filter((g) => !changes.includes(g));
+  const changes: AccountChange[] = [];
+  const stays: AccountGroup[] = [];
+  for (const group of plan.groups) {
+    if (group.typeId === null) stays.push(group);
+    else changes.push({ ...group, typeId: group.typeId });
+  }
+  changes.sort((a, b) => b.gainPerDay - a.gainPerDay || a.planetIds[0] - b.planetIds[0]);
   return {
     changes,
     stays,
