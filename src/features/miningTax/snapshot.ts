@@ -13,7 +13,8 @@ import { readCompressedOre } from './oreForm';
 import { repriceForOreForm } from './oreFormReprice';
 import { coalesceAssignments } from './coalesce';
 import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
-import type { MiningLedgerEntry } from '@/engine/miningTax/types';
+import { entryFromAssignments } from '@/engine/miningTax/assignmentEntry';
+import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
 
 export interface MoonMiningTaxRow {
   characterId: number;
@@ -141,6 +142,32 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
         assignments: covering,
         unassignedOreLines: computeOwnership(entry.oreLines, covering).unassigned,
         duplicateAssignmentIds: findDuplicateAssignmentIds(entry.oreLines, covering),
+      });
+    }
+
+    // ESI only returns ~30 days, so an Assignment can outlive its entry (or
+    // its character's ledger read can fail with nothing cached). Its row
+    // stays, rebuilt from the Assignments' own stored ore, so the bill neither
+    // vanishes from the table nor drops out of the Owed balances.
+    const freshKeys = new Set(
+      ledger.entries.map((e) => entryKey(ledger.characterId, e.date, e.solarSystemId))
+    );
+    const agedOut = new Map<string, MiningTaxAssignmentRecord[]>();
+    for (const a of assignments) {
+      const key = entryKey(a.characterId, a.date, a.solarSystemId);
+      if (freshKeys.has(key)) continue;
+      const group = agedOut.get(key);
+      if (group) group.push(a);
+      else agedOut.set(key, [a]);
+    }
+    for (const covering of agedOut.values()) {
+      const { date, solarSystemId } = covering[0];
+      rows.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+        entry: entryFromAssignments(ledger.characterId, date, solarSystemId, covering),
+        assignments: covering,
+        unassignedOreLines: [],
       });
     }
   });
