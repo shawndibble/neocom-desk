@@ -65,6 +65,8 @@
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantAction": "Log in again with EVE Online",
+    "needsLoginTitle": "{{character}} needs a new login",
+    "needsLoginHint": "EVE refused or expired {{character}}'s access, so nothing can load for this character. Log in again to restore it.",
     "titleFor": "{{character}} — {{title}}",
     "standingsTitle": "Broker fees are assuming 0 standings",
     "standingsHint": "Every NPC-station broker fee is calculated as if this character had no standings. Grant Character details for accurate fees.",

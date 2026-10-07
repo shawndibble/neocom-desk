@@ -46,6 +46,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
+import { NeedsLoginNotice } from '@/app/AuthFailureNotice';
+import { useAuthFailure } from '@/stores/authFailure';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
@@ -1238,6 +1240,7 @@ export function Characters() {
     setRemovingCharacter(null);
     try {
       await removeCharacterAfterSync(id, isSyncConfigured());
+      useAuthFailure.getState().dismissNeedsLogin(id);
     } catch {
       // The local removal is one transaction, so a failure left every row in
       // place — say so rather than leave the click looking ignored.
@@ -1533,6 +1536,8 @@ export function Characters() {
           </>
         }
       />
+
+      <NeedsLoginNotice />
 
       {characters.length === 0 ? (
         <EmptyState title={t('characters.emptyTitle')} hint={t('characters.emptyHint')} />
