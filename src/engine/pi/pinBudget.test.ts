@@ -77,6 +77,7 @@ const FIXTURE_INFRASTRUCTURE: PiInfrastructure = {
 };
 
 const LEVEL_4 = { cpu: 21_315, powergrid: 17_000 };
+const LEVEL_5 = { cpu: 25_415, powergrid: 19_000 };
 
 /** A payload claiming a Basic Industry Facility is free — nothing then bounds a fit. */
 const FREE_BASIC_INFRASTRUCTURE: PiInfrastructure = {
@@ -758,6 +759,21 @@ describe('spareCapacity', () => {
       highTech: 5,
       storage: 3,
       launchpad: 3,
+    });
+  });
+
+  it('holds at Command Center level 5 for a launchpad, an ECU and ten heads', () => {
+    // Used: launchpad 3,600 / 700 + ECU 400 / 2,600 + 10 heads 1,100 / 5,500
+    // = 5,100 tf / 8,800 MW. Left: 20,315 tf / 10,200 MW. A basic (200 / 800)
+    // fits min(101, 12.75) = 12 — Powergrid binds.
+    const spare = spareCapacity({ cpu: 5_100, powergrid: 8_800 }, LEVEL_5, FIXTURE_INFRASTRUCTURE);
+    expect(spare).toEqual({
+      extractorControlUnit: 3,
+      basic: 12,
+      advanced: 14,
+      highTech: 18,
+      storage: 14,
+      launchpad: 5,
     });
   });
 
