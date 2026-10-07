@@ -171,6 +171,20 @@ Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, 
 | Copy what an alt knows | Compare | "Differing only" shows skills one Character has and another lacks |
 | Cost the gap | Plan tools > Skill injectors | SP gap, injectors needed, price at selected hub |
 
+## Ordering tools (one plan, several goals)
+
+| Tool | Effect | Limit |
+|---|---|---|
+| Drag handle (pointer or keyboard) | Exact manual order | Drop refused if a skill lands after a dependant or strands a sibling level |
+| Priority High / Normal / Low per entry | Steers Reorder only; a prerequisite inherits the most urgent priority of its dependants (`planPriority.ts`) | Three levels; no "ship" tag. Mark every skill of ship A High, ship B Normal, to finish A first |
+| Group by Priority | Shows bands "{Label} priority" | View only, device-local |
+| Optimize > Reorder only / Shortest first / Optimize for me | Reorders within priority; groups by attribute pair for speed (`reorderSuggestion.ts:100`) | Preview in a Modal, Accept or Reject. Priority only affects interleaving, so it is a soft preference, not a hard "A before B" |
+| Plan Milestones ("Fly Loki") | Named goal at a (skill, level); shows its projected finish; "Next milestone" chip | Milestones do NOT steer the optimizer (no reference in `src/engine/optimizer`) |
+| Separate Skill Plan per ship | Each plan has its own time and finish; Duplicate or Copy to character | One target plan receives adds; skills shared by two ships get counted in each plan separately |
+| Remap markers / Optimize at my markers | Place attribute remaps where they help the order | Optimizer supports at most 2 remaps |
+
+No tool says "finish ship A fully, then B, using the best order inside each". Closest: priority High on A's skills, then Reorder.
+
 ## Shared bits
 - `SkillDetailModal` (`src/components/SkillDetailModal.tsx`): opened by `SkillLink` from Compare and elsewhere; strings `skills.detail.*` ("Skill not found", load failure).
 - `TargetPlanPicker` / `AddToPlanBar` / `useTargetPlan`: shared add-to-plan target (also used by Ships, Fittings, Market required skills). Target per Character, synced.
