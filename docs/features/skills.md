@@ -185,6 +185,19 @@ Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, 
 
 No tool says "finish ship A fully, then B, using the best order inside each". Closest: priority High on A's skills, then Reorder.
 
+## Buying skills (skill books)
+
+Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). No plan-level shopping list exists.
+
+| Need | Where | Behavior |
+|---|---|---|
+| Price of one skill | Skill detail modal (`SkillDetailModal.tsx:133`, opened from any `SkillLink`, e.g. Compare, Show info) | Lowest sell at the selected Trade Hub station, lowest sell in its region, fixed NPC price (row hidden if none), hub picker (shared synced hub), links into Market Browser (`/market/browser`, nearby = 10 jumps) |
+| Why "No sell orders" is rare | `skillSellPrices.ts` | Priced from the hub region's ESI order book, not the hub-station aggregate, because NPC-seeded books sit in NPC stations across the region |
+| Cost of reaching the SP | Plan tools > Skill injectors | Large Skill Injectors needed and price at hub; covers SP gap, not which skills to buy |
+| Buy several skills | none | Open each skill's modal, or search each in Market Browser |
+
+Gaps: no total book cost for a plan; no "skills in this plan I do not own" list; Trained inspector does not show price (modal does).
+
 ## Shared bits
 - `SkillDetailModal` (`src/components/SkillDetailModal.tsx`): opened by `SkillLink` from Compare and elsewhere; strings `skills.detail.*` ("Skill not found", load failure).
 - `TargetPlanPicker` / `AddToPlanBar` / `useTargetPlan`: shared add-to-plan target (also used by Ships, Fittings, Market required skills). Target per Character, synced.
