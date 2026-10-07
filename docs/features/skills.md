@@ -153,6 +153,24 @@ CCP's baked combat certificates graded for the active Character, by area rather 
 
 ---
 
+## Ways to find and add skills (discovery paths)
+
+Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). None of these paths is guided for a returning player; Help/FAQ has no Skills text.
+
+| Intent | Where | How |
+|---|---|---|
+| I know the skill name | Plan editor skill picker | Search (name, group, description; 250 ms debounce) or group filter; pick level I-V; shows prereqs and unlocks |
+| Browse what I have | Trained | Expand a group, click a skill, inspector "Add to Skill Plan" (next level) |
+| Copy my in-game queue | Plan editor Import | From skill queue (Append or Replace, Undo) |
+| Bring a plan from elsewhere | Plan editor Import | Paste text, or `.emp`/`.xml` file; EFT fit text resolves to its required skills |
+| Follow CCP's career path | Plans > From a Certified Plan | Explorer, Industrialist, Enforcer, Soldier of Fortune; minus trained levels |
+| Combat grades | Certificates | Per group; "Add {grade} to plan" |
+| Fly a hull | Ship Tree > Ship Info > Skills & Mastery | Per skill or Add tier N (cumulative) |
+| Improve a fit | Fittings: Missing skills chip, What to train panel | Ranks next levels by effect on the fit, Tech II upgrades |
+| Item or build gate | Market item required skills, Industry skill-gate chip | Add to Skill Plan |
+| Copy what an alt knows | Compare | "Differing only" shows skills one Character has and another lacks |
+| Cost the gap | Plan tools > Skill injectors | SP gap, injectors needed, price at selected hub |
+
 ## Shared bits
 - `SkillDetailModal` (`src/components/SkillDetailModal.tsx`): opened by `SkillLink` from Compare and elsewhere; strings `skills.detail.*` ("Skill not found", load failure).
 - `TargetPlanPicker` / `AddToPlanBar` / `useTargetPlan`: shared add-to-plan target (also used by Ships, Fittings, Market required skills). Target per Character, synced.
