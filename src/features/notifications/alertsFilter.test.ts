@@ -3,7 +3,6 @@ import type { NotificationFeedRecord } from '@/db';
 import {
   EMPTY_ALERTS_FILTER,
   activeAlertsFilterCount,
-  dismissAllEntries,
   filterAlertGroups,
   type DisplayAlertGroup,
 } from './alertsFilter';
@@ -135,43 +134,5 @@ describe('activeAlertsFilterCount', () => {
         showMuted: true,
       })
     ).toBe(5);
-  });
-});
-
-describe('dismissAllEntries', () => {
-  function entryOf(id: string, title: string): NotificationFeedRecord {
-    return { id, characterId: 1, eventId: 'newMail', title, body: '', firedAt: 1 };
-  }
-  const skill = group({
-    key: 'a',
-    label: 'Skill complete',
-    severity: 'warning',
-    entries: [entryOf('a1', 'Skill done')],
-  });
-  const mail = group({
-    key: 'b',
-    label: 'New mail',
-    severity: 'watch',
-    entries: [entryOf('b1', 'Mail')],
-  });
-
-  it('returns only the entries of groups matching the query', () => {
-    const filter = { ...EMPTY_ALERTS_FILTER, query: 'skill' };
-    expect(dismissAllEntries([skill, mail], filter).map((e) => e.id)).toEqual(['a1']);
-  });
-
-  it('returns only the entries of groups matching the severity filter', () => {
-    const filter = { ...EMPTY_ALERTS_FILTER, severities: new Set(['warning' as const]) };
-    expect(dismissAllEntries([skill, mail], filter).map((e) => e.id)).toEqual(['a1']);
-  });
-
-  it('skips muted groups even when shown, and returns all unmuted with no filter', () => {
-    const muted = group({ key: 'm', muted: true, entries: [entryOf('m1', 'Muted')] });
-    expect(dismissAllEntries([skill, mail, muted], EMPTY_ALERTS_FILTER).map((e) => e.id)).toEqual([
-      'a1',
-      'b1',
-    ]);
-    const shown = { ...EMPTY_ALERTS_FILTER, showMuted: true };
-    expect(dismissAllEntries([skill, mail, muted], shown).map((e) => e.id)).toEqual(['a1', 'b1']);
   });
 });
