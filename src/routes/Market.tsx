@@ -771,11 +771,13 @@ export function Market() {
                   <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                     <FilterChip
                       label={t('market.modeHub')}
+                      size="md"
                       selected={effectiveLocation.mode === 'hub'}
                       onToggle={() => handleModeChange('hub')}
                     />
                     <FilterChip
                       label={t('market.modeRegion')}
+                      size="md"
                       selected={effectiveLocation.mode === 'region'}
                       onToggle={() => handleModeChange('region')}
                     />
@@ -786,11 +788,7 @@ export function Market() {
                     value={effectiveHub.id}
                     onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
                   >
-                    <SelectTrigger
-                      size="sm"
-                      aria-label={t('market.tradeHub')}
-                      className="w-32 sm:w-44"
-                    >
+                    <SelectTrigger aria-label={t('market.tradeHub')} className="w-32 sm:w-44">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -805,7 +803,6 @@ export function Market() {
                   // "All regions" (`null` to the picker) fans the selected item's
                   // book out over every region; see `allRegionsFetchKey`.
                   <RegionSelect
-                    size="sm"
                     options={marketRegions ?? []}
                     value={allRegions ? null : chosenRegionId}
                     onChange={(regionId) => handleRegionChange(regionId ?? ALL_REGIONS)}
@@ -817,7 +814,6 @@ export function Market() {
                   />
                 )}
                 <IconButton
-                  size="sm"
                   icon={<Icon.Refresh />}
                   label={t('market.refresh')}
                   onClick={handleRefresh}
@@ -834,7 +830,6 @@ export function Market() {
               </>
             ) : tab === 'hauling' && haulingRefresh ? (
               <IconButton
-                size="sm"
                 icon={<Icon.Refresh />}
                 label={t('market.refresh')}
                 onClick={haulingRefresh.refresh}
