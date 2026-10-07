@@ -2214,7 +2214,7 @@
     "rigMatch": {
       "open": "Match from in-game numbers",
       "title": "Work out the rigs",
-      "steps": "In game: open the Industry window and (1) pick this structure as the Facility. Hover (2) an arrow between the input materials and the blueprint for the material bonus, then (3) the hourglass beside the blueprint for the time bonus. Type the Structure Role Bonus % each one shows.",
+      "steps": "In game: open the Industry window and (1) pick this structure as the Facility. Hover (2) an arrow between the input materials and the blueprint (or formula, for reactions) for the material bonus, then (3) the hourglass beside it for the time bonus. Type the Structure Role Bonus % each one shows; the minus sign is optional.",
       "imageAlt": "The in-game Industry window with three numbered arrows: 1 the Facility line, 2 the arrow between the input materials and the blueprint, 3 the hourglass beside the blueprint.",
       "material": "Material bonus %",
       "time": "Time bonus %",

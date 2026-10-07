@@ -1,6 +1,7 @@
 /**
- * "Match from in-game numbers": the pilot reads the Structure Role Bonus
- * off the Industry window's material and job-duration tooltips, types them in, and picks
+ * "Match from in-game numbers": the pilot reads the Structure Role
+ * Bonus off the Industry window's material and job-duration tooltips, types
+ * them in, and picks
  * the rig fit that produces them. ESI never exposes a structure's rigs, so
  * this is the only way to fill a fit in without knowing it by heart.
  */
@@ -38,9 +39,10 @@ export function RigMatchHelper({ facility, security, onApply }: RigMatchHelperPr
           <div className="flex flex-col gap-3 text-xs">
             <p>{t('industry.rigMatch.steps')}</p>
             <img
-              src="/images/industry/rig-match-industry-window.png"
+              src="/images/industry/rig-match-industry-window.webp"
               alt={t('industry.rigMatch.imageAlt')}
-              loading="lazy"
+              width={1003}
+              height={561}
               className="w-full rounded border border-line"
             />
             <p className="text-text-dim">
