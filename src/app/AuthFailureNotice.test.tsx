@@ -64,6 +64,12 @@ describe('AuthFailureRedirect', () => {
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID });
   });
 
+  it('forgets a character that no longer exists', async () => {
+    useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
+    renderApp();
+    await waitFor(() => expect(useAuthFailure.getState().needsLogin).toEqual([]));
+  });
+
   it('drops the notice when dismissed', async () => {
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -78,6 +84,12 @@ describe('AuthFailureRedirect', () => {
   });
 
   it('consumes the failure, so the redirect happens once rather than every render', async () => {
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Ada Vance',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
     await waitFor(() => expect(useAuthFailure.getState().failure).toBeNull());

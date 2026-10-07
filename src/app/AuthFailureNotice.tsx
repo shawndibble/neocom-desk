@@ -58,6 +58,15 @@ export function NeedsLoginNotice() {
     [needsLogin]
   );
 
+  // A Character removed by any path (sync, another tab) must not leave its mark
+  // behind to resurface if the same id is added again this session.
+  useEffect(() => {
+    if (!characters) return;
+    needsLogin.forEach((id, i) => {
+      if (characters[i] === undefined) dismissNeedsLogin(id);
+    });
+  }, [characters, needsLogin, dismissNeedsLogin]);
+
   const named = (characters ?? []).filter((c) => c !== undefined);
   if (named.length === 0) return null;
 
