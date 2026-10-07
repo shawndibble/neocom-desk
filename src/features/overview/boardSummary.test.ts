@@ -90,6 +90,7 @@ function miningData(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoard
     oldestUnpaidDays: null,
     needsReauth: false,
     fetchedAt: null,
+    characterCount: 1,
     ...overrides,
   };
 }

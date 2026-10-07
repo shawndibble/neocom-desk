@@ -88,6 +88,8 @@ export interface CharacterFilterControlProps {
   variant?: 'icon' | 'field';
   /** `variant="field"` only: the setting's name. The button's accessible name becomes "<name>: <value>", since the value alone doesn't say what is being set. */
   triggerLabel?: string;
+  /** How many Characters "All" covers. Shown in its label ("All characters · 4"), the choosable form of `CharacterScopeReadout`. */
+  characterCount?: number;
 }
 
 /**
@@ -129,13 +131,18 @@ export function CharacterFilterControl({
   size = 'sm',
   variant = 'icon',
   triggerLabel,
+  characterCount,
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
   const isAll = resolved === 'all';
-  const label = isAll ? t('character.filter.allCharacters') : t('character.filter.thisCharacter');
+  const allLabel =
+    characterCount === undefined
+      ? t('character.filter.allCharacters')
+      : t('character.filter.allCharactersCount', { count: characterCount });
+  const label = isAll ? allLabel : t('character.filter.thisCharacter');
   const options = (
-    <DropdownMenuContent align="start" className="w-40">
+    <DropdownMenuContent align="start" className="w-48">
       <DropdownMenuRadioGroup
         value={isAll ? 'all' : 'current'}
         onValueChange={(next) => onChange(next as CharacterFilterValue)}
@@ -145,9 +152,7 @@ export function CharacterFilterControl({
             {t('character.filter.thisCharacter')}
           </DropdownMenuRadioItem>
         )}
-        <DropdownMenuRadioItem value="all">
-          {t('character.filter.allCharacters')}
-        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
     </DropdownMenuContent>
   );

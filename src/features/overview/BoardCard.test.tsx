@@ -29,6 +29,27 @@ describe('BoardCard help', () => {
   });
 });
 
+describe('MiningTaxCard scope', () => {
+  it('reads out that it covers every Character (issue #2846)', () => {
+    render(
+      <MemoryRouter>
+        <MiningTaxCard
+          data={{
+            unpaidIsk: 0,
+            payeeCount: 0,
+            unassignedCount: 0,
+            oldestUnpaidDays: null,
+            needsReauth: false,
+            fetchedAt: null,
+            characterCount: 3,
+          }}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('All characters · 3')).toBeInTheDocument();
+  });
+});
+
 describe('Overview jargon cards', () => {
   it('give Orders, Mining tax and Planetary one help button each', () => {
     const { container } = render(

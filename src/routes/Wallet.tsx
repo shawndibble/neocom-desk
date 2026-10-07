@@ -36,6 +36,7 @@ import {
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -224,6 +225,7 @@ export function Wallet() {
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const activeCharacter = allCharacters?.find((c) => c.characterId === activeCharacterId);
   const walletFilterCandidates = useMemo(
     () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
@@ -244,6 +246,7 @@ export function Wallet() {
         activeCharacterId={activeCharacterId}
         value={walletCharacterFilter}
         onChange={setWalletCharacterFilter}
+        characterCount={walletFilterCandidates.length}
       />
     ) : undefined;
 
@@ -774,6 +777,16 @@ export function Wallet() {
         <Panel
           padded={false}
           title={t('wallet.journalTab')}
+          meta={
+            // Journal stays one Character (#2846): say so beside the title.
+            activeCharacter && (
+              <CharacterScopeReadout
+                scope="one"
+                characterId={activeCharacter.characterId}
+                characterName={activeCharacter.name}
+              />
+            )
+          }
           actions={
             <span className="flex items-center gap-2">
               <Link

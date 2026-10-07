@@ -19,7 +19,13 @@ import {
   loadPaletteContacts,
   type PaletteContact,
 } from './contactsProvider';
-import { createAssetsProvider, loadPaletteAssets, type PaletteAsset } from './assetsProvider';
+import {
+  createAssetsProvider,
+  loadPaletteAssets,
+  loadPaletteAssetsScope,
+  type PaletteAsset,
+} from './assetsProvider';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   createMarketItemsProvider,
   marketItemCatalogue,
@@ -54,6 +60,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   // per keystroke: typing neither waits on it nor fetches.
   const contacts = useLiveQuery(loadPaletteContacts, [], NO_CONTACTS);
   const assets = useLiveQuery(loadPaletteAssets, [], NO_ASSETS);
+  const assetsScope = useLiveQuery(loadPaletteAssetsScope, []);
 
   const destinations = useMemo(
     () => listNavDestinations({ locked, corpVisible, corpCapabilities: capabilities, t }),
@@ -106,6 +113,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
           ].join(' · '),
       }),
       createAssetsProvider({
+        scope: assetsScope,
         assets,
         activeCharacterId,
         navigate: (path) => void navigate(path),
@@ -133,6 +141,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       setActiveCharacter,
       contacts,
       assets,
+      assetsScope,
       lpStores,
       onShowItem,
     ]
@@ -278,6 +287,11 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                     className="px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase"
                   >
                     {t(group.provider.labelKey)}
+                    {group.provider.scope && (
+                      <span className="ml-2">
+                        <CharacterScopeReadout {...group.provider.scope} />
+                      </span>
+                    )}
                   </div>
                   {group.status === 'error' ? (
                     <div className="px-2 py-1.5 text-sm text-danger">

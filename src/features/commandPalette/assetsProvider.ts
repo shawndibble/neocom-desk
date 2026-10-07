@@ -115,7 +115,41 @@ export async function loadPaletteAssets(): Promise<PaletteAsset[]> {
   return buildPaletteAssets(lists, names);
 }
 
+export interface PaletteAssetsScope {
+  readonly total: number;
+  /** Characters the group cannot read: no grant, or nothing cached yet. */
+  readonly missing: readonly string[];
+}
+
+/** Cache-only, like `loadPaletteAssets`. Who the Assets group leaves out. */
+export async function loadPaletteAssetsScope(): Promise<PaletteAssetsScope> {
+  const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
+  const granted = new Set(
+    tokens
+      .filter((token) => ASSETS_SCOPES.every((scope) => token.scopes.includes(scope)))
+      .map((token) => token.characterId)
+  );
+  const holders = characters.filter((character) => granted.has(character.characterId));
+  const rows =
+    holders.length === 0
+      ? new Map()
+      : await readCachedRows<CharacterAsset[]>(
+          holders.map((character) => character.characterId),
+          ASSETS_KEY
+        );
+  return {
+    total: characters.length,
+    missing: characters
+      .filter(
+        (character) => !granted.has(character.characterId) || !rows.has(character.characterId)
+      )
+      .map((character) => character.name),
+  };
+}
+
 export interface AssetsProviderOptions {
+  /** `loadPaletteAssetsScope()`'s answer; the group's readout. */
+  readonly scope?: PaletteAssetsScope;
   /** `loadPaletteAssets()`'s answer, kept live while the palette is open; empty until it lands. */
   readonly assets: readonly PaletteAsset[];
   readonly activeCharacterId: number | null;
@@ -131,6 +165,7 @@ export interface AssetsProviderOptions {
  * shows "Searching…" for) anything, and an empty list hides the group.
  */
 export function createAssetsProvider({
+  scope,
   assets,
   activeCharacterId,
   navigate,
@@ -142,6 +177,10 @@ export function createAssetsProvider({
     labelKey: 'commandPalette.groups.assets',
     // After Characters, before Market Items.
     order: 3,
+    scope:
+      scope && scope.total > 0
+        ? { scope: 'all', total: scope.total, missing: scope.missing }
+        : undefined,
     minQueryLength: 2,
     search: (query): PaletteResult[] =>
       rankedSearch(assets, query, { primary: (a) => a.name, limit: GROUP_LIMIT }).map((a) => ({

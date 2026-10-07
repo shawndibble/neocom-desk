@@ -144,6 +144,8 @@ export interface MiningTaxBoardData {
   oldestUnpaidDays: number | null;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** How many Characters the ledger covers — every one on the account. */
+  characterCount: number;
 }
 
 export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
@@ -177,6 +179,7 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
       oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / 86_400_000),
     needsReauth: snapshot.reauthCharacters.length > 0,
     fetchedAt: snapshot.fetchedAt,
+    characterCount: await db.characters.count(),
   };
 }
 

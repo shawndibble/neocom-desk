@@ -10,6 +10,7 @@
  * Station Manager who is not an Accountant simply has no rail: no error, no
  * empty state, nothing (CONTEXT.md round 35, AC3).
  */
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -67,7 +68,19 @@ export function CorpVitalsRail({
   const balanceId = useId();
 
   return (
-    <Panel title={t('corp.vitalsTitle')}>
+    <Panel
+      title={t('corp.vitalsTitle')}
+      meta={
+        // The runway chip reads one wallet only (#2846).
+        <CharacterScopeReadout
+          scope="corp"
+          division={
+            divisions.find((division) => division.division === journalDivision)?.name ??
+            t('corp.vitals.division', { division: journalDivision })
+          }
+        />
+      }
+    >
       <div className="space-y-3">
         {/*
           A plain div, not a `<dl>`: nothing else here reads it as a

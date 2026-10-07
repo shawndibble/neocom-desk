@@ -17,6 +17,7 @@ function data(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoardData {
     oldestUnpaidDays: null,
     needsReauth: false,
     fetchedAt: null,
+    characterCount: 1,
     ...overrides,
   };
 }
