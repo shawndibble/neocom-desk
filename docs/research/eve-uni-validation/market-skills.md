@@ -99,3 +99,9 @@ Row 18, rank-1 level II. Ours 1,415, wiki 1,414. 250 x 2^2.5 = 250 x 5.6568542 =
 - Is the 100 ISK minimum broker fee still in game? Wiki only.
 - Retail/Wholesale slot values not verified against wiki.
 - Unreadable: https://support.eveonline.com/hc/en-us/articles/203218962 (403); wiki /Skill_points and /Skill_injector 404.
+
+## Hostile review (2026-10-07)
+
+- Level II SP: the earlier "ours right" call was reversed. The wiki shows 1,414 (rank 1) and 2,828 (rank 2), which equals round-to-nearest. Ceil gives 1,415 and 2,829. No CCP source gives per-level SP. Unresolved until an in-game ESI check (see the Neocom Desk ticket on `spForLevel`). Do not edit the wiki yet.
+- Accounting V sales tax: CCP support article "Broker Fee and Sales Tax" says reduced "down to 3.37%". Patch 22.02 set the 7.5% base. The wiki Tax page (3.3%, last edited 2026-05-23) is wrong. Replacement text uses CCP's 3.37%. The Trading page already says 3.37% and needs no edit.
+- Tatara refining base yield: ESI type 35836 attribute 2722 is 5.5 (Athanor 2.0), so 52.75%. The wiki's "4% / 52%" is a stale value. Neocom Desk models no structure refining yield, so this is a wiki-only fix.
