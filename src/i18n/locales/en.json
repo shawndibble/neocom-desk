@@ -4305,6 +4305,7 @@
       "emptyHint": "No ships in the assets of the chosen characters.",
       "showAllCharacters": "Show all characters",
       "inCargo": "In cargo",
+      "unknownType": "Type #{{id}}",
       "columns": {
         "ship": "Ship",
         "character": "Character",

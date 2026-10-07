@@ -22,8 +22,8 @@ interface ShipData {
   rows: ShipRow[];
   typeNames: ReadonlyMap<number, string>;
   characterNames: ReadonlyMap<number, string>;
-  /** Names of the owned assets a ship sits in, by item id (for the trail). */
-  holderTypeIds: ReadonlyMap<number, number>;
+  /** Type names of the owned assets a ship sits in, by item id (for the trail). */
+  holderNames: ReadonlyMap<number, string>;
 }
 
 type ShipsState = { status: 'loading' } | { status: 'ready'; data: ShipData } | { status: 'error' };
@@ -44,17 +44,22 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     entry.assets.map((asset) => ({ ...asset, characterId: entry.characterId }))
   );
   const rows = findShips(owned, isShip);
-  const holderTypeIds = new Map(owned.map((a) => [a.item_id, a.type_id]));
   const typeNames = new Map<number, string>();
-  for (const typeId of new Set([...rows.map((r) => r.typeId), ...holderTypeIds.values()])) {
+  for (const typeId of new Set(rows.map((r) => r.typeId))) {
     const name = types[String(typeId)]?.name;
     if (name) typeNames.set(typeId, name);
+  }
+  const trailIds = new Set(rows.flatMap((r) => r.trail));
+  const holderNames = new Map<number, string>();
+  for (const asset of owned) {
+    const name = trailIds.has(asset.item_id) ? types[String(asset.type_id)]?.name : undefined;
+    if (name) holderNames.set(asset.item_id, name);
   }
   return {
     rows,
     typeNames,
     characterNames: new Map(entries.map((e) => [e.characterId, e.name])),
-    holderTypeIds,
+    holderNames,
   };
 }
 
@@ -107,24 +112,33 @@ function usePlaces(
   useEffect(() => {
     if (rows.length === 0 || !route.hydrated) return;
     let cancelled = false;
+    // A new basis or origin restarts the counts: no mixing old and new jumps.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setPlaces(NO_PLACES);
+    setSystemOf(new Map());
+    /* eslint-enable react-hooks/set-state-in-effect */
     const distinct = [...new Map(rows.map((r) => [placeKey(r), r])).values()];
     void (async () => {
       const originSystemId =
-        activeCharacterId === null ? null : await loadCharacterSolarSystemId(activeCharacterId);
+        activeCharacterId === null
+          ? null
+          : await loadCharacterSolarSystemId(activeCharacterId).catch(() => null);
       await mapWithConcurrencyLimit(distinct, ESI_FANOUT_CONCURRENCY, async (row) => {
         const key = placeKey(row);
         let place: ResolvedPlace = { name: null, systemId: null };
+        let security: number | null = null;
+        let jumps: JumpsAwayResult = { kind: 'unknown', reason: 'noRoute' };
         try {
           place = await resolvePlace(row);
+          if (cancelled) return;
+          if (place.systemId !== null) security = await loadSystemSecurity(place.systemId);
+          if (originSystemId === null) jumps = { kind: 'unknown', reason: 'noLocation' };
+          else if (place.systemId !== null) {
+            jumps = await jumpsBetween(originSystemId, place.systemId, route);
+          }
         } catch {
-          // Best effort: the row keeps its fallback label.
+          // Best effort: the row keeps its fallback label and an unknown count.
         }
-        if (cancelled) return;
-        const security = place.systemId === null ? null : await loadSystemSecurity(place.systemId);
-        let jumps: JumpsAwayResult;
-        if (originSystemId === null) jumps = { kind: 'unknown', reason: 'noLocation' };
-        else if (place.systemId === null) jumps = { kind: 'unknown', reason: 'noRoute' };
-        else jumps = await jumpsBetween(originSystemId, place.systemId, route);
         if (cancelled) return;
         setSystemOf((prev) => new Map(prev).set(key, place.systemId));
         setPlaces((prev) => ({
@@ -136,7 +150,7 @@ function usePlaces(
           jumps: new Map(prev.jumps).set(key, jumps),
         }));
       });
-    })();
+    })().catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -243,7 +257,7 @@ export function MyShipsPanel({
           <div role="table" aria-label={t('assets.myShips.title')}>
             <div
               role="row"
-              className={`${ROW_GRID} hidden border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase sm:grid`}
+              className={`${ROW_GRID} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
             >
               <span role="columnheader">{t('assets.myShips.columns.ship')}</span>
               <span role="columnheader">{t('assets.myShips.columns.character')}</span>
@@ -261,9 +275,7 @@ export function MyShipsPanel({
                   ? t('assets.stationLabel', { id: row.locationId })
                   : t('assets.structureLabel', { id: row.locationId }));
               const trail = row.trail
-                .map((itemId) =>
-                  state.data.typeNames.get(state.data.holderTypeIds.get(itemId) ?? 0)
-                )
+                .map((itemId) => state.data.holderNames.get(itemId))
                 .filter(Boolean)
                 .join(' › ');
               return (
@@ -276,7 +288,8 @@ export function MyShipsPanel({
                   <span role="cell" className="flex min-w-0 items-center gap-2">
                     <TypeIcon typeId={row.typeId} size={32} width={24} height={24} />
                     <span className="truncate font-semibold text-accent">
-                      {state.data.typeNames.get(row.typeId) ?? `Type #${row.typeId}`}
+                      {state.data.typeNames.get(row.typeId) ??
+                        t('assets.myShips.unknownType', { id: row.typeId })}
                     </span>
                     {row.inCargo && (
                       <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
