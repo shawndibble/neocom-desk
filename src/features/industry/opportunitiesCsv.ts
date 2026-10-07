@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
 import { unitMargin } from './opportunityMetrics';
 
@@ -35,9 +35,7 @@ export function opportunitiesCsvColumns(t: CsvTranslate): CsvColumn<OpportunityR
 }
 
 /** "What's profitable" (the market-wide scan). */
-export function marketWideOpportunitiesCsvColumns(
-  t: CsvTranslate
-): CsvColumn<MarketWideResultRow>[] {
+export function marketWideOpportunitiesCsvColumns(t: CsvTranslate): CsvColumn<MarketWideDayRow>[] {
   return [
     { header: t('industry.product'), value: (row) => row.productName },
     {
@@ -47,6 +45,7 @@ export function marketWideOpportunitiesCsvColumns(
     { header: t('industry.csvMarginPct'), value: (row) => row.marginPct },
     { header: t('industry.csvTimeSeconds'), value: (row) => row.seconds },
     { header: t('industry.iskPerHour'), value: (row) => row.iskPerHour },
+    { header: t('industry.iskPerDay'), value: (row) => row.iskPerDay },
     { header: t('industry.buildCost'), value: (row) => row.buildCost },
     {
       header: t('industry.opportunitiesOrderDepthLabel'),

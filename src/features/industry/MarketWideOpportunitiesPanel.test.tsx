@@ -9,6 +9,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
+import { useSalesShare } from './salesSharePref';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const row = (
@@ -28,6 +29,8 @@ const row = (
     orderDepth: 'deep',
     marginPct: 18.4,
     seconds: 3600,
+    unitMargin: 1000,
+    outputQuantity: 1,
     ...extra,
   }) as unknown as MarketWideResultRow;
 
@@ -392,5 +395,73 @@ describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
     ];
     renderPanel(undefined, ['/?marketWide.sort=duration:asc']);
     expect(productOrder()).toEqual(['Widget Gamma', 'Widget Delta', 'Widget Beta']);
+  });
+});
+
+describe('MarketWideOpportunitiesPanel ISK/day', () => {
+  const productOrder = () =>
+    screen
+      .getAllByText(/^Widget/)
+      .map((node) => node.textContent)
+      .filter((name) => name?.startsWith('Widget'));
+
+  afterEach(() => {
+    hookState.rows = null;
+  });
+
+  // Beta sells 1/day, Gamma 50/day, Delta is unread; every job builds 24/day.
+  const threeRows = () => [
+    row(200, 'Widget Beta'),
+    row(300, 'Widget Gamma'),
+    row(400, 'Widget Delta'),
+  ];
+
+  it('shows ISK/day after ISK/hour, with – where sales are unread', () => {
+    hookState.rows = threeRows();
+    renderPanel();
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const at = (label: string) => headers.findIndex((h) => h.startsWith(label));
+    expect(at('ISK/day')).toBe(at('ISK/hour') + 1);
+    expect(
+      within(screen.getByText('Widget Delta').closest('tr')!).getAllByText(i18n.t('common.unknown'))
+        .length
+    ).toBeGreaterThan(0);
+  });
+
+  it('sorts by ISK/day descending with unknown last, volume-capped below the better seller', () => {
+    hookState.rows = threeRows();
+    renderPanel(undefined, ['/?marketWide.sort=iskPerDay:desc']);
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Beta', 'Widget Delta']);
+  });
+
+  it('keeps ISK/hour as the default sort', () => {
+    hookState.rows = [
+      row(200, 'Widget Beta', { iskPerHour: 1 }),
+      row(300, 'Widget Gamma', { iskPerHour: 2 }),
+    ];
+    renderPanel();
+    expect(productOrder()).toEqual(['Widget Gamma', 'Widget Beta']);
+  });
+
+  it('changes the figures with the share in the funnel, and remembers it', async () => {
+    hookState.rows = threeRows();
+    const user = userEvent.setup();
+    renderPanel();
+    const gammaRow = () => screen.getByText('Widget Gamma').closest('tr')!;
+    const before = gammaRow().textContent;
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Share of daily sales' }));
+    await user.click(await screen.findByRole('option', { name: '25% of daily sales' }));
+    expect(gammaRow().textContent).not.toBe(before);
+    expect(useSalesShare.getState().value).toBe('25');
+  });
+
+  it('reads the share from the URL', () => {
+    hookState.rows = threeRows();
+    const base = renderPanel(undefined, ['/']);
+    const before = screen.getByText('Widget Gamma').closest('tr')!.textContent;
+    base.unmount();
+    renderPanel(undefined, ['/?marketWide.share=5']);
+    expect(screen.getByText('Widget Gamma').closest('tr')!.textContent).not.toBe(before);
   });
 });

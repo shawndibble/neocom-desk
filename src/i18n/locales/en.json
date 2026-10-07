@@ -2432,6 +2432,8 @@
     "profit": "Profit",
     "margin": "Margin",
     "iskPerHour": "ISK/hour",
+    "iskPerDay": "ISK/day",
+    "iskPerDayTooltip": "Profit per unit × the smaller of units one job slot builds a day and units you could sell a day ({{share}}% of the daily volume across the trade-hub regions). Shows – while sales are unread.",
     "iskPerHourTooltip": "Profit divided by build time (job-slot occupancy time, not wall-clock wait) — an hourly-rate comparison across builds.",
     "profitToggleLabel": "Profit basis",
     "toggleNet": "Net",
@@ -2902,6 +2904,8 @@
       },
       "skills": "Skills",
       "sales": "Sales",
+      "salesShare": "Share of daily sales",
+      "salesShareOption": "{{share}}% of daily sales",
       "hideRarelySold": "Hide rarely sold (under {{limit}}/day)",
       "maxBuildCost": "Max build cost",
       "buildCostCaps": {

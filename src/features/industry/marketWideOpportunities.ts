@@ -81,6 +81,12 @@ export interface MarketWideResultRow extends MarketWideRow {
   priceCapped: boolean;
 }
 
+/** A scan row plus ISK/day, which needs the product's traded volume and the share assumption. */
+export interface MarketWideDayRow extends MarketWideResultRow {
+  /** Null while sales are unread/unknown, or the product doesn't sell. */
+  iskPerDay: number | null;
+}
+
 /** Every product typeID `marketWideTrees.json` carries a tree for. */
 export function marketWideProductTypeIds(trees: MarketWideTreeMap): number[] {
   return Object.keys(trees).map(Number);
