@@ -27,7 +27,7 @@ import { miningTaxPaymentHref } from '@/features/miningTax/paymentDeepLink';
 import { linkedRefIds } from '@/features/miningTax/paymentLinks';
 import {
   loadWalletBalanceWithStatus,
-  loadWalletJournal,
+  loadWalletJournalWithStatus,
   loadWalletTransactions,
   loadAllCharactersWalletBalances,
   totalWalletBalance,
@@ -108,6 +108,8 @@ interface Snapshot {
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   balanceNeedsReauth: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  journalNeedsReauth: boolean;
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
@@ -120,13 +122,14 @@ async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, loyaltyStatus] = await Promise.all([
+  const [balanceStatus, journalStatus, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
-    loadWalletJournal(characterId),
+    loadWalletJournalWithStatus(characterId),
     loadCharacterLoyaltyPoints(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
+  const { cached: journalResult, needsReauth: journalNeedsReauth } = journalStatus;
   const journalTruncated = journalResult?.truncated ?? false;
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   const corporationIds = signal.cancelled
@@ -137,6 +140,7 @@ async function loadWalletSnapshot(
     balanceResult,
     balanceNeedsReauth,
     journalResult,
+    journalNeedsReauth,
     journalTruncated,
     loyaltyResult,
     loyaltyNeedsReauth,
@@ -299,6 +303,7 @@ export function Wallet() {
   const balanceResult = data?.balanceResult ?? null;
   const balanceNeedsReauth = data?.balanceNeedsReauth ?? false;
   const journalResult = data?.journalResult ?? null;
+  const journalNeedsReauth = data?.journalNeedsReauth ?? false;
   const journalTruncated = data?.journalTruncated ?? false;
   const loyaltyResult = data?.loyaltyResult ?? null;
   const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
@@ -669,7 +674,17 @@ export function Wallet() {
               {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
                 <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
-              {journal.length === 0 ? (
+              {journalNeedsReauth ? (
+                <div className="mt-4">
+                  <GrantBanner
+                    characterId={activeCharacterId}
+                    endpoints={['getCharacterWalletJournal']}
+                    title={t('wallet.reauthTitle')}
+                    hint={t('wallet.reauthHint')}
+                    actionLabel={t('wallet.reauthAction')}
+                  />
+                </div>
+              ) : journal.length === 0 ? (
                 <CachedEmptyState
                   result={journalResult}
                   title={t('wallet.journalEmptyTitle')}
@@ -779,7 +794,17 @@ export function Wallet() {
             </span>
           }
         >
-          {!journalResult || journal.length === 0 ? (
+          {journalNeedsReauth ? (
+            <div className="p-3">
+              <GrantBanner
+                characterId={activeCharacterId}
+                endpoints={['getCharacterWalletJournal']}
+                title={t('wallet.reauthTitle')}
+                hint={t('wallet.reauthHint')}
+                actionLabel={t('wallet.reauthAction')}
+              />
+            </div>
+          ) : !journalResult || journal.length === 0 ? (
             <CachedEmptyState
               result={journalResult}
               title={t('wallet.journalEmptyTitle')}
