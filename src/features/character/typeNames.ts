@@ -227,6 +227,27 @@ export async function loadTypeNames(typeIds: readonly number[]): Promise<Map<num
 }
 
 /**
+ * Hauled volume (m3) per type: the packaged volume where the type has one,
+ * else the unpackaged volume - same fallback the Hauling page uses.
+ */
+export async function loadTypePackagedVolumes(
+  typeIds: readonly number[]
+): Promise<Map<number, number>> {
+  try {
+    const types = await loadTypes();
+    const map = new Map<number, number>();
+    for (const id of typeIds) {
+      const type = types[String(id)];
+      const volume = type?.packagedVolume ?? type?.volume;
+      if (volume !== undefined) map.set(id, volume);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+/**
  * Physical volume (m3, unpackaged) per type, best-effort from the slim SDE
  * snapshot — never fetched live, so a market/asset-only type this snapshot
  * doesn't cover just shows as unknown.
