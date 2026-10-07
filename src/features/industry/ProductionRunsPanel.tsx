@@ -48,7 +48,13 @@ interface ProductionRunsPanelProps {
   characterId: number;
   buildPlanId: string;
   /** Prefills the "Log Production" form; null when the plan's own result hasn't computed yet. */
-  defaults: { quantity: number; materialCost: number; jobFee: number } | null;
+  defaults: {
+    quantity: number;
+    materialCost: number;
+    jobFee: number;
+    /** The industry job this log was opened from ("Log production" on a job); stored as the run's `sourceJobId`. */
+    sourceJobId?: number;
+  } | null;
   productTypeID: number | null;
   productName: string;
   skills: SkillLevels;
@@ -173,6 +179,7 @@ export function ProductionRunsPanel({
       totalCost: materialCost + jobFee,
       loggedAt: now,
       updatedAt: now,
+      ...(defaults?.sourceJobId !== undefined && { sourceJobId: defaults.sourceJobId }),
     });
     scheduleSync(characterId);
     closeLogProduction();

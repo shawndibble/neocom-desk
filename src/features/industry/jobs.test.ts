@@ -27,6 +27,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.industryJobHistory.clear();
   await db.characters.clear();
   await db.tokens.clear();
 });
@@ -78,6 +79,50 @@ describe('loadCharacterIndustryJobs', () => {
     expect(result.cached?.data).toEqual(payload);
     const cached = await db.esiCache.get([CHAR_ID, 'industryJobs']);
     expect(cached?.value).toEqual(payload);
+  });
+
+  it('asks for completed jobs but never lets a delivered one reach the cache row', async () => {
+    let includeCompleted: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`, ({ request }) => {
+        includeCompleted = new URL(request.url).searchParams.get('include_completed');
+        return HttpResponse.json([
+          job({ job_id: 1, status: 'active' }),
+          job({ job_id: 2, status: 'ready' }),
+          job({ job_id: 3, status: 'delivered' }),
+          job({ job_id: 4, status: 'cancelled' }),
+          job({ job_id: 5, status: 'reverted' }),
+        ]);
+      })
+    );
+
+    const result = await loadCharacterIndustryJobs(CHAR_ID);
+
+    expect(includeCompleted).toBe('true');
+    expect(result.cached?.data.map((j) => j.job_id)).toEqual([1, 2]);
+    const cached = await db.esiCache.get([CHAR_ID, 'industryJobs']);
+    expect((cached?.value as IndustryJob[]).map((j) => j.job_id)).toEqual([1, 2]);
+  });
+
+  it('keeps delivered jobs in the history after ESI stops returning them', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 3, status: 'delivered' })])
+      )
+    );
+    await loadCharacterIndustryJobs(CHAR_ID);
+    // A fresh cache row would answer the second load without a request.
+    await db.esiCache.clear();
+    await db.esiCacheMeta.clear();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 9, status: 'delivered' })])
+      )
+    );
+    await loadCharacterIndustryJobs(CHAR_ID);
+
+    const history = await db.industryJobHistory.get(CHAR_ID);
+    expect(history?.jobs.map((j) => j.job_id).sort()).toEqual([3, 9]);
   });
 
   it('falls back to the cache when ESI is unreachable (offline)', async () => {

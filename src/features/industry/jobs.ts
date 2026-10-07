@@ -19,6 +19,8 @@ import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
+import { isOpenJob } from './jobHistory';
+import { recordJobHistory } from './jobHistoryStore';
 
 const KEY = 'industryJobs';
 const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
@@ -28,11 +30,26 @@ export const KEYS = { jobs: KEY } as const;
 
 export type JobsLoadResult = StatusResult<IndustryJob[]>;
 
-/** Active (non-completed) industry jobs for a character. ESI or cache, with a distinct reauth state. */
+/**
+ * Active (not yet delivered) industry jobs for a character. ESI or cache, with
+ * a distinct reauth state.
+ *
+ * Fetched with `include_completed=true` so delivered jobs can be kept as the
+ * Job History (issue #2866), but they are folded into `industryJobHistory` and
+ * stripped here: the cached value is read by slots, alerts, the board and the
+ * roster, all of which mean "not yet delivered" by it. A 304 still vouches for
+ * the stripped value, because the strip is a pure function of the response.
+ */
 export function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoadResult> {
-  const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCharacterIndustryJobs(characterId, { ...options, includeCompleted: false })
-  );
+  const { fetchLive, conditional } = conditionalFetch(async (options) => {
+    const result = await getCharacterIndustryJobs(characterId, {
+      ...options,
+      includeCompleted: true,
+    });
+    if (!result.data) return result;
+    await recordJobHistory(characterId, result.data);
+    return { ...result, data: result.data.filter(isOpenJob) };
+  });
   return loadWithCacheStatus(characterId, KEY, fetchLive, {
     detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
     skipCacheOnAuthFailure: true,

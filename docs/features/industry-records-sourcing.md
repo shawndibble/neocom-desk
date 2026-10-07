@@ -10,7 +10,7 @@ Where brief items actually live (code differs from the obvious guess):
 - Active Jobs panel (personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
 - Owned blueprints panel + `ownedBlueprints` CSV = Opportunities tab "All owned" view (`opps.view=owned`).
 - Corp blueprints = toggle inside All owned. Corp stock (`corpOwnedStock.ts`) and corp blueprints (`corpOwnedBlueprints.ts`) as plan sources = Build Plan "Corp Assets" toggle (other doc).
-- No jobs history anywhere: jobs are fetched `include_completed=false` (`src/features/industry/jobs.ts:32-40`, `src/esi/endpoints.ts:1469`).
+- Job History (issue #2866): jobs are fetched `include_completed=true`; delivered personal jobs are kept in Dexie `industryJobHistory` past ESI's window (`jobHistoryStore.ts`), shown in the panel's History segment. Corp jobs have no history.
 
 ## 1. Summary table
 
@@ -58,7 +58,7 @@ What: "Active jobs" panel above the tabs; running industry jobs of all activitie
 
 Data / scopes:
 
-- Personal: ESI `getCharacterIndustryJobs`, scope `esi-industry.read_character_jobs.v1`, `include_completed=false`, cached key `industryJobs`, conditional fetch. 403 -> `needsReauth` (no cache fallback).
+- Personal: ESI `getCharacterIndustryJobs`, scope `esi-industry.read_character_jobs.v1`, `include_completed=true`, cached key `industryJobs` (stripped to active/paused/ready before caching, so slots, alerts and the board never see delivered/cancelled/reverted jobs; delivered ones go to `industryJobHistory`), conditional fetch. 403 -> `needsReauth` (no cache fallback).
 - Corp (issue #2302): `loadAccountCorpIndustryJobs` -> `getCorporationIndustryJobs` via any account Character with scope `esi-industry.read_corporation_jobs.v1` (opt-in) and role `canReadIndustry` (`corpCapabilities`); one read per corporation (`pickCorpReaders`, active Character preferred); scope checked from stored token first so no app-wide reauth banner. Listed by `installer_id` for selected account Characters; job an alert named is kept even if not installed by one (`visibleCorpJobs`). Never rejects.
 - Skills for slot readout: `loadCorrectedSkills(skipQueueWithoutScope)`.
 - Multi-Character: `loadAllCharactersIndustryJobs` fan-out (`ESI_FANOUT_CONCURRENCY`), characters without scope listed in `skipped` note.
@@ -78,7 +78,7 @@ Controls and states:
 
 Observed gaps:
 
-- No completed-job history: delivered jobs drop off; Records' own caveat says unlogged completed jobs are not counted (`industry.productionLogCaveat`).
+- Job History: header `Active | History` segment (`jobs.view`, shown once a delivered job is stored; History opens unfolded). History lists delivered jobs newest first. Unlogged manufacturing/reaction rows: amber tint + "Log production…" (same flow as Active). Logged rows: green "Logged" badge + "View plan" link. Logged = a Production Run with `sourceJobId` = job id (set when logging from a job), else same Character + product type logged after the job ended, each run used once (`jobHistory.ts` `classifyHistoryJobs`). Folded header adds "N delivered, not logged". Build Plan page shows "N delivered jobs not logged" (this blueprint) linking to `/industry/plans?jobs.view=history`. History is device-local, deleted with the Character. Unlogged completed jobs are still not counted in Records (`industry.productionLogCaveat`); History is where to find and log them.
 - Log production is personal jobs only (comment cites decision `20260905-181537-production-log-row-per-allocation-sync-accept-wallet`); corp job rows have no action.
 - Header ghost-reauth for corp scope is intentionally absent (decision `20260929-184545-no-note-for-corp-jobs-nobody-here-can`).
 - No row context menu or row click on a job; ItemInfoLink only.
@@ -215,6 +215,7 @@ Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because
 | `jobs.chars`                                                                                  | Active Jobs       | Character filter; default = synced default |
 | `jobs.activity`, `jobs.status`                                                                | Active Jobs       | id list / enum set, empty = none           |
 | `jobs.sort`                                                                                   | Active Jobs       | default endsIn asc                         |
+| `jobs.view`                                                                                   | Active Jobs       | `active` (default) / `history`             |
 | `highlight`                                                                                   | Active Jobs       | job id from alert deep link                |
 | `records.from`, `records.to`                                                                  | Records           | ISO date                                   |
 | `records.itemSort`, `records.runSort`                                                         | Records           | optional sort, unsorted default            |
@@ -280,7 +281,7 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 
 ## 12. Consolidated observed gaps
 
-- No completed-job history anywhere (`include_completed=false`); Records excludes unlogged jobs.
+- Completed-job history is personal jobs only, from the first fetch after this shipped (ESI's completed-job window is not backfilled); Records still excludes unlogged jobs.
 - Log production unavailable for corp jobs; no corp dimension in the production log.
 - Price history and row menus missing on desktop Opportunities: see section 6 gaps and Q17.
 - Market-Wide: fixed hub, ME-0 approximation, no compare, no data-age badge.
