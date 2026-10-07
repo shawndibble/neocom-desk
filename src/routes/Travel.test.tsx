@@ -40,6 +40,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
+let lawlessSystems: ReadonlySet<number> = new Set();
+vi.mock('@/features/travel/useLawlessSystems', () => ({
+  useLawlessSystems: () => lawlessSystems,
+}));
+
 const loadSolarSystemJumps = vi.fn();
 vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadMarketSde')>()),
@@ -192,7 +197,10 @@ beforeAll(async () => {
 }, 30_000);
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
-beforeEach(() => resetState());
+beforeEach(() => {
+  lawlessSystems = new Set();
+  return resetState();
+});
 
 async function resetState() {
   clearJumpGraphIndex();
@@ -256,6 +264,24 @@ describe('Travel › Route Safety', () => {
     expect(routeFact('Null')).toBe('0');
     expect(routeFact('Lowest')).toBe('0.5');
     expect(routeFact('Kills 1h')).toBe('12 ship · 4 pod');
+  });
+
+  it('tags a lawless system on its row, and nothing when none is listed', async () => {
+    lawlessSystems = new Set([PERIMETER]);
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    const table = await screen.findByRole('table', { name: 'Systems on the route' });
+    const body = (await within(table).findAllByRole('row')).slice(1);
+    expect(await within(body[1]).findByText('Lawless')).toBeInTheDocument();
+    expect(within(body[0]).queryByText('Lawless')).toBeNull();
+    expect(within(body[2]).queryByText('Lawless')).toBeNull();
+  });
+
+  it('shows no lawless tag when the list is empty', async () => {
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    expect(screen.queryByText('Lawless')).toBeNull();
   });
 
   it('draws the route strip with a spoken description and its key systems', async () => {
