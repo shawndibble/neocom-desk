@@ -18,6 +18,9 @@ const fakeAuth = vi.hoisted(() => ({ currentUser: null as { uid: string } | null
 
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
+  // The chunked reader asks `meta` first; an empty one sends it to `getDocs`.
+  getDoc: vi.fn(async () => ({ data: () => undefined })),
+  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
   collection: (_db: unknown, name: string) => ({ name }),
   query: (...args: unknown[]) => args,
   orderBy: (...args: unknown[]) => args,

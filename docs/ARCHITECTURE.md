@@ -22,7 +22,11 @@ no app server. Two kinds of data:
   admin-write-only collection — not per-Character data — fed by a scheduled
   function that holds no EVE token and calls no ESI endpoint at all. It holds
   every for-sale contract line of every item type; BPC Sourcing takes its
-  blueprint-copy slice out of it client-side. The same scheduled function, off
+  blueprint-copy slice out of it client-side. Its chunks are sorted by item
+  type, and a small sibling doc, `publicContractOffersIndex/types` (issue
+  #2921), records per type the offer count, cheapest ask and chunk range, plus
+  every region — so the Items board can suggest names and fetch just one
+  item's chunks before the full download lands. The same scheduled function, off
   the same archive fetch, also writes `publicCourierContracts` (issue #909):
   public courier contracts as a route and a fee, a sibling collection because
   they carry no item lines. Ingestion only so far — nothing reads it yet.

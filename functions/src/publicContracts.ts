@@ -306,24 +306,83 @@ function numericColumn(value: string): number | undefined {
 }
 
 /**
- * Deterministic order, in place. `byContractThenType` alone is not a total
- * order here the way it effectively was on the blueprint-only rows: one
- * contract routinely lists the same type twice — two stacks of the same ore,
- * two copies of one blueprint at different ME — and a tie there falls back to
- * the CSV's incidental row order, which is what the sort exists to defeat.
- * Tie-breaking down to the last distinguishing field means the only rows left
- * in an unspecified order are ones that serialize identically, so the chunk
- * doc's content is the same either way.
+ * Deterministic order, in place, **type first** (issue #2921): chunks are
+ * sliced from this order, so a type's offers land in a run of neighbouring
+ * chunks and `buildContractOfferIndex` can say which ones. A reader that wants
+ * one item then fetches those chunk docs instead of all ~124.
+ *
+ * Within a type, contract then the remaining fields. `byContractThenType`
+ * alone is not a total order here the way it effectively was on the
+ * blueprint-only rows: one contract routinely lists the same type twice — two
+ * stacks of the same ore, two copies of one blueprint at different ME — and a
+ * tie there falls back to the CSV's incidental row order, which is what the
+ * sort exists to defeat. Tie-breaking down to the last distinguishing field
+ * means the only rows left in an unspecified order are ones that serialize
+ * identically, so the chunk doc's content is the same either way.
+ *
+ * Readers that need a *contract's* lines together (BPC Sourcing's multi-type
+ * tally) already read every chunk before grouping — a contract could straddle
+ * a chunk boundary before this — so the order change costs them nothing.
  */
 export function sortContractOfferRows(rows: PublicContractOfferRow[]): PublicContractOfferRow[] {
   return rows.sort(
     (a, b) =>
+      a.typeId - b.typeId ||
       byContractThenType(a, b) ||
       a.quantity - b.quantity ||
       (a.me ?? -1) - (b.me ?? -1) ||
       (a.te ?? -1) - (b.te ?? -1) ||
       (a.runs ?? -1) - (b.runs ?? -1)
   );
+}
+
+/**
+ * What the index says about one item type's offers, as a tuple — a keyed
+ * object costs ~2x the bytes per type, and this doc carries every listed type
+ * (11k on 2026-10-01) against Firestore's 1MiB document limit.
+ *
+ * `[count, cheapest, firstChunk, lastChunk]`: how many offers; the lowest
+ * positive ask among offers that don't want PLEX in return (`null` when none
+ * qualifies); and the inclusive range of chunk docs holding them.
+ */
+export type ContractOfferIndexEntry = [
+  count: number,
+  cheapest: number | null,
+  firstChunk: number,
+  lastChunk: number,
+];
+
+/**
+ * A small doc beside the chunks (issue #2921): per listed type, how many
+ * offers and the cheapest ask, which chunks hold them, and every region with an
+ * offer. It is what lets a client suggest item names and fill the region list
+ * before any chunk has downloaded, and fetch only the chunks of the item being
+ * searched. `rows` must already be in `sortContractOfferRows` order, since the
+ * chunk range is read off each row's position.
+ */
+export interface ContractOfferIndex {
+  types: Record<string, ContractOfferIndexEntry>;
+  regionIds: number[];
+}
+
+export function buildContractOfferIndex(
+  rows: readonly PublicContractOfferRow[],
+  chunkSize: number
+): ContractOfferIndex {
+  const types: Record<string, ContractOfferIndexEntry> = {};
+  const regions = new Set<number>();
+  rows.forEach((row, position) => {
+    regions.add(row.regionId);
+    const chunk = Math.floor(position / chunkSize);
+    const key = String(row.typeId);
+    const entry = (types[key] ??= [0, null, chunk, chunk]);
+    entry[0] += 1;
+    entry[3] = chunk;
+    if (row.price > 0 && !row.requestedPlex && (entry[1] === null || row.price < entry[1])) {
+      entry[1] = row.price;
+    }
+  });
+  return { types, regionIds: [...regions].sort((a, b) => a - b) };
 }
 
 /**
@@ -378,6 +437,9 @@ export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
 
 export const PUBLIC_CONTRACT_OFFERS_COLLECTION = 'publicContractOffers';
 export const PUBLIC_CONTRACT_OFFERS_META_DOC = 'meta';
+/** The index doc's own collection, not a doc in the chunk collection: an older client reads that whole collection and treats every non-`meta` doc as a chunk of rows. */
+export const PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION = 'publicContractOffersIndex';
+export const PUBLIC_CONTRACT_OFFERS_INDEX_DOC = 'types';
 
 const COURIER_CONTRACT_TYPE = 'courier';
 

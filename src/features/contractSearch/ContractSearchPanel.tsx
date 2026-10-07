@@ -68,6 +68,7 @@ import {
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
 import { OFFERS_CACHE_KEY, useChunkProgress } from '@/features/contractSearch/chunkedSnapshot';
 import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
+import { useEarlyOffers, useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
@@ -154,6 +155,7 @@ const loadCourier = async (characterId: number) =>
 
 /** Stable identities: the name hooks key their effects on these references. */
 const EMPTY_ROWS: readonly PublicContractOfferRow[] = [];
+const EMPTY_TYPE_ROWS: readonly { typeId: number }[] = [];
 const EMPTY_COURIER_CONTRACT_ROWS: readonly PublicCourierContractRow[] = [];
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
@@ -456,43 +458,14 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   const offersResult = offers.data?.cached ?? null;
   const courierResult = courier.data?.cached ?? null;
-  const rows = offersResult?.data?.rows ?? EMPTY_ROWS;
+  const fullRows = offersResult?.data?.rows ?? EMPTY_ROWS;
+  const haveFull = fullRows.length > 0;
   const courierRows = courierResult?.data?.rows ?? EMPTY_COURIER_CONTRACT_ROWS;
 
   // A pure read of the build's own env, so it needs no loader to report it —
   // this distinguishes "this build has no sync backend at all" from "synced,
   // and empty", which is what the two boards' own empty states say.
   const syncConfigured = isSyncConfigured();
-
-  // Names fill in behind whichever table is showing — see
-  // `contractSearchNames.ts`. None of them gate a board: every consumer
-  // already renders an unresolved id honestly.
-  const { value: typeNames, resolving: namingTypes } = useListedTypeNames(rows);
-  const { value: endpoints } = useCourierEndpoints(courierRows);
-  // Synchronous, so the haul list never empties while its ends are being
-  // placed: an unresolved end shows its raw location id, exactly as a player
-  // structure does once resolution has finished.
-  const courierRoutes = useMemo(
-    () => resolveCourierRoutes(courierRows, endpoints),
-    [courierRows, endpoints]
-  );
-  const regionIds = useMemo(() => {
-    const ids = new Set<number>(rows.map((row) => row.regionId));
-    for (const route of courierRoutes) {
-      if (route.origin.regionId !== null) ids.add(route.origin.regionId);
-      if (route.destination.regionId !== null) ids.add(route.destination.regionId);
-    }
-    return [...ids];
-  }, [rows, courierRoutes]);
-  const { value: regionNames } = useRegionNames(regionIds);
-  // Over the whole snapshot, not the filtered rows: keyed on the distinct
-  // location ids, so narrowing the filter never changes the key and never
-  // flashes the newly shown rows back to "resolving".
-  const offerLocations = useOfferLocations(rows);
-  // Converts a contract's PLEX ask into ISK so it prices, sorts and filters
-  // like any other — until it lands, a PLEX-asking row reads as unpriced.
-  const hasPlexAsks = useMemo(() => rows.some((row) => row.requestedPlex), [rows]);
-  const plexPrice = usePlexPrice(hasPlexAsks);
 
   const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
   const uiFilter = useMemo<UiFilter>(
@@ -508,6 +481,104 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     }),
     [itemsParams]
   );
+  /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
+  const selectedTypeId = itemsParams['items.type'];
+  /**
+   * Search-first (issue #2921): with nothing to search for the Items board
+   * asks for a search instead of rendering ~370k offers, while the snapshot
+   * keeps downloading behind it so the first search usually finds it landed.
+   */
+  const searchActive = isItemsSearchActive(uiFilter, selectedTypeId);
+  const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
+
+  // The index and, for a search naming a few types, just those types' chunks
+  // arrive ahead of the full snapshot (issue #2921). Until the full rows land,
+  // names, suggestions and the region list come off the index, and the table
+  // off the early rows; both quietly hand over to the full snapshot.
+  const offerIndex = useOfferIndex(activeCharacterId, mode === 'items' && syncConfigured);
+  const indexTypeRows = useMemo(
+    () =>
+      offerIndex ? [...offerIndex.types.keys()].map((typeId) => ({ typeId })) : EMPTY_TYPE_ROWS,
+    [offerIndex]
+  );
+  const nameSource = haveFull ? fullRows : indexTypeRows;
+  // Names fill in behind whichever table is showing — see
+  // `contractSearchNames.ts`. None of them gate a board: every consumer
+  // already renders an unresolved id honestly.
+  const { value: typeNames, resolving: namingTypes } = useListedTypeNames(nameSource);
+  const typeOptions = useMemo(
+    () => listedContractTypeOptions(nameSource, typeNames),
+    [nameSource, typeNames]
+  );
+
+  /**
+   * Deferred rather than the raw keystroke value: `typeIds` feeding
+   * `displayRows` below re-filters and re-sorts up to ~370k rows, and running
+   * that synchronously on every keystroke is what made a click elsewhere in
+   * the app stall while this panel was open (issue #2024). `uiFilter.typeQuery`
+   * itself stays undeferred — the search box and the (cheap, small-set)
+   * suggestion list must still track every keystroke immediately.
+   */
+  const deferredTypeQuery = useDeferredValue(uiFilter.typeQuery);
+
+  /**
+   * A pinned type wins outright. Otherwise a non-blank query widens to the
+   * types it ranks against; `null` means "no type restriction", which is not
+   * the same as the empty set a query matching nothing produces.
+   */
+  const typeIds = useMemo<ReadonlySet<number> | null>(() => {
+    if (selectedTypeId !== null) return new Set([selectedTypeId]);
+    if (deferredTypeQuery.trim() === '') return null;
+    return new Set(
+      rankedSearch(typeOptions, deferredTypeQuery, {
+        primary: (option) => option.name,
+        limit: TYPE_SEARCH_LIMIT,
+      }).map((option) => option.typeId)
+    );
+  }, [selectedTypeId, deferredTypeQuery, typeOptions]);
+
+  const early = useEarlyOffers(
+    offerIndex,
+    typeIds,
+    activeCharacterId,
+    mode === 'items' && !haveFull && searchActive
+  );
+  const rows = haveFull ? fullRows : (early.rows ?? EMPTY_ROWS);
+  /**
+   * A search with nothing to show yet: the full snapshot is still coming down
+   * and no early read answered. A query that matched no listed type needs no
+   * rows at all, so it is not waiting on any.
+   */
+  const awaitingRows =
+    !haveFull && early.rows === null && !(typeIds !== null && typeIds.size === 0);
+
+  const { value: endpoints } = useCourierEndpoints(courierRows);
+  // Synchronous, so the haul list never empties while its ends are being
+  // placed: an unresolved end shows its raw location id, exactly as a player
+  // structure does once resolution has finished.
+  const courierRoutes = useMemo(
+    () => resolveCourierRoutes(courierRows, endpoints),
+    [courierRows, endpoints]
+  );
+  const regionIds = useMemo(() => {
+    const ids = new Set<number>(rows.map((row) => row.regionId));
+    for (const id of haveFull ? [] : (offerIndex?.regionIds ?? [])) ids.add(id);
+    for (const route of courierRoutes) {
+      if (route.origin.regionId !== null) ids.add(route.origin.regionId);
+      if (route.destination.regionId !== null) ids.add(route.destination.regionId);
+    }
+    return [...ids];
+  }, [rows, courierRoutes, haveFull, offerIndex]);
+  const { value: regionNames } = useRegionNames(regionIds);
+  // Over the whole snapshot, not the filtered rows: keyed on the distinct
+  // location ids, so narrowing the filter never changes the key and never
+  // flashes the newly shown rows back to "resolving".
+  const offerLocations = useOfferLocations(rows);
+  // Converts a contract's PLEX ask into ISK so it prices, sorts and filters
+  // like any other — until it lands, a PLEX-asking row reads as unpriced.
+  const hasPlexAsks = useMemo(() => rows.some((row) => row.requestedPlex), [rows]);
+  const plexPrice = usePlexPrice(hasPlexAsks);
+
   // Computed here rather than inside `ContractSearchFilterBar`: `FilterBar`
   // unmounts its children whenever the funnel collapses, and both the origin
   // and the distances behind it (`features/route/currentSystem.ts`) must
@@ -526,15 +597,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       : [...visibleItemsColumns, id];
     void setVisibleItemsColumns(next);
   }
-  /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
-  const selectedTypeId = itemsParams['items.type'];
-  /**
-   * Search-first (issue #2921): with nothing to search for the Items board
-   * asks for a search instead of rendering ~370k offers, while the snapshot
-   * keeps downloading behind it so the first search usually finds it landed.
-   */
-  const searchActive = isItemsSearchActive(uiFilter, selectedTypeId);
-  const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
 
   // Freshness and the offline banner both name the snapshot actually on
@@ -571,12 +633,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     onStatusChange?.({ lastSyncedAt, loading: headerLoading, refresh });
   }, [onStatusChange, lastSyncedAt, headerLoading, refresh]);
 
-  const typeOptions = useMemo(() => listedContractTypeOptions(rows, typeNames), [rows, typeNames]);
-
   const regionOptions = useMemo(() => {
-    const ids = [...new Set(rows.map((row) => row.regionId))];
+    // Every region with an offer, which the index states before any chunk has
+    // landed; a few early rows would otherwise offer only their own regions.
+    const ids =
+      !haveFull && offerIndex
+        ? [...offerIndex.regionIds]
+        : [...new Set(rows.map((row) => row.regionId))];
     return ids.map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
-  }, [rows, regionNames]);
+  }, [rows, haveFull, offerIndex, regionNames]);
 
   /**
    * Everything except the item type. Split out so a keystroke in the search
@@ -631,36 +696,20 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       return location === undefined || withinJumpRange(location.systemId, allowed);
     });
   }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
-  const statsByType = useMemo(
-    () => contractOfferStats(nonTypeRows, plexPrice),
-    [nonTypeRows, plexPrice]
-  );
-
-  /**
-   * Deferred rather than the raw keystroke value: `typeIds` feeding
-   * `displayRows` below re-filters and re-sorts up to ~370k rows, and running
-   * that synchronously on every keystroke is what made a click elsewhere in
-   * the app stall while this panel was open (issue #2024). `uiFilter.typeQuery`
-   * itself stays undeferred — the search box and the (cheap, small-set)
-   * suggestion list must still track every keystroke immediately.
-   */
-  const deferredTypeQuery = useDeferredValue(uiFilter.typeQuery);
-
-  /**
-   * A pinned type wins outright. Otherwise a non-blank query widens to the
-   * types it ranks against; `null` means "no type restriction", which is not
-   * the same as the empty set a query matching nothing produces.
-   */
-  const typeIds = useMemo<ReadonlySet<number> | null>(() => {
-    if (selectedTypeId !== null) return new Set([selectedTypeId]);
-    if (deferredTypeQuery.trim() === '') return null;
-    return new Set(
-      rankedSearch(typeOptions, deferredTypeQuery, {
-        primary: (option) => option.name,
-        limit: TYPE_SEARCH_LIMIT,
-      }).map((option) => option.typeId)
-    );
-  }, [selectedTypeId, deferredTypeQuery, typeOptions]);
+  const statsByType = useMemo(() => {
+    // Before the full rows land, the index's own per-type count and cheapest
+    // stand in. They ignore the other filters, which only matters until the
+    // snapshot arrives and the stats are computed as before.
+    if (!haveFull && offerIndex) {
+      return new Map<number, ContractOfferStats>(
+        [...offerIndex.types.values()].map((entry) => [
+          entry.typeId,
+          { offerCount: entry.count, cheapest: entry.cheapest },
+        ])
+      );
+    }
+    return contractOfferStats(nonTypeRows, plexPrice);
+  }, [haveFull, offerIndex, nonTypeRows, plexPrice]);
 
   /**
    * Cheapest first, so the rows arrive in the order the table's default
@@ -1190,7 +1239,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                       />
                     )}
                   </div>
-                ) : modeLoading && rows.length === 0 ? (
+                ) : awaitingRows ? (
                   <div className="flex flex-col items-center gap-2 py-16">
                     <Spinner label={modeLoadingLabel} />
                     <p aria-hidden="true" className="text-text-dim">

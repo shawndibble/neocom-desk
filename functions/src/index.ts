@@ -63,6 +63,7 @@ import {
 import {
   accumulateRequestedPlex,
   chunkDocId,
+  buildContractOfferIndex,
   chunkRows,
   compactContractOfferRow,
   courierContractFrom,
@@ -72,6 +73,8 @@ import {
   sortCourierContractRows,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   PUBLIC_CONTRACT_OFFERS_COLLECTION,
+  PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION,
+  PUBLIC_CONTRACT_OFFERS_INDEX_DOC,
   PUBLIC_CONTRACT_OFFERS_META_DOC,
   PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
   PUBLIC_COURIER_CONTRACTS_COLLECTION,
@@ -336,7 +339,7 @@ async function writeChunkedSnapshot<Row>(
   db: Firestore,
   snapshot: ChunkedSnapshot,
   rows: readonly Row[]
-): Promise<void> {
+): Promise<number> {
   const collection = db.collection(snapshot.collection);
   const metaRef = collection.doc(snapshot.metaDoc);
   const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
@@ -352,11 +355,13 @@ async function writeChunkedSnapshot<Row>(
   }
   await commitInPages(db, ops, snapshot.chunkDocsPerBatch);
 
+  const lastSyncedAt = Date.now();
   await metaRef.set({
-    lastSyncedAt: Date.now(),
+    lastSyncedAt,
     chunkCount: chunks.length,
     rowCount: rows.length,
   });
+  return lastSyncedAt;
 }
 
 const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
@@ -384,7 +389,21 @@ async function writePublicContractOffersSnapshot(
   db: Firestore,
   rows: readonly PublicContractOfferRow[]
 ): Promise<void> {
-  await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
+  const lastSyncedAt = await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
+  // The index is an optimisation a client can do without (it falls back to
+  // reading every chunk), so a failure to write it is logged, never allowed to
+  // fail a run whose chunks and meta are already published (issue #2921).
+  try {
+    await db
+      .collection(PUBLIC_CONTRACT_OFFERS_INDEX_COLLECTION)
+      .doc(PUBLIC_CONTRACT_OFFERS_INDEX_DOC)
+      .set({
+        lastSyncedAt,
+        ...buildContractOfferIndex(rows, PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE),
+      });
+  } catch (error) {
+    logError('public contract offers index write failed', { error: String(error) });
+  }
 }
 
 async function writePublicCourierContractsSnapshot(

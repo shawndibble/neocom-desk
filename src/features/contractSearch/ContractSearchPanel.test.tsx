@@ -39,6 +39,16 @@ vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
 }));
 
+// The early-read index (issue #2921) defaults to "none published", which is
+// the snapshot as the rest of this suite was written against; the search-first
+// suite below publishes one.
+const loadOfferIndex = vi.fn();
+const loadOffersForTypes = vi.fn();
+vi.mock('@/features/contractSearch/publicContractOfferIndex', () => ({
+  loadOfferIndex: (...args: unknown[]) => loadOfferIndex(...args),
+  loadOffersForTypes: (...args: unknown[]) => loadOffersForTypes(...args),
+}));
+
 // PLEX trades on its own global market; the panel reads one price for it.
 const usePlexPrice = vi.fn<() => number | null>(() => null);
 vi.mock('@/features/market/plexPrice', () => ({
@@ -297,6 +307,10 @@ beforeEach(async () => {
   // Same reset, same reason: a Courier filter one case sets (issue #1719)
   // must not leak into the next as a remembered default.
   useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
+  loadOfferIndex.mockReset();
+  loadOfferIndex.mockResolvedValue(null);
+  loadOffersForTypes.mockReset();
+  loadOffersForTypes.mockResolvedValue(null);
   loadPublicContractOffers.mockReset();
   loadPublicContractOffers.mockResolvedValue(
     cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION])
@@ -2015,6 +2029,72 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     offers.settle(cachedSnapshot([TRIT_FORGE]));
     await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
     expect(screen.getByText('Search to see contract offers')).toBeInTheDocument();
+  });
+
+  describe('with the index published, before the full snapshot lands', () => {
+    const INDEX = {
+      lastSyncedAt: 1,
+      types: new Map([
+        [34, { typeId: 34, count: 2, cheapest: 500_000, firstChunk: 0, lastChunk: 0 }],
+        [35, { typeId: 35, count: 1, cheapest: null, firstChunk: 1, lastChunk: 1 }],
+      ]),
+      regionIds: [10000002, 10000043],
+    };
+
+    it('suggests item names, with counts, from the index alone', async () => {
+      loadPublicContractOffers.mockReturnValue(
+        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+      );
+      loadOfferIndex.mockResolvedValue(INDEX);
+      const user = userEvent.setup();
+      renderWithRouter(['/']);
+
+      await user.type(await screen.findByPlaceholderText('Search item name…'), 'trit');
+
+      const suggestions = await screen.findByRole('list', { name: 'Matching items' });
+      expect(within(suggestions).getByRole('button', { name: /Tritanium/ })).toHaveTextContent(
+        '2 offers'
+      );
+    });
+
+    it('shows a pinned item from just its chunks while the full snapshot is still downloading', async () => {
+      loadPublicContractOffers.mockReturnValue(
+        deferred<ChunkedSnapshotRead<PublicContractOfferRow>>().promise
+      );
+      loadOfferIndex.mockResolvedValue(INDEX);
+      loadOffersForTypes.mockResolvedValue([TRIT_FORGE, TRIT_DOMAIN]);
+      renderWithRouter(['/?items.type=34&items.q=Tritanium']);
+
+      expect(await bodyRows()).toHaveLength(2);
+      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34]), CHAR_ID);
+    });
+
+    it('waits for the full snapshot when the early read cannot answer', async () => {
+      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+      loadPublicContractOffers.mockReturnValue(offers.promise);
+      loadOfferIndex.mockResolvedValue(INDEX);
+      loadOffersForTypes.mockResolvedValue(null);
+      renderWithRouter(['/?items.type=34&items.q=Tritanium']);
+
+      expect(
+        await screen.findByText('Loading public contracts, this may take a moment.')
+      ).toBeInTheDocument();
+
+      offers.settle(cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION]));
+      expect(await bodyRows()).toHaveLength(2);
+    });
+
+    it('waits for the full snapshot on a search that names no item', async () => {
+      const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+      loadPublicContractOffers.mockReturnValue(offers.promise);
+      loadOfferIndex.mockResolvedValue(INDEX);
+      renderWithRouter(['/?items.maxPrice=1000000000']);
+
+      expect(
+        await screen.findByText('Loading public contracts, this may take a moment.')
+      ).toBeInTheDocument();
+      expect(loadOffersForTypes).not.toHaveBeenCalled();
+    });
   });
 
   it('treats a filter other than the item name as a search', async () => {
