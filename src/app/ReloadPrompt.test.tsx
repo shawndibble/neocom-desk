@@ -10,7 +10,12 @@ const { updateServiceWorker, state, registerSWOptions } = vi.hoisted(() => ({
   state: { needRefresh: true },
   registerSWOptions: {
     current: undefined as
-      { onRegisteredSW?: (...a: unknown[]) => void; onNeedReload?: () => void } | undefined,
+      | {
+          onRegisteredSW?: (...a: unknown[]) => void;
+          onNeedReload?: () => void;
+          onNeedRefresh?: () => void;
+        }
+      | undefined,
   },
 }));
 
@@ -18,6 +23,7 @@ vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: (options?: {
     onRegisteredSW?: (...a: unknown[]) => void;
     onNeedReload?: () => void;
+    onNeedRefresh?: () => void;
   }) => {
     registerSWOptions.current = options;
     return {
@@ -188,33 +194,36 @@ describe('ReloadPrompt', () => {
   });
 
   describe('boot apply', () => {
-    const BOOT_APPLY_WINDOW_MS = 60 * 1000;
-    let view: ReturnType<typeof renderPrompt>;
+    const BOOT_APPLY_WINDOW_MS = 15 * 1000;
 
     beforeEach(() => {
       state.needRefresh = false;
-      view = renderPrompt();
+      renderPrompt();
     });
 
-    function updateFound() {
-      state.needRefresh = true;
-      view.rerender(
-        <MemoryRouter initialEntries={['/']}>
-          <CaptureNavigate />
-          <ReloadPrompt />
-        </MemoryRouter>
-      );
-    }
-
     it('applies an update found right after the app loads, without a route change', () => {
-      updateFound();
+      registerSWOptions.current?.onNeedRefresh?.();
       expect(updateServiceWorker).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not apply on mount alone', () => {
+      expect(updateServiceWorker).not.toHaveBeenCalled();
     });
 
     it('leaves an update found after the boot window to the route-change rule', async () => {
       await vi.advanceTimersByTimeAsync(BOOT_APPLY_WINDOW_MS + 1000);
-      updateFound();
+      registerSWOptions.current?.onNeedRefresh?.();
       expect(updateServiceWorker).not.toHaveBeenCalled();
+    });
+
+    it('never reloads the OAuth callback page, whose code is already spent', () => {
+      window.history.pushState({}, '', '/callback?code=abc');
+      try {
+        registerSWOptions.current?.onNeedRefresh?.();
+        expect(updateServiceWorker).not.toHaveBeenCalled();
+      } finally {
+        window.history.pushState({}, '', '/');
+      }
     });
   });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { currentRouterPathname, isOnRoute } from './routerPath';
 
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 // A tab must stay hidden this long before a waiting update applies — a
@@ -11,10 +12,10 @@ const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
 // threshold.
 const APPLY_CHECK_POLL_MS = 15 * 1000;
 
-// An update that turns up this soon after the app loads is applied at once:
-// the browser checks sw.js on every load, so a reload or cold start is the
-// moment a fresh build is found, and nothing has been typed into the page yet.
-const BOOT_APPLY_WINDOW_MS = 60 * 1000;
+// sw.js is checked on every load, so an update found this soon after load is
+// a reload or cold start finding a fresh build: apply it at once. Kept short
+// so a slow check never wipes input the user has already started typing.
+const BOOT_APPLY_WINDOW_MS = 15 * 1000;
 
 // Long enough for the opacity transition below to visibly finish before
 // navigating away; short enough that it doesn't feel like a delay.
@@ -82,9 +83,9 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 }
 
 /**
- * No UI. An update found within a minute of load (a reload or cold start)
- * applies at once. Otherwise it polls the registration for updates, then applies a waiting update
- * silently instead of prompting: once the tab has been hidden for a short
+ * No UI. Applies an update found right after load (see BOOT_APPLY_WINDOW_MS)
+ * at once. Also polls the registration for updates, then applies a waiting
+ * update silently instead of prompting: once the tab has been hidden for a short
  * grace period, or — for a tab that stays visible — the next time the user
  * navigates to a different in-app route. A tab that's visible and on the
  * same route is never reloaded mid-use, however long it sits idle; the
@@ -99,7 +100,6 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 export function ReloadPrompt() {
   const hiddenSinceRef = useRef(0);
   const isFirstRouteRef = useRef(true);
-  const mountedAtRef = useRef(0);
   const { pathname } = useLocation();
   const {
     needRefresh: [needRefresh],
@@ -111,10 +111,13 @@ export function ReloadPrompt() {
       setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);
     },
     onNeedReload: coverViewportAndReload,
+    // Fires on the false-to-true flip, including an update already waiting at load.
+    onNeedRefresh() {
+      // Not on /callback: a reload there replays the OAuth code, already spent.
+      if (isOnRoute(currentRouterPathname(), '/callback')) return;
+      if (performance.now() < BOOT_APPLY_WINDOW_MS) void updateServiceWorkerRef.current();
+    },
   });
-
-  // First render's value is the baseline; only a later flip counts as "just found".
-  const hadRefreshRef = useRef(needRefresh);
 
   // Mobile OSes freeze a backgrounded PWA's timers entirely, so the polling
   // tick below never runs while the tab is hidden — it only resumes once the
@@ -168,18 +171,6 @@ export function ReloadPrompt() {
     document.addEventListener('visibilitychange', trackVisibility);
     return () => document.removeEventListener('visibilitychange', trackVisibility);
   }, []);
-
-  // Boot apply: the update flips needRefresh on within the window after the
-  // app loaded. An update already waiting at mount still counts — the library
-  // reports it a moment after registering, as a false-to-true flip too.
-  useEffect(() => {
-    if (!mountedAtRef.current) mountedAtRef.current = Date.now();
-    const justFound = needRefresh && !hadRefreshRef.current;
-    hadRefreshRef.current = needRefresh;
-    if (justFound && Date.now() - mountedAtRef.current < BOOT_APPLY_WINDOW_MS) {
-      void updateServiceWorker();
-    }
-  }, [needRefresh, updateServiceWorker]);
 
   useEffect(() => {
     if (!needRefresh) return;
