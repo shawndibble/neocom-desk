@@ -121,6 +121,21 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 - Copy Share Link: short `/share/<id>` link via `features/share/shareStore` (same code gives same link, expires; Firestore backed); too-large and failure notices.
 - Copy Fitting (EFT), Copy multibuy list, Download EVE XML (`fittingXmlDocument.ts`), Manufacture Plan (router state to `/industry`, `@/lib/shortcuts`), Appraise in Market (router state to Market). Price preview Jita sell/buy in menu.
 
+## Fixing an over-CPU / over-PG fit
+
+No one-click "make it fit" or auto-fit exists (no such module in `src/features/fittings` or `src/engine/fittings`). Tools that avoid trying alternatives one by one:
+
+| Tool | Where | What it shows |
+|---|---|---|
+| Gauge / Fitting section | Ring gauges, stats "Fitting" section | CPU/PG used vs total, over-by state, over-budget flash |
+| Swap for meta variant / Variations modal | Item menu on a module | All meta variants in one table: whole-fitting stat changes, Fits / Doesn't fit, can-fly, price; click to swap; CSV |
+| Add panel filters | Add panel > Modules | "Fits this slot", Resources filter, Meta level; rows disabled with reason "too much CPU/PG" |
+| What to train | Stats section | Skill levels ranked by effect on the fit (CPU/PG skills included), Add to Skill Plan; Tech II upgrades within a few skills |
+| Implant Finder | Header Implants control | Tries every implant on this fit; lists cheapest fixes when over CPU/PG (`implantFinder.ts`) |
+| Skill basis: All V | Header Skill basis control | Stats only; shows if skills alone would fix it |
+
+Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot rules only (`FittingVariationsPanel.tsx:95-110`).
+
 ## Fitting Compare (`src/routes/FittingCompare.tsx`)
 
 - Up to 3 Fittings (`MAX_COMPARE_SLOTS`), all in URL as repeated `?f=` (`compareUrl.ts`); each add/remove/replace is a history entry; updater form guards stale renders.
