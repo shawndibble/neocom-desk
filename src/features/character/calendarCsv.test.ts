@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CalendarEventSummary } from '@/esi/endpoints';
-import { calendarCsvColumns } from './calendarCsv';
+import { calendarCsvColumns, calendarExportEvents } from './calendarCsv';
+import { localMidnight } from '@/engine/localDay';
 
 const t = (k: string) => k;
 
@@ -42,5 +43,28 @@ describe('calendarCsvColumns', () => {
     expect(responseColumn.value(event({ event_response: 'not_responded' }))).toBe(
       'calendar.responseNotResponded'
     );
+  });
+});
+
+describe('calendarExportEvents', () => {
+  const day = new Date(2026, 8, 1, 12).getTime();
+  const nextDay = new Date(2026, 8, 2, 12).getTime();
+  const onDay = event({ event_id: 1, event_date: new Date(day).toISOString() });
+  const onNextDay = event({ event_id: 2, event_date: new Date(nextDay).toISOString() });
+
+  it('exports nothing while the calendar-event kind is hidden', () => {
+    expect(calendarExportEvents([onDay, onNextDay], ['calendarEvent'], null)).toEqual([]);
+  });
+
+  it('keeps events when only other kinds are hidden', () => {
+    expect(calendarExportEvents([onDay], ['industryJob'], null)).toEqual([onDay]);
+  });
+
+  it('exports every event when no day is selected', () => {
+    expect(calendarExportEvents([onDay, onNextDay], [], null)).toEqual([onDay, onNextDay]);
+  });
+
+  it('exports only the selected local day', () => {
+    expect(calendarExportEvents([onDay, onNextDay], [], localMidnight(day))).toEqual([onDay]);
   });
 });

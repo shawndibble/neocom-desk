@@ -53,7 +53,7 @@ import { useUrlParam } from '@/lib/useUrlState';
 import type { UrlParamCodec } from '@/lib/urlState';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { calendarCsvColumns } from '@/features/character/calendarCsv';
+import { calendarCsvColumns, calendarExportEvents } from '@/features/character/calendarCsv';
 import type { CalendarRsvpResponse } from '@/esi/endpoints';
 
 /**
@@ -297,7 +297,7 @@ export function Calendar() {
       : buildFortnightDays(anchor, today, weekStart);
   }, [anchor, density, isNarrow, nowMs, weekStart]);
 
-  const events = eventsWithOverrides ?? [];
+  const events = useMemo(() => eventsWithOverrides ?? [], [eventsWithOverrides]);
   const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
 
   function goToday() {
@@ -315,11 +315,16 @@ export function Calendar() {
   }
 
   // The events aren't a DataTable (the map and the rail are views over
-  // them), so the export reads `events` as given — in ESI's order.
+  // them), so the export reads `events` in ESI's order, narrowed to what the
+  // rail shows: kind filter and selected day.
+  const exportEvents = useMemo(
+    () => calendarExportEvents(events, hiddenKinds, selectedDayMs),
+    [events, hiddenKinds, selectedDayMs]
+  );
   const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
   const eventsExport = useTableExport({
     surface: 'calendar',
-    rows: events,
+    rows: exportEvents,
     columns: csvColumns,
     source: 'rows',
   });
