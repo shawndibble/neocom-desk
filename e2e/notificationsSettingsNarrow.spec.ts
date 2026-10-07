@@ -85,7 +85,7 @@ test('select-all checkboxes stay independently clickable beside the enlarged tog
   // select-all columns keep their own hit areas: toggling one must change
   // the checkbox, not the section's expanded state.
   const selectAll = page.getByRole('checkbox', {
-    name: `Toggle all Overview notifications for ${CHARACTER_NAME}`,
+    name: `Toggle all Alerts notifications for ${CHARACTER_NAME}`,
   });
   await expect(selectAll).toBeVisible();
   const before = await selectAll.isChecked();

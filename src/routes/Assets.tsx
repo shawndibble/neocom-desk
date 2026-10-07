@@ -866,7 +866,15 @@ export function Assets() {
     const csvAssetsByItemId = new Map(
       (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
     );
-    const matches = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
+    const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
+    // Flat views hide stacks under the minimum value on screen; the export
+    // follows. Tree view ignores the filter, so its export does too.
+    const matches =
+      flatModeActive && minValueThreshold > 0
+        ? searched.filter(
+            (m) => assetStackValue(m.asset, priceByTypeId, ownCopyValues) >= minValueThreshold
+          )
+        : searched;
 
     const byLocation = new Map<number, AssetMatch[]>();
     for (const entry of matches) {

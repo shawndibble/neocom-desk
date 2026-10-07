@@ -143,7 +143,7 @@ export async function beginAddCharacterLogin(): Promise<void> {
  * reasoning as `beginAddCharacterLogin`: the returning identity is unknowable
  * until EVE sends them back. Unlike that base request, `groups` here may omit
  * a default-on Permission (an unchecked box) or include an opt-in one
- * (Corporation, Structure markets) — Customize offers all 13 either way.
+ * (Corporation, Structure markets) — Customize offers all 15 either way.
  */
 export async function beginCustomizedAddCharacterLogin(
   groups: readonly ScopeGroup[]
