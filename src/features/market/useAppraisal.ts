@@ -28,6 +28,7 @@ import {
   type AppraisalOutcome,
   type HubComparisonRow,
 } from './appraisalData';
+import { addRecent, useRecentAppraisals } from './appraisalRecent';
 
 export interface AppraisalController {
   /** What is in the box. */
@@ -115,6 +116,14 @@ export function useAppraisal(
     // Guarded rather than left to the effect: an empty submit would otherwise
     // leave the previous result on screen with nothing backing it.
     if (next.trim() === '') return;
+    // Hydrated first: saving over an unread list would drop what is stored.
+    void useRecentAppraisals
+      .getState()
+      .hydrate()
+      .then(() => {
+        const { value, setValue } = useRecentAppraisals.getState();
+        return setValue(addRecent(value, next, Date.now()));
+      });
     setSubmitted(next);
     // Re-submitting the same text unchanged must still re-run, or the
     // button does nothing after a failure.
