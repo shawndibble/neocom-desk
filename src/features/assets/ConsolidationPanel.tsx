@@ -10,6 +10,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { planConsolidation } from '@/engine/assets/consolidation';
 import { loadAllCharactersAssets, type FannedOutAssets } from '@/features/character/assets';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
@@ -220,7 +221,7 @@ export function ConsolidationPanel() {
                       </span>
                       {destSystem !== null && (
                         <Link
-                          className="text-xs text-accent underline"
+                          className={inlineLinkClassName}
                           to={routeToHref(destSystem, fromSystems.get(c.characterId) ?? null)}
                         >
                           {t('assets.consolidate.viewRoute')}
