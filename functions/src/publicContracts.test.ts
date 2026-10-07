@@ -10,6 +10,8 @@ import {
   requestedPlexByContract,
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
+  buildContractOfferIndex,
+  chunkDocData,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   courierContractFrom,
   isOutstandingCourierContract,
@@ -349,8 +351,8 @@ describe('filterAndCompactPublicContractOffers', () => {
   it('joins every item type on an eligible contract, not just blueprint copies', () => {
     expect(rows().map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
       '1:34',
-      '1:32858',
       '2:17738',
+      '1:32858',
     ]);
   });
 
@@ -395,7 +397,7 @@ describe('filterAndCompactPublicContractOffers', () => {
     expect(plexRows[0]).toMatchObject({ contractId: 1, typeId: 32858, requestedPlex: 1000 });
   });
 
-  it('sorts deterministically by contract then type, independent of input order', () => {
+  it('sorts deterministically by type then contract, independent of input order', () => {
     const backwards = filterAndCompactPublicContractOffers(
       parseContractsCsv(contracts).reverse(),
       parseContractItemsCsv(items).reverse(),
@@ -403,8 +405,8 @@ describe('filterAndCompactPublicContractOffers', () => {
     );
     expect(backwards.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
       '1:34',
-      '1:32858',
       '2:17738',
+      '1:32858',
     ]);
   });
 });
@@ -413,7 +415,7 @@ describe('sortContractOfferRows', () => {
   const row = (fields: Partial<PublicContractOfferRow>) =>
     fields as NonNullable<ReturnType<typeof compactContractOfferRow>>;
 
-  it('orders by contract then type, in place, independent of input order', () => {
+  it('orders by type then contract, in place, independent of input order', () => {
     const rows = [
       row({ contractId: 2, typeId: 10 }),
       row({ contractId: 1, typeId: 99 }),
@@ -421,7 +423,7 @@ describe('sortContractOfferRows', () => {
     ];
 
     expect(sortContractOfferRows(rows)).toBe(rows);
-    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual(['1:5', '1:99', '2:10']);
+    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual(['1:5', '2:10', '1:99']);
   });
 
   it('breaks a same-contract, same-type tie rather than leaving CSV order to decide', () => {
@@ -445,6 +447,88 @@ describe('sortContractOfferRows', () => {
       '32858/1/2',
       '32858/1/10',
     ]);
+  });
+});
+
+describe('chunkDocData', () => {
+  it('stamps a chunk with the publish it belongs to, alongside its rows', () => {
+    expect(chunkDocData([{ a: 1 }], 1234)).toEqual({ rows: [{ a: 1 }], publishedAt: 1234 });
+  });
+});
+
+describe('buildContractOfferIndex', () => {
+  const offer = (fields: Partial<PublicContractOfferRow>) =>
+    ({
+      price: 100,
+      isAuction: false,
+      quantity: 1,
+      regionId: 10000002,
+      ...fields,
+    }) as PublicContractOfferRow;
+
+  it('says how many offers, the cheapest, and which chunks hold each type', () => {
+    // Already type-sorted, as the writer hands them over; chunks of 2.
+    const rows = [
+      offer({ typeId: 34, price: 50 }),
+      offer({ typeId: 34, price: 20 }),
+      offer({ typeId: 35, price: 70 }),
+      offer({ typeId: 36, price: 10 }),
+      offer({ typeId: 36, price: 15 }),
+    ];
+
+    const index = buildContractOfferIndex(rows, 2);
+
+    expect(index.types).toEqual({
+      '34': [2, 20, 0, 0],
+      '35': [1, 70, 1, 1],
+      '36': [2, 10, 1, 2],
+    });
+  });
+
+  it('prices an auction at its buyout, as the client does, not at its starting bid', () => {
+    const index = buildContractOfferIndex(
+      [offer({ typeId: 34, price: 1, isAuction: true, buyout: 2_000_000 })],
+      10
+    );
+    expect(index.types['34']).toEqual([1, 2_000_000, 0, 0]);
+  });
+
+  it('falls back to the starting bid for an auction with no buyout', () => {
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 7, isAuction: true })], 10);
+    expect(index.types['34']).toEqual([1, 7, 0, 0]);
+  });
+
+  it('leaves cheapest null for a type with only unpriced (zero-price) offers', () => {
+    const index = buildContractOfferIndex([offer({ typeId: 34, price: 0 })], 10);
+    expect(index.types['34']).toEqual([1, null, 0, 0]);
+  });
+
+  it('skips a PLEX-asking offer when finding the cheapest, but still counts it', () => {
+    const index = buildContractOfferIndex(
+      [offer({ typeId: 34, price: 5, requestedPlex: 10 }), offer({ typeId: 34, price: 90 })],
+      10
+    );
+    expect(index.types['34']).toEqual([2, 90, 0, 0]);
+  });
+
+  it('lists each region once, sorted', () => {
+    const index = buildContractOfferIndex(
+      [
+        offer({ typeId: 1, regionId: 10000043 }),
+        offer({ typeId: 2, regionId: 10000002 }),
+        offer({ typeId: 3, regionId: 10000043 }),
+      ],
+      10
+    );
+    expect(index.regionIds).toEqual([10000002, 10000043]);
+  });
+
+  it('keeps a worst-case index for twice the listed-type count today clear of the 1MiB document limit', () => {
+    const rows = Array.from({ length: 25_000 }, (_, i) =>
+      offer({ typeId: 1_000_000 + i, price: 999999999999.99 })
+    );
+    const bytes = Buffer.byteLength(JSON.stringify(buildContractOfferIndex(rows, 3000)));
+    expect(bytes).toBeLessThan(1_048_576 * 0.9);
   });
 });
 

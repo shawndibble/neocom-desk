@@ -20,13 +20,17 @@
  * though the live side is Firestore, not ESI — `loadWithCache` only needs a
  * `fetchLive`.
  */
-import { collection, getDocs } from 'firebase/firestore/lite';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
+import { create } from 'zustand';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 
 const META_DOC_ID = 'meta';
+
+/** The offers snapshot's cache key; also what its chunk-download progress is keyed by. Lives here, not in `publicContractOffers.ts`, so a view can read progress without importing the loader. */
+export const OFFERS_CACHE_KEY = 'publicContractOffersAll';
 
 export interface ChunkedSnapshot<TRow> {
   rows: TRow[];
@@ -36,6 +40,8 @@ export interface ChunkedSnapshot<TRow> {
 
 interface ChunkDocData<TRow> {
   rows: TRow[];
+  /** The publish this chunk belongs to; absent on a chunk written before the stamp existed. */
+  publishedAt?: number;
 }
 
 interface MetaDocData {
@@ -70,13 +76,61 @@ export interface ChunkedSnapshotSource {
   staleAfterMs: number;
 }
 
-async function fetchSnapshot<TRow>(
-  source: ChunkedSnapshotSource,
-  characterId: number
-): Promise<ChunkedSnapshot<TRow> | null> {
-  if (!isSyncConfigured()) return null;
-  await ensureAnySession(characterId);
+/** Mirrors `functions/src/publicContracts.ts`'s `chunkDocId`; `chunkedSnapshot.test.ts` pins the two together. */
+export function chunkDocId(index: number): string {
+  return `chunk-${String(index).padStart(4, '0')}`;
+}
 
+/** How many chunk docs are in flight at once: enough to hide round-trip latency, few enough not to starve the page's other requests. */
+export const CHUNK_READ_CONCURRENCY = 6;
+
+/**
+ * How far a snapshot's chunk download has got, per cache key. A store beside
+ * the loader rather than a return value, because the loader runs inside
+ * `loadWithCache`, which settles once, at the end — nothing on that path can
+ * report "40 of 124" while it is still running. `total` is `null` until the
+ * `meta` doc has said how many chunks there are.
+ */
+export interface ChunkProgress {
+  done: number;
+  total: number | null;
+}
+
+interface ProgressStore {
+  byKey: Record<string, ChunkProgress | undefined>;
+  set(key: string, progress: ChunkProgress | null): void;
+}
+
+export const useChunkProgressStore = create<ProgressStore>((set) => ({
+  byKey: {},
+  set: (key, progress) =>
+    set((state) => {
+      const byKey = { ...state.byKey };
+      if (progress === null) delete byKey[key];
+      else byKey[key] = progress;
+      return { byKey };
+    }),
+}));
+
+/** The in-flight chunk download for a snapshot, or `undefined` when none is running. */
+export function useChunkProgress(cacheKey: string): ChunkProgress | undefined {
+  return useChunkProgressStore((state) => state.byKey[cacheKey]);
+}
+
+/** `meta`'s fields, where `chunkCount` is absent on a snapshot published before the count was recorded. */
+async function readMeta(collectionName: string): Promise<MetaDocData & { chunkCount?: number }> {
+  const metaSnap = await getDoc(doc(getSyncFirestore(), collectionName, META_DOC_ID));
+  return (
+    (metaSnap.data() as (MetaDocData & { chunkCount?: number }) | undefined) ?? {
+      lastSyncedAt: 0,
+    }
+  );
+}
+
+/** The whole collection in one query: no progress to report, so only the fallback when `meta` carries no chunk count. */
+async function readWholeCollection<TRow>(
+  source: ChunkedSnapshotSource
+): Promise<ChunkedSnapshot<TRow>> {
   const snapshot = await getDocs(collection(getSyncFirestore(), source.collectionName));
   const rows: TRow[] = [];
   let lastSyncedAt: number | null = null;
@@ -88,6 +142,78 @@ async function fetchSnapshot<TRow>(
     }
   }
   return { rows, lastSyncedAt };
+}
+
+/**
+ * The chunk docs, in order, plus whether any belongs to a different publish
+ * than the `meta` this read began with. Every chunk is stamped with its
+ * publish's `lastSyncedAt` (`chunkDocData` in the writer), because `meta` is
+ * written *after* the chunks: for the length of a publish `meta` still names
+ * the previous one while the chunks are already new, so re-reading `meta`
+ * proves nothing. A chunk with no stamp predates the stamp and is accepted.
+ */
+async function readChunks<TRow>(
+  source: ChunkedSnapshotSource,
+  chunkCount: number,
+  publishedAt: number
+): Promise<{ chunks: TRow[][]; mixed: boolean }> {
+  const chunks: TRow[][] = new Array<TRow[]>(chunkCount);
+  let next = 0;
+  let done = 0;
+  let mixed = false;
+  let failed = false;
+  const report = useChunkProgressStore.getState().set;
+  report(source.cacheKey, { done, total: chunkCount });
+  async function worker(): Promise<void> {
+    while (next < chunkCount && !failed) {
+      const index = next;
+      next += 1;
+      try {
+        const snap = await getDoc(
+          doc(getSyncFirestore(), source.collectionName, chunkDocId(index))
+        );
+        const data = snap.data() as ChunkDocData<TRow> | undefined;
+        chunks[index] = data?.rows ?? [];
+        if (data?.publishedAt !== undefined && data.publishedAt !== publishedAt) mixed = true;
+      } catch (error) {
+        // One failed chunk fails the read; the other workers stop instead of
+        // reporting progress for a download that is already lost.
+        failed = true;
+        throw error;
+      }
+      done += 1;
+      if (!failed) report(source.cacheKey, { done, total: chunkCount });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CHUNK_READ_CONCURRENCY, chunkCount) }, worker));
+  return { chunks, mixed };
+}
+
+/**
+ * Reads `meta`, then the chunk docs it counts, a few at a time, reporting each
+ * landing (`useChunkProgress`). If a publish landed mid-read, some chunks carry
+ * a newer stamp than `meta` did at the start; the whole read is then retried
+ * once, so a half-old, half-new snapshot is never cached for the window.
+ */
+async function fetchSnapshot<TRow>(
+  source: ChunkedSnapshotSource,
+  characterId: number
+): Promise<ChunkedSnapshot<TRow> | null> {
+  if (!isSyncConfigured()) return null;
+  await ensureAnySession(characterId);
+
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      const meta = await readMeta(source.collectionName);
+      if (meta.chunkCount === undefined) return await readWholeCollection<TRow>(source);
+      const { chunks, mixed } = await readChunks<TRow>(source, meta.chunkCount, meta.lastSyncedAt);
+      if (!mixed || attempt >= 1) {
+        return { rows: chunks.flat(), lastSyncedAt: meta.lastSyncedAt || null };
+      }
+    }
+  } finally {
+    useChunkProgressStore.getState().set(source.cacheKey, null);
+  }
 }
 
 /**

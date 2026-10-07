@@ -21,7 +21,6 @@ import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
-import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadCourierEndpoints } from './courierEndpoints';
 
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
@@ -96,7 +95,7 @@ function useResolved<TInput, TValue>(
  * Items-board only. Loading it here rather than in the shared loader is what
  * stops the Courier board waiting on 1.45 MB it never reads.
  */
-export function useListedTypeNames(rows: readonly PublicContractOfferRow[]): {
+export function useListedTypeNames(rows: readonly { typeId: number }[]): {
   value: ReadonlyMap<number, string>;
   resolving: boolean;
 } {
@@ -122,7 +121,7 @@ export function useListedTypeNames(rows: readonly PublicContractOfferRow[]): {
 }
 
 async function resolveCatalogNames(
-  rows: readonly PublicContractOfferRow[]
+  rows: readonly { typeId: number }[]
 ): Promise<ReadonlyMap<number, string>> {
   if (rows.length === 0) return EMPTY_NAMES;
   const catalog = await loadMarketTypesById();
