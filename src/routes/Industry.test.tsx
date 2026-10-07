@@ -311,6 +311,32 @@ describe('Industry: Build Plan CRUD', () => {
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    // Nothing is deleted until the confirm modal (which names the plan) is accepted.
+    let confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    expect(within(confirm).getByText(/"Rifter run"/)).toBeInTheDocument();
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+    );
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+    await user.click(
+      within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const escDialog = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    // The menu's close can leave focus outside the dialog; Escape needs it inside.
+    within(escDialog).getByRole('button', { name: 'Cancel' }).focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Delete build plan' })).not.toBeInTheDocument()
+    );
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+    await user.click(
+      within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    confirm = await screen.findByRole('dialog', { name: 'Delete build plan' });
+    await user.click(within(confirm).getByRole('button', { name: 'Delete' }));
     // handleDelete is fire-and-forget from the click handler (Industry.tsx),
     // so wait for the live-query-driven UI to drop the row before reading
     // Dexie directly — otherwise the read can race the still-in-flight
