@@ -11,6 +11,11 @@ const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
 // threshold.
 const APPLY_CHECK_POLL_MS = 15 * 1000;
 
+// An update that turns up this soon after the app loads is applied at once:
+// the browser checks sw.js on every load, so a reload or cold start is the
+// moment a fresh build is found, and nothing has been typed into the page yet.
+const BOOT_APPLY_WINDOW_MS = 60 * 1000;
+
 // Long enough for the opacity transition below to visibly finish before
 // navigating away; short enough that it doesn't feel like a delay.
 const COVER_FADE_MS = 150;
@@ -77,7 +82,8 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 }
 
 /**
- * No UI. Polls the registration for updates, then applies a waiting update
+ * No UI. An update found within a minute of load (a reload or cold start)
+ * applies at once. Otherwise it polls the registration for updates, then applies a waiting update
  * silently instead of prompting: once the tab has been hidden for a short
  * grace period, or — for a tab that stays visible — the next time the user
  * navigates to a different in-app route. A tab that's visible and on the
@@ -93,6 +99,7 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 export function ReloadPrompt() {
   const hiddenSinceRef = useRef(0);
   const isFirstRouteRef = useRef(true);
+  const mountedAtRef = useRef(0);
   const { pathname } = useLocation();
   const {
     needRefresh: [needRefresh],
@@ -105,6 +112,9 @@ export function ReloadPrompt() {
     },
     onNeedReload: coverViewportAndReload,
   });
+
+  // First render's value is the baseline; only a later flip counts as "just found".
+  const hadRefreshRef = useRef(needRefresh);
 
   // Mobile OSes freeze a backgrounded PWA's timers entirely, so the polling
   // tick below never runs while the tab is hidden — it only resumes once the
@@ -158,6 +168,18 @@ export function ReloadPrompt() {
     document.addEventListener('visibilitychange', trackVisibility);
     return () => document.removeEventListener('visibilitychange', trackVisibility);
   }, []);
+
+  // Boot apply: the update flips needRefresh on within the window after the
+  // app loaded. An update already waiting at mount still counts — the library
+  // reports it a moment after registering, as a false-to-true flip too.
+  useEffect(() => {
+    if (!mountedAtRef.current) mountedAtRef.current = Date.now();
+    const justFound = needRefresh && !hadRefreshRef.current;
+    hadRefreshRef.current = needRefresh;
+    if (justFound && Date.now() - mountedAtRef.current < BOOT_APPLY_WINDOW_MS) {
+      void updateServiceWorker();
+    }
+  }, [needRefresh, updateServiceWorker]);
 
   useEffect(() => {
     if (!needRefresh) return;

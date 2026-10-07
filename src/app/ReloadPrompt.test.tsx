@@ -187,6 +187,37 @@ describe('ReloadPrompt', () => {
     vi.unstubAllGlobals();
   });
 
+  describe('boot apply', () => {
+    const BOOT_APPLY_WINDOW_MS = 60 * 1000;
+    let view: ReturnType<typeof renderPrompt>;
+
+    beforeEach(() => {
+      state.needRefresh = false;
+      view = renderPrompt();
+    });
+
+    function updateFound() {
+      state.needRefresh = true;
+      view.rerender(
+        <MemoryRouter initialEntries={['/']}>
+          <CaptureNavigate />
+          <ReloadPrompt />
+        </MemoryRouter>
+      );
+    }
+
+    it('applies an update found right after the app loads, without a route change', () => {
+      updateFound();
+      expect(updateServiceWorker).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves an update found after the boot window to the route-change rule', async () => {
+      await vi.advanceTimersByTimeAsync(BOOT_APPLY_WINDOW_MS + 1000);
+      updateFound();
+      expect(updateServiceWorker).not.toHaveBeenCalled();
+    });
+  });
+
   describe('periodic update check', () => {
     const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
