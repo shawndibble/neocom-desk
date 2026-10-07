@@ -4158,6 +4158,24 @@
     "saveFailed": "Couldn’t save — nothing was changed. Try again."
   },
   "assets": {
+    "consolidate": {
+      "title": "Consolidate",
+      "toggle": "Consolidate across Characters",
+      "loading": "Reading every Character's assets…",
+      "failed": "Could not read assets.",
+      "notEnoughCharacters": "Consolidating needs assets from at least two Characters.",
+      "pickDestination": "Bring everything to",
+      "destinationPlaceholder": "Pick a station",
+      "incomplete": "Not fully read: {{names}}. Volumes are a lower bound.",
+      "nothingToMove": "Nothing loose to move — every Character's stock is already there or in ships and containers.",
+      "total": "{{volume}} to move",
+      "totalAtLeast": "At least {{volume}} to move",
+      "trips_one": "{{count}} trip at your saved Cargo Space",
+      "trips_other": "{{count}} trips at your saved Cargo Space",
+      "noHauler": "Pick a Cargo Space on the Hauling page for trips",
+      "viewRoute": "View route",
+      "more": "…and {{count}} more types"
+    },
     "title": "Assets",
     "treeLabel": "Character assets",
     "refresh": "Refresh",

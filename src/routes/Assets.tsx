@@ -42,6 +42,7 @@ import {
   loadOtherCharactersAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
+import { ConsolidationPanel } from '@/features/assets/ConsolidationPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   fromStoredCharacterFilterValue,
@@ -681,6 +682,7 @@ export function Assets() {
     [defaultCharacterFilter]
   );
   const [view, setView] = useUrlParams(viewParams);
+  const [showConsolidate, setShowConsolidate] = useState(false);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
@@ -1631,6 +1633,12 @@ export function Assets() {
                   onClick={() => setView({ all: !allItemsView })}
                 />
                 <IconButton
+                  icon={<Icon.Route />}
+                  label={t('assets.consolidate.toggle')}
+                  pressed={showConsolidate}
+                  onClick={() => setShowConsolidate((open) => !open)}
+                />
+                <IconButton
                   icon={<Icon.Select />}
                   label={t('assets.select.toggle')}
                   pressed={selectMode}
@@ -1647,6 +1655,7 @@ export function Assets() {
             </>
           }
         />
+        {showConsolidate && <ConsolidationPanel />}
 
         {assetsResult && !assetsNeedsReauth && (
           <SearchInput
