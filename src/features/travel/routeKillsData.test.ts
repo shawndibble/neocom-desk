@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fetchSystemRecentKills = vi.fn();
+const fetchRegionRecentKills = vi.fn();
 vi.mock('@/lib/zkillboard', () => ({
   fetchSystemRecentKills: (id: number) => fetchSystemRecentKills(id),
+  fetchRegionRecentKills: (id: number) => fetchRegionRecentKills(id),
 }));
 
 const getUniverseStargate = vi.fn();
@@ -22,6 +24,7 @@ vi.mock('@/sde/loadSde', () => ({
 const {
   RECENT_KILLS_TTL_MS,
   clearRouteKillCaches,
+  loadRegionRecentKills,
   loadSystemRecentKills,
   loadTypeGroups,
   resolveKillLocations,
@@ -30,6 +33,7 @@ const {
 beforeEach(() => {
   clearRouteKillCaches();
   fetchSystemRecentKills.mockReset();
+  fetchRegionRecentKills.mockReset();
   getUniverseStargate.mockReset();
   lookupNpcStation.mockReset();
 });
@@ -106,5 +110,29 @@ describe('loadTypeGroups', () => {
     const groupOf = await loadTypeGroups();
     expect(groupOf(22456)).toBe(541);
     expect(groupOf(1)).toBeUndefined();
+  });
+});
+
+describe('loadRegionRecentKills', () => {
+  it('serves a region from cache for five minutes, then asks again', async () => {
+    fetchRegionRecentKills.mockResolvedValue({ ok: true, bySystem: new Map() });
+    await loadRegionRecentKills(10000002, 0);
+    await loadRegionRecentKills(10000002, RECENT_KILLS_TTL_MS - 1);
+    expect(fetchRegionRecentKills).toHaveBeenCalledTimes(1);
+    await loadRegionRecentKills(10000002, RECENT_KILLS_TTL_MS);
+    expect(fetchRegionRecentKills).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one request between two callers asking at once', async () => {
+    fetchRegionRecentKills.mockResolvedValue({ ok: true, bySystem: new Map() });
+    await Promise.all([loadRegionRecentKills(1, 0), loadRegionRecentKills(1, 0)]);
+    expect(fetchRegionRecentKills).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a failure, so the next look retries', async () => {
+    fetchRegionRecentKills.mockResolvedValueOnce({ ok: false });
+    expect(await loadRegionRecentKills(1, 0)).toEqual({ ok: false });
+    fetchRegionRecentKills.mockResolvedValueOnce({ ok: true, bySystem: new Map() });
+    expect(await loadRegionRecentKills(1, 1)).toEqual({ ok: true, bySystem: new Map() });
   });
 });

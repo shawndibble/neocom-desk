@@ -333,6 +333,21 @@ describe('FittingRackList with the editor’s item actions', () => {
     );
   }
 
+  it("links a fitted item's name to Show info", () => {
+    const actions = fakeItemActions({ names });
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingRackList fitting={fitting} stats={withSlots} />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: '#10' });
+    expect(link.getAttribute('href')).toContain('info=type-10');
+  });
+
   it('offers no charge entries on a module that takes no charge, and keeps them on one that does', async () => {
     const actions = fakeItemActions({ names });
     render(

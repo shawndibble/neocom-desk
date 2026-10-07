@@ -61,6 +61,30 @@ export interface OwnedStockPlacement {
   locationId: number;
   locationType: EngineAsset['location_type'];
   quantity: number;
+  /**
+   * How much of `quantity` sits inside station containers (issue #2869), by
+   * the container directly holding it. Absent when every unit is loose in the
+   * hangar. Informational for the scope picker: the placement stays one line
+   * per location, so totals and breakdown rows are unchanged.
+   */
+  containers?: OwnedStockContainerHolding[];
+}
+
+export interface OwnedStockContainerHolding {
+  containerId: number;
+  /** The container's own typeID, for labelling it. */
+  typeId: number;
+  quantity: number;
+}
+
+/** One container holding stock, for populating the "exclude containers" picker. */
+export interface OwnedStockContainer {
+  containerId: number;
+  typeId: number;
+  characterId: number;
+  corporationId?: number;
+  locationId: number;
+  locationType: EngineAsset['location_type'];
 }
 
 export interface DetectedOwnedStock {
@@ -114,9 +138,13 @@ export function filterStockByScope(
   if (!scope || scope.mode === 'everywhere') return stock;
 
   const allowed = new Set(scope.locations.map(ownedStockLocationKey));
+  const excluded = new Set(scope.excludedContainers ?? []);
   const filtered: DetectedOwnedStockMap = new Map();
   for (const [typeID, entry] of stock) {
-    const placements = entry.placements.filter((p) => allowed.has(ownedStockLocationKey(p)));
+    const placements = entry.placements
+      .filter((p) => allowed.has(ownedStockLocationKey(p)))
+      .map((p) => withoutContainers(p, excluded))
+      .filter((p) => p.quantity > 0);
     if (placements.length === 0) continue;
     filtered.set(typeID, {
       quantity: placements.reduce((sum, p) => sum + p.quantity, 0),
@@ -124,6 +152,48 @@ export function filterStockByScope(
     });
   }
   return filtered;
+}
+
+function withoutContainers(
+  placement: OwnedStockPlacement,
+  excluded: ReadonlySet<number>
+): OwnedStockPlacement {
+  if (excluded.size === 0 || !placement.containers) return placement;
+  const kept = placement.containers.filter((c) => !excluded.has(c.containerId));
+  const removed = placement.containers.reduce(
+    (sum, c) => sum + (excluded.has(c.containerId) ? c.quantity : 0),
+    0
+  );
+  if (removed === 0) return placement;
+  const narrowed: OwnedStockPlacement = { ...placement, quantity: placement.quantity - removed };
+  if (kept.length > 0) narrowed.containers = kept;
+  else delete narrowed.containers;
+  return narrowed;
+}
+
+/**
+ * Every container holding any of the detected stock, for the scope picker's
+ * "exclude containers" list. Order is not meaningful.
+ */
+export function collectStockContainers(stock: DetectedOwnedStockMap): OwnedStockContainer[] {
+  const seen = new Map<string, OwnedStockContainer>();
+  for (const entry of stock.values()) {
+    for (const p of entry.placements) {
+      for (const c of p.containers ?? []) {
+        const key = `${ownedStockLocationKey(p)}#${c.containerId}`;
+        if (seen.has(key)) continue;
+        seen.set(key, {
+          containerId: c.containerId,
+          typeId: c.typeId,
+          characterId: p.characterId,
+          ...(p.corporationId !== undefined ? { corporationId: p.corporationId } : {}),
+          locationId: p.locationId,
+          locationType: p.locationType,
+        });
+      }
+    }
+  }
+  return [...seen.values()];
 }
 
 /**
@@ -165,19 +235,27 @@ export function collectStockLocations(stock: DetectedOwnedStockMap): OwnedStockL
 function resolvePlacement(
   asset: StockAsset,
   byItemId: ReadonlyMap<number, StockAsset>
-): { locationId: number; locationType: EngineAsset['location_type'] } | null {
+): {
+  locationId: number;
+  locationType: EngineAsset['location_type'];
+  container?: { containerId: number; typeId: number };
+} | null {
+  const directParent = asset.location_type === 'item' ? byItemId.get(asset.location_id) : undefined;
+  const container = directParent
+    ? { container: { containerId: directParent.item_id, typeId: directParent.type_id } }
+    : {};
   let current = asset;
   const seen = new Set<number>([asset.item_id]);
   while (current.location_type === 'item') {
     if (isShipHeld(current.location_flag)) return null;
     const parent = byItemId.get(current.location_id);
     if (!parent || seen.has(parent.item_id)) {
-      return { locationId: current.location_id, locationType: 'item' };
+      return { locationId: current.location_id, locationType: 'item', ...container };
     }
     seen.add(parent.item_id);
     current = parent;
   }
-  return { locationId: current.location_id, locationType: current.location_type };
+  return { locationId: current.location_id, locationType: current.location_type, ...container };
 }
 
 /**
@@ -228,11 +306,13 @@ export function detectOwnedStock(
       if (a.is_singleton || !typeIDs.has(a.type_id)) continue;
       const resolved = resolvePlacement(a, byItemId);
       if (!resolved) continue;
+      const { container, ...where } = resolved;
       const placement: OwnedStockPlacement = {
         characterId,
         ...(corporationId !== undefined ? { corporationId } : {}),
-        ...resolved,
+        ...where,
         quantity: a.quantity,
+        ...(container ? { containers: [{ ...container, quantity: a.quantity }] } : {}),
       };
 
       let byLocation = grouped.get(a.type_id);
@@ -244,6 +324,12 @@ export function detectOwnedStock(
       const existing = byLocation.get(key);
       if (existing) {
         existing.quantity += a.quantity;
+        if (container) {
+          existing.containers ??= [];
+          const line = existing.containers.find((c) => c.containerId === container.containerId);
+          if (line) line.quantity += a.quantity;
+          else existing.containers.push({ ...container, quantity: a.quantity });
+        }
       } else {
         byLocation.set(key, placement);
       }

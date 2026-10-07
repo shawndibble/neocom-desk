@@ -8,15 +8,14 @@
  * two surfaces end up disagreeing about whether a facility is idle — so they
  * are derived here and passed down.
  *
- * `nearestPin` and `roomSummary` moved here from `AdvisorPanel.tsx` for the
- * same reason: they are inputs to that shared answer, not to one card's markup.
+ * `nearestPin` and `roomSummary` live here because they are inputs to that shared answer, not to one card's markup.
  */
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
 import type { PinCounts, PinLoad } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 import { colonyFactoryBalance } from './factoryBalanceModel';
 import { idleFacilityPlan, type IdleFacilityPlan } from './colonyActionModel';
 
@@ -97,7 +96,7 @@ export const LAYOUT_KINDS: readonly PiPinKind[] = [
 export function layoutLabel(pins: PinCounts, t: TFunction): string {
   return LAYOUT_KINDS.filter((kind) => (pins[kind] ?? 0) > 0)
     .map((kind) =>
-      t('piAdvisor.layoutPin', { count: pins[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+      t('piShared.layoutPin', { count: pins[kind], pin: t(`piShared.pinKind.${kind}`) })
     )
     .join(' → ');
 }
@@ -108,7 +107,7 @@ export function roomSummary(headroom: Record<PiPinKind, number>, t: TFunction): 
     .sort((a, b) => (headroom[b] ?? 0) - (headroom[a] ?? 0))
     .slice(0, 2)
     .map((kind) =>
-      t('piAdvisor.roomForItem', { count: headroom[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+      t('piShared.roomForItem', { count: headroom[kind], pin: t(`piShared.pinKind.${kind}`) })
     )
     .join(' · ');
 }

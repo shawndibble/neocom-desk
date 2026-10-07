@@ -25,6 +25,21 @@ describe('legacyLocation', () => {
     expect(legacyLocation('/settings/help', '', '').pathname).toBe('/help/support');
   });
 
+  it('sends the retired PI Advisor tab to Colonies, dropping its retired ?system', () => {
+    expect(legacyLocation('/planetary-industry/advisor', '?system=30000142', '')).toEqual({
+      pathname: '/planetary-industry/colonies',
+      search: '',
+      hash: '',
+    });
+    expect(
+      legacyLocation('/planetary-industry/advisor', '?system=30000142&character=7', '#x')
+    ).toEqual({
+      pathname: '/planetary-industry/colonies',
+      search: '?character=7',
+      hash: '#x',
+    });
+  });
+
   it('leaves a path it does not know alone', () => {
     expect(legacyLocation('/market/browser', '?q=1', '')).toEqual({
       pathname: '/market/browser',

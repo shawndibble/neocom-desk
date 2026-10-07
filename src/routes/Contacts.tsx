@@ -26,6 +26,7 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -60,7 +61,6 @@ import {
   type ContactsFilter,
   type StandingCategory,
 } from '@/features/character/contactsFilter';
-import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
@@ -721,7 +721,6 @@ function AcrossCharactersPanel({
           {...sortProps}
           mobileSort
           stackLayout="dense"
-          className="dt-actions-pinned"
           onRowClick={(row) => {
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
@@ -729,15 +728,6 @@ function AcrossCharactersPanel({
           rowClassName={(row) =>
             contactPublicInfoKind(acrossIdentity(row)) ? undefined : NOT_CLICKABLE
           }
-          rowMoreActions
-          rowContextMenu={(row, tr) => (
-            <ContactContextMenu
-              contact={acrossIdentity(row)}
-              name={entityName(names, row.contactId)}
-            >
-              {tr}
-            </ContactContextMenu>
-          )}
         />
       )}
     </Panel>
@@ -843,17 +833,6 @@ export function Contacts() {
     );
   }, [contacts, affiliations, ownAffiliation]);
 
-  function contactRowContextMenu(contact: CharacterContact, tr: ReactElement) {
-    return (
-      <ContactContextMenu
-        contact={contact}
-        name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
-      >
-        {tr}
-      </ContactContextMenu>
-    );
-  }
-
   // The identity column (never hidden) plus the optional columns the picker
   // controls, in table order — `CONTACTS_CHARACTER_COLUMN_IDS`' own order.
   const optionalCharacterColumns = useMemo<
@@ -922,15 +901,15 @@ export function Contacts() {
         id: 'labels',
         header: t('contacts.labels'),
         // One line however many labels or however long: the full list is the
-        // cell's title, so truncation hides nothing.
+        // cell's tooltip, so truncation hides nothing.
         render: (contact) => {
           const names = contactLabelNames(contact, contactLabels);
           if (names.length === 0) return <EmptyCell />;
           const text = names.join(', ');
           return (
-            <span className="inline-block max-w-56 truncate align-bottom" title={text}>
+            <HintText content={text} className="inline-block max-w-56 truncate align-bottom">
               {text}
-            </span>
+            </HintText>
           );
         },
         sortValue: (contact) => contactLabelNames(contact, contactLabels)[0],
@@ -1216,7 +1195,6 @@ export function Contacts() {
               {...characterSortProps}
               mobileSort
               stackLayout="dense"
-              className="dt-actions-pinned"
               onRowClick={(contact) => {
                 const kind = contactPublicInfoKind(contact);
                 if (kind) openPublicInfo(kind, contact.contact_id);
@@ -1224,8 +1202,6 @@ export function Contacts() {
               rowClassName={(contact) =>
                 contactPublicInfoKind(contact) ? undefined : NOT_CLICKABLE
               }
-              rowContextMenu={contactRowContextMenu}
-              rowMoreActions
             />
           )}
         </Panel>

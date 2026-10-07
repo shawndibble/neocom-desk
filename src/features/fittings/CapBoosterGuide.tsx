@@ -2,6 +2,7 @@ import { Fragment, useMemo, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { formatSeconds } from '@/lib/duration';
 import {
@@ -13,6 +14,7 @@ import {
 import type { ChargeChoice } from '@/engine/fittings/chargeChoice';
 import type { CapacitorStatus } from '@/engine/fittings/types';
 import { formatIsk } from './chargeFormat';
+import { chargeRowClassName } from './chargeRowStyle';
 import type { WeaponChargeGroup } from './useChargeChoices';
 
 interface Props {
@@ -24,7 +26,7 @@ interface Props {
   pricesLoading: boolean;
 }
 
-const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.4rem_2.4rem_1.8rem_2.6rem_2.4rem]';
+const COLUMNS = 'grid-cols-[minmax(0,1fr)_3.4rem_2.4rem_1.8rem_3.8rem_2.4rem]';
 
 /** "Navy 800": the table's name for a charge, its size and version. */
 function shortName(name: string): string {
@@ -94,7 +96,7 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
             <TypeIcon typeId={loaded.typeId} size={32} width={20} height={20} />
             <span className="min-w-0 truncate">
               {t('fittings.chargePicker.loaded')}{' '}
-              <span className="font-semibold text-accent">{loaded.name}</span>
+              <span className="font-semibold">{loaded.name}</span>
             </span>
             <span
               className={cx(
@@ -112,7 +114,7 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
 
       {picks && (
         <div
-          className="bg-panel-2 py-0.5"
+          className="border-y border-line py-0.5"
           role="group"
           aria-label={t('fittings.chargePicker.picks')}
         >
@@ -130,22 +132,15 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                 aria-pressed={group.loaded.has(choice.typeId)}
                 disabled={!onLoad}
                 onClick={() => onLoad?.(choice.typeId)}
-                className={cx(
-                  'grid w-full grid-cols-[5.5rem_minmax(0,1fr)_auto] items-baseline gap-2 border-l-2 px-2 py-1 text-left hover:bg-panel',
-                  group.loaded.has(choice.typeId) ? 'border-accent' : 'border-transparent'
+                className={chargeRowClassName(
+                  group.loaded.has(choice.typeId),
+                  'grid w-full grid-cols-[5.5rem_minmax(0,1fr)_auto] items-baseline gap-2 px-2 py-1 text-left'
                 )}
               >
                 <span className="text-[0.6875rem] text-text-dim">
                   {t(`fittings.capGuide.${key}`)}
                 </span>
-                <span
-                  className={cx(
-                    'truncate text-xs font-semibold',
-                    group.loaded.has(choice.typeId) && 'text-accent'
-                  )}
-                >
-                  {choice.name}
-                </span>
+                <span className="truncate text-xs font-semibold">{choice.name}</span>
                 <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
                   {key === 'smallestStable'
                     ? capText(t, choice.cap.capacitor)
@@ -171,8 +166,10 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
           <span>{t('fittings.capGuide.colCharge')}</span>
           <span className="text-right">{t('fittings.capGuide.colCap')}</span>
           <span className="text-right">{t('fittings.capGuide.colGj')}</span>
-          <span className="text-right" title={t('fittings.capGuide.colLoadTitle')}>
-            {t('fittings.capGuide.colLoad')}
+          <span className="text-right">
+            <HintText content={t('fittings.capGuide.colLoadTitle')}>
+              {t('fittings.capGuide.colLoad')}
+            </HintText>
           </span>
           <span className="text-right">{t('fittings.capGuide.colIsk')}</span>
           <span className="text-right">{t('fittings.capGuide.colIskGj')}</span>
@@ -192,15 +189,18 @@ export function CapBoosterGuide({ group, onLoad, wrapRow, pricesLoading }: Props
                   onClick={() => onLoad?.(c.typeId)}
                   aria-pressed={isLoaded}
                   aria-label={rowLabel(t, c, worse)}
-                  className={cx(
-                    'grid w-full gap-1 border-t border-line px-1 py-1 text-left tabular-nums hover:bg-panel-2 disabled:cursor-not-allowed',
-                    COLUMNS,
-                    (worse || c.skillMissing) && 'opacity-50'
+                  className={chargeRowClassName(
+                    isLoaded,
+                    cx(
+                      'grid w-full gap-1 border-t border-line px-1 py-1 text-left tabular-nums',
+                      COLUMNS,
+                      (worse || c.skillMissing) && 'opacity-50'
+                    )
                   )}
                 >
-                  <span className={cx('truncate', isLoaded && 'text-accent')}>
-                    {isLoaded && '● '}
+                  <span className="truncate">
                     {shortName(c.name)}
+                    {isLoaded && ` · ${t('fittings.add.loaded')}`}
                   </span>
                   <span className={cx('text-right', !cap.capacitor.stable && 'text-warning')}>
                     {capShort(cap.capacitor)}

@@ -7,29 +7,6 @@ import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
-import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
-import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
-
-const NAMES: Record<number, string> = { 587: 'Rifter', 34: 'Tritanium' };
-const itemNameFor = (typeId: number) => NAMES[typeId] ?? `Type ${typeId}`;
-
-function itemMenuFor(typeId: number, trigger: React.ReactElement) {
-  return (
-    <FakeItemActions>
-      <ItemContextMenu typeId={typeId} itemName={itemNameFor(typeId)} blueprintTypeID={null}>
-        {trigger}
-      </ItemContextMenu>
-    </FakeItemActions>
-  );
-}
-
-function itemActionsFor(typeId: number) {
-  return (
-    <FakeItemActions>
-      <ItemMoreActions typeId={typeId} itemName={itemNameFor(typeId)} blueprintTypeID={null} />
-    </FakeItemActions>
-  );
-}
 
 /** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
@@ -407,7 +384,9 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
       productTypeID: 587,
     });
-    await userEvent.click(screen.getByRole('button', { name: /Rifter has no hub sell price/ }));
+    const link = screen.getByRole('link', { name: /Rifter has no hub sell price/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    await userEvent.click(link);
     expect(screen.getByText('Market Browser')).toBeInTheDocument();
   });
 
@@ -417,7 +396,7 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       productTypeID: null,
     });
     expect(
-      screen.queryByRole('button', { name: /Rifter has no hub sell price/ })
+      screen.queryByRole('link', { name: /Rifter has no hub sell price/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
   });
@@ -469,26 +448,6 @@ describe('ResultsSummary: use or sell the owned materials', () => {
     renderSummary({ ownedSale: unpriced });
 
     expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
-  });
-});
-
-describe('ResultsSummary: item actions button (issue #1498)', () => {
-  it('gives the revenue row no "More actions" button — the hero carries the product’s', () => {
-    renderSummary({ itemMenuFor, itemActionsFor });
-    expect(screen.queryByRole('button', { name: 'More actions for Rifter' })).toBeNull();
-  });
-
-  it('keeps the revenue row’s right-click item menu', () => {
-    renderSummary({ itemMenuFor, itemActionsFor });
-    fireEvent.contextMenu(screen.getByText('Rifter').closest('tr')!);
-    expect(screen.getAllByRole('menuitem').length).toBeGreaterThan(0);
-  });
-
-  it('renders a "More actions" button per owned-sale row', async () => {
-    renderSummary({ ownedSale: OWNED_SALE, itemActionsFor });
-    await userEvent.click(screen.getByRole('button', { name: /^per material(?! actions)/i }));
-
-    expect(screen.getByRole('button', { name: 'More actions for Tritanium' })).toBeInTheDocument();
   });
 });
 

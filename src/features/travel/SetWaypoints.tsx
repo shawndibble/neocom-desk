@@ -23,6 +23,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from '@/components/ui';
 import { db } from '@/db';
 import type { EsiEndpointId } from '@/esi/registry';
@@ -110,6 +111,19 @@ export function SetWaypoints({
     }
   }
 
+  const sendButton = (
+    <Button
+      size="sm"
+      className="max-sm:flex-1"
+      aria-disabled={blockedReason !== null || undefined}
+      loading={sending}
+      onClick={() => {
+        if (blockedReason === null && characterId !== null) void send(characterId);
+      }}
+    >
+      {sending ? t('travel.waypoints.sending') : t('travel.waypoints.action')}
+    </Button>
+  );
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -140,17 +154,12 @@ export function SetWaypoints({
               </SelectContent>
             </Select>
           )}
-          <Button
-            size="sm"
-            className="max-sm:flex-1"
-            disabled={blockedReason !== null || sending}
-            title={blockedReason ?? undefined}
-            onClick={() => {
-              if (characterId !== null) void send(characterId);
-            }}
-          >
-            {sending ? t('travel.waypoints.sending') : t('travel.waypoints.action')}
-          </Button>
+          {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
+          {blockedReason === null ? (
+            sendButton
+          ) : (
+            <Tooltip content={blockedReason}>{sendButton}</Tooltip>
+          )}
         </div>
       </div>
       {characterId === null && blockedReason !== null && (

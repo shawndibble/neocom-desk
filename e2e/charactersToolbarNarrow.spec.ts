@@ -102,8 +102,11 @@ test('the table view shows Last synced age text at 390px (#1783)', async ({ page
   await landOnCharactersAtPhoneWidth(page);
   await page.getByRole('button', { name: 'Table' }).click();
 
+  // The age comes from stats and the skill queue, which load after the table
+  // renders ("Unknown" until then). On a loaded CI shard that outran the 5s
+  // default and the cell was still "Unknown", so wait for the data explicitly.
   const age = page.locator('table td time').first();
-  await expect(age).toBeVisible();
+  await expect(age).toBeVisible({ timeout: 20_000 });
   await expect(age).not.toHaveText('');
 });
 

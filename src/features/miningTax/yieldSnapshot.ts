@@ -27,6 +27,8 @@ import { EsiError } from '@/esi/errors';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import type { ReprocessingMap } from '@/sde/types';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { oreFormTypeId } from '@/engine/miningTax/oreForm';
+import { loadOreFormNames } from './oreForm';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { getUniverseType } from '@/esi/endpoints';
@@ -175,7 +177,10 @@ async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, numbe
  * resulting rows from reading as "Partial" for refine data that was never
  * fetched on purpose.
  */
-export async function loadMiningYieldSnapshot(showRefining = true): Promise<MiningYieldSnapshot> {
+export async function loadMiningYieldSnapshot(
+  showRefining = true,
+  compressed = true
+): Promise<MiningYieldSnapshot> {
   const yields = await loadAllCharacterYields();
 
   const characters: TrackedCharacter[] = yields.map((y) => ({
@@ -223,7 +228,8 @@ export async function loadMiningYieldSnapshot(showRefining = true): Promise<Mini
     loadCompressedOreTypeIds(),
     showRefining ? loadReprocessing() : Promise.resolve<ReprocessingMap>({}),
   ]);
-  const pricingTypeId = (typeId: number): number => compressedByRaw[String(typeId)] ?? typeId;
+  const pricingTypeId = (typeId: number): number =>
+    oreFormTypeId(typeId, compressedByRaw, compressed);
 
   const reprocessingByTypeId = new Map<number, YieldReprocessingEntry | undefined>();
   for (const typeId of rawTypeIds) {
@@ -391,13 +397,16 @@ export async function loadMiningYieldSnapshot(showRefining = true): Promise<Mini
     return { characterId, characterName, entry, ...byBasis.buy, byBasis };
   });
 
-  const [systemRows, typeNames, sdeTypes] = await Promise.all([
+  const [systemRows, materialNames, oreNames, sdeTypes] = await Promise.all([
     Promise.all(systemIds.map(async (id) => ({ id, ...(await loadSystemNameAndSecurity(id)) }))),
     // Materials as well as ore: the detail modal lists what each day refines
     // into, and an unnamed "#34" there is no use to a miner.
-    loadTypeNames([...rawTypeIds, ...materialTypeIds]),
+    loadTypeNames(materialTypeIds),
+    loadOreFormNames(rawTypeIds, compressed),
     loadTypes(),
   ]);
+  // Ore last: a type that is both ore and a refine output reads as ore.
+  const typeNames = new Map([...materialNames, ...oreNames]);
   const typeVolumes = new Map<number, number>();
   const typeIdsMissingVolume: number[] = [];
   for (const typeId of rawTypeIds) {

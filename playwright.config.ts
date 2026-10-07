@@ -13,6 +13,14 @@ const PREVIEW_BASE_URL = `http://localhost:${PREVIEW_PORT}/`;
 const BUILT_SPECS = /\.built\.spec\.ts$/;
 
 /**
+ * Specs that must run on the Vite dev server: they `import()` a `/src/...ts`
+ * module inside the page, a URL only the dev server serves. Everything else
+ * runs on the production bundle, which skips the dev server's per-context
+ * module waterfall.
+ */
+const DEV_SPECS = /\.dev\.spec\.ts$/;
+
+/**
  * Escape hatch for a local dev-server-only run.
  *
  * Playwright starts every `webServer` entry whatever `--project` or a file
@@ -115,10 +123,30 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: BUILT_SPECS,
-      use: { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL },
+      testIgnore: skipBuilt ? BUILT_SPECS : [BUILT_SPECS, DEV_SPECS],
+      // Default (CI): the production bundle on the preview server. The dev
+      // server makes every spec's fresh browser context re-fetch its module
+      // waterfall, which was most of the suite's wall time. `E2E_SKIP_BUILT=1`
+      // keeps the dev server for a local run that cannot build.
+      use: skipBuilt
+        ? { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL }
+        : {
+            ...devices['Desktop Chrome'],
+            baseURL: PREVIEW_BASE_URL,
+            // Same reason as the `built` project: no precache race.
+            serviceWorkers: 'block',
+          },
     },
-    ...(skipBuilt ? [] : [BUILT_PROJECT]),
+    ...(skipBuilt
+      ? []
+      : [
+          BUILT_PROJECT,
+          {
+            name: 'dev',
+            testMatch: DEV_SPECS,
+            use: { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL },
+          },
+        ]),
   ],
   webServer: [
     {

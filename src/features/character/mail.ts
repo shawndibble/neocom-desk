@@ -18,6 +18,7 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   readCached,
+  readCachedRows,
   writeCached,
   STALE_AFTER,
   type CachedResult,
@@ -87,6 +88,56 @@ export async function loadMoreMailHeaders(
     if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'getCharacterMailHeaders');
     return { headers: [...currentHeaders], hasMore: true };
   }
+}
+
+/** Everything the Mail list needs from one Character's mailbox: headers, label counts, list names. */
+export interface MailOwnerLoad {
+  headers: CachedResult<MailHeader[]> | null;
+  labels: CachedResult<MailLabels> | null;
+  lists: MailingList[];
+  /** 401/403 (or a failed token refresh) on any of the three reads: "log in again", not "offline". */
+  needsReauth: boolean;
+  hasMore: boolean;
+}
+
+/** The three reads at once — ESI or cache, each on its own freshness window. */
+export async function loadMailOwner(characterId: number): Promise<MailOwnerLoad> {
+  const [headers, labels, lists] = await Promise.all([
+    loadMailHeaders(characterId),
+    loadMailLabels(characterId),
+    loadMailingLists(characterId),
+  ]);
+  return {
+    headers: headers.cached,
+    labels: labels.cached,
+    lists: lists.cached?.data ?? [],
+    needsReauth: headers.needsReauth || labels.needsReauth || lists.needsReauth,
+    hasMore: headers.hasMore,
+  };
+}
+
+/** Same shape as `loadMailOwner`, from Dexie only — never a live call. */
+export async function loadMailOwnerCacheOnly(characterId: number): Promise<MailOwnerLoad> {
+  const [headers, labels, lists] = await Promise.all([
+    readCachedRows<MailHeader[]>([characterId], KEYS.headers),
+    readCachedRows<MailLabels>([characterId], KEYS.labels),
+    readCachedRows<MailingList[]>([characterId], KEYS.lists),
+  ]);
+  const cached = headers.get(characterId) ?? null;
+  return {
+    headers: cached,
+    labels: labels.get(characterId) ?? null,
+    lists: lists.get(characterId)?.data ?? [],
+    needsReauth: false,
+    hasMore: (cached?.data.length ?? 0) >= MAIL_HEADERS_PAGE_SIZE,
+  };
+}
+
+/** Cached label sets for many Characters, for per-Character unread figures — never a live call. */
+export function readMailLabelsForCharacters(
+  characterIds: readonly number[]
+): Promise<Map<number, CachedResult<MailLabels>>> {
+  return readCachedRows<MailLabels>(characterIds, KEYS.labels);
 }
 
 /** System + Custom Labels with unread counts — the tab bar's four buckets (CONTEXT.md round 18) and the custom-label filter chips (round 22). ESI or cache. */

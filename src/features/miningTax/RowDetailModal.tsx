@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -11,14 +12,13 @@ import {
   InfoTooltip,
   Modal,
   StatChip,
-  TypeIcon,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -191,7 +191,7 @@ export function RowDetailModal({
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
             content={t('miningTax.dateEveHint')}
@@ -217,7 +217,9 @@ export function RowDetailModal({
         )}
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-text-dim">
           <span>
-            {row.characterName}
+            <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>
+            {' · '}
+            <SystemLink systemId={row.entry.solarSystemId}>{systemName}</SystemLink>
             {assigned && assignment && (
               <>
                 {' · '}
@@ -261,11 +263,11 @@ export function RowDetailModal({
                   key={line.typeId}
                   className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                 >
-                  <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                  <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 flex-1 truncate">
-                    <MarketItemLink typeId={line.typeId}>
+                    <OreLink typeId={line.typeId}>
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                    </MarketItemLink>
+                    </OreLink>
                   </span>
                   <span className="tabular-nums text-text-dim">
                     {line.quantity.toLocaleString()}
@@ -293,9 +295,9 @@ export function RowDetailModal({
               {assignment.reviewDiff.map((diff) => (
                 <li key={diff.typeId} className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate">
-                    <MarketItemLink typeId={diff.typeId}>
+                    <OreLink typeId={diff.typeId}>
                       {typeNames.get(diff.typeId) ?? `#${diff.typeId}`}
-                    </MarketItemLink>
+                    </OreLink>
                   </span>
                   <span className="shrink-0 tabular-nums">
                     {diff.before.toLocaleString()} → {diff.after.toLocaleString()}

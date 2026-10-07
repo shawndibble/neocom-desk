@@ -5,15 +5,31 @@ import '@/i18n';
 import { db } from '@/db';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
+import {
+  MINING_TAX_COMPRESSED_ORE_KEY,
+  useMiningTaxCompressedOre,
+} from '@/features/miningTax/oreForm';
 import { MiningTaxSettingsForm } from './MiningTaxSettingsForm';
 
 beforeEach(async () => {
   await db.settings.clear();
   useAutoContinueSessions.setState({ value: false, hydrated: false });
   useMiningTaxOreValueMode.setState({ value: false, hydrated: false });
+  useMiningTaxCompressedOre.setState({ value: true, hydrated: false });
 });
 
 describe('MiningTaxSettingsForm', () => {
+  it('shows the compressed-ore checkbox on by default and saves it when cleared', async () => {
+    const user = userEvent.setup();
+    render(<MiningTaxSettingsForm />);
+
+    const box = await screen.findByRole('checkbox', { name: 'Value and show ore as compressed' });
+    expect(box).toBeChecked();
+    await user.click(box);
+
+    expect((await db.settings.get(MINING_TAX_COMPRESSED_ORE_KEY))?.value).toBe(false);
+  });
+
   it('opens on the stored values of both settings', async () => {
     await db.settings.put({ key: 'miningTaxAutoContinue', value: true });
     render(<MiningTaxSettingsForm />);

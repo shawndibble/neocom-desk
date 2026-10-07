@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PlanEntry } from '@/engine/types';
 import { Button, SkillBar } from '@/components/ui';
 import type { SkillTrainingStatus } from './skillStatus';
-import { SkillNameButton } from './SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { SkillStatusIcon } from './SkillStatusIcon';
 
 export interface SkillRowProps {
@@ -55,13 +55,9 @@ export function SkillRow({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <SkillStatusIcon status={status} />
       {skillTypeID !== undefined ? (
-        <SkillNameButton
-          skillTypeID={skillTypeID}
-          planEntries={planEntries}
-          className="flex-auto text-text"
-        >
+        <SkillLink typeId={skillTypeID} planEntries={planEntries} className="flex-auto">
           {name}
-        </SkillNameButton>
+        </SkillLink>
       ) : (
         <span className="flex-auto text-text">{name}</span>
       )}
@@ -73,7 +69,7 @@ export function SkillRow({
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
         {inPlan && (
-          <span className="inline-flex items-center rounded-xs border border-accent-dim bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+          <span className="inline-flex items-center rounded-xs bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
             {inPlanLabel}
           </span>
         )}

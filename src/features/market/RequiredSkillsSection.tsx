@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
-import { SkillNameButton } from '@/features/skills/SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
@@ -111,9 +111,9 @@ function NameOnlySkillRow({
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-3 text-xs">
-      <SkillNameButton skillTypeID={skillTypeID} className="flex-1 text-text">
+      <SkillLink typeId={skillTypeID} className="flex-1">
         {name}
-      </SkillNameButton>
+      </SkillLink>
       <span className="text-text-dim">{t('plans.level', { level })}</span>
     </div>
   );

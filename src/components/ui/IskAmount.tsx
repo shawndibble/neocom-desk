@@ -1,21 +1,18 @@
+import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { Tooltip } from './Tooltip';
-
-/**
- * How a touch reader gets the exact value. `longPress` wherever the tap
- * already does something — a table row that opens a detail view owns its tap,
- * and taking it would break the row. `tap` where the figure is inert.
- * No default: the two surfaces look identical in JSX, so the call site says
- * which one it is.
- */
-export type IskRevealGesture = 'tap' | 'longPress';
+import { IskFigureGroupContext, RowTappableContext } from './tooltipHold';
 
 interface IskAmountProps {
   value: number;
-  /** Reveal gesture for touch — see `IskRevealGesture`. */
-  revealOn: IskRevealGesture;
+  /**
+   * @deprecated Ignored: every figure is tap-reveal except inside a tappable
+   * row (`RowTappableContext`). Kept only so the Planetary Industry call sites,
+   * which are being overhauled separately, still compile. Remove with them.
+   */
+  revealOn?: 'tap';
   /** Precision of the revealed exact figure. 2 matches Wallet/Contracts; pass 0 for whole-ISK surfaces. */
   decimals?: number;
   /** Extra classes on the trigger, e.g. a tone or `tabular-nums` alignment from the cell. */
@@ -24,7 +21,11 @@ interface IskAmountProps {
 
 /**
  * An ISK figure shown as shorthand ("1.3B") with the exact value one gesture
- * away — hover, keyboard focus, or touch. Shorthand is a display treatment
+ * away — hover, keyboard focus, or a tap. Inside a tappable row (a clickable
+ * `DataTable` row, via `RowTappableContext`) the tap belongs to the row and
+ * opens it; the exact figure is in the row's detail, and hover and focus still
+ * show the bubble. A touch-and-hold never reveals it: inside a row menu it is
+ * the menu's, and elsewhere a tap does the job. Shorthand is a display treatment
  * only: clipboard/CSV output keeps reading the underlying number rather than
  * anything rendered here.
  *
@@ -34,9 +35,11 @@ interface IskAmountProps {
  * naming an element with no role, so many readers drop such a label and,
  * with the shorthand hidden, read an empty cell.
  *
- * It stays a tab stop. The tooltip is the only way a sighted keyboard user
- * reaches the exact figure, and `Tooltip` reveals on focus, so a figure that
- * cannot take focus would hide that value from the keyboard entirely.
+ * It stays keyboard-reachable. The tooltip is the only way a sighted keyboard
+ * user reaches the exact figure, and `Tooltip` reveals on focus, so a figure
+ * that cannot take focus would hide that value from the keyboard entirely.
+ * A dense card can wrap its figures in `IskFigureGroup`: one tab stop for the
+ * group, arrow keys between figures, each still revealing on focus.
  *
  * Shorthand rounds to one fraction digit, so two different values can render
  * the same string. That is the trade a scanning surface makes, and it is why
@@ -44,19 +47,18 @@ interface IskAmountProps {
  * `sortValue`), never on this text. Ledgers and editable fields keep full
  * precision instead — see `docs/context/decisions/` for the rule.
  */
-export function IskAmount({ value, revealOn, decimals = 2, className = '' }: IskAmountProps) {
+export function IskAmount({ value, decimals = 2, className = '' }: IskAmountProps) {
   const { t } = useTranslation();
+  // Inside a clickable row the tap opens the row, whose detail carries the exact figure.
+  const rowTappable = useContext(RowTappableContext);
+  // Inside an `IskFigureGroup` the group owns the tab stop (roving tabindex).
+  const inGroup = useContext(IskFigureGroupContext);
   const exact = t('common.iskExact', { amount: formatIsk(value, decimals) });
   return (
-    // A long-press reveal is the figure's own even inside a row menu: the
-    // exact value has no other way to a touch screen.
-    <Tooltip
-      content={exact}
-      openOnTap={revealOn === 'tap'}
-      holdToReveal={revealOn === 'longPress' ? true : undefined}
-    >
+    <Tooltip content={exact} openOnTap={!rowTappable}>
       <span
-        tabIndex={0}
+        tabIndex={inGroup ? -1 : 0}
+        data-isk-figure={inGroup ? '' : undefined}
         className={cx(
           'cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
           className

@@ -13,6 +13,7 @@
  * Everything here is read-only. A Mining Yield row records what ESI reported;
  * there is nothing about it for a pilot to edit.
  */
+import { OreIcon, OreLink } from './OreIcon';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
@@ -22,14 +23,13 @@ import {
   Modal,
   StatChip,
   StatChips,
-  TypeIcon,
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { CharacterLink, SystemLink } from '@/features/entities';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
@@ -98,9 +98,9 @@ export function YieldDetailModal({
 
   const typeNameCell = (typeId: number) => (
     <span className="flex items-center gap-1.5">
-      <TypeIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
+      <OreIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
       <span className="truncate">
-        <MarketItemLink typeId={typeId}>{typeName(typeId)}</MarketItemLink>
+        <OreLink typeId={typeId}>{typeName(typeId)}</OreLink>
       </span>
     </span>
   );
@@ -166,7 +166,7 @@ export function YieldDetailModal({
     {
       id: 'type',
       header: t('miningTax.oreColumn'),
-      primary: true,
+      stickyStart: true,
       render: (line) => typeNameCell(line.typeId),
       sortValue: (line) => typeName(line.typeId),
     },
@@ -181,6 +181,7 @@ export function YieldDetailModal({
     {
       id: 'volume',
       header: t('miningTax.overview.detail.m3Column'),
+      phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap text-text-dim tabular-nums',
       render: (line) => {
@@ -208,7 +209,6 @@ export function YieldDetailModal({
         line.rawValue > 0 ? (
           <IskAmount
             value={line.rawValue}
-            revealOn="tap"
             decimals={0}
             className={lineWinner(line) === 'raw' ? 'text-isk-pos' : undefined}
           />
@@ -228,7 +228,6 @@ export function YieldDetailModal({
               line.refineValue > 0 ? (
                 <IskAmount
                   value={line.refineValue}
-                  revealOn="tap"
                   decimals={0}
                   className={lineWinner(line) === 'refined' ? 'text-isk-pos' : undefined}
                 />
@@ -245,7 +244,7 @@ export function YieldDetailModal({
     {
       id: 'material',
       header: t('miningTax.overview.detail.materialColumn'),
-      primary: true,
+      stickyStart: true,
       render: (material) => typeNameCell(material.typeId),
       sortValue: (material) => typeName(material.typeId),
     },
@@ -263,11 +262,7 @@ export function YieldDetailModal({
       align: 'right',
       className: 'whitespace-nowrap text-text-dim',
       render: (material) =>
-        material.value === null ? (
-          '—'
-        ) : (
-          <IskAmount value={material.value} revealOn="tap" decimals={0} />
-        ),
+        material.value === null ? '—' : <IskAmount value={material.value} decimals={0} />,
       sortValue: (material) => material.value ?? undefined,
     },
   ];
@@ -297,7 +292,7 @@ export function YieldDetailModal({
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.overview.detail.title', { date: entry.date, system: systemName })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
             content={t('miningTax.dateEveHint')}
@@ -307,7 +302,11 @@ export function YieldDetailModal({
     >
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <span className="text-text-dim">{row.characterName}</span>
+          <span className="text-text-dim">
+            <CharacterLink id={row.characterId}>{row.characterName}</CharacterLink>
+            {' · '}
+            <SystemLink systemId={entry.solarSystemId}>{systemName}</SystemLink>
+          </span>
           <StatChips>
             <StatChip
               label={t('miningTax.overview.volumeStat')}
@@ -346,7 +345,7 @@ export function YieldDetailModal({
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
             <p className="mt-1 text-xl font-semibold tabular-nums">
-              <IskAmount value={valuation.rawValue} revealOn="tap" decimals={0} />
+              <IskAmount value={valuation.rawValue} decimals={0} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
@@ -362,7 +361,7 @@ export function YieldDetailModal({
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">
-                  <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
+                  <IskAmount value={valuation.refineValue} decimals={0} />
                 </p>
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {
@@ -388,7 +387,7 @@ export function YieldDetailModal({
                   ) : (
                     <>
                       {totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
-                      <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
+                      <IskAmount value={Math.abs(totals.delta)} decimals={0} />
                     </>
                   )}
                 </p>
@@ -430,11 +429,9 @@ export function YieldDetailModal({
                 rowKey={(line) => line.typeId}
                 label={t('miningTax.overview.detail.oreMinedTitle')}
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
-                // Four short figures a card, same shape as the Price History
-                // day list: one per line would run a multi-ore day twice as
-                // long for no gain in legibility. The neighbouring "refines
-                // into" table has only two and stays at the default.
-                stackColumns={2}
+                // A compare table: raw against refined across the columns, so it
+                // stays a table on a phone and scrolls sideways.
+                responsive="table"
               />
             </div>
           </div>
@@ -467,6 +464,7 @@ export function YieldDetailModal({
                       rows={refinedRows}
                       rowKey={(material) => material.typeId}
                       label={t('miningTax.overview.detail.refinesIntoTitle')}
+                      responsive="table"
                     />
                   </div>
                 )}

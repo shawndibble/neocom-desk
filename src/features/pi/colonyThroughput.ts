@@ -42,14 +42,14 @@
  * happens to look better.
  *
  * The peak chain cannot be built from `BuiltColonyAdvice` alone:
- * `MeasuredExtractor` (`advisorModel.ts`) carries only the mean rate, and
+ * `MeasuredExtractor` (`systemPlanetModel.ts`) carries only the mean rate, and
  * peak/mean is not a fixed ratio — `qty_per_cycle` enters CCP's noise term
  * (`Math.pow(qtyPerCycle, 0.7)`), so two extractors with the same mean can
  * have different peaks. Deriving it needs each extractor's own install-time
  * baseline, which `builtAdvice` reads off the colony's raw ESI pins and then
  * discards. So this module takes those raw pins as a second, explicit
  * argument alongside the `BuiltColonyAdvice` they built — the same
- * `CharacterPlanetDetail.pins` `advisorModel.ts`'s `builtAdvice` already had
+ * `CharacterPlanetDetail.pins` `systemPlanetModel.ts`'s `builtAdvice` already had
  * in hand at the point it built `colony`.
  *
  * Only the extraction leg gets a peak: a factory's own output is capped by
@@ -57,12 +57,12 @@
  * is the same on both chains.
  *
  * The per-product peak sum below deliberately mirrors the exact filter
- * `advisorModel.ts`'s `measureExtractors`/`builtAdvice` apply when building
+ * `systemPlanetModel.ts`'s `measureExtractors`/`builtAdvice` apply when building
  * `extractedPerHour` — product resolvable off the pin, program carries a full
  * yield baseline — because the mean and the peak have to be sums over the
  * *same* set of extractors to mean anything held up against each other; a
  * peak measured over a different extractor set than the mean would make the
- * comparison meaningless rather than merely approximate. `advisorModel.ts` is
+ * comparison meaningless rather than merely approximate. `systemPlanetModel.ts` is
  * not owned by this change, so that filter is duplicated here rather than
  * shared, and the "same extractor set" test below is what keeps the
  * duplicate honest.
@@ -76,7 +76,7 @@ import { extractorCycleYields, hasYieldBaseline, programCycleCount } from '@/eng
 import type { ExtractorYieldProgram, PiChain, ThroughputCheck } from '@/engine/pi/types';
 import { piTier } from '@/engine/pi/chain';
 import { colonyFactoryBalance, colonyOutputPerHour } from './factoryBalanceModel';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { BuiltColonyAdvice } from './systemPlanetModel';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -114,7 +114,7 @@ export function peakRatePerHour(program: ExtractorYieldProgram): number {
  * Every extractor pin's own product and peak rate, summed per product —
  * built off the colony's raw ESI pins because `BuiltColonyAdvice` does not
  * carry the install-time baseline a peak needs. Mirrors
- * `advisorModel.ts`'s `measureExtractors`/`builtAdvice` filter exactly (see
+ * `systemPlanetModel.ts`'s `measureExtractors`/`builtAdvice` filter exactly (see
  * this module's header): a pin without a resolvable product, or a program
  * without a full yield baseline, is left out here the same way it is left
  * out of `extractedPerHour`.
@@ -251,6 +251,21 @@ export function colonyHoursToFull(
   pi: PiData,
   haulHours: number
 ): number | null {
+  return colonyStorage(colony, pins, pi, haulHours)?.hoursToFull ?? null;
+}
+
+/**
+ * `colonyHoursToFull`'s reading plus the buffer it was measured against (the
+ * launchpad and storage facilities' own capacity, m3), so the Colonies row's
+ * "Storage full in" and its expanded Launchpad block come from one check.
+ * Null when nothing is extracted, so there is nothing to fill it.
+ */
+export function colonyStorage(
+  colony: BuiltColonyAdvice,
+  pins: readonly PlanetPin[],
+  pi: PiData,
+  haulHours: number
+): { hoursToFull: number | null; bufferM3: number } | null {
   if (colony.extractedPerHour.length === 0) return null;
   const check = colonyThroughputCheck({
     colony,
@@ -261,5 +276,5 @@ export function colonyHoursToFull(
     linkCapacityPerHour: null,
     bufferHours: haulHours,
   });
-  return check.peak.hoursToFull;
+  return { hoursToFull: check.peak.hoursToFull, bufferM3: check.peak.bufferM3 };
 }

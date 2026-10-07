@@ -1,17 +1,22 @@
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { marketLinkParams } from '@/engine/market/urlState';
 
 interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> {
   typeId: number;
   children: ReactNode;
-  /** Replaces the default inline-link look, e.g. to draw it as a button. */
+  /** Replaces the default `entityLinkClassName` look, e.g. to draw it as a button. */
   className?: string;
   /** Forces `marketLinkParams`' hub override — see its own doc for why. */
   hubId?: string;
 }
 
 /**
+ * Market context only (prices, order books, Compare, Appraisal). An item
+ * name elsewhere is an `ItemInfoLink` (`features/entities`), which opens Show
+ * info; the Market stays in the row menu and the Item Detail's best prices.
+ *
  * Wraps an item name with a link to its Market listing (#411), preserving
  * whatever region/hub the current page is already scoped to — same
  * `marketLinkParams` precedence as `ImplantChip` (#405) and the item context
@@ -33,10 +38,7 @@ export function MarketItemLink({
     <Link
       {...rest}
       to={`/market/browser?${new URLSearchParams(params).toString()}`}
-      className={
-        className ??
-        'hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-      }
+      className={className ?? entityLinkClassName()}
     >
       {children}
     </Link>

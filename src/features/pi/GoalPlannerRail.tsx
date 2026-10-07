@@ -12,33 +12,31 @@ import {
   Button,
   Checkbox,
   CollapsiblePanel,
-  IconButton,
   InfoTooltip,
   Panel,
   RegionSelect,
   SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   TextInput,
   type ControlSize,
 } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { Goal } from '@/engine/pi/goalTypes';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { PiProductLink } from './PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { MenuItem, RowMoreActions } from '@/components/ui/RowActions';
 import type { PiCadence } from './cadencePref';
 import { customsRatePercent, customsSourceText } from './customsRate';
-import { ASSUMED_UNKNOWN_CUSTOMS, type PlannerColonyRow } from './goalPlannerModel';
+import type { PlannerColonyRow } from './goalPlannerModel';
+import { ASSUMED_UNKNOWN_CUSTOMS } from './colonyCustoms';
 import { DEFAULT_GOAL_PER_DAY } from './goalsParam';
 import type { ProductOption } from './products';
 import { SectionLabel, TierChip } from './DirectiveRow';
-import { CadenceRow, PercentInput } from './piControls';
+import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
+import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
+import { PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
+import { PI_MAP_HREF } from './piPlanLink';
 
 /** How long typing pauses before a units box re-plans. */
 const COMMIT_DEBOUNCE_MS = 300;
@@ -140,13 +138,11 @@ export function GoalsSection({
   goals,
   products,
   onGoalsChange,
-  hubId,
   size,
 }: {
   goals: readonly Goal[];
   products: readonly ProductOption[];
   onGoalsChange: (goals: Goal[]) => void;
-  hubId: TradeHub['id'];
   size: ControlSize;
 }) {
   const { t } = useTranslation();
@@ -173,34 +169,43 @@ export function GoalsSection({
           {shown.map((goal) => {
             const product = byId.get(goal.typeId)!;
             return (
-              <li key={goal.typeId} className="flex items-center gap-2">
-                <TierChip tier={product.tier} />
-                <span className="min-w-0 flex-1 truncate text-sm text-text">
-                  <ItemContextMenu typeId={goal.typeId} itemName={product.name}>
-                    <MarketItemLink typeId={goal.typeId} hubId={hubId}>
-                      {product.name}
-                    </MarketItemLink>
-                  </ItemContextMenu>
-                </span>
-                <UnitsBox
-                  value={goal.unitsPerDay}
-                  size={size}
-                  label={t('piPlan.goalRateLabel', { name: product.name })}
-                  describedBy={hintId}
-                  onCommit={(unitsPerDay) =>
-                    onGoalsChange(
-                      goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
-                    )
-                  }
-                />
-                <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('piPlan.goalRemove', { name: product.name })}
-                  size="row"
-                  onClick={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
-                />
-              </li>
+              // The name is a plain link (the browser's link menu stays on it); the
+              // item menu is the row's, behind the ⋮, with Remove folded in rather
+              // than a × beside it (DESIGN.md §6c "Restraint").
+              <ItemContextMenu
+                key={goal.typeId}
+                typeId={goal.typeId}
+                itemName={product.name}
+                linksKeepBrowserMenu
+                extraItems={
+                  <MenuItem
+                    className="text-danger"
+                    onSelect={() => onGoalsChange(goals.filter((g) => g.typeId !== goal.typeId))}
+                  >
+                    {t('piPlan.goalRemove', { name: product.name })}
+                  </MenuItem>
+                }
+              >
+                <li className="flex items-center gap-2">
+                  <TierChip tier={product.tier} />
+                  <span className="min-w-0 flex-1 truncate text-sm text-text">
+                    <PiProductLink typeId={goal.typeId}>{product.name}</PiProductLink>
+                  </span>
+                  <UnitsBox
+                    value={goal.unitsPerDay}
+                    size={size}
+                    label={t('piPlan.goalRateLabel', { name: product.name })}
+                    describedBy={hintId}
+                    onCommit={(unitsPerDay) =>
+                      onGoalsChange(
+                        goals.map((g) => (g.typeId === goal.typeId ? { ...g, unitsPerDay } : g))
+                      )
+                    }
+                  />
+                  <span className="text-[0.6875rem] text-text-dim">{t('piPlan.perDayUnit')}</span>
+                  <RowMoreActions />
+                </li>
+              </ItemContextMenu>
             );
           })}
         </ul>
@@ -231,6 +236,7 @@ function ColonyRow({
   name,
   systemName,
   size,
+  focusCustoms,
   onToggle,
   onCustomsChange,
 }: {
@@ -238,6 +244,7 @@ function ColonyRow({
   name: string;
   systemName: string;
   size: ControlSize;
+  focusCustoms: boolean;
   onToggle: (enabled: boolean) => void;
   onCustomsChange: (percent: number | null) => void;
 }) {
@@ -283,6 +290,7 @@ function ColonyRow({
             </label>
             <PercentInput
               id={inputId}
+              autoFocus={focusCustoms}
               commitOn="blur"
               size={size}
               value={row.taxAssumed ? null : customsRatePercent(row.taxRate)}
@@ -334,6 +342,7 @@ export function ColoniesSection({
   planetName,
   systemName,
   size,
+  focusCustoms = false,
   expanded,
   onToggleExpanded,
   onToggle,
@@ -343,6 +352,8 @@ export function ColoniesSection({
   planetName: (planetId: number) => string;
   systemName: (systemId: number) => string;
   size: ControlSize;
+  /** Focus the first colony's customs rate on mount (the `#customs` deep link). */
+  focusCustoms?: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
   onToggle: (planetId: number, enabled: boolean) => void;
@@ -350,6 +361,7 @@ export function ColoniesSection({
 }) {
   const { t } = useTranslation();
   const enabled = rows.filter((row) => row.enabled).length;
+  const firstRateRow = focusCustoms ? rows.find((row) => row.excluded === null) : undefined;
   return (
     <CollapsiblePanel
       title={t('piPlan.coloniesTitle')}
@@ -365,8 +377,8 @@ export function ColoniesSection({
       {rows.length === 0 ? (
         <p className="text-xs text-text-dim">
           {t('piPlan.coloniesNone')}{' '}
-          <Link className={inlineLinkClassName} to="/planetary-industry/advisor">
-            {t('piPlan.openAdvisor')}
+          <Link className={inlineLinkClassName} to={PI_MAP_HREF}>
+            {t('piPlan.openMap')}
           </Link>
         </p>
       ) : (
@@ -374,6 +386,7 @@ export function ColoniesSection({
           {rows.map((row) => (
             <ColonyRow
               key={row.planetId}
+              focusCustoms={focusCustoms && row.planetId === firstRateRow?.planetId}
               row={row}
               name={planetName(row.planetId)}
               systemName={systemName(row.systemId)}
@@ -391,10 +404,10 @@ export function ColoniesSection({
 // --- Assumptions ---------------------------------------------------------
 
 export interface AssumptionsProps {
-  hubId: TradeHub['id'];
-  onHubChange: (hubId: TradeHub['id']) => void;
-  buyP1: boolean;
-  onBuyP1Change: (buy: boolean) => void;
+  /** The shared PI settings, shown here and edited in the settings form. */
+  hubName: string;
+  buybackPct: number | null;
+  buyTiers: readonly number[];
   fallbackRate: number;
   onFallbackRateChange: (rate: number) => void;
   /** Whether any colony's rate leans on the fallback — the field shows only then. */
@@ -402,7 +415,6 @@ export interface AssumptionsProps {
   maxP0Types: 1 | 2;
   onMaxP0TypesChange: (value: 1 | 2) => void;
   cadence: PiCadence;
-  onCadenceChange: (cadence: PiCadence) => void;
   size: ControlSize;
   expanded: boolean;
   onToggleExpanded: () => void;
@@ -416,15 +428,57 @@ function Hint({ id, children }: { id: string; children: ReactNode }) {
   );
 }
 
+/** The PI settings at a glance, with the way into the shared form. */
+function SettingsSummary(props: AssumptionsProps) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const days = (count: number) => t('piShared.cadenceDays', { count });
+  return (
+    <div className="space-y-1">
+      <ul className="space-y-0.5 text-xs text-text">
+        <li>
+          {props.buybackPct === null
+            ? t('piPlan.settingsSellHub', { hub: props.hubName })
+            : t('piPlan.settingsSellBuyback', { pct: props.buybackPct, hub: props.hubName })}
+        </li>
+        <li>
+          {props.buyTiers.length > 0
+            ? t('piPlan.settingsBuys', {
+                tiers: props.buyTiers.map((tier) => t('piPlan.tierChip', { tier })).join(', '),
+              })
+            : t('piPlan.settingsBuysNothing')}
+        </li>
+        <li>
+          {t('piPlan.settingsCadence', {
+            restart: days(props.cadence.restartDays),
+            haul: days(props.cadence.haulDays),
+          })}
+        </li>
+      </ul>
+      <button
+        type="button"
+        className={`${inlineLinkClassName} ${tappableRowClassName} text-xs`}
+        onClick={() => setOpen(true)}
+      >
+        {t('piPlan.settingsChange')}
+      </button>
+      <PageSettingsModal
+        open={open}
+        onClose={() => setOpen(false)}
+        pageName={t('pi.title')}
+        section="industry"
+      >
+        <PiSettingsForm />
+      </PageSettingsModal>
+    </div>
+  );
+}
+
 export function AssumptionsSection(props: AssumptionsProps) {
   const { t } = useTranslation();
-  const hubId = useId();
-  const hubHint = useId();
-  const buyHint = useId();
   const rateId = useId();
   const rateHint = useId();
   const typesHint = useId();
-  const cadenceHint = useId();
   return (
     <CollapsiblePanel
       title={t('piPlan.assumptionsTitle')}
@@ -433,44 +487,7 @@ export function AssumptionsSection(props: AssumptionsProps) {
       labels={{ show: t('piPlan.assumptionsShow'), hide: t('piPlan.assumptionsHide') }}
     >
       <div className="space-y-3">
-        <div className="space-y-1">
-          <label htmlFor={hubId} className="block">
-            <SectionLabel>{t('piPlan.hub')}</SectionLabel>
-          </label>
-          <Select
-            value={props.hubId}
-            onValueChange={(id) => props.onHubChange(id as TradeHub['id'])}
-          >
-            <SelectTrigger
-              id={hubId}
-              size={props.size}
-              aria-describedby={hubHint}
-              className="w-full"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TRADE_HUBS.map((hub) => (
-                <SelectItem key={hub.id} value={hub.id}>
-                  {hub.systemName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Hint id={hubHint}>{t('piPlan.hubHint')}</Hint>
-        </div>
-
-        <div className="space-y-1">
-          <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
-            <Checkbox
-              checked={props.buyP1}
-              aria-describedby={buyHint}
-              onChange={(event) => props.onBuyP1Change(event.target.checked)}
-            />
-            {t('piPlan.buyP1')}
-          </label>
-          <Hint id={buyHint}>{t('piPlan.buyP1Hint')}</Hint>
-        </div>
+        <SettingsSummary {...props} />
 
         <div className="space-y-1">
           <SegmentedControl
@@ -486,26 +503,6 @@ export function AssumptionsSection(props: AssumptionsProps) {
             fill
           />
           <Hint id={typesHint}>{t('piPlan.maxP0TypesHint')}</Hint>
-        </div>
-
-        <div className="space-y-2">
-          <CadenceRow
-            label={t('piAdvisor.cadenceRestartLabel')}
-            hint={t('piAdvisor.cadenceRestartHint')}
-            value={props.cadence.restartDays}
-            size={props.size}
-            describedBy={cadenceHint}
-            onChange={(restartDays) => props.onCadenceChange({ ...props.cadence, restartDays })}
-          />
-          <CadenceRow
-            label={t('piAdvisor.cadenceHaulLabel')}
-            hint={t('piAdvisor.cadenceHaulHint')}
-            value={props.cadence.haulDays}
-            size={props.size}
-            describedBy={cadenceHint}
-            onChange={(haulDays) => props.onCadenceChange({ ...props.cadence, haulDays })}
-          />
-          <Hint id={cadenceHint}>{t('piPlan.cadenceHint')}</Hint>
         </div>
 
         {props.fallbackInUse && (

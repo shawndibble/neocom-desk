@@ -211,6 +211,12 @@ jobs:
       # The retry below is the residual net — an Ubuntu archive wobble, or a
       # failure fetching the browser itself — neither of which the line above
       # covers.
+      # Browser binaries only; `--with-deps` below still installs the apt
+      # libraries, and skips the Chromium download on a cache hit.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Playwright browsers
         # A retry loop turns one hung install into three, and the job default
         # is six hours.

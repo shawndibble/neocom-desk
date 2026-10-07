@@ -1,12 +1,10 @@
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
 /** No width cap of its own: the Help page narrows itself to a readable measure (`routes/Help.tsx`). */
 const PROSE = 'space-y-3 text-sm';
-
-const LINK = inlineLinkClassName;
 
 /**
  * Settings' Help & Support tab: Discord is the one destination for bug
@@ -33,14 +31,7 @@ export function HelpPanel() {
             <Trans
               i18nKey="settings.help.communityBody"
               components={{
-                discord: (
-                  <a
-                    href={DISCORD_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={LINK}
-                  />
-                ),
+                discord: <ExternalLink href={DISCORD_URL} />,
               }}
             />
           </p>
@@ -54,9 +45,7 @@ export function HelpPanel() {
             <Trans
               i18nKey="settings.help.sourceBody"
               components={{
-                repo: (
-                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className={LINK} />
-                ),
+                repo: <ExternalLink href={REPO_URL} />,
               }}
             />
           </p>

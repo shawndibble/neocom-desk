@@ -9,11 +9,12 @@
  * caller's too: Pilot Lookup opens the modal, the modal switches tabs.
  * Neither links to the modal's Character tab, which would only repeat this view.
  */
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { AllianceLink, CorporationLink } from '@/features/entities';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillStatsSection } from './ZkillStatsSection';
@@ -21,8 +22,12 @@ import { pilotAge, type PilotProfile } from './pilotLookup';
 
 export interface PilotProfileViewProps {
   profile: PilotProfile;
-  onOpenCorporation: (corporationId: number) => void;
-  onOpenAlliance: (allianceId: number) => void;
+  /**
+   * Inside Show Info the corporation / alliance names switch its tab instead
+   * of opening it; without these they are `CorporationLink` / `AllianceLink`.
+   */
+  onOpenCorporation?: (corporationId: number) => void;
+  onOpenAlliance?: (allianceId: number) => void;
   /** Hides the name heading where the surrounding dialog already titles it. */
   hideName?: boolean;
 }
@@ -57,10 +62,7 @@ export default PilotProfileView;
  * The Corporation and Alliance links are this page's only way into those orgs,
  * two rows 2px apart: a 44px hit area on a phone, no overhang to overlap (#2520).
  */
-const identityLinkClassName = cx(
-  inlineLinkClassName,
-  'inline-flex min-h-11 items-center md:min-h-0'
-);
+const identityLinkClassName = 'inline-flex min-h-11 items-center md:min-h-0';
 
 function PilotIdentity({
   profile,
@@ -73,6 +75,9 @@ function PilotIdentity({
   const [now] = useState(() => new Date());
   const age = pilotAge(profile.birthday, now);
   const { allianceId } = profile;
+  const corporationLabel =
+    profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId });
+  const allianceLabel = (id: number) => profile.allianceName ?? t('travel.pilot.unnamed', { id });
   return (
     <div className="flex flex-wrap items-start gap-4">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
@@ -81,26 +86,36 @@ function PilotIdentity({
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
           <dt className="text-text-dim">{t('travel.pilot.corporation')}</dt>
           <dd>
-            <button
-              type="button"
-              className={identityLinkClassName}
-              onClick={() => onOpenCorporation(profile.corporationId)}
-            >
-              {profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId })}
-            </button>
+            {onOpenCorporation ? (
+              <button
+                type="button"
+                className={entityLinkClassName(identityLinkClassName)}
+                onClick={() => onOpenCorporation(profile.corporationId)}
+              >
+                {corporationLabel}
+              </button>
+            ) : (
+              <CorporationLink id={profile.corporationId} className={identityLinkClassName}>
+                {corporationLabel}
+              </CorporationLink>
+            )}
           </dd>
           <dt className="text-text-dim">{t('travel.pilot.alliance')}</dt>
           <dd>
             {allianceId === null ? (
               t('travel.pilot.noAlliance')
-            ) : (
+            ) : onOpenAlliance ? (
               <button
                 type="button"
-                className={identityLinkClassName}
+                className={entityLinkClassName(identityLinkClassName)}
                 onClick={() => onOpenAlliance(allianceId)}
               >
-                {profile.allianceName ?? t('travel.pilot.unnamed', { id: allianceId })}
+                {allianceLabel(allianceId)}
               </button>
+            ) : (
+              <AllianceLink id={allianceId} className={identityLinkClassName}>
+                {allianceLabel(allianceId)}
+              </AllianceLink>
             )}
           </dd>
           <dt className="text-text-dim">{t('travel.pilot.securityStatus')}</dt>
@@ -120,14 +135,9 @@ function PilotIdentity({
           </dd>
         </dl>
         <div className="flex flex-wrap gap-3 pt-1 text-sm">
-          <a
-            href={characterZkillUrl(profile.characterId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={inlineLinkClassName}
-          >
+          <ExternalLink href={characterZkillUrl(profile.characterId)}>
             {t('travel.pilot.zkillboard')}
-          </a>
+          </ExternalLink>
         </div>
       </div>
     </div>

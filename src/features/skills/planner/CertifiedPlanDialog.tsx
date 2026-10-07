@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Radio, Spinner, Tabs, type TabItem } from '@/components/ui';
+import { rowInteractiveClassName, selectedRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { loadCertifiedPlans, loadSkills } from '@/sde/loadSde';
 import type { CertifiedPlan } from '@/sde/types';
@@ -152,7 +153,9 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
                       <label
                         className={cx(
                           'flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2',
-                          isPicked ? 'bg-accent/10 text-text' : 'text-text hover:bg-panel-2'
+                          'text-text',
+                          rowInteractiveClassName,
+                          isPicked ? selectedRowClassName : 'border-l-2 border-l-transparent'
                         )}
                       >
                         <Radio
@@ -162,7 +165,7 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
                           className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block font-medium">{plan.name}</span>
+                          <span className="dt-primary block font-medium">{plan.name}</span>
                           <span className="block text-text-dim">
                             {plan.factionName ?? t('plans.certified.anyFaction')}
                           </span>

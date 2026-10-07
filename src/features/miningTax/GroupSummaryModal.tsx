@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -14,7 +15,6 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
@@ -120,7 +120,7 @@ export function GroupSummaryModal({
       title={
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: formatDateRange(dates), system: systemName })}
-          <SecurityValue security={systemSecurity} t={t} />
+          <SecurityValue security={systemSecurity} />
           <InfoTooltip
             label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
             content={t('miningTax.dateEveHint')}
@@ -212,9 +212,9 @@ export function GroupSummaryModal({
                 {member.assignment.oreLines.map((line) => (
                   <li key={line.typeId} className="flex items-center justify-between py-1">
                     <span className="min-w-0 truncate">
-                      <MarketItemLink typeId={line.typeId}>
+                      <OreLink typeId={line.typeId}>
                         {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                      </MarketItemLink>
+                      </OreLink>
                     </span>
                     <span className="tabular-nums text-text-dim">
                       {line.quantity.toLocaleString()}

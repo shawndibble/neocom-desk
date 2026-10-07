@@ -1,3 +1,5 @@
+import { cx } from '@/lib/cx';
+
 /**
  * The one control size scale, and the one field treatment.
  *
@@ -16,8 +18,58 @@
 export type ControlSize = 'sm' | 'md';
 
 /**
+ * The shared interaction recipe (DESIGN.md §6c "States and motion"): every
+ * interactive primitive composes these so transition, focus and disabled
+ * behave the same everywhere instead of being re-spelled per control.
+ *
+ * - `interactiveClassName`: colour properties only, 120ms ease-out, snapping
+ *   in at 40ms while pressed (`active:duration-40`), and no transition at all
+ *   under reduced motion. Never a transform.
+ * - `focusRingClassName`: the 2px accent outline, outset, for boxed controls
+ *   and inline links.
+ * - `focusRingInsetClassName`: the same ring drawn inside the box, for
+ *   full-bleed rows, tabs and nav items (an outset ring would be clipped by
+ *   the row's neighbours or its scroller).
+ * - `disabledClassName`: `opacity-40` and `cursor-not-allowed` for both the
+ *   native attribute and `aria-disabled` (the one that keeps a tooltip able
+ *   to open).
+ */
+export const interactiveClassName =
+  'transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none';
+
+export const focusRingClassName =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+export const focusRingInsetClassName =
+  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
+
+/**
+ * A full-width row or list item that is itself the control: the `panel-2` hover
+ * fill, a step darker while pressed, and the shared transition. Compose the
+ * focus ring (inset for rows) separately.
+ */
+export const rowInteractiveClassName = cx('hover:bg-panel-2 active:bg-panel', interactiveClassName);
+
+export const disabledClassName =
+  'disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
+
+/**
+ * The selected row (DESIGN.md §6c): a 2px accent left border, a `panel-2`
+ * fill and an accent label on the row's primary cell (`dt-primary` in a
+ * `DataTable`). A real border, not a background or a shadow, so it survives
+ * forced-colours mode; hover only fills, so a hovered row never reads as the
+ * selected one. `DataTable` applies it itself for `selectedRowKey`; a hand-built
+ * list of rows uses it directly, with `aria-current="true"` on the row.
+ */
+export const selectedRowClassName =
+  'border-l-2 border-l-accent bg-panel-2 [&_.dt-primary]:text-accent';
+
+/**
  * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
- * step up on a touch viewport so a thumb gets a 44px target. `IconButton`
+ * step up on a touch viewport so a thumb gets a 44px target. Touch means below
+ * `md` *or* a coarse primary pointer (`touch:`, see `index.css`), so a touch
+ * tablet keeps the touch tier at every width; `touch:` is declared after `md:`
+ * and wins above it, and a fine pointer renders exactly as before. `IconButton`
  * shipped this tier first (`size-11 md:size-9`); it lives here now so the text
  * controls beside it match at *both* breakpoints instead of only on desktop.
  *
@@ -25,8 +77,8 @@ export type ControlSize = 'sm' | 'md';
  * readouts, not targets, and growing them on a phone would only cost rows.
  */
 export const controlHeightClassName: Record<ControlSize, string> = {
-  sm: 'h-9 md:h-7',
-  md: 'h-11 md:h-9',
+  sm: 'h-9 md:h-7 touch:h-9',
+  md: 'h-11 md:h-9 touch:h-11',
 };
 
 /**
@@ -59,10 +111,44 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
  * `min-h-11` / `md:min-h-7` shape #1055's Balances-strip fix established).
  * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
  */
-export const tappableRowClassName = 'min-h-11 md:min-h-7';
+export const tappableRowClassName = 'min-h-11 md:min-h-7 touch:min-h-11';
+
+/**
+ * A native checkbox or radio is 16px, and a pseudo-element on it is not an
+ * option (Firefox draws none on native form controls). Its 44px touch target
+ * is the label that wraps it instead: this is that label's class. Used where a
+ * bare control sits alone in a table cell or a card corner; a control already
+ * inside a `tappableRowClassName` label row needs nothing. The label grows the
+ * cell it sits in on touch rather than overlaying its neighbours, so no two
+ * targets can overlap (WCAG 2.5.8).
+ */
+export const touchCheckboxLabelClassName = 'inline-flex items-center justify-center touch:size-11';
+
+/**
+ * A 44px-tall hit area on a coarse pointer for a small drag grip: an invisible
+ * `::before` as wide as the grip itself and 44px tall, centred on it. Only the
+ * vertical axis grows: along the row a grip's neighbour (the title, the row's
+ * ⋮ or remove button) is right beside it, while vertically a touch row is
+ * already 44px tall, so the area stays inside the grip's own row and column and
+ * can never cover a sibling control. The grip keeps `touch-none` itself.
+ */
+export const gripHitAreaClassName =
+  "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-11 touch:before:-translate-y-1/2 touch:before:content-['']";
+
+/**
+ * The CompareDrawer's resize separator on touch: the separator itself grows to
+ * a 44px band (so it takes layout space instead of overlaying the header or the
+ * content above it) and its hairline is redrawn centred in it.
+ */
+export const resizeHandleTouchClassName =
+  "touch:h-11 touch:border-b-0 touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:top-1/2 touch:after:h-px touch:after:bg-line touch:after:content-['']";
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
-export const inlineLinkClassName = 'text-accent font-medium underline';
+export const inlineLinkClassName = cx(
+  'text-accent font-medium underline decoration-1 underline-offset-2 rounded-xs hover:decoration-2 active:text-accent/75',
+  interactiveClassName,
+  focusRingClassName
+);
 
 /**
  * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
@@ -80,7 +166,11 @@ export function toggleChipStateClassName(
   selected: boolean,
   { hoverable = true }: { hoverable?: boolean } = {}
 ): string {
-  if (selected) return 'border-accent-dim bg-accent/15 text-accent';
+  if (selected) {
+    return hoverable
+      ? 'border-accent-dim bg-accent/15 text-accent hover:bg-accent/22 active:bg-accent/28'
+      : 'border-accent-dim bg-accent/15 text-accent';
+  }
   const off = 'border-line bg-panel-2 text-text-dim';
-  return hoverable ? `${off} hover:border-line-bright hover:text-text` : off;
+  return hoverable ? `${off} hover:border-line-bright hover:text-text active:bg-panel` : off;
 }

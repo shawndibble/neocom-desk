@@ -3,6 +3,11 @@ import {
   buildLabelTabMap,
   buildReplyAllRecipients,
   capHeadersForDisplay,
+  mailKey,
+  mergeOwnedMail,
+  skippedMailCharacters,
+  sumUnreadByTab,
+  totalSystemUnread,
   mailSearchMatches,
   mergeMailHeaderPage,
   parseMailFolders,
@@ -314,5 +319,79 @@ describe('quoteMailBody', () => {
     expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', '')).toBe(
       '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n>'
     );
+  });
+});
+
+describe('mergeOwnedMail', () => {
+  it('merges newest first across Characters and attaches the owner', () => {
+    const merged = mergeOwnedMail([
+      {
+        characterId: 1,
+        characterName: 'One',
+        headers: [
+          { mail_id: 10, timestamp: '2026-08-01T00:00:00Z' },
+          { mail_id: 11, timestamp: '2026-08-03T00:00:00Z' },
+        ],
+      },
+      {
+        characterId: 2,
+        characterName: 'Two',
+        headers: [{ mail_id: 10, timestamp: '2026-08-02T00:00:00Z' }],
+      },
+    ]);
+    expect(merged.map((m) => [m.ownerId, m.header.mail_id])).toEqual([
+      [1, 11],
+      [2, 10],
+      [1, 10],
+    ]);
+    expect(merged[1].ownerName).toBe('Two');
+  });
+
+  it('keeps ids unique per Character: the same mail_id under two owners yields two keys', () => {
+    const merged = mergeOwnedMail([
+      { characterId: 1, characterName: 'One', headers: [{ mail_id: 5, timestamp: 'a' }] },
+      { characterId: 2, characterName: 'Two', headers: [{ mail_id: 5, timestamp: 'a' }] },
+    ]);
+    expect(new Set(merged.map((m) => mailKey(m.ownerId, m.header.mail_id))).size).toBe(2);
+  });
+});
+
+describe('unread across Characters', () => {
+  const one = [
+    { label_id: 1, name: 'Inbox', unread_count: 3 },
+    { label_id: 2, name: 'Sent', unread_count: 0 },
+    { label_id: 100, name: 'Custom', unread_count: 9 },
+  ];
+  const two = [
+    { label_id: 1, name: 'Inbox', unread_count: 2 },
+    { label_id: 4, name: 'Corp', unread_count: 5 },
+  ];
+
+  it("sums one Character's System Label unread counts, ignoring custom labels", () => {
+    expect(totalSystemUnread(one)).toBe(3);
+    expect(totalSystemUnread(two)).toBe(7);
+  });
+
+  it('sums each System Label across Characters', () => {
+    const sums = sumUnreadByTab([one, two]);
+    expect(sums.get('inbox')).toBe(5);
+    expect(sums.get('corp')).toBe(5);
+    expect(sums.get('sent')).toBe(0);
+  });
+});
+
+describe('skippedMailCharacters', () => {
+  it('names Characters without the mail grant or without cached headers', () => {
+    expect(
+      skippedMailCharacters([
+        { name: 'A', granted: true, hasHeaders: true },
+        { name: 'B', granted: false, hasHeaders: false },
+        { name: 'C', granted: true, hasHeaders: false },
+      ])
+    ).toEqual(['B', 'C']);
+  });
+
+  it('is empty when every Character is covered', () => {
+    expect(skippedMailCharacters([{ name: 'A', granted: true, hasHeaders: true }])).toEqual([]);
   });
 });

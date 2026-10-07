@@ -60,29 +60,16 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
   return { actions };
 }
 
-describe('CorpTransactionsPanel — the row as an item', () => {
-  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
-    const user = userEvent.setup();
-    const { actions } = renderPanel();
+describe('CorpTransactionsPanel — a read-only ledger row', () => {
+  it('has no More actions button or context menu; the item name links to Show info', async () => {
+    renderPanel();
 
-    await user.click(
-      await screen.findByRole('button', { name: 'More actions for Damage Control II' })
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
-
-    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
-  });
-
-  it('carries the item context menu on every row', async () => {
-    const { actions } = renderPanel();
-
-    fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
-
-    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    const row = await screen.findByRole('row', { name: /Damage Control II/ });
+    expect(screen.getByRole('link', { name: 'Damage Control II' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
   });
 });
 

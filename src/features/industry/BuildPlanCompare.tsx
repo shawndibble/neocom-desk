@@ -7,6 +7,9 @@
  * idiom: this is a state of the detail pane, not a separate route).
  */
 import { useMemo, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { onPlanLinkClick, planHref } from './planLinkClick';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
@@ -42,9 +45,8 @@ interface BuildPlanCompareProps {
 /**
  * A numeric cell: "…" while its row is still fetching, else the formatted
  * value or "—" when unresolved (row.error) or unpriceable (BuildResult's own
- * null). ISK cells pass an `IskAmount` node rather than a string — `revealOn`
- * is "tap" throughout, because nothing in this table takes a row tap of its
- * own. Sorting still reads `sortValue` off the raw number.
+ * null). ISK cells pass an `IskAmount` node rather than a string. Sorting still
+ * reads `sortValue` off the raw number.
  */
 function numericCell(
   row: ComparedBuildRow,
@@ -111,18 +113,19 @@ export function BuildPlanCompare({
       id: 'plan',
       header: t('industry.comparePlanColumn'),
       primary: true,
+      stickyStart: true,
       sortValue: (row) => row.planName,
       render: (row) => {
         const reason = row.loading ? null : unresolvedReason(row, t);
         return (
           <span className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => onOpenPlan(row.planId)}
-              className="truncate text-left hover:underline focus-visible:underline"
+            <Link
+              to={planHref(row.planId)}
+              onClick={onPlanLinkClick(() => onOpenPlan(row.planId))}
+              className={entityLinkClassName('truncate text-left')}
             >
               {row.planName}
-            </button>
+            </Link>
             {reason && (
               <InfoTooltip
                 label={t('industry.compareUnresolvedFor', { plan: row.planName })}
@@ -165,7 +168,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.totalCost ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -181,7 +184,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.profit ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -203,7 +206,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.iskPerHour ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -217,7 +220,7 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.breakEvenPrice ?? null,
-          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
     },
@@ -243,6 +246,9 @@ export function BuildPlanCompare({
           rows={rows}
           rowKey={(row) => row.planId}
           label={t('industry.compareTableLabel')}
+          // A comparison table: read across its columns, so it scrolls sideways
+          // on a phone with the plan name pinned rather than stacking into cards.
+          responsive="table"
           defaultSort={{ columnId: 'plan', direction: 'asc' }}
         />
       </div>

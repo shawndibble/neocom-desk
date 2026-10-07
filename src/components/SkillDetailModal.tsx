@@ -92,7 +92,7 @@ export function SkillDetailModal() {
   const title = state.status === 'ready' ? state.data.name : t('skills.detail.title');
 
   return (
-    <Modal open onClose={close} title={title}>
+    <Modal open onClose={close} title={title} closeOnBack={false}>
       {state.status === 'loading' || state.status === 'idle' ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />

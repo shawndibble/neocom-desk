@@ -222,11 +222,11 @@ describe('FittingStartScreen', () => {
       await screen.findByRole('button', { name: 'More actions for Armor Drake' })
     );
     expect(await screen.findByRole('menuitem', { name: 'Copy Fitting' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).not.toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Kite' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }));
     expect(await screen.findByLabelText('Fitting name')).toHaveValue('Kite');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
@@ -256,7 +256,7 @@ describe('FittingStartScreen', () => {
   it('opens Import in a dialog, with the Load card', async () => {
     renderScreen();
     await screen.findByText('Armor Drake');
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Import…' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
   });
@@ -350,7 +350,7 @@ describe('FittingStartScreen on a phone', () => {
     expect(screen.queryByText(/^preview of/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Kite/ })).not.toHaveAttribute('aria-pressed');
     expect(screen.getByRole('button', { name: 'New from hull' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import…' })).toBeInTheDocument();
   });
 
   it('still gives each row its menu', async () => {
@@ -370,7 +370,7 @@ describe('FittingStartScreen in a dialog', () => {
     );
     expect(onOpened).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'New from hull' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import…' })).not.toBeInTheDocument();
   });
 
   it('keeps the In-game refresh by the search, with no page header to hold it', async () => {
@@ -403,7 +403,7 @@ describe('FittingStartScreen in a dialog', () => {
     await screen.findByText('Armor Drake');
     expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Import' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Import…' }));
     expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Back to fittings' }));

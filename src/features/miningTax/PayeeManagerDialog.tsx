@@ -1,11 +1,7 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Field,
   Fields,
   IconButton,
@@ -16,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
@@ -130,10 +127,6 @@ export function PayeeManagerDialog({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
   const [moveTargetId, setMoveTargetId] = useState<string>('');
-  // Set by the row menu's Delete item, acted on once the menu has closed: the
-  // menu hands focus back to its trigger as it closes, which would pull focus
-  // out of a confirmation opened any earlier (and Escape with it).
-  const deleteChosen = useRef<PayeeRecord | null>(null);
 
   // Deduped by id: the same corp Payee, however it's stored per-character
   // under the hood, must not show up twice just because two alts happen to
@@ -284,9 +277,9 @@ export function PayeeManagerDialog({
                 <li key={payee.id} className="flex items-center gap-1 py-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <p className="min-w-0 flex-1 truncate text-sm" title={payee.name}>
-                        {payee.name}
-                      </p>
+                      <Tooltip content={payee.name}>
+                        <p className="min-w-0 flex-1 truncate text-sm">{payee.name}</p>
+                      </Tooltip>
                       {owed && owed.amount > 0 ? (
                         <span className="shrink-0 text-xs text-isk-neg tabular-nums">
                           {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
@@ -314,35 +307,6 @@ export function PayeeManagerDialog({
                     label={t('miningTax.editPayee', { name: payee.name })}
                     onClick={() => startEdit(payee)}
                   />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <IconButton
-                        variant="plain"
-                        size="row"
-                        icon={<Icon.More />}
-                        label={t('common.moreActionsLabel', { name: payee.name })}
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      onCloseAutoFocus={(e) => {
-                        const chosen = deleteChosen.current;
-                        if (!chosen) return;
-                        e.preventDefault();
-                        deleteChosen.current = null;
-                        openDelete(chosen);
-                      }}
-                    >
-                      <DropdownMenuItem
-                        className="text-danger data-[highlighted]:text-danger"
-                        onSelect={() => {
-                          deleteChosen.current = payee;
-                        }}
-                      >
-                        {t('miningTax.deletePayeeAction')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </li>
               );
             })}
@@ -402,6 +366,20 @@ export function PayeeManagerDialog({
               </p>
             )}
             <div className="flex justify-end gap-2">
+              {draft.id && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="mr-auto"
+                  aria-label={t('miningTax.deletePayeeNamed', { name: draft.name || draft.id })}
+                  onClick={() => {
+                    const target = payees.find((p) => p.id === draft.id);
+                    if (target) openDelete(target);
+                  }}
+                >
+                  {t('miningTax.deletePayeeAction')}
+                </Button>
+              )}
               {payees.length > 0 && (
                 <Button size="sm" onClick={closeForm}>
                   {t('filters.cancel')}

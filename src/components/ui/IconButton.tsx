@@ -105,7 +105,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         aria-pressed={pressed}
         disabled={disabled}
         onClick={onClick}
-        className={iconButtonClassName({ variant, tone, size, pressed, disabled, className })}
+        className={iconButtonClassName({
+          variant,
+          tone,
+          size,
+          pressed,
+          // `aria-disabled` (a tooltip-bearing inert button) must not hover either.
+          disabled: disabled || rest['aria-disabled'] === true || rest['aria-disabled'] === 'true',
+          className,
+        })}
       >
         <span aria-hidden="true" className="flex items-center justify-center">
           {icon}

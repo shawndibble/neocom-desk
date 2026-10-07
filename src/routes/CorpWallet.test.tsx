@@ -258,8 +258,11 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     const label = await within(screen.getByRole('group', { name: 'Wallet division' })).findByText(
       long
     );
-    expect(label).toHaveAttribute('title', long);
+    // A Tooltip, not a native title: reachable by keyboard and touch (§6c).
+    expect(label).not.toHaveAttribute('title');
     expect(label.closest('button')).not.toHaveAttribute('title');
+    await userEvent.hover(label);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(long);
   });
 
   it('opens on the journal, and it follows the selected division', async () => {
@@ -370,7 +373,9 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     render(<App />);
 
     expect(
-      await screen.findByText('No corporation wallet data cached. Reconnect to fetch it.')
+      await screen.findByText(
+        "No corporation wallet data cached. Couldn't load it yet. Try again shortly."
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).toBeNull();
   });

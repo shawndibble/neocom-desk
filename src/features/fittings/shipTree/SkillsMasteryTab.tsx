@@ -13,13 +13,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
 import { Done } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
 import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
 import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
-import { SkillNameButton } from '@/features/skills/SkillNameButton';
+import { SkillLink } from '@/features/entities';
 import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
@@ -200,10 +205,10 @@ export function SkillsMasteryTab({
                     onClick={() => setTier(n)}
                     className={cx(
                       'flex h-9 min-w-12 items-center justify-center gap-1 rounded-xs border px-2 font-bold',
-                      tier === n
-                        ? 'border-accent bg-accent/10'
-                        : 'border-line hover:border-line-bright',
-                      n === 5 ? 'text-mastery-elite' : tier === n ? 'text-accent' : 'text-text-dim'
+                      interactiveClassName,
+                      focusRingClassName,
+                      toggleChipStateClassName(tier === n),
+                      n === 5 && 'text-mastery-elite'
                     )}
                   >
                     {complete && <Done size={12} aria-hidden="true" />}
@@ -248,9 +253,9 @@ export function SkillsMasteryTab({
                         />
                       ) : (
                         <div className="flex items-center gap-3">
-                          <SkillNameButton skillTypeID={p.skillTypeID} className="flex-1 text-text">
+                          <SkillLink typeId={p.skillTypeID} className="flex-1">
                             {skillName(p.skillTypeID)}
-                          </SkillNameButton>
+                          </SkillLink>
                           <span className="text-text-dim">
                             {t('plans.level', { level: p.level })}
                           </span>

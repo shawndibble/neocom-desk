@@ -105,6 +105,7 @@ import {
   PlanetaryCard,
   type FoldedDomain,
 } from '@/features/overview/cards';
+import { miningTaxSummaryNode } from '@/features/overview/miningSummaryNode';
 import {
   loadCalendarEventsBoard,
   loadContractsBoard,
@@ -153,6 +154,8 @@ import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from 
 interface RouteCard extends BoardCardSpec {
   to: string;
   summary: string;
+  /** Visible form of `summary` when it carries ISK (§6c). */
+  summaryNode?: ReactNode;
   danger?: boolean;
   /** Absent for Alerts, whose desktop form is the column rather than a card. */
   render?: () => ReactNode;
@@ -488,6 +491,7 @@ export function Overview() {
       to: '/mining/tax',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
+      summaryNode: miningTaxSummaryNode(miningSnapshot.data),
       fetchedAt: miningSnapshot.data?.fetchedAt,
       loading: miningSnapshot.loading,
       render: () => <MiningTaxCard data={miningSnapshot.data} />,
@@ -687,6 +691,7 @@ export function Overview() {
     key: spec.key,
     domain: t(OVERVIEW_CARD_LABEL[spec.key]),
     summary: spec.summary,
+    summaryNode: spec.summaryNode,
     severity: spec.severity,
     to: spec.to,
     danger: spec.danger,

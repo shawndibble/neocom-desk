@@ -33,11 +33,13 @@ import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRigh
 import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
+import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
+import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
 import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
 import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
 import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { Bell } from '@phosphor-icons/react/dist/csr/Bell';
-import { BellSlash } from '@phosphor-icons/react/dist/csr/BellSlash';
 import { BlueprintIcon } from '@phosphor-icons/react/dist/csr/Blueprint';
 import { Broadcast } from '@phosphor-icons/react/dist/csr/Broadcast';
 import { Buildings } from '@phosphor-icons/react/dist/csr/Buildings';
@@ -58,6 +60,7 @@ import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
 import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
+import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
 import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
 import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
@@ -79,6 +82,8 @@ import { GearSix } from '@phosphor-icons/react/dist/csr/GearSix';
 import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
 import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
 import { Handshake } from '@phosphor-icons/react/dist/csr/Handshake';
+import { Hourglass } from '@phosphor-icons/react/dist/csr/Hourglass';
+import { Lightbulb } from '@phosphor-icons/react/dist/csr/Lightbulb';
 import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
 import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
 import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
@@ -155,6 +160,8 @@ function withWeight(Glyph: PhosphorIcon): ComponentType<IconProps> {
   return Wrapped;
 }
 
+/** Leaves Neocom Desk: the trailing glyph on `ExternalLink` and on a `Button` that opens another site. */
+export const External = withWeight(ArrowSquareOut);
 /** Steps back up one level in the Assets drill-down; also the generic "go back". */
 export const Back = withWeight(CaretLeft);
 /** A row you can descend into. */
@@ -213,6 +220,10 @@ export const RetargetGroup = withWeight(Target);
 export const Warn = withWeight(Warning);
 /** Opens a longer explanation of the numbers on screen, e.g. a Build Plan's calculation breakdown. */
 export const Info = withWeight(InfoGlyph);
+/** Waiting on an answer or an outcome (an RSVP not yet given). A status glyph, never a button: ⓘ (`Info`) is reserved for Show Info and explanation modals (§6c). */
+export const Pending = withWeight(Hourglass);
+/** A neutral hint in a status pill (§6c: ⓘ is never a static glyph). */
+export const Tip = withWeight(Lightbulb);
 /**
  * The Corp ops board's severity ladder, shaped as well as coloured (issue
  * #419) — `SEVERITY_TONE`'s four colours alone are not a signal for a
@@ -284,8 +295,6 @@ export const ZoomOut = withWeight(Minus);
 export const ZoomIn = withWeight(Plus);
 /** Toggles text labels drawn over a map, e.g. the Ship Tree's hull names. */
 export const ShowLabels = withWeight(TextAa);
-/** A row's browser-notification channel is currently on (issue #364). */
-export const BrowserNotifyOn = withWeight(Bell);
 
 /**
  * Marks a Notification Event the backend can schedule ahead of time, so it
@@ -294,8 +303,6 @@ export const BrowserNotifyOn = withWeight(Bell);
  * property of the event, not of a channel.
  */
 export const ScheduledPush = withWeight(Broadcast);
-/** A row's browser-notification channel is currently off (issue #364). */
-export const BrowserNotifyOff = withWeight(BellSlash);
 /** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
 export const HideInFeed = withWeight(EyeSlash);
 /** A Quickbar item's price alert target (issue #680) — the same crosshair `OptimizeAtMarkers` uses for a different feature, distinct by name here. */
@@ -323,6 +330,13 @@ export const Wallet = withWeight(WalletGlyph);
 export const Planetary = withWeight(Planet);
 /** An extractor program's live telemetry — the one PI card with real-time data. */
 export const Extraction = withWeight(Gauge);
+/** Planetary Industry buildings, for the explainer and the in-game checklist. */
+export const PiExtractor = withWeight(ArrowLineDown);
+export const PiFactory = withWeight(Factory);
+export const PiLaunchpad = withWeight(RocketLaunch);
+export const PiCommandCenter = withWeight(Broadcast);
+export const PiCustomsOffice = withWeight(Crosshair);
+export const PiSkyhook = withWeight(ArrowLineUp);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /**
@@ -352,8 +366,7 @@ export const Faction = withWeight(Flag);
 export const MoonMining = withWeight(Moon);
 /**
  * The notification *feature* as a whole, as sold on the login page. Distinct
- * from `BrowserNotifyOn`/`BrowserNotifyOff`, which are the two states of one
- * row's toggle and must stay a pair.
+ * from the per-channel notification toggles.
  */
 export const Notifications = withWeight(Bell);
 /**

@@ -5,7 +5,8 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, useState, type ReactElement } from 'react';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -49,18 +50,24 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { useRowStartPlan } from './rowStartPlan';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
+import { iskPerDay } from '@/engine/industry/iskPerDay';
+import { DEFAULT_SALES_SHARE, SALES_SHARE_OPTIONS, useSalesShare } from './salesSharePref';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { StartPlanButton } from './StartPlanButton';
 import { formatPercent, numericCell } from './format';
-import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
+import {
+  filterFromParamValues,
+  paramsPatchFromFilter,
+  useRememberedUrlParams,
+  useUrlSort,
+} from '@/lib/useUrlState';
 import { boolParam, defineUrlFilter, enumParam, enumSetParam } from '@/lib/urlState';
 import { MARKET_WIDE_PAGE_SIZE, topRows } from './marketWidePage';
 import { MobileMarketWideList } from './MobileMarketWideList';
@@ -109,6 +116,8 @@ interface MarketWideFilterState {
   hideSkillGated: boolean;
   /** Hides products selling fewer than `RARELY_SOLD_PER_DAY` a day across the trade-hub regions. */
   hideRarelySold: boolean;
+  /** The percent of daily sales ISK/day assumes the pilot sells, as `SALES_SHARE_OPTIONS` text. */
+  salesShare: string;
 }
 
 const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
@@ -119,6 +128,10 @@ const MARKET_WIDE_FILTER = defineUrlFilter<MarketWideFilterState>({
   // The key the standalone chip used, so links saved before the move still apply.
   hideSkillGated: { key: 'marketWide.hideGated', codec: boolParam() },
   hideRarelySold: { key: 'marketWide.hideRare', codec: boolParam() },
+  salesShare: {
+    key: 'marketWide.share',
+    codec: enumParam(SALES_SHARE_OPTIONS, DEFAULT_SALES_SHARE),
+  },
 });
 
 function activeFilterCount(filter: MarketWideFilterState): number {
@@ -129,6 +142,7 @@ function activeFilterCount(filter: MarketWideFilterState): number {
     filter.maxBuildCost !== 'any',
     filter.hideSkillGated,
     filter.hideRarelySold,
+    filter.salesShare !== DEFAULT_SALES_SHARE,
   ].filter(Boolean).length;
 }
 
@@ -156,13 +170,14 @@ function toggled<V>(set: ReadonlySet<V>, member: V): ReadonlySet<V> {
  * keeping these stable is what stops a re-render from re-sorting every row.
  */
 const SORT_VALUE = {
-  product: (row: MarketWideResultRow) => row.productName,
-  blueprintSource: (row: MarketWideResultRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
-  margin: (row: MarketWideResultRow) => row.marginPct ?? undefined,
-  duration: (row: MarketWideResultRow) => row.seconds,
-  iskPerHour: (row: MarketWideResultRow) => row.iskPerHour ?? undefined,
-  buildCost: (row: MarketWideResultRow) => row.buildCost,
-  orderDepth: (row: MarketWideResultRow) => ORDER_DEPTH_RANK[row.orderDepth],
+  product: (row: MarketWideDayRow) => row.productName,
+  blueprintSource: (row: MarketWideDayRow) => BLUEPRINT_SOURCE_RANK[row.blueprintSource],
+  margin: (row: MarketWideDayRow) => row.marginPct ?? undefined,
+  duration: (row: MarketWideDayRow) => row.seconds,
+  iskPerHour: (row: MarketWideDayRow) => row.iskPerHour ?? undefined,
+  buildCost: (row: MarketWideDayRow) => row.buildCost,
+  orderDepth: (row: MarketWideDayRow) => ORDER_DEPTH_RANK[row.orderDepth],
+  iskPerDay: (row: MarketWideDayRow) => row.iskPerDay ?? undefined,
 };
 const MARKET_WIDE_DEFAULT_SORT = { columnId: 'iskPerHour', direction: 'desc' } as const;
 
@@ -190,11 +205,32 @@ export function MarketWideOpportunitiesPanel({
     [allCharacters]
   );
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
-  const [filter, setFilter] = useUrlFilter<MarketWideFilterState>(
-    '',
-    MARKET_WIDE_FILTER.schema,
-    MARKET_WIDE_FILTER.fieldToParam,
-    MARKET_WIDE_FILTER.emptyParams
+  // The share assumption is a remembered default behind its URL key
+  // (`salesSharePref.ts`): a link's `marketWide.share` wins, only an edit is stored.
+  const rememberedShare = useSalesShare((state) => state.value);
+  const hydrateRememberedShare = useSalesShare((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedShare();
+  }, [hydrateRememberedShare]);
+  const rememberedParams = useMemo(
+    () => ({
+      values: { [MARKET_WIDE_FILTER.fieldToParam.salesShare]: rememberedShare },
+      remember: (patch: Record<string, unknown>) => {
+        const next = patch[MARKET_WIDE_FILTER.fieldToParam.salesShare];
+        if (typeof next === 'string') void useSalesShare.getState().setValue(next);
+      },
+    }),
+    [rememberedShare]
+  );
+  const [params, setParams] = useRememberedUrlParams(MARKET_WIDE_FILTER.schema, rememberedParams);
+  const filter = useMemo(
+    () => filterFromParamValues<MarketWideFilterState>(params, MARKET_WIDE_FILTER.fieldToParam),
+    [params]
+  );
+  const setFilter = useCallback(
+    (next: MarketWideFilterState) =>
+      setParams(paramsPatchFromFilter(next, MARKET_WIDE_FILTER.fieldToParam)),
+    [setParams]
   );
   const { rows, loading, hasRun, unavailableSources, run } = useMarketWideOpportunities({
     hub,
@@ -243,10 +279,26 @@ export function MarketWideOpportunitiesPanel({
   const maxBuildCostIsk = BUILD_COST_CAP_ISK[filter.maxBuildCost];
   const hideRarelySold = filter.hideRarelySold;
   const rowTypeIds = useMemo(() => rows.map((row) => row.productTypeID), [rows]);
-  const dailySales = useDailySales(rowTypeIds, hideRarelySold);
+  // Always fetched: ISK/day needs every ranked row's volume, not only the filter's.
+  const dailySales = useDailySales(rowTypeIds, hasRun);
+  const sharePct = Number(filter.salesShare);
+  const dayRows = useMemo<MarketWideDayRow[]>(
+    () =>
+      rows.map((row) => ({
+        ...row,
+        iskPerDay: iskPerDay({
+          unitMargin: row.unitMargin,
+          outputQuantity: row.outputQuantity,
+          jobSeconds: row.seconds,
+          averageDailyVolume: dailySales.sales.get(row.productTypeID),
+          sharePct,
+        }),
+      })),
+    [rows, dailySales.sales, sharePct]
+  );
   const visibleRows = useMemo(
     () =>
-      rows.filter(
+      dayRows.filter(
         (row) =>
           !(hideSkillGated && skillGateByProductTypeID.get(row.productTypeID)?.gated) &&
           (maxBuildCostIsk === null || row.buildCost <= maxBuildCostIsk) &&
@@ -257,7 +309,7 @@ export function MarketWideOpportunitiesPanel({
       maxBuildCostIsk,
       hideRarelySold,
       dailySales.sales,
-      rows,
+      dayRows,
       skillGateByProductTypeID,
     ]
   );
@@ -273,10 +325,10 @@ export function MarketWideOpportunitiesPanel({
     const entry = catalog?.byProductTypeID.get(row.productTypeID);
     return entry ? onStartPlan(entry) : Promise.resolve(false);
   };
-  const blueprintTypeIDFor = (productTypeID: number) =>
-    catalog ? (catalog.byProductTypeID.get(productTypeID)?.blueprintTypeID ?? null) : undefined;
 
-  const columns: DataTableColumn<MarketWideResultRow>[] = [
+  const startPlanFromRow = useRowStartPlan(startPlanFor);
+
+  const columns: DataTableColumn<MarketWideDayRow>[] = [
     {
       id: 'product',
       header: t('industry.product'),
@@ -286,7 +338,11 @@ export function MarketWideOpportunitiesPanel({
         const verdict = skillGateByProductTypeID.get(row.productTypeID);
         return (
           <span className="inline-flex items-center gap-1.5">
-            <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
+            {catalog?.byProductTypeID.has(row.productTypeID) ? (
+              <span className={entityLinkClassName()}>{row.productName}</span>
+            ) : (
+              row.productName
+            )}
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
@@ -344,7 +400,7 @@ export function MarketWideOpportunitiesPanel({
           t('common.unknown')
         ) : (
           <span className="inline-flex items-center justify-end gap-1">
-            <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+            <IskAmount value={row.iskPerHour} decimals={0} />
             {row.priceCapped && (
               <InfoTooltip
                 label={t('industry.marketOpportunitiesPriceCapped')}
@@ -355,12 +411,27 @@ export function MarketWideOpportunitiesPanel({
         ),
     },
     {
+      id: 'iskPerDay',
+      header: t('industry.iskPerDay'),
+      headerTooltip: t('industry.iskPerDayTooltip', { share: filter.salesShare }),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.iskPerDay,
+      cellClassName: (row) => (row.iskPerDay !== null ? iskToneClass(row.iskPerDay) : undefined),
+      render: (row) =>
+        row.iskPerDay === null ? (
+          t('common.unknown')
+        ) : (
+          <IskAmount value={row.iskPerDay} decimals={0} />
+        ),
+    },
+    {
       id: 'buildCost',
       header: t('industry.buildCost'),
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.buildCost,
-      render: (row) => <IskAmount value={row.buildCost} revealOn="tap" decimals={0} />,
+      render: (row) => <IskAmount value={row.buildCost} decimals={0} />,
     },
     {
       id: 'orderDepth',
@@ -375,18 +446,9 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'action',
       header: '',
-      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} />,
+      render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
-  const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
-    <ItemContextMenu
-      typeId={row.productTypeID}
-      itemName={row.productName}
-      blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
-    >
-      {tr}
-    </ItemContextMenu>
-  );
   const { sort, onSortChange } = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
@@ -486,6 +548,27 @@ export function MarketWideOpportunitiesPanel({
               })}
             />
           </div>
+          <FilterField label={t('industry.marketOpportunitiesFilters.salesShare')}>
+            <Select
+              value={draft.salesShare}
+              onValueChange={(value) => setDraft({ ...draft, salesShare: value })}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={t('industry.marketOpportunitiesFilters.salesShare')}
+                className="w-52"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SALES_SHARE_OPTIONS.map((share) => (
+                  <SelectItem key={share} value={share}>
+                    {t('industry.marketOpportunitiesFilters.salesShareOption', { share })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
           <div
             role="group"
             aria-label={t('industry.marketOpportunitiesFilters.sales')}
@@ -565,7 +648,7 @@ export function MarketWideOpportunitiesPanel({
         <div className="flex flex-col gap-2">
           {unavailableNote}
           <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-          {hideRarelySold && dailySales.pending > 0 && (
+          {dailySales.pending > 0 && (
             <p className="text-[0.6875rem] text-text-dim">
               {t('industry.marketOpportunitiesCheckingSales', { count: dailySales.pending })}
             </p>
@@ -577,8 +660,8 @@ export function MarketWideOpportunitiesPanel({
                 columns={columns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
+                onRowClick={startPlanFromRow}
+                rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
               />
@@ -588,7 +671,6 @@ export function MarketWideOpportunitiesPanel({
               rows={shownRows}
               total={visibleRows.length}
               {...sortProps}
-              blueprintTypeIDFor={blueprintTypeIDFor}
               skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
               nameForSkill={(typeID) => (catalog ? nameForType(catalog, typeID) : unknownName)}
               nameForCharacter={(id) => characterNames.get(id) ?? unknownName}

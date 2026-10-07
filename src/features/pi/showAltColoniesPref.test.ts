@@ -5,12 +5,10 @@ import {
   PI_COLONIES_SHOW_ALTS_KEY,
   DEFAULT_PI_COLONIES_SHOW_ALTS,
 } from './showAltColoniesPref';
-import { useAltColonies, PI_ALT_COLONIES_KEY, DEFAULT_PI_ALT_COLONIES } from './altColoniesPref';
 
 beforeEach(async () => {
   await db.settings.clear();
   useShowAltColonies.setState({ value: DEFAULT_PI_COLONIES_SHOW_ALTS, hydrated: false });
-  useAltColonies.setState({ value: DEFAULT_PI_ALT_COLONIES, hydrated: false });
 });
 
 describe('useShowAltColonies', () => {
@@ -33,26 +31,6 @@ describe('useShowAltColonies', () => {
   it('falls back to off when the stored value is not a boolean', async () => {
     await db.settings.put({ key: PI_COLONIES_SHOW_ALTS_KEY, value: 'yes' });
     await useShowAltColonies.getState().hydrate();
-    expect(useShowAltColonies.getState().value).toBe(false);
-  });
-
-  /**
-   * *Show me* is not *plan with*: widening the Colonies list to see where an
-   * alt's colonies sit must not widen what the Advisor assumes it may route
-   * between. Two keys is the whole mechanism, so it gets a test.
-   */
-  it('does not move the Advisor’s own alt-colonies setting', async () => {
-    await useShowAltColonies.getState().setValue(true);
-    await useAltColonies.getState().hydrate();
-
-    expect(useAltColonies.getState().value).toBe(false);
-    expect(await db.settings.get(PI_ALT_COLONIES_KEY)).toBeUndefined();
-  });
-
-  it('is not moved by the Advisor’s setting either', async () => {
-    await useAltColonies.getState().setValue(true);
-    await useShowAltColonies.getState().hydrate();
-
     expect(useShowAltColonies.getState().value).toBe(false);
   });
 });

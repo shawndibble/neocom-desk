@@ -1,6 +1,6 @@
 /**
- * The Fitting editor's one item menu: every fitted module, empty slot, drone,
- * cargo item and Add panel item offers its actions through it, on the Ring
+ * The Fitting editor's one item menu: every fitted module, empty slot, drone
+ * and Ring cargo tile offers its actions through it, on the Ring
  * and the List alike. Built on the app's `RowActionsMenu`, so each gets the
  * right-click menu, Radix's own touch-and-hold for it, and — where the row
  * has room — a visible "More actions" (⋮) button a keyboard or touch user
@@ -26,7 +26,11 @@ import {
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
-import { ShowInfoMenuItem, ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
+import {
+  BuildPlanMenuItems,
+  ShowInfoMenuItem,
+  ViewInMarketMenuItem,
+} from '@/features/market/ItemContextMenu';
 import { ChargePickerMenuItems } from './ChargePickerMenu';
 import { useFittingItemActions, type FittingItemActions } from './fittingItemActions';
 
@@ -63,7 +67,7 @@ function slotName(t: ReturnType<typeof useTranslation>['t'], rack: FittingSlotKi
   return t('fittings.item.slot', { rack: t(`fittings.list.rack.${rack}`), index: index + 1 });
 }
 
-/** Load charge ▸ (from cargo) and "Load into all compatible", for one module. */
+/** Load charge (from cargo) and "Load into all compatible", for one module. */
 function ModuleChargeItems({
   actions,
   module,
@@ -122,7 +126,7 @@ function ChargeToCargoItem({
 }
 
 /**
- * "Change charge (all N) ▸" on a Ring tile or List row: the Charge Picker for
+ * "Change charge (all N)" on a Ring tile or List row: the Charge Picker for
  * every fitted module of this type — the weapon group the Offense row's own
  * menu changes. Only with the editor's Fitting to work it out from.
  */
@@ -474,7 +478,7 @@ export function DroneMenuItems({
   );
 }
 
-/** "Load into all compatible" and "Load into… ▸" for a charge, from cargo or not. */
+/** "Load into all compatible" and "Load into…" for a charge, from cargo or not. */
 function ChargeLoadItems({
   actions,
   typeId,
@@ -605,6 +609,7 @@ export function AddItemMenuItems({
       <MenuSeparator />
       <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
+      <BuildPlanMenuItems typeId={typeId} />
     </>
   );
 }

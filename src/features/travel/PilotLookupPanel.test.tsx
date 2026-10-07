@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   loadPilotProfile: vi.fn(),
   fetchPilotStats: vi.fn(),
   loadTypeNames: vi.fn(),
-  openPublicInfoModal: vi.fn(),
   fetchPilotKillmails: vi.fn(),
   loadKillmailFit: vi.fn(),
   resolveNames: vi.fn(),
@@ -30,7 +29,6 @@ vi.mock('@/features/character/mailRecipientSearch', () => ({
   searchMailRecipients: mocks.searchMailRecipients,
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: mocks.loadTypeNames }));
-vi.mock('@/stores/publicInfoModal', () => ({ openPublicInfoModal: mocks.openPublicInfoModal }));
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: mocks.fetchPilotStats,
@@ -166,13 +164,18 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
     expect(screen.getByText('-2.3')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'zKillboard' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: /^zKillboard/ }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
     );
     // The profile is already on the page; the modal would only repeat it.
     expect(screen.queryByRole('button', { name: 'Public Info' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Some Corp' }));
-    expect(mocks.openPublicInfoModal).toHaveBeenCalledWith('corporation', 200);
+    // Corp and alliance are real Show Info links (§6c), not modal-opening buttons.
+    expect(screen.getByRole('link', { name: 'Some Corp' }).getAttribute('href')).toContain(
+      'info=corporation-200'
+    );
+    expect(screen.getByRole('link', { name: 'Some Alliance' }).getAttribute('href')).toContain(
+      'info=alliance-300'
+    );
   });
 
   it('shows the unknown-pilot state when ESI has no such character', async () => {
@@ -268,7 +271,7 @@ describe('PilotLookupPanel', () => {
       expect(within(list).getByText('Loss')).toBeTruthy();
       expect(within(list).getByText('12.5M')).toBeTruthy();
       expect(mocks.loadKillmailFit).not.toHaveBeenCalled();
-      expect(screen.getByRole('link', { name: 'More on zKillboard' }).getAttribute('href')).toBe(
+      expect(screen.getByRole('link', { name: /^More on zKillboard/ }).getAttribute('href')).toBe(
         'https://zkillboard.com/character/42/'
       );
     });

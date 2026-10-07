@@ -62,6 +62,11 @@ describe('jobProductionSeed', () => {
   it('carries the job runs and cost, defaulting a missing cost to 0', () => {
     expect(jobProductionSeed({ runs: 5, cost: 12345 })).toEqual({ runs: 5, jobFee: 12345 });
     expect(jobProductionSeed({ runs: 2, cost: undefined })).toEqual({ runs: 2, jobFee: 0 });
+    expect(jobProductionSeed({ runs: 2, cost: 1, job_id: 77 })).toEqual({
+      runs: 2,
+      jobFee: 1,
+      jobId: 77,
+    });
   });
 });
 

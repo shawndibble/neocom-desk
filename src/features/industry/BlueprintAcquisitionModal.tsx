@@ -57,6 +57,7 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import { loadContractLocationInfo } from '@/features/bpcContracts/blueprintLocation';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { useLpValue } from '@/features/loyalty/lpValue';
+import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
@@ -230,10 +231,7 @@ export function BlueprintAcquisitionModal({
   const [contractScope, setContractScope] = useState<ContractScope>(HUB_REGION);
 
   const lpValue = useLpValue((state) => state.value);
-  const lpValueHydrated = useLpValue((state) => state.hydrated);
   const hydrateLpValue = useLpValue((state) => state.hydrate);
-  const setLpValue = useLpValue((state) => state.setValue);
-  const [lpValueDraft, setLpValueDraft] = useState<string | null>(null);
   useEffect(() => {
     void hydrateLpValue();
   }, [hydrateLpValue]);
@@ -368,14 +366,6 @@ export function BlueprintAcquisitionModal({
       overridePrice: price,
     });
     onClose();
-  }
-
-  function commitLpValue() {
-    if (lpValueDraft === null) return;
-    const parsed = unmaskNumber(lpValueDraft);
-    setLpValueDraft(null);
-    if (parsed === undefined || !Number.isFinite(parsed) || parsed < 0) return;
-    void setLpValue(parsed);
   }
 
   const tier = (row: { me: number; te: number }) =>
@@ -676,22 +666,7 @@ export function BlueprintAcquisitionModal({
           lp.status !== 'unavailable' &&
           lpSection.total === 0 ? null : (
             <>
-              <label className="flex flex-wrap items-center gap-2">
-                {t('industry.bpAcqLpValueLabel')}
-                <TextInput
-                  size="sm"
-                  className="w-28"
-                  inputMode="decimal"
-                  disabled={!lpValueHydrated}
-                  value={lpValueDraft ?? String(lpValue)}
-                  onChange={(e) => setLpValueDraft(e.target.value)}
-                  onBlur={commitLpValue}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitLpValue();
-                  }}
-                />
-              </label>
-              <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
+              <LpValueField id="bp-acq-lp-value" />
             </>
           )}
           {lp.status === 'loading' || lpRatesLoading ? (

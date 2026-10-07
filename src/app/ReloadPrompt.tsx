@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { currentRouterPathname, isOnRoute } from './routerPath';
 
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 // A tab must stay hidden this long before a waiting update applies — a
@@ -10,6 +11,11 @@ const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
 // Coarse cadence for re-checking the hidden threshold above — not itself a
 // threshold.
 const APPLY_CHECK_POLL_MS = 15 * 1000;
+
+// sw.js is checked on every load, so an update found this soon after load is
+// a reload or cold start finding a fresh build: apply it at once. Kept short
+// so a slow check never wipes input the user has already started typing.
+const BOOT_APPLY_WINDOW_MS = 15 * 1000;
 
 // Long enough for the opacity transition below to visibly finish before
 // navigating away; short enough that it doesn't feel like a delay.
@@ -77,8 +83,9 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 }
 
 /**
- * No UI. Polls the registration for updates, then applies a waiting update
- * silently instead of prompting: once the tab has been hidden for a short
+ * No UI. Applies an update found right after load (see BOOT_APPLY_WINDOW_MS)
+ * at once. Also polls the registration for updates, then applies a waiting
+ * update silently instead of prompting: once the tab has been hidden for a short
  * grace period, or — for a tab that stays visible — the next time the user
  * navigates to a different in-app route. A tab that's visible and on the
  * same route is never reloaded mid-use, however long it sits idle; the
@@ -104,6 +111,12 @@ export function ReloadPrompt() {
       setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);
     },
     onNeedReload: coverViewportAndReload,
+    // Fires on the false-to-true flip, including an update already waiting at load.
+    onNeedRefresh() {
+      // Not on /callback: a reload there replays the OAuth code, already spent.
+      if (isOnRoute(currentRouterPathname(), '/callback')) return;
+      if (performance.now() < BOOT_APPLY_WINDOW_MS) void updateServiceWorkerRef.current();
+    },
   });
 
   // Mobile OSes freeze a backgrounded PWA's timers entirely, so the polling

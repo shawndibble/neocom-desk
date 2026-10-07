@@ -111,7 +111,7 @@ export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivi
  * same number — otherwise a stored 2,000,000 displays as itself while every
  * figure on the page came from the clamp.
  */
-export const MAX_JOB_RUNS = 100_000;
+export const MAX_JOB_RUNS = 1_000_000;
 
 /**
  * Pre-issue-#609 single-tier rig model: one tier value read into both the ME
@@ -336,9 +336,10 @@ export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<Sec
  * needed — `RIG_SLOT_COUNT` is the most a structure can fit.
  *
  * Source: EVE University wiki "Stacking penalties" — CCP's general module
- * formula `multiplier(i) = e^(-(i / 2.67805)^2)` for the i-th strongest
- * module (0-indexed) in a penalty group, rounded to 3 decimals: 1, 0.869,
- * 0.571 for i = 0, 1, 2.
+ * formula `multiplier(i) = e^(-(i / 2.67)^2)` for the i-th strongest module
+ * (0-indexed) in a penalty group: 1, 0.86912, 0.57058, rounded to 3
+ * decimals: 1, 0.869, 0.571 for i = 0, 1, 2. The constant 2.67805 would give
+ * 0.86985 / 0.57251, which do not round to the table values.
  */
 const STACKING_PENALTY_MULTIPLIERS: readonly number[] = [1, 0.869, 0.571];
 
@@ -644,7 +645,17 @@ export interface OwnedStockLocation {
  * governs the whole plan, not per-material.
  */
 export type OwnedStockScope =
-  { mode: 'everywhere' } | { mode: 'selected'; locations: readonly OwnedStockLocation[] };
+  | { mode: 'everywhere' }
+  | {
+      mode: 'selected';
+      locations: readonly OwnedStockLocation[];
+      /**
+       * Station containers (by `item_id`) whose stacks do not count even inside
+       * a selected location (issue #2869). Absent or empty: everything at the
+       * selected locations counts, as before.
+       */
+      excludedContainers?: readonly number[];
+    };
 
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
 export interface AcquisitionLine {

@@ -34,6 +34,8 @@ import type { PlannerSnapshot } from './goalPlannerModel';
 export interface GoalPlannerSnapshot extends PlannerSnapshot {
   /** The planets read came back 403: a missing scope, not an empty list. */
   needsReauth: boolean;
+  /** ESI did not answer the planets read and nothing is cached: unknown, not "no colonies". */
+  fetchFailed: boolean;
   /** When the colony list was read; null when nothing is cached. */
   fetchedAt: Date | null;
   planetNames: ReadonlyMap<number, string>;
@@ -95,6 +97,7 @@ export async function loadGoalPlannerSnapshot(characterId: number): Promise<Goal
     securityBySystem,
     customsSkill,
     needsReauth: planets.needsReauth,
+    fetchFailed: planets.fetchFailed === true,
     fetchedAt: planets.cached ? new Date(planets.cached.fetchedAt) : null,
     planetNames,
     systemNames,

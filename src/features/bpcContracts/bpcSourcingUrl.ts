@@ -19,13 +19,14 @@ import { DEFAULT_JUMP_RANGE, JUMP_RANGES } from '@/engine/route/jumpRange';
 
 /**
  * Which listings the search covers: `contract` BPCs, `contractBpo` contract
- * originals and `market` market BPO sell orders (issue #1241), plus `owned`.
+ * originals and `market` market BPO sell orders (issue #1241), `lp` copies from the pilot's LP stores, plus `owned`.
  */
 export type SourceToggle = BpcSearchSource | 'contractBpo';
 export const SOURCE_TOGGLES: readonly SourceToggle[] = [
   'contract',
   'contractBpo',
   'market',
+  'lp',
   'owned',
 ];
 /** Both on by default (until the pilot picks their own, `bpcSourcesPref.ts`): an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */

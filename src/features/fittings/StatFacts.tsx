@@ -1,18 +1,19 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field, Fields } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
 import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
 
 /**
  * One figure as `format` shows it. Under "Overheat all" it reads in the
  * warning tone — the game's own mark for heat — only when heat changed it as
- * shown, with the unheated figure on hover; a figure heat leaves as it is
- * (a hold, the mass, a fitting budget) stays in the normal tone. `note`
- * joins the unheated figure on hover, since this title hides any the caller
- * set around it. `toneClassName` tints the figure by its own reading (the
- * capacitor's stability) and then wins over the heat tone; the unheated
- * figure still shows on hover.
+ * shown, with the unheated figure in a tooltip (`HintText`); a figure heat
+ * leaves as it is (a hold, the mass, a fitting budget) stays in the normal
+ * tone. `note` joins the unheated figure in the tooltip, or stands alone as
+ * it when heat changed nothing. `toneClassName` tints the figure by its own
+ * reading (the capacitor's stability) and then wins over the heat tone; the
+ * unheated figure still shows in the tooltip.
  */
 export function HeatFigure<S extends { unheated: S | null }>({
   stats,
@@ -28,6 +29,12 @@ export function HeatFigure<S extends { unheated: S | null }>({
   const { t } = useTranslation();
   const unheated = unheatedIfChanged(stats, format);
   if (unheated === null) {
+    if (note)
+      return (
+        <HintText content={note} className={toneClassName}>
+          {format(stats)}
+        </HintText>
+      );
     return toneClassName ? (
       <span className={toneClassName}>{format(stats)}</span>
     ) : (
@@ -36,10 +43,10 @@ export function HeatFigure<S extends { unheated: S | null }>({
   }
   const was = t('fittings.stats.unheated', { value: unheated });
   return (
-    <span className={toneClassName ?? 'text-warning'} title={note ? `${was} · ${note}` : was}>
+    <HintText content={note ? `${was} · ${note}` : was} className={toneClassName ?? 'text-warning'}>
       {format(stats)}
       <span className="sr-only"> ({was})</span>
-    </span>
+    </HintText>
   );
 }
 

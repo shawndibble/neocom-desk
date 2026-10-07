@@ -16,6 +16,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
+import { SystemLink } from '@/features/entities';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { HubComparisonRow } from './appraisalData';
@@ -57,8 +59,9 @@ function CopyableTotal({
         type="button"
         onClick={() => void copy()}
         aria-label={t('market.appraisal.copyTotal', { amount: exact })}
-        className="rounded-xs text-left hover:text-accent focus-visible:outline-2 focus-visible:outline-accent"
+        className={`rounded-xs text-left hover:text-accent ${interactiveClassName} ${focusRingClassName}`}
       >
+        {/* Exception: a copy button with its own exact-figure tooltip; IskAmount would nest a second tab stop. */}
         <span aria-hidden="true">{formatIskCompact(value)}</span>
       </button>
     </Tooltip>
@@ -137,7 +140,9 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
             key={row.hub.id}
             className="min-w-0 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm"
           >
-            <p className="truncate text-sm font-semibold text-text">{row.hub.systemName}</p>
+            <p className="truncate text-sm font-semibold">
+              <SystemLink systemId={row.hub.systemId}>{row.hub.systemName}</SystemLink>
+            </p>
             <dl className="mt-2 flex flex-col gap-2">
               <HubFigure
                 label={t('market.appraisal.sellTotal')}

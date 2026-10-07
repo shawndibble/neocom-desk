@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { HintText } from '@/components/ui/HintText';
 import type { ShipTreeShip } from '@/sde/types';
 import { TraitList } from './TraitList';
 import type { ShipTreeSource } from './useShipTreeData';
 
-const tag = 'rounded-xs border border-line px-1.5 py-0.5 text-xs text-text-dim';
+// Plain static text: a box here would read as a control (DESIGN.md §6c).
+const tag = 'px-1 py-0.5 text-xs text-text-dim';
 
 /** Ship Info › Description: class and faction, the bonuses, then CCP's description. */
 export function DescriptionTab({ ship, source }: { ship: ShipTreeShip; source: ShipTreeSource }) {
@@ -14,14 +16,14 @@ export function DescriptionTab({ ship, source }: { ship: ShipTreeShip; source: S
     <div className="space-y-3 text-xs">
       <div className="flex flex-wrap gap-1.5">
         {group && (
-          <span className={tag} title={group.description}>
+          <HintText content={group.description} className={tag}>
             {group.name}
-          </span>
+          </HintText>
         )}
         {faction && (
-          <span className={tag} title={faction.description}>
+          <HintText content={faction.description} className={tag}>
             {faction.name}
-          </span>
+          </HintText>
         )}
       </div>
       {ship.traits.length > 0 && (

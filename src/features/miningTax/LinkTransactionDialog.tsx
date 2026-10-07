@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Radio, TextInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
@@ -94,7 +94,7 @@ export function LinkTransactionDialog({
                     className={cx(
                       'flex cursor-pointer items-start gap-2 px-2 py-1.5 text-xs',
                       tappableRowClassName,
-                      on && 'border-l border-accent'
+                      on && selectedRowClassName
                     )}
                   >
                     <Radio

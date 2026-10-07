@@ -90,6 +90,11 @@ describe('turretDamageMultiplier', () => {
     expect(turretDamageMultiplier(0)).toBe(0);
     expect(turretDamageMultiplier(0.005)).toBeCloseTo(0.015);
   });
+
+  it('matches a worked example at a 50% hit chance', () => {
+    // Wrecking: 0.01 × 3 = 0.03. Normal: 0.49 × ((0.01 + 0.5) / 2 + 0.49) = 0.36505.
+    expect(turretDamageMultiplier(0.5)).toBeCloseTo(0.39505, 5);
+  });
 });
 
 describe('missileApplication', () => {

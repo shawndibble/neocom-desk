@@ -7,7 +7,14 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, SearchInput } from '@/components/ui';
+import { Caret, Checkbox, entityLinkClassName, SearchInput, Tooltip } from '@/components/ui';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import type { ShipTreeShip } from '@/sde/types';
 import { FlyDot } from './FlyDot';
@@ -73,7 +80,9 @@ export function ShipTreeLadder({ source, tree, onFaction, onOpenShip, viewSwitch
           placeholder={t('ships.tree.filterPlaceholder')}
           aria-label={t('ships.tree.filterLabel')}
         />
-        <label className="flex items-center gap-1.5 text-xs text-text-dim">
+        <label
+          className={`flex items-center gap-1.5 text-xs text-text-dim ${tappableRowClassName}`}
+        >
           <Checkbox checked={onlyFlyable} onChange={(e) => setOnlyFlyable(e.target.checked)} />
           {t('ships.tree.onlyFlyable')}
         </label>
@@ -91,7 +100,11 @@ export function ShipTreeLadder({ source, tree, onFaction, onOpenShip, viewSwitch
                 onFaction(s.factionID);
                 onOpenShip(s);
               }}
-              className="flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 hover:border-line-bright"
+              className={cx(
+                'flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 hover:border-line-bright hover:bg-panel-2 active:bg-panel',
+                interactiveClassName,
+                focusRingClassName
+              )}
             >
               <FlyDot status={statuses.get(s.typeID)} />
               {s.name}
@@ -183,24 +196,33 @@ function LadderClass({
       data-unlocked={unlocked}
       className={cx(depth > 0 && 'ml-4 border-l border-line pl-3')}
     >
-      <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
-        {omegaChips.has(id) && (
-          <span className="isis-omega-chip" title={t('ships.tree.omega')} data-omega="true">
-            <span>Ω</span>
-          </span>
+      <summary
+        className={cx(
+          'flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 py-1.5',
+          rowInteractiveClassName,
+          focusRingInsetClassName
         )}
-        <span
-          className={cx('isis-icon isis-class-mini', !unlocked && 'locked')}
-          title={classSkillTitle(t, name, skills, trainedLevel, skillName)}
-        >
-          <img
-            src={classIconUrl(group?.icon ?? '')}
-            alt=""
-            draggable={false}
-            loading="lazy"
-            decoding="async"
-          />
-        </span>
+      >
+        <Caret expanded={searching || userOpen} />
+        {omegaChips.has(id) && (
+          // A tap in a <summary> toggles the section, so no tap-to-reveal: hold shows these.
+          <Tooltip content={t('ships.tree.omega')}>
+            <span tabIndex={0} className="isis-omega-chip" data-omega="true">
+              <span>Ω</span>
+            </span>
+          </Tooltip>
+        )}
+        <Tooltip content={classSkillTitle(t, name, skills, trainedLevel, skillName)}>
+          <span tabIndex={0} className={cx('isis-icon isis-class-mini', !unlocked && 'locked')}>
+            <img
+              src={classIconUrl(group?.icon ?? '')}
+              alt=""
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
+        </Tooltip>
         <span
           className={cx(
             'text-xs font-semibold tracking-widest uppercase',
@@ -229,7 +251,7 @@ function LadderClass({
                   type="button"
                   onClick={() => onFaction(fid)}
                   aria-label={t('ships.tree.switchFaction', { name: factionName })}
-                  className="flex min-h-7 items-center gap-1 text-accent hover:underline"
+                  className={entityLinkClassName('flex min-h-7 items-center gap-1')}
                 >
                   {emblem && (
                     <img
@@ -258,12 +280,23 @@ function LadderClass({
                 data-ship={s.typeID}
                 onClick={() => onOpenShip(s)}
                 className={cx(
-                  'flex w-full items-center gap-2 px-1 py-1 text-left text-sm hover:bg-panel-2',
-                  !status?.canFly && 'text-text-dim'
+                  'group flex w-full items-center gap-2 px-1 py-1 text-left text-sm',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName
                 )}
               >
                 <IsisThumb ship={s} status={status} />
-                <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                {/* The accent name is the cue that the row opens Ship Info. */}
+                <span
+                  className={cx(
+                    'min-w-0 flex-1 truncate text-accent',
+                    // Underline follows the whole row (group), unlike entityLinkClassName's own hover.
+                    'underline decoration-transparent underline-offset-2 group-hover:decoration-current group-focus-visible:decoration-current',
+                    !status?.canFly && 'opacity-70'
+                  )}
+                >
+                  {s.name}
+                </span>
                 <span className="shrink-0 text-xs text-text-dim">{flyLabel(t, status)}</span>
               </button>
             </li>

@@ -17,7 +17,7 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
@@ -50,7 +50,6 @@ import {
   CorpRosterTable,
   type RosterRow,
 } from '@/features/corp/CorpRoster';
-import { MemberContextMenu } from '@/features/corp/MemberContextMenu';
 import { membersCsvColumns } from '@/features/corp/membersCsv';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
@@ -203,27 +202,6 @@ async function loadMembersSnapshot(
       : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
 
   return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
-}
-
-/**
- * Row context menu (issue #421, AC1): the shared Public Info Modal is the one
- * entry point, same as every other list with a Show Info action. Module-level,
- * so the roster's memoized rows see one stable function.
- */
-function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
-  return (
-    <MemberContextMenu
-      characterId={row.characterId}
-      name={label(row.name, row.characterId)}
-      location={
-        row.locationId !== null && row.locationName !== null
-          ? { id: row.locationId, name: row.locationName }
-          : undefined
-      }
-    >
-      {tr}
-    </MemberContextMenu>
-  );
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -436,11 +414,7 @@ function CorpMembersView() {
                 }
               />
             ) : (
-              <CorpRosterTable
-                rows={visibleRows}
-                rowContextMenu={memberRowContextMenu}
-                tableProps={membersExport.tableProps}
-              />
+              <CorpRosterTable rows={visibleRows} tableProps={membersExport.tableProps} />
             )}
           </Panel>
         </div>

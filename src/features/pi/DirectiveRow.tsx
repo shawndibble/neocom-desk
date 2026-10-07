@@ -14,7 +14,7 @@
  * the number it is worth, right-aligned and tabular. The eye runs down the
  * verb column to find the work and down the number column to rank it, without
  * parsing a sentence. The reasoning is not deleted: it moves to the colony's
- * detail modal, which is what `AdvisorPanel`'s Details button opens.
+ * detail view.
  *
  * ## The verbs are a closed set, and the colour is the meaning
  *
@@ -70,13 +70,13 @@ const TONE_CLASS: Record<DirectiveTone, string> = {
   muted: 'text-text-dim italic',
 };
 
-export function VerbTag({ verb }: { verb: DirectiveVerb }) {
+export function VerbTag({ verb, label }: { verb: DirectiveVerb; label?: string }) {
   const { t } = useTranslation();
   return (
     <span
       className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${VERB_CLASS[verb]}`}
     >
-      {t(`piAdvisor.verb.${verb}`)}
+      {label ?? t(`piShared.verb.${verb}`)}
     </span>
   );
 }
@@ -171,7 +171,7 @@ export function InputChip({ source, children }: { source: InputSource; children:
 /**
  * A colony's load on one axis, as a percentage.
  *
- * The card's version of `AdvisorPanel`'s `BudgetBar`: the same reading with
+ * The card's budget bar: the same reading with
  * the raw figures dropped, because "8,017 / 25,415 tf" is four numbers to
  * compare across six cards and "32%" is one. The exact figures are in the
  * detail modal, where a pilot checking the arithmetic will be.
@@ -195,7 +195,7 @@ export function LoadMeter({
       </span>
       <div
         role="progressbar"
-        aria-label={t('piAdvisor.budgetBarLabel', { axis: label })}
+        aria-label={t('piShared.budgetBarLabel', { axis: label })}
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -233,7 +233,7 @@ export function EstimateBadge() {
   const { t } = useTranslation();
   return (
     <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-      {t('piAdvisor.estimateBadge')}
+      {t('piShared.estimateBadge')}
     </span>
   );
 }

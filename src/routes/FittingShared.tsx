@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { BootScreen } from '@/app/BootScreen';
-import { buttonClassName, EmptyState, LogoMark, Spinner, TypeIcon } from '@/components/ui';
+import { Button, buttonClassName, EmptyState, LogoMark, Spinner, TypeIcon } from '@/components/ui';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
@@ -258,18 +258,13 @@ export function FittingShareView({
           {t('fittingShare.openInApp')}
         </Link>
         {state.status === 'ready' && (
-          <button
-            type="button"
-            onClick={() => void copyEft()}
-            disabled={typeName === null}
-            className={buttonClassName({ size: 'sm' })}
-          >
+          <Button size="sm" onClick={() => void copyEft()} disabled={typeName === null}>
             {copied
               ? t('fittingShare.copied')
               : copyFailed
                 ? t('fittingShare.copyFailed')
                 : t('fittingShare.copyEft')}
-          </button>
+          </Button>
         )}
       </div>
     </main>

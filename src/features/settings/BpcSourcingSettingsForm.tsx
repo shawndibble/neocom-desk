@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
 import {
@@ -28,11 +29,13 @@ export function BpcSourcingSettingsForm() {
           htmlFor="settings-bpc-hide-auctions"
           inline
         >
-          <Checkbox
-            id="settings-bpc-hide-auctions"
-            checked={hideAuctions}
-            onChange={() => void setHideAuctions(!hideAuctions)}
-          />
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              id="settings-bpc-hide-auctions"
+              checked={hideAuctions}
+              onChange={() => void setHideAuctions(!hideAuctions)}
+            />
+          </label>
         </Field>
         <Field
           label={t('settings.bpcHidePlexLabel')}
@@ -40,11 +43,13 @@ export function BpcSourcingSettingsForm() {
           inline
           note={t('settings.bpcHideHint')}
         >
-          <Checkbox
-            id="settings-bpc-hide-plex"
-            checked={hidePlex}
-            onChange={() => void setHidePlex(!hidePlex)}
-          />
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              id="settings-bpc-hide-plex"
+              checked={hidePlex}
+              onChange={() => void setHidePlex(!hidePlex)}
+            />
+          </label>
         </Field>
       </Fields>
     </div>

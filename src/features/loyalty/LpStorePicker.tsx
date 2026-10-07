@@ -18,7 +18,12 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SearchInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
@@ -268,8 +273,8 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
                   className={cx(
                     'flex cursor-pointer items-center justify-between gap-3 border-b border-line px-2 py-1.5 last:border-b-0',
                     option.corporationId === highlighted?.corporationId
-                      ? 'bg-panel-2'
-                      : 'hover:bg-panel-2'
+                      ? selectedRowClassName
+                      : rowInteractiveClassName
                   )}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pick(option)}

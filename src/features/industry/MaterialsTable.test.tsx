@@ -7,8 +7,6 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
-import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type {
   EffectiveMaterial,
@@ -481,11 +479,13 @@ describe('MaterialsTable on a phone', () => {
     const row = screen.getByText('Tritanium').closest('li')!;
     expect(row).toHaveTextContent('1,000');
     expect(row).toHaveTextContent('600');
-    // Have is a dashed number, not a field stretched across its column.
+    // Have is a number with a faint pencil, not a field stretched across its column.
     expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
     const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
     expect(have).toHaveTextContent('400');
-    expect(have).toHaveClass('text-accent', 'decoration-dashed');
+    expect(have).toHaveClass('text-accent');
+    expect(have.querySelector('svg')).not.toBeNull();
+    expect(have.className).not.toContain('dashed');
 
     // A tap opens the field, focused; leaving it puts the number back.
     fireEvent.click(have);
@@ -742,38 +742,6 @@ function renderTable(props: Partial<React.ComponentProps<typeof MaterialsTable>>
   );
 }
 
-/** Mirrors BuildPlanDetail's wiring: the catalog is already in hand, so `blueprintTypeID` is never the "checking…" undefined. */
-function menuFor(blueprintByProduct: Record<number, number>, actions = fakeItemActions()) {
-  return function rowContextMenu(material: MaterialCostLine, tr: React.ReactElement) {
-    return (
-      <FakeItemActions actions={actions}>
-        <ItemContextMenu
-          typeId={material.typeID}
-          itemName={nameFor(material.typeID)}
-          blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
-        >
-          {tr}
-        </ItemContextMenu>
-      </FakeItemActions>
-    );
-  };
-}
-
-/** `rowActions` mirror of `menuFor` — same props, the visible button instead of the right-click wrapper. */
-function actionsFor(blueprintByProduct: Record<number, number>, actions = fakeItemActions()) {
-  return function rowActions(material: MaterialCostLine) {
-    return (
-      <FakeItemActions actions={actions}>
-        <ItemMoreActions
-          typeId={material.typeID}
-          itemName={nameFor(material.typeID)}
-          blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
-        />
-      </FakeItemActions>
-    );
-  };
-}
-
 describe('MaterialsTable', () => {
   it('renders a row per material with quantity, unit price and line total', () => {
     renderTable();
@@ -783,7 +751,7 @@ describe('MaterialsTable', () => {
     expect(within(rows[1]).getByText('Mechanical Parts')).toBeInTheDocument();
   });
 
-  it('links the material name to its Market listing', () => {
+  it('links the material name to its Show info', () => {
     renderTable();
     const rows = screen.getAllByRole('row').slice(1);
     expect(within(rows[0]).getByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
@@ -811,111 +779,13 @@ describe('MaterialsTable', () => {
     expect(within(row!).getByText('—')).toBeInTheDocument();
   });
 
-  it('renders rows unwrapped, and stays focus-inert, when no row menu is supplied', () => {
+  it('has no row menu and no More-actions button (the per-line text action is the row’s action)', () => {
     renderTable();
     const row = screen.getByText('Tritanium').closest('tr');
     expect(row).not.toHaveAttribute('tabindex');
     fireEvent.contextMenu(row!);
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
-  });
-
-  describe('row context menu', () => {
-    it('opens on right-click with the shared item actions', () => {
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
-      const row = screen.getByText('Mechanical Parts').closest('tr');
-      row!.focus();
-      fireEvent.contextMenu(row!);
-
-      expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Set price alert…' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-      expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    });
-
-    it('never shows the "checking…" Build Plan label — Industry already holds the catalog', () => {
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
-      const row = screen.getByText('Mechanical Parts').closest('tr');
-      fireEvent.contextMenu(row!);
-      expect(screen.getByRole('menuitem', { name: 'Build Plan' })).toBeEnabled();
-      expect(
-        screen.queryByRole('menuitem', { name: 'Build Plan (checking…)' })
-      ).not.toBeInTheDocument();
-    });
-
-    it('disables the Build Plan action for a material nothing manufactures', () => {
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
-      const row = screen.getByText('Tritanium').closest('tr');
-      fireEvent.contextMenu(row!);
-      expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toHaveAttribute(
-        'aria-disabled',
-        'true'
-      );
-    });
-
-    it('offers a PI Plan for a material planetary industry makes (Transmitter, P2)', async () => {
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
-      const row = screen.getByText('Mechanical Parts').closest('tr');
-      fireEvent.contextMenu(row!);
-      expect(await screen.findByRole('menuitem', { name: 'PI Plan' })).toBeInTheDocument();
-    });
-
-    it('offers no PI Plan for a material no factory makes', async () => {
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
-      const row = screen.getByText('Tritanium').closest('tr');
-      fireEvent.contextMenu(row!);
-      expect(
-        await screen.findByRole('menuitem', { name: 'No blueprint options' })
-      ).toBeInTheDocument();
-      expect(screen.queryByRole('menuitem', { name: 'PI Plan' })).not.toBeInTheDocument();
-    });
-
-    it('targets the right-clicked material, not the first row', async () => {
-      const user = userEvent.setup();
-      const actions = fakeItemActions();
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }, actions) });
-      const row = screen.getByText('Mechanical Parts').closest('tr');
-      fireEvent.contextMenu(row!);
-      await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-      expect(actions.showInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
-    });
-  });
-
-  describe('row actions button (issue #1498)', () => {
-    it('renders a focusable "More actions" button per row', () => {
-      renderTable({ rowActions: actionsFor({ 9840: 9841 }) });
-      expect(
-        screen.getByRole('button', { name: 'More actions for Mechanical Parts' })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'More actions for Tritanium' })
-      ).toBeInTheDocument();
-    });
-
-    it('opens the identical item menu the right-click path opens', async () => {
-      const user = userEvent.setup();
-      renderTable({
-        rowContextMenu: menuFor({ 9840: 9841 }),
-        rowActions: actionsFor({ 9840: 9841 }),
-      });
-
-      const contextRow = screen.getByText('Mechanical Parts').closest('tr');
-      fireEvent.contextMenu(contextRow!);
-      const contextMenuItems = screen
-        .getAllByRole('menuitem')
-        .map((item) => item.textContent)
-        .sort();
-      await user.keyboard('{Escape}');
-
-      await user.click(screen.getByRole('button', { name: 'More actions for Mechanical Parts' }));
-      const buttonMenuItems = screen
-        .getAllByRole('menuitem')
-        .map((item) => item.textContent)
-        .sort();
-
-      expect(buttonMenuItems).toEqual(contextMenuItems);
-    });
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
   });
 });
 
@@ -1672,10 +1542,48 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
     expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
   });
 
-  it('never marks a row bought, not built, even with a gated verdict on the books', () => {
+  it('marks a bought row whose cost call is build — the gate is why it was not built', () => {
     renderTable({
       materials: MENU_LINES,
       skillGates: new Map([[9840, GATED]]),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 40,
+            buyUnitPrice: 50,
+            savings: 100,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
+      characterNameFor,
+    });
+
+    expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
+  });
+
+  it('leaves a bought row unmarked when buying is cheaper anyway', () => {
+    renderTable({
+      materials: MENU_LINES,
+      skillGates: new Map([[9840, GATED]]),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'buy',
+            makeUnitPrice: 60,
+            buyUnitPrice: 50,
+            savings: 0,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
       characterNameFor,
     });
 
@@ -1695,6 +1603,6 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
       characterNameFor,
     });
 
-    expect(within(row('Mechanical Parts')).queryByRole('img')).toBeNull();
+    expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
   });
 });

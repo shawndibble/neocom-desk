@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, Panel, Tooltip } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
@@ -106,6 +106,15 @@ export function FittingPreview({
   const unreadable = row.source === 'saved' && row.hull === null;
   const notes = rowNotes(row);
   const typeName = (typeId: number) => catalogueTypeName(catalogue, typeId);
+  // `aria-disabled`, not the native attribute, so the reason stays reachable.
+  const compareButton = (
+    <Button
+      aria-disabled={typeof shareCode !== 'string' || undefined}
+      onClick={() => typeof shareCode === 'string' && onCompare(shareCode)}
+    >
+      {t('fittings.start.preview.compare')}
+    </Button>
+  );
   return (
     <Panel title={row.name}>
       <div className="flex flex-col gap-4">
@@ -127,13 +136,13 @@ export function FittingPreview({
                 </Button>
               </>
             )}
-            <Button
-              disabled={typeof shareCode !== 'string'}
-              title={shareCode === null ? t('fittings.start.preview.tooLargeToCompare') : undefined}
-              onClick={() => typeof shareCode === 'string' && onCompare(shareCode)}
-            >
-              {t('fittings.start.preview.compare')}
-            </Button>
+            {shareCode === null ? (
+              <Tooltip content={t('fittings.start.preview.tooLargeToCompare')}>
+                {compareButton}
+              </Tooltip>
+            ) : (
+              compareButton
+            )}
             <Button variant="primary" disabled={fitting === null} onClick={onOpen}>
               {t('fittings.start.preview.open')}
             </Button>

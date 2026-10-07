@@ -13,6 +13,7 @@
  * structure fills the facility, system and security the way it does there, and
  * a structure also shows its rig slots and tax.
  */
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -40,6 +41,7 @@ import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
 import { rigKindLabelKey } from './rigFitLabels';
+import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 
 export type RetargetTarget = Omit<BuildGroupSnapshot, 'appliedAt'>;
@@ -245,7 +247,7 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
             <>
               <div className="flex flex-col gap-1">
                 <span>{t('industry.rigFitLabel')}</span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {resolveRigFit({ rigFit: target.rigFit }).map((kind, slot) => (
                     // A slot's position is its identity, so the index is a stable key.
                     <Select
@@ -274,6 +276,11 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                       </SelectContent>
                     </Select>
                   ))}
+                  <RigMatchHelper
+                    facility={target.facility}
+                    security={target.security}
+                    onApply={(fit) => setTarget((current) => ({ ...current, rigFit: fit }))}
+                  />
                 </div>
               </div>
 
@@ -308,11 +315,13 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
           <ul className="max-h-64 divide-y divide-line overflow-y-auto">
             {plans.map((plan) => (
               <li key={plan.id} className="flex items-center gap-2 px-1 py-1.5">
-                <Checkbox
-                  id={`retarget-plan-${plan.id}`}
-                  checked={checked.has(plan.id)}
-                  onChange={() => toggle(plan.id)}
-                />
+                <label className={touchCheckboxLabelClassName}>
+                  <Checkbox
+                    id={`retarget-plan-${plan.id}`}
+                    checked={checked.has(plan.id)}
+                    onChange={() => toggle(plan.id)}
+                  />
+                </label>
                 <label htmlFor={`retarget-plan-${plan.id}`} className="flex flex-1 flex-col">
                   <span>{plan.name}</span>
                   <span className="text-text-dim">

@@ -2,7 +2,10 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
+import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { mobileSheetPaths, type MobileTabPath } from '@/lib/mobileTabs';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
@@ -148,7 +151,11 @@ export function MobileMoreSheet({
         <button
           type="button"
           onClick={openSearch}
-          className="flex min-h-11 items-center gap-2 rounded-xs border border-line-bright bg-panel-2 px-3 text-left text-sm text-text-dim transition-colors hover:text-text"
+          className={cx(
+            'flex min-h-11 items-center gap-2 rounded-xs border border-line-bright bg-panel-2 px-3 text-left text-sm text-text-dim hover:text-text active:bg-panel',
+            interactiveClassName,
+            focusRingClassName
+          )}
         >
           <Icon.Search aria-hidden="true" size={Icon.ICON_SIZE.md} />
           {t('nav.searchPlaceholder')}
@@ -165,7 +172,11 @@ export function MobileMoreSheet({
                   key={view.path}
                   to={view.path}
                   onClick={onClose}
-                  className="flex min-h-11 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text transition-colors hover:border-line-bright"
+                  className={cx(
+                    'flex min-h-11 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text hover:border-line-bright active:bg-panel',
+                    interactiveClassName,
+                    focusRingClassName
+                  )}
                 >
                   <Icon.Recent aria-hidden="true" size={Icon.ICON_SIZE.sm} />
                   {view.breadcrumb}
@@ -196,7 +207,11 @@ export function MobileMoreSheet({
               type="button"
               aria-expanded={showHidden}
               onClick={() => setShowHidden((shown) => !shown)}
-              className="flex min-h-11 w-full items-center gap-2 text-left text-xs text-text-dim"
+              className={cx(
+                'flex min-h-11 w-full items-center gap-2 rounded-xs text-left text-xs text-text-dim',
+                interactiveClassName,
+                focusRingClassName
+              )}
             >
               <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
               <span className="min-w-0 flex-1 truncate">
@@ -209,6 +224,7 @@ export function MobileMoreSheet({
               <span aria-hidden="true" className="text-accent">
                 {t(showHidden ? 'nav.hiddenCollapse' : 'nav.hiddenExpand')}
               </span>
+              <Caret expanded={showHidden} />
             </button>
             {showHidden && <div className={TILE_GRID}>{hiddenPages.map(tile)}</div>}
           </div>
@@ -218,7 +234,11 @@ export function MobileMoreSheet({
           <button
             type="button"
             onClick={() => setEditing((on) => !on)}
-            className="flex min-h-11 items-center gap-2 text-left text-xs text-text-dim"
+            className={cx(
+              'flex min-h-11 items-center gap-2 rounded-xs text-left text-xs text-text-dim',
+              interactiveClassName,
+              focusRingClassName
+            )}
           >
             <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
             {editing ? t('nav.editDone') : t('nav.editRail')}

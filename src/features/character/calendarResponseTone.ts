@@ -16,12 +16,12 @@ export const RESPONSE_TEXT_TONE: Record<CalendarEventSummary['event_response'], 
   not_responded: 'text-text-dim',
 };
 
-/** Badge fill for `EventDetailModal`'s status pill — same tone family as `RESPONSE_TEXT_TONE`, plus a fill and border. */
+/** Badge fill for `EventDetailModal`'s status pill — same tone family as `RESPONSE_TEXT_TONE`, plus a fill (no border: it is a status word, not a control). */
 export const RESPONSE_BADGE_TONE: Record<CalendarEventSummary['event_response'], string> = {
-  accepted: 'border-success/40 bg-success/10 text-success',
-  declined: 'border-danger/40 bg-danger/10 text-danger',
-  tentative: 'border-warning/40 bg-warning/10 text-warning',
-  not_responded: 'border-line bg-panel-2 text-text-dim',
+  accepted: 'bg-success/10 text-success',
+  declined: 'bg-danger/10 text-danger',
+  tentative: 'bg-warning/10 text-warning',
+  not_responded: 'bg-panel-2 text-text-dim',
 };
 
 /** The glyph for each response — `EventDetailModal`'s status pill and its RSVP buttons. */
@@ -29,5 +29,5 @@ export const RESPONSE_ICON: Record<CalendarEventSummary['event_response'], typeo
   accepted: Icon.Done,
   declined: Icon.Blocked,
   tentative: Icon.Warn,
-  not_responded: Icon.Info,
+  not_responded: Icon.Pending,
 };

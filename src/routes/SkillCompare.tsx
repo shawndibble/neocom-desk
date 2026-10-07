@@ -17,7 +17,15 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { controlHeightClassName, toggleChipStateClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingClassName,
+  interactiveClassName,
+  toggleChipStateClassName,
+} from '@/components/ui/controlStyles';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { SkillLink } from '@/features/entities';
+import { cx } from '@/lib/cx';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -42,9 +50,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { skillCompareCsvColumns } from '@/features/skills/skillCompareCsv';
 import { boolParam, idListParam, nullableTextParam } from '@/lib/urlState';
-
-const FOCUS_RING =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
 
 /** Short-lived view state (ADR 0015): the selection, its saved-comparison link, and the two display toggles. One group — several of these change together in a single click (see `toggleCharacter`, `handleLoad`). */
 const SKILL_COMPARE_PARAMS = {
@@ -131,8 +136,7 @@ function SavedComparisonRow({
         <button
           type="button"
           onClick={() => onLoad(comparison)}
-          onDoubleClick={() => setRenaming(true)}
-          className={`flex-1 truncate text-left ${FOCUS_RING}`}
+          className={entityLinkClassName('flex-1 truncate text-left')}
         >
           {comparison.name}
         </button>
@@ -348,8 +352,10 @@ export function SkillCompare() {
       {
         id: 'skill',
         header: t('skillCompare.skillColumn'),
+        stickyStart: true,
         sortValue: (row) => row.name,
-        render: (row) => row.name,
+        // Skill -> its modal (DESIGN.md §6c).
+        render: (row) => <SkillLink typeId={row.skillTypeID}>{row.name}</SkillLink>,
       },
       ...(groupColumnVisible
         ? [
@@ -357,6 +363,7 @@ export function SkillCompare() {
               id: 'group',
               header: t('skillCompare.groupColumn'),
               className: 'text-text-dim',
+              phoneHidden: true,
               sortValue: (row) => row.groupName,
               render: (row) => row.groupName,
             } satisfies DataTableColumn<ComparisonRow>,
@@ -436,7 +443,13 @@ export function SkillCompare() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleCharacter(character.characterId)}
-                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 text-xs ${controlHeightClassName.sm} ${FOCUS_RING} ${toggleChipStateClassName(selected)}`}
+                  className={cx(
+                    'flex items-center gap-1.5 rounded-xs border px-2.5 text-xs',
+                    controlHeightClassName.sm,
+                    interactiveClassName,
+                    focusRingClassName,
+                    toggleChipStateClassName(selected)
+                  )}
                 >
                   <CharacterAvatar characterId={character.characterId} size="sm" />
                   {character.name}
@@ -497,12 +510,9 @@ export function SkillCompare() {
               hint={t('skillCompare.differingOnlyEmptyHint')}
             />
           ) : (
-            // Below `sm`, DataTable's default 'stack' layout turns each skill
-            // into its own card with a character/level line per row — real
-            // reading beats the horizontal scroll a matrix would otherwise
-            // force on a phone. `overflow-x-auto` still covers wider widths,
-            // where several compared characters can outgrow the viewport as
-            // real columns.
+            // A matrix reads across its columns, so it stays a table on a phone:
+            // it scrolls sideways with the skill column pinned, the group
+            // column dropped below `sm`.
             <div className="overflow-x-auto">
               <DataTable
                 {...compareExport.tableProps}
@@ -511,6 +521,7 @@ export function SkillCompare() {
                 rowKey={(row) => row.skillTypeID}
                 label={t('skillCompare.tableLabel')}
                 defaultSort={{ columnId: 'skill', direction: 'asc' }}
+                responsive="table"
               />
             </div>
           )}

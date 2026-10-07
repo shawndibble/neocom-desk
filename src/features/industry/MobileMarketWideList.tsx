@@ -10,14 +10,13 @@
  * The rows arrive already filtered, sorted and cut to the page the panel is
  * showing, so the rank is just a card's position.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, IskAmount, TypeIcon, type DataTableSort } from '@/components/ui';
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
-import { ItemMoreActions } from '@/features/market/ItemContextMenu';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatPercent } from './format';
@@ -26,6 +25,7 @@ import { MobileSortToolbar } from './MobileSortToolbar';
 import { ORDER_DEPTH_TONE } from './opportunityMetrics';
 import { SkillGateMarker } from './SkillGateMarker';
 import { StartPlanButton } from './StartPlanButton';
+import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 
 interface MobileMarketWideListProps {
   /** The page being shown: filtered, sorted and cut. */
@@ -34,8 +34,6 @@ interface MobileMarketWideListProps {
   total: number;
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;
-  /** For the item menu's "Build plan" entry; undefined while the catalog loads. */
-  blueprintTypeIDFor: (productTypeID: number) => number | null | undefined;
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
   nameForSkill: (typeID: number) => string;
   nameForCharacter: (characterId: number) => string;
@@ -74,7 +72,7 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
             node: (
               <>
                 {row.iskPerHour > 0 ? '+' : ''}
-                <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+                <IskAmount value={row.iskPerHour} decimals={0} />
               </>
             ),
             toneClassName: iskToneClass(row.iskPerHour),
@@ -89,7 +87,7 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
     case 'duration':
       return { node: formatDuration(row.seconds) };
     case 'buildCost':
-      return { node: <IskAmount value={row.buildCost} revealOn="tap" decimals={0} /> };
+      return { node: <IskAmount value={row.buildCost} decimals={0} /> };
   }
 }
 
@@ -98,7 +96,6 @@ export function MobileMarketWideList({
   total,
   sort,
   onSortChange,
-  blueprintTypeIDFor,
   skillGateFor,
   nameForSkill,
   nameForCharacter,
@@ -106,6 +103,7 @@ export function MobileMarketWideList({
 }: MobileMarketWideListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
 
   const fieldLabel: Record<SortFieldId, string> = {
     iskPerHour: t('industry.iskPerHour'),
@@ -145,6 +143,10 @@ export function MobileMarketWideList({
           return (
             <li
               key={row.productTypeID}
+              // A tap on the card is Start plan's action; its controls are exempt.
+              onClick={(event) => {
+                if (isCardOwnClick(event)) startPlanFromRow(row);
+              }}
               className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] gap-x-3 border-b border-line py-3 pr-1 pl-3 last:border-b-0"
             >
               <span className="relative size-10">
@@ -157,7 +159,7 @@ export function MobileMarketWideList({
                 />
                 <span
                   aria-hidden="true"
-                  className="absolute -bottom-1 -left-1 rounded-xs border border-line bg-bg px-1 text-[0.625rem] leading-4 font-semibold text-text-dim tabular-nums"
+                  className="absolute -bottom-1 -left-1 rounded-xs bg-bg px-1 text-[0.625rem] leading-4 font-semibold text-text-dim tabular-nums"
                 >
                   {t('industry.marketOpportunitiesRankBadge', { rank: index + 1 })}
                 </span>
@@ -168,8 +170,8 @@ export function MobileMarketWideList({
                   <span className="sr-only">
                     {t('industry.marketOpportunitiesRank', { rank: index + 1 })}
                   </span>
-                  <span className="text-sm font-semibold break-words">
-                    <MarketItemLink typeId={row.productTypeID}>{row.productName}</MarketItemLink>
+                  <span className={entityLinkClassName('text-sm font-semibold break-words')}>
+                    {row.productName}
                   </span>
                   {verdict?.gated && (
                     <SkillGateMarker
@@ -182,8 +184,8 @@ export function MobileMarketWideList({
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.6875rem] text-text-dim">
                   <span
                     className={cx(
-                      'rounded-xs border px-1.5 text-[0.625rem] leading-4 font-semibold tracking-wider uppercase',
-                      owned ? 'border-success/40 text-success' : 'border-line text-text-dim'
+                      'text-[0.625rem] leading-4 font-semibold tracking-wider uppercase',
+                      owned ? 'text-success' : 'text-text-dim'
                     )}
                   >
                     <span className="sr-only">
@@ -235,17 +237,11 @@ export function MobileMarketWideList({
                     {fieldLabel[heroId]}
                   </span>
                 </span>
-                <span className="flex items-center">
-                  <StartPlanButton
-                    onStart={() => onStartPlan(row)}
-                    compact={{ name: row.productName }}
-                  />
-                  <ItemMoreActions
-                    typeId={row.productTypeID}
-                    itemName={row.productName}
-                    blueprintTypeID={blueprintTypeIDFor(row.productTypeID)}
-                  />
-                </span>
+                <StartPlanButton
+                  onStart={() => onStartPlan(row)}
+                  planKey={row}
+                  compact={{ name: row.productName }}
+                />
               </div>
             </li>
           );

@@ -1,6 +1,8 @@
-import { formatCompactNumber } from '@/lib/compactNumber';
-
-/** A Charge Picker price: "62", "1,240", "12.5K". */
+/**
+ * A Charge Picker price, exact: "62", "1,240", "12,500". A per-unit price is
+ * small enough to read whole, and DESIGN.md §6c allows no compact ISK
+ * formatter on screen without the exact value one hover away.
+ */
 export function formatIsk(value: number): string {
-  return value >= 10_000 ? formatCompactNumber(value) : Math.round(value).toLocaleString('en-US');
+  return Math.round(value).toLocaleString('en-US');
 }

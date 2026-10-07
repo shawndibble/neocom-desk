@@ -13,10 +13,17 @@
 import { JumpsLink } from '@/features/travel/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterBar, FilterChip, FilterField, InfoTooltip, TextInput } from '@/components/ui';
+import {
+  FilterBar,
+  FilterChip,
+  FilterField,
+  InfoTooltip,
+  TextInput,
+  textActionClassName,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { HintText } from '@/components/ui/HintText';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { SPACE_KINDS } from '@/engine/space';
 import { securityStatusColor } from '@/engine/securityStatus';
@@ -242,10 +249,7 @@ export function OrderBookScopeBar({
             <button
               type="button"
               onClick={() => onFilterChange({ ...filterValue, jumps: DEFAULT_JUMP_RANGE })}
-              className={cx(
-                inlineLinkClassName,
-                'max-sm:inline-flex max-sm:min-h-11 max-sm:items-center'
-              )}
+              className={textActionClassName()}
             >
               {t('market.scope.clearRange')}
             </button>
@@ -254,9 +258,9 @@ export function OrderBookScopeBar({
       case 'station':
         return (
           <>
-            <span className="min-w-0 truncate font-semibold" title={scope.stationName}>
+            <HintText content={scope.stationName} className="min-w-0 truncate font-semibold">
               {scope.stationName}
-            </span>
+            </HintText>
             {scope.security !== null && (
               <span
                 className="font-semibold tabular-nums"

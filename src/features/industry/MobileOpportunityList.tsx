@@ -21,6 +21,8 @@
  * Comparing: once two or more cards are ticked, a bar pinned above the bottom
  * tab bar carries the Compare action — the panel header has no room for it.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { selectedRowClassName } from '@/components/ui/controlStyles';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,13 +40,12 @@ import {
   textActionClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
-import { ViewInMarketMenuItem } from '@/features/market/ItemContextMenu';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
+import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 import { formatIsk } from '@/lib/isk';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
@@ -106,7 +107,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
           node: (
             <>
               {value > 0 ? '+' : ''}
-              <IskAmount value={value} revealOn="tap" decimals={0} />
+              <IskAmount value={value} decimals={0} />
             </>
           ),
           toneClassName: iskToneClass(value),
@@ -123,7 +124,7 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
           node: (
             <>
               {value > 0 ? '+' : ''}
-              <IskAmount value={value} revealOn="tap" decimals={0} />
+              <IskAmount value={value} decimals={0} />
             </>
           ),
           toneClassName: iskToneClass(value),
@@ -170,6 +171,7 @@ export function MobileOpportunityList({
 }: MobileOpportunityListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
   const fields = sortFields(t);
 
   const { sort, onSortChange: setSort } = useUrlSort(
@@ -213,12 +215,19 @@ export function MobileOpportunityList({
           return (
             <li
               key={row.candidate.id}
+              aria-current={selected ? 'true' : undefined}
+              // A tap on the card is Start plan's action; its controls are exempt.
+              onClick={(event) => {
+                if (isCardOwnClick(event)) startPlanFromRow(row.candidate.catalogEntry);
+              }}
               className={cx(
                 'grid grid-cols-[2.75rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
-                selected && 'bg-accent-dim/15 shadow-[inset_2px_0_0_var(--color-accent)]'
+                selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
               )}
             >
-              <label className="flex size-11 cursor-pointer items-center justify-center self-start">
+              <label
+                className={`flex size-11 cursor-pointer items-center justify-center self-start`}
+              >
                 <Checkbox
                   checked={selected}
                   onChange={() => onToggleSelected(row.candidate.id)}
@@ -230,7 +239,9 @@ export function MobileOpportunityList({
                 {/* The hero rides the name row's right edge like a price tag, matching the owned-blueprint cards. */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="text-sm font-semibold break-words">{productName}</span>
+                    <span className={entityLinkClassName('text-sm font-semibold break-words')}>
+                      {productName}
+                    </span>
                     {members.length > 1 && (
                       <span className="text-[0.6875rem] font-semibold text-text-dim">
                         {t('industry.opportunitiesCopies', { count: members.length })}
@@ -308,20 +319,12 @@ export function MobileOpportunityList({
                   />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => void onStartPlan(row.candidate.catalogEntry)}>
-                    {t('industry.marketOpportunitiesStartPlan')}
-                  </DropdownMenuItem>
                   {productTypeID !== null && (
-                    <>
-                      <DropdownMenuItem
-                        onSelect={() => onViewHistory(productTypeID, productName, row.hub.regionId)}
-                      >
-                        {t('industry.opportunitiesPriceHistory')}
-                      </DropdownMenuItem>
-                      <MenuKindContext.Provider value="dropdown">
-                        <ViewInMarketMenuItem typeId={productTypeID} />
-                      </MenuKindContext.Provider>
-                    </>
+                    <DropdownMenuItem
+                      onSelect={() => onViewHistory(productTypeID, productName, row.hub.regionId)}
+                    >
+                      {t('industry.opportunitiesPriceHistory')}
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>

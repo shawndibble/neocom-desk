@@ -1540,6 +1540,24 @@ async function main() {
     }
   }
 
+  // --- System -> planet-type counts (issue #2631) ---
+  // Same rows as the radius table, grouped by system and typed through the
+  // planet typeID mapping (Shattered variants map to their base type there).
+  // Planets of a type ESI has no colony string for are left out.
+  const piSystemPlanets = {};
+  {
+    const rows = raw['mapDenormalize.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (Number(r[h.groupID]) !== PLANET_GROUP_ID) continue;
+      const planetType = piPlanetTypeByTypeId[r[h.typeID]];
+      if (!planetType) continue;
+      const counts = (piSystemPlanets[r[h.solarSystemID]] ??= {});
+      counts[planetType] = (counts[planetType] ?? 0) + 1;
+    }
+  }
+
   const piPlanetTypeCoverage = new Set(Object.values(piPlanetTypeByTypeId));
   const piMissingPlanetTypes = ESI_PLANET_TYPES.filter((p) => !piPlanetTypeCoverage.has(p));
   const pi = {
@@ -1608,6 +1626,17 @@ async function main() {
     const radiusCount = Object.keys(piPlanetRadiusKm).length;
     if (radiusCount < 10_000) {
       problems.push(`only ${radiusCount} planet radii found; mapDenormalize looks wrong or empty`);
+    }
+    // Planet finders rank systems on these counts: empty, missing Jita, or a
+    // type no system holds would make them quietly wrong.
+    const systemPlanetCount = Object.keys(piSystemPlanets).length;
+    if (systemPlanetCount < 1_000) {
+      problems.push(`only ${systemPlanetCount} systems with planets; mapDenormalize looks wrong`);
+    }
+    if (!piSystemPlanets[JITA_SYSTEM_ID]) problems.push('Jita has no planets in pi-system-planets');
+    const typesWithSystems = new Set(Object.values(piSystemPlanets).flatMap((c) => Object.keys(c)));
+    for (const type of ESI_PLANET_TYPES) {
+      if (!typesWithSystems.has(type)) problems.push(`no system holds a ${type} planet`);
     }
     for (const [typeID, schematic] of Object.entries(piSchematics)) {
       if (!schematic.facility) problems.push(`schematic ${typeID} has no facility`);
@@ -2121,6 +2150,8 @@ async function main() {
     // Its own file, not folded into pi.json: it is one entry per planet in New
     // Eden and every other consumer of pi.json would pay for it on load.
     ['pi-planet-radius.json', piPlanetRadiusKm],
+    // Counts per system, for the planet finders (issue #2631); also its own file.
+    ['pi-system-planets.json', piSystemPlanets],
     ['moonOreTypes.json', moonOreTypeIds],
     ['oreAndIceTypeIds.json', oreAndIceTypeIds],
     ['gasCloudTypeIds.json', gasCloudTypeIds],

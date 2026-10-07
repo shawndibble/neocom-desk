@@ -51,7 +51,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     // The Start screen's Import opens the Load card in a dialog.
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
     const box = await loadButton.boundingBox();
@@ -80,7 +80,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     // The Start screen's Import opens the Load card in a dialog.
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
@@ -103,8 +103,16 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByText('125mm Gatling AutoCannon I')).toBeVisible();
     await page.keyboard.press('Escape');
+    // Closing a sheet pops its history entry (Back); reloading while that
+    // navigation is in flight aborts it (net::ERR_ABORTED).
+    await expect(sheet).toBeHidden();
+    await page.waitForLoadState('load');
 
-    await page.reload();
+    // The Back pop is a same-document navigation `load` can't see, so on a
+    // slow runner it can still be in flight; retry the reload until it lands.
+    await expect(async () => {
+      await page.reload();
+    }).toPass();
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
@@ -144,7 +152,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     const longName = 'Rifter - long PvE mission tackle fit name here for the header';
-    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByRole('button', { name: 'Import…', exact: true }).click();
     await page.getByLabel('Link or text').fill(`[Rifter, ${longName}]
 1MN Afterburner I`);
     await page.getByRole('button', { name: 'Load', exact: true }).click();

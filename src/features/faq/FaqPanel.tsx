@@ -1,7 +1,12 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { Caret } from '@/components/ui/Disclosure';
 import { tabPath } from '@/lib/pageTabs';
 import { HELP_TABS } from '@/app/pageTabs';
@@ -60,7 +65,11 @@ function FaqItem({
         aria-expanded={expanded}
         aria-controls={expanded ? answerId : undefined}
         onClick={onToggle}
-        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-text hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={cx(
+          'flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-text',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
       >
         <Caret expanded={expanded} />
         {question}
@@ -179,7 +188,7 @@ export function FaqPanel() {
         <Trans
           i18nKey="settings.faq.store.privacyLink"
           components={{
-            privacy: <a href="/privacy.html" target="_blank" rel="noopener" className={LINK} />,
+            privacy: <a href="/privacy.html" className={LINK} />,
           }}
         />{' '}
         <Trans

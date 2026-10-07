@@ -1,3 +1,6 @@
+import { focusRingInsetClassName, selectedRowClassName } from '@/components/ui/controlStyles';
+import { Link } from 'react-router-dom';
+import { cx } from '@/lib/cx';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,6 +13,7 @@ import {
   IconButton,
   Modal,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord, SkillPlanRecord } from '@/db';
@@ -24,7 +28,8 @@ export interface PlanRowStats {
 
 interface PlanListProps {
   plans: readonly SkillPlanRecord[];
-  onOpen: (id: string) => void;
+  /** Where a plan's row goes: the row is a real link (DESIGN.md §6c). */
+  planHref: (id: string) => string;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
@@ -42,7 +47,7 @@ interface PlanListProps {
 
 function PlanRow({
   plan,
-  onOpen,
+  planHref,
   onDuplicate,
   onRequestCopy,
   onRequestDelete,
@@ -59,7 +64,7 @@ function PlanRow({
   stats: PlanRowStats | undefined;
   onRequestCopy: ((plan: SkillPlanRecord) => void) | null;
   onRequestDelete: (plan: SkillPlanRecord) => void;
-} & Pick<PlanListProps, 'onOpen' | 'onDuplicate' | 'onRename'>) {
+} & Pick<PlanListProps, 'planHref' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(autoRename);
   const [draftName, setDraftName] = useState(plan.name);
@@ -84,7 +89,7 @@ function PlanRow({
 
   return (
     <li
-      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? 'bg-accent/15' : ''}`}
+      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? selectedRowClassName : ''}`}
     >
       {renaming ? (
         <TextInput
@@ -104,77 +109,76 @@ function PlanRow({
           className="flex-1"
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => onOpen(plan.id)}
-          aria-current={active ? 'true' : undefined}
-          className="min-w-0 flex-1 text-left"
-        >
-          <span className="block truncate" title={plan.name}>
-            {plan.name}
-          </span>
-          {stats && (
-            <span className="block truncate text-[0.6875rem] text-text-dim tabular-nums">
-              {stats.finish === null
-                ? t('plans.listRowNothingToTrain')
-                : t('plans.listRowStats', {
-                    duration: formatCountdown(stats.totalSeconds),
-                    date: formatLocalDate(stats.finish),
-                  })}
+        <Tooltip content={plan.name} className="min-w-0 flex-1">
+          <Link
+            to={planHref(plan.id)}
+            aria-current={active ? 'true' : undefined}
+            className={cx(
+              'group flex min-w-0 flex-1 items-center gap-1 rounded-xs text-left',
+              focusRingInsetClassName
+            )}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="dt-primary block truncate text-accent group-hover:underline">
+                {plan.name}
+              </span>
+              {stats && (
+                <span className="block truncate text-[0.6875rem] text-text-dim tabular-nums">
+                  {stats.finish === null
+                    ? t('plans.listRowNothingToTrain')
+                    : t('plans.listRowStats', {
+                        duration: formatCountdown(stats.totalSeconds),
+                        date: formatLocalDate(stats.finish),
+                      })}
+                </span>
+              )}
             </span>
-          )}
-        </button>
+          </Link>
+        </Tooltip>
       )}
-      {/* Rename, Duplicate and Copy live in one menu so the name keeps the row's
-          width (and the finish date under it stays on one line). Delete stays a
-          visible button: it is the destructive one. */}
-      {
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton
-              size="sm"
-              variant="plain"
-              icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-              label={t('plans.moreActions', { name: plan.name })}
-            />
-          </DropdownMenuTrigger>
-          {/* Rename opens its input only once the menu has closed: opened earlier,
+      {/* One trailing ⋮ holds every action (Delete is the danger item), so the
+          name keeps the row's width and the finish date under it stays on one line. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton
+            size="sm"
+            variant="plain"
+            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+            label={t('plans.moreActions', { name: plan.name })}
+          />
+        </DropdownMenuTrigger>
+        {/* Rename opens its input only once the menu has closed: opened earlier,
               the menu's focus handling blurs it and cancels the rename. */}
-          <DropdownMenuContent
-            align="end"
-            onCloseAutoFocus={(e) => {
-              if (renameChosen.current) {
-                e.preventDefault();
-                renameChosen.current = false;
-                setRenaming(true);
-              }
+        <DropdownMenuContent
+          align="end"
+          onCloseAutoFocus={(e) => {
+            if (renameChosen.current) {
+              e.preventDefault();
+              renameChosen.current = false;
+              setRenaming(true);
+            }
+          }}
+        >
+          <DropdownMenuItem
+            onSelect={() => {
+              renameChosen.current = true;
             }}
           >
-            <DropdownMenuItem
-              onSelect={() => {
-                renameChosen.current = true;
-              }}
-            >
-              {t('plans.rename')}
+            {t('plans.rename')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
+            {t('plans.duplicate')}
+          </DropdownMenuItem>
+          {onRequestCopy && (
+            <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
+              {t('plans.copyToCharacter')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
-              {t('plans.duplicate')}
-            </DropdownMenuItem>
-            {onRequestCopy && (
-              <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
-                {t('plans.copyToCharacter')}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      }
-      <IconButton
-        size="sm"
-        icon={<Icon.Close />}
-        label={`${t('plans.delete')} ${plan.name}`}
-        tone="danger"
-        onClick={() => onRequestDelete(plan)}
-      />
+          )}
+          <DropdownMenuItem className="text-danger" onSelect={() => onRequestDelete(plan)}>
+            {t('plans.delete')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </li>
   );
 }
@@ -182,7 +186,7 @@ function PlanRow({
 /** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (confirm), rename inline. */
 export function PlanList({
   plans,
-  onOpen,
+  planHref,
   onDuplicate,
   onDelete,
   onRename,
@@ -208,7 +212,7 @@ export function PlanList({
             <PlanRow
               key={plan.id}
               plan={plan}
-              onOpen={onOpen}
+              planHref={planHref}
               onDuplicate={onDuplicate}
               onRequestCopy={canCopy ? setCopyingPlan : null}
               onRequestDelete={setDeletingPlan}

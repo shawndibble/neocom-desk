@@ -15,10 +15,10 @@
  * being null (first load) is treated as "not yet known to be invalid", not
  * "invalid".
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRememberedUrlParams, useUrlParam, type UrlParamValues } from '@/lib/useUrlState';
-import { enumParam, type UrlParamCodec } from '@/lib/urlState';
+import { enumParam, TEXT_DEBOUNCE_MS, type UrlParamCodec } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
@@ -38,10 +38,7 @@ import {
 import type { MarketGroupNode, MarketTypeEntry, MarketRegionEntry } from '@/sde/marketTypes';
 
 /** Tree search, in the URL (ADR 0015) scoped to the Browser tab. */
-const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
-  parse: (raw) => raw ?? '',
-  serialize: (value) => (value === '' ? null : value),
-};
+const BROWSER_SEARCH_KEY = 'browser.q';
 
 /** The selected item's own views: its Order Book, its Variations, its Price History. */
 export type MarketItemTab = 'orders' | 'variations' | 'history';
@@ -122,7 +119,53 @@ export function useMarketBrowser({
 
   // Tree search, in the URL (ADR 0015) scoped to the Browser tab — a reload
   // or a shared link reopens the same search rather than an empty tree.
-  const [query, setQuery] = useUrlParam('browser.q', BROWSER_SEARCH_PARAM);
+  //
+  // The box is bound to local text and the URL is written once typing pauses.
+  // Written per keystroke, the navigation lags the box: a fast typist's
+  // letters are dropped and the caret jumps to the end. The write lives here
+  // rather than in `useUrlParam`'s own debounce so that `navigateTo` can fold
+  // the text into its navigation and cancel the timer — a timer left running
+  // would write from the pre-navigation location and drop the selected item.
+  const urlQuery = searchParams.get(BROWSER_SEARCH_KEY) ?? '';
+  const [query, setQueryText] = useState(urlQuery);
+  const queryWritten = useRef(urlQuery);
+  const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The debounced write below runs from a stale render's closure, and
+  // react-router's functional `setSearchParams` updater hands it that render's
+  // `searchParams` as `prev`. A navigation inside the debounce window (View in
+  // Market from the item menu, which drops `q`) would be overwritten by the
+  // pre-navigation params, losing `type`. Read the latest instead.
+  const latestSearchParams = useRef(searchParams);
+  useEffect(() => {
+    latestSearchParams.current = searchParams;
+  });
+
+  function cancelQueryTimer() {
+    if (queryTimer.current !== null) clearTimeout(queryTimer.current);
+    queryTimer.current = null;
+  }
+  useEffect(() => cancelQueryTimer, []);
+
+  // The URL moved on its own (Back/Forward, a link): adopt it, drop a pending write.
+  useEffect(() => {
+    if (urlQuery === queryWritten.current) return;
+    queryWritten.current = urlQuery;
+    cancelQueryTimer();
+    setQueryText(urlQuery);
+  }, [urlQuery]);
+
+  function setQuery(next: string) {
+    setQueryText(next);
+    cancelQueryTimer();
+    queryTimer.current = setTimeout(() => {
+      queryTimer.current = null;
+      queryWritten.current = next;
+      const params = new URLSearchParams(latestSearchParams.current);
+      if (next === '') params.delete(BROWSER_SEARCH_KEY);
+      else params.set(BROWSER_SEARCH_KEY, next);
+      setSearchParams(params, { replace: true });
+    }, TEXT_DEBOUNCE_MS);
+  }
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
   // Groups the user has explicitly collapsed while a search is filtering the
   // tree (see MarketGroupTree's `expanded` calc) — kept apart from
@@ -269,9 +312,12 @@ export function useMarketBrowser({
       ? effectiveLocation.regionId
       : effectiveHub.regionId;
 
+  // The tree filters off a deferred copy so a keystroke paints in the box
+  // first; the filter and tree render catch up after.
+  const deferredQuery = useDeferredValue(query);
   const filterResult = useMemo(
-    () => (groups && types ? filterMarketTree(groups, types, query) : null),
-    [groups, types, query]
+    () => (groups && types ? filterMarketTree(groups, types, deferredQuery) : null),
+    [groups, types, deferredQuery]
   );
 
   function handleToggle(groupId: number) {
@@ -308,6 +354,11 @@ export function useMarketBrowser({
       params.delete('region');
       params.delete('group');
       params.delete('browser.station');
+      // Fold in text still waiting on its debounce, so this navigation is the only write.
+      cancelQueryTimer();
+      queryWritten.current = query;
+      if (query === '') params.delete(BROWSER_SEARCH_KEY);
+      else params.set(BROWSER_SEARCH_KEY, query);
       for (const [key, value] of Object.entries(buildMarketParams(typeId, next))) {
         params.set(key, value);
       }

@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import type { SyncStatus } from '@/sync';
 import { syncDisplayState, type SyncDisplayState } from './syncStatus';
 
 const DOT_CLASS: Record<SyncDisplayState, string> = {
   idle: 'bg-success',
-  syncing: 'bg-accent animate-pulse',
+  syncing: 'bg-accent motion-safe:animate-pulse',
   error: 'bg-danger',
   offline: 'bg-text-faint',
 };
@@ -20,11 +21,12 @@ export function SyncStatusDot({ status, online }: SyncStatusDotProps) {
   const displayState = syncDisplayState(status, online);
   const label = t(`sync.${displayState}`);
   return (
-    <span
-      role="status"
-      title={label}
-      aria-label={label}
-      className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[displayState]}`}
-    />
+    <Tooltip content={label}>
+      <span
+        role="status"
+        aria-label={label}
+        className={`inline-block size-2 shrink-0 rounded-full ${DOT_CLASS[displayState]}`}
+      />
+    </Tooltip>
   );
 }

@@ -8,6 +8,7 @@
  * Identical copies (same owner, print, location, ME/TE and runs) fold into
  * one card whose quantity is their sum (`identicalBlueprints.ts`).
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -26,6 +27,7 @@ import {
 } from './ownedBlueprints';
 import { MobileSortToolbar } from './MobileSortToolbar';
 import { StartPlanButton } from './StartPlanButton';
+import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 
 interface MobileOwnedBlueprintListProps {
   rows: readonly OwnedBlueprintRow[];
@@ -82,6 +84,7 @@ export function MobileOwnedBlueprintList({
 }: MobileOwnedBlueprintListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const startPlanFromRow = useRowStartPlan(onStartPlan);
 
   const fieldLabel: Record<SortFieldId, string> = {
     blueprint: t('industry.ownedBlueprintsBlueprint'),
@@ -131,6 +134,10 @@ export function MobileOwnedBlueprintList({
           return (
             <li
               key={row.id}
+              // A tap on the card is Start plan's action; its controls are exempt.
+              onClick={(event) => {
+                if (entry && isCardOwnClick(event)) startPlanFromRow(entry);
+              }}
               className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] gap-x-3 border-b border-line py-3 pr-1 pl-3 last:border-b-0"
             >
               <TypeIcon
@@ -142,7 +149,15 @@ export function MobileOwnedBlueprintList({
               />
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-y-0.5">
-                  <span className="text-sm font-semibold break-words">{name}</span>
+                  <span
+                    className={
+                      entry
+                        ? entityLinkClassName('text-sm font-semibold break-words')
+                        : 'text-sm font-semibold break-words'
+                    }
+                  >
+                    {name}
+                  </span>
                   <BlueprintBadge kind={row.kind === 'bpo' ? 'original' : 'copy'} t={t} />
                   {row.activity === 'reaction' && (
                     <span className="ml-1.5 text-[0.6875rem] text-text-dim">
@@ -187,7 +202,7 @@ export function MobileOwnedBlueprintList({
                 <span className="flex flex-col items-end leading-tight tabular-nums">
                   {row.iskPerHour !== null ? (
                     <span className={cx('text-base font-bold', iskToneClass(row.iskPerHour))}>
-                      <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+                      <IskAmount value={row.iskPerHour} decimals={0} />
                     </span>
                   ) : (
                     <span className="text-sm text-text-dim" aria-label={unknown}>
@@ -198,7 +213,13 @@ export function MobileOwnedBlueprintList({
                     {t('industry.iskPerHour')}
                   </span>
                 </span>
-                {entry && <StartPlanButton onStart={() => onStartPlan(entry)} compact={{ name }} />}
+                {entry && (
+                  <StartPlanButton
+                    onStart={() => onStartPlan(entry)}
+                    compact={{ name }}
+                    planKey={entry}
+                  />
+                )}
               </div>
             </li>
           );

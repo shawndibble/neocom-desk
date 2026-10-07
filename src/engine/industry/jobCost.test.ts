@@ -27,6 +27,30 @@ describe('estimatedItemValue', () => {
   });
 });
 
+describe('jobFee worked totals', () => {
+  const EIV = 10_000_000;
+  const SCI = 0.0272;
+
+  it('Raitaru, 0% tax: 10M x 0.0272 x 0.97 + 400k SCC = 663,840', () => {
+    const fee = jobFee(EIV, SCI, FACILITY_PRESETS.raitaru, 0);
+    expect(fee.grossCost).toBeCloseTo(263_840, 2);
+    expect(fee.sccSurcharge).toBeCloseTo(400_000, 2);
+    expect(fee.total).toBeCloseTo(663_840, 2);
+  });
+
+  it('Raitaru, 1% tax adds 100,000: 763,840', () => {
+    expect(jobFee(EIV, SCI, FACILITY_PRESETS.raitaru, 1).total).toBeCloseTo(763_840, 2);
+  });
+
+  it('NPC station, default tax: 272,000 + 400,000 + 25,000 = 697,000', () => {
+    const fee = jobFee(EIV, SCI, FACILITY_PRESETS.npcStation);
+    expect(fee.grossCost).toBeCloseTo(272_000, 2);
+    expect(fee.sccSurcharge).toBeCloseTo(400_000, 2);
+    expect(fee.facilityTax).toBeCloseTo(25_000, 2);
+    expect(fee.total).toBeCloseTo(697_000, 2);
+  });
+});
+
 describe('jobFee', () => {
   it('computes NPC station fee: EIV * (SCI + tax + SCC)', () => {
     // gross = 1e6 * 0.05 = 50_000; scc = 1e6 * 4% = 40_000; tax = 1e6 * 0.25% = 2_500

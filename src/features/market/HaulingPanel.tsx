@@ -10,6 +10,7 @@
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  */
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,11 +32,18 @@ import {
   Spinner,
   TextInput,
   Toast,
+  Tooltip,
   IconButton,
+  IskAmount,
   TypeIcon,
   DataTableDenseCell,
   type DataTableColumn,
 } from '@/components/ui';
+import {
+  focusRingClassName,
+  touchCheckboxLabelClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -43,7 +51,7 @@ import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { multibuyText, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { DemandKind, HaulingFlag } from '@/engine/market/haulingMarket';
-import { formatIsk, formatIskCompact, formatMarketIsk } from '@/lib/isk';
+import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -72,7 +80,6 @@ import {
   type StoredHaulingFilter,
 } from './haulingFilterPref';
 import { ItemContextMenu } from './ItemContextMenu';
-import { MarketItemLink } from './MarketItemLink';
 import {
   EVERYTHING_CATEGORY_ID,
   DEFAULT_HAULING_CATEGORY_ID,
@@ -265,11 +272,16 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   // The table's `stacked`, and every cell class that would otherwise follow
   // the viewport (`max-sm:`) picks by it instead (ADR 0017).
   const cards = isPhone || tableCards;
+  const compact = isPhone || tableNarrow;
   const isk = (value: number, digits: number) =>
-    isPhone || tableNarrow ? formatIskCompact(value) : formatIsk(value, digits);
+    compact ? <IskAmount value={value} decimals={digits} /> : formatIsk(value, digits);
   /** A per-unit price: the Market page's cents-below-10,000 rule. */
   const price = (value: number) =>
-    isPhone || tableNarrow ? formatIskCompact(value) : formatMarketIsk(value);
+    compact ? (
+      <IskAmount value={value} decimals={marketIskDecimals(value)} />
+    ) : (
+      formatMarketIsk(value)
+    );
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -476,12 +488,15 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       headerClassName: 'w-8',
       className: 'w-8',
       stackEdge: 'start',
+      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
-        <Checkbox
-          aria-label={t('market.hauling.selectRow', { item: row.name })}
-          checked={overrides.get(row.typeId)?.selected !== false}
-          onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
-        />
+        <label className={touchCheckboxLabelClassName}>
+          <Checkbox
+            aria-label={t('market.hauling.selectRow', { item: row.name })}
+            checked={overrides.get(row.typeId)?.selected !== false}
+            onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
+          />
+        </label>
       ),
     },
     {
@@ -499,12 +514,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">
           {!cards && <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />}
-          <MarketItemLink
-            typeId={row.typeId}
-            className="min-w-0 truncate font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            {row.name}
-          </MarketItemLink>
+          <span className={entityLinkClassName('min-w-0 truncate font-medium')}>{row.name}</span>
           {row.flags.length > 0 && (
             <IconButton
               variant="plain"
@@ -537,7 +547,10 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             headerClassName: 'whitespace-nowrap',
             className: 'whitespace-nowrap',
             sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
-            render: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
+            render: (row: HaulingViewRow) => {
+              const hub = hubAtAnyEnd(row, anyEnd);
+              return hub.systemName;
+            },
           },
         ]),
     {
@@ -622,11 +635,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       render: (row) =>
         row.mode === 'list' && (
           <DataTableDenseCell>
-            <span
-              aria-hidden="true"
-              title={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
-              className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]}`}
-            />
+            <Tooltip content={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}>
+              <span
+                tabIndex={0}
+                role="img"
+                aria-label={t('market.hauling.demandDays', { count: row.demand.daysWithTrades })}
+                className={`size-2 shrink-0 ${DEMAND_MARK[row.demand.demand]} ${focusRingClassName}`}
+              />
+            </Tooltip>
             {formatDaysToSell(row.sale.daysToSell)}
             <span className="text-xs text-text-dim @max-[62rem]:sr-only">
               · {t(`market.hauling.demand.${row.demand.demand}`)}
@@ -972,7 +988,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   screen; on a phone the meter and actions take a second. */}
               <div className="@container flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-panel-2 px-3 py-2 text-sm tabular-nums">
                 <div className="flex items-center gap-x-4">
-                  <label className="flex items-center gap-2 text-xs text-text-dim">
+                  <label
+                    className={`flex items-center gap-2 text-xs text-text-dim ${tappableRowClassName}`}
+                  >
                     <Checkbox
                       aria-label={t('market.hauling.selectAll')}
                       checked={allSelected}
@@ -988,12 +1006,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   <span>
                     <b className={plan.totals.profit > 0 ? 'text-success' : undefined}>
                       {plan.totals.profit > 0 ? '+' : ''}
-                      {formatIskCompact(plan.totals.profit)}
+                      <IskAmount value={plan.totals.profit} />
                     </b>{' '}
                     <span className="text-text-dim">{t('market.hauling.plan.profitWord')}</span>
                   </span>
                   <span>
-                    <b>{formatIskCompact(plan.totals.cost)}</b>{' '}
+                    <b>
+                      <IskAmount value={plan.totals.cost} />
+                    </b>{' '}
                     <span className="text-text-dim">{t('market.hauling.plan.spendWord')}</span>
                   </span>
                 </div>
@@ -1212,12 +1232,11 @@ function BringInput({
   onCommit: (quantity: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return (
+  const input = (
     <TextInput
       size="sm"
       inputMode="numeric"
       aria-label={label}
-      title={title}
       // Shorter and narrower on the card: its height sets the meta line's,
       // and a 360px card still fits it beside that line. 28px is under the
       // touch tier's 36px on purpose (DESIGN.md §3); `max-md:` because the
@@ -1232,4 +1251,5 @@ function BringInput({
       onBlur={() => setDraft(null)}
     />
   );
+  return title ? <Tooltip content={title}>{input}</Tooltip> : input;
 }
