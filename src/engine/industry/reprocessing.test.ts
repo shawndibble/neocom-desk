@@ -20,6 +20,17 @@ const YIELD = {
 };
 
 describe('reprocessingEfficiency', () => {
+  it('stacks skills, specialisation and implant: 0.5 x 1.15 x 1.10 x 1.10 x 1.04', () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 5,
+        reprocessingEfficiencyLevel: 5,
+        specialisationLevel: 5,
+        implantBonusPct: 4,
+      })
+    ).toBeCloseTo(0.72358, 5);
+  });
+
   it('is the bare station rate with no skills trained', () => {
     expect(
       reprocessingEfficiency({

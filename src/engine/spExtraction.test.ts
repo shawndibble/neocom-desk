@@ -50,4 +50,10 @@ describe('extractorCount', () => {
     expect(extractorCount(SP_EXTRACTION_FLOOR_SP)).toBe(0);
     expect(extractorCount(1_000_000)).toBe(0);
   });
+
+  it('steps at each 500k chunk above 5M SP', () => {
+    expect(extractorCount(5_499_999)).toBe(0);
+    expect(extractorCount(5_500_000)).toBe(1);
+    expect(extractorCount(5_999_999)).toBe(1);
+  });
 });
