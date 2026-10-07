@@ -1,7 +1,7 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Panel } from '@/components/ui';
-import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { SessionContinuation } from './sessionContinuation';
 
 interface ContinueSessionCardProps {
@@ -51,9 +51,9 @@ export function ContinueSessionCard({
             <span key={line.typeId} className="font-normal text-text-dim">
               {i === 0 ? ' · ' : ', '}
               {line.quantity.toLocaleString()}{' '}
-              <MarketItemLink typeId={line.typeId}>
+              <OreLink typeId={line.typeId}>
                 {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-              </MarketItemLink>
+              </OreLink>
             </span>
           ))}
         </p>

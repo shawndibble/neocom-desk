@@ -12,7 +12,10 @@ vi.mock('./pricing', async (importOriginal) => ({
 }));
 
 const formMock = vi.hoisted(() => ({ compressed: true }));
-vi.mock('./oreForm', () => ({ readCompressedOre: async () => formMock.compressed }));
+vi.mock('./oreForm', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./oreForm')>()),
+  readCompressedOre: async () => formMock.compressed,
+}));
 
 const CHAR = 1;
 const TYPE = 45490;
@@ -113,5 +116,33 @@ describe('repriceForOreForm', () => {
     await db.miningTaxAssignments.put(record({ oreLineValues: { [TYPE]: 777 } }));
     await repriceForOreForm(CHAR);
     expect((await db.miningTaxAssignments.get('a1'))?.estimatedValue).toBe(777);
+  });
+
+  it('does not overwrite a record that was paid while prices were loading', async () => {
+    formMock.compressed = false;
+    await db.miningTaxAssignments.put(record());
+    pricingMock.loadUnitPricesOnDate.mockImplementation(async () => {
+      await db.miningTaxAssignments.update('a1', { status: 'paid', updatedAt: 99 });
+      return { prices: new Map([[TYPE, 5]]), unpriced: new Set(), sellFallback: new Set() };
+    });
+
+    await repriceForOreForm(CHAR);
+
+    const row = await db.miningTaxAssignments.get('a1');
+    expect(row).toMatchObject({ status: 'paid', estimatedValue: 1000 });
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('does not bring back a record deleted while prices were loading', async () => {
+    formMock.compressed = false;
+    await db.miningTaxAssignments.put(record());
+    pricingMock.loadUnitPricesOnDate.mockImplementation(async () => {
+      await db.miningTaxAssignments.delete('a1');
+      return { prices: new Map([[TYPE, 5]]), unpriced: new Set(), sellFallback: new Set() };
+    });
+
+    await repriceForOreForm(CHAR);
+
+    expect(await db.miningTaxAssignments.get('a1')).toBeUndefined();
   });
 });

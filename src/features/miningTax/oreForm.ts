@@ -3,7 +3,7 @@
  * moon ore and ice as their Compressed type (default) or the raw one. Synced,
  * like `oreValueMode.ts`: it is how the pilot sells, not a per-device choice.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadCompressedOreTypeIds } from '@/sde/loadSde';
@@ -55,24 +55,45 @@ export async function loadOreFormNames(
   return out;
 }
 
-/** Maps a raw ore id to the type it shows as (icon, market link), following the setting. Identity until the SDE map loads. */
-export function useOreFormTypeId(): (rawTypeId: number) => number {
-  const compressed = useMiningTaxCompressedOre((state) => state.value);
-  const [compressedByRaw, setCompressedByRaw] = useState<Record<string, number>>({});
-  useEffect(() => {
-    let live = true;
+let compressedMap: Record<string, number> = {};
+let mapRequested = false;
+const mapListeners = new Set<() => void>();
+
+function subscribeMap(listener: () => void): () => void {
+  mapListeners.add(listener);
+  if (!mapRequested) {
+    mapRequested = true;
     loadCompressedOreTypeIds()
       .then((map) => {
-        if (live) setCompressedByRaw(map);
+        compressedMap = map;
+        mapListeners.forEach((notify) => notify());
       })
       .catch(() => {
         // No SDE map: icons keep the raw type, which is only a lookalike.
+        mapRequested = false;
       });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return (rawTypeId) => oreFormTypeId(rawTypeId, compressedByRaw, compressed);
+  }
+  return () => {
+    mapListeners.delete(listener);
+  };
+}
+
+/** Maps a raw ore id to the type it shows as (icon, market link), following the setting. Identity until the SDE map loads. */
+export function useOreFormTypeId(): (rawTypeId: number) => number {
+  const compressed = useMiningTaxCompressedOre((state) => state.value);
+  const map = useSyncExternalStore(subscribeMap, () => compressedMap);
+  return useCallback((rawTypeId) => oreFormTypeId(rawTypeId, map, compressed), [map, compressed]);
+}
+
+/** Sets or clears `rawOrePriced` for a value priced under `compressed`. */
+export function withOreFormMarker<T extends { rawOrePriced?: boolean }>(
+  record: T,
+  compressed: boolean
+): T {
+  const next = { ...record };
+  if (compressed) delete next.rawOrePriced;
+  else next.rawOrePriced = true;
+  return next;
 }
 
 /**

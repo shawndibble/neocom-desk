@@ -14,7 +14,7 @@ import { scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
-import { readCompressedOre } from './oreForm';
+import { readCompressedOre, withOreFormMarker } from './oreForm';
 
 export async function repriceForOreForm(characterId: number): Promise<void> {
   const compressed = await readCompressedOre();
@@ -24,7 +24,11 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
   if (stale.length === 0) return;
 
   const payees = await loadPayees(characterId);
-  const updates: MiningTaxAssignmentRecord[] = [];
+  const updates: {
+    assignment: MiningTaxAssignmentRecord;
+    estimatedValue: number;
+    taxOwed: number;
+  }[] = [];
   for (const assignment of stale) {
     try {
       const payee = payees.find((p) => p.id === assignment.payeeId);
@@ -45,20 +49,26 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
         assignment.taxPct,
         overrides
       );
-      const next: MiningTaxAssignmentRecord = {
-        ...assignment,
-        estimatedValue,
-        taxOwed,
-        updatedAt: Date.now(),
-      };
-      if (compressed) delete next.rawOrePriced;
-      else next.rawOrePriced = true;
-      updates.push(next);
+      updates.push({ assignment, estimatedValue, taxOwed });
     } catch {
       // No prices reachable right now: keep the old value, retry next load.
     }
   }
   if (updates.length === 0) return;
-  await db.miningTaxAssignments.bulkPut(updates);
-  scheduleSync(characterId);
+  // Prices were awaited above, so each row is re-read and only written if it is
+  // still the Outstanding record we priced: a pay, a sync pull, a coalesce or a
+  // delete in between wins over this write.
+  let wrote = false;
+  await db.transaction('rw', db.miningTaxAssignments, async () => {
+    for (const { assignment, estimatedValue, taxOwed } of updates) {
+      const live = await db.miningTaxAssignments.get(assignment.id);
+      if (!live || live.status !== 'outstanding' || live.updatedAt !== assignment.updatedAt)
+        continue;
+      await db.miningTaxAssignments.put(
+        withOreFormMarker({ ...live, estimatedValue, taxOwed, updatedAt: Date.now() }, compressed)
+      );
+      wrote = true;
+    }
+  });
+  if (wrote) scheduleSync(characterId);
 }

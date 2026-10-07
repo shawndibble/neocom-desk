@@ -31,7 +31,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { normalizePaymentInfo } from './paymentLinks';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
-import { currentCompressedOre } from './oreForm';
+import { currentCompressedOre, withOreFormMarker } from './oreForm';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -695,16 +695,17 @@ export async function planNeedsReviewResolution(
     prices,
     assignment.taxPct
   );
-  const updated: MiningTaxAssignmentRecord = {
-    ...assignment,
-    oreLines: relevantFresh,
-    estimatedValue,
-    taxOwed,
-    status: 'outstanding',
-    updatedAt: Date.now(),
-  };
-  if (compressed) delete updated.rawOrePriced;
-  else updated.rawOrePriced = true;
+  const updated: MiningTaxAssignmentRecord = withOreFormMarker(
+    {
+      ...assignment,
+      oreLines: relevantFresh,
+      estimatedValue,
+      taxOwed,
+      status: 'outstanding',
+      updatedAt: Date.now(),
+    },
+    compressed
+  );
   delete updated.reviewDiff;
   delete updated.paidAt;
   // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds

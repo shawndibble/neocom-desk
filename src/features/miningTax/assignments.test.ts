@@ -35,6 +35,7 @@ const TYPE_A = 45490;
 const TYPE_B = 45491;
 
 beforeEach(async () => {
+  useMiningTaxCompressedOre.setState({ value: true, hydrated: true });
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
   await db.payees.clear();
@@ -88,7 +89,6 @@ describe('createAssignment', () => {
     });
 
     expect(assignment.rawOrePriced).toBe(true);
-    useMiningTaxCompressedOre.setState({ value: true, hydrated: true });
   });
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
