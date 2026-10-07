@@ -208,19 +208,10 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
     <BoardCard
       title={t('overview.board.miningTax')}
       meta={
-        <>
-          {data !== null && data.characterCount > 0 && (
-            <CharacterScopeReadout
-              scope="all"
-              total={data.characterCount}
-              missing={data.missingCharacterNames}
-            />
-          )}
-          <SeverityWord
-            severity={miningTaxSeverity(data)}
-            warningLabel={data?.needsReauth ? REAUTH_WORD : 'overview.board.word.unpaid'}
-          />
-        </>
+        <SeverityWord
+          severity={miningTaxSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : 'overview.board.word.unpaid'}
+        />
       }
       to="/mining/tax"
       help={t('overview.board.miningTaxHelp')}
@@ -238,6 +229,16 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
                 })
       }
     >
+      {/* Not in `meta`: the title and severity word already fill the header at 1180px. */}
+      {data !== null && data.characterCount > 0 && (
+        <div className="px-3 pt-3">
+          <CharacterScopeReadout
+            scope="all"
+            total={data.characterCount}
+            missing={data.missingCharacterNames}
+          />
+        </div>
+      )}
       <TileRow>
         <NumberTile
           label={t('overview.board.iskUnpaid')}
