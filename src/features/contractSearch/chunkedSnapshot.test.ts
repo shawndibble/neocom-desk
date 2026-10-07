@@ -8,13 +8,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID, STALE_GRACE_MS, resetRevalidationState } from '@/esi/cache';
-import { loadChunkedSnapshot, type ChunkedSnapshotSource } from './chunkedSnapshot';
+import {
+  chunkDocId,
+  loadChunkedSnapshot,
+  useChunkProgressStore,
+  type ChunkedSnapshotSource,
+} from './chunkedSnapshot';
 
 const getDocs = vi.hoisted(() => vi.fn());
+const getDoc = vi.hoisted(() => vi.fn());
 
 vi.mock('firebase/firestore/lite', () => ({
   getDocs,
+  getDoc,
   collection: (_db: unknown, name: string) => ({ name }),
+  doc: (_db: unknown, collectionName: string, id: string) => ({ path: `${collectionName}/${id}` }),
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => undefined) }));
@@ -28,17 +36,20 @@ const SOURCE: ChunkedSnapshotSource = {
 };
 const CHARACTER_ID = 91;
 
-/** One `meta` doc plus N chunk docs, the layout `writeChunkedSnapshot` emits. */
-function snapshotDocs(lastSyncedAt: number, chunks: readonly (readonly unknown[])[]) {
-  return {
-    docs: [
-      { id: 'meta', data: () => ({ lastSyncedAt }) },
-      ...chunks.map((rows, i) => ({
-        id: `chunk-${String(i).padStart(4, '0')}`,
-        data: () => ({ rows }),
-      })),
+/** Serves `meta` and each chunk by path, the way Firestore answers per-doc reads. */
+function serveDocs(
+  lastSyncedAt: number,
+  chunks: readonly (readonly unknown[])[],
+  withChunkCount = true
+): void {
+  const data = new Map<string, unknown>([
+    [
+      'publicCourierContracts/meta',
+      withChunkCount ? { lastSyncedAt, chunkCount: chunks.length } : { lastSyncedAt },
     ],
-  };
+    ...chunks.map((rows, i) => [`publicCourierContracts/${chunkDocId(i)}`, { rows }] as const),
+  ]);
+  getDoc.mockImplementation(async (ref: { path: string }) => ({ data: () => data.get(ref.path) }));
 }
 
 async function seedLapsedRow(value: unknown): Promise<void> {
@@ -59,13 +70,20 @@ beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
   getDocs.mockReset();
+  getDoc.mockReset();
+  useChunkProgressStore.setState({ byKey: {} });
+});
+
+describe('chunkDocId', () => {
+  it('matches the id scheme functions/src/publicContracts.ts writes', () => {
+    expect(chunkDocId(0)).toBe('chunk-0000');
+    expect(chunkDocId(123)).toBe('chunk-0123');
+  });
 });
 
 describe('loadChunkedSnapshot', () => {
-  it('concatenates every chunk doc and reads lastSyncedAt off meta', async () => {
-    getDocs.mockResolvedValue(
-      snapshotDocs(1_700_000_000_000, [[{ id: 1 }, { id: 2 }], [{ id: 3 }]])
-    );
+  it('concatenates every chunk doc in order and reads lastSyncedAt off meta', async () => {
+    serveDocs(1_700_000_000_000, [[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
 
     const result = await loadChunkedSnapshot<{ id: number }>(SOURCE, CHARACTER_ID);
 
@@ -74,15 +92,69 @@ describe('loadChunkedSnapshot', () => {
     expect(result.revalidating).toBe(false);
   });
 
-  it('renders a lapsed snapshot without waiting for the collection read', async () => {
+  it('reports chunks landed against the count meta states, then clears', async () => {
+    serveDocs(5, [[{ id: 1 }], [{ id: 2 }], [{ id: 3 }]]);
+    const seen: Array<{ done: number; total: number | null } | undefined> = [];
+    const unsubscribe = useChunkProgressStore.subscribe((state) =>
+      seen.push(state.byKey[SOURCE.cacheKey])
+    );
+
+    await loadChunkedSnapshot<{ id: number }>(SOURCE, CHARACTER_ID);
+    unsubscribe();
+
+    expect(seen[0]).toEqual({ done: 0, total: 3 });
+    expect(seen).toContainEqual({ done: 3, total: 3 });
+    expect(seen.at(-1)).toBeUndefined();
+    expect(useChunkProgressStore.getState().byKey[SOURCE.cacheKey]).toBeUndefined();
+  });
+
+  it('re-reads once when a publish lands mid-read', async () => {
+    serveDocs(1, [[{ id: 'old' }]]);
+    const base = getDoc.getMockImplementation()!;
+    let metaReads = 0;
+    getDoc.mockImplementation(async (ref: { path: string }) => {
+      if (ref.path.endsWith('/meta')) {
+        metaReads += 1;
+        // Second read (the post-check) sees a newer publish; later reads settle.
+        if (metaReads === 2) return { data: () => ({ lastSyncedAt: 2, chunkCount: 1 }) };
+        if (metaReads >= 3) return { data: () => ({ lastSyncedAt: 2, chunkCount: 1 }) };
+      }
+      return base(ref);
+    });
+
+    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+
+    expect(result.cached?.data.lastSyncedAt).toBe(2);
+  });
+
+  it('falls back to one whole-collection read when meta has no chunk count', async () => {
+    serveDocs(7, [], false);
+    getDocs.mockResolvedValue({
+      docs: [
+        { id: 'meta', data: () => ({ lastSyncedAt: 7 }) },
+        { id: 'chunk-0000', data: () => ({ rows: [{ id: 'legacy' }] }) },
+      ],
+    });
+
+    const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
+
+    expect(result.cached?.data.rows).toEqual([{ id: 'legacy' }]);
+  });
+
+  it('renders a lapsed snapshot without waiting for the chunk reads', async () => {
     await seedLapsedRow({ rows: [{ id: 'last-cycle' }], lastSyncedAt: 1 });
     let released!: () => void;
     const gate = new Promise<void>((resolve) => {
       released = resolve;
     });
-    getDocs.mockImplementation(async () => {
+    getDoc.mockImplementation(async (ref: { path: string }) => {
       await gate;
-      return snapshotDocs(2, [[{ id: 'this-cycle' }]]);
+      return {
+        data: () =>
+          ref.path.endsWith('/meta')
+            ? { lastSyncedAt: 2, chunkCount: 1 }
+            : { rows: [{ id: 'this-cycle' }] },
+      };
     });
 
     const pending = loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
@@ -99,12 +171,11 @@ describe('loadChunkedSnapshot', () => {
   });
 
   it('still blocks when there is no stored snapshot to show', async () => {
-    getDocs.mockResolvedValue(snapshotDocs(3, [[{ id: 'cold' }]]));
+    serveDocs(3, [[{ id: 'cold' }]]);
 
     const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
 
     expect(result.cached?.data.rows).toEqual([{ id: 'cold' }]);
     expect(result.revalidating).toBe(false);
-    expect(getDocs).toHaveBeenCalledTimes(1);
   });
 });

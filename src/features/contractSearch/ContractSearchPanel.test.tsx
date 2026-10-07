@@ -22,6 +22,7 @@ import {
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
+import { OFFERS_CACHE_KEY, useChunkProgressStore } from '@/features/contractSearch/chunkedSnapshot';
 import type { CachedResult } from '@/esi/cache';
 import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import { clearNpcStationIndex } from '@/sde/npcStations';
@@ -380,11 +381,18 @@ function SearchTabHarness() {
 }
 
 /**
+ * The Items board asks for a search before it shows a table (issue #2921), and
+ * any control off its default counts as one. A minimum quantity of 0 is a
+ * search that excludes nothing, so the suites that read the table render it.
+ */
+const SEARCHING = '/?items.minQty=0';
+
+/**
  * Always inside a Router: every item row is a Build Plan context-menu trigger
  * (#931), as is each detail-modal line, and both call `useNavigate`. Matches
  * production — the panel only ever renders under `/contracts`.
  */
-function renderWithRouter(initialEntries?: string[]) {
+function renderWithRouter(initialEntries: string[] = [SEARCHING]) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <SearchTabHarness />
@@ -538,7 +546,7 @@ describe('ContractSearchPanel', () => {
 
   it('draws no Items/Courier switch of its own — the route tabs pick the corpus', async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[SEARCHING]}>
         <ContractSearchPanel mode="items" />
       </MemoryRouter>
     );
@@ -628,7 +636,8 @@ describe('ContractSearchPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-    await waitFor(async () => expect(await bodyRows()).not.toHaveLength(0));
+    // Reset clears every control, which leaves nothing to search for.
+    expect(await screen.findByText('Search to see contract offers')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toHaveValue('');
   });
 
@@ -644,7 +653,7 @@ describe('ContractSearchPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
-    await waitFor(async () => expect(await bodyRows()).toHaveLength(3));
+    expect(await screen.findByText('Search to see contract offers')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Max price' })).toHaveValue('');
   });
 
@@ -1241,7 +1250,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
 
   function renderWithProbe() {
     return render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[SEARCHING]}>
         <ContractSearchPanel mode="items" />
         <LocationProbe />
       </MemoryRouter>
@@ -1970,6 +1979,63 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     expect(
       within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — search first (issue #2921)', () => {
+  function deferred<T>() {
+    let settle!: (value: T) => void;
+    const promise = new Promise<T>((resolve) => {
+      settle = resolve;
+    });
+    return { promise, settle };
+  }
+
+  beforeEach(() => useChunkProgressStore.setState({ byKey: {} }));
+
+  it('asks for a search instead of listing offers when nothing is filtered', async () => {
+    renderWithRouter(['/']);
+
+    expect(await screen.findByText('Search to see contract offers')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search item name…')).toBeInTheDocument();
+  });
+
+  it('keeps the search box usable while the snapshot downloads, and shows the download', async () => {
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    useChunkProgressStore.getState().set(OFFERS_CACHE_KEY, { done: 40, total: 124 });
+    renderWithRouter(['/']);
+
+    expect(await screen.findByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '124');
+    expect(screen.getByText('Downloading offers… 40 of 124')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search item name…')).toBeEnabled();
+
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+    expect(screen.getByText('Search to see contract offers')).toBeInTheDocument();
+  });
+
+  it('treats a filter other than the item name as a search', async () => {
+    renderWithRouter(['/?items.maxPrice=1000000000']);
+
+    expect(await bodyRows()).not.toHaveLength(0);
+    expect(screen.queryByText('Search to see contract offers')).not.toBeInTheDocument();
+  });
+
+  it('waits behind a spinner, filter bar intact, when a search arrives before the snapshot', async () => {
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    renderWithRouter(['/?items.maxPrice=1000000000']);
+
+    expect(
+      await screen.findByText('Loading public contracts, this may take a moment.')
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search item name…')).toBeInTheDocument();
+
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    expect(await bodyRows()).toHaveLength(1);
   });
 });
 

@@ -20,13 +20,17 @@
  * though the live side is Firestore, not ESI — `loadWithCache` only needs a
  * `fetchLive`.
  */
-import { collection, getDocs } from 'firebase/firestore/lite';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
+import { create } from 'zustand';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/esi/cache';
 
 const META_DOC_ID = 'meta';
+
+/** The offers snapshot's cache key; also what its chunk-download progress is keyed by. Lives here, not in `publicContractOffers.ts`, so a view can read progress without importing the loader. */
+export const OFFERS_CACHE_KEY = 'publicContractOffersAll';
 
 export interface ChunkedSnapshot<TRow> {
   rows: TRow[];
@@ -70,13 +74,61 @@ export interface ChunkedSnapshotSource {
   staleAfterMs: number;
 }
 
-async function fetchSnapshot<TRow>(
-  source: ChunkedSnapshotSource,
-  characterId: number
-): Promise<ChunkedSnapshot<TRow> | null> {
-  if (!isSyncConfigured()) return null;
-  await ensureAnySession(characterId);
+/** Mirrors `functions/src/publicContracts.ts`'s `chunkDocId`; `chunkedSnapshot.test.ts` pins the two together. */
+export function chunkDocId(index: number): string {
+  return `chunk-${String(index).padStart(4, '0')}`;
+}
 
+/** How many chunk docs are in flight at once: enough to hide round-trip latency, few enough not to starve the page's other requests. */
+const CHUNK_READ_CONCURRENCY = 6;
+
+/**
+ * How far a snapshot's chunk download has got, per cache key. A store beside
+ * the loader rather than a return value, because the loader runs inside
+ * `loadWithCache`, which settles once, at the end — nothing on that path can
+ * report "40 of 124" while it is still running. `total` is `null` until the
+ * `meta` doc has said how many chunks there are.
+ */
+export interface ChunkProgress {
+  done: number;
+  total: number | null;
+}
+
+interface ProgressStore {
+  byKey: Record<string, ChunkProgress | undefined>;
+  set(key: string, progress: ChunkProgress | null): void;
+}
+
+export const useChunkProgressStore = create<ProgressStore>((set) => ({
+  byKey: {},
+  set: (key, progress) =>
+    set((state) => {
+      const byKey = { ...state.byKey };
+      if (progress === null) delete byKey[key];
+      else byKey[key] = progress;
+      return { byKey };
+    }),
+}));
+
+/** The in-flight chunk download for a snapshot, or `undefined` when none is running. */
+export function useChunkProgress(cacheKey: string): ChunkProgress | undefined {
+  return useChunkProgressStore((state) => state.byKey[cacheKey]);
+}
+
+/** `meta`'s fields, where `chunkCount` is absent on a snapshot published before the count was recorded. */
+async function readMeta(collectionName: string): Promise<MetaDocData & { chunkCount?: number }> {
+  const metaSnap = await getDoc(doc(getSyncFirestore(), collectionName, META_DOC_ID));
+  return (
+    (metaSnap.data() as (MetaDocData & { chunkCount?: number }) | undefined) ?? {
+      lastSyncedAt: 0,
+    }
+  );
+}
+
+/** The whole collection in one query: no progress to report, so only the fallback when `meta` carries no chunk count. */
+async function readWholeCollection<TRow>(
+  source: ChunkedSnapshotSource
+): Promise<ChunkedSnapshot<TRow>> {
   const snapshot = await getDocs(collection(getSyncFirestore(), source.collectionName));
   const rows: TRow[] = [];
   let lastSyncedAt: number | null = null;
@@ -88,6 +140,57 @@ async function fetchSnapshot<TRow>(
     }
   }
   return { rows, lastSyncedAt };
+}
+
+async function readChunks<TRow>(
+  source: ChunkedSnapshotSource,
+  chunkCount: number
+): Promise<TRow[][]> {
+  const chunks: TRow[][] = new Array<TRow[]>(chunkCount);
+  let next = 0;
+  let done = 0;
+  const report = useChunkProgressStore.getState().set;
+  report(source.cacheKey, { done, total: chunkCount });
+  async function worker(): Promise<void> {
+    while (next < chunkCount) {
+      const index = next;
+      next += 1;
+      const snap = await getDoc(doc(getSyncFirestore(), source.collectionName, chunkDocId(index)));
+      chunks[index] = (snap.data() as ChunkDocData<TRow> | undefined)?.rows ?? [];
+      done += 1;
+      report(source.cacheKey, { done, total: chunkCount });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CHUNK_READ_CONCURRENCY, chunkCount) }, worker));
+  return chunks;
+}
+
+/**
+ * Reads `meta`, then the chunk docs it counts, a few at a time, reporting each
+ * landing (`useChunkProgress`). Chunks are written one by one and `meta` last,
+ * so a publish landing mid-read would hand back a mix of two cycles; `meta` is
+ * read again afterwards and the whole read retried once if it moved.
+ */
+async function fetchSnapshot<TRow>(
+  source: ChunkedSnapshotSource,
+  characterId: number
+): Promise<ChunkedSnapshot<TRow> | null> {
+  if (!isSyncConfigured()) return null;
+  await ensureAnySession(characterId);
+
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      const meta = await readMeta(source.collectionName);
+      if (meta.chunkCount === undefined) return await readWholeCollection<TRow>(source);
+      const chunks = await readChunks<TRow>(source, meta.chunkCount);
+      const after = await readMeta(source.collectionName);
+      if (after.lastSyncedAt === meta.lastSyncedAt || attempt >= 1) {
+        return { rows: chunks.flat(), lastSyncedAt: meta.lastSyncedAt || null };
+      }
+    }
+  } finally {
+    useChunkProgressStore.getState().set(source.cacheKey, null);
+  }
 }
 
 /**

@@ -66,6 +66,8 @@ import {
   type PublicCourierContractRow,
 } from '@/engine/contracts/courierSearch';
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
+import { OFFERS_CACHE_KEY, useChunkProgress } from '@/features/contractSearch/chunkedSnapshot';
+import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
@@ -363,6 +365,37 @@ function ContractSearchFilterBar({
   );
 }
 
+/** A thin, out-of-the-way bar: how many of the snapshot's chunk docs have landed. Indeterminate until `meta` has said how many there are. */
+function SnapshotProgress({
+  done,
+  total,
+  label,
+}: {
+  done: number;
+  total: number | null;
+  label: string;
+}) {
+  const determinate = total !== null && total > 0;
+  return (
+    <div className="flex w-full max-w-xs flex-col items-center gap-1">
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={determinate ? total : undefined}
+        aria-valuenow={determinate ? done : undefined}
+        className="h-1 w-full overflow-hidden rounded-full bg-line"
+      >
+        <div
+          className={cx('h-full bg-accent', determinate ? 'transition-[width]' : 'animate-pulse')}
+          style={{ width: determinate ? `${Math.round((done / total) * 100)}%` : '30%' }}
+        />
+      </div>
+      <p className="text-[0.6875rem] text-text-dim">{label}</p>
+    </div>
+  );
+}
+
 interface Suggestion extends ContractTypeOption {
   stats: ContractOfferStats;
 }
@@ -495,6 +528,13 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   }
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
+  /**
+   * Search-first (issue #2921): with nothing to search for the Items board
+   * asks for a search instead of rendering ~370k offers, while the snapshot
+   * keeps downloading behind it so the first search usually finds it landed.
+   */
+  const searchActive = isItemsSearchActive(uiFilter, selectedTypeId);
+  const downloadProgress = useChunkProgress(OFFERS_CACHE_KEY);
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
 
   // Freshness and the offline banner both name the snapshot actually on
@@ -993,7 +1033,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 {t('contractSearch.refreshingInBackground')}
               </p>
             )}
-            {modeLoading && modeRowCount === 0 ? (
+            {mode === 'courier' && modeLoading && modeRowCount === 0 ? (
               <div className="flex flex-col items-center gap-2 py-16">
                 <Spinner label={modeLoadingLabel} />
                 {/* Visible copy of the spinner's own label — the first sync is
@@ -1005,7 +1045,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               </div>
             ) : modeError ? (
               <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-            ) : modeRowCount === 0 ? (
+            ) : modeRowCount === 0 && !(mode === 'items' && modeLoading) ? (
               // Nothing synced for the corpus on screen — distinct from
               // `noFilterMatches` below, which is "rows exist, the filter just
               // excludes them all". Per mode, so an empty courier snapshot never
@@ -1132,7 +1172,42 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   </div>
                 )}
 
-                {displayRows.length === 0 ? (
+                {!searchActive ? (
+                  <div className="flex flex-col items-center gap-3 py-12">
+                    <EmptyState
+                      title={t('contractSearch.searchFirstTitle')}
+                      hint={t('contractSearch.searchFirstHint')}
+                      className="py-0"
+                    />
+                    {modeLoading && (
+                      <SnapshotProgress
+                        done={downloadProgress?.done ?? 0}
+                        total={downloadProgress?.total ?? null}
+                        label={t('contractSearch.downloadProgress', {
+                          done: downloadProgress?.done ?? 0,
+                          total: downloadProgress?.total ?? 0,
+                        })}
+                      />
+                    )}
+                  </div>
+                ) : modeLoading && rows.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-16">
+                    <Spinner label={modeLoadingLabel} />
+                    <p aria-hidden="true" className="text-text-dim">
+                      {modeLoadingLabel}
+                    </p>
+                    {downloadProgress?.total != null && (
+                      <SnapshotProgress
+                        done={downloadProgress.done}
+                        total={downloadProgress.total}
+                        label={t('contractSearch.downloadProgress', {
+                          done: downloadProgress.done,
+                          total: downloadProgress.total,
+                        })}
+                      />
+                    )}
+                  </div>
+                ) : displayRows.length === 0 ? (
                   namingTypes && uiFilter.typeQuery.trim() !== '' ? (
                     // Every type still reads `#34` until the market catalogue
                     // lands, so a typed query matches nothing yet. "No matches"

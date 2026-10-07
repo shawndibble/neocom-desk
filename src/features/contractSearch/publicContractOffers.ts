@@ -15,6 +15,7 @@
  * values below.
  */
 import {
+  OFFERS_CACHE_KEY,
   loadChunkedSnapshot,
   type ChunkedSnapshotRead,
   type ChunkedSnapshotSource,
@@ -29,7 +30,7 @@ const SOURCE: ChunkedSnapshotSource = {
    * different payload shapes under one key is a corrupt cache, not a shared
    * one.
    */
-  cacheKey: 'publicContractOffersAll',
+  cacheKey: OFFERS_CACHE_KEY,
   /** How often the backend republishes the snapshot. */
   staleAfterMs: 30 * 60_000,
 };
