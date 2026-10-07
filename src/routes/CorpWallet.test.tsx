@@ -373,7 +373,9 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     render(<App />);
 
     expect(
-      await screen.findByText('No corporation wallet data cached. Reconnect to fetch it.')
+      await screen.findByText(
+        "No corporation wallet data cached. Couldn't load it yet. Try again shortly."
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).toBeNull();
   });

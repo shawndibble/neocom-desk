@@ -146,7 +146,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 ## States
 
 - Hydrating: spinner; no active Character: redirect.
-- Loading: spinner. `assetsNeedsReauth`: `GrantBanner` "Log in again to see your assets" for `getCharacterAssets`. Error: "Couldn't load" empty state. No data: "No assets cached / Reconnect to fetch this character's assets."
+- Loading: spinner. `assetsNeedsReauth`: `GrantBanner` "Log in again to see your assets" for `getCharacterAssets`. Error: "Couldn't load" empty state. No data: "No assets cached / Couldn't load this character's assets yet. Try again shortly."
 - Offline (`fromCache`): warning "offline" line.
 - Truncated: "Incomplete — Only the first N assets were fetched — this character has more." + **Try again**.
 - Prices unreachable: page still renders cached assets, badges 0 (`Assets.test.tsx:639`).
