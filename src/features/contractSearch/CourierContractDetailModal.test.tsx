@@ -15,6 +15,11 @@ vi.mock('@/features/contractSearch/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
+let lawlessSystems: ReadonlySet<number> = new Set();
+vi.mock('@/features/travel/useLawlessSystems', () => ({
+  useLawlessSystems: () => lawlessSystems,
+}));
+
 // Hydrated at once, so the modal asks for its route on first render.
 const RULES = { preference: 'prefer-highsec' as const };
 vi.mock('@/features/route/routeRules', () => ({
@@ -78,6 +83,7 @@ function renderModal(jumps: CourierJumps = { kind: 'known', count: 2 }) {
 
 beforeEach(() => {
   routeExposure.mockReset();
+  lawlessSystems = new Set();
 });
 
 describe('CourierContractDetailModal route path', () => {
@@ -110,6 +116,24 @@ describe('CourierContractDetailModal route path', () => {
 
     await user.click(toggle);
     expect(screen.queryByRole('list', { name: 'Route, system by system' })).toBeNull();
+  });
+
+  it('tags a lawless system on the route', async () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    lawlessSystems = new Set([30000142]);
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(await screen.findByRole('button', { name: '2 jumps' }));
+
+    const items = within(
+      screen.getByRole('list', { name: 'Route, system by system' })
+    ).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Jita0.9Lawless',
+      'Uedama0.5Gank Chokepoint',
+      'Amarr1.0',
+    ]);
   });
 
   it('keeps the count as plain text when the route could not be worked out', async () => {

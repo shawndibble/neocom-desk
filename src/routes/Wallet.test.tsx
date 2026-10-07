@@ -434,7 +434,7 @@ describe('Wallet', () => {
     expect(
       screen.getByText('Clear the search or reset the filters above to see every entry.')
     ).toBeInTheDocument();
-    expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/try again shortly/i)).not.toBeInTheDocument();
   });
 
   it('offers Reset filters on the filtered-empty journal, and restores every entry', async () => {

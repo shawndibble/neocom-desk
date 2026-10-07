@@ -96,10 +96,15 @@ describe('parseReadingPct', () => {
     expect(parseReadingPct('0')).toBe(0);
   });
 
+  it('reads the minus sign the tooltips print as the reduction it means', () => {
+    expect(parseReadingPct('-20.0%')).toBe(20);
+    expect(parseReadingPct('−1,0 %')).toBe(1);
+  });
+
   it('rejects blanks, words and out-of-range numbers', () => {
     expect(parseReadingPct('')).toBeNull();
     expect(parseReadingPct('abc')).toBeNull();
-    expect(parseReadingPct('-1')).toBeNull();
+    expect(parseReadingPct('-120')).toBeNull();
     expect(parseReadingPct('120')).toBeNull();
   });
 });

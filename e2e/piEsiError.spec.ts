@@ -49,7 +49,9 @@ for (const [label, viewport] of VIEWPORTS) {
       const alert = page.getByRole('alert').filter({ hasText: NOTICE });
       await expect(alert).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText(/no colonies yet/i)).toHaveCount(0);
-      await expect(page.getByText(/Reconnect/)).toHaveCount(0);
+      await expect(
+        page.getByText(/Couldn't load this character's planetary colonies yet/)
+      ).toHaveCount(0);
       const box = await alert.boundingBox();
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
       // The notice owns the colony slot only: Plan keeps Find best, Map keeps its board (#2760).

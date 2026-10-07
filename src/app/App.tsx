@@ -23,6 +23,7 @@ import { preloadedLazy } from './preloadedLazy';
 import { writeSignedInShellHint } from './signedInShellHint';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
 import { DocumentTitleTracker } from './DocumentTitleTracker';
+import { StaleStoresReloader } from './StaleStoresReloader';
 import { ReloadPrompt } from './ReloadPrompt';
 import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
@@ -333,6 +334,7 @@ export function App() {
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
         <DocumentTitleTracker />
+        <StaleStoresReloader />
         <Suspense fallback={<RouteFallback />}>
           <SentryRoutes>
             <Route path="/" element={<Root />} />

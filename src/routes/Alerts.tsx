@@ -47,6 +47,7 @@ import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/ale
 import {
   EMPTY_ALERTS_FILTER,
   activeAlertsFilterCount,
+  dismissAllEntries,
   filterAlertGroups,
   type DisplayAlertGroup,
 } from '@/features/notifications/alertsFilter';
@@ -186,7 +187,7 @@ export function Alerts() {
   const visible = useMemo(() => filterAlertGroups(groups, filter), [groups, filter]);
 
   const liveGroups = useMemo(() => groups.filter((group) => !group.muted), [groups]);
-  const liveEntries = useMemo(() => liveGroups.flatMap((group) => group.entries), [liveGroups]);
+  const shownLiveEntries = useMemo(() => dismissAllEntries(groups, filter), [groups, filter]);
 
   const severityCounts = useMemo(() => {
     const counts = new Map<DeadlineSeverity, number>();
@@ -219,18 +220,18 @@ export function Alerts() {
             >
               {t('alerts.settings')}
             </Link>
-            {liveEntries.length > 0 && (
+            {shownLiveEntries.length > 0 && (
               <IconButton
                 icon={<Icon.DismissAll />}
                 label={t('alerts.dismissAll')}
                 onClick={() => {
-                  // Every unmuted group is about to empty out; only a muted
+                  // Every shown unmuted group is about to empty out; only a muted
                   // group shown via the chip can still be there afterwards.
                   const survivor = visible.find((group) => group.muted);
                   focusAfterRemoval(
                     survivor ? [survivor.key, PANEL_HEADING_FOCUS] : [PANEL_HEADING_FOCUS]
                   );
-                  void dismissFeedEntriesAndSync(liveEntries);
+                  void dismissFeedEntriesAndSync(shownLiveEntries);
                 }}
               />
             )}

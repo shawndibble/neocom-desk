@@ -47,6 +47,7 @@ import type { TripOptions } from '@/engine/route/tripPlan';
 import { planLocalTrip, type LocalTripResult } from '@/features/route/localRoute';
 import type { RouteQuery, RouteRules } from '@/features/route/routeRules';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { useLawlessSystems } from './useLawlessSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
 import {
   bridgeEndsFromKey,
@@ -156,6 +157,7 @@ export function useRouteSafety({
   bridges = null,
 }: RouteSafetyRequest): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
+  const lawless = useLawlessSystems();
   const [resolved, setResolved] = useState<ResolvedTrip | null>(null);
   const { rules, key: routeKey, hydrated } = route;
   const { optimize = false, returnToStart = false, keepLastStopLast = false } = tripOptions;
@@ -295,7 +297,20 @@ export function useRouteSafety({
       systems: resolved.systems,
       regionNames: resolved.regionNames,
       activity,
+      lawless,
     });
     return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
-  }, [bridges, fromId, stops, resolved, requestKey, activity, holes, planWithAvoid, pins, listed]);
+  }, [
+    bridges,
+    fromId,
+    stops,
+    resolved,
+    requestKey,
+    activity,
+    lawless,
+    holes,
+    planWithAvoid,
+    pins,
+    listed,
+  ]);
 }
