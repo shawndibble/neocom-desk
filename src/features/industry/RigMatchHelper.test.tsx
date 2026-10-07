@@ -8,8 +8,8 @@ async function openAndType(me: string, te: string, onApply = vi.fn()) {
   const user = userEvent.setup();
   render(<RigMatchHelper facility="azbel" security="nullsec" onApply={onApply} />);
   await user.click(screen.getByRole('button', { name: 'Match from in-game numbers' }));
-  await user.type(screen.getByLabelText('Material bonus %'), me);
-  await user.type(screen.getByLabelText('Time bonus %'), te);
+  await user.type(screen.getByLabelText('Material bonus % (Structure Role Bonus)'), me);
+  await user.type(screen.getByLabelText('Time bonus % (Structure Role Bonus)'), te);
   return { user, onApply };
 }
 
@@ -20,6 +20,13 @@ describe('RigMatchHelper', () => {
     await user.click(screen.getByRole('button', { name: 'Use this fit' }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect([...onApply.mock.calls[0][0]].sort()).toEqual(['meT2', 'none', 'teT1']);
+  });
+
+  it('reads the tooltip lines as printed: a rig-less structure is its own hull bonus', async () => {
+    // Azbel hull: 1% material, 20% time, typed as the tooltips print them.
+    const { user, onApply } = await openAndType('-1.0%', '-20.0%');
+    await user.click(screen.getByRole('button', { name: 'Use this fit' }));
+    expect([...onApply.mock.calls[0][0]]).toEqual(['none', 'none', 'none']);
   });
 
   it('says so when nothing matches, naming the line to read', async () => {
