@@ -144,6 +144,7 @@ None of these features need an ESI scope. Sign-in to Firebase requires a refresh
 
 ## Observed gaps
 
+- Not to be confused: the Characters page's "Last synced" column and card dot (`Characters.tsx:325,380,737`) show ESI data age (`characterLastSynced`), not Firebase sync. Analytics: no in-app opt-out and `page_view` sends the full URL with query (#2855).
 - No manual "Sync now" and no "last synced" display: UI callers of `triggerSync` are `src/app/App.tsx:302` and `removeCharacter.ts:40` only; the string `sync.lastSynced` ("Last synced {{time}}") exists in `en.json` but no non-test code reads it.
 - Sync status is scoped to the active Character (`src/app/useSyncStatus.ts:20`); a failing alt (or background sweep failure) never surfaces.
 - Phone shows no sync indicator for syncing/offline: `SyncStatusDot` lives only in the `hidden md:flex` rail (`Layout.tsx:373`); `SyncErrorNote` only renders in `error`.

@@ -125,6 +125,21 @@ Per active Character. One row per Permission (15 `SCOPE_GROUPS`, `src/esi/regist
 
 Phones and tablets only, once per device (key `installPrompt.seen`, `:8`; accept or dismiss both suppress it forever, no snooze). `detectInstallPlatform` (`:38`): iOS (incl. iPadOS 13+ reporting Macintosh with touch points > 1) split Safari vs other WebKit browsers (CriOS/FxiOS/EdgiOS/OPiOS); Android split Firefox vs Chromium; desktop -> null. `selectInstallPromptVariant` (`:51`): `none` if seen, already standalone (`display-mode: standalone` or `navigator.standalone`) or desktop; `native` when `beforeinstallprompt` has fired (Install button calls `prompt()`, then marks seen after the choice); Android Chromium without the event -> none (waits for it); iOS Safari / iOS other / Firefox Android -> written instructions ("tap Share…, then Add to Home Screen", "open Firefox's menu (⋮), then choose Add app to Home screen"). Fixed bottom-left banner (`bottom-16` above the tab bar on phones), `role=alert`, buttons Install (native only) and Dismiss. Decisions: `20261002-165619-install-prompt-is-mobile-only.md`, `20260901-181135-install-prompt-notifications.md`.
 
+### Install later (gap)
+
+Banner is one-shot; no Settings/Help/FAQ path to install afterwards (grep `install` in Settings, settings feature, faq, help: none). Ticket #2860.
+
+## ESI outage, rate limit, offline (what the player sees)
+
+| Situation | App behaviour | What the player sees |
+| --- | --- | --- |
+| ESI 420/429 or error-limit low | `esi/budget.ts` shuts the gate (`Retry-After`, circuit up to `MAX_CIRCUIT_MS` 5 min); callers wait up to `MAX_BUDGET_WAIT_MS` 5 s then refuse without a request; `esi/cache.ts` serves the stored row | Same as offline: "Showing cached data", amber "offline" line, Data Age badge ages; no mention of ESI or rate limit |
+| ESI slow | per-call `REQUEST_TIMEOUT_MS` 30 s, then cache | Same |
+| Device offline | cache fallback | Same, plus Update/sync skipped; sync error note only on Firebase failure |
+| Downtime (daily) | no special handling found | Same as outage |
+
+Foreground requests for the active Character get permits before background work (`ESI_FOREGROUND_RESERVE` 4 of `ESI_MAX_IN_FLIGHT` 12). No page distinguishes cause. Ticket #2856.
+
 ## Update flow (`src/app/ReloadPrompt.tsx`; `docs/adr/0007-hand-written-service-worker-for-background-sync.md`)
 
 No UI. Service worker `registerType: 'prompt'`. Polls `registration.update()` every 30 min (`:6`; skipped offline or while installing). A waiting update applies: immediately if found within 15 s of page start (`BOOT_APPLY_WINDOW_MS`, `:18`; a reload finding a fresh build), never on `/callback` (a reload would replay the spent OAuth code, `:117`); when the tab has been hidden >= 30 s (`:10`, re-checked on `visibilitychange` and every 15 s, `:13`); or on the next in-app route change of a visible tab (never mid-page on idle); a manual reload counts as consent (`beforeunload` fires skip-waiting best effort). Reloads go through a fade-to-background cover (150 ms, instant with reduced motion) instead of the library's flicker. Manual: Settings › Data & storage › **Update now** (`sync-backup.md`).

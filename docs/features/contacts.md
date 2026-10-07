@@ -31,6 +31,10 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
 - View is `across` only if `tab === 'across'` and (data not loaded yet or more than one Character) (`Contacts.tsx:1001`). With one Character `/contacts/across` silently renders This character, and the switch is not shown (decision `20260912-211914-across-characters-reads-cached-contacts-and-fetches-on`).
 - Scope gate: `routeScopes.ts:269`, endpoints `getCharacterContacts`, `getCharacterContactLabels`, `postUniverseNames`; strings `contacts`.
 
+## NPC standings (not here)
+
+This page lists personal contacts only. The Character's standings with NPC corporations and factions are read (`features/character/standings.ts`, `useTradeHubStandings.ts`) only to compute broker fees and refine tax and are never listed (#2859). Standings to a contact are the contact's own number, not these.
+
 ## States
 
 - Not hydrated: spinner. No active Character: redirect `/characters`.

@@ -168,6 +168,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 ## Observed gaps (facts from code)
 
+- No income/expense breakdown by ref type for a date range; only the filtered net total (`WalletJournalTable.tsx:151`) (#2858).
 - Journal tab and the balance chart are always the active Character's; the `?char=` filter only affects the Balance panel.
 - All-characters Balance has no history chart and no per-row actions; Character rows do not link anywhere.
 - Journal tab never shows a re-login banner: `loadWalletJournal` exposes no `needsReauth`; a revoked wallet scope shows the generic cached-empty state (Balance tab does show the grant banner).

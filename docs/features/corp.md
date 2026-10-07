@@ -244,6 +244,7 @@ All pure, `nowMs` is a parameter (never `Date.now()` inside `src/engine`).
 
 ## Observed gaps
 
+- Kind cards' "N more" is a plain line (`CorpKindCards.tsx:121-127`), not a control: rows past the top 3 are unreachable (#2857).
 - No structures page: fuel/timers/moons/jobs/offline services exist only as Overview board items (top 3 per kind, remainder counted "N more"); no all-rows view, no sort/filter, no structure detail (services, location, fuel quantity).
 - Board gives no notification bridge: short clocks are explicitly deferred to notifications, but the foreground poller runs every 5 min (`foregroundPoller.ts:59`) while the decision text cites a ten-minute cadence; corp events are best-effort, no server push (Notifications panel disclosure).
 - Roster change announcements are device-local (`corp.rosterBaseline`), so another device re-announces the same joins/leaves.

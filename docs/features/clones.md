@@ -67,7 +67,7 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 
 ## Observed gaps
 
-- Only jump clones and home clone: active clone implants not shown (`jump_clones` only, `Clones.tsx:172`; `getCharacterImplants` not loaded).
+- Only jump clones and home clone on this page (`jump_clones` only, `Clones.tsx:172`; `getCharacterImplants` not loaded here). The active clone's implants are on Skills › Trained (`ImplantChip` per fitted implant, "N of 5 slots empty", `Skills.tsx`; needs `esi-clones.read_implants.v1`). Player question "what am I wearing right now?" -> Skills › Trained, not Clones.
 - No Show Info/map link for clone locations; no search/filter.
 - `clones.emptyHint` says "Reconnect" even when nothing is wrong beyond an empty cache.
 - Cooldown is only 24h minus Infomorph level; Clone State not shown.

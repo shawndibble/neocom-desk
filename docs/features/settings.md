@@ -317,7 +317,7 @@ Rate limits: Settings makes no ESI calls except corp roles (cached 1 h) and Upda
 
 ## Observed gaps
 
-- No theme control; no sync management UI (sync appears only as the shell status dot, `app/SyncStatusDot.tsx`); no per-setting sync indicator or "sync now".
+- No theme control (by design: the UI is dark-only, `docs/DESIGN.md:642`; accessibility levers are Text size and OS reduced-motion, which the app honours); no sync management UI (sync appears only as the shell status dot, `app/SyncStatusDot.tsx`); no per-setting sync indicator or "sync now".
 - Notifications hint says "These choices stay on this device" (`en.json:7659`, rendered `NotificationsPanel.tsx:497`), but any non-browser-channel write also calls `setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, ...)` and `scheduleSync` (`features/notifications/preferences.ts:189-198`; key `syncedPreferences.ts:34`). Only the master switch, channel gates and browser-column toggles stay local.
 - Feed naming is inconsistent: the hint says "Alerts adds a row to the Alerts page" (`en.json:7659`); the column header is "Alerts" (`en.json:7730`); the channel checkbox is "Overview notifications" with hint "A dismissible list on the Overview page" (`en.json:7726-7727`, `NotificationsPanel.tsx:592`); the column hint says "A row on the Overview page" (`en.json:7770`). One channel, three names (Alerts / Overview / Overview notifications).
 - Reset view preferences sets a "confirmed" flag and a 2 s timer, then reloads immediately (`Settings.tsx:557-567`), so the confirmation is never visible; neither it nor Clear cache (`Settings.tsx:517-530`) asks for confirmation; Clear cache is all-Characters only.

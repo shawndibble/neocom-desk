@@ -86,6 +86,8 @@ Modal copy states local deletion and that the synced copy stays. `removeCharacte
 
 ## Observed gaps
 
+- SP extraction: readiness only (`engine/spExtraction.ts`: 5,000,000 floor, 500,000 per extractor, count = floor((total - 5M)/500k), raw `total_sp` which excludes unallocated SP); no extractor cost or injector sale price, so no "worth it" figure (#2854). Opt-in and threshold live in Settings › Characters, not Notifications.
+
 - No multi-select or bulk actions; group assignment per Character.
 - Table has no group management; two sort controls (`sort` vs `table.sort`).
 - No manual Character ordering.
