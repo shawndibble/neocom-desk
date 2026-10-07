@@ -16,10 +16,8 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
-  DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   IconButton,
   IskAmount,
   PageHeader,
@@ -1657,39 +1655,31 @@ export function Assets() {
           actions={
             <>
               <div className="ml-auto flex items-center gap-1.5">
-                <IconButton
-                  icon={<Icon.FlatList />}
-                  label={t('assets.allItemsToggle')}
-                  pressed={allItemsView}
-                  onClick={() => setView({ all: !allItemsView })}
-                />
-                <IconButton
-                  icon={<Icon.Route />}
-                  label={t('assets.consolidate.toggle')}
-                  pressed={showConsolidate}
-                  onClick={() => setShowConsolidate((open) => !open)}
-                />
-                <IconButton
-                  icon={<Icon.Select />}
-                  label={t('assets.select.toggle')}
-                  pressed={selectMode}
-                  onClick={toggleSelectMode}
-                />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      icon={<Icon.Settings />}
-                      label={t('assets.tools.label')}
-                      size="md"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
-                      {t('assets.myShips.title')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
+                <TableActionsMenu
+                  name={t('assets.title')}
+                  label={t('assets.tools.label')}
+                  tableExport={assetsExport}
+                  size="md"
+                >
+                  <DropdownMenuCheckboxItem
+                    checked={allItemsView}
+                    onCheckedChange={(on) => setView({ all: on })}
+                  >
+                    {t('assets.allItemsToggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={showConsolidate}
+                    onCheckedChange={setShowConsolidate}
+                  >
+                    {t('assets.consolidate.toggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
+                    {t('assets.select.toggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
+                    {t('assets.myShips.title')}
+                  </DropdownMenuItem>
+                </TableActionsMenu>
                 <IconButton
                   icon={<Icon.Refresh />}
                   label={t('assets.refresh')}
