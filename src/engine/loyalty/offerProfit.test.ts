@@ -7,6 +7,26 @@ import { SKILL_IDS } from '@/engine/industry/types';
 const MAX_SKILLS = { [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 5 };
 const NO_SKILLS = {};
 
+describe('loyaltyOfferProfit literal vector', () => {
+  it('10M order revenue at Accounting V / Broker Relations V: 4,256.25 ISK per LP', () => {
+    const result = loyaltyOfferProfit({
+      iskCost: 1_000_000,
+      lpCost: 2_000,
+      requiredItemsCost: 0,
+      revenue: 10_000_000,
+      buildCost: 0,
+      playerLp: 1_000_000,
+      liquidationBasis: 'order',
+      skills: MAX_SKILLS,
+    });
+    expect(result.salesTax).toBeCloseTo(337_500, 2);
+    expect(result.brokerFee).toBeCloseTo(150_000, 2);
+    expect(result.netRevenue).toBeCloseTo(9_512_500, 2);
+    expect(result.profit).toBeCloseTo(8_512_500, 2);
+    expect(result.iskPerLp).toBeCloseTo(4_256.25, 2);
+  });
+});
+
 describe('loyaltyOfferProfit', () => {
   it('prices a simple (non-blueprint) offer: revenue net of market fees, minus ISK cost and required items', () => {
     const revenue = 8 * 1_800; // 8 probes at 1,800 ISK each

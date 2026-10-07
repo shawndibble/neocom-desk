@@ -1475,7 +1475,7 @@ export function getCharacterIndustryJobs(
  * collapses everything mined in one (date, solar system, type) to a single
  * row before it ever reaches the app — no intra-day timestamp, no moon
  * identity (docs/context/decisions/20260905-170644-moon-mining-tax-ledger.md).
- * 90-day retention on ESI's side.
+ * 30-day retention on ESI's side (the app's own ledger keeps 90).
  */
 export interface MiningLedgerRow {
   /** EVE/UTC calendar date, e.g. "2026-09-04". */

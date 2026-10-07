@@ -1030,6 +1030,62 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
+  describe('CSV export honours the min-value filter (issue #2840)', () => {
+    async function exportCsv() {
+      vi.mocked(exportRows).mockClear();
+      const user = userEvent.setup();
+      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Assets' }), {
+        button: 0,
+        pointerType: 'mouse',
+      });
+      (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+      await user.keyboard('{Enter}');
+      await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
+      return JSON.stringify(vi.mocked(exportRows).mock.calls[0][2]);
+    }
+
+    it('leaves out stacks below the minimum in the All items view', async () => {
+      window.history.replaceState({}, '', '/assets?all=1&min=10000');
+      render(<App />);
+      await screen.findByText('Pyerite');
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Pyerite');
+      expect(rows).not.toContain('Tritanium');
+    });
+
+    it('filters nothing while prices are still loading', async () => {
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(
+        http.get('https://esi.evetech.net/markets/prices', async () => {
+          await gate;
+          return HttpResponse.json([{ type_id: 35, average_price: 5000 }]);
+        })
+      );
+      window.history.replaceState({}, '', '/assets?all=1&min=10000');
+      render(<App />);
+      await screen.findByText('Tritanium');
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Tritanium');
+      expect(rows).toContain('Pyerite');
+      release();
+    });
+
+    it('exports the full list in the tree view even with min in the URL', async () => {
+      window.history.replaceState({}, '', '/assets?min=10000');
+      render(<App />);
+      await screen.findByText(JITA);
+
+      const rows = await exportCsv();
+      expect(rows).toContain('Pyerite');
+      expect(rows).toContain('Tritanium');
+    });
+  });
+
   it('takes ISK shorthand in the minimum value, with no echo line in the strip (issue #2227)', async () => {
     const user = userEvent.setup();
     render(<App />);

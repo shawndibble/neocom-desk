@@ -73,7 +73,7 @@ export async function reconcileAssignments(
 
   for (const assignment of assignments) {
     const key = `${assignment.date}:${assignment.solarSystemId}`;
-    // Absent from the fresh read means it aged out of ESI's 90-day retention
+    // Absent from the fresh read means it aged out of ESI's 30-day retention
     // (or a character's grant lapsed this refresh) — leave the assignment as
     // it stands rather than treat "no fresh data" as "nothing was mined".
     const relevantFresh = ownershipByKey.get(key)?.ownedLines.get(assignment.id);
