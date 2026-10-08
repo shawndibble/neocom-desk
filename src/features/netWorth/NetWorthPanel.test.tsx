@@ -240,7 +240,8 @@ describe('NetWorthPanel, layers with no value', () => {
   it('lists a layer when another Character in view holds it', async () => {
     await seedBare();
     renderPanel({ characters: [A, B] });
-    expect(await screen.findByRole('button', { name: 'Series: 3 of 3' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Series: 3 of 3' }));
+    expect(await screen.findByRole('option', { name: 'Order escrow' })).toBeInTheDocument();
   });
 
   it('keeps the unticked setting for a layer that is empty now and returns later', async () => {

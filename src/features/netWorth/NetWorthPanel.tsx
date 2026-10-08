@@ -95,11 +95,11 @@ function useHidden() {
 
 function LayerPicker({
   listed,
-  hidden,
+  shown,
   onToggle,
 }: {
   listed: readonly LayerId[];
-  hidden: readonly LayerId[];
+  shown: readonly LayerId[];
   onToggle: (id: LayerId) => void;
 }) {
   const { t } = useTranslation();
@@ -112,10 +112,7 @@ function LayerPicker({
       })),
     [t, listed]
   );
-  const selected = useMemo(
-    () => new Set(listed.filter((id) => !hidden.includes(id))),
-    [listed, hidden]
-  );
+  const selected = useMemo(() => new Set(shown), [shown]);
   return (
     <MultiSelect
       trigger={
@@ -449,7 +446,7 @@ export function NetWorthPanel({
       }
       actions={
         <span className="flex items-center gap-2">
-          <LayerPicker listed={listed} hidden={hiddenLayers} onToggle={toggleLayer} />
+          <LayerPicker listed={listed} shown={shown} onToggle={toggleLayer} />
           {actions}
         </span>
       }
