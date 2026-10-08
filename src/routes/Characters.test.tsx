@@ -1520,7 +1520,7 @@ describe('Characters table view', () => {
       within(screen.getByRole('table')).queryByRole('button', { name: 'Remove Pilot One' })
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'More actions for Pilot One' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Remove Pilot One' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Pilot One…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Remove' });
     expect(dialog).toHaveTextContent('Pilot One');
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));

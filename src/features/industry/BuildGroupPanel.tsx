@@ -741,8 +741,13 @@ export function BuildGroupPanel({
           group page redesign) — Members and Materials sit side by side
           rather than competing with a nav rail and a 20rem list column for
           the same row. */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+        {/* The plans sit above the table, not beside it: the buy table has six
+            figure columns and "Still to buy" is the one that matters, so it
+            gets the page's full width rather than what a 20rem list leaves. */}
+        <div
+          className={`grid grid-cols-[minmax(0,1fr)] items-start gap-4 ${craftedTypeIds.length > 0 ? 'md:grid-cols-2' : ''}`}
+        >
           <Panel title={t('industry.groupMembers')} padded={false}>
             <ul className="divide-y divide-line text-xs">
               {plans.map((plan) => {

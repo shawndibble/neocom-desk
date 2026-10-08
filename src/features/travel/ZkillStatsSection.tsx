@@ -148,8 +148,9 @@ export function ZkillStatsSection({
   const s = stats.stats;
   const figures = killFigures(t, s);
   return (
-    <section aria-label={t('travel.pilot.statsLabel')} className="space-y-3">
-      <ZkillRatioMeters stats={s} />
+    // DOM order is the phone's reading order: figures, note, then meters. From `md`
+    // up the meters lead, as they always did (`md:order-first` on a flex column).
+    <section aria-label={t('travel.pilot.statsLabel')} className="flex flex-col gap-3">
       <StatTiles
         className="md:grid-cols-6"
         items={[
@@ -166,6 +167,9 @@ export function ZkillStatsSection({
         ]}
       />
       <ZkillStatsNote stats={stats} subject="pilot" />
+      <div className="empty:hidden md:order-first">
+        <ZkillRatioMeters stats={s} />
+      </div>
       {/* Half the modal's width on desktop: bars stretched across all of it
           make the spread between hulls harder to compare, not easier. */}
       {s.topShips.length > 0 && (

@@ -1,6 +1,6 @@
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, Spinner } from '@/components/ui';
+import { Checkbox, Field, Fields, Spinner } from '@/components/ui';
 import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import { useAutoContinueSessions } from '@/features/miningTax/continueSessionPref';
@@ -36,15 +36,15 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
   return (
     <div className="space-y-4">
       <DefaultsSyncHint />
-      <div className="divide-y divide-line">
-        <CheckboxRow
+      <Fields variant="form">
+        <CheckboxField
           id="settings-mining-tax-compressed-ore"
           label={t('settings.miningTaxCompressedOreLabel')}
           hint={t('settings.miningTaxCompressedOreHint')}
           checked={compressedOre}
           onChange={() => void setCompressedOre(!compressedOre)}
         />
-        <CheckboxRow
+        <CheckboxField
           id="settings-mining-tax-ore-value-mode"
           label={t('settings.miningTaxOreValueModeLabel')}
           hint={t('settings.miningTaxOreValueModeHint')}
@@ -52,7 +52,7 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
           onChange={() => void setOreValueMode(!oreValueMode)}
         />
         {/* Device-local (`continueSessionPref.ts`): its hint says so. */}
-        <CheckboxRow
+        <CheckboxField
           id="settings-mining-tax-auto-continue"
           label={t('settings.miningTaxAutoContinueLabel')}
           hint={t('settings.miningTaxAutoContinueHint')}
@@ -62,12 +62,12 @@ export function MiningTaxSettingsForm({ onAutoContinueChange }: MiningTaxSetting
             else void setAutoContinue(!autoContinue);
           }}
         />
-      </div>
+      </Fields>
     </div>
   );
 }
 
-interface CheckboxRowProps {
+interface CheckboxFieldProps {
   id: string;
   label: string;
   hint: string;
@@ -75,19 +75,13 @@ interface CheckboxRowProps {
   onChange: () => void;
 }
 
-/** Checkbox at the left, label beside it, help text under the label. */
-function CheckboxRow({ id, label, hint, checked, onChange }: CheckboxRowProps) {
+/** One lone-checkbox row of the Settings form grid, hint as the row's note. */
+function CheckboxField({ id, label, hint, checked, onChange }: CheckboxFieldProps) {
   return (
-    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-      <label htmlFor={id} className={touchCheckboxLabelClassName}>
+    <Field label={label} htmlFor={id} inline note={hint}>
+      <label className={touchCheckboxLabelClassName}>
         <Checkbox id={id} checked={checked} onChange={onChange} />
       </label>
-      <div className="min-w-0">
-        <label htmlFor={id} className="block cursor-pointer font-semibold">
-          {label}
-        </label>
-        <p className="mt-1 text-sm text-text-dim">{hint}</p>
-      </div>
-    </div>
+    </Field>
   );
 }

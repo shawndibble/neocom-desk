@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -17,8 +18,13 @@ const COPIED_FEEDBACK_MS = 2000;
  * text the Hub Compare cards copy) and says so in a bubble on the figure
  * itself — not a tooltip, which a touch tap never opens, and not a toast in a
  * corner, away from what was clicked.
+ *
+ * `compact` prints the shorthand alone (`2.8B`) with the exact figure in a
+ * hover/focus tooltip, for the result header's narrow groups, where a
+ * ten-digit figure ran under its neighbour. The click still copies the full
+ * digits.
  */
-export function FullIskTotal({ value }: { value: number }) {
+export function FullIskTotal({ value, compact = false }: { value: number; compact?: boolean }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,19 +48,29 @@ export function FullIskTotal({ value }: { value: number }) {
     timer.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
   }
 
+  const button = (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      aria-label={t('market.appraisal.copyTotal', {
+        amount: t('common.iskExact', { amount: full }),
+      })}
+      className={`cursor-copy rounded-xs hover:underline ${interactiveClassName} ${focusRingClassName}`}
+    >
+      {compact
+        ? formatIskCompact(value)
+        : /* Exception: the exact figure is printed beside the shorthand, so IskAmount's tooltip would repeat it. */
+          t('market.appraisal.totalFull', { full, short: formatIskCompact(value) })}
+    </button>
+  );
+
   return (
     <span className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => void copy()}
-        aria-label={t('market.appraisal.copyTotal', {
-          amount: t('common.iskExact', { amount: full }),
-        })}
-        className={`cursor-copy rounded-xs hover:underline ${interactiveClassName} ${focusRingClassName}`}
-      >
-        {/* Exception: the exact figure is printed beside the shorthand, so IskAmount's tooltip would repeat it. */}
-        {t('market.appraisal.totalFull', { full, short: formatIskCompact(value) })}
-      </button>
+      {compact ? (
+        <Tooltip content={t('common.iskExact', { amount: full })}>{button}</Tooltip>
+      ) : (
+        button
+      )}
       {/* Mounted only while showing, so a page of these isn't a page of
         empty live regions competing with its own status line. */}
       {copied && (

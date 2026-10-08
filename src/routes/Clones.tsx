@@ -7,6 +7,7 @@ import {
   EmptyState,
   IconButton,
   Panel,
+  SegmentedControl,
   Spinner,
   StatChip,
   Tooltip,
@@ -50,6 +51,24 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
+import {
+  CloneVerdictCard,
+  type CloneVerdictCardState,
+} from '@/features/character/CloneVerdictCard';
+import {
+  loadCloneTrainingData,
+  WORN_CLONE_ID,
+  type CloneTrainingData,
+} from '@/features/character/cloneTraining';
+import {
+  CLONES_SORTS,
+  sortClones,
+  useClonesSort,
+  type ClonesSort,
+} from '@/features/character/clonesSort';
+import { cloneVerdict, MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/cloneVerdict';
+import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
+import { isQueuePaused } from '@/features/skills/queueStatus';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -70,8 +89,10 @@ interface Snapshot {
   wornImplants: CachedResult<number[]> | null;
   /** The read-implants grant is missing (401/403): a banner above the table, never in place of it. */
   implantsNeedsReauth: boolean;
-  /** The active training queue, loaded for the page's next layout; nothing renders from it yet. */
+  /** The active training queue. */
   queueResult: CachedResult<SkillQueueEntry[]> | null;
+  /** What the training verdict needs; null when the attribute sheet can't be read. */
+  training: CloneTrainingData | null;
   /** The Character's current solar system; null when unresolved (missing grant, offline, uncached). */
   characterSystemId: number | null;
   /** Solar system of each clone location, keyed by `location_id`; null when it can't be resolved. */
@@ -187,6 +208,16 @@ async function loadClonesSnapshot(
     if (name) locationNames.set(id, name);
   });
 
+  // The verdict needs the worn implants and the queue; either missing is its own one-line state.
+  const training =
+    corrected.queueResult && wornImplants && !signal.cancelled
+      ? await loadCloneTrainingData(characterId, loadedAt, {
+          jumpClones: clones,
+          wornImplantIds: wornImplants.data,
+          queue: corrected.queueResult.data,
+        }).catch(() => null)
+      : null;
+
   return {
     clonesResult,
     clonesNeedsReauth,
@@ -194,6 +225,7 @@ async function loadClonesSnapshot(
     wornImplants,
     implantsNeedsReauth,
     queueResult: corrected.queueResult,
+    training,
     characterSystemId,
     systemIds,
     characterSystemName: characterSystem?.name ?? null,
@@ -238,6 +270,8 @@ function CloneCard({
   implantNames,
   implantDescriptions,
   prices,
+  training,
+  current = false,
 }: {
   heading: ReactNode;
   place: string;
@@ -248,17 +282,45 @@ function CloneCard({
   implantDescriptions: ReadonlyMap<number, string>;
   /** Undefined until the price read settles. */
   prices: PriceMap | undefined;
+  /** Queue time in this clone; absent when there is no verdict. */
+  training?: { row: CloneRow | undefined; best: boolean };
+  /** The clone the Character is wearing now: set apart from the jump clones. */
+  current?: boolean;
 }) {
   const { t } = useTranslation();
   const value = prices ? sumImplantValue(implantIds, prices) : null;
+  const delta = training?.row?.deltaSeconds ?? null;
   return (
-    <li className="space-y-1 border-b border-line px-3 py-2 text-sm last:border-b-0">
+    <li
+      className={`space-y-1.5 rounded-xs border p-3 text-sm ${
+        current ? 'border-accent/60 bg-accent/5 md:col-span-2' : 'border-line bg-panel-2'
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="[overflow-wrap:anywhere]">{heading}</span>
         <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
         {security !== undefined && <SecurityStatus security={security} />}
         {jumps}
       </div>
+      {training?.row?.totalSeconds != null && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs">
+          <span className="tabular-nums">
+            {t('clones.verdict.rowQueue', { duration: formatDuration(training.row.totalSeconds) })}
+          </span>
+          {delta !== null && Math.abs(delta) >= MIN_JUMP_GAIN_SECONDS && (
+            <span className={delta < 0 ? 'text-success' : 'text-text-dim'}>
+              {t(delta < 0 ? 'clones.verdict.rowSooner' : 'clones.verdict.rowLonger', {
+                duration: formatDuration(Math.abs(delta)),
+              })}
+            </span>
+          )}
+          {training.best && (
+            <span className="rounded-xs border border-success/60 px-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
+              {t('clones.verdict.badge')}
+            </span>
+          )}
+        </p>
+      )}
       {implantIds.length === 0 ? (
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
@@ -427,6 +489,103 @@ export function Clones() {
   };
   const homeSecurity = securityOf(homeLocation?.location_id);
   const hasWorn = data?.wornImplants != null;
+  // The summary cards need loaded clones data; every other state lives in the list panel.
+  const showSummary = !(loading && !data) && !clonesNeedsReauth && !error && clonesResult !== null;
+
+  // Which clone is best for the active queue (the engine does the numbers).
+  const sort = useClonesSort((state) => state.value);
+  const setSort = useClonesSort((state) => state.setValue);
+  const hydrateSort = useClonesSort((state) => state.hydrate);
+  const cloneStates = useCloneStates((state) => state.value);
+  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
+  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateSort();
+    void hydrateCloneStates();
+  }, [hydrateSort, hydrateCloneStates]);
+  const training = data?.training ?? null;
+  const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
+  const verdictResult = useMemo(() => {
+    if (!training || training.paused || !cloneStatesHydrated || activeCharacterId === null) {
+      return null;
+    }
+    return cloneVerdict({
+      queue: training.queue,
+      baseAttributes: training.baseAttributes,
+      clones: training.clones,
+      wornCloneId: WORN_CLONE_ID,
+      cloneState: cloneStateFor(cloneStates, activeCharacterId),
+      now: new Date(loadedAt),
+      cooldownReadyAt: readyAt,
+    });
+  }, [training, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAt, readyAt]);
+  const cloneLabel = (clone: JumpClone) => clone.name?.trim() || locationLabel(clone);
+  const verdictCard: CloneVerdictCardState | null = (() => {
+    if (!data) return null;
+    const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
+    if (data.wornImplants === null) return note(t('clones.verdict.noteImplants'));
+    if (data.queueResult === null) return note(t('clones.verdict.noteQueue'));
+    // The queue's own state outranks an unreadable sheet: an empty queue needs no attributes.
+    if (isQueuePaused(data.queueResult.data)) return note(t('clones.verdict.notePaused'));
+    if (data.queueResult.data.length === 0) return note(t('clones.verdict.noteEmpty'));
+    if (training === null) return note(t('clones.verdict.noteAttributes'));
+    if (training.paused) return note(t('clones.verdict.notePaused'));
+    if (!verdictResult) return null;
+    const { verdict } = verdictResult;
+    if (verdict.kind === 'none') return note(t('clones.verdict.noteEmpty'));
+    if (verdict.kind === 'stay') {
+      const rival = clones.find((c) => c.jump_clone_id === verdict.closest?.cloneId);
+      return {
+        kind: 'stay',
+        stay: verdict.stay,
+        cooldownReadyAt: readyAt,
+        closest:
+          verdict.closest && rival
+            ? { label: cloneLabel(rival), extraSeconds: verdict.closest.extraSeconds }
+            : null,
+      };
+    }
+    const target = clones.find((c) => c.jump_clone_id === verdict.cloneId);
+    if (!target) return null;
+    const route = jumpsByLocation?.get(target.location_id);
+    if (!route) return note(t('clones.verdict.noteRouting'));
+    if (route.kind === 'unknown') return note(t('clones.verdict.noteRoute'));
+    return {
+      kind: 'jump',
+      label: cloneLabel(target),
+      savedSeconds: verdict.savedSeconds,
+      attributes: verdict.attributes,
+      stay: verdict.stay,
+      best: verdict.best,
+      cooldownReadyAt: verdict.cooldownReadyAt,
+      route: {
+        locationId: target.location_id,
+        placeName: locationLabel(target),
+        jumps: route.jumps,
+      },
+    };
+  })();
+  const showTraining = verdictCard !== null && verdictCard.kind !== 'note';
+  const rowOf = (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id);
+  const sortedClones = sortClones(
+    clones.map((clone) => {
+      const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
+      return {
+        clone,
+        id: clone.jump_clone_id,
+        locationId: clone.location_id,
+        deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
+        value:
+          implantValue &&
+          (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
+            ? implantValue.total
+            : null,
+      };
+    }),
+    sort,
+    jumpsByLocation
+  ).map((x) => x.clone);
+  const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
   const csvColumns = useMemo(
     () => clonesCsvColumns(t, { locationNames, implantNames }),
     [t, locationNames, implantNames]
@@ -456,12 +615,116 @@ export function Clones() {
       />
       <OverviewSubNav />
 
+      {showSummary && (
+        <>
+          <div className="grid gap-4 text-sm md:grid-cols-3">
+            <Panel className="h-full">
+              <section aria-label={t('clones.cooldown')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.cooldownShared')}
+                </h3>
+                <StatChip
+                  label={t('clones.cooldown')}
+                  tone={cooldownTone}
+                  value={
+                    cooldown.onCooldown && cooldown.readyAt
+                      ? t('clones.cooldownOnCooldownValue', {
+                          date: formatTimestamp(cooldown.readyAt, timeZone),
+                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
+                        })
+                      : t('clones.cooldownReadyValue')
+                  }
+                />
+                <div
+                  role="progressbar"
+                  aria-label={t('clones.cooldown')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(cooldownFraction * 100)}
+                  className="h-1.5 overflow-hidden rounded-full bg-line"
+                >
+                  <div
+                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
+                    style={{ width: `${cooldownFraction * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-text-dim">
+                  {lastCloneJumpDate &&
+                    `${t('clones.lastJump', {
+                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
+                    })} · `}
+                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
+                </p>
+              </section>
+            </Panel>
+            <Panel className="h-full">
+              <section aria-label={t('clones.youAreIn')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.youAreIn')}
+                </h3>
+                <p>
+                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
+                  {characterSystemId !== null && securities.has(characterSystemId) && (
+                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
+                  )}
+                </p>
+                {hasWorn && (
+                  <p className="text-xs text-text-dim">
+                    {t('clones.implantCount', { count: wornIds.length })}
+                    {wornValue && wornValue.unpriced < wornIds.length && (
+                      <>
+                        {' · '}
+                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
+                        {wornValue.unpriced > 0 &&
+                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
+                      </>
+                    )}
+                  </p>
+                )}
+              </section>
+            </Panel>
+            {homeLocationName && (
+              <Panel className="h-full">
+                <section aria-label={t('clones.respawn')} className="space-y-1">
+                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('clones.respawn')}
+                  </h3>
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
+                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
+                    <JumpsAwayText
+                      result={homeJumps}
+                      t={t}
+                      locationId={homeLocation?.location_id}
+                      linkClassName={TOUCH_LINK}
+                    />
+                  </p>
+                  {lastStationChangeDate && (
+                    <p className="text-xs text-text-dim">
+                      {t('clones.lastStationChange', {
+                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
+                      })}
+                    </p>
+                  )}
+                </section>
+              </Panel>
+            )}
+          </div>
+          {verdictCard && (
+            <CloneVerdictCard
+              state={verdictCard}
+              names={training?.skillNames ?? NO_NAMES}
+              timeZone={timeZone}
+            />
+          )}
+        </>
+      )}
+
       {/*
-        Data age and Refresh ride on the panel's own toolbar rather than up
-        beside the character's name: they describe *this* tab's data, and above
-        the tabs is the block every tab shares. One panel wraps every branch so
-        that toolbar — the only way back from a failed or empty load — is there
-        in all of them, not just when there are rows to show.
+        The summary cards above the list carry no title or toolbar of their
+        own. Data age, Refresh and Export ride on the clone list's toolbar
+        below, and that one panel wraps every branch so the toolbar — the only
+        way back from a failed or empty load — is there in all of them.
       */}
       <Panel
         title={t('clones.title')}
@@ -500,98 +763,6 @@ export function Clones() {
           <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
         ) : (
           <>
-            {/* Home clone and cooldown were their own Panel; panels don't nest,
-                so this becomes this one's first row, hairline-separated from
-                whatever follows. It renders whenever clones data loaded at
-                all, not only when there are jump clones — a character with a
-                home clone and zero jump clones still has both to show. */}
-            <div className="grid gap-3 border-b border-line px-3 py-3 text-sm md:grid-cols-3">
-              <section aria-label={t('clones.cooldown')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.cooldownShared')}
-                </h3>
-                <StatChip
-                  label={t('clones.cooldown')}
-                  tone={cooldownTone}
-                  value={
-                    cooldown.onCooldown && cooldown.readyAt
-                      ? t('clones.cooldownOnCooldownValue', {
-                          date: formatTimestamp(cooldown.readyAt, timeZone),
-                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                        })
-                      : t('clones.cooldownReadyValue')
-                  }
-                />
-                <div
-                  role="progressbar"
-                  aria-label={t('clones.cooldown')}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(cooldownFraction * 100)}
-                  className="h-1.5 overflow-hidden rounded-full bg-line"
-                >
-                  <div
-                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
-                    style={{ width: `${cooldownFraction * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-text-dim">
-                  {lastCloneJumpDate &&
-                    `${t('clones.lastJump', {
-                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
-                    })} · `}
-                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
-                </p>
-              </section>
-              <section aria-label={t('clones.youAreIn')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.youAreIn')}
-                </h3>
-                <p>
-                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
-                  {characterSystemId !== null && securities.has(characterSystemId) && (
-                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
-                  )}
-                </p>
-                {hasWorn && (
-                  <p className="text-xs text-text-dim">
-                    {t('clones.implantCount', { count: wornIds.length })}
-                    {wornValue && wornValue.unpriced < wornIds.length && (
-                      <>
-                        {' · '}
-                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
-                        {wornValue.unpriced > 0 &&
-                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
-                      </>
-                    )}
-                  </p>
-                )}
-              </section>
-              {homeLocationName && (
-                <section aria-label={t('clones.respawn')} className="space-y-1">
-                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('clones.respawn')}
-                  </h3>
-                  <p className="flex flex-wrap items-center gap-x-2">
-                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
-                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
-                    <JumpsAwayText
-                      result={homeJumps}
-                      t={t}
-                      locationId={homeLocation?.location_id}
-                      linkClassName={TOUCH_LINK}
-                    />
-                  </p>
-                  {lastStationChangeDate && (
-                    <p className="text-xs text-text-dim">
-                      {t('clones.lastStationChange', {
-                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
-                      })}
-                    </p>
-                  )}
-                </section>
-              )}
-            </div>
             {implantsNeedsReauth && (
               <div className="border-b border-line p-3">
                 <GrantBanner
@@ -608,10 +779,24 @@ export function Clones() {
                 {t('common.offlineTitle')}
               </p>
             )}
+            {clones.length > 1 && (
+              <div className="overflow-x-auto border-b border-line px-3 py-2">
+                <SegmentedControl<ClonesSort>
+                  label={t('clones.sort.label')}
+                  value={sort}
+                  onChange={(next) => void setSort(next)}
+                  options={CLONES_SORTS.map((value) => ({
+                    value,
+                    label: t(`clones.sort.${value}`),
+                  }))}
+                />
+              </div>
+            )}
             {(clones.length > 0 || hasWorn) && (
-              <ul aria-label={t('clones.title')}>
+              <ul aria-label={t('clones.title')} className="grid gap-3 p-3 md:grid-cols-2">
                 {hasWorn && (
                   <CloneCard
+                    current
                     heading={<span className="font-semibold">{t('clones.wearingNow')}</span>}
                     place={characterSystemName ?? t('clones.unknownPlace')}
                     security={
@@ -622,9 +807,14 @@ export function Clones() {
                     implantNames={implantNames}
                     implantDescriptions={implantDescriptions}
                     prices={prices}
+                    training={
+                      showTraining
+                        ? { row: rowOf(WORN_CLONE_ID), best: bestCloneId === WORN_CLONE_ID }
+                        : undefined
+                    }
                   />
                 )}
-                {clones.map((clone) => {
+                {sortedClones.map((clone) => {
                   const name = clone.name?.trim() || undefined;
                   return (
                     <CloneCard
@@ -650,6 +840,14 @@ export function Clones() {
                       implantNames={implantNames}
                       implantDescriptions={implantDescriptions}
                       prices={prices}
+                      training={
+                        showTraining
+                          ? {
+                              row: rowOf(clone.jump_clone_id),
+                              best: bestCloneId === clone.jump_clone_id,
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })}
