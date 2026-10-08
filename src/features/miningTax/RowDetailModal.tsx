@@ -150,6 +150,11 @@ export function RowDetailModal({
         {t('miningTax.linkTransactionAction')}
       </DropdownMenuItem>
     ),
+    status === 'outstanding' && (
+      <DropdownMenuItem key="mark-paid" onSelect={onMarkPaid}>
+        {t('miningTax.markPaidAction')}
+      </DropdownMenuItem>
+    ),
     onJoin && status === 'outstanding' && (
       <DropdownMenuItem key="join" onSelect={onJoin}>
         {t('miningTax.joinAction')}
@@ -370,11 +375,6 @@ export function RowDetailModal({
             {status === 'needs-review' && (
               <Button variant="primary" disabled={busy} onClick={onResolve}>
                 {t('miningTax.resolveConfirm')}
-              </Button>
-            )}
-            {status === 'outstanding' && (
-              <Button disabled={busy} onClick={onMarkPaid}>
-                {t('miningTax.markPaidAction')}
               </Button>
             )}
             <Button disabled={busy} onClick={onEdit}>
