@@ -5,6 +5,7 @@ import {
   buildCharacterSeries,
   dailyWalletFromJournal,
   layerValues,
+  listedLayers,
   netWorthOf,
   partitionByCoverage,
   toggleHidden,
@@ -163,5 +164,36 @@ describe('dailyWalletFromJournal', () => {
       ['2026-10-01', 7],
       ['2026-10-02', 9],
     ]);
+  });
+});
+
+describe('listedLayers', () => {
+  const empty = { plexValue: 0, escrow: 0, sellStock: 0 };
+
+  it('always lists ISK and Assets, even with no snapshots', () => {
+    expect(listedLayers([])).toEqual(['isk', 'assets']);
+  });
+
+  it('drops layers that are zero on every snapshot day', () => {
+    expect(listedLayers([row('2026-10-01', empty), row('2026-10-02', empty)])).toEqual([
+      'isk',
+      'assets',
+    ]);
+  });
+
+  it('lists a layer that is non-zero on any one day, in canonical order', () => {
+    const rows = [row('2026-10-01', empty), row('2026-10-02', { ...empty, sellStock: 7 })];
+    expect(listedLayers(rows)).toEqual(['isk', 'assets', 'sellOrders']);
+  });
+
+  it('lists a layer when only one of several Characters holds it', () => {
+    const rows = [row('2026-10-01', empty, 1), row('2026-10-01', { ...empty, escrow: 3 }, 2)];
+    expect(listedLayers(rows)).toEqual(['isk', 'assets', 'escrow']);
+  });
+
+  it('reads rows as stored: a missing sellStock is not a value', () => {
+    expect(listedLayers([row('2026-10-01', { ...empty, sellStock: undefined })])).not.toContain(
+      'sellOrders'
+    );
   });
 });
