@@ -34,7 +34,7 @@ import {
   type RingSlot,
   type SlotLayout,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups, shownModuleState } from '@/engine/fittings/fittingEdit';
+import { cargoGroups, nextModuleState, shownModuleState } from '@/engine/fittings/fittingEdit';
 import type { HardpointKind, HardpointKindOf } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
@@ -77,6 +77,7 @@ import {
 } from './fittingItemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 
 /**
  * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
@@ -589,6 +590,15 @@ function SlotTile({
   const draggable = !compact && module !== undefined && onMoveModule !== undefined;
   const interactive = !compact && onSelect !== undefined;
   const menu = !compact && actions !== null;
+  // A click on a fitted module steps its state, as the game does; a subsystem
+  // has none, and Enter/Space (a click with no detail) keep selecting.
+  const cycles =
+    menu && module !== undefined && shownState !== undefined && slot.rack !== 'subsystem';
+  const guard = useLiftAfterHoldGuard();
+  function cycleState() {
+    if (!cycles || !actions || shownState === undefined) return;
+    actions.setState(slot.rack, slot.index, nextModuleState(shownState, maxState ?? 'overload'));
+  }
   const onDelete = deleteKeyHandler(
     menu && module !== undefined ? () => actions.remove(slot.rack, slot.index) : undefined
   );
@@ -629,8 +639,31 @@ function SlotTile({
       tabIndex={tabbable ? 0 : -1}
       className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
-      onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
+      {...(cycles ? guard.handlers : undefined)}
+      onClick={
+        interactive || cycles
+          ? (event) => {
+              // The click a touch lifting off a long-press sends is the menu's, not a cycle.
+              if (cycles && guard.swallowClick(event)) return;
+              if (cycles && event.detail > 0) cycleState();
+              else onSelect?.(slot.rack, slot.index);
+            }
+          : undefined
+      }
       onKeyDown={(event) => {
+        if (cycles) guard.handlers.onKeyDown();
+        if (
+          cycles &&
+          event.key === 's' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey
+        ) {
+          event.preventDefault();
+          cycleState();
+          return;
+        }
         onDelete?.(event);
         if (!event.defaultPrevented) onKeyDown?.(event);
       }}

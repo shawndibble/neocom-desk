@@ -8337,6 +8337,7 @@
     "onPageHint": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo.",
     "saveFitting": "Save the fitting (Fittings)",
     "saveFittingAsNew": "Save the fitting as a new copy (Fittings)",
+    "cycleModuleState": "Step a focused Ring module through its states (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",

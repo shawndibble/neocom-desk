@@ -609,6 +609,18 @@ export function reachableModuleStates(
 }
 
 /**
+ * The state a click on a module moves it to: the next of its reachable states
+ * (the menu's own list), wrapping from the last back to offline.
+ */
+export function nextModuleState(
+  shown: FittingItemState,
+  maxState: FittingItemState
+): FittingItemState {
+  const states = reachableModuleStates(maxState, shown);
+  return states[(states.indexOf(shown) + 1) % states.length];
+}
+
+/**
  * The state a module shows: the one the engine reached, or the one asked for
  * until it has. A subsystem always shows online — it has no state to toggle,
  * though the engine, finding no online effect on it, reports it offline.

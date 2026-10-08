@@ -975,6 +975,13 @@ Rows:
 - **A row with a menu** shows the ⋮ (`rowMoreActions`) only if the menu
   passes the restraint rules below. Right-click and touch-and-hold open the
   same menu, never the only way in. A row without a ⋮ has no custom menu.
+- **A tile that holds a state** (a fitted module on the Fittings Ring): a
+  click steps it to its next reachable state, wrapping to the first, the way
+  the game cycles a module. The menu's State submenu lists the same states;
+  selecting the tile for the Add panel is the menu's job. An empty tile
+  selects on click. Enter/Space keep selecting; `S` on a focused tile cycles.
+  A touch long-press or a drag never cycles, and Back undoes a cycle like any
+  fitting edit.
 
 ### Restraint: decide by what is already there
 
