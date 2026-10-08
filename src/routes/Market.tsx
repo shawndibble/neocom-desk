@@ -98,6 +98,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   orderBookFigureChars,
   orderBookWidthsRem,
+  type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
 import { useTimedToast } from '@/components/ui/useTimedToast';
@@ -605,8 +606,15 @@ export function Market() {
   // card. Short of that, Location narrows first, so fewer widths need cards.
   const isPhone = useIsPhone();
   const bookBestSell = loadedView?.summary.bestSell ?? null;
+  // One station, already named by the scope bar: no Location column to repeat it.
+  const singleStationBook =
+    !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
+  const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
+  // Location can't be ticked while it is held back, so the picker doesn't offer it.
+  const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
+    singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
-    useVisibleMarketOrderColumns((state) => state.value),
+    singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
     orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
@@ -635,6 +643,7 @@ export function Market() {
     bestSell: loadedView?.summary.bestSell ?? null,
     cards: orderCards,
     locationSqueezed: orderLocationSqueezed,
+    hideLocation: singleStationBook,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
@@ -1198,7 +1207,7 @@ export function Market() {
                         total={sortedSell.length}
                         best={loadedView?.summary.bestSell ?? null}
                         columns={baseColumns}
-                        availableColumns={SELL_ORDER_COLUMN_IDS}
+                        availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
                         visibleColumns={visibleOrderColumns}
                         columnsById={orderColumnsById}
                         onToggleColumn={toggleOrderColumn}
@@ -1256,7 +1265,7 @@ export function Market() {
                         total={sortedBuy.length}
                         best={loadedView?.summary.bestBuy ?? null}
                         columns={buyColumns}
-                        availableColumns={BUY_ORDER_COLUMN_IDS}
+                        availableColumns={pickableColumns(BUY_ORDER_COLUMN_IDS)}
                         visibleColumns={visibleOrderColumns}
                         columnsById={orderColumnsById}
                         onToggleColumn={toggleOrderColumn}
