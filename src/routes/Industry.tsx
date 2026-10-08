@@ -180,33 +180,42 @@ export function Industry() {
     if (activeCharacterId === null || !plans || !catalog || !buildGroupsHydrated) return;
     handledBlueprintPasteKey.current = location.key;
     void (async () => {
-      const preview = previewBlueprintPaste(text, catalog, await loadBlueprintNames());
-      void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-      const result = await applyBlueprintPaste(preview, {
-        characterId: activeCharacterId,
-        plans,
-        ownedBlueprints,
-        defaultsFrom: mostRecentlyUpdatedPlan(plans),
-        // Off disk for the same reason as `createPlan`.
-        facilityDefaults: await loadActivityFacilityDefaults(),
-        assumedMe,
-        assumedTe,
-        buildGroups,
-        setBuildGroups,
-        groupName: t('industry.blueprintPasteGroupName'),
-      });
-      if (!result) {
-        setBlueprintPasteNote(t('industry.blueprintPasteNone'));
-        return;
+      try {
+        const preview = previewBlueprintPaste(text, catalog, await loadBlueprintNames());
+        void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+        const result = await applyBlueprintPaste(preview, {
+          characterId: activeCharacterId,
+          plans,
+          ownedBlueprints,
+          defaultsFrom: mostRecentlyUpdatedPlan(plans),
+          // Off disk for the same reason as `createPlan`.
+          facilityDefaults: await loadActivityFacilityDefaults(),
+          assumedMe,
+          assumedTe,
+          buildGroups,
+          setBuildGroups,
+          groupName: t('industry.blueprintPasteGroupName'),
+        });
+        if (!result) {
+          setBlueprintPasteNote(
+            [
+              t('industry.blueprintPasteNone'),
+              t('industry.blueprintPasteSkipped', { count: preview.skipped }),
+            ].join(' ')
+          );
+          return;
+        }
+        await setExpandedGroups(
+          withGroupExpanded(expandedGroups, activeCharacterId, result.groupId, true)
+        );
+        void navigate(`/industry/groups/${result.groupId}`, {
+          state: {
+            blueprintPasteNotice: { skipped: preview.skipped, reused: result.reused },
+          } satisfies BlueprintPasteNoticeState,
+        });
+      } catch {
+        setBlueprintPasteNote(t('industry.blueprintPasteFailed'));
       }
-      await setExpandedGroups(
-        withGroupExpanded(expandedGroups, activeCharacterId, result.groupId, true)
-      );
-      void navigate(`/industry/groups/${result.groupId}`, {
-        state: {
-          blueprintPasteNotice: { skipped: preview.skipped, reused: result.reused },
-        } satisfies BlueprintPasteNoticeState,
-      });
     })();
   }, [
     location.key,

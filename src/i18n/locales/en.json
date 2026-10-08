@@ -2725,6 +2725,7 @@
     "blueprintPasteSkipped_one": "{{count}} pasted blueprint was skipped: it has nothing to manufacture or react.",
     "blueprintPasteSkipped_other": "{{count}} pasted blueprints were skipped: they have nothing to manufacture or react.",
     "blueprintPasteNone": "None of the pasted blueprints can be manufactured or reacted, so no group was made.",
+    "blueprintPasteFailed": "Could not create a group from the pasted blueprints. Try pasting again.",
     "blueprintPasteReused": "You pasted these blueprints before, so this is the group they made.",
     "blueprintPasteCreated": "Created from your pasted blueprints. Delete the group to remove its plans.",
     "fitImportGroupName": "{{fit}} — {{ship}}",
@@ -8335,7 +8336,7 @@
     "saveFittingAsNew": "Save the fitting as a new copy (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit, blueprint list, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
     "pasteDestinations": {
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
