@@ -35,6 +35,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   loadPilotProfile,
   resolvePilotByName,
+  searchBoxSeed,
   type PilotProfile,
   type PilotSummary,
 } from './pilotLookup';
@@ -49,6 +50,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 export function PilotLookupPanel() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
+  const [resolved, setResolved] = useState<PilotSummary | null>(null);
   const location = useLocation();
   // The pasted list lives here, not in the URL, so it survives a trip to one
   // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
@@ -68,6 +70,7 @@ export function PilotLookupPanel() {
       <PageHeader title={t('nav.pilotLookup')} />
       <Panel>
         <PilotSearch
+          resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
           list={list}
           onList={setList}
           onSelect={(pilot) => {
@@ -84,7 +87,7 @@ export function PilotLookupPanel() {
       ) : params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
       ) : (
-        <PilotResult key={params.pilot} characterId={params.pilot} />
+        <PilotResult key={params.pilot} characterId={params.pilot} onResolved={setResolved} />
       )}
     </div>
   );
@@ -97,10 +100,13 @@ type ResolveState =
   | { kind: 'failed' };
 
 function PilotSearch({
+  resolved,
   list,
   onList,
   onSelect,
 }: {
+  /** The pilot in the URL once its profile has loaded. */
+  resolved: PilotSummary | null;
   list: PilotPaste | null;
   onList: (paste: PilotPaste | null) => void;
   onSelect: (pilot: PilotSummary) => void;
@@ -118,6 +124,24 @@ function PilotSearch({
   const latestSearch = useRef(0);
   // Likewise for an exact-name lookup: typing again supersedes one in flight.
   const latestLookup = useRef(0);
+  // The pilot whose name the box last showed, and whether the user is editing it.
+  const seededId = useRef<number | null>(null);
+  const typing = useRef(false);
+
+  useEffect(() => {
+    // The pilot left the URL: coming back to it must seed again, even over edited text.
+    if (resolved === null) seededId.current = null;
+    const seed = searchBoxSeed({
+      resolved,
+      seededId: seededId.current,
+      typing: typing.current,
+    });
+    if (seed === null) return;
+    seededId.current = resolved?.characterId ?? null;
+    setQuery(seed);
+    setSuggestions([]);
+    setOpen(false);
+  }, [resolved]);
 
   const trimmed = query.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
@@ -125,6 +149,8 @@ function PilotSearch({
   useEffect(() => {
     if (!canSuggest || activeCharacterId === null) return;
     if (trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH) return;
+    // A seeded or chosen name is already a pilot; only the user's typing asks ESI for matches.
+    if (!typing.current) return;
     const ticket = ++latestSearch.current;
     const controller = new AbortController();
     const id = setTimeout(() => {
@@ -147,6 +173,8 @@ function PilotSearch({
 
   function choose(pilot: PilotSummary) {
     setQuery(pilot.name);
+    seededId.current = pilot.characterId;
+    typing.current = false;
     setOpen(false);
     setHighlight(null);
     setResolve({ kind: 'idle' });
@@ -229,6 +257,7 @@ function PilotSearch({
               onChange={(e) => {
                 // Typing supersedes a lookup in flight, and another query's hits must not linger.
                 latestLookup.current++;
+                typing.current = true;
                 setQuery(e.target.value);
                 setSuggestions([]);
                 setOpen(true);
@@ -236,7 +265,10 @@ function PilotSearch({
                 setResolve({ kind: 'idle' });
               }}
               onFocus={() => setOpen(true)}
-              onBlur={() => setOpen(false)}
+              onBlur={() => {
+                typing.current = false;
+                setOpen(false);
+              }}
               onPaste={(e) => {
                 const pasted = classifyPilotPaste(e.clipboardData.getData('text/plain'));
                 if (pasted === null) return;
@@ -305,7 +337,13 @@ type ProfileState =
   | { kind: 'ready'; profile: PilotProfile; fetchedAt: Date };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
-function PilotResult({ characterId }: { characterId: number }) {
+function PilotResult({
+  characterId,
+  onResolved,
+}: {
+  characterId: number;
+  onResolved: (pilot: PilotSummary) => void;
+}) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -314,12 +352,13 @@ function PilotResult({ characterId }: { characterId: number }) {
     let cancelled = false;
     void loadPilotProfile(characterId)
       .then((loaded) => {
-        if (!cancelled)
-          setProfile(
-            loaded === null
-              ? { kind: 'unknown' }
-              : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
-          );
+        if (cancelled) return;
+        setProfile(
+          loaded === null
+            ? { kind: 'unknown' }
+            : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
+        );
+        if (loaded !== null) onResolved({ characterId, name: loaded.name });
       })
       .catch(() => {
         if (!cancelled) setProfile({ kind: 'failed' });
@@ -327,7 +366,7 @@ function PilotResult({ characterId }: { characterId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [characterId, attempt]);
+  }, [characterId, attempt, onResolved]);
 
   function retry() {
     setProfile({ kind: 'loading' });

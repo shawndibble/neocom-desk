@@ -163,6 +163,7 @@ describe('PilotLookupPanel', () => {
     renderTab('/pilot-lookup?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
+    expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('Some Pilot');
     expect(screen.getByText('-2.3')).toBeTruthy();
     expect(screen.getByRole('link', { name: /^zKillboard/ }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
