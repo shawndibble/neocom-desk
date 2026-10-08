@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, StatChip, StatChips } from '@/components/ui';
+import { IskAmount, StatChip } from '@/components/ui';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -28,7 +28,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
       </h3>
-      <StatChips>{children}</StatChips>
+      {/* One readout per line, label left and value right (the mockup's shape), so a
+          wide value has the column to itself and can't run into a neighbour group. */}
+      <div className="flex min-w-0 flex-col [&>span]:w-full [&>span>span:last-child]:ml-auto">
+        {children}
+      </div>
     </section>
   );
 }
@@ -48,7 +52,7 @@ export function AppraisalHeaderStats({
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
             label={t('market.appraisal.instantNet')}
-            className="font-semibold"
+            emphasis
             value={
               <span className={iskToneClass(net.instantNet)}>
                 <IskAmount value={net.instantNet} decimals={0} />
@@ -75,7 +79,7 @@ export function AppraisalHeaderStats({
           label={t('market.appraisal.sellTotal')}
           value={<FullIskTotal value={totals.sell} />}
           tone="accent"
-          className="font-semibold"
+          emphasis
           tooltip={t('market.appraisal.sellTotalHelp')}
         />
         <StatChip
@@ -101,7 +105,7 @@ export function AppraisalHeaderStats({
         )}
       </Group>
       <Group title={t('market.appraisal.groupCargo')}>
-        <AppraisalVolumeChip totals={totals} />
+        <AppraisalVolumeChip totals={totals} emphasis />
         <StatChip label={t('market.appraisal.items')} value={itemCount} />
         {showRefine && (
           <StatChip

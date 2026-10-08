@@ -48,6 +48,28 @@ export interface ConsolidationPlan {
   trips: number | null;
 }
 
+/** Hangar stock only: not assembled, not in a container/ship, not in space. */
+export function isHangarStock(a: ConsolidationAsset): boolean {
+  return !a.isSingleton && a.locationType !== 'item' && a.locationType !== 'solar_system';
+}
+
+/** One line of the plan: `m3` is `null` when the type's volume is unknown. */
+export function consolidationLine(
+  typeId: number,
+  quantity: number,
+  unitM3: ReadonlyMap<number, number>
+): ConsolidationLine {
+  const unit = unitM3.get(typeId);
+  return { typeId, quantity, m3: unit === undefined ? null : unit * quantity };
+}
+
+/** `ceil(totalM3 / capacityM3)`; null without a usable capacity or without volume. */
+export function tripsFor(totalM3: number, capacityM3: number | null): number | null {
+  return capacityM3 !== null && capacityM3 > 0 && totalM3 > 0
+    ? Math.ceil(totalM3 / capacityM3)
+    : null;
+}
+
 export function planConsolidation(input: {
   destinationLocationId: number;
   characters: readonly ConsolidationCharacter[];
@@ -60,17 +82,15 @@ export function planConsolidation(input: {
   for (const { characterId, name, assets } of input.characters) {
     const quantities = new Map<number, number>();
     for (const a of assets) {
-      // Hangar stock only: not assembled, not in a container/ship, not in space.
-      if (a.isSingleton || a.locationType === 'item' || a.locationType === 'solar_system') continue;
+      if (!isHangarStock(a)) continue;
       if (a.locationId === input.destinationLocationId) continue;
       quantities.set(a.typeId, (quantities.get(a.typeId) ?? 0) + a.quantity);
     }
     if (quantities.size === 0) continue;
 
-    const lines: ConsolidationLine[] = [...quantities].map(([typeId, quantity]) => {
-      const unit = input.unitM3.get(typeId);
-      return { typeId, quantity, m3: unit === undefined ? null : unit * quantity };
-    });
+    const lines = [...quantities].map(([typeId, quantity]) =>
+      consolidationLine(typeId, quantity, input.unitM3)
+    );
     lines.sort((a, b) => (b.m3 ?? -1) - (a.m3 ?? -1) || a.typeId - b.typeId);
 
     perCharacter.push({
@@ -83,10 +103,5 @@ export function planConsolidation(input: {
   }
 
   const totalM3 = perCharacter.reduce((sum, c) => sum + c.totalM3, 0);
-  const cap = input.holdsCapacityM3;
-  return {
-    perCharacter,
-    totalM3,
-    trips: cap !== null && cap > 0 && totalM3 > 0 ? Math.ceil(totalM3 / cap) : null,
-  };
+  return { perCharacter, totalM3, trips: tripsFor(totalM3, input.holdsCapacityM3) };
 }

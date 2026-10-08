@@ -56,6 +56,7 @@ import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { StructureFeeLine } from './StructureFeeLine';
 import { scopeOrdersCsvColumns, type ScopeOrderCsvRow } from './scopeOrdersCsv';
 
 export interface OrderDetailModalProps {
@@ -463,6 +464,7 @@ export function OrderDetailContent({
   stationNameFor,
   structureMarket,
   relistFees,
+  accountingLevel,
   onCheckDeeper,
   onClose,
 }: OrderDetailContentProps) {
@@ -602,7 +604,7 @@ export function OrderDetailContent({
   // own card, shared between the always-open desktop layout and the phone Disclosure.
   const numbersContent = (
     <>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-2 gap-2 lg:grid-cols-3">
         <StatCard
           label={t('market.orders.statMyPrice')}
           value={formatMarketIsk(row.price)}
@@ -681,8 +683,8 @@ export function OrderDetailContent({
           and stacked on a phone — the two things anyone opening this modal
           came for, above every explanation.
         */}
-        <div className="grid gap-3 md:grid-cols-[minmax(0,19rem)_1fr]">
-          <section className="rounded-xs border border-line bg-panel-2 p-3">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+          <section className="min-w-0 rounded-xs border border-line bg-panel-2 p-3">
             <h3 className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
               {t('market.orders.quickAnswer')}
               {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
@@ -777,6 +779,13 @@ export function OrderDetailContent({
                 </p>
               </div>
             )}
+            {location === 'structure' && !row.isBuyOrder && (
+              <StructureFeeLine
+                structureId={row.locationId}
+                gross={row.price * row.volumeRemain}
+                accountingLevel={accountingLevel}
+              />
+            )}
             <p className="mt-2">
               <OrderRowSummaryText row={row} />
             </p>
@@ -847,7 +856,7 @@ export function OrderDetailContent({
             <div
               role="table"
               aria-label={whoLabel}
-              className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]"
+              className="grid grid-cols-[auto_minmax(0,1fr)_auto] text-xs md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
             >
               <div role="row" className="contents">
                 <span
@@ -958,7 +967,7 @@ export function OrderDetailContent({
 
         {/* Cost basis and exits are sell-side ideas: a buy order has neither (#1733). */}
         {!row.isBuyOrder && (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 [&>*]:min-w-0">
             <section className="rounded-xs border border-line">
               {row.costBasis === null ? (
                 <>
@@ -1338,7 +1347,7 @@ function StatCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+    <div className="min-w-0 rounded-xs border border-line bg-panel-2 px-2.5 py-2 break-words">
       <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
         {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}

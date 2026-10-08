@@ -112,11 +112,11 @@ describe('SustainedTankReadout', () => {
   it('reads the sustained tank for the ring', () => {
     render(
       <SustainedTankReadout
-        stats={stats({ tank: { ...neutralExtendedStats().tank, sustainedEffective: 168.4 } })}
+        stats={stats({ tank: { ...neutralExtendedStats().tank, sustainedEffective: 2.46 } })}
       />
     );
     expect(screen.getByText('Sustained')).toBeInTheDocument();
-    expect(screen.getByText('168 EHP/s')).toBeInTheDocument();
+    expect(screen.getByText('2.5 EHP/s')).toBeInTheDocument();
   });
 
   it('renders nothing before there are stats', () => {

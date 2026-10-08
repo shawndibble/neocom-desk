@@ -21,7 +21,7 @@ vi.mock('@/features/character/affiliations', () => ({
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
 
 import { EsiError } from '@/esi/errors';
-import { loadPilotProfile, pilotAge, resolvePilotByName } from './pilotLookup';
+import { loadPilotProfile, pilotAge, resolvePilotByName, searchBoxSeed } from './pilotLookup';
 
 describe('pilotAge', () => {
   it('counts whole years to the last anniversary, then the days since', () => {
@@ -152,5 +152,29 @@ describe('loadPilotProfile', () => {
     mocks.resolveAffiliations.mockResolvedValue(new Map());
     mocks.getCharacterPublicInfo.mockRejectedValue(new EsiError(0, 'timeout'));
     await expect(loadPilotProfile(42)).rejects.toThrow('timeout');
+  });
+});
+
+describe('searchBoxSeed', () => {
+  const resolved = { characterId: 7, name: 'Ada' };
+
+  it('seeds the name of a pilot that just resolved', () => {
+    expect(searchBoxSeed({ resolved, seededId: null, typing: false })).toBe('Ada');
+  });
+
+  it('seeds again when Back or Forward lands on another pilot', () => {
+    expect(searchBoxSeed({ resolved, seededId: 3, typing: false })).toBe('Ada');
+  });
+
+  it('does nothing before the pilot resolves', () => {
+    expect(searchBoxSeed({ resolved: null, seededId: null, typing: false })).toBeNull();
+  });
+
+  it('does nothing for a pilot already seeded or chosen', () => {
+    expect(searchBoxSeed({ resolved, seededId: 7, typing: false })).toBeNull();
+  });
+
+  it('never overwrites a user who is typing', () => {
+    expect(searchBoxSeed({ resolved, seededId: null, typing: true })).toBeNull();
   });
 });

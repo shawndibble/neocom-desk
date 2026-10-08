@@ -11,8 +11,10 @@ import { formatCubicMetres } from '@/lib/volume';
  */
 export function AppraisalVolumeChip({
   totals,
+  emphasis = false,
 }: {
   totals: Pick<AppraisalTotals, 'volume' | 'volumeUnknownRows'>;
+  emphasis?: boolean;
 }) {
   const { t } = useTranslation();
   const partial = totals.volumeUnknownRows > 0;
@@ -21,6 +23,7 @@ export function AppraisalVolumeChip({
   return (
     <StatChip
       label={t('market.appraisal.totalVolume')}
+      emphasis={emphasis}
       value={
         partial
           ? t('market.appraisal.totalVolumePartialValue', { value })

@@ -36,6 +36,8 @@ export interface RealizedProfitInputs {
   brokerRelationsLevel: number;
   /** The character's standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
+  /** Insurance paid out on lost units (Run Loss). Untaxed proceeds; absent = 0. */
+  insurancePayout?: number;
 }
 
 export interface RealizedProfitResult {
@@ -45,6 +47,8 @@ export interface RealizedProfitResult {
   salesTax: number;
   brokerFee: number;
   netRevenue: number;
+  /** Insurance payout counted as proceeds, after fees. */
+  insurance: number;
   profit: number;
   /** Null while nothing has sold yet — a percentage of zero revenue is not a number. */
   marginPct: number | null;
@@ -60,7 +64,8 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     inputs.standing?.corpStanding
   );
   const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
-  const profit = netRevenue - totalCost;
+  const insurance = inputs.insurancePayout ?? 0;
+  const profit = netRevenue + insurance - totalCost;
 
   return {
     totalCost,
@@ -69,6 +74,7 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     salesTax: salesTaxAmount,
     brokerFee: brokerFeeAmount,
     netRevenue,
+    insurance,
     profit,
     marginPct: inputs.grossRevenue > 0 ? (profit / inputs.grossRevenue) * 100 : null,
   };
@@ -81,6 +87,8 @@ export interface SoldUnitsMarginInputs {
   /** Confirmed units sold so far. */
   quantitySold: number;
   netRevenue: number;
+  /** Units written off as a Run Loss; their cost leaves `unsoldCost`. */
+  quantityLost?: number;
 }
 
 export interface SoldUnitsMargin {
@@ -99,6 +107,55 @@ export function soldUnitsMargin(inputs: SoldUnitsMarginInputs): SoldUnitsMargin 
   return {
     soldCost,
     margin: inputs.netRevenue - soldCost,
-    unsoldCost: inputs.totalCost - soldCost,
+    unsoldCost:
+      inputs.totalCost -
+      soldCost -
+      lostUnitsCost(inputs.totalCost, inputs.quantity, inputs.quantityLost ?? 0),
   };
+}
+
+function lostUnitsCost(totalCost: number, quantity: number, quantityLost: number): number {
+  if (quantity <= 0) return 0;
+  return (totalCost / quantity) * Math.min(Math.max(quantityLost, 0), quantity);
+}
+
+export interface RunLossInputs {
+  totalCost: number;
+  /** Units the run produced. */
+  quantity: number;
+  quantityLost: number;
+  insurancePayout: number;
+}
+
+export interface RunLossResult {
+  /** Cost of the lost units at the run's cost per unit. */
+  writtenOffCost: number;
+  insurance: number;
+  /** `writtenOffCost - insurance`; positive is a loss. Shown on its own line, never folded into Realized profit. */
+  netLoss: number;
+}
+
+/** The accounting of one Run Loss record (issue #2851). */
+export function runLoss(inputs: RunLossInputs): RunLossResult {
+  const writtenOffCost = lostUnitsCost(inputs.totalCost, inputs.quantity, inputs.quantityLost);
+  return {
+    writtenOffCost,
+    insurance: inputs.insurancePayout,
+    netLoss: writtenOffCost - inputs.insurancePayout,
+  };
+}
+
+export interface LossQuantityInputs {
+  quantity: number;
+  quantitySold: number;
+  /** Units already lost by the run's other loss records (exclude the one being edited). */
+  otherLost: number;
+  quantityLost: number;
+}
+
+/** `null` when the units are acceptable; a loss may never exceed the units still unaccounted for. */
+export function validateLossQuantity(i: LossQuantityInputs): 'invalid' | 'too-many' | null {
+  if (!Number.isInteger(i.quantityLost) || i.quantityLost <= 0) return 'invalid';
+  const unaccounted = Math.max(0, i.quantity - i.quantitySold - i.otherLost);
+  return i.quantityLost > unaccounted ? 'too-many' : null;
 }
