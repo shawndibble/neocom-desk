@@ -12,7 +12,7 @@ import { TRAVEL_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { parseLegPin } from '@/engine/route/legWays';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
-import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
+import { WORMHOLE_SHIP_SIZES, type WormholeShipSize } from '@/engine/route/theraConnections';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
   MIN_ROUTE_HOLE_MIN_LIFE,
@@ -69,6 +69,8 @@ export const ROUTE_PARAMS = {
   whsize: optionalEnumParam(WORMHOLE_SHIP_SIZES),
   whlife: optionalIntParam({ min: MIN_ROUTE_HOLE_MIN_LIFE, max: MAX_ROUTE_HOLE_MIN_LIFE }),
   whhub: optionalEnumParam(ROUTE_HOLE_HUBS),
+  // The hull `whsize` was read from (issue #2850): only labels the size, never changes the route.
+  whhull: optionalIdParam(),
   // Use jump bridges (issue #2478); absent means the page's saved default.
   jb: optionalBoolParam(),
   pin: legPinsParam(),
@@ -98,6 +100,16 @@ export function routeViaHref(
 }
 
 /**
+ * The hull a link is for: its size rides in `whsize` for this link only (the
+ * saved default is untouched), and `whhull` lets the rules panel say where the
+ * size came from.
+ */
+export interface RouteHull {
+  typeId: number;
+  size: WormholeShipSize;
+}
+
+/**
  * Route Safety to one system: what "View route" opens. With no `fromId` the
  * page starts from the Character's current system on its own; a courier
  * contract passes its pickup system, since that is where its jumps begin. A
@@ -107,11 +119,16 @@ export function routeViaHref(
 export function routeToHref(
   systemId: number,
   fromId?: number | null,
-  preference?: RoutePreferenceKind | null
+  preference?: RoutePreferenceKind | null,
+  hull?: RouteHull | null
 ): string {
   const params = new URLSearchParams();
   if (fromId != null) params.set('from', String(fromId));
   if (preference != null) params.set('pref', ROUTE_PARAMS.pref.serialize(preference) ?? '');
   params.set('stops', ROUTE_PARAMS.stops.serialize([systemId]) ?? '');
+  if (hull != null) {
+    params.set('whsize', hull.size);
+    params.set('whhull', String(hull.typeId));
+  }
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
 }

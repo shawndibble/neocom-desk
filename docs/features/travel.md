@@ -66,15 +66,16 @@ Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, R
 
 ### Link parameters (`src/features/travel/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
-| Param                             | Meaning                                                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `from`                            | Start system id; absent = Current System                                                                   |
-| `stops`                           | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read                                      |
-| `opt`, `ret`, `keep`              | Optimize stop order, Return to start, Keep last stop last                                                  |
-| `pref`                            | Route Preference override; absent = saved default                                                          |
-| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override                                                   |
-| `jb`                              | Use jump bridges override                                                                                  |
-| `pin`                             | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick |
+| Param                             | Meaning                                                                                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `from`                            | Start system id; absent = Current System                                                                                                             |
+| `stops`                           | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read                                                                                |
+| `opt`, `ret`, `keep`              | Optimize stop order, Return to start, Keep last stop last                                                                                            |
+| `pref`                            | Route Preference override; absent = saved default                                                                                                    |
+| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override                                                                                             |
+| `whhull`                          | Hull type id the `whsize` was read from (`engine/route/hullWormholeSize.ts`); the Route rules panel shows "Set from <hull>" until the size is edited |
+| `jb`                              | Use jump bridges override                                                                                                                            |
+| `pin`                             | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick                                           |
 
 Parameter edits `push` history (Back works). Unreadable pin tokens degrade to "not pinned".
 

@@ -51,7 +51,7 @@
  * pins, which belong to legs by position — except the first stop added to a
  * Route via link, which is the leg its pin was made for.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -76,6 +76,7 @@ import {
 } from '@/features/route/routeRules';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
+import { typeName } from '@/sde/loadSde';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
 import { useAnsiblexGates } from './ansiblexGates';
@@ -175,6 +176,20 @@ function RouteFacts({
 export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
+  const hullTypeId = params.whsize === null ? null : params.whhull;
+  const [hullName, setHullName] = useState<{ typeId: number; name: string } | null>(null);
+  useEffect(() => {
+    if (hullTypeId === null) return;
+    let live = true;
+    void typeName(hullTypeId)
+      .then((name) => live && setHullName({ typeId: hullTypeId, name }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [hullTypeId]);
+  const sizeHullName =
+    hullTypeId !== null && hullName?.typeId === hullTypeId ? hullName.name : null;
   const current = useCurrentSystem();
   const fromId = params.from ?? current.systemId;
   const fromIsCurrent = params.from === null && current.systemId !== null;
@@ -323,9 +338,13 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
                 setParams({ pref: null });
               }}
               holeQuery={holeQuery}
+              sizeHullName={sizeHullName}
               onHoleChange={(change) => {
                 saveRouteHoleDefault(change);
-                setParams({ [HOLE_PARAM[change.field]]: null });
+                setParams({
+                  [HOLE_PARAM[change.field]]: null,
+                  ...(change.field === 'shipSize' ? { whhull: null } : {}),
+                });
               }}
               bridges={{
                 bridgeQuery,

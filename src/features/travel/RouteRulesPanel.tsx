@@ -115,11 +115,14 @@ export function RouteHoleFields({
   onChange,
   bridges,
   bare = false,
+  sizeHullName,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
   bare?: boolean;
+  /** The hull the link's size was read from: says so beside the control until it is edited. */
+  sizeHullName?: string | null;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
@@ -135,7 +138,14 @@ export function RouteHoleFields({
         {t('travel.holes.enabled')}
       </label>
       <div className="space-y-1.5">
-        <p className="font-semibold">{t('travel.holes.shipSize')}</p>
+        <p className="font-semibold">
+          {t('travel.holes.shipSize')}
+          {sizeHullName != null && (
+            <span className="ml-2 font-normal text-text-dim">
+              {t('travel.holes.sizeFromHull', { hull: sizeHullName })}
+            </span>
+          )}
+        </p>
         <SegmentedControl
           label={t('travel.holes.shipSize')}
           options={WORMHOLE_SHIP_SIZES.map((value) => ({
@@ -256,8 +266,11 @@ export function RouteRulesPanel({
   onPreferenceChange,
   holeQuery,
   onHoleChange,
+  sizeHullName,
   bridges,
 }: {
+  /** The hull the link's ship size was read from, while the size is still that link's. */
+  sizeHullName?: string | null;
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
   /** Saves the pilot's default (the one Settings → Travel shows), and drops the link's override. */
@@ -326,7 +339,12 @@ export function RouteRulesPanel({
             />
           </section>
 
-          <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} />
+          <RouteHoleFields
+            query={holeQuery}
+            onChange={onHoleChange}
+            bridges={bridges}
+            sizeHullName={sizeHullName}
+          />
         </div>
       ) : (
         <Spinner />

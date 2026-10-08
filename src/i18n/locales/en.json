@@ -8915,6 +8915,7 @@
       "group": "Route Safety only · your default on this page, can be overridden in the link",
       "enabled": "Route through Thera / Turnur",
       "shipSize": "My ship fits",
+      "sizeFromHull": "Set from {{hull}}",
       "minLifeBefore": "Skip holes with under",
       "minLifeAfter": "h left",
       "minLifeLabel": "Skip holes with under this many hours left",
