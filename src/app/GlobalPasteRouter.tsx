@@ -1,21 +1,39 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
+import { parseChatLink } from '@/engine/import/chatLink';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
+import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
+import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { entityInfoHref } from '@/lib/entityInfo';
 import { tabPath } from '@/lib/pageTabs';
 import {
   isTypingTarget,
   OVERLAY_SELECTOR,
   type FittingLoadState,
   type MarketAppraiseState,
+  type PilotListState,
   type SkillPlanImportState,
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
 const SKILL_PLANS_PATH = '/skills/plans';
 
-/** Per destination: where the paste goes, carrying its text in route state. */
-const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state: unknown }]> = {
+/** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
+const pilotLookup = (text: string): [string, { state: unknown }] => [
+  '/pilot-lookup',
+  { state: { pilotListText: text } satisfies PilotListState },
+];
+
+/**
+ * Per destination: where the paste goes, carrying its text in route state.
+ * Keyed by `PasteDestination`, so once a new id is added to that union, a
+ * missing route here fails the typecheck.
+ */
+const DESTINATIONS: Record<
+  PasteDestination,
+  (text: string, here: Pick<Location, 'pathname' | 'search'>) => [string, { state: unknown }]
+> = {
   fitting: (text) => [
     FITTINGS_PATH,
     { state: { fittingLoadText: text } satisfies FittingLoadState },
@@ -24,10 +42,24 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
   ],
+  // An item or ship opens its Item Detail over the current page (the same
+  // `?info=type-<id>` a name link makes); a system opens Route Safety.
+  chatLink: (text, here) => {
+    const link = parseChatLink(text);
+    // The detector already found a link; null only means "stay on this page".
+    if (link === null) return [`${here.pathname}${here.search}`, { state: null }];
+    if (link.kind === 'system') return [routeToHref(link.id), { state: null }];
+    return [
+      entityInfoHref(here, { kind: 'type', id: link.id }),
+      { state: ENTITY_INFO_PUSHED_STATE },
+    ];
+  },
   skillPlan: (text) => [
     SKILL_PLANS_PATH,
     { state: { skillPlanImportText: text } satisfies SkillPlanImportState },
   ],
+  pilotList: pilotLookup,
+  dscan: pilotLookup,
 };
 
 /**
@@ -58,8 +90,7 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
 /**
  * The app-wide paste router: Ctrl+V / Cmd+V anywhere on a page — not into a
  * field — with an EFT fit or an item list on the clipboard opens it in
- * Fittings or the Appraisal straight away, and a skill plan opens the Skills
- * planner with the import ready. No confirm step: a mistaken paste
+ * Fittings or the Appraisal straight away. No confirm step: a mistaken paste
  * is one Back away, and every page keeps its own state across the trip.
  *
  * Mounted once from `Layout`. Steps aside for a focused field and for any
@@ -68,6 +99,11 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
  */
 export function GlobalPasteRouter() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  });
   // Only the latest paste may navigate, whichever classifies first.
   const latestPaste = useRef(0);
 
@@ -83,7 +119,7 @@ export function GlobalPasteRouter() {
       classifyPaste(text)
         .then((destination) => {
           if (id !== latestPaste.current || destination === null) return;
-          void navigate(...DESTINATIONS[destination](text));
+          void navigate(...DESTINATIONS[destination](text, locationRef.current));
         })
         // No catalogue (offline, first visit) means no jump — the pilot can
         // still paste into Fittings' Load or the Appraisal box by hand.

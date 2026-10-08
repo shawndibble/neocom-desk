@@ -1179,7 +1179,7 @@ export function PlanEditor({
    */
   function handleOptimizeForMe() {
     if (scheduled.length === 0) return;
-    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap);
+    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones);
     const reorderedEntries = applyReorderSuggestion(editable.entries, suggested);
     const reorderedSchedule = schedulePlan(
       {
@@ -1578,7 +1578,7 @@ export function PlanEditor({
     if (scheduled.length === 0) return;
     setReorderPreview({
       kind: 'attributes',
-      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
+      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones),
     });
     showReorderConfirm('attributes');
   }
@@ -1591,7 +1591,7 @@ export function PlanEditor({
       steps: sortShortestFirst(
         scheduled,
         catalog.engineSkills,
-        { attributes, implants: effectiveImplants, cloneState },
+        { attributes, implants: effectiveImplants, cloneState, milestones: plan.milestones },
         priorityMap
       ),
     });

@@ -49,6 +49,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
+  loadCompressedOreTypeIds: vi.fn(async () => ({})),
 }));
 
 // Only reached by the "View in Market" navigation test below: Market Browser
@@ -189,6 +190,24 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Opens the Tools (⋯) menu and picks one of its toggles. */
+async function clickTool(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'Tools' }));
+  await user.click(await screen.findByRole('menuitemcheckbox', { name }));
+}
+
+/** Tools ▸ Export table ▸ Download CSV. */
+async function downloadCsv(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Tools' }), {
+    button: 0,
+    pointerType: 'mouse',
+  });
+  (await screen.findByRole('menuitem', { name: 'Export table' })).focus();
+  await user.keyboard('{ArrowRight}');
+  (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+  await user.keyboard('{Enter}');
+}
+
 /** Clicks the link into a location or container by its (partial) label. */
 async function openLocation(
   user: ReturnType<typeof userEvent.setup>,
@@ -211,6 +230,20 @@ function locationOrder(): string[] {
 }
 
 describe('Assets', () => {
+  it('shows the word Tools on its trigger and keeps Refresh inside the menu, not beside it (#2945)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+
+    const tools = screen.getByRole('button', { name: 'Tools' });
+    expect(tools).toHaveTextContent('Tools');
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+
+    await user.click(tools);
+    expect(await screen.findByRole('menuitem', { name: /^My ships.*nearest first/ })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: /^Refresh/ })).toBeEnabled();
+  });
+
   it('lists locations at the root; drilling into one shows its contents', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -992,7 +1025,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await screen.findByText(JITA);
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
@@ -1002,7 +1035,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await user.type(screen.getByLabelText('Minimum value'), '10000');
@@ -1037,12 +1070,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     async function exportCsv() {
       vi.mocked(exportRows).mockClear();
       const user = userEvent.setup();
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Assets' }), {
-        button: 0,
-        pointerType: 'mouse',
-      });
-      (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
-      await user.keyboard('{Enter}');
+      await downloadCsv(user);
       await waitFor(() => expect(exportRows).toHaveBeenCalledTimes(1));
       return JSON.stringify(vi.mocked(exportRows).mock.calls[0][2]);
     }
@@ -1093,7 +1121,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await user.type(screen.getByLabelText('Minimum value'), '10t');
@@ -1108,7 +1136,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await user.click(screen.getByLabelText('Sort'));
@@ -1128,7 +1156,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await user.click(screen.getByLabelText('Sort'));
@@ -1139,7 +1167,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await waitFor(() => {
@@ -1153,7 +1181,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await screen.findByText('Tritanium');
 
     await user.type(screen.getByLabelText('Minimum value'), '10000');
@@ -1164,7 +1192,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     render(<App />);
     await screen.findByText(JITA);
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByLabelText('Minimum value')).toHaveValue('');
@@ -1296,7 +1324,7 @@ describe('cross-character search (issue #85)', () => {
     async function openMyShips(user: ReturnType<typeof userEvent.setup>) {
       await screen.findByText(JITA);
       await user.click(screen.getByRole('button', { name: 'Tools' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'My ships' }));
+      await user.click(await screen.findByRole('menuitem', { name: /^My ships/ }));
       return screen.findByRole('dialog', { name: 'My ships' });
     }
 
@@ -1332,6 +1360,20 @@ describe('cross-character search (issue #85)', () => {
         ).toHaveLength(2)
       );
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
+    });
+
+    it('shows the ship class under the name and a summary line', async () => {
+      server.use(
+        http.get('https://esi.evetech.net/universe/groups/25', () =>
+          HttpResponse.json({ group_id: 25, name: 'Frigate' })
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      expect(await within(panel).findByText('Frigate')).toBeInTheDocument();
+      expect(within(panel).getByText('1 ship across 1 character · nearest first')).toBeVisible();
     });
 
     it('a row is one link into the ship’s location', async () => {
@@ -1435,12 +1477,7 @@ describe('cross-character search (issue #85)', () => {
     await screen.findByText(JITA);
 
     async function exportCsv() {
-      fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Assets' }), {
-        button: 0,
-        pointerType: 'mouse',
-      });
-      (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
-      await user.keyboard('{Enter}');
+      await downloadCsv(user);
     }
 
     await user.type(screen.getByPlaceholderText(/search items/i), 'tritanium');
@@ -1690,7 +1727,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await screen.findByText(JITA);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
 
     expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0);
   });
@@ -1728,7 +1765,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
 
     expect(await screen.findByText('1 item selected')).toBeInTheDocument();
@@ -1740,12 +1777,12 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     expect(await screen.findByText('1 item selected')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
+    await clickTool(user, 'Select');
 
     expect(screen.queryByText('1 item selected')).not.toBeInTheDocument();
     for (const checkbox of screen.getAllByRole('checkbox')) {
@@ -1774,7 +1811,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
     await user.click(screen.getByRole('button', { name: 'Add to Quickbar' }));
@@ -1794,7 +1831,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     await user.click(screen.getByRole('button', { name: 'Add to Compare' }));
 
@@ -1821,7 +1858,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
     await user.click(screen.getByRole('button', { name: 'Copy names' }));
@@ -1849,7 +1886,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
 
     expect(await screen.findByText('2 items selected')).toBeInTheDocument();
@@ -1876,7 +1913,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
     await user.click(screen.getByRole('button', { name: 'Select all in view' }));
     expect(await screen.findByText('2 items selected')).toBeInTheDocument();
 
@@ -1894,7 +1931,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
-    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await clickTool(user, 'Select');
 
     expect(screen.getByRole('button', { name: 'Deselect all' })).toBeDisabled();
   });
@@ -1938,8 +1975,9 @@ describe('view state in the URL (issue #1306)', () => {
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'All items' })).toHaveAttribute(
-      'aria-pressed',
+    await userEvent.click(screen.getByRole('button', { name: 'Tools' }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'All items' })).toHaveAttribute(
+      'aria-checked',
       'true'
     );
     expect(screen.getByLabelText('Minimum value')).toHaveValue('10000');
@@ -1963,11 +2001,11 @@ describe('view state in the URL (issue #1306)', () => {
     await user.type(screen.getByPlaceholderText(/search items/i), 'trit');
     await waitFor(() => expect(window.location.search).toBe('?q=trit'));
 
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('all')).toBe('1'));
 
     await user.clear(screen.getByPlaceholderText(/search items/i));
-    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await clickTool(user, 'All items');
     await waitFor(() => expect(window.location.search).toBe(''));
   });
 
@@ -1977,10 +2015,12 @@ describe('view state in the URL (issue #1306)', () => {
     render(<App />);
 
     expect(await screen.findByText(JITA)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'All items' })).toHaveAttribute(
-      'aria-pressed',
+    await userEvent.click(screen.getByRole('button', { name: 'Tools' }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'All items' })).toHaveAttribute(
+      'aria-checked',
       'false'
     );
+    await userEvent.keyboard('{Escape}');
     expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
   });
 
@@ -2027,6 +2067,32 @@ describe('view state in the URL (issue #1306)', () => {
 
     expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
     expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
+  });
+
+  it.each(['char', 'chars'])(
+    'opens for the Character ?%s= names, stating whose data it is, without switching the active one (issue #2936)',
+    async (key) => {
+      await seedSecondCharacter();
+      window.history.replaceState({}, '', `/assets?${key}=${CHAR_ID_2}`);
+      render(<App />);
+
+      expect(await screen.findByText('Pilot Two only')).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+    }
+  );
+
+  it('shows the grant note, not an empty list, for a named Character without the assets scope (issue #2936)', async () => {
+    await seedSecondCharacter();
+    await db.tokens.update(CHAR_ID_2, { scopes: [] });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+        HttpResponse.json({ error: 'forbidden' }, { status: 403 })
+      )
+    );
+    window.history.replaceState({}, '', `/assets?char=${CHAR_ID_2}`);
+    render(<App />);
+
+    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
   });
 
   it('writes a picked character filter to the URL', async () => {

@@ -17,6 +17,7 @@ import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
 import { fitTypeIds } from './lib/fitTypeIds.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
+import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -736,6 +737,7 @@ async function main() {
         description: r[h.description] ?? '',
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
+        mass: num(r[h.mass]) ?? 0,
         // Units that must be reprocessed together. `invTypeMaterials`
         // quantities are per portion, not per unit, so nothing can price a
         // refine without this (issue #537).
@@ -804,7 +806,8 @@ async function main() {
         !skillTypeIds.has(typeID) &&
         !piPinTypeIds.has(typeID) &&
         typeID !== PI_LINK_TYPE_ID &&
-        !refinableTypeIds.has(typeID)
+        !refinableTypeIds.has(typeID) &&
+        types.get(typeID)?.groupID !== WORMHOLE_GROUP_ID
       )
         continue;
       const value = r[iInt] !== '' ? Number(r[iInt]) : num(r[iFloat]);
@@ -2118,6 +2121,19 @@ async function main() {
   // --- typeNames.json: every type name, published or not; see lib/typeNames.mjs ---
   const typeNames = bakeTypeNames([...types.values()].map((t) => t.name));
 
+  // --- wormholeMass.json / shipMass.json: Route Safety's mass check (issue #2906) ---
+  const typeRows = [...types].map(([typeID, t]) => ({ typeID, ...t }));
+  const wormholeMass = bakeWormholeMass(typeRows, attrsByType);
+  const shipMass = bakeShipMass(
+    typeRows,
+    new Set([...groups].filter(([, g]) => g.categoryID === SHIP_CATEGORY_ID).map(([id]) => id))
+  );
+  if (Object.keys(wormholeMass).length < 80 || wormholeMass.M267?.[0] !== 375_000_000) {
+    throw new Error(
+      'wormholeMass.json looks wrong: expected 80+ types and M267 at 375 Mt per jump'
+    );
+  }
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -2159,6 +2175,8 @@ async function main() {
     ['shipTree.json', shipTree],
     // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
     ['typeNames.json', typeNames],
+    ['wormholeMass.json', wormholeMass],
+    ['shipMass.json', shipMass],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {

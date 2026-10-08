@@ -186,7 +186,7 @@ export function SustainedTankReadout({
       <span className="text-text-dim">{t('fittings.stats.tank.sustained')}</span>{' '}
       <span>
         {t('fittings.stats.unit.ehpPerSecond', {
-          value: stats.tank.sustainedEffective.toFixed(0),
+          value: stats.tank.sustainedEffective.toFixed(1),
         })}
       </span>
     </p>

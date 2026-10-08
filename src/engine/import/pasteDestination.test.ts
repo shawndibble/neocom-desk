@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import en from '@/i18n/locales/en.json';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
-import { pasteDestination, type PasteSources } from '@/engine/import/pasteDestination';
+import {
+  detectPasteDestination,
+  PASTE_DETECTORS,
+  pasteDestination,
+  type PasteDetector,
+  type PasteSources,
+} from '@/engine/import/pasteDestination';
 
 const CATALOGUE: AppraisalCatalogue = new Map(
   ['Rifter', 'Damage Control II', 'Tritanium', 'Pyerite', 'Nocxium', 'Warp Disruptor II'].map(
@@ -13,7 +20,7 @@ const SKILLS = new Map([
   ['gunnery', { typeID: 3300 }],
   ['small hybrid turret', { typeID: 3301 }],
 ]);
-const SOURCES = { catalogue: CATALOGUE, hullNames: HULLS, skillByName: SKILLS };
+const SOURCES: PasteSources = { catalogue: CATALOGUE, hullNames: HULLS, skillByName: SKILLS };
 
 const FIT = ['[Rifter, Kite Fit]', '', 'Damage Control II', '', 'Warp Disruptor II'].join('\n');
 
@@ -57,7 +64,55 @@ describe('pasteDestination', () => {
   });
 
   it('ignores text where most lines are not items', () => {
-    expect(pasteDestination('Tritanium\nhello there\nsee you in local\no7', SOURCES)).toBeNull();
+    expect(
+      pasteDestination('Tritanium\nhello there!\nsee you in local, o7\no7?', SOURCES)
+    ).toBeNull();
+  });
+
+  it('sends two or more pilot names to Pilot Lookup', () => {
+    expect(pasteDestination('Alpha One\nBeta Two\nGamma Three', SOURCES)).toBe('pilotList');
+  });
+
+  it('sends an in-game chat link to its page', () => {
+    expect(pasteDestination('<url=showinfo:587>Rifter</url>', SOURCES)).toBe('chatLink');
+    expect(pasteDestination('<url=showinfo:5//30000142>Jita</url>', SOURCES)).toBe('chatLink');
+  });
+
+  it('leaves an unsupported chat link alone', () => {
+    expect(pasteDestination('<url=showinfo:2//98000001>Corp</url>', SOURCES)).toBeNull();
+  });
+
+  it('sends a D-Scan to Pilot Lookup', () => {
+    expect(pasteDestination('626\tMy Vexor\tVexor\t1 km\n626\tB\tVexor\t2 km', SOURCES)).toBe(
+      'dscan'
+    );
+  });
+
+  it('still opens Pilot Lookup when a name list holds one item-like name', () => {
+    expect(pasteDestination('Alpha One\nTritanium\nBeta Two\nGamma Three', SOURCES)).toBe(
+      'pilotList'
+    );
+    expect(pasteDestination('Tritanium\nAlpha One', SOURCES)).toBe('pilotList');
+  });
+
+  it('keeps an item list with one unknown line in the Appraisal, not Pilot Lookup', () => {
+    expect(pasteDestination('Tritanium\nPyerite\nNocxium\nMystery Box', SOURCES)).toBe('appraisal');
+  });
+
+  it('never appraises a D-Scan, even one whose names are real items', () => {
+    expect(
+      pasteDestination('1\tTritanium\tTritanium\t1 km\n2\tPyerite\tPyerite\t2 km', SOURCES)
+    ).toBe('dscan');
+  });
+
+  it('leaves a malformed scan alone', () => {
+    expect(
+      pasteDestination('626\tMy Vexor\tVexor\t1 km\nsee you in local, o7?', SOURCES)
+    ).toBeNull();
+  });
+
+  it('leaves a single name alone', () => {
+    expect(pasteDestination('Alpha One', SOURCES)).toBeNull();
   });
 
   it('ignores prose and links', () => {
@@ -111,5 +166,62 @@ describe('pasteDestination', () => {
   it('ignores an empty or whitespace paste', () => {
     expect(pasteDestination('', SOURCES)).toBeNull();
     expect(pasteDestination('  \n\t\n', SOURCES)).toBeNull();
+  });
+});
+
+describe('detectPasteDestination', () => {
+  const claims = (id: string, verdict: 'match' | 'veto' | 'pass'): PasteDetector<string> => ({
+    id,
+    detect: () => verdict,
+  });
+
+  it('sends a paste matching two detectors to the higher-priority one', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'match'), claims('second', 'match')])
+    ).toBe('first');
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('second', 'match'), claims('first', 'match')])
+    ).toBe('second');
+  });
+
+  it('falls through a pass to the next detector', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'pass'), claims('second', 'match')])
+    ).toBe('second');
+  });
+
+  it('stops at a veto so lower-priority detectors cannot reread the paste', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'veto'), claims('second', 'match')])
+    ).toBeNull();
+  });
+
+  it('does nothing when no detector is confident, or the paste is blank', () => {
+    expect(detectPasteDestination('x', SOURCES, [claims('first', 'pass')])).toBeNull();
+    expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
+  });
+
+  it('keeps the shipped order: fit, chat link, D-Scan, skill plan, item list, then Local list', () => {
+    expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
+      'fitting',
+      'chatLink',
+      'dscan',
+      'skillPlan',
+      'appraisal',
+      'pilotList',
+    ]);
+  });
+
+  it('has Help strings for every registered destination', () => {
+    const help = en.shortcuts.pasteDestinations as Record<string, { label: string; opens: string }>;
+    for (const { id } of PASTE_DETECTORS) {
+      expect(help[id]?.label, id).toBeTruthy();
+      expect(help[id]?.opens, id).toBeTruthy();
+    }
+  });
+
+  it('prefers the fit over the item list when a paste reads as both', () => {
+    const fitOfItems = ['[Rifter, Items]', 'Tritanium', 'Pyerite', 'Nocxium'].join('\n');
+    expect(pasteDestination(fitOfItems, SOURCES)).toBe('fitting');
   });
 });

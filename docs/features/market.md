@@ -4,22 +4,22 @@ Scope: `/market` (Browser, Open orders, History, History > Transactions, Apprais
 
 ## Summary table
 
-| Feature              | Where                               | Notes                                                                                       |
-| -------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| Market page shell    | `/market`, `src/routes/Market.tsx`  | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves               |
-| Browser              | `/market/browser`                   | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters      |
-| Order book item tabs | Browser item panel                  | Order book, Variations, Price history                                                       |
-| Quickbar             | Browser finder column               | Per-character pinned items, drag reorder, price alerts                                      |
-| Compare drawer       | all Market tabs when set non-empty  | Prices + Attributes views; scratch set                                                      |
-| Open orders          | `/market/orders`                    | All-character worklist by problem; Order Detail modal                                       |
-| History (orders)     | `/market/history`                   | Expired/cancelled orders                                                                    |
-| Transactions         | `/market/history/transactions`      | Wallet fills with realized margin; reached via History view select (not its own tab button) |
-| Appraisal            | `/market/appraisal`                 | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                           |
-| Hauling              | `/market/hauling`                   | Hub price-gap scan, Trip Plan, Multibuy                                                     |
-| LP Store             | `/market/lp-store[/:corporationId]` | Market sub-view (nav), own route; ISK/LP ranking                                            |
-| Contract Item search | `/contracts/search/items`           | Public contract lines from shared Firestore snapshot                                        |
-| Courier search       | `/contracts/search/courier`         | Public courier contracts ranked ISK/jump                                                    |
-| Page paste           | `src/app/GlobalPasteRouter.tsx`     | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                             |
+| Feature              | Where                                                                                | Notes                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Market page shell    | `/market`, `src/routes/Market.tsx`                                                   | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves               |
+| Browser              | `/market/browser`                                                                    | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters      |
+| Order book item tabs | Browser item panel                                                                   | Order book, Variations, Price history                                                       |
+| Quickbar             | Browser finder column                                                                | Per-character pinned items, drag reorder, price alerts                                      |
+| Compare drawer       | all Market tabs when set non-empty                                                   | Prices + Attributes views; scratch set                                                      |
+| Open orders          | `/market/orders` (`?char=<id>` narrows to one Character, with a "Name only" readout) | All-character worklist by problem; Order Detail modal                                       |
+| History (orders)     | `/market/history`                                                                    | Expired/cancelled orders                                                                    |
+| Transactions         | `/market/history/transactions`                                                       | Wallet fills with realized margin; reached via History view select (not its own tab button) |
+| Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                           |
+| Hauling              | `/market/hauling`                                                                    | Hub price-gap scan, Trip Plan, Multibuy                                                     |
+| LP Store             | `/market/lp-store[/:corporationId]`                                                  | Market sub-view (nav), own route; ISK/LP ranking                                            |
+| Contract Item search | `/contracts/search/items`                                                            | Public contract lines from shared Firestore snapshot                                        |
+| Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                                    |
+| Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                             |
 
 ## 1. Route, nav, scopes
 
@@ -501,7 +501,7 @@ Summary
 - Sort: URL `sort`, default `iskPerLp desc`; sortable cols item/profit/iskPerLp; unpriceable (null) sink last (`rankByIskPerLp`; sortValue undefined). `mobileSort` on phone, `stackSummary` "n offers".
 - Row click selects; row context menu = `ItemContextMenu` on the product (blueprint rows target the manufactured product; Build Plan item if blueprint). No three-dot `rowMoreActions` by decision `20260927-144329-lp-store-offers-table-skips-the-row-three` (though `rowMoreActions` prop is present in code, `LoyaltyStore.tsx:689`: see gaps).
 - CSV (`loyaltyStoreCsv.ts`): item, LP cost, ISK cost, profit, ISK/LP — all cols regardless of picker; filtered rows; blank for unpriceable. Materials CSV: name, needed, owned, buy cost.
-- States: spinner until offers + blueprint catalog + market snapshot all loaded (`ready`); empty store ("emptyTitle"); filters hide all ("noMatch" + reset).
+- States: spinner until offers + blueprint catalog + market snapshot all loaded (`ready`); empty store ("emptyTitle"); offers load failed with nothing cached (error EmptyState + Try again); filters hide all ("noMatch" + reset).
 
 ### Offer detail (`OfferDetail`)
 
@@ -522,7 +522,7 @@ Summary
 
 ### Observed gaps (LP Store)
 
-- No error state: a failed/unresolvable offers load becomes `[]` and shows the "empty store" copy (`useLoyaltyStoreOffers.ts:82` `offersResult?.data ?? []`); no retry/refresh control on the page.
+- A failed offers load (ESI down, nothing cached) shows an error state with Try again (`loadLoyaltyStoreOffersStatus`, `offersError`), not the "empty store" copy.
 - `useUrlParams` has no hub/basis in URL; shared links do not carry price basis.
 - Offers table passes `rowMoreActions` (`LoyaltyStore.tsx:689`) although decision `20260927-144329` says not to; verify intent.
 - `documentTitle.ts` still carries dead `/wallet/loyalty` entries beside the new `/market/lp-store` ones.
@@ -642,7 +642,7 @@ Scope matrix: Browser, Variations, Compare, Price History, Appraisal, Hauling = 
 - Orders/History/Transactions read only through active-character redirect; no all-character History or Transactions.
 - No live prices on Quickbar rows; alerts only for pinned items.
 - Appraisal paste lost on reload; refine/LP omitted from CSV and share.
-- LP Store has no error state, no retry, hub/basis not in URL.
+- LP Store: hub/basis not in URL.
 - Contract search needs an active Character: with none the page redirects to `/characters` (`Contracts.tsx:550`), no anonymous browse.
 - Hauling scan is top-N (80/40), hubs only, hard-coded categories.
 - Price History and Hauling demand are region-wide, not station-level.
@@ -653,7 +653,7 @@ Scope matrix: Browser, Variations, Compare, Price History, Appraisal, Hauling = 
 
 - Persist Appraisal paste (session) and include refine/LP columns in CSV.
 - Quickbar: show live best price per row from the Fuzzwork hub snapshot, with alert-hit highlighting.
-- LP Store: error + retry state, hub/basis in URL for shareable links.
+- LP Store: hub/basis in URL for shareable links.
 - Contract search: sign-in-free path (cache key not tied to character); today it redirects to `/characters`.
 - Hauling: station-level history when ESI allows, user-selectable category groups, show scan coverage ("top 80 of N").
 - Open orders: slot usage line (`orderSlots.ts` exists), price-alert action on rows, filter/copy-location in row menu.

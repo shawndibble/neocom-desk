@@ -130,3 +130,8 @@ export const loadShipTree = cached<ShipTreeData>('shipTree.json');
  * ~1.7 MB, so not precached: only the EVE Workbench's out-of-date check reads it.
  */
 export const loadGameTypeNames = cached<string[]>('typeNames.json');
+
+/** Hole type ("M267") -> [max per jump, max total] in kg, for Route Safety's mass check (issue #2906). */
+export const loadWormholeMass = cached<Record<string, [number, number]>>('wormholeMass.json');
+/** Published hull typeId -> [name, groupID, mass in kg], for the same check. */
+export const loadShipMass = cached<Record<string, [string, number, number]>>('shipMass.json');
