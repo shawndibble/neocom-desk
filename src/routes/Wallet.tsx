@@ -35,7 +35,6 @@ import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -716,19 +715,7 @@ export function Wallet() {
         <Panel
           padded={false}
           title={t('wallet.journalTab')}
-          meta={
-            // Journal stays one Character (#2846): say so beside the title.
-            <>
-              <WalletOriginCrumb />
-              {activeCharacter && (
-                <CharacterScopeReadout
-                  scope="one"
-                  characterId={activeCharacter.characterId}
-                  characterName={activeCharacter.name}
-                />
-              )}
-            </>
-          }
+          meta={<WalletOriginCrumb />}
           actions={
             <span className="flex items-center gap-2">
               <Link

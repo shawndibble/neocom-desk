@@ -881,7 +881,7 @@ A surface that reads more than the active Character says so on screen, in one
 form with two looks. **Choosable:** the Character filter, whose "All" label
 carries the count ("All characters · 4"). **Fixed:** `CharacterScopeReadout`,
 an unboxed micro-label with the same icon and words — "All characters · 4",
-"Aria Vale only", "Corp · Master Wallet". When a read leaves Characters out it
+"Aria Vale only" (only where the surface could read another Character, not on a single-Character panel like the Wallet Journal), "Corp · Master Wallet". When a read leaves Characters out it
 says "All characters · 3 of 4" with a warning icon, and its tooltip names who
 is missing. Never clickable; if the pilot can change the scope, use the filter.
 
