@@ -2029,6 +2029,32 @@ describe('view state in the URL (issue #1306)', () => {
     expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
   });
 
+  it.each(['char', 'chars'])(
+    'opens for the Character ?%s= names, stating whose data it is, without switching the active one (issue #2936)',
+    async (key) => {
+      await seedSecondCharacter();
+      window.history.replaceState({}, '', `/assets?${key}=${CHAR_ID_2}`);
+      render(<App />);
+
+      expect(await screen.findByText('Pilot Two only')).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+    }
+  );
+
+  it('shows the grant note, not an empty list, for a named Character without the assets scope (issue #2936)', async () => {
+    await seedSecondCharacter();
+    await db.tokens.update(CHAR_ID_2, { scopes: [] });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+        HttpResponse.json({ error: 'forbidden' }, { status: 403 })
+      )
+    );
+    window.history.replaceState({}, '', `/assets?char=${CHAR_ID_2}`);
+    render(<App />);
+
+    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+  });
+
   it('writes a picked character filter to the URL', async () => {
     const user = userEvent.setup();
     await seedSecondCharacter();

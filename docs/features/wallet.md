@@ -169,7 +169,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 ## Observed gaps (facts from code)
 
 - No income/expense breakdown by ref type for a date range; only the filtered net total (`WalletJournalTable.tsx:151`) (#2858).
-- Journal tab and the balance chart are always the active Character's; the `?char=` filter only affects the Balance panel.
+- Journal tab and the balance chart are the active Character's, unless the URL names another with `?char=<id>` (alias `?chars=<id>`): then the whole page follows that Character, the readout says "Name only", a ‹ Wallet crumb shows when arriving from the Wallet chart, and the active Character is not switched. Otherwise the `?char=current|all` filter only affects the Balance panel.
 - All-characters Balance has no history chart and no per-row actions; Character rows do not link anywhere.
 - Journal tab never shows a re-login banner: `loadWalletJournal` exposes no `needsReauth`; a revoked wallet scope shows the generic cached-empty state (Balance tab does show the grant banner).
 - Item names on journal lines come from at most 5 pages of transactions (`MAX_TRANSACTION_PAGES`); older journal lines stay unlinked (documented in `journalTransactionLink.ts`).

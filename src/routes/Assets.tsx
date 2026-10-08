@@ -53,6 +53,9 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
+import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { MyShipsPanel } from '@/features/character/MyShipsPanel';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -649,9 +652,10 @@ function isUnresolvedParent(
 export function Assets() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadAssetsSnapshot,
-    undefined,
+    viewedCharacterId,
     { cacheKey: 'assets' }
   );
 
@@ -726,7 +730,10 @@ export function Assets() {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  const crossCharacterFilter = view.chars;
+  // Viewing a named Character is a fixed scope: the cross-Character filter
+  // (and its legacy `chars` value, which here named the Character) stands down.
+  const crossCharacterFilter: CharacterFilterValue =
+    viewedCharacterId === undefined ? view.chars : 'current';
   const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
     crossCharacterFilter,
     activeCharacterId
@@ -744,8 +751,12 @@ export function Assets() {
   // Absent for a one-Character account: "This character" and "All characters"
   // then resolve to the same pilot, leaving a control that cannot change
   // anything (`OpenOrdersPanel`'s precedent).
+  const viewedCharacter =
+    viewedCharacterId === undefined
+      ? undefined
+      : (allCharactersQuery ?? []).find((c) => c.characterId === viewedCharacterId);
   const crossCharacterFilterMeta =
-    crossCharacterCandidates.length > 1 ? (
+    crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
       <CharacterFilterControl
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
@@ -1647,6 +1658,14 @@ export function Assets() {
           // is" role the decision describes for a panel's own `meta`.
           meta={
             <>
+              <WalletOriginCrumb />
+              {viewedCharacter && (
+                <CharacterScopeReadout
+                  scope="one"
+                  characterId={viewedCharacter.characterId}
+                  characterName={viewedCharacter.name}
+                />
+              )}
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (

@@ -880,6 +880,13 @@ an unboxed micro-label with the same icon and words — "All characters · 4",
 says "All characters · 3 of 4" with a warning icon, and its tooltip names who
 is missing. Never clickable; if the pilot can change the scope, use the filter.
 
+### Origin crumb
+
+A page opened from another surface's drill-in (the Wallet chart, for Assets,
+Wallet Journal and Open orders) shows a "‹ Wallet" link (`WalletOriginCrumb`)
+beside its scope readout, only when route state says it arrived that way.
+Browser Back is unchanged; the crumb is a labelled way up, not a second Back.
+
 ### Entities
 
 - **Look:** every clickable entity name is accent at rest, underlined on
