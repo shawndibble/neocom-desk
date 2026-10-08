@@ -4501,6 +4501,7 @@
     },
     "myShips": {
       "title": "My ships",
+      "hint": "nearest first",
       "loading": "Loading ships…",
       "error": "Could not read your ships.",
       "emptyTitle": "No ships found",

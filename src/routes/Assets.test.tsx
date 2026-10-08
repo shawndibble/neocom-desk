@@ -230,6 +230,20 @@ function locationOrder(): string[] {
 }
 
 describe('Assets', () => {
+  it('shows the word Tools on its trigger and keeps Refresh inside the menu, not beside it (#2945)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+
+    const tools = screen.getByRole('button', { name: 'Tools' });
+    expect(tools).toHaveTextContent('Tools');
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+
+    await user.click(tools);
+    expect(await screen.findByRole('menuitem', { name: /^My ships.*nearest first/ })).toBeVisible();
+    expect(await screen.findByRole('menuitem', { name: /^Refresh/ })).toBeEnabled();
+  });
+
   it('lists locations at the root; drilling into one shows its contents', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1310,7 +1324,7 @@ describe('cross-character search (issue #85)', () => {
     async function openMyShips(user: ReturnType<typeof userEvent.setup>) {
       await screen.findByText(JITA);
       await user.click(screen.getByRole('button', { name: 'Tools' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'My ships' }));
+      await user.click(await screen.findByRole('menuitem', { name: /^My ships/ }));
       return screen.findByRole('dialog', { name: 'My ships' });
     }
 
