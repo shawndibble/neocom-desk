@@ -31,6 +31,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   loadPilotProfile,
   resolvePilotByName,
+  searchBoxSeed,
   type PilotProfile,
   type PilotSummary,
 } from './pilotLookup';
@@ -44,19 +45,21 @@ const SEARCH_DEBOUNCE_MS = 300;
 export function PilotLookupPanel() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
+  const [resolved, setResolved] = useState<PilotSummary | null>(null);
 
   return (
     <div className="space-y-4">
       <PageHeader title={t('nav.pilotLookup')} />
       <Panel>
         <PilotSearch
+          resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
           onSelect={(pilot) => setParams({ pilot: pilot.characterId }, { push: true })}
         />
       </Panel>
       {params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
       ) : (
-        <PilotResult key={params.pilot} characterId={params.pilot} />
+        <PilotResult key={params.pilot} characterId={params.pilot} onResolved={setResolved} />
       )}
     </div>
   );
@@ -68,7 +71,14 @@ type ResolveState =
   | { kind: 'not-found'; name: string }
   | { kind: 'failed' };
 
-function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) {
+function PilotSearch({
+  resolved,
+  onSelect,
+}: {
+  /** The pilot in the URL once its profile has loaded. */
+  resolved: PilotSummary | null;
+  onSelect: (pilot: PilotSummary) => void;
+}) {
   const { t } = useTranslation();
   const listboxId = useId();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -82,6 +92,22 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
   const latestSearch = useRef(0);
   // Likewise for an exact-name lookup: typing again supersedes one in flight.
   const latestLookup = useRef(0);
+  // The pilot whose name the box last showed, and whether the user is editing it.
+  const seededId = useRef<number | null>(null);
+  const typing = useRef(false);
+
+  useEffect(() => {
+    const seed = searchBoxSeed({
+      resolved,
+      seededId: seededId.current,
+      typing: typing.current,
+    });
+    if (seed === null) return;
+    seededId.current = resolved?.characterId ?? null;
+    setQuery(seed);
+    setSuggestions([]);
+    setOpen(false);
+  }, [resolved]);
 
   const trimmed = query.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
@@ -111,6 +137,8 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
 
   function choose(pilot: PilotSummary) {
     setQuery(pilot.name);
+    seededId.current = pilot.characterId;
+    typing.current = false;
     setOpen(false);
     setHighlight(null);
     setResolve({ kind: 'idle' });
@@ -177,6 +205,7 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
               onChange={(e) => {
                 // Typing supersedes a lookup in flight, and another query's hits must not linger.
                 latestLookup.current++;
+                typing.current = true;
                 setQuery(e.target.value);
                 setSuggestions([]);
                 setOpen(true);
@@ -184,7 +213,10 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
                 setResolve({ kind: 'idle' });
               }}
               onFocus={() => setOpen(true)}
-              onBlur={() => setOpen(false)}
+              onBlur={() => {
+                typing.current = false;
+                setOpen(false);
+              }}
               onKeyDown={handleKeyDown}
               className="w-full"
             />
@@ -247,7 +279,13 @@ type ProfileState =
   | { kind: 'ready'; profile: PilotProfile };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
-function PilotResult({ characterId }: { characterId: number }) {
+function PilotResult({
+  characterId,
+  onResolved,
+}: {
+  characterId: number;
+  onResolved: (pilot: PilotSummary) => void;
+}) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileState>({ kind: 'loading' });
 
@@ -255,8 +293,9 @@ function PilotResult({ characterId }: { characterId: number }) {
     let cancelled = false;
     void loadPilotProfile(characterId)
       .then((loaded) => {
-        if (!cancelled)
-          setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
+        if (cancelled) return;
+        setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
+        if (loaded !== null) onResolved({ characterId, name: loaded.name });
       })
       .catch(() => {
         if (!cancelled) setProfile({ kind: 'failed' });
@@ -264,7 +303,7 @@ function PilotResult({ characterId }: { characterId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, onResolved]);
 
   if (profile.kind === 'loading') {
     return (
