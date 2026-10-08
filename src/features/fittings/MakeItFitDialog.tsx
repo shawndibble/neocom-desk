@@ -12,7 +12,7 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import { catalogueTypeName } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { useMakeItFit } from './useMakeItFit';
-import { rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 
 const OPTION_LIMIT = 8;
@@ -64,7 +64,8 @@ export function MakeItFitDialog({ open, onClose, variants, catalogue, onApply, p
                     type="button"
                     className={cx(
                       'border-line w-full rounded-xs border p-2 text-left text-sm',
-                      rowInteractiveClassName
+                      rowInteractiveClassName,
+                      focusRingInsetClassName
                     )}
                     onClick={() => onApply(option)}
                   >
