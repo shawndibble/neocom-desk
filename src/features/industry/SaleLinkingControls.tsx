@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
+import type { ProductionLossRecord } from '@/db';
 import type { SaleLinking } from './useSaleLinking';
 import { SourcingInput } from './MaterialsTable';
 import { formatIsk } from '@/lib/isk';
@@ -37,6 +38,10 @@ export function SoldSplitButton({
   onSold,
   onWatch,
   onManual,
+  onLost,
+  losses = [],
+  onEditLoss,
+  onRemoveLoss,
   onDelete,
   onRefresh,
   refreshing = false,
@@ -44,6 +49,12 @@ export function SoldSplitButton({
   onSold: () => void;
   onWatch: () => void;
   onManual: () => void;
+  /** "Mark as lost…" — books a Run Loss (issue #2851). */
+  onLost: () => void;
+  /** The run's existing loss records; each gets an Edit/Remove item. */
+  losses?: readonly ProductionLossRecord[];
+  onEditLoss?: (loss: ProductionLossRecord) => void;
+  onRemoveLoss?: (loss: ProductionLossRecord) => void;
   onDelete: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -67,6 +78,22 @@ export function SoldSplitButton({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onWatch}>{t('industry.watchOpenOrder')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={onManual}>{t('industry.manualSale')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onLost}>{t('industry.markAsLost')}…</DropdownMenuItem>
+            {losses.map((loss) => {
+              const named = losses.length > 1;
+              const detail = {
+                count: loss.quantity,
+                date: new Date(loss.lostAt).toLocaleDateString(),
+              };
+              return [
+                <DropdownMenuItem key={`${loss.id}:edit`} onSelect={() => onEditLoss?.(loss)}>
+                  {named ? t('industry.editLossNamed', detail) : `${t('industry.editLoss')}`}
+                </DropdownMenuItem>,
+                <DropdownMenuItem key={`${loss.id}:remove`} onSelect={() => onRemoveLoss?.(loss)}>
+                  {named ? t('industry.removeLossNamed', detail) : t('industry.removeLoss')}
+                </DropdownMenuItem>,
+              ];
+            })}
             <DropdownMenuSeparator />
             {/* `data-[highlighted]:text-danger` re-states the tone the shared item
                 style resets on hover/keyboard focus — the one item here that

@@ -8,7 +8,13 @@ import type { MarketOrder } from '@/esi/endpoints';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 
 const loadWalletTransactions = vi.hoisted(() => vi.fn());
-vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions }));
+const hasWalletScope = vi.hoisted(() => vi.fn());
+const loadWalletJournal = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/wallet', () => ({
+  loadWalletTransactions,
+  hasWalletScope,
+  loadWalletJournal,
+}));
 
 const loadOrders = vi.hoisted(() => vi.fn());
 vi.mock('@/features/character/orders', () => ({ loadOrders }));
@@ -78,6 +84,9 @@ beforeEach(async () => {
   await db.productionRuns.clear();
   await db.productionSaleLinks.clear();
   await db.productionOrderWatches.clear();
+  await db.productionLosses.clear();
+  hasWalletScope.mockReset().mockResolvedValue(false);
+  loadWalletJournal.mockReset().mockResolvedValue(null);
   loadWalletTransactions.mockReset().mockResolvedValue(null);
   loadOrders.mockReset().mockResolvedValue({ cached: null, needsReauth: false });
   scheduleSync.mockReset();
@@ -492,6 +501,77 @@ describe('ProductionRunsPanel', () => {
     expect(priceInput.getAttribute('aria-describedby')).toBe(alerts[1].id);
     expect(await db.productionSaleLinks.count()).toBe(0);
     expect(screen.getByRole('dialog', { name: 'Manual / Private Sale' })).toBeTruthy();
+  });
+
+  it('marks units as lost with typed insurance, shows the badge, and writes them off open inventory', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('button', { name: 'Sold…' });
+
+    await chooseSoldMenuItem(user, 'Mark as lost…');
+    const dialog = await screen.findByRole('dialog', { name: 'Mark as lost' });
+    const units = within(dialog).getByLabelText('Units lost');
+    await user.clear(units);
+    await user.type(units, '2');
+    await user.click(within(dialog).getByRole('button', { name: 'Type ISK' }));
+    await user.type(within(dialog).getByLabelText('Insurance payout (ISK)'), '50000');
+    await user.tab();
+    await user.click(within(dialog).getByRole('button', { name: 'Mark as lost' }));
+
+    await waitFor(async () => {
+      expect(await db.productionLosses.count()).toBe(1);
+    });
+    const saved = (await db.productionLosses.toArray())[0];
+    expect(saved).toMatchObject({ runId: 'run-1', quantity: 2, insurancePayout: 50_000 });
+    expect(await screen.findByText('2 lost')).toBeTruthy();
+  });
+
+  it('rejects losing more units than remain unaccounted for', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('button', { name: 'Sold…' });
+
+    await chooseSoldMenuItem(user, 'Mark as lost…');
+    const dialog = await screen.findByRole('dialog', { name: 'Mark as lost' });
+    const units = within(dialog).getByLabelText('Units lost');
+    await user.clear(units);
+    await user.type(units, '9');
+    await user.tab();
+    await user.click(within(dialog).getByRole('button', { name: 'Mark as lost' }));
+
+    expect(await within(dialog).findByRole('alert')).toBeTruthy();
+    expect(await db.productionLosses.count()).toBe(0);
+  });
+
+  it('removes a loss after one confirmation', async () => {
+    await addRun();
+    const now = Date.now();
+    await db.productionLosses.add({
+      id: `${CHARACTER_ID}:loss:abc`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      quantity: 2,
+      lostAt: now,
+      insurancePayout: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByText('2 lost');
+
+    await chooseSoldMenuItem(user, 'Remove loss');
+    const dialog = await screen.findByRole('dialog', { name: 'Remove loss' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove loss' }));
+
+    await waitFor(async () => {
+      expect(await db.productionLosses.count()).toBe(0);
+    });
   });
 
   it('opens the Log Production dialog on a bumped logRequest, without clicking', async () => {

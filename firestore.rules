@@ -159,6 +159,14 @@ service cloud.firestore {
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();
       }
+
+      match /productionLosses/{lossId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
     }
 
     // Device registrations (issue #356, ADR 0010): written only by the
