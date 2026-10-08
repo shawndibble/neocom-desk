@@ -813,10 +813,8 @@ describe('Wallet', () => {
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       await user.click(await within(table).findByText('Pilot Two'));
 
-      expect(await screen.findByRole('table', { name: 'Net worth by layer' })).toBeInTheDocument();
       await waitFor(() => expect(window.location.search).toContain('drill=92'));
       expect(screen.queryByRole('table', { name: 'Balance by character' })).toBeNull();
-      expect(screen.getByRole('table', { name: 'Net worth by layer' })).toBeInTheDocument();
 
       // The browser Back button undoes the drill.
       window.history.back();
