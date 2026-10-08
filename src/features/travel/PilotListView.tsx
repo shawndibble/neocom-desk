@@ -49,7 +49,8 @@ import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
-import { SPACE_TEXT, STANDING_TEXT } from './pilotListStyles';
+import { PilotStandingTag } from './PilotStandingTag';
+import { SPACE_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
@@ -241,54 +242,56 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   );
 
   return (
-    <Panel className="space-y-4">
-      <HereControl here={here} />
-      {settled < found.length && (
-        <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
-          <Spinner label={t('common.loading')} />
-          {t('travel.pilot.list.progress', { done: settled, total: found.length })}
-        </p>
-      )}
-      {PILOT_GROUP_ORDER.map((id) => {
-        const list = groups.get(id) ?? [];
-        if (list.length === 0) return null;
-        if (id === 'friendly') {
+    <Panel>
+      <div className="flex flex-col gap-6">
+        <HereControl here={here} />
+        {settled < found.length && (
+          <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
+            <Spinner label={t('common.loading')} />
+            {t('travel.pilot.list.progress', { done: settled, total: found.length })}
+          </p>
+        )}
+        {PILOT_GROUP_ORDER.map((id) => {
+          const list = groups.get(id) ?? [];
+          if (list.length === 0) return null;
+          if (id === 'friendly') {
+            return (
+              <section key={id} className="space-y-2">
+                <GroupHeading id={id} count={list.length} space={here.space} />
+                <Button
+                  size="sm"
+                  aria-expanded={showFriendly}
+                  onClick={() => setShowFriendly((open) => !open)}
+                >
+                  {showFriendly
+                    ? t('travel.pilot.list.friendlyHide')
+                    : t('travel.pilot.list.friendlyShow')}
+                </Button>
+                {showFriendly && table(id, list)}
+              </section>
+            );
+          }
           return (
             <section key={id} className="space-y-2">
               <GroupHeading id={id} count={list.length} space={here.space} />
-              <Button
-                size="sm"
-                aria-expanded={showFriendly}
-                onClick={() => setShowFriendly((open) => !open)}
-              >
-                {showFriendly
-                  ? t('travel.pilot.list.friendlyHide')
-                  : t('travel.pilot.list.friendlyShow')}
-              </Button>
-              {showFriendly && table(id, list)}
+              {table(id, list)}
             </section>
           );
-        }
-        return (
-          <section key={id} className="space-y-2">
-            <GroupHeading id={id} count={list.length} space={here.space} />
-            {table(id, list)}
-          </section>
-        );
-      })}
-      {notFound.length > 0 && (
-        <p className="text-xs text-text-dim">
-          {t('travel.pilot.list.notFoundNames', {
-            count: notFound.length,
-            names: notFound.join(', '),
-          })}
-        </p>
-      )}
-      {paste.overflow > 0 && (
-        <p className="text-xs text-text-dim">
-          {t('travel.pilot.list.overflow', { shown: paste.names.length, count: paste.overflow })}
-        </p>
-      )}
+        })}
+        {notFound.length > 0 && (
+          <p className="text-xs text-text-dim">
+            {t('travel.pilot.list.notFoundNames', {
+              count: notFound.length,
+              names: notFound.join(', '),
+            })}
+          </p>
+        )}
+        {paste.overflow > 0 && (
+          <p className="text-xs text-text-dim">
+            {t('travel.pilot.list.overflow', { shown: paste.names.length, count: paste.overflow })}
+          </p>
+        )}
+      </div>
     </Panel>
   );
 }
@@ -327,15 +330,17 @@ function HereControl({ here }: { here: HereSpace }) {
   const { t } = useTranslation();
   const { current, space } = here;
   const name = useSystemName(current.systemId);
-  const source =
-    current.source === 'picked'
-      ? t('travel.pilot.list.hereSetByYou')
-      : current.source === 'game'
-        ? t('travel.pilot.list.hereFromGame')
-        : null;
+  // The label already says it is the API's system; only a hand-picked one needs saying.
+  const source = current.source === 'picked' ? t('travel.pilot.list.hereSetByYou') : null;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
-      <span>{t('travel.pilot.list.hereLabel')}</span>
+      <span>
+        {t(
+          current.source === 'picked'
+            ? 'travel.pilot.list.hereLabelPicked'
+            : 'travel.pilot.list.hereLabel'
+        )}
+      </span>
       <SolarSystemPicker
         value={current.systemId}
         onChange={(systemId) => current.pick(systemId)}
@@ -388,12 +393,13 @@ function StandingCell({ row }: { row: PilotListRow }) {
         <span className="block text-text-dim">{t(`travel.pilot.list.own.${own}`)}</span>
       )}
       {standing !== null && (
-        <span className={cx('block', STANDING_TEXT[standing.band])}>
-          {t(`travel.pilot.list.band.${standing.band}`)} {standing.value > 0 ? '+' : ''}
-          {standing.value}
-          <span className="block text-[0.6875rem] text-text-dim">
-            {t(`travel.pilot.list.via.${standing.via}`)}
-          </span>
+        <span className="flex items-center gap-1.5">
+          <PilotStandingTag standing={standing} />
+          {standing.via !== 'character' && (
+            <span className="text-[0.6875rem] text-text-dim">
+              {t(`travel.pilot.list.via.${standing.via}`)}
+            </span>
+          )}
         </span>
       )}
     </span>
