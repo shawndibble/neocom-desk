@@ -4572,7 +4572,8 @@
     },
     "allItemsToggle": "All items",
     "tools": {
-      "label": "Tools"
+      "label": "Tools",
+      "view": "View"
     },
     "myShips": {
       "title": "My ships",

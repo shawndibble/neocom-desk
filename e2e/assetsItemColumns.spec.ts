@@ -124,3 +124,32 @@ test('the label strip is absent below md', async ({ page }) => {
   await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
   await expect(page.getByTestId('item-column-labels')).toBeHidden();
 });
+
+// #3087: the toggles sit under a "View" caption; the actions below share one left edge.
+for (const width of [1280, 390]) {
+  test(`the Tools menu actions share a left edge and fit the viewport at ${width}px`, async ({
+    page,
+  }) => {
+    await seedAssets(page);
+    await signInAndGoto(page);
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`./assets/${STATION}`);
+    await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
+    await page.getByRole('button', { name: 'Tools' }).click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByText('View', { exact: true })).toBeVisible();
+
+    const lefts: number[] = [];
+    for (const name of [/^My ships/, /^Plan a move/, /^Refresh/]) {
+      const item = menu.getByRole('menuitem', { name });
+      const box = await item.boundingBox();
+      expect(box).not.toBeNull();
+      lefts.push(box!.x);
+    }
+    expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
+
+    const menuBox = await menu.boundingBox();
+    expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width);
+  });
+}

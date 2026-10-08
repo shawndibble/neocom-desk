@@ -100,6 +100,23 @@ export function DropdownMenuSeparator({
   );
 }
 
+/** A small-caps caption heading the items below it — not focusable, not a menu item. */
+export function DropdownMenuLabel({
+  className,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.Label>) {
+  return (
+    <DropdownMenuPrimitive.Label
+      role="presentation"
+      className={cx(
+        'px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 export function DropdownMenuSubTrigger({
   className,
   children,

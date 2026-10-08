@@ -262,6 +262,35 @@ describe('Assets', () => {
     expect(await screen.findByRole('menuitem', { name: /^Refresh/ })).toBeEnabled();
   });
 
+  it('heads the two toggles with a View caption and separates them from the actions (#3087)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Tools' }));
+
+    const menu = await screen.findByRole('menu');
+    const caption = within(menu).getByText('View');
+    expect(within(menu).queryByRole('menuitem', { name: 'View' })).not.toBeInTheDocument();
+    const allItems = within(menu).getByRole('menuitemcheckbox', { name: 'All items' });
+    const select = within(menu).getByRole('menuitemcheckbox', { name: 'Select' });
+    const separator = within(menu).getAllByRole('separator')[0];
+    const myShips = within(menu).getByRole('menuitem', { name: /^My ships/ });
+    const before = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(caption, allItems)).toBe(true);
+    expect(before(allItems, select)).toBe(true);
+    expect(before(select, separator)).toBe(true);
+    expect(before(separator, myShips)).toBe(true);
+
+    expect(allItems).toHaveAttribute('aria-checked', 'false');
+    await user.click(allItems);
+    await user.click(screen.getByRole('button', { name: 'Tools' }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'All items' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+  });
+
   it('lists locations at the root; drilling into one shows its contents', async () => {
     const user = userEvent.setup();
     render(<App />);

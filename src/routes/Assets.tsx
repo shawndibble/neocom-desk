@@ -19,6 +19,8 @@ import {
   DataAgeBadge,
   EmptyState,
   DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuItem,
   IconButton,
   IskAmount,
@@ -1729,6 +1731,7 @@ export function Assets() {
                   tableExport={assetsExport}
                   size="md"
                 >
+                  <DropdownMenuLabel>{t('assets.tools.view')}</DropdownMenuLabel>
                   <DropdownMenuCheckboxItem
                     checked={allItemsView}
                     onCheckedChange={(on) => setView({ all: on })}
@@ -1738,6 +1741,7 @@ export function Assets() {
                   <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
                     {t('assets.select.toggle')}
                   </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
                     {t('assets.myShips.title')}
                     <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
