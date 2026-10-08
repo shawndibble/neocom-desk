@@ -4,6 +4,11 @@
  * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
  * a Local list or D-Scan in Pilot Lookup, and anything else is left alone.
  *
+ * Destinations live in one registry, `PASTE_DETECTORS`. Its order IS the
+ * priority: the first detector to claim a paste wins, so a new format goes
+ * where it cannot hijack an earlier one. Adding a destination = one entry
+ * here, one route in `GlobalPasteRouter`, and its Help strings.
+ *
  * Deliberately conservative, since the router acts on pastes the pilot never
  * aimed at a field: a fit needs a header naming a real hull, and an item list
  * needs most of its lines to be real item names. A pasted URL, a chat line or
@@ -23,28 +28,67 @@ export interface PasteSources {
   hullNames: ReadonlySet<string>;
 }
 
-export function pasteDestination(
+/**
+ * What a detector makes of a paste: `match` claims it, `veto` ends detection
+ * with no destination (the text is unmistakably this format but unusable —
+ * lower-priority detectors must not reinterpret it), `pass` defers to the next.
+ */
+export type PasteVerdict = 'match' | 'veto' | 'pass';
+
+export interface PasteDetector<Id extends string = PasteDestination> {
+  id: Id;
+  detect: (text: string, sources: PasteSources) => PasteVerdict;
+}
+
+/**
+ * Every destination, highest priority first. The Help page lists them in this
+ * order, with its strings under `shortcuts.pasteDestinations.<id>`.
+ */
+export const PASTE_DETECTORS: readonly PasteDetector[] = [
+  {
+    id: 'fitting',
+    detect: (text, { hullNames }) => {
+      if (!looksLikeEftFit(text)) return 'pass';
+      // A bracketed first line is a fit or nothing: reading a malformed one as
+      // loose items would appraise the pilot's fit body under a broken header.
+      const shipName = parseEftFit(text).shipName.trim().toLowerCase();
+      return shipName !== '' && hullNames.has(shipName) ? 'match' : 'veto';
+    },
+  },
+  {
+    id: 'appraisal',
+    detect: (text, { catalogue }) => {
+      const entries = parseAppraisalPaste(text);
+      if (entries.length === 0) return 'pass';
+      const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
+      // A strict majority: a list the pilot copied out of the game rarely has
+      // more than a stray unknown line, while prose rarely has more than one hit.
+      return matched.length > unmatched.length ? 'match' : 'pass';
+    },
+  },
+  {
+    // Last, so an item list never reads as pilot names: two or more lines that
+    // all look like names (Local), or all like D-Scan rows.
+    id: 'pilotList',
+    detect: (text) => (classifyPilotPaste(text) === null ? 'pass' : 'match'),
+  },
+];
+
+/** The first detector to claim `text`, or null when none is confident. */
+export function detectPasteDestination<Id extends string>(
   text: string,
-  { catalogue, hullNames }: PasteSources
-): PasteDestination | null {
+  sources: PasteSources,
+  detectors: readonly PasteDetector<Id>[]
+): Id | null {
   if (text.trim() === '') return null;
-
-  if (looksLikeEftFit(text)) {
-    // A bracketed first line is a fit or nothing: reading a malformed one as
-    // loose items would appraise the pilot's fit body under a broken header.
-    const shipName = parseEftFit(text).shipName.trim().toLowerCase();
-    return shipName !== '' && hullNames.has(shipName) ? 'fitting' : null;
+  for (const { id, detect } of detectors) {
+    const verdict = detect(text, sources);
+    if (verdict === 'match') return id;
+    if (verdict === 'veto') return null;
   }
+  return null;
+}
 
-  const entries = parseAppraisalPaste(text);
-  if (entries.length > 0) {
-    const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
-    // A strict majority: a list the pilot copied out of the game rarely has
-    // more than a stray unknown line, while prose rarely has more than one hit.
-    if (matched.length > unmatched.length) return 'appraisal';
-  }
-
-  // Last, so an item list never reads as pilot names: two or more lines that
-  // all look like names (Local), or all like D-Scan rows.
-  return classifyPilotPaste(text) === null ? null : 'pilotList';
+export function pasteDestination(text: string, sources: PasteSources): PasteDestination | null {
+  return detectPasteDestination(text, sources, PASTE_DETECTORS);
 }

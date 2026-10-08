@@ -12,7 +12,11 @@ import {
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
-/** Per destination: where the paste goes, carrying its text in route state. */
+/**
+ * Per destination: where the paste goes, carrying its text in route state.
+ * Keyed by the detector ids of `PASTE_DETECTORS`, so a new detector without a
+ * route here fails the typecheck.
+ */
 const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state: unknown }]> = {
   fitting: (text) => [
     FITTINGS_PATH,

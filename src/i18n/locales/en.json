@@ -8328,12 +8328,13 @@
     "saveFittingAsNew": "Save the fitting as a new copy (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit or item list (inventory, cargo or contract) opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
-    "pasteFitting": "EFT fitting",
-    "pasteFittingOpens": "Opens in Fittings",
-    "pasteItems": "Item list",
-    "pasteItemsOpens": "Opens in Appraisal"
+    "pasteDestinations": {
+      "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
+      "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
+      "pilotList": { "label": "Local list or D-Scan", "opens": "Opens in Pilot Lookup" }
+    }
   },
   "activityLog": {
     "title": "Activity Log",
