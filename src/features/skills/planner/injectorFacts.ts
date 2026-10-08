@@ -4,7 +4,8 @@
  * cost, "if injected now". Pure — no fetch/DOM/Dexie — so the bracket walk
  * and price wiring are each testable on their own.
  */
-import { injectorsToCover } from '@/engine/skillInjectors';
+import { ALPHA_SP_CAP, injectorsToCover } from '@/engine/skillInjectors';
+import type { CloneState } from '@/engine/types';
 
 /** The subset of `HubAggregate` this view model prices against. */
 export interface InjectorPriceSource {
@@ -22,7 +23,9 @@ export interface InjectorFacts {
   none: boolean;
   /** True when `totalSp` hasn't loaded — every other figure but `spToTrain` is unavailable. */
   spUnknown: boolean;
-  /** Large Skill Injectors needed to close the gap. */
+  /** SP of the gap an Alpha clone cannot hold past `ALPHA_SP_CAP`; 0 for Omega or under the cap. */
+  alphaShortfallSp: number;
+  /** Large Skill Injectors needed to close the (Alpha-clamped) gap. */
   count: number;
   /** SP the last injector delivers past the gap. */
   surplusSp: number;
@@ -36,13 +39,20 @@ export function buildInjectorFacts(
   scheduled: readonly { sp: number }[],
   totalSp: number | null,
   unallocatedSp: number | null,
-  priceSource: InjectorPriceSource | null
+  priceSource: InjectorPriceSource | null,
+  cloneState: CloneState = 'omega'
 ): InjectorFacts {
   const spToTrain = scheduled.reduce((sum, step) => sum + step.sp, 0);
   const pricePerInjector = priceSource?.sellMin ?? null;
   // Shared by both "nothing to compute" branches below: no injectors, so no
   // priced total either — never a stray `pricePerInjector * 0`.
-  const nothingToCover = { count: 0, surplusSp: 0, pricePerInjector, priceTotal: null };
+  const nothingToCover = {
+    alphaShortfallSp: 0,
+    count: 0,
+    surplusSp: 0,
+    pricePerInjector,
+    priceTotal: null,
+  };
 
   if (totalSp === null) {
     return {
@@ -67,7 +77,13 @@ export function buildInjectorFacts(
   // the in-game bracket (which keys off every SP point the character holds,
   // spent or not) needs the two added back together.
   const bracketSp = totalSp + unallocated;
-  const { count, surplusSp } = injectorsToCover(gapSp, bracketSp);
+  // An Alpha clone cannot hold more than ALPHA_SP_CAP, so only the headroom
+  // below it (counting unallocated SP, which already sits in bracketSp) can
+  // be injected; the rest of the gap is reported as a shortfall.
+  const headroom = cloneState === 'alpha' ? Math.max(0, ALPHA_SP_CAP - bracketSp) : gapSp;
+  const coverableGap = Math.min(gapSp, headroom);
+  const alphaShortfallSp = gapSp - coverableGap;
+  const { count, surplusSp } = injectorsToCover(coverableGap, bracketSp);
 
   return {
     spToTrain,
@@ -75,9 +91,10 @@ export function buildInjectorFacts(
     gapSp,
     none: false,
     spUnknown: false,
+    alphaShortfallSp,
     count,
     surplusSp,
     pricePerInjector,
-    priceTotal: pricePerInjector === null ? null : pricePerInjector * count,
+    priceTotal: pricePerInjector === null || count === 0 ? null : pricePerInjector * count,
   };
 }

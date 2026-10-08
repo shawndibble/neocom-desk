@@ -2116,6 +2116,7 @@
       "noSellOrders": "No sell orders at {{hub}}",
       "spUnknown": "Unknown until your total SP loads.",
       "none": "Your plan is already covered by unallocated SP — no injectors needed.",
+      "alphaOverCap": "This plan needs {{sp}} more SP than an Alpha clone can hold (cap {{cap}} SP).",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
     "skillsToBuy": {
