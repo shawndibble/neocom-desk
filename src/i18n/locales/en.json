@@ -4676,6 +4676,7 @@
     "title": "Mail",
     "refresh": "Refresh",
     "readingFor": "For {{name}}",
+    "rowOwner": "Mail for {{name}}",
     "emptyTitle": "No mail cached",
     "emptyHint": "Couldn't load this character's mail yet. Try again shortly.",
     "emptyFetchedTitle": "No mail",

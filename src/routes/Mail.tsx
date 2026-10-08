@@ -938,14 +938,20 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                                 </span>
                                 <span className="min-w-0 truncate">{party}</span>
                                 {isAll && (
-                                  <span className="inline-flex max-w-32 shrink-0 items-center gap-1 rounded-xs border border-line px-1 text-[0.6875rem]">
+                                  // Portrait alone: the name beside it repeated down the
+                                  // whole list and crowded the sender. The name stays
+                                  // reachable via the alt/title and the reading pane.
+                                  <span
+                                    title={t('mail.rowOwner', { name: row.ownerName })}
+                                    className="shrink-0"
+                                  >
                                     <CharacterAvatar
                                       characterId={row.ownerId}
                                       size="sm"
                                       loading="lazy"
-                                      className="rounded-full"
+                                      alt={t('mail.rowOwner', { name: row.ownerName })}
+                                      className="rounded-full border-0"
                                     />
-                                    <span className="truncate">{row.ownerName}</span>
                                   </span>
                                 )}
                                 {header.timestamp && (
