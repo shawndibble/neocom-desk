@@ -127,7 +127,7 @@ Panel "Journal". Panel actions: link "Transactions →" (to `/market/history/tra
 
 Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
-- Columns (`walletJournal.tsx`): Date (nowrap, dim), Type (humanized ESI `ref_type`; always visible, titles each card on phone), Description, Amount (right, tone by sign), Balance (right, dim). Balance starts unticked on a phone (`WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT`) but the Columns menu can show them.
+- Columns (`walletJournal.tsx`): Date (nowrap, dim), Type (humanized ESI `ref_type`; always visible, titles each card on phone), Description, Amount (right, tone by sign), Balance (right, dim). Balance starts unticked on a phone (`WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT`) but the Columns menu can show it.
 - Sortable columns: date, refType, description, amount, balance (`JOURNAL_SORT_COLUMN_IDS`). Default Date desc. Sort in URL `journal.sort`; a sort on a hidden column survives until it returns.
 - `responsive="table"` (plain table sideways-scrolling on a phone, DESIGN §6c) and `virtualize="auto"` (every page, uncapped; thousands of rows).
 - Column picker (`ColumnPickerMenu`: button "Columns", reset): toggle Date/Description/Amount/Balance. Type is not in the catalog. Device-local setting `walletJournalVisibleColumns`, **shared with the corp journal**.
