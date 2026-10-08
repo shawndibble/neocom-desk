@@ -6,7 +6,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 | Feature                                  | Where                                 | Notes                                                                                                           |
 | ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | Worth panel (net worth, EverMarks, chart), LP-per-corp table                                                    |
+| Balance tab (`/wallet/balance`, default) | `Wallet.tsx`                          | Worth panel (net worth, EverMarks, chart), LP-per-corp table                                                    |
 | Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                                                   |
 | `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                                                          |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                                                  |

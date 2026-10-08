@@ -114,7 +114,7 @@ function LayerPicker({
   return (
     <MultiSelect
       trigger={
-        <Button size="sm">
+        <Button size="md">
           {t('wallet.netWorth.seriesButton', { shown: selected.size, total: LAYER_IDS.length })}
         </Button>
       }
