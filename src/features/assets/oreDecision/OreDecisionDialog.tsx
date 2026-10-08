@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { db } from '@/db';
@@ -464,7 +465,7 @@ export function OreDecisionDialog({
                   </span>
                   <button
                     type="button"
-                    className="text-accent underline-offset-2 hover:underline"
+                    className={textActionClassName()}
                     onClick={() => setEditingYield((v) => !v)}
                     aria-expanded={editingYield}
                   >
