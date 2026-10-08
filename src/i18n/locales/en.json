@@ -4398,7 +4398,7 @@
         "compressed": "Compressed",
         "raw": "Raw",
         "edited": "Edited by hand",
-        "copy": "Copy as text",
+        "copy": "Copy pricing as text",
         "copied": "Copied",
         "caveat": "Hub, ore form and unit prices are your current settings, re-read for the day mined. The bill itself is frozen.",
         "drift": "Unit prices are re-read for the day mined and now differ from the figures this bill was frozen at ({{value}} ISK). Hub and ore form are your current settings.",
