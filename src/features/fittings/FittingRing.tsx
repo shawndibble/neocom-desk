@@ -1180,8 +1180,8 @@ export function FittingRing({
           </div>
         )}
 
-        {/* The phone has no readouts under the ring, so the two budgets that gate a fit sit above the rack buttons. */}
-        {compact && (
+        {/* The phone editor has no readouts under the ring, so the two budgets that gate a fit sit above the rack buttons. (The Start preview is compact too, but carries its own meters.) */}
+        {compact && onRackOpen && (
           <div
             className="mx-auto grid grid-cols-2 gap-x-4 gap-y-1"
             style={{ maxWidth: RING_MAX_WIDTH }}
