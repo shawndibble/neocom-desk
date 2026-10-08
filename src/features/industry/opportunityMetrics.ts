@@ -34,3 +34,44 @@ export function unitMargin(row: OpportunityRow): number | null {
   const units = unitCount(row);
   return units > 0 ? row.result.profit / units : null;
 }
+
+/** Share of material cost (at the row's own pricing) a row's owned stock must cover for "mostly". */
+export const MOSTLY_COVERED_PCT = 75;
+
+export type StockFilter = 'any' | 'mostly' | 'full';
+
+export interface StockCoverage {
+  /** 0–100: owned material value over total material value. */
+  coveredPct: number;
+  /** ISK left to buy after owned stock is claimed. */
+  stillToBuyIsk: number;
+}
+
+/**
+ * How much of a row's top-level materials owned stock covers, valued at the
+ * row's own unit prices. Null when any material is unpriced (a partial
+ * percentage would mislead) or the row has no materials.
+ */
+export function stockCoverage(row: OpportunityRow): StockCoverage | null {
+  const materials = row.result.materials;
+  if (materials.length === 0) return null;
+  let ownedValue = 0;
+  let stillToBuyIsk = 0;
+  for (const m of materials) {
+    if (m.unitPrice === null || m.unpriced) return null;
+    ownedValue += m.ownedQuantity * m.unitPrice;
+    stillToBuyIsk += m.lineCost;
+  }
+  const total = ownedValue + stillToBuyIsk;
+  if (total <= 0) return null;
+  return { coveredPct: (ownedValue / total) * 100, stillToBuyIsk };
+}
+
+export function matchesStockFilter(row: OpportunityRow, filter: StockFilter): boolean {
+  if (filter === 'any') return true;
+  const coverage = stockCoverage(row);
+  if (!coverage) return false;
+  return filter === 'full'
+    ? coverage.stillToBuyIsk === 0
+    : coverage.coveredPct >= MOSTLY_COVERED_PCT;
+}

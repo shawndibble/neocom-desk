@@ -2865,6 +2865,12 @@
     "opportunitiesRankLabel": "Rank {{rank}}",
     "opportunitiesBlueprint": "Blueprint",
     "opportunitiesUnitMargin": "Unit margin",
+    "opportunitiesStockCovers": "Stock covers",
+    "opportunitiesStillToBuy": "Still to buy",
+    "opportunitiesUseMyStock": "Use my stock",
+    "opportunitiesStockAny": "Any",
+    "opportunitiesStockMostly": "{{pct}}%+ covered",
+    "opportunitiesStockFull": "Fully covered",
     "opportunitiesOrderDepthLabel": "Depth",
     "opportunitiesOrderDepth": {
       "deep": "Deep",
