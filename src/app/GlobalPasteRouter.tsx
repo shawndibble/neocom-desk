@@ -49,7 +49,8 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
   const [catalogue, hullNames, skillByName] = await Promise.all([
     loadAppraisalCatalogue(),
     loadHullNames(),
-    loadSkillNameMap(),
+    // A skill catalogue that won't load costs only the skill-plan route.
+    loadSkillNameMap().catch(() => new Map<string, { typeID: number }>()),
   ]);
   return pasteDestination(text, { catalogue, hullNames, skillByName });
 }

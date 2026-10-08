@@ -78,13 +78,17 @@ export function SkillPlans() {
     if (importedText.current === importText) return;
     importedText.current = importText;
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapCount);
-    void db.skillPlans.add(plan).then(() => {
-      if (isSyncConfigured()) scheduleSync(activeCharacterId);
-      void navigate(`/skills/plans/${plan.id}`, {
-        replace: true,
-        state: { skillPlanImportText: importText } satisfies SkillPlanImportState,
-      });
-    });
+    void db.skillPlans
+      .add(plan)
+      .then(() => {
+        if (isSyncConfigured()) scheduleSync(activeCharacterId);
+        void navigate(`/skills/plans/${plan.id}`, {
+          replace: true,
+          state: { skillPlanImportText: importText } satisfies SkillPlanImportState,
+        });
+      })
+      // Storage refused the plan: stay on the list rather than loop or throw.
+      .catch(() => undefined);
   }, [hydrated, activeCharacterId, importText, remapCount, navigate, t]);
 
   if (!hydrated) {
