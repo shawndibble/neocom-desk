@@ -20,5 +20,6 @@ PNG exports of the chosen mockups for ready tickets. The originals are private C
 | [my-losses](my-losses/README.md) | Issue #2852 | idea B, contextual entry points (Alerts card, See loss on insurance rows, Pilot Lookup) |
 | [structure-fee](structure-fee/README.md) | Issue #2911 | idea A, an assumed-fee line with a Set fee popover and a Settings list |
 | [reaction-highsec-warning](reaction-highsec-warning/README.md) | Issue #2908 | idea C, the verdict changes only while the Reaction Location is highsec |
+| [ore-decision](ore-decision/README.md) | Issue #2836 | hybrid of A (Assets menu dialog) and B (plan ore toggle); no Ore tab |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
