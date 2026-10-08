@@ -48,7 +48,7 @@ export function AppraisalHeaderStats({
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
             label={t('market.appraisal.instantNet')}
-            className="font-semibold"
+            emphasis
             value={
               <span className={iskToneClass(net.instantNet)}>
                 <IskAmount value={net.instantNet} decimals={0} />
@@ -75,7 +75,7 @@ export function AppraisalHeaderStats({
           label={t('market.appraisal.sellTotal')}
           value={<FullIskTotal value={totals.sell} />}
           tone="accent"
-          className="font-semibold"
+          emphasis
           tooltip={t('market.appraisal.sellTotalHelp')}
         />
         <StatChip
@@ -101,7 +101,7 @@ export function AppraisalHeaderStats({
         )}
       </Group>
       <Group title={t('market.appraisal.groupCargo')}>
-        <AppraisalVolumeChip totals={totals} />
+        <AppraisalVolumeChip totals={totals} emphasis />
         <StatChip label={t('market.appraisal.items')} value={itemCount} />
         {showRefine && (
           <StatChip

@@ -571,6 +571,46 @@ export function AppraisalPanel({
         }
       >
         <div className="flex flex-col gap-2">
+          {recent.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <label
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                htmlFor="market-appraisal-recent"
+              >
+                {t('market.appraisal.recent')}
+              </label>
+              <Select
+                value=""
+                onValueChange={(value) =>
+                  controller.appraiseText(recent[Number(value)]?.text ?? '')
+                }
+              >
+                <SelectTrigger size="sm" id="market-appraisal-recent" className="w-full min-w-0">
+                  <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {recent.map((entry, index) => {
+                    const { names, more } = recentLabel(entry.text);
+                    return (
+                      <SelectItem key={entry.text} value={String(index)}>
+                        {t(
+                          more > 0
+                            ? 'market.appraisal.recentLabelMore'
+                            : 'market.appraisal.recentLabel',
+                          {
+                            names: names.join(', '),
+                            count: more,
+                            age: formatAge(openedAt - entry.savedAt, t),
+                          }
+                        )}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
             {t('market.appraisal.pasteLabel')}
           </label>
@@ -664,48 +704,9 @@ export function AppraisalPanel({
           </div>
 
           {recent.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <label
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  htmlFor="market-appraisal-recent"
-                >
-                  {t('market.appraisal.recent')}
-                </label>
-                <Select
-                  value=""
-                  onValueChange={(value) =>
-                    controller.appraiseText(recent[Number(value)]?.text ?? '')
-                  }
-                >
-                  <SelectTrigger size="sm" id="market-appraisal-recent" className="min-w-0 flex-1">
-                    <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {recent.map((entry, index) => {
-                      const { names, more } = recentLabel(entry.text);
-                      return (
-                        <SelectItem key={entry.text} value={String(index)}>
-                          {t(
-                            more > 0
-                              ? 'market.appraisal.recentLabelMore'
-                              : 'market.appraisal.recentLabel',
-                            {
-                              names: names.join(', '),
-                              count: more,
-                              age: formatAge(openedAt - entry.savedAt, t),
-                            }
-                          )}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
-                {t('market.appraisal.clearRecent')}
-              </Button>
-            </div>
+            <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
+              {t('market.appraisal.clearRecent')}
+            </Button>
           )}
 
           {unmatched.length > 0 && (
