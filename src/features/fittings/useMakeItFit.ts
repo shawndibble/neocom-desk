@@ -18,6 +18,8 @@ import { yieldToEventLoop } from './yieldToEventLoop';
 export interface MakeItFitState {
   /** Null while calculating. */
   result: FitSwapsResult | null;
+  /** The calculation threw; there is no result to show. */
+  failed: boolean;
   /** The open Fitting's stats as they stand, for each option's change list. */
   before: FittingStats | null;
 }
@@ -28,6 +30,7 @@ export function useMakeItFit(
   enabled: boolean
 ): MakeItFitState {
   const hubId = useMarketHub((state) => state.value);
+  const [failed, setFailed] = useState<VariantEvaluator | null>(null);
   const [computed, setComputed] = useState<{
     variants: VariantEvaluator;
     result: FitSwapsResult;
@@ -61,17 +64,21 @@ export function useMakeItFit(
       const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
       const priceMap = await getHubPrices(hub, typeIds).catch(() => null);
       if (cancelled) return;
-      const { before } = await variants.compare(variants.fitting);
-      const result = await findFitSwaps({
-        fitting: variants.fitting,
-        before,
-        candidates,
-        stats: async (fitting) => (await variants.compare(fitting)).after,
-        priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
-        yieldFn: yieldToEventLoop,
-        isCancelled: () => cancelled,
-      });
-      if (!cancelled) setComputed({ variants, result, before });
+      try {
+        const { before } = await variants.compare(variants.fitting);
+        const result = await findFitSwaps({
+          fitting: variants.fitting,
+          before,
+          candidates,
+          stats: async (fitting) => (await variants.compare(fitting)).after,
+          priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
+          yieldFn: yieldToEventLoop,
+          isCancelled: () => cancelled,
+        });
+        if (!cancelled) setComputed({ variants, result, before });
+      } catch {
+        if (!cancelled) setFailed(variants);
+      }
     })();
     return () => {
       cancelled = true;
@@ -79,5 +86,9 @@ export function useMakeItFit(
   }, [enabled, variants, candidates, hubId]);
 
   const fresh = computed && computed.variants === variants ? computed : null;
-  return { result: fresh?.result ?? null, before: fresh?.before ?? null };
+  return {
+    result: fresh?.result ?? null,
+    before: fresh?.before ?? null,
+    failed: failed === variants,
+  };
 }

@@ -28,7 +28,7 @@ interface Props {
 
 export function MakeItFitDialog({ open, onClose, variants, catalogue, onApply, placement }: Props) {
   const { t } = useTranslation();
-  const { result, before } = useMakeItFit(variants, catalogue, open);
+  const { result, before, failed } = useMakeItFit(variants, catalogue, open);
   const name = (typeId: number) => catalogueTypeName(catalogue, typeId);
 
   return (
@@ -38,7 +38,9 @@ export function MakeItFitDialog({ open, onClose, variants, catalogue, onApply, p
       title={t('fittings.makeItFit.title')}
       placement={placement}
     >
-      {result === null || before === null ? (
+      {failed ? (
+        <p className="text-danger text-sm">{t('fittings.makeItFit.failed')}</p>
+      ) : result === null || before === null ? (
         <p className="text-text-dim flex items-center gap-2 text-sm">
           <Spinner /> {t('fittings.makeItFit.searching')}
         </p>
@@ -48,7 +50,11 @@ export function MakeItFitDialog({ open, onClose, variants, catalogue, onApply, p
         </p>
       ) : (
         <div className="space-y-2">
-          <p className="text-text-dim text-xs">{t('fittings.makeItFit.hint')}</p>
+          <p className="text-text-dim text-xs">
+            {t('fittings.makeItFit.hint')}
+            {result.options.length > OPTION_LIMIT &&
+              ` ${t('fittings.makeItFit.showing', { shown: OPTION_LIMIT, total: result.options.length })}`}
+          </p>
           <ul className="space-y-1">
             {result.options.slice(0, OPTION_LIMIT).map((option) => {
               const delta = diffFittingStats(before, option.after);
