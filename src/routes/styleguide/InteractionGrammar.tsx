@@ -123,6 +123,15 @@ export function InteractionGrammar() {
             <Icon.Rename size={Icon.ICON_SIZE.sm} className="text-text-faint" aria-hidden="true" />
           </span>
         </Cue>
+        <Cue rule={k('rules.assumed')}>
+          <span className="flex items-center gap-1 text-xs text-warning">
+            <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+            {k('samples.assumedFee')}
+          </span>
+          <button type="button" className={textActionClassName()}>
+            {t('market.structureFee.setFee')}
+          </button>
+        </Cue>
         <Cue rule={k('rules.iskAmount')} note={k('notes.iskAmount')}>
           <IskAmount value={1_342_500_000} />
           <IskAmount value={48_250} />

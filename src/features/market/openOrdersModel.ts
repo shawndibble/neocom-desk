@@ -53,6 +53,8 @@ import {
   type UndercutResult,
 } from '@/engine/market/undercut';
 import { orderFloor, type OrderFloor } from '@/engine/market/orderFloor';
+import { structureBrokerPct } from '@/engine/market/structureFee';
+import type { StructureFees } from '@/features/market/structureFees';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { orderExpiry, type OrderExpiry } from '@/engine/market/orderHealth';
 import {
@@ -184,6 +186,13 @@ export interface BuildRowsInput {
    * simply not yet resolved).
    */
   standingsByOrder?: ReadonlyMap<number, ResolvedStandings>;
+  /**
+   * The owner's broker fee the pilot typed per player structure (issue
+   * #2911), keyed structure id. A structure with an entry is costed at the
+   * SCC surcharge plus that rate instead of NPC skill/standing rates; one
+   * without keeps NPC rules (the Order detail labels that as assumed).
+   */
+  structureFees?: StructureFees;
   now: number;
   /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
@@ -269,6 +278,7 @@ function buildRow(
     now,
     daysWithoutSale,
     standingsByOrder,
+    structureFees,
   } = input;
 
   const isBuyOrder = order.is_buy_order ?? false;
@@ -307,6 +317,7 @@ function buildRow(
   const costBasis = costBases.get(order.order_id) ?? null;
   const skills = skillsByCharacter.get(entry.characterId);
   const standing = standingsByOrder?.get(order.order_id);
+  const ownerPct = structureFees?.[order.location_id];
   const floor =
     costBasis && skills
       ? orderFloor({
@@ -317,6 +328,7 @@ function buildRow(
           advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
           factionStanding: standing?.factionStanding,
           corpStanding: standing?.corpStanding,
+          structureBrokerPct: ownerPct === undefined ? undefined : structureBrokerPct(ownerPct),
         })
       : null;
 

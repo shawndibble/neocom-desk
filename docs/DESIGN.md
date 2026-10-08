@@ -838,26 +838,27 @@ clear when it changes (a different Character).
 
 ### Cue vocabulary
 
-| Cue                                                  | Means only                                                                                                                                                                                                       |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Accent text                                          | Clickable                                                                                                                                                                                                        |
-| Solid underline at rest                              | A link inside a sentence (`inlineLinkClassName`)                                                                                                                                                                 |
-| Trailing `Icon.External` (Phosphor `ArrowSquareOut`) | Leaves Neocom Desk (`ExternalLink`)                                                                                                                                                                              |
-| Dotted underline                                     | Has a tooltip (`HintText`)                                                                                                                                                                                       |
-| "?" circle                                           | Explains a term (`InfoTooltip`): a tooltip, never a dialog                                                                                                                                                       |
-| ⓘ `IconButton`                                       | Opens Show Info or an explanation modal                                                                                                                                                                          |
-| Faint pencil after a value                           | Edit this value in place                                                                                                                                                                                         |
-| "…" ending a label                                   | Opens a dialog that needs more input or a confirmation before the action runs (Windows' rule). Not on a button that only shows a window (Show info, Payees, Settings), and never on an icon-only button.         |
-| Trailing `CaretRight` on a row                       | Goes to another page or view                                                                                                                                                                                     |
-| Leading caret that rotates                           | Expands in place (`Disclosure`'s `Caret`)                                                                                                                                                                        |
-| Trailing rotating chevron, right edge                | Navigation expanders (rail pages with views, the More sheet's hidden pages) keep a trailing rotating chevron at the right edge, not the leading caret used for in-content disclosures (owner decision, Oct 2026) |
-| `CaretDown` inside field chrome                      | Opens a list to pick from                                                                                                                                                                                        |
-| Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                              |
-| ⋮                                                    | The row's or table's action menu, only where it holds two or more real actions (⋯ is only the phone nav's More)                                                                                                  |
-| Accent 2px left border                               | Selected                                                                                                                                                                                                         |
-| `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                                |
-| A box sized like a field                             | A control (§6)                                                                                                                                                                                                   |
-| Warning box with a `Button` "Retry"                  | A read failed and nothing is cached: the data is unknown, not empty (PI `EsiDidntAnswer`). Retry re-runs the read                                                                                                |
+| Cue                                                  | Means only                                                                                                                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Accent text                                          | Clickable                                                                                                                                                                                                          |
+| Solid underline at rest                              | A link inside a sentence (`inlineLinkClassName`)                                                                                                                                                                   |
+| Trailing `Icon.External` (Phosphor `ArrowSquareOut`) | Leaves Neocom Desk (`ExternalLink`)                                                                                                                                                                                |
+| Dotted underline                                     | Has a tooltip (`HintText`)                                                                                                                                                                                         |
+| "?" circle                                           | Explains a term (`InfoTooltip`): a tooltip, never a dialog                                                                                                                                                         |
+| ⓘ `IconButton`                                       | Opens Show Info or an explanation modal                                                                                                                                                                            |
+| Faint pencil after a value                           | Edit this value in place                                                                                                                                                                                           |
+| "…" ending a label                                   | Opens a dialog that needs more input or a confirmation before the action runs (Windows' rule). Not on a button that only shows a window (Show info, Payees, Settings), and never on an icon-only button.           |
+| Amber warning mark (`Icon.Warn`, `text-warning`)     | A figure that leans on a default the pilot has not confirmed ('Assuming NPC station fees'). The adjacent "Set fee…" button opens a popover (a bottom sheet on a phone) to confirm it; once set the mark goes away. |
+| Trailing `CaretRight` on a row                       | Goes to another page or view                                                                                                                                                                                       |
+| Leading caret that rotates                           | Expands in place (`Disclosure`'s `Caret`)                                                                                                                                                                          |
+| Trailing rotating chevron, right edge                | Navigation expanders (rail pages with views, the More sheet's hidden pages) keep a trailing rotating chevron at the right edge, not the leading caret used for in-content disclosures (owner decision, Oct 2026)   |
+| `CaretDown` inside field chrome                      | Opens a list to pick from                                                                                                                                                                                          |
+| Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                                |
+| ⋮                                                    | The row's or table's action menu, only where it holds two or more real actions (⋯ is only the phone nav's More)                                                                                                    |
+| Accent 2px left border                               | Selected                                                                                                                                                                                                           |
+| `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                                  |
+| A box sized like a field                             | A control (§6)                                                                                                                                                                                                     |
+| Warning box with a `Button` "Retry"                  | A read failed and nothing is cached: the data is unknown, not empty (PI `EsiDidntAnswer`). Retry re-runs the read                                                                                                  |
 
 Retired meanings, each with its replacement:
 
@@ -879,6 +880,13 @@ an unboxed micro-label with the same icon and words — "All characters · 4",
 "Aria Vale only", "Corp · Master Wallet". When a read leaves Characters out it
 says "All characters · 3 of 4" with a warning icon, and its tooltip names who
 is missing. Never clickable; if the pilot can change the scope, use the filter.
+
+### Origin crumb
+
+A page opened from another surface's drill-in (the Wallet chart, for Assets,
+Wallet Journal and Open orders) shows a "‹ Wallet" link (`WalletOriginCrumb`)
+beside its scope readout, only when route state says it arrived that way.
+Browser Back is unchanged; the crumb is a labelled way up, not a second Back.
 
 ### Entities
 

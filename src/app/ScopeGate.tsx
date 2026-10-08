@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { ReauthBanner } from '@/components/ui';
 import { beginEveLogin } from './loginFlow';
 import { useGrantedScopes } from './useGrantedScopes';
@@ -41,8 +42,11 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
   const { t } = useTranslation();
   const gated = isGatedRoute(path);
   const granted = useGrantedScopes();
+  // Assets opened for another Character (`?char=`) judges that
+  // Character's grant itself (its own `GrantBanner`), not the active one's.
+  const viewingOther = useViewedCharacterId() !== undefined && path === '/assets';
 
-  if (!gated || granted === undefined) return <>{children}</>;
+  if (!gated || granted === undefined || viewingOther) return <>{children}</>;
   if (missingScopesForRoute(path, granted).length === 0) return <>{children}</>;
 
   const namespace = routeStringsNamespace(path);

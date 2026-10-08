@@ -53,7 +53,23 @@ describe('pasteDestination', () => {
   });
 
   it('ignores text where most lines are not items', () => {
-    expect(pasteDestination('Tritanium\nhello there\nsee you in local\no7', SOURCES)).toBeNull();
+    expect(
+      pasteDestination('Tritanium\nhello there!\nsee you in local, o7\no7?', SOURCES)
+    ).toBeNull();
+  });
+
+  it('sends two or more pilot names to Pilot Lookup', () => {
+    expect(pasteDestination('Alpha One\nBeta Two\nGamma Three', SOURCES)).toBe('pilotList');
+  });
+
+  it('sends a D-Scan to Pilot Lookup', () => {
+    expect(pasteDestination('626\tMy Vexor\tVexor\t1 km\n626\tB\tVexor\t2 km', SOURCES)).toBe(
+      'pilotList'
+    );
+  });
+
+  it('leaves a single name alone', () => {
+    expect(pasteDestination('Alpha One', SOURCES)).toBeNull();
   });
 
   it('ignores prose and links', () => {

@@ -469,7 +469,7 @@ Verdicts (`buildVsBuy.ts:107-154`)
 
 - List: Profit + name always; Verdict/Runs from `sm`; ISK/h + Margin from `lg`; toolbar icon-only; drag handle size-9 on touch.
 - Plan page: Hero row wraps (`xl` joins button column); Costs panel sits beside Materials from `xl` (Volume column hidden between `xl` and `2xl`); below `xl` stacked; Costs folded by default below 64rem (`useIsDesktop`, not only phones); Materials switches to the phone ledger below the phone breakpoint; Setup is a fold; inputs 2-3 col grid; rigs wrap.
-- Group page: two columns from `lg`; Materials table drops Volume and Owned columns on phone (`phoneHidden`) and scrolls sideways; so Group Owned Overlay entry is not available on phone (only via Use all).
+- Group page: two columns from `lg`; Materials table drops the Volume column on phone (`phoneHidden`) and scrolls sideways; the Owned column stays on phone (#2843).
 - Compare: scrolls sideways, plan pinned.
 - Touch: row long-press = menu (`useLiftAfterHoldGuard`); info/tooltips use `openOnTap` where the row tap is otherwise inert.
 
@@ -498,7 +498,7 @@ Plan page
   Group page
 - No Price / Line total columns in the group buy table (only need, volume, owned, still to buy); headline is the Acquisition Verdict only, while the list row shows summed Sale Profitability for the same group (two different measures).
 - No rename / delete / add plan on the group page; Members panel only links out.
-- Phone hides Volume and Owned columns, so no per-row owned entry on phone.
+- Phone hides only the Volume column; per-row owned entry works on phone (#2843).
 - Retarget facility list is unfiltered (`RetargetGroupDialog.tsx:190`) and `retargetPatch` writes the facility to every checked plan without checking activity, so a manufacturing facility can land on a reaction plan or vice versa.
 - Auto Build for group: generic overwrite confirm only, no preview; no per-member opt-out.
 - Mixed-hub group: whole-group copy disabled by design; no way to re-home a member from the group page.

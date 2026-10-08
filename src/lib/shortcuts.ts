@@ -21,6 +21,14 @@ export interface FittingLoadState {
 }
 
 /**
+ * Router `location.state` shape the app-wide paste router navigates
+ * `/pilot-lookup` with: a pasted Local list or D-Scan, checked on arrival.
+ */
+export interface PilotListState {
+  readonly pilotListText: string;
+}
+
+/**
  * Router `location.state` shape a Fitting's Export menu navigates `/industry`
  * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
  * on arrival ("Manufacture Plan"). Shared so the producer

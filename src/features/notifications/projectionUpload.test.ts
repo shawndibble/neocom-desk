@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readNotificationPermission } from './permission';
 import { registerDeviceForWebPush, unregisterDeviceForWebPush } from '@/sync/deviceRegistration';
 import { webPushSupport } from '@/sync/webPushSupport';
+import { usePushFailure } from './pushFailure';
 import { uploadProjectionRows, unregisterProjectionRegistration } from './projectionUpload';
 import type { ProjectionRow } from '@/engine/projection';
 
@@ -29,6 +30,7 @@ const ROW: ProjectionRow = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  usePushFailure.setState({ value: null, hydrated: true });
   vi.mocked(webPushSupport).mockReturnValue('supported');
   vi.mocked(readNotificationPermission).mockReturnValue('granted');
   vi.mocked(registerDeviceForWebPush).mockResolvedValue({
@@ -75,6 +77,23 @@ describe('uploadProjectionRows', () => {
   it('resolves rather than rejecting when registration fails', async () => {
     vi.mocked(registerDeviceForWebPush).mockRejectedValue(new Error('network error'));
     await expect(uploadProjectionRows(new Map([[1, [ROW]]]))).resolves.toBeUndefined();
+  });
+});
+
+describe('push failure record', () => {
+  it('records a failed upload and clears it on the next success', async () => {
+    vi.mocked(registerDeviceForWebPush).mockRejectedValueOnce(new Error('network error'));
+    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    expect(usePushFailure.getState().value).not.toBeNull();
+    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    expect(usePushFailure.getState().value).toBeNull();
+  });
+
+  it('leaves a standing failure alone when the upload was skipped as unchanged', async () => {
+    usePushFailure.setState({ value: { reason: 'network', at: 1 } });
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue(null);
+    await uploadProjectionRows(new Map([[1, [ROW]]]));
+    expect(usePushFailure.getState().value).toEqual({ reason: 'network', at: 1 });
   });
 });
 
