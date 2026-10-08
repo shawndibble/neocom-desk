@@ -8,6 +8,7 @@ import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingRing } from './FittingRing';
+import { MakeItFitContext } from './makeItFitContext';
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
@@ -129,8 +130,49 @@ describe('FittingRing', () => {
     // A T3's subsystems get a sheet of their own.
     fireEvent.click(screen.getByRole('button', { name: /^Subsystems\s*0 \/ 5$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('subsystem');
-    // No readouts on the overview — the List bars carry those numbers.
-    expect(screen.queryByRole('meter', { name: 'CPU' })).toBeNull();
+    // The overview carries the two budgets that gate a fit, above the rack buttons.
+    expect(screen.getByRole('meter', { name: 'CPU' })).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Powergrid' })).toBeTruthy();
+    expect(screen.queryByRole('meter', { name: 'Calibration' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /make it fit/i })).toBeNull();
+  });
+
+  it('offers one Make it fit on the phone overview when CPU is over, and none under budget', () => {
+    const open = vi.fn();
+    const ring = (cpuUsed: number) => (
+      <MakeItFitContext.Provider value={open}>
+        <FittingRing fitting={fitting} stats={statsWith(cpuUsed)} compact onRackOpen={vi.fn()} />
+      </MakeItFitContext.Provider>
+    );
+    const { rerender } = render(ring(112.5));
+    expect(screen.getByText('Over by 12.5')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /make it fit/i }));
+    expect(open).toHaveBeenCalledOnce();
+    rerender(ring(90));
+    expect(screen.queryByText(/Over by/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /make it fit/i })).toBeNull();
+  });
+
+  it('offers a single Make it fit when CPU and powergrid are both over', () => {
+    render(
+      <MakeItFitContext.Provider value={vi.fn()}>
+        <FittingRing
+          fitting={fitting}
+          stats={{ ...statsWith(112.5), powergridUsed: 120, powergridTotal: 100 }}
+        />
+      </MakeItFitContext.Provider>
+    );
+    expect(screen.getAllByRole('button', { name: /make it fit/i })).toHaveLength(1);
+  });
+
+  it('names the four module-state colours in a legend', () => {
+    render(<FittingRing fitting={fitting} stats={statsWith(10)} />);
+    const legend = screen.getByRole('list', { name: 'Module states' });
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent)
+    ).toEqual(['Offline', 'Online', 'Active', 'Overheated']);
   });
 
   it('flags over-used calibration, not just CPU and powergrid', () => {
@@ -428,6 +470,54 @@ describe('FittingRing with the editor’s item actions', () => {
     // The keyboard cycles with S.
     fireEvent.keyDown(screen.getByLabelText(/^Low slots 1, online/), { key: 's' });
     expect(actions.setState).toHaveBeenCalledTimes(3);
+  });
+
+  it('never recolours a state-bearing tile’s border on hover', () => {
+    renderRing(fakeItemActions({ names }), { onSlotSelect: vi.fn() });
+    // The border colour is the module's state; hover would read as a state change.
+    expect(screen.getByLabelText(/^High slots 1, active/).className).not.toMatch(/hover:border/);
+    expect(screen.getByLabelText(/^Low slots 1, online/).className).not.toMatch(/hover:border/);
+    expect(screen.getByLabelText(/^High slots 1, active/).className).toMatch(/\bborder-success\b/);
+    // An empty slot has no state to confuse, so it keeps its hover.
+    expect(screen.getByLabelText(/^Mid slots 1, empty/).className).toMatch(/hover:border-accent/);
+    // The keyboard focus ring stays.
+    expect(screen.getByLabelText(/^High slots 1, active/).className).toMatch(/focus-visible/);
+  });
+
+  it('keeps the border on the state a click reached', () => {
+    const actions = fakeItemActions({ names });
+    const { rerender } = renderRing(actions);
+    fireEvent.click(screen.getByLabelText(/^High slots 1, active/), { detail: 1 });
+    expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
+    rerender(
+      <MemoryRouter>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingRing
+              fitting={{
+                ...fitting,
+                modules: fitting.modules.map((m, i) => (i === 0 ? { ...m, state: 'overload' } : m)),
+              }}
+              stats={statsWith(10)}
+              typeName={(typeId) => names[typeId as keyof typeof names] ?? '?'}
+              moduleResults={[{ ...results[0], state: 'overload' }, results[1]]}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    expect(screen.getByLabelText(/^High slots 1, overloaded/).className).toMatch(
+      /\bborder-warning\b/
+    );
+  });
+
+  it('says in the one tooltip what a click does, where a click does something', async () => {
+    renderRing(fakeItemActions({ names }));
+    fireEvent.pointerMove(screen.getByLabelText(/^High slots 1, active/), { pointerType: 'mouse' });
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Autocannon (active)');
+    expect(tooltip).toHaveTextContent('Click to set Overheated');
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1);
   });
 
   it('opens a fitted tile’s menu: its reachable states, unload, remove', async () => {

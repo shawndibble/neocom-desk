@@ -984,6 +984,13 @@ Rows:
   selects on click. Enter/Space keep selecting; `S` on a focused tile cycles.
   A touch long-press or a drag never cycles, and Back undoes a cycle like any
   fitting edit.
+  The tile's border colour _is_ the state (grey offline, blue online, green
+  active, amber overheated), so it never changes on hover — a hover recolour
+  reads as a state change. Hover and focus show the pointer cursor, the one
+  tooltip (name, state, and what a click does, only where a click does
+  something) and, from the keyboard, the focus ring. A four-swatch legend
+  under the Ring names the colours, since touch has no hover. A tile that
+  holds no state (an empty slot, a cargo item) may keep its hover border.
 
 ### Header controls
 
@@ -992,6 +999,8 @@ Three tiers decide how a page-header or toolbar control is labelled:
 1. **Scope and mode controls** (Character scope, a series/layer picker, a view toggle) always carry a visible text label at every width; truncate it rather than drop it.
 2. **Frequent actions** (Columns, filter, export) show icon + text from `md` up (`IconButton visibleLabel`, or the `showLabel` / `triggerLabel` opt-ins on `ColumnPickerMenu`, `TableActionsMenu`, `FilterBar`) and stay the conventional icon below `md`.
 3. **Rare actions** share one ⋮ "More actions" menu with text items (only with two or more real actions). Refresh stays a standalone icon beside the `DataAgeBadge`.
+
+The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.
 
 ### Restraint: decide by what is already there
 

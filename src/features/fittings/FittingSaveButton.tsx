@@ -26,12 +26,15 @@ interface FittingSaveButtonProps {
   onSaveToEve: () => void;
   canSaveToEve: boolean;
   saveToEveBlockedReason?: string;
+  /** The phone's header: the button keeps its short "Save" label, and its accessible name and tooltip say where it saves. */
+  compact?: boolean;
 }
 
 /**
  * Save as one split button (mockup A): the button saves to My Fittings — the
- * everyday save — and its caret holds Save to EVE, the rarer export that
- * opens its own dialog.
+ * everyday save, named on the button — and its caret lists every destination,
+ * that one first, then Save to EVE, the rarer export that opens its own
+ * dialog.
  */
 export function FittingSaveButton({
   onSave,
@@ -42,6 +45,7 @@ export function FittingSaveButton({
   onSaveToEve,
   canSaveToEve,
   saveToEveBlockedReason,
+  compact = false,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
   const apple = isApplePlatform();
@@ -49,11 +53,14 @@ export function FittingSaveButton({
   // always swallow the browser's own "save page", even while Save is off.
   useChord('s', onSave, { enabled: canSave });
   useChord('s', onSaveAsNew, { shift: true, enabled: canSave && updating });
+  const destination = updating
+    ? t('fittings.myFittings.updateDestination')
+    : t('fittings.myFittings.saveDestination');
   const withReason = (button: ReactElement<{ className?: string }>) =>
     !canSave && saveBlockedReason ? (
       <Tooltip content={saveBlockedReason}>{button}</Tooltip>
     ) : (
-      <Tooltip content={modChordDisplayKey(apple, 'S')}>{button}</Tooltip>
+      <Tooltip content={`${destination} · ${modChordDisplayKey(apple, 'S')}`}>{button}</Tooltip>
     );
   return (
     <div className="flex">
@@ -61,12 +68,17 @@ export function FittingSaveButton({
       {withReason(
         <Button
           variant="primary"
+          aria-label={destination}
           aria-disabled={!canSave || undefined}
           aria-keyshortcuts={apple ? 'Meta+S' : 'Control+S'}
           onClick={onSave}
           className="rounded-r-none"
         >
-          {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
+          {updating
+            ? t('fittings.myFittings.update')
+            : compact
+              ? t('fittings.myFittings.save')
+              : t('fittings.myFittings.saveDestination')}
         </Button>
       )}
       <DropdownMenu>
@@ -80,6 +92,10 @@ export function FittingSaveButton({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuItem disabled={!canSave} onSelect={onSave}>
+            {destination}
+            <span className="ml-auto pl-4 text-text-dim">{modChordDisplayKey(apple, 'S')}</span>
+          </DropdownMenuItem>
           {updating && (
             <>
               <DropdownMenuItem disabled={!canSave} onSelect={onSaveAsNew}>
@@ -88,9 +104,9 @@ export function FittingSaveButton({
                   {modChordDisplayKey(apple, 'S', { shift: true })}
                 </span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
             </>
           )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem disabled={!canSaveToEve} onSelect={onSaveToEve}>
             {t('fittings.saveToEve.action')}
           </DropdownMenuItem>

@@ -4,6 +4,7 @@ import {
   Button,
   FilterChip,
   IconButton,
+  Modal,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -35,6 +36,15 @@ import { useTimedToast } from '@/components/ui/useTimedToast';
 
 const TIERS = [0, 1, 2, 3, 4] as const;
 interface MasteryChipProps {
+  /**
+   * `badge` (default): the header's icon button opening a popover. `dialog`:
+   * no button of its own — the phone header's ⋮ menu opens it, as a sheet,
+   * through `open`; `onAvailable` says whether this hull has anything to show.
+   */
+  presentation?: 'badge' | 'dialog';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onAvailable?: (available: boolean) => void;
   hullTypeId: number;
   hullName: string;
   characterId: number;
@@ -49,8 +59,17 @@ interface MasteryChipProps {
  * while the skill catalogue loads, it holds the badge's place with an empty
  * slot so the header doesn't reflow when it lands (issue #2255).
  */
-export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipProps) {
+export function MasteryChip({
+  presentation = 'badge',
+  open: dialogOpen = false,
+  onOpenChange,
+  onAvailable,
+  hullTypeId,
+  hullName,
+  characterId,
+}: MasteryChipProps) {
   const { t } = useTranslation();
+  const dialog = presentation === 'dialog';
   const [open, setOpen] = useState(false);
   const [masteries, setMasteries] = useState<MasteryMap | null>(null);
   const [tier, setTier] = useState(4);
@@ -79,6 +98,9 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
 
   const tiers = masteries?.[String(hullTypeId)];
   const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
+  useEffect(() => {
+    onAvailable?.(hasData);
+  }, [hasData, onAvailable]);
 
   const rows = useMemo(() => {
     if (!catalog || !tiers) return null;
@@ -99,7 +121,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
     );
   }, [catalog, tiers, tier, trainedSkills, attributes, implants, cloneState]);
 
-  if (masteries === null || (hasData && !rows)) return <HeaderBadgeSlot />;
+  if (masteries === null || (hasData && !rows)) return dialog ? null : <HeaderBadgeSlot />;
   if (!hasData || !rows) return null;
 
   const visible = hideCompleted ? rows.filter((row) => row.status !== 'trained') : rows;
@@ -116,119 +138,129 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
     setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
   }
 
+  const body = (
+    <div className="space-y-2">
+      {!dialog && (
+        <p className="text-xs font-semibold text-text">
+          {t('fittings.mastery.title', { name: hullName })}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {TIERS.map((n) => (
+          <FilterChip
+            key={n}
+            label={romanLevel(n + 1)}
+            selected={tier === n}
+            onToggle={() => setTier(n)}
+          />
+        ))}
+        <FilterChip
+          label={t('fittings.mastery.hideCompleted')}
+          selected={hideCompleted}
+          onToggle={() => setHideCompleted((v) => !v)}
+        />
+      </div>
+      {untrained.length > 0 && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
+      {visible.length === 0 ? (
+        <p className="text-xs text-text-dim">{t('fittings.mastery.empty')}</p>
+      ) : (
+        <div className="max-h-72 overflow-y-auto">
+          {visible.map((row) => {
+            const planned = isEntryCovered(planEntries, row.skillTypeID, row.targetLevel);
+            return (
+              <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
+                <SkillRow
+                  name={row.name}
+                  skillTypeID={row.skillTypeID}
+                  planEntries={planEntries}
+                  status={row.status}
+                  currentLevel={row.currentLevel}
+                  timeLabel={
+                    row.status === 'trained'
+                      ? t('skills.fitCheck.trained')
+                      : formatCountdown(row.seconds)
+                  }
+                  addLabel={t('skills.fitCheck.add')}
+                  inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
+                  plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
+                  onAdd={
+                    planned
+                      ? undefined
+                      : () =>
+                          void add([{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }])
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-xs text-text-dim">{t('fittings.mastery.suggestedNote')}</p>
+      {untrained.length > 0 && unplanned.length < untrained.length && (
+        <p className="text-xs text-text-dim">
+          {unplanned.length === 0
+            ? t('skills.fitCheck.allPlanned')
+            : t('skills.fitCheck.alreadyPlanned', {
+                count: untrained.length - unplanned.length,
+              })}
+        </p>
+      )}
+      {target.plans !== undefined && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {untrained.length > 0 && (
+            <span className="text-xs text-text-dim">
+              {t('fittings.mastery.total', { time: formatCountdown(totalSeconds) })}
+            </span>
+          )}
+          <TargetPlanPicker target={target} />
+          {unplanned.length > 0 && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() =>
+                void add(
+                  unplanned.map((row) => ({
+                    skillTypeID: row.skillTypeID,
+                    targetLevel: row.targetLevel,
+                  }))
+                )
+              }
+            >
+              {target.plans.length === 0
+                ? t('skills.fitCheck.createPlanAndAdd')
+                : t('skills.fitCheck.addAllToPlan')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <IconButton
-            icon={<Skills />}
-            label={t('fittings.mastery.chip')}
-            tooltip={t('fittings.mastery.tooltip', { name: hullName })}
-          />
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-text">
-              {t('fittings.mastery.title', { name: hullName })}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {TIERS.map((n) => (
-                <FilterChip
-                  key={n}
-                  label={romanLevel(n + 1)}
-                  selected={tier === n}
-                  onToggle={() => setTier(n)}
-                />
-              ))}
-              <FilterChip
-                label={t('fittings.mastery.hideCompleted')}
-                selected={hideCompleted}
-                onToggle={() => setHideCompleted((v) => !v)}
-              />
-            </div>
-            {untrained.length > 0 && (
-              <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />
-            )}
-            {visible.length === 0 ? (
-              <p className="text-xs text-text-dim">{t('fittings.mastery.empty')}</p>
-            ) : (
-              <div className="max-h-72 overflow-y-auto">
-                {visible.map((row) => {
-                  const planned = isEntryCovered(planEntries, row.skillTypeID, row.targetLevel);
-                  return (
-                    <div
-                      key={row.skillTypeID}
-                      className="border-b border-line py-1.5 last:border-b-0"
-                    >
-                      <SkillRow
-                        name={row.name}
-                        skillTypeID={row.skillTypeID}
-                        planEntries={planEntries}
-                        status={row.status}
-                        currentLevel={row.currentLevel}
-                        timeLabel={
-                          row.status === 'trained'
-                            ? t('skills.fitCheck.trained')
-                            : formatCountdown(row.seconds)
-                        }
-                        addLabel={t('skills.fitCheck.add')}
-                        inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
-                        plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
-                        onAdd={
-                          planned
-                            ? undefined
-                            : () =>
-                                void add([
-                                  { skillTypeID: row.skillTypeID, targetLevel: row.targetLevel },
-                                ])
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <p className="text-xs text-text-dim">{t('fittings.mastery.suggestedNote')}</p>
-            {untrained.length > 0 && unplanned.length < untrained.length && (
-              <p className="text-xs text-text-dim">
-                {unplanned.length === 0
-                  ? t('skills.fitCheck.allPlanned')
-                  : t('skills.fitCheck.alreadyPlanned', {
-                      count: untrained.length - unplanned.length,
-                    })}
-              </p>
-            )}
-            {target.plans !== undefined && (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                {untrained.length > 0 && (
-                  <span className="text-xs text-text-dim">
-                    {t('fittings.mastery.total', { time: formatCountdown(totalSeconds) })}
-                  </span>
-                )}
-                <TargetPlanPicker target={target} />
-                {unplanned.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() =>
-                      void add(
-                        unplanned.map((row) => ({
-                          skillTypeID: row.skillTypeID,
-                          targetLevel: row.targetLevel,
-                        }))
-                      )
-                    }
-                  >
-                    {target.plans.length === 0
-                      ? t('skills.fitCheck.createPlanAndAdd')
-                      : t('skills.fitCheck.addAllToPlan')}
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
+      {dialog ? (
+        <Modal
+          open={dialogOpen}
+          onClose={() => onOpenChange?.(false)}
+          title={t('fittings.mastery.title', { name: hullName })}
+          placement="sheet"
+        >
+          {body}
+        </Modal>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <IconButton
+              icon={<Skills />}
+              label={t('fittings.mastery.chip')}
+              tooltip={t('fittings.mastery.tooltip', { name: hullName })}
+            />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
+            {body}
+          </PopoverContent>
+        </Popover>
+      )}
       {added && (
         <Toast
           message={t('skills.fitCheck.addedToast', {

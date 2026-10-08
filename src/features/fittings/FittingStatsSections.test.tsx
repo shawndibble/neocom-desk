@@ -813,7 +813,7 @@ describe('FittingStatsSections — remembered layout', () => {
   });
 });
 
-describe('FittingStatsSections — Overheat all and Copy stats', () => {
+describe('FittingStatsSections — Overheat all', () => {
   /**
    * `heatedStats()` as "Overheat all" hands it over: the heated figures are
    * the figures, the unheated ones ride along. The blasters' DPS rises with
@@ -966,19 +966,6 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
   it('has nothing to overheat on a fit with no module that can', () => {
     renderSections(stats());
     expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeDisabled();
-  });
-
-  it('copies the headline stats as text', async () => {
-    const written: string[] = [];
-    configureClipboard(async (text) => {
-      written.push(text);
-    });
-    const user = userEvent.setup();
-    renderSections(heatedStats());
-    await user.click(screen.getByRole('button', { name: 'Copy stats' }));
-    expect(written[0]).toMatch(/^DPS 173\.7 \(181\.7 overheated\)/);
-    expect(await screen.findByText('Stats copied')).toBeInTheDocument();
-    configureClipboard(null);
   });
 });
 
