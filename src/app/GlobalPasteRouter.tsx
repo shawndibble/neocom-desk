@@ -12,6 +12,12 @@ import {
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
+/** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
+const pilotLookup = (text: string): [string, { state: unknown }] => [
+  '/pilot-lookup',
+  { state: { pilotListText: text } satisfies PilotListState },
+];
+
 /**
  * Per destination: where the paste goes, carrying its text in route state.
  * Keyed by `PasteDestination`, so once a new id is added to that union, a
@@ -26,10 +32,8 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
   ],
-  pilotList: (text) => [
-    '/pilot-lookup',
-    { state: { pilotListText: text } satisfies PilotListState },
-  ],
+  pilotList: pilotLookup,
+  dscan: pilotLookup,
 };
 
 /**

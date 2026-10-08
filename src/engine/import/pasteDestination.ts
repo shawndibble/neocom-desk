@@ -20,7 +20,7 @@ import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
-export type PasteDestination = 'fitting' | 'appraisal' | 'pilotList';
+export type PasteDestination = 'fitting' | 'dscan' | 'appraisal' | 'pilotList';
 
 export interface PasteSources {
   /** The market catalogue, keyed by lower-case item name. */
@@ -57,6 +57,12 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
     },
   },
   {
+    // Ahead of the item list: a D-Scan's rows also read as `Name<tab>...`, but
+    // every one starting with a numeric type id is unmistakably a scan.
+    id: 'dscan',
+    detect: (text) => (classifyPilotPaste(text)?.kind === 'dscan' ? 'match' : 'pass'),
+  },
+  {
     id: 'appraisal',
     detect: (text, { catalogue }) => {
       const entries = parseAppraisalPaste(text);
@@ -69,9 +75,9 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
   },
   {
     // Last, so an item list never reads as pilot names: two or more lines that
-    // all look like names (Local), or all like D-Scan rows.
+    // all look like names (a Local list).
     id: 'pilotList',
-    detect: (text) => (classifyPilotPaste(text) === null ? 'pass' : 'match'),
+    detect: (text) => (classifyPilotPaste(text)?.kind === 'local' ? 'match' : 'pass'),
   },
 ];
 
