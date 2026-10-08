@@ -852,10 +852,12 @@ describe('AppraisalPanel — Copy lists', () => {
       controller: controller({ result: outcome({ appraisal: { ...APPRAISAL, items: [] } }) }),
     });
     await userEvent.click(menuButton());
-    expect(await screen.findByRole('menuitem', { name: /^Refine/ })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    for (const name of [/^Sell now/, /^List at undercut/, /^Refine/, /^Multibuy/]) {
+      expect(await screen.findByRole('menuitem', { name })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      );
+    }
   });
 
   it('copies one name/price line per listable item, no quantity, ignoring Price Percent', async () => {

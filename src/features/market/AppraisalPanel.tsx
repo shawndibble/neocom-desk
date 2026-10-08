@@ -110,12 +110,6 @@ interface AppraisalPanelProps {
   defaultCompareExpanded?: boolean;
 }
 
-/**
- * A per-unit price, exact. A missing price is a dash, never a zero — the house
- * placeholder. Stays on `formatIskAuto` rather than shorthand: an each-price
- * runs from a 5 ISK mineral to a billion-ISK hull, and compact notation rounds
- * the cheap end (4.99 and 5.01 both render "5") into nonsense.
- */
 type CopyList = 'sellNow' | 'list' | 'refine' | 'multibuy';
 
 /** Menu order: the three ways out of the pile, then the way in. */
@@ -127,6 +121,12 @@ function copyListOf<T>(items: readonly T[], toText: (items: readonly T[]) => str
   return { count: text === '' ? 0 : text.split('\n').length, text };
 }
 
+/**
+ * A per-unit price, exact. A missing price is a dash, never a zero — the house
+ * placeholder. Stays on `formatIskAuto` rather than shorthand: an each-price
+ * runs from a 5 ISK mineral to a billion-ISK hull, and compact notation rounds
+ * the cheap end (4.99 and 5.01 both render "5") into nonsense.
+ */
 function eachCell(value: number | null): string {
   if (value === null) return '—';
   return formatIskAuto(value);
