@@ -128,6 +128,7 @@ test.describe('Opportunities — ranked phone list', () => {
       const stock = page.getByRole('combobox', { name: 'Use my stock' });
       await expect(picker).toBeVisible();
       await expect(stock).toBeVisible();
+      await expect(picker).toBeInViewport({ ratio: 1 });
       const header = picker.locator('xpath=ancestor::header');
       const controls = header.locator('button, [role="combobox"]');
       await expect.poll(() => controls.count()).toBeGreaterThan(1);
