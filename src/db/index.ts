@@ -834,6 +834,8 @@ export interface NetWorthSnapshotRecord {
   plexValue: number;
   /** Escrow held by open buy orders. */
   escrow: number;
+  /** Remaining sell-order stock; absent on rows written before it existed. */
+  sellStock?: number;
   hubId: string;
   /** Epoch ms of the write. */
   updatedAt: number;

@@ -1,3 +1,4 @@
+import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import {
   createContext,
   useCallback,
@@ -1636,6 +1637,7 @@ export function Assets() {
           'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
         )}
       >
+        <FromWalletCrumb />
         <PageHeader
           title={t('assets.title')}
           // `CharacterFilterControl` rides here rather than in `actions` per

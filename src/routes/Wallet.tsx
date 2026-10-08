@@ -1,5 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { guarded } from '@/app/routeChunks';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -30,8 +29,6 @@ import {
   loadWalletJournalWithStatus,
   loadWalletTransactions,
   loadAllCharactersWalletBalances,
-  totalWalletBalance,
-  type CharacterWalletBalance,
   type WalletBalancesSnapshot,
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
@@ -55,11 +52,11 @@ import { characterFilterParam } from '@/features/character/characterFilterUrlPar
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { formatIsk } from '@/lib/isk';
-import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
-import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
+import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
+import { NetWorthPanel } from '@/features/netWorth/NetWorthPanel';
 import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
@@ -81,18 +78,7 @@ import type {
   WalletJournalEntry,
   WalletTransactionCommon,
 } from '@/esi/endpoints';
-import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanceHistory';
-
-/**
- * Dynamic import, not a static one: `WalletBalanceChart.tsx` statically
- * imports Recharts, so this is the boundary that keeps the library out of
- * the initial page bundle — it only loads once the Balance tab actually
- * renders a chart (see `market/PriceHistoryChart.tsx`'s bundle-size
- * precedent).
- */
-const LazyWalletBalanceChart = lazy(() =>
-  guarded(() => import('@/features/character/WalletBalanceChart'))
-);
+import { intParam } from '@/lib/urlState';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -101,7 +87,12 @@ const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 /** Same, for the personal fills the journal links its market lines to. */
 const EMPTY_FILLS: readonly WalletTransactionCommon[] = [];
 
-const BALANCE_SORT = { columnId: 'character', direction: 'asc' } as const;
+/**
+ * `?drill=<id>`: the Character the net worth view is drilled into; 0 = none. Not
+ * `?character=`: that param is the alert deep link, which `AlertCharacterSwitch`
+ * strips and turns into an active-Character switch.
+ */
+const DRILL_PARAM = intParam(0);
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
 
 interface Snapshot {
@@ -178,7 +169,6 @@ async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnap
  */
 export function Wallet() {
   const { t } = useTranslation();
-  const timeZone = useTimeZone();
   const navigate = useNavigate();
   const location = useLocation();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
@@ -227,8 +217,35 @@ export function Wallet() {
     resolvedWalletFilter.size !== 1 ||
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
+  // Drilling into one Character is route state, so the browser Back button undoes it.
+  const [drilledId, setDrilledId] = useUrlParam('drill', DRILL_PARAM);
+  const drillInto = useCallback((id: number) => setDrilledId(id, { push: true }), [setDrilledId]);
+  const leaveDrill = useCallback(() => setDrilledId(0, { push: true }), [setDrilledId]);
+
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const activeCharacter = allCharacters?.find((c) => c.characterId === activeCharacterId);
+  const drilledCharacter = allCharacters?.find((c) => c.characterId === drilledId);
+  const drilledCharacters = useMemo(
+    () =>
+      drilledCharacter
+        ? [{ characterId: drilledCharacter.characterId, name: drilledCharacter.name }]
+        : [],
+    [drilledCharacter]
+  );
+  const activeCharacters = useMemo(
+    () =>
+      activeCharacter
+        ? [{ characterId: activeCharacter.characterId, name: activeCharacter.name }]
+        : [],
+    [activeCharacter]
+  );
+  const multiCharacters = useMemo(
+    () =>
+      (allCharacters ?? [])
+        .filter((c) => resolvedWalletFilter === 'all' || resolvedWalletFilter.has(c.characterId))
+        .map((c) => ({ characterId: c.characterId, name: c.name })),
+    [allCharacters, resolvedWalletFilter]
+  );
   const walletFilterCandidates = useMemo(
     () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
@@ -264,7 +281,7 @@ export function Wallet() {
     useState<WalletBalancesSnapshot | null>(null);
   const [walletBalancesRefreshCount, setWalletBalancesRefreshCount] = useState(0);
   useEffect(() => {
-    if (!showingAllWalletBalances) return;
+    if (!showingAllWalletBalances && !drilledCharacter) return;
     let cancelled = false;
     void loadAllCharactersWalletBalances().then((snapshot) => {
       if (!cancelled) setWalletBalancesSnapshot(snapshot);
@@ -272,7 +289,7 @@ export function Wallet() {
     return () => {
       cancelled = true;
     };
-  }, [showingAllWalletBalances, walletBalancesRefreshCount]);
+  }, [showingAllWalletBalances, drilledCharacter, walletBalancesRefreshCount]);
   const refreshWalletBalances = useCallback(
     () => setWalletBalancesRefreshCount((count) => count + 1),
     []
@@ -371,41 +388,6 @@ export function Wallet() {
     loyaltyColumns.map((column) => column.id)
   );
 
-  const walletBalanceColumns = useMemo<DataTableColumn<CharacterWalletBalance>[]>(
-    () => [
-      {
-        id: 'character',
-        header: t('wallet.balanceCharacterColumn'),
-        stickyStart: true,
-        sortValue: (row) => row.characterName,
-        render: (row) => row.characterName,
-      },
-      {
-        id: 'balance',
-        header: t('wallet.isk'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (row) => (row.needsReauth ? -Infinity : (row.balanceResult?.data ?? -Infinity)),
-        render: (row) =>
-          row.needsReauth ? (
-            <span className="text-warning">{t('wallet.reauthTitle')}</span>
-          ) : row.balanceResult ? (
-            <span className={iskToneClass(row.balanceResult.data)}>
-              {formatIsk(row.balanceResult.data, 2)}
-            </span>
-          ) : (
-            t('common.unknown')
-          ),
-      },
-    ],
-    [t]
-  );
-  const balanceSortProps = useUrlSort(
-    'balance.sort',
-    BALANCE_SORT,
-    walletBalanceColumns.map((column) => column.id)
-  );
-
   const personalTransactions = personalFills.data?.transactions ?? EMPTY_FILLS;
   const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
   const itemNamesTruncated = personalFills.data?.truncated ?? false;
@@ -450,11 +432,6 @@ export function Wallet() {
   // over the same array on every render (issue #413). Export reads the
   // table's sorted rows, so it follows the same order.
   const journal = journalResult?.data ?? EMPTY_JOURNAL;
-  const walletBalancePoints = useMemo(() => walletBalanceHistory(journal), [journal]);
-  const walletBalanceTrendDirection = useMemo(
-    () => walletBalanceTrend(walletBalancePoints),
-    [walletBalancePoints]
-  );
 
   // In the URL (`journal.*`, issue #1302).
   const [journalFilter, setJournalFilter, journalRowsFilter] = useUrlFilter<WalletJournalFilter>(
@@ -463,31 +440,28 @@ export function Wallet() {
     JOURNAL_FIELD_TO_PARAM,
     EMPTY_JOURNAL_FILTER_PARAMS
   );
+  const liveWallet = useMemo(() => {
+    const map = new Map<number, { balance: number | null; needsReauth: boolean }>();
+    for (const entry of walletBalancesSnapshot?.entries ?? []) {
+      map.set(entry.characterId, {
+        balance: entry.balanceResult?.data ?? null,
+        needsReauth: entry.needsReauth,
+      });
+    }
+    // The page already holds the active Character's own balance.
+    if (activeCharacterId !== null && !map.has(activeCharacterId)) {
+      map.set(activeCharacterId, {
+        balance: balanceResult?.data ?? null,
+        needsReauth: balanceNeedsReauth,
+      });
+    }
+    return map;
+  }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
   const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
     journal,
     journalRowsFilter
   );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
-
-  const visibleWalletBalances = useMemo(() => {
-    const entries = walletBalancesSnapshot?.entries ?? [];
-    return resolvedWalletFilter === 'all'
-      ? entries
-      : entries.filter((entry) => resolvedWalletFilter.has(entry.characterId));
-  }, [walletBalancesSnapshot, resolvedWalletFilter]);
-  const walletBalancesTotal = useMemo(
-    () => totalWalletBalance(visibleWalletBalances),
-    [visibleWalletBalances]
-  );
-  // Narrowing to two of five Characters must not still show a "hasn't
-  // shared" notice for one of the other three — same filter
-  // `visibleWalletBalances` above already applies.
-  const walletBalancesSkipped = useMemo(() => {
-    const skipped = walletBalancesSnapshot?.skipped ?? [];
-    return resolvedWalletFilter === 'all'
-      ? skipped
-      : skipped.filter((s) => resolvedWalletFilter.has(s.characterId));
-  }, [walletBalancesSnapshot, resolvedWalletFilter]);
 
   // Each table's title-bar export button and its row menus export the same rows, in
   // the order the table shows them.
@@ -497,12 +471,6 @@ export function Wallet() {
     rows: filteredJournal,
     columns: journalCsvColumns,
     truncated: journalTruncated,
-  });
-  const walletBalancesCsv = useMemo(() => walletBalancesCsvColumns(t), [t]);
-  const walletBalancesExport = useTableExport({
-    surface: 'wallet-balances',
-    rows: visibleWalletBalances,
-    columns: walletBalancesCsv,
   });
   const loyaltyCsvColumns = useMemo(
     () => loyaltyPointsCsvColumns(t, (id) => corporationNames.get(id) ?? `#${id}`),
@@ -538,6 +506,7 @@ export function Wallet() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      {tab === 'journal' && <FromWalletCrumb />}
       <PageHeader
         title={t('wallet.title')}
         meta={oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined}
@@ -582,151 +551,106 @@ export function Wallet() {
             swaps beneath it: unchanged for "This character", a per-character
             table + total for anything wider.
           */}
-          {showingAllWalletBalances ? (
-            <Panel
-              padded={false}
-              title={t('wallet.balanceByCharacter')}
-              meta={walletCharacterFilterMeta}
+          {drilledCharacter ? (
+            <NetWorthPanel
+              mode="single"
+              drilled
+              characters={drilledCharacters}
+              liveWallet={liveWallet}
+              filterMeta={walletCharacterFilterMeta}
+              onDrill={drillInto}
+              onBack={leaveDrill}
+            />
+          ) : showingAllWalletBalances ? (
+            <NetWorthPanel
+              mode="multi"
+              characters={multiCharacters}
+              liveWallet={liveWallet}
+              filterMeta={walletCharacterFilterMeta}
+              onDrill={drillInto}
+              onBack={leaveDrill}
               actions={
-                <span className="flex items-center gap-2">
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Refresh />}
-                    label={t('wallet.refresh')}
-                    onClick={refreshWalletBalances}
-                    disabled={walletBalancesLoading}
-                  />
-                  <TableActionsMenu
-                    name={t('wallet.balanceByCharacter')}
-                    tableExport={walletBalancesExport}
-                  />
-                </span>
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Refresh />}
+                  label={t('wallet.refresh')}
+                  onClick={refreshWalletBalances}
+                  disabled={walletBalancesLoading}
+                />
               }
-            >
-              {walletBalancesLoading ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              ) : (
-                <>
-                  <p className="px-3 pt-2 text-xl font-medium tabular-nums">
-                    {t('wallet.totalBalance')}:{' '}
-                    <span className={iskToneClass(walletBalancesTotal)}>
-                      {formatIsk(walletBalancesTotal, 2)}
-                    </span>
-                  </p>
-                  {walletBalancesSkipped.length > 0 && (
-                    <div className="space-y-1 px-3 pt-2">
-                      {walletBalancesSkipped.map((s) => (
-                        <p key={s.characterId} className="text-xs text-text-dim">
-                          {s.name} — {t('wallet.balanceCharacterNotShared')}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  {visibleWalletBalances.length === 0 ? (
-                    <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
-                  ) : (
-                    <DataTable
-                      {...walletBalancesExport.tableProps}
-                      label={t('wallet.balanceByCharacter')}
-                      columns={walletBalanceColumns}
-                      rows={visibleWalletBalances}
-                      rowKey={(row) => row.characterId}
-                      sort={balanceSortProps.sort}
-                      onSortChange={balanceSortProps.onSortChange}
-                      responsive="table"
-                    />
-                  )}
-                </>
-              )}
-            </Panel>
+            />
           ) : (
-            <Panel title={t('wallet.balanceTab')} meta={walletCharacterFilterMeta}>
-              <div className="flex flex-wrap gap-x-8 gap-y-4">
-                <div>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('wallet.isk')}
+            <>
+              <Panel title={t('wallet.balanceTab')} meta={walletCharacterFilterMeta}>
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                  <div>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('wallet.isk')}
+                    </p>
+                    {balanceNeedsReauth ? (
+                      <GrantBanner
+                        characterId={activeCharacterId}
+                        endpoints={['getCharacterWallet']}
+                        title={t('wallet.reauthTitle')}
+                        hint={t('wallet.reauthHint')}
+                        actionLabel={t('wallet.reauthAction')}
+                      />
+                    ) : balanceResult ? (
+                      <p
+                        className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                      >
+                        {formatIsk(balanceResult.data, 2)}
+                      </p>
+                    ) : (
+                      <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('wallet.everMarks')}
+                      <InfoTooltip
+                        label={t('wallet.everMarksTooltipLabel')}
+                        content={t('wallet.everMarksTooltip')}
+                      />
+                    </p>
+                    <p className="text-xl font-medium tabular-nums">
+                      {loyaltyResult && !loyaltyNeedsReauth
+                        ? everMarks.toLocaleString()
+                        : t('common.unknown')}
+                    </p>
+                  </div>
+                </div>
+                {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+                  <p className="mt-3 text-[0.6875rem] text-warning uppercase">
+                    {t(offlineTitleKey)}
                   </p>
-                  {balanceNeedsReauth ? (
+                )}
+                {journalNeedsReauth ? (
+                  <div className="mt-4">
                     <GrantBanner
                       characterId={activeCharacterId}
-                      endpoints={['getCharacterWallet']}
+                      endpoints={['getCharacterWalletJournal']}
                       title={t('wallet.reauthTitle')}
                       hint={t('wallet.reauthHint')}
                       actionLabel={t('wallet.reauthAction')}
                     />
-                  ) : balanceResult ? (
-                    <p
-                      className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
-                    >
-                      {formatIsk(balanceResult.data, 2)}
-                    </p>
-                  ) : (
-                    <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
-                  )}
-                </div>
-                <div>
-                  <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('wallet.everMarks')}
-                    <InfoTooltip
-                      label={t('wallet.everMarksTooltipLabel')}
-                      content={t('wallet.everMarksTooltip')}
-                    />
-                  </p>
-                  <p className="text-xl font-medium tabular-nums">
-                    {loyaltyResult && !loyaltyNeedsReauth
-                      ? everMarks.toLocaleString()
-                      : t('common.unknown')}
-                  </p>
-                </div>
-              </div>
-              {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
-              )}
-              {journalNeedsReauth ? (
-                <div className="mt-4">
-                  <GrantBanner
-                    characterId={activeCharacterId}
-                    endpoints={['getCharacterWalletJournal']}
-                    title={t('wallet.reauthTitle')}
-                    hint={t('wallet.reauthHint')}
-                    actionLabel={t('wallet.reauthAction')}
-                  />
-                </div>
-              ) : journal.length === 0 ? (
-                <CachedEmptyState
-                  result={journalResult}
-                  title={t('wallet.journalEmptyTitle')}
-                  hint={t('wallet.journalEmptyHint')}
-                  fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
-                  className="py-8"
-                />
-              ) : (
-                <div className="mt-4">
-                  {journalTruncated && (
-                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
+                  </div>
+                ) : (
+                  journalTruncated && (
+                    <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
                       {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
                     </p>
-                  )}
-                  {walletBalancePoints.length > 0 && (
-                    <Suspense
-                      fallback={
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
-                      }
-                    >
-                      <LazyWalletBalanceChart
-                        points={walletBalancePoints}
-                        trend={walletBalanceTrendDirection}
-                        timeZone={timeZone}
-                      />
-                    </Suspense>
-                  )}
-                </div>
-              )}
-            </Panel>
+                  )
+                )}
+              </Panel>
+              <NetWorthPanel
+                mode="single"
+                characters={activeCharacters}
+                liveWallet={liveWallet}
+                onDrill={drillInto}
+                onBack={leaveDrill}
+              />
+            </>
           )}
 
           <Panel

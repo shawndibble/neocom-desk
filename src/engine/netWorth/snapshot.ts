@@ -18,6 +18,8 @@ export interface NetWorthSnapshotRow {
   plexValue: number;
   /** Escrow held by open buy orders. */
   escrow: number;
+  /** Remaining sell-order stock, `volume_remain x price`. Absent on rows written before it existed (read as 0). */
+  sellStock?: number;
   hubId: string;
   /** Epoch ms of the write — the sync merge's last-write-wins key. */
   updatedAt: number;
@@ -42,6 +44,9 @@ export interface SnapshotAsset {
 export interface SnapshotOrder {
   is_buy_order?: boolean;
   escrow?: number;
+  price?: number;
+  volume_remain?: number;
+  is_corporation?: boolean;
 }
 
 export interface SnapshotInputs {
@@ -73,7 +78,12 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
     assetValue += asset.quantity * (input.priceByTypeId.get(asset.type_id) ?? 0);
   }
   let escrow = 0;
-  for (const order of orders) if (order.is_buy_order) escrow += order.escrow ?? 0;
+  let sellStock = 0;
+  for (const order of orders) {
+    if (order.is_buy_order) escrow += order.escrow ?? 0;
+    // A corp order is the corp's stock, not the Character's.
+    else if (!order.is_corporation) sellStock += (order.volume_remain ?? 0) * (order.price ?? 0);
+  }
   const day = utcDay(input.now);
   return {
     id: snapshotId(input.characterId, day),
@@ -83,6 +93,7 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
     assetValue,
     plexValue: plexQuantity * (input.plexPrice ?? 0),
     escrow,
+    sellStock,
     hubId: input.hubId,
     updatedAt: input.now,
   };
