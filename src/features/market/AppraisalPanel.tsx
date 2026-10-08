@@ -553,7 +553,7 @@ export function AppraisalPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_minmax(0,1fr)] lg:items-start">
       <Panel
         title={t('market.appraisal.pasteTitle')}
         meta={
