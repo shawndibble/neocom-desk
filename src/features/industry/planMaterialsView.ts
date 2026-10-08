@@ -126,3 +126,36 @@ export function applyToGroupOwnedStock(
     else ledger[typeID] = to;
   }
 }
+
+/** The material whose owned count the Build Group's ledger and a member plan disagree on most. */
+export interface GroupOwnedDifference {
+  typeID: number;
+  name: string;
+  group: number;
+  plan: number;
+}
+
+/**
+ * Where a member plan's own owned counts and its Build Group's ledger
+ * (`ownedStock`) disagree, for the plan's own materials. A missing count is 0
+ * on both sides. The largest absolute gap wins, ties to the lowest typeID, so
+ * the one-line hint names a stable material. `null` when every count agrees.
+ */
+export function groupOwnedDifference(
+  materials: readonly { typeID: number; name: string }[],
+  planOwned: Record<number, { ownedQuantity?: number } | undefined> | undefined,
+  groupOwned: Record<number, number> | undefined
+): GroupOwnedDifference | null {
+  let best: GroupOwnedDifference | null = null;
+  for (const { typeID, name } of materials) {
+    const plan = Math.max(0, Math.floor(planOwned?.[typeID]?.ownedQuantity ?? 0));
+    const group = Math.max(0, Math.floor(groupOwned?.[typeID] ?? 0));
+    if (plan === group) continue;
+    const gap = Math.abs(plan - group);
+    const bestGap = best ? Math.abs(best.plan - best.group) : -1;
+    if (gap > bestGap || (gap === bestGap && best && typeID < best.typeID)) {
+      best = { typeID, name, group, plan };
+    }
+  }
+  return best;
+}

@@ -2287,6 +2287,8 @@
     "reactionLocation": "Reaction location",
     "reactionLocationNotSet": "No reaction location set",
     "ownedStockScopeLabel": "Owned Material Source",
+    "groupOwnedDiffers": "Group total differs: {{group}} counts {{groupQty}} {{material}} owned, this plan {{planQty}}.",
+    "openTheGroup": "Open the group",
     "ownedStockScopeEverywhere": "Everywhere",
     "ownedStockScopeSelected": "Selected locations",
     "ownedStockScopeNoLocations": "No detected owned stock yet to choose locations from.",
