@@ -110,3 +110,49 @@ for (const width of [1024, 1280, 1440]) {
     await expectNoPageOverflow(page);
   });
 }
+
+for (const width of [390, 1024, 1280]) {
+  test(`recent-list select sits in the paste card header at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await signInAndGoto(page);
+    await mockHubPrices(page);
+    await page.goto('./market/appraisal?hub=jita');
+    // No history yet: no select at all.
+    await expect(page.getByRole('combobox', { name: 'Load a recent list' })).toHaveCount(0);
+    await page.getByLabel(/items from inventory/i).fill(PASTE);
+    await page.getByRole('button', { name: 'Appraise', exact: true }).click();
+    await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
+
+    const select = page.getByRole('combobox', { name: 'Load a recent list' });
+    await expect(select).toBeVisible();
+    const g = await select.evaluate((el) => {
+      const header = el.closest('header')!;
+      const title = header.querySelector('h2')!.getBoundingClientRect();
+      const h = header.getBoundingClientRect();
+      const s = el.getBoundingClientRect();
+      const card = header.parentElement!.getBoundingClientRect();
+      return {
+        title: title.toJSON(),
+        header: h.toJSON(),
+        select: s.toJSON(),
+        card: card.toJSON(),
+        headerOverflow: header.scrollWidth - header.clientWidth,
+      };
+    });
+    expect(g.select.left, 'select is to the right of the title').toBeGreaterThanOrEqual(
+      g.title.right - 1
+    );
+    // Same row: vertical centres within the header's height, no wrap.
+    expect(g.select.top).toBeGreaterThanOrEqual(g.header.top - 1);
+    expect(g.select.bottom).toBeLessThanOrEqual(g.header.bottom + 1);
+    expect(g.select.right).toBeLessThanOrEqual(g.card.right + 1);
+    expect(g.select.width).toBeLessThan(g.card.width * 0.6);
+    expect(g.headerOverflow).toBeLessThanOrEqual(1);
+    await expectNoPageOverflow(page);
+    await page.screenshot({
+      path: process.env.SHOT_DIR
+        ? `${process.env.SHOT_DIR}/recent-${width}.png`
+        : 'test-results/recent.png',
+    });
+  });
+}

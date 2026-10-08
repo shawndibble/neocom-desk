@@ -556,6 +556,42 @@ export function AppraisalPanel({
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)] xl:items-start">
       <Panel
         title={t('market.appraisal.pasteTitle')}
+        actions={
+          recent.length > 0 ? (
+            <Select
+              value=""
+              onValueChange={(value) => controller.appraiseText(recent[Number(value)]?.text ?? '')}
+            >
+              <SelectTrigger
+                size="sm"
+                id="market-appraisal-recent"
+                aria-label={t('market.appraisal.recentPlaceholder')}
+                className="w-32 max-w-full min-w-0"
+              >
+                <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {recent.map((entry, index) => {
+                  const { names, more } = recentLabel(entry.text);
+                  return (
+                    <SelectItem key={entry.text} value={String(index)}>
+                      {t(
+                        more > 0
+                          ? 'market.appraisal.recentLabelMore'
+                          : 'market.appraisal.recentLabel',
+                        {
+                          names: names.join(', '),
+                          count: more,
+                          age: formatAge(openedAt - entry.savedAt, t),
+                        }
+                      )}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          ) : undefined
+        }
         meta={
           controller.canAppraise ? (
             <StatChip
@@ -571,46 +607,6 @@ export function AppraisalPanel({
         }
       >
         <div className="flex flex-col gap-2">
-          {recent.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                htmlFor="market-appraisal-recent"
-              >
-                {t('market.appraisal.recent')}
-              </label>
-              <Select
-                value=""
-                onValueChange={(value) =>
-                  controller.appraiseText(recent[Number(value)]?.text ?? '')
-                }
-              >
-                <SelectTrigger size="sm" id="market-appraisal-recent" className="w-full min-w-0">
-                  <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {recent.map((entry, index) => {
-                    const { names, more } = recentLabel(entry.text);
-                    return (
-                      <SelectItem key={entry.text} value={String(index)}>
-                        {t(
-                          more > 0
-                            ? 'market.appraisal.recentLabelMore'
-                            : 'market.appraisal.recentLabel',
-                          {
-                            names: names.join(', '),
-                            count: more,
-                            age: formatAge(openedAt - entry.savedAt, t),
-                          }
-                        )}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
             {t('market.appraisal.pasteLabel')}
           </label>

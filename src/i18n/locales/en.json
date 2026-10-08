@@ -7261,7 +7261,6 @@
       "minusOwnedGrantTitle": "Owned stock needs the Assets permission",
       "minusOwnedGrantHint": "This character logged in without it. Grant it to subtract what you own.",
       "minusOwnedGrantAction": "Grant Assets permission",
-      "recent": "Recent",
       "recentPlaceholder": "Load a recent list",
       "recentLabel": "{{names}} · {{age}}",
       "recentLabelMore": "{{names}} +{{count}} more · {{age}}",
