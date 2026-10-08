@@ -134,7 +134,7 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 
 ## Fixing an over-CPU / over-PG fit
 
-No one-click "make it fit" or auto-fit exists (no such module in `src/features/fittings` or `src/engine/fittings`). Tools that avoid trying alternatives one by one:
+**Make it fit…** (`src/engine/fittings/makeItFit.ts`, `MakeItFitDialog.tsx`) sits beside the red "Over by" text on the CPU, powergrid and calibration readouts. It recalculates every meta-variant swap of a fitted module or rig, offers those that bring the fit under budget (a pair of swaps only when no single swap does), ranked by smallest loss of damage, tank and speed, then by ISK at the pilot's Trade Hub. One click applies it as an ordinary edit. Other tools:
 
 | Tool                                     | Where                                | What it shows                                                                                                              |
 | ---------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
