@@ -7835,6 +7835,13 @@
     "notifications": {
       "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. Device pop-up choices stay on this device. Alerts choices and thresholds sync with your account's other devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
+      "pushFailed": {
+        "browser-refused": "Your browser refused to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "network": "Couldn't reach the server to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "server-rejected": "The server turned down this device's background alert setup, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "unknown": "Background alert setup failed, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work."
+      },
+      "pushRetryButton": "Retry",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
