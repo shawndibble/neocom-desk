@@ -9,6 +9,7 @@
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import {
   Button,
   DataAgeBadge,
@@ -24,8 +25,10 @@ import {
   MIN_RECIPIENT_SEARCH_LENGTH,
   searchMailRecipients,
 } from '@/features/character/mailRecipientSearch';
+import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -35,6 +38,7 @@ import {
   type PilotProfile,
   type PilotSummary,
 } from './pilotLookup';
+import { PilotListView } from './PilotListView';
 import { PilotProfileView } from './PilotProfileView';
 
 const PILOT_PARAMS = { pilot: optionalIdParam() };
@@ -45,16 +49,39 @@ const SEARCH_DEBOUNCE_MS = 300;
 export function PilotLookupPanel() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
+  const location = useLocation();
+  // The pasted list lives here, not in the URL, so it survives a trip to one
+  // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
+  const [list, setList] = useState<PilotPaste | null>(null);
+  const [handledListKey, setHandledListKey] = useState<string | null>(null);
+
+  // Adopted during render, once per navigation (`location.key`), rather than in an effect.
+  const routedText = (location.state as Partial<PilotListState> | null)?.pilotListText;
+  if (routedText && handledListKey !== location.key) {
+    setHandledListKey(location.key);
+    const pasted = classifyPilotPaste(routedText);
+    if (pasted !== null) setList(pasted);
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader title={t('nav.pilotLookup')} />
       <Panel>
         <PilotSearch
-          onSelect={(pilot) => setParams({ pilot: pilot.characterId }, { push: true })}
+          list={list}
+          onList={setList}
+          onSelect={(pilot) => {
+            setList(null);
+            setParams({ pilot: pilot.characterId }, { push: true });
+          }}
         />
       </Panel>
-      {params.pilot === null ? (
+      {params.pilot === null && list !== null ? (
+        <PilotListView
+          paste={list}
+          onOpen={(characterId) => setParams({ pilot: characterId }, { push: true })}
+        />
+      ) : params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
       ) : (
         <PilotResult key={params.pilot} characterId={params.pilot} />
@@ -69,7 +96,15 @@ type ResolveState =
   | { kind: 'not-found'; name: string }
   | { kind: 'failed' };
 
-function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) {
+function PilotSearch({
+  list,
+  onList,
+  onSelect,
+}: {
+  list: PilotPaste | null;
+  onList: (paste: PilotPaste | null) => void;
+  onSelect: (pilot: PilotSummary) => void;
+}) {
   const { t } = useTranslation();
   const listboxId = useId();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -158,6 +193,22 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
   const listOpen = open && shown.length > 0;
   const label = t('travel.pilot.searchLabel');
 
+  if (list !== null) {
+    // The one smart box, collapsed: the paste is a token, not a wall of text.
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-text">
+          {list.kind === 'local'
+            ? t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })
+            : t('travel.pilot.list.tokenDscan', { count: list.typeIds.length })}
+        </span>
+        <Button type="button" onClick={() => onList(null)}>
+          {t('travel.pilot.list.clear')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       <div className="flex flex-wrap items-end gap-3">
@@ -186,6 +237,12 @@ function PilotSearch({ onSelect }: { onSelect: (pilot: PilotSummary) => void }) 
               }}
               onFocus={() => setOpen(true)}
               onBlur={() => setOpen(false)}
+              onPaste={(e) => {
+                const pasted = classifyPilotPaste(e.clipboardData.getData('text/plain'));
+                if (pasted === null) return;
+                e.preventDefault();
+                onList(pasted);
+              }}
               onKeyDown={handleKeyDown}
               className="w-full"
             />
