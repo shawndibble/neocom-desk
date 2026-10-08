@@ -408,7 +408,7 @@ describe('Wallet no longer carries the corporation', () => {
   it('offers no owner switch, division selector or Transactions tab on /wallet, even to a corp wallet reader', async () => {
     window.history.pushState({}, '', '/wallet');
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // The switch used to appear only once corp access resolved to `ready`,
     // which is also what puts Corp in the sidebar.
     expect(await screen.findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
