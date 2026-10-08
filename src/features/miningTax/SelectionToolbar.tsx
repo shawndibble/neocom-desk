@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { CombineEligibility } from './selection';
@@ -34,17 +35,32 @@ interface ToolbarAction {
   primary?: boolean;
   /** `null` when the action can run; otherwise the one-line reason it cannot. */
   blockedReason: string | null;
+  /**
+   * Keep the reason off the visible bar and expose it only as the disabled
+   * button's accessible description (issue #3065): Settle up and Link payment
+   * usually share one sentence, which otherwise prints twice.
+   */
+  describedOnly?: boolean;
   onRun: () => void;
 }
+
+/**
+ * Which blocked action gets the bar's single visible reason line when several
+ * are blocked: Combine first (the one a pilot cannot guess), then Dismiss, then
+ * Select all.
+ */
+const REASON_PRIORITY: string[] = ['combine', 'dismiss', 'select-all'];
 
 /**
  * What can be done with the checked rows (issue #539), shown directly above
  * the table and only once something is checked.
  *
  * An action that cannot apply renders **disabled with its reason spelled out
- * below** rather than disappearing: a Combine button that vanishes teaches
+ * below** rather than disappearing (at most one reason line in total, picked by
+ * `REASON_PRIORITY`; Settle up and Link payment explain themselves to assistive
+ * tech only, via `aria-describedby`): a Combine button that vanishes teaches
  * nothing about why these particular three rows can't be combined. The reason
- * is real visible text, never a `title` attribute — a native `disabled` button
+ * is real visible text (except Settle up / Link payment, see below), never a `title` attribute — a native `disabled` button
  * fires no pointer or focus events in Chromium or Firefox, so a tooltip on one
  * can never be read (and the same is true of Radix's `Tooltip`, which needs a
  * live trigger).
@@ -68,6 +84,7 @@ export function SelectionToolbar({
   onLinkPayment,
 }: SelectionToolbarProps) {
   const { t } = useTranslation();
+  const idBase = useId();
   if (selectedCount === 0) return null;
 
   const selectAll: ToolbarAction = {
@@ -83,6 +100,7 @@ export function SelectionToolbar({
       label: t('miningTax.settleUpSelectedAction', { count: settleUpCount }),
       primary: true,
       blockedReason: settleUpCount === 0 ? t('miningTax.settleUpBlockedHint') : null,
+      describedOnly: true,
       onRun: onSettleUp,
     },
     ...(onLinkPayment
@@ -91,6 +109,7 @@ export function SelectionToolbar({
             id: 'link-payment',
             label: t('miningTax.linkPaymentSelectedAction'),
             blockedReason: linkPaymentBlockedReason,
+            describedOnly: true,
             onRun: onLinkPayment,
           },
         ]
@@ -109,7 +128,11 @@ export function SelectionToolbar({
     },
   ];
 
-  const blocked = [selectAll, ...bulkActions].filter((a) => a.blockedReason !== null);
+  const all = [selectAll, ...bulkActions];
+  const visibleReason = REASON_PRIORITY.map((id) => all.find((a) => a.id === id)).find(
+    (a) => a?.blockedReason != null
+  )?.blockedReason;
+  const reasonId = (action: ToolbarAction) => `${idBase}-${action.id}-reason`;
 
   const button = (action: ToolbarAction) => (
     <Button
@@ -120,6 +143,7 @@ export function SelectionToolbar({
       size={action.primary ? 'md' : 'sm'}
       variant={action.primary ? 'primary' : undefined}
       disabled={action.blockedReason !== null}
+      aria-describedby={action.describedOnly && action.blockedReason ? reasonId(action) : undefined}
       onClick={action.onRun}
     >
       {action.label}
@@ -143,15 +167,15 @@ export function SelectionToolbar({
 
       <div className="ml-auto flex flex-wrap items-center gap-1.5">{bulkActions.map(button)}</div>
 
-      {blocked.length > 0 && (
-        <ul className="w-full space-y-0.5">
-          {blocked.map((action) => (
-            <li key={action.id} className="text-[0.6875rem] text-text-dim">
-              {action.blockedReason}
-            </li>
-          ))}
-        </ul>
-      )}
+      {all
+        .filter((a) => a.describedOnly && a.blockedReason)
+        .map((a) => (
+          <span key={a.id} id={reasonId(a)} className="sr-only">
+            {a.blockedReason}
+          </span>
+        ))}
+
+      {visibleReason && <p className="w-full text-[0.6875rem] text-text-dim">{visibleReason}</p>}
     </div>
   );
 }
