@@ -690,7 +690,7 @@
      0.75rem + 2.75rem of box needs more than the 2.5rem above to leave a gap
      before the text. */
   @media (pointer: coarse) {
-    .dt-stacked.dt-stack-dense:not(.dt-dense-tight) tr:has(> td.dt-edge-start) {
+    .dt-stacked.dt-stack-dense:not(.dt-dense-tight, .dt-dense-lead) tr:has(> td.dt-edge-start) {
       padding-left: 4rem;
     }
   }
@@ -760,6 +760,41 @@
     /* A tighter gap than the base rule's, so a 360px phone still fits the
        meta line and the box on one line. */
     padding-left: 0.25rem;
+  }
+
+  /* Opt-in (`dt-dense-lead` on the table, Mining Tax): the tick box joins
+     line one ahead of the title with a small gap, and the row keeps its
+     ordinary left padding, so line two starts at the card's left edge under
+     the box rather than indented to the title. The cell is only the box
+     wide; a coarse pointer's 44px label overflows it evenly into the
+     padding around, so the touch target grows without the box carrying
+     visible empty space. Stacked above the title (z-index) so the overhang
+     takes the tap. An unselectable row keeps the empty cell, so every date
+     in the list shares one left edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-edge-start) {
+    padding-left: 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-lead td.dt-edge-start {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    order: -3;
+    flex: none;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.25rem;
+    z-index: 1;
+  }
+
+  /* Never shrunk to the cell: the overhang is the touch target. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead td.dt-edge-start > label {
+    flex: none;
   }
 
   .dt-stacked.dt-stack-dense td.dt-meta {

@@ -118,6 +118,20 @@ interface PlanVerdictHeroProps {
   nameForCharacter?: (characterId: number) => string;
   /** Joins the hero's job time to the plan character's open job slots; omitted when the caller has none. */
   slotLine?: ReactNode;
+  /**
+   * Set while the Reaction Location is highsec, where reactions cannot run
+   * (issue #2908). Warns and offers the fix; blocks nothing.
+   */
+  locationBlock?: ReactionLocationBlock;
+}
+
+export interface ReactionLocationBlock {
+  /** The facility and system the reactions are planned at, for the callout. */
+  facilityName: string;
+  systemName: string;
+  /** One-tap move to the nearest lowsec system; null when none is known. */
+  fix: { systemName: string; onApply: () => void } | null;
+  onChoose: () => void;
 }
 
 /**
@@ -149,6 +163,7 @@ export function PlanVerdictHero({
   nameForSkill,
   nameForCharacter,
   slotLine,
+  locationBlock,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
 
@@ -219,9 +234,11 @@ export function PlanVerdictHero({
               </div>
             ) : (
               <p
-                className={`text-3xl leading-tight font-semibold tabular-nums ${
-                  profit === null ? 'text-text-dim' : iskToneClass(profit)
-                }`}
+                className={cx(
+                  'text-3xl leading-tight font-semibold tabular-nums',
+                  profit === null ? 'text-text-dim' : iskToneClass(profit),
+                  locationBlock && 'line-through opacity-60'
+                )}
               >
                 {/* The figure is the Sale Profitability statement (ADR 0006) — labelled, not restated as a pill. */}
                 <span className="sr-only">{t('industry.saleProfitabilityLabel')} </span>
@@ -253,12 +270,41 @@ export function PlanVerdictHero({
                     : qualifiers.join(' · ')}
               </p>
             )}
+            {locationBlock && (
+              <div
+                role="status"
+                className="mt-1 flex flex-col items-start gap-2 rounded-xs border border-warning/40 bg-warning/10 p-2.5 text-xs text-warning"
+              >
+                <p>
+                  {t('industry.reactionBlocked.callout', {
+                    facility: locationBlock.facilityName,
+                    system: locationBlock.systemName,
+                  })}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {locationBlock.fix && (
+                    <Button size="sm" variant="primary" onClick={locationBlock.fix.onApply}>
+                      {t('industry.reactionBlocked.move', {
+                        system: locationBlock.fix.systemName,
+                      })}
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={locationBlock.onChoose}>
+                    {t('industry.reactionBlocked.chooseLocation')}
+                  </Button>
+                </div>
+              </div>
+            )}
             {slotLine}
           </div>
 
           {!pricesLoading && pricesReady && (
             <div className="flex min-w-0 flex-col items-start gap-2 md:flex-1">
-              {result.recommendation === 'build' ? (
+              {locationBlock ? (
+                <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="warning">
+                  {t('industry.reactionBlocked.verdict')}
+                </VerdictPill>
+              ) : result.recommendation === 'build' ? (
                 <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
                   {t('industry.verdictBuild', {
                     amount: formatIsk((result.buyCost ?? 0) - result.totalCost),

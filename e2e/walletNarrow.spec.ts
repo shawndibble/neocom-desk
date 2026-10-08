@@ -127,8 +127,8 @@ test.describe('Journal phone table', () => {
     await expect(firstRow).toBeVisible();
     expect(await firstRow.evaluate((tr) => getComputedStyle(tr).display)).toBe('table-row');
 
-    // Description and Balance are shed; Date, Type and Amount stay.
-    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeHidden();
+    // Balance is shed; Date, Type, Description and Amount stay.
+    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: /Balance/ })).toBeHidden();
     await expect(table.getByRole('columnheader', { name: /Amount/ })).toBeVisible();
 

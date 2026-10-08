@@ -209,21 +209,37 @@ function usableOwnedStockLocation(value: unknown): boolean {
   );
 }
 
+function usableIds(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) && value.every((id) => typeof id === 'number' && Number.isFinite(id)))
+  );
+}
+
 function usableOwnedStockScope(value: unknown): value is OwnedStockScope {
   if (typeof value !== 'object' || value === null) return false;
-  const { mode, locations, excludedContainers } = value as {
+  const { mode, locations, excludedContainers, containers, hangars } = value as {
     mode?: unknown;
     locations?: unknown;
     excludedContainers?: unknown;
+    containers?: unknown;
+    hangars?: unknown;
   };
   if (mode === 'everywhere') return true;
   return (
     mode === 'selected' &&
     Array.isArray(locations) &&
     locations.every(usableOwnedStockLocation) &&
-    (excludedContainers === undefined ||
-      (Array.isArray(excludedContainers) &&
-        excludedContainers.every((id) => typeof id === 'number' && Number.isFinite(id))))
+    usableIds(excludedContainers) &&
+    usableIds(containers) &&
+    (hangars === undefined ||
+      (Array.isArray(hangars) &&
+        hangars.every(
+          (h) =>
+            usableOwnedStockLocation(h) &&
+            typeof (h as { division?: unknown }).division === 'number' &&
+            Number.isFinite((h as { division: number }).division)
+        )))
   );
 }
 

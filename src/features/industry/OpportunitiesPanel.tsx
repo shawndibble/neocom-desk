@@ -11,7 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
+  MenuItem,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
@@ -46,6 +47,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { useRowStartPlan } from './rowStartPlan';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -56,7 +58,14 @@ import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent, numericCell } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
-import { ORDER_DEPTH_RANK, ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
+import {
+  matchesStockFilter,
+  MOSTLY_COVERED_PCT,
+  ORDER_DEPTH_RANK,
+  ORDER_DEPTH_TONE,
+  stockCoverage,
+  unitMargin,
+} from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   AUTO_RECALCULATE_MAX,
@@ -117,6 +126,8 @@ const SORT_VALUE = {
     row.candidate.blueprint.runs === -1 ? Number.MAX_SAFE_INTEGER : row.candidate.blueprint.runs,
   unitMargin: (row: OpportunityRow) => unitMargin(row) ?? undefined,
   margin: (row: OpportunityRow) => row.result.marginPct ?? undefined,
+  stockCovers: (row: OpportunityRow) => stockCoverage(row)?.coveredPct,
+  stillToBuy: (row: OpportunityRow) => stockCoverage(row)?.stillToBuyIsk,
   duration: (row: OpportunityRow) => row.result.seconds,
   iskPerHour: (row: OpportunityRow) => row.result.iskPerHour ?? undefined,
   orderDepth: (row: OpportunityRow) => ORDER_DEPTH_RANK[row.orderDepth],
@@ -127,6 +138,8 @@ const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
  * blueprints and Character filter, either priced and ranked or listed whole.
  */
 const VIEW_PARAM = enumParam(['ranked', 'owned'] as const, 'ranked');
+/** "Use my stock" (issue #2847): narrow Ranked to builds owned stock covers. */
+const STOCK_PARAM = enumParam(['any', 'mostly', 'full'] as const, 'any');
 
 /** Module-level so the table's windowing sees one stable function. */
 const opportunityRowKey = (row: OpportunityRow) => row.candidate.id;
@@ -157,6 +170,7 @@ export function OpportunitiesPanel({
   );
 
   const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
+  const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);
   const [characterFilter, setCharacterFilter] = useUrlParam(
     OPPORTUNITIES_CHARACTERS_KEY,
     CHARACTER_FILTER
@@ -269,7 +283,14 @@ export function OpportunitiesPanel({
   });
   const standingsByCharacter = useTradeHubStandingsByCharacter(characterIds);
 
-  const { rows, loading, progress, manualRefreshOnly, needsRefresh, refresh } = useOpportunities({
+  const {
+    rows: allRows,
+    loading,
+    progress,
+    manualRefreshOnly,
+    needsRefresh,
+    refresh,
+  } = useOpportunities({
     candidates,
     catalog,
     pi,
@@ -282,6 +303,10 @@ export function OpportunitiesPanel({
     assumedMe,
   });
 
+  const rows = useMemo(
+    () => allRows.filter((row) => matchesStockFilter(row, stockFilter)),
+    [allRows, stockFilter]
+  );
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -323,6 +348,34 @@ export function OpportunitiesPanel({
     itemName: string;
     regionId: number;
   } | null>(null);
+
+  // The desktop twin of the phone card's "…" menu: the shared item menu plus
+  // Price history, the one action the ranked row's click doesn't carry.
+  function rowContextMenu(row: OpportunityRow, tr: ReactElement) {
+    const { productTypeID, productName } = row.candidate.catalogEntry;
+    if (productTypeID === null) return tr;
+    return (
+      <ItemContextMenu
+        typeId={productTypeID}
+        itemName={productName}
+        extraItems={
+          <MenuItem
+            onSelect={() =>
+              setHistoryItem({
+                typeId: productTypeID,
+                itemName: productName,
+                regionId: row.hub.regionId,
+              })
+            }
+          >
+            {t('industry.opportunitiesPriceHistory')}
+          </MenuItem>
+        }
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   const showCharacterFilter = characterCandidates.length > 1;
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
@@ -429,6 +482,27 @@ export function OpportunitiesPanel({
       render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
     },
     {
+      id: 'stockCovers',
+      header: t('industry.opportunitiesStockCovers'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.stockCovers,
+      render: (row) => numericCell(stockCoverage(row)?.coveredPct ?? null, formatPercent, unknown),
+    },
+    {
+      id: 'stillToBuy',
+      header: t('industry.opportunitiesStillToBuy'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: SORT_VALUE.stillToBuy,
+      render: (row) =>
+        numericCell(
+          stockCoverage(row)?.stillToBuyIsk ?? null,
+          (v) => <IskAmount value={v} decimals={0} />,
+          unknown
+        ),
+    },
+    {
       id: 'duration',
       header: t('industry.time'),
       align: 'right',
@@ -502,6 +576,39 @@ export function OpportunitiesPanel({
       onChange={setCharacterFilter}
     />
   );
+  const stockOptions = [
+    { value: 'any' as const, label: t('industry.opportunitiesStockAny') },
+    {
+      value: 'mostly' as const,
+      label: t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
+    },
+    { value: 'full' as const, label: t('industry.opportunitiesStockFull') },
+  ];
+  const stockFilterControl = isDesktop ? (
+    <SegmentedControl
+      label={t('industry.opportunitiesUseMyStock')}
+      size="sm"
+      value={stockFilter}
+      onChange={setStockFilter}
+      options={stockOptions}
+    />
+  ) : (
+    <Select
+      value={stockFilter}
+      onValueChange={(next) => setStockFilter(next as typeof stockFilter)}
+    >
+      <SelectTrigger size="sm" aria-label={t('industry.opportunitiesUseMyStock')}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {stockOptions.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
   // Below `lg` the view picker *is* the panel's title: a bordered select
   // reading "Ranked builds" / "Owned blueprints", so the title, the view, the
   // Character filter and the actions all fit one line on a phone. The
@@ -537,9 +644,13 @@ export function OpportunitiesPanel({
         ]}
       />
       {characterFilterControl}
+      {view === 'ranked' && stockFilterControl}
     </span>
   ) : (
-    characterFilterControl
+    <span className="flex items-center gap-2">
+      {characterFilterControl}
+      {view === 'ranked' && stockFilterControl}
+    </span>
   );
   const title = isDesktop ? t('industry.opportunitiesTitle') : undefined;
 
@@ -571,7 +682,7 @@ export function OpportunitiesPanel({
         activeCharacterId={activeCharacterId}
         ownedByCharacter={ownedByCharacter}
         characterNames={characterNames}
-        rankedRows={rows}
+        rankedRows={allRows}
         ownedStockSnapshot={ownedStockSnapshot}
         loading={blueprintsLoading}
         title={title}
@@ -621,6 +732,17 @@ export function OpportunitiesPanel({
           hint={t('industry.opportunitiesNeedsRefreshHint')}
           className="py-8"
         />
+      ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
+        <EmptyState
+          title={t('industry.opportunitiesStockEmptyTitle')}
+          hint={t('industry.opportunitiesStockEmptyHint')}
+          action={
+            <Button size="sm" onClick={() => setStockFilter('any')}>
+              {t('common.resetFilters')}
+            </Button>
+          }
+          className="py-8"
+        />
       ) : isDesktop ? (
         <div className="overflow-x-auto">
           <DataTable
@@ -631,6 +753,8 @@ export function OpportunitiesPanel({
             virtualize="auto"
             label={t('industry.opportunitiesTitle')}
             onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+            rowContextMenu={rowContextMenu}
+            rowMoreActions
             {...sortProps}
           />
         </div>

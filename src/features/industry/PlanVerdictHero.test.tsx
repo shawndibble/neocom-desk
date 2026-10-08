@@ -325,3 +325,40 @@ describe('PlanVerdictHero: top-level skill-gate marker (issue #1231)', () => {
     expect(screen.queryByRole('img')).toBeNull();
   });
 });
+
+describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
+  const block = (fix: { systemName: string; onApply: () => void } | null, onChoose = vi.fn()) => ({
+    facilityName: 'Athanor',
+    systemName: 'Jita',
+    fix,
+    onChoose,
+  });
+
+  it('replaces BUILD with the warning, strikes the profit, keeps Log production enabled', () => {
+    renderHero({ locationBlock: block(null) });
+    expect(screen.getByText("Can't run as planned")).toBeInTheDocument();
+    expect(screen.queryByText(/^BUILD saves/)).toBeNull();
+    expect(screen.getByRole('button', { name: /log production/i })).toBeEnabled();
+    expect(screen.getByRole('status')).toHaveTextContent(/highsec/);
+  });
+
+  it('offers the nearest-lowsec move and a way to choose a location', async () => {
+    const onApply = vi.fn();
+    const onChoose = vi.fn();
+    renderHero({ locationBlock: block({ systemName: 'Tama', onApply }, onChoose) });
+    await userEvent.click(screen.getByRole('button', { name: 'Move reactions to Tama (lowsec)' }));
+    expect(onApply).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Choose location…' }));
+    expect(onChoose).toHaveBeenCalled();
+  });
+
+  it('omits the move button when no lowsec system is known', () => {
+    renderHero({ locationBlock: block(null) });
+    expect(screen.queryByRole('button', { name: /^Move reactions/ })).toBeNull();
+  });
+
+  it('looks as it always did without a block', () => {
+    renderHero();
+    expect(screen.queryByText("Can't run as planned")).toBeNull();
+  });
+});
