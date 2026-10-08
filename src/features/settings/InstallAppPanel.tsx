@@ -12,7 +12,7 @@ const STEPS_KEYS = {
 } as const;
 
 /**
- * Settings → Data & storage → Install this app. The later path for the
+ * Settings → Data & storage → Install this app (phones and tablets only). The later path for the
  * one-time install banner: ignores `installPrompt.seen`, so a dismissed banner
  * is never the end of it.
  */
@@ -26,6 +26,8 @@ export function InstallAppPanel() {
     deferredPromptAvailable: deferredPrompt !== null,
     platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
   });
+
+  if (variant === 'none') return null;
 
   return (
     <Panel title={t('settings.installTitle')} data-testid="install-app-panel">

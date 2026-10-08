@@ -1,3 +1,4 @@
+import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -755,6 +756,7 @@ function MarketDefaultsPanel() {
 
             <LpValueField id="settings-lp-value" />
           </Fields>
+          <StructureFeesList />
         </div>
       ) : (
         <Spinner />
@@ -1104,8 +1106,10 @@ export function Settings() {
             <>
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
-                <UpdatePanel />
-                <InstallAppPanel />
+                <div className="space-y-4">
+                  <UpdatePanel />
+                  <InstallAppPanel />
+                </div>
                 <ExportPanel />
                 <ImportPanel />
               </div>

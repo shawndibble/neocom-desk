@@ -13,6 +13,9 @@ import { ShareShell } from '@/features/share/ShareShell';
 import { loadShare, type LoadShareResult, type StoredShare } from '@/features/share/shareStore';
 import { parseFittingSharePayload } from '@/engine/fitting/fittingSharePayload';
 import { FittingShareView } from './FittingShared';
+import { parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
+import { DscanShareScreen, type DscanShareState } from '@/features/travel/DscanShareScreen';
+import { sharedDscanOpenInApp } from '@/features/travel/sharedDscanSeed';
 
 type LoadState = { shareId: string; result: LoadShareResult } | null;
 
@@ -21,6 +24,11 @@ function appraisalState(share: StoredShare): AppraisalShareState {
   if (snapshot === null) return { status: 'invalid' };
   const view = appraisalShareViewFromSnapshot(snapshot);
   return view.ok ? { status: 'ready', view: view.value } : { status: 'invalid' };
+}
+
+function dscanState(share: StoredShare): DscanShareState {
+  const scan = parseDscanSnapshot(share.payload);
+  return scan === null ? { status: 'invalid' } : { status: 'ready', typeIds: scan.typeIds };
 }
 
 /**
@@ -60,6 +68,16 @@ export function SharedLink() {
             openInApp={
               state.status === 'ready' ? sharedAppraisalOpenInApp(state.view, shareId) : undefined
             }
+          />
+        );
+      }
+      case 'dscan': {
+        const state = dscanState(result.share);
+        return (
+          <DscanShareScreen
+            state={state}
+            expiresAt={result.share.expiresAt}
+            openInApp={state.status === 'ready' ? sharedDscanOpenInApp(shareId) : undefined}
           />
         );
       }

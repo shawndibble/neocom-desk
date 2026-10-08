@@ -52,13 +52,14 @@ import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
+import { cx } from '@/lib/cx';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 
 /** Build-vs-buy verdict, compact enough for a list row's own column. */
-export type PlanVerdictTag = 'build' | 'buy' | 'unknown';
+export type PlanVerdictTag = 'build' | 'buy' | 'unknown' | 'fixLocation';
 
 /** Profit / Verdict — the two figures both a plan row and a group row carry. */
 export interface PlanRollupStats {
@@ -172,6 +173,8 @@ const VERDICT_TAG_CLASS: Record<PlanVerdictTag, string> = {
   build: 'text-success border-success/50',
   buy: 'text-warning border-warning/50',
   unknown: 'text-text-dim border-line',
+  // Reactions planned in highsec (issue #2908): the call is the pilot's to fix.
+  fixLocation: 'text-warning border-warning/50',
 };
 
 function VerdictTag({
@@ -189,7 +192,9 @@ function VerdictTag({
       ? t('industry.verdictTagBuild')
       : verdict === 'buy'
         ? t('industry.verdictTagBuy')
-        : t('industry.verdictTagUnknown');
+        : verdict === 'fixLocation'
+          ? t('industry.reactionBlocked.fixLocationTag')
+          : t('industry.verdictTagUnknown');
   const tag = (
     <span
       className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-widest ${VERDICT_TAG_CLASS[verdict]}`}
@@ -197,7 +202,8 @@ function VerdictTag({
       {label}
     </span>
   );
-  if (verdict === 'unknown' || buildCost == null || buyCost == null) return tag;
+  if (verdict === 'unknown' || verdict === 'fixLocation' || buildCost == null || buyCost == null)
+    return tag;
   return (
     <Tooltip
       content={
@@ -550,13 +556,29 @@ function PlanRow({
               </Tooltip>
             </span>
           )}
-          <span className="w-24 shrink-0 text-right">
+          {/* Dimmed, not withheld, while the verdict is "Fix location". */}
+          <span
+            className={cx(
+              'w-24 shrink-0 text-right',
+              stats?.verdict === 'fixLocation' && 'opacity-50'
+            )}
+          >
             <ProfitCell profit={stats?.profit ?? null} />
           </span>
-          <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
+          <span
+            className={cx(
+              'hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block',
+              stats?.verdict === 'fixLocation' && 'opacity-50'
+            )}
+          >
             {stats?.iskPerHour == null ? '—' : <IskAmount value={stats.iskPerHour} decimals={0} />}
           </span>
-          <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
+          <span
+            className={cx(
+              'hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block',
+              stats?.verdict === 'fixLocation' && 'opacity-50'
+            )}
+          >
             {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
           </span>
           <span className="hidden w-14 shrink-0 justify-end sm:flex">

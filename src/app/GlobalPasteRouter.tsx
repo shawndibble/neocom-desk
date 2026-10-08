@@ -1,18 +1,40 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, type Location } from 'react-router-dom';
+import { parseChatLink } from '@/engine/import/chatLink';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
+import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
 import { FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
+import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { entityInfoHref } from '@/lib/entityInfo';
 import { tabPath } from '@/lib/pageTabs';
 import {
   isTypingTarget,
   OVERLAY_SELECTOR,
   type FittingLoadState,
+  type IndustryBlueprintListState,
   type MarketAppraiseState,
+  type PilotListState,
+  type SkillPlanImportState,
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
-/** Per destination: where the paste goes, carrying its text in route state. */
-const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state: unknown }]> = {
+const SKILL_PLANS_PATH = '/skills/plans';
+
+/** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
+const pilotLookup = (text: string): [string, { state: unknown }] => [
+  '/pilot-lookup',
+  { state: { pilotListText: text } satisfies PilotListState },
+];
+
+/**
+ * Per destination: where the paste goes, carrying its text in route state.
+ * Keyed by `PasteDestination`, so once a new id is added to that union, a
+ * missing route here fails the typecheck.
+ */
+const DESTINATIONS: Record<
+  PasteDestination,
+  (text: string, here: Pick<Location, 'pathname' | 'search'>) => [string, { state: unknown }]
+> = {
   fitting: (text) => [
     FITTINGS_PATH,
     { state: { fittingLoadText: text } satisfies FittingLoadState },
@@ -21,6 +43,28 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
   ],
+  // An item or ship opens its Item Detail over the current page (the same
+  // `?info=type-<id>` a name link makes); a system opens Route Safety.
+  chatLink: (text, here) => {
+    const link = parseChatLink(text);
+    // The detector already found a link; null only means "stay on this page".
+    if (link === null) return [`${here.pathname}${here.search}`, { state: null }];
+    if (link.kind === 'system') return [routeToHref(link.id), { state: null }];
+    return [
+      entityInfoHref(here, { kind: 'type', id: link.id }),
+      { state: ENTITY_INFO_PUSHED_STATE },
+    ];
+  },
+  skillPlan: (text) => [
+    SKILL_PLANS_PATH,
+    { state: { skillPlanImportText: text } satisfies SkillPlanImportState },
+  ],
+  blueprintList: (text) => [
+    '/industry',
+    { state: { blueprintListText: text } satisfies IndustryBlueprintListState },
+  ],
+  pilotList: pilotLookup,
+  dscan: pilotLookup,
 };
 
 /**
@@ -28,13 +72,29 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
  * catalogue load on the first page-level paste, not with the signed-in shell.
  */
 async function classifyPaste(text: string): Promise<PasteDestination | null> {
-  const [{ pasteDestination }, { loadAppraisalCatalogue }, { loadHullNames }] = await Promise.all([
+  const [
+    { pasteDestination },
+    { loadAppraisalCatalogue },
+    { loadHullNames },
+    { loadSkillNameMap },
+    { loadBlueprintNames },
+  ] = await Promise.all([
     import('@/engine/import/pasteDestination'),
     import('@/features/market/appraisalData'),
     import('@/features/fittings/hullNames'),
+    import('@/features/skills/typeCatalog'),
+    import('@/features/industry/blueprintNames'),
   ]);
-  const [catalogue, hullNames] = await Promise.all([loadAppraisalCatalogue(), loadHullNames()]);
-  return pasteDestination(text, { catalogue, hullNames });
+  const [catalogue, hullNames, skillByName, blueprintNames] = await Promise.all([
+    loadAppraisalCatalogue(),
+    loadHullNames(),
+    // A skill catalogue that won't load costs only the skill-plan route.
+    loadSkillNameMap().catch(() => new Map<string, { typeID: number }>()),
+    // Without the blueprint data a blueprint list is just not recognised; the
+    // fit and item-list pastes must not depend on it.
+    loadBlueprintNames().catch(() => undefined),
+  ]);
+  return pasteDestination(text, { catalogue, hullNames, skillByName, blueprintNames });
 }
 
 /**
@@ -49,6 +109,11 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
  */
 export function GlobalPasteRouter() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  });
   // Only the latest paste may navigate, whichever classifies first.
   const latestPaste = useRef(0);
 
@@ -64,7 +129,7 @@ export function GlobalPasteRouter() {
       classifyPaste(text)
         .then((destination) => {
           if (id !== latestPaste.current || destination === null) return;
-          void navigate(...DESTINATIONS[destination](text));
+          void navigate(...DESTINATIONS[destination](text, locationRef.current));
         })
         // No catalogue (offline, first visit) means no jump — the pilot can
         // still paste into Fittings' Load or the Appraisal box by hand.

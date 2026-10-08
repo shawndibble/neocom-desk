@@ -598,6 +598,7 @@ here — they go one per file in `docs/context/decisions/`.
   selecting a row still opens a real Build Plan for exact numbers.
 - **LP Store**: An NPC corporation's loyalty-point store: offers that trade LP earned with that corporation (plus ISK and sometimes items) for goods. Every NPC corporation that runs one — navies, independents, CONCORD, pirate factions — ships in the static snapshot `market/lpCorporations.json` (id, name, faction), so any store can be searched offline, not only those of corporations a Character already holds LP with.
 - **LP Value**: What one loyalty point is counted as worth, in ISK per LP, when an LP Store pick is priced as ISK cost + LP cost × LP Value. Each corporation's LP has its own **market** LP Value — what its store's best offers turn a point into at the Trade Hub being priced at, after fees. The pilot can type their own instead (Blueprint Acquisition modal, synced as `sync.loyaltyLpValue`), which then applies to every store; 0, the default, means "use the market". When neither prices a store's LP, the LP is left unpriced, never counted free. Distinct from one LP Store offer's ISK/LP, which is what that offer earns per LP spent. See `docs/context/decisions/20261002-222635-lp-value-defaults-to-each-stores-market-rate.md`.
+- **CONCORD LP Exchange**: A station service converting CONCORD LP held in a Character wallet into a corporation's LP, at a per-corporation rate (0.8 verified for the Empire factions, 0.4 assumed elsewhere; 1,000 LP costs 1,250 CONCORD LP at 0.8). The LP Store can value offers in ISK per CONCORD LP; a corporation with no exchange shows none. _Avoid_: LP conversion.
 - **Liquidity Floor**: The minimum sell-order ISK a product must carry at the
   hub to be considered at all in **Market-Wide Build Opportunities** — the
   same `sellPrice * sellVolume` depth `classifyOrderDepth` (**Order Depth**)
@@ -843,7 +844,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Plan Milestone**: A named goal ("Fly Loki") pinned to a Skill Plan entry's
   skill level, not to its position — anchored by (skillTypeID, level) so it
   survives a reorder or the plan's own "suggest full reorder" by construction
-  (`engine/skillPlanMilestones.ts`). Three states against the current **Skill
+  (`engine/skillPlanMilestones.ts`). Reorder treats it as a hard deadline: its skills finish first. Three states against the current **Skill
   Plan schedule**: _projected_ (its step is still scheduled — the date is when
   that step, and every prerequisite it needs, finishes training), _reached_
   (the step is gone because the level is already trained), and _orphaned_ (the
@@ -856,6 +857,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   storage: a marker is an entry-list _position_, while a milestone means "when
   these skills are done, wherever they end up."
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
+- **Dismissed delivery**: A delivered manufacturing or reaction job in Active Jobs' History that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,
   regardless of which Build Plan it came from, grouped by item. Distinct
@@ -873,6 +875,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   or dropped when it was logged in error — without leaving Records. That menu
   item is Records' only delete: its rows navigate, so there is no edit modal
   here to hold a danger button like the per-plan panel's.
+- **Run Loss**: Units of a **Production Run** destroyed or lost before they sold (issue #2851), recorded as their own synced record — several per run — with an optional insurance payout (a wallet-journal payout or typed ISK). It writes the lost units off Unsold cost and Open inventory value and counts the insurance as untaxed proceeds; the run's cost is still charged in full by Realized profit. Reached from the Sold… menu's "Mark as lost…".
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived
@@ -1011,7 +1014,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Share Link**: A short `/share/<id>` link to something a pilot chose to
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
-  **Shared Appraisal**, or a **Fitting**. It opens with or without a session,
+  **Shared Appraisal**, a **Shared D-Scan**, or a **Fitting**. It opens with or without a session,
   and says when it expires. It never names who shared it. A Fitting's Share
   Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
   in, it shows the Fitting at every skill level V; a logged-in visitor goes
@@ -1022,6 +1025,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   and the time it was priced. Never re-priced. Read-only to whoever opens it;
   "Open Neocom Desk" carries it into the live Appraisal tab. Not a quote: it
   commits nobody to buying at those prices.
+- **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan
+  text (capped in size), never just the counts. The recipient's class counts
+  and ship list are rebuilt from that text by the same parsing and class
+  mapping Pilot Lookup's live D-Scan view uses. Read-only; "Open Neocom Desk"
+  carries the scan into the live view. Cannot be revoked: expiry is the only
+  end of the link.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**

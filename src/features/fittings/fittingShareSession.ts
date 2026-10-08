@@ -9,7 +9,8 @@
 import type { Fitting } from '@/engine/fittings/types';
 
 export interface OwnWrite {
-  code: string;
+  /** Null: the hook left `?f=` for the bare path, holding an oversized Fitting open. */
+  code: string | null;
   /** Set by `edit()` only; a Load's own write carries `fitting: null`. */
   fitting: Fitting | null;
 }

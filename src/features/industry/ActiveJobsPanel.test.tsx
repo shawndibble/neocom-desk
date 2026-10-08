@@ -1681,6 +1681,29 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
     expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
   });
 
+  it('dismisses a delivered job: drops it from the count, marks the row, and Undo / Restore bring it back', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+    expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
+    expect(screen.queryByText(/delivered jobs?$/)).not.toBeInTheDocument();
+    await openHistory();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    expect(await screen.findByText('Dismissed')).toBeInTheDocument();
+    expect(screen.queryByText('1 delivered, not logged')).not.toBeInTheDocument();
+    expect((await screen.findByRole('button', { name: 'Restore' })).closest('tr')).not.toHaveClass(
+      'bg-warning/10'
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(await screen.findByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+    expect(screen.getByText('1 delivered, not logged')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    expect(await screen.findByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
   it('tints an unlogged row and offers Log production', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob()])));
     renderPanel();

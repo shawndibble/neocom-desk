@@ -24,7 +24,11 @@
  * broker fee on top of tax, fill pays tax alone.
  */
 
-import { relistBreakEvenPrice, salesTaxPct } from '@/engine/industry/fees';
+import {
+  relistBreakEvenPrice,
+  relistBreakEvenPriceAtBrokerPct,
+  salesTaxPct,
+} from '@/engine/industry/fees';
 
 export interface OrderFloorInputs {
   /** What one unit cost the player, from a linked Production Run or a hand-entered cost. */
@@ -37,6 +41,8 @@ export interface OrderFloorInputs {
   advancedBrokerRelationsLevel: number;
   factionStanding?: number;
   corpStanding?: number;
+  /** Total broker fee % when the order sits at a player structure (SCC surcharge + the owner's rate). Replaces the skill/standing-derived NPC rate; 0 is a real rate, so test for undefined. */
+  structureBrokerPct?: number;
 }
 
 export interface OrderFloor {
@@ -56,20 +62,30 @@ export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
     advancedBrokerRelationsLevel,
     factionStanding,
     corpStanding,
+    structureBrokerPct,
   } = inputs;
 
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
   if (!Number.isFinite(remainingQuantity) || remainingQuantity <= 0) return null;
 
-  const relist = relistBreakEvenPrice(
-    unitCost * remainingQuantity,
-    remainingQuantity,
-    accountingLevel,
-    brokerRelationsLevel,
-    advancedBrokerRelationsLevel,
-    factionStanding,
-    corpStanding
-  );
+  const relist =
+    structureBrokerPct === undefined
+      ? relistBreakEvenPrice(
+          unitCost * remainingQuantity,
+          remainingQuantity,
+          accountingLevel,
+          brokerRelationsLevel,
+          advancedBrokerRelationsLevel,
+          factionStanding,
+          corpStanding
+        )
+      : relistBreakEvenPriceAtBrokerPct(
+          unitCost * remainingQuantity,
+          remainingQuantity,
+          accountingLevel,
+          structureBrokerPct,
+          advancedBrokerRelationsLevel
+        );
   // remainingQuantity > 0, so relistBreakEvenPrice never returns null here.
   const tax = salesTaxPct(accountingLevel);
   const fill = unitCost / (1 - tax / 100);
