@@ -114,7 +114,7 @@ import {
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
@@ -2233,7 +2233,8 @@ function NodeRowView({
       onToggleSelection={() => onToggleSelection([asset.item_id])}
       t={t}
       wrap={(children) => (
-        <ItemContextMenu
+        <OreItemMenu
+          quantity={asset.quantity}
           typeId={asset.type_id}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
@@ -2241,7 +2242,7 @@ function NodeRowView({
           onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
         >
           {children}
-        </ItemContextMenu>
+        </OreItemMenu>
       )}
     />
   );
