@@ -15,6 +15,7 @@ import {
 import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
+import * as Icon from '@/components/ui/icons';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { editEntry, type CombinedMemberValues } from './ledgerActions';
 import { useLedgerAction } from './useLedgerAction';
@@ -93,6 +94,8 @@ export function EntryEditDialog({
   // Per day, the whole day's value when ore values aren't edited one by one.
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({});
   const { pending: saving, error: saveError, run } = useLedgerAction();
+  // The one case with a single editable value for the whole entry.
+  const singleDayValue = !perOre && !multiDay ? current[0]?.assignment : undefined;
   const paid = current.some((m) => m.assignment.status === 'paid');
 
   const payee = payees.find((p) => p.id === payeeId);
@@ -261,7 +264,7 @@ export function EntryEditDialog({
                     </li>
                   );
                 })}
-                {!perOre && (
+                {!perOre && multiDay && (
                   <li className="flex items-center gap-1.5 py-1.5 text-xs">
                     <span className="min-w-0 flex-1 text-text-dim">
                       {t('miningTax.estimatedValueLabel')}
@@ -288,7 +291,32 @@ export function EntryEditDialog({
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xs border border-line px-2 py-1.5">
             <p className={LABEL}>{t('miningTax.estimatedValueLabel')}</p>
-            <p className="font-semibold tabular-nums">{formatIsk(totalValue)}</p>
+            {singleDayValue ? (
+              // The one place this day's value is edited (§6c: a faint pencil
+              // marks an editable value). Per-ore and combined entries keep
+              // their per-line boxes, so there the tile is a read-only total.
+              <div className="relative">
+                <IskInput
+                  echo={false}
+                  aria-label={t('miningTax.entryEdit.dayValueLabel', {
+                    date: singleDayValue.date,
+                  })}
+                  className="[&_input]:pr-7"
+                  value={dayOverrides[singleDayValue.id] ?? ''}
+                  defaultAmount={Math.round(singleDayValue.estimatedValue)}
+                  onChange={(value) =>
+                    setDayOverrides((previous) => ({ ...previous, [singleDayValue.id]: value }))
+                  }
+                />
+                <Icon.Rename
+                  size={Icon.ICON_SIZE.sm}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-text-faint"
+                />
+              </div>
+            ) : (
+              <p className="font-semibold tabular-nums">{formatIsk(totalValue)}</p>
+            )}
           </div>
           <div className="rounded-xs border border-line px-2 py-1.5">
             <p className={LABEL}>{t('miningTax.entryEdit.taxAt', { pct: pctValid ? pct : '—' })}</p>
