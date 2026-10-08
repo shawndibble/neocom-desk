@@ -782,6 +782,8 @@
       "shareLink": "Copy Share Link",
       "eft": "Copy Fitting",
       "multibuy": "Copy multibuy list",
+      "multibuyMinusOwned": "Copy multibuy list, minus owned",
+      "allOwned": "You already own everything on this list.",
       "eveXml": "Download EVE XML",
       "manufacturePlan": "Manufacture Plan",
       "appraise": "Appraise in Market",
@@ -793,7 +795,8 @@
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
         "eft": "Fitting copied",
-        "multibuy": "Multibuy list copied"
+        "multibuy": "Multibuy list copied",
+        "multibuyMinusOwned": "Multibuy list copied, minus what you hold in {{station}}"
       },
       "downloaded": {
         "eveXml": "Fitting XML downloaded"

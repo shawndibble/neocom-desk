@@ -188,13 +188,19 @@ export function fittingToEveXml(fitting: Fitting, nameFor: ItemNameFor): string 
   return lines.join('\n');
 }
 
-/** One `name<TAB>quantity` line per item — the shape the game's multibuy and Appraisal both read. */
+/**
+ * One `name<TAB>quantity` line per item — the shape the game's multibuy and Appraisal both read.
+ * With `owned` (units held per type id), each line is the part still to buy and covered lines go.
+ */
 export function fittingToMultibuy(
   fitting: Fitting,
   nameFor: ItemNameFor,
-  cloneImplants: readonly number[] = []
+  cloneImplants: readonly number[] = [],
+  owned?: ReadonlyMap<number, number>
 ): string {
   return [...fittingItemCounts(fitting, cloneImplants)]
-    .map(([typeId, quantity]) => `${nameFor(typeId)}\t${quantity}`)
+    .map(([typeId, quantity]) => [typeId, quantity - Math.min(owned?.get(typeId) ?? 0, quantity)])
+    .filter(([, need]) => need > 0)
+    .map(([typeId, need]) => `${nameFor(typeId)}\t${need}`)
     .join('\n');
 }
