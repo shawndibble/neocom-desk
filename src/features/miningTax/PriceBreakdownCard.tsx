@@ -80,7 +80,7 @@ export function PriceBreakdownCard({
       t('miningTax.detail.breakdown.lineText', {
         name: name(l.typeId),
         quantity: l.quantity.toLocaleString(),
-        unit: unitText(l.unitPrice),
+        unit: unitText(l.overridden ? undefined : l.unitPrice),
         value: formatIsk(l.lineValue),
         source: sourceLabel(l),
       })
@@ -89,6 +89,7 @@ export function PriceBreakdownCard({
       value: formatIsk(assignment.estimatedValue),
       tax: formatIsk(assignment.taxOwed),
     }),
+    ...(drifted ? [t('miningTax.detail.breakdown.driftText')] : []),
   ].join('\n');
 
   return (
@@ -126,17 +127,17 @@ export function PriceBreakdownCard({
               <OreLink typeId={l.typeId}>{name(l.typeId)}</OreLink>
             </span>
             <span className="tabular-nums text-text-dim">
-              {l.quantity.toLocaleString()} × {unitText(l.unitPrice)}
+              {l.quantity.toLocaleString()} × {unitText(l.overridden ? undefined : l.unitPrice)}
             </span>
             <span className="text-text-dim">{sourceLabel(l)}</span>
           </li>
         ))}
       </ul>
-      {drifted && (
-        <p className="text-xs text-text-dim">
-          {t('miningTax.detail.breakdown.drift', { value: formatIsk(assignment.estimatedValue) })}
-        </p>
-      )}
+      <p className="text-xs text-text-dim">
+        {drifted
+          ? t('miningTax.detail.breakdown.drift', { value: formatIsk(assignment.estimatedValue) })
+          : t('miningTax.detail.breakdown.caveat')}
+      </p>
     </div>
   );
 }
