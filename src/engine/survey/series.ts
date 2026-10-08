@@ -38,6 +38,14 @@ export interface SurveyOre {
   volume: number;
 }
 
+/** One scan as a point on the volume chart. */
+export interface SurveyPoint {
+  at: number;
+  total: number;
+  /** Volume left per ore, m³. */
+  byOre: Record<string, number>;
+}
+
 export interface SurveySummary {
   /** Everything the scans have shown of the field: the first scan plus rocks that came into range. */
   startVolume: number;
@@ -48,6 +56,10 @@ export interface SurveySummary {
   /** Ores still in the field, biggest first. */
   ores: SurveyOre[];
   intervals: SurveyInterval[];
+  /** Every scan, oldest first, for the chart. */
+  points: SurveyPoint[];
+  /** Every ore any scan showed, biggest first at the start, so chart layers keep their order. */
+  oreNames: string[];
   /** m³/s over the last few intervals, or null before there is any real mining. */
   pace: number | null;
   /** Epoch ms the field runs out at that pace; null when unknown or finished. */
@@ -121,6 +133,18 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const startVolume = total(first) + intervals.reduce((sum, i) => sum + i.added, 0);
 
+  const points: SurveyPoint[] = scans.map((scan) => {
+    const byOre: Record<string, number> = {};
+    for (const rock of scan.rocks) byOre[rock.ore] = (byOre[rock.ore] ?? 0) + rock.volume;
+    return { at: scan.at, total: total(scan), byOre };
+  });
+  const oreNames: string[] = [];
+  for (const point of [...points].reverse()) {
+    for (const ore of Object.keys(point.byOre)) if (!oreNames.includes(ore)) oreNames.push(ore);
+  }
+  const peak = (ore: string): number => Math.max(...points.map((p) => p.byOre[ore] ?? 0));
+  oreNames.sort((a, b) => peak(b) - peak(a));
+
   const recent = intervals.slice(-PACE_INTERVALS);
   const minedRecent = recent.reduce((sum, i) => sum + i.mined, 0);
   const secondsRecent = recent.reduce((sum, i) => sum + (i.to - i.from) / 1000, 0);
@@ -150,6 +174,8 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     rocksLeft: last.rocks.length,
     ores,
     intervals,
+    points,
+    oreNames,
     pace,
     etaAt,
     finished,

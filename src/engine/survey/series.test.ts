@@ -78,6 +78,15 @@ describe('summarizeSurvey', () => {
     expect(s.intervals[0]).toMatchObject({ mined: 500, added: 500 });
   });
 
+  it('gives each scan as a point with its volume left per ore', () => {
+    const s = summarizeSurvey([scan(0, ['A', 500], ['B', 300]), scan(5, ['A', 400], ['B', 300])])!;
+    expect(s.points).toEqual([
+      { at: T0, total: 800, byOre: { A: 500, B: 300 } },
+      { at: T0 + 5 * MIN, total: 700, byOre: { A: 400, B: 300 } },
+    ]);
+    expect(s.oreNames).toEqual(['A', 'B']);
+  });
+
   it('lists ores by volume left with rock counts', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500], ['Sylvite', 300])])!;
     expect(s.ores).toEqual([

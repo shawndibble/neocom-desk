@@ -3925,6 +3925,7 @@
   "miningTax": {
     "title": "Mining",
     "taxTab": "Tax",
+    "surveyTab": "Survey",
     "overviewTab": "Overview",
     "refresh": "Refresh",
     "reauthTitle": "Some characters need to log in again",
@@ -8453,6 +8454,7 @@
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
     "pasteDestinations": {
+      "survey": { "label": "Survey scan", "opens": "Adds to your Mining Survey" },
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
       "chatLink": { "label": "Chat link", "opens": "Opens the item or system page" },
       "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
