@@ -27,9 +27,9 @@ import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv
 import { iskToneClass } from '@/features/character/format';
 import { lineRows, stackRows } from '@/engine/netWorth/chartRows';
 import {
-  LAYER_IDS,
   buildCharacterSeries,
   layerValues,
+  listedLayers,
   netWorthOf,
   toggleHidden,
   totalsFor,
@@ -94,28 +94,30 @@ function useHidden() {
 }
 
 function LayerPicker({
-  hidden,
+  listed,
+  shown,
   onToggle,
 }: {
-  hidden: readonly LayerId[];
+  listed: readonly LayerId[];
+  shown: readonly LayerId[];
   onToggle: (id: LayerId) => void;
 }) {
   const { t } = useTranslation();
   const options = useMemo(
     () =>
-      LAYER_IDS.map((id) => ({
+      listed.map((id) => ({
         id,
         label: t(LAYER_LABEL_KEYS[id]),
         swatch: <span aria-hidden="true" className={cx('size-2.5 rounded-xs', LAYER_SWATCH[id])} />,
       })),
-    [t]
+    [t, listed]
   );
-  const selected = useMemo(() => new Set(LAYER_IDS.filter((id) => !hidden.includes(id))), [hidden]);
+  const selected = useMemo(() => new Set(shown), [shown]);
   return (
     <MultiSelect
       trigger={
         <Button size="md">
-          {t('wallet.netWorth.seriesButton', { shown: selected.size, total: LAYER_IDS.length })}
+          {t('wallet.netWorth.seriesButton', { shown: selected.size, total: listed.length })}
         </Button>
       }
       options={options}
@@ -135,18 +137,26 @@ interface LayerRow {
   shown: boolean;
 }
 
-function LayerTable({ values, shown }: { values: LayerValues; shown: readonly LayerId[] }) {
+function LayerTable({
+  values,
+  listed,
+  shown,
+}: {
+  values: LayerValues;
+  listed: readonly LayerId[];
+  shown: readonly LayerId[];
+}) {
   const { t } = useTranslation();
   const total = netWorthOf(values, shown);
   const rows = useMemo<LayerRow[]>(
     () =>
-      LAYER_IDS.map((id) => ({
+      listed.map((id) => ({
         id,
         value: values[id],
         share: total > 0 && shown.includes(id) ? values[id] / total : 0,
         shown: shown.includes(id),
       })),
-    [values, shown, total]
+    [values, listed, shown, total]
   );
   const columns = useMemo<DataTableColumn<LayerRow>[]>(
     () => [
@@ -217,9 +227,20 @@ export function NetWorthPanel({
   const ids = useMemo(() => characters.map((c) => c.characterId), [characters]);
   const data = useNetWorthData(ids);
 
-  const shown = useMemo(() => LAYER_IDS.filter((id) => !hiddenLayers.includes(id)), [hiddenLayers]);
+  const listed = useMemo(
+    () =>
+      listedLayers(
+        characters.flatMap(({ characterId }) => data.snapshotsByCharacter.get(characterId) ?? [])
+      ),
+    [characters, data.snapshotsByCharacter]
+  );
+  const shown = useMemo(() => {
+    const visible = listed.filter((id) => !hiddenLayers.includes(id));
+    // A layer that goes empty can leave only hidden ones listed; an empty chart says nothing.
+    return visible.length > 0 ? visible : listed;
+  }, [listed, hiddenLayers]);
   const toggleLayer = (id: LayerId) =>
-    void setHiddenLayers([...toggleHidden(hiddenLayers, id, LAYER_IDS)]);
+    void setHiddenLayers([...toggleHidden(hiddenLayers, id, listed)]);
 
   const seriesById = useMemo(() => {
     const map = new Map<number, CharacterSeries>();
@@ -290,9 +311,7 @@ export function NetWorthPanel({
   const singleLatest = single ? (tableRows[0]?.layers ?? null) : null;
   const total =
     mode === 'single' ? (singleLatest ? netWorthOf(singleLatest, shown) : 0) : totals.total;
-  const excluded = LAYER_IDS.filter((id) => hiddenLayers.includes(id)).map((id) =>
-    t(LAYER_LABEL_KEYS[id])
-  );
+  const excluded = listed.filter((id) => !shown.includes(id)).map((id) => t(LAYER_LABEL_KEYS[id]));
 
   // One Character's panel says nothing about scope: the page header already names them.
   const readout =
@@ -342,7 +361,7 @@ export function NetWorthPanel({
           </span>
         ),
       },
-      ...LAYER_IDS.map<DataTableColumn<NetWorthTableRow>>((id) => ({
+      ...listed.map<DataTableColumn<NetWorthTableRow>>((id) => ({
         id,
         header: t(LAYER_LABEL_KEYS[id]),
         align: 'right',
@@ -371,7 +390,7 @@ export function NetWorthPanel({
       { id: 'go', header: '', align: 'right', render: () => <RowCaret /> },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleCharacter closes over the same values listed
-    [t, hiddenCharacters, hiddenLayers, included.length, shown, coveredIds]
+    [t, hiddenCharacters, hiddenLayers, included.length, shown, listed, coveredIds]
   );
 
   const chart = hasPoints ? (
@@ -427,7 +446,7 @@ export function NetWorthPanel({
       }
       actions={
         <span className="flex items-center gap-2">
-          <LayerPicker hidden={hiddenLayers} onToggle={toggleLayer} />
+          <LayerPicker listed={listed} shown={shown} onToggle={toggleLayer} />
           {actions}
         </span>
       }
@@ -476,7 +495,7 @@ export function NetWorthPanel({
       <p className="mt-2 text-[0.6875rem] text-text-dim">{t('wallet.netWorth.footnote')}</p>
       {mode === 'single' && singleLatest && (
         <div className="mt-3">
-          <LayerTable values={singleLatest} shown={shown} />
+          <LayerTable values={singleLatest} listed={listed} shown={shown} />
         </div>
       )}
     </Panel>
