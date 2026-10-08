@@ -20,6 +20,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel } from '@/components/ui';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { CorpBoardItem, CorpBoardItemKind } from '@/engine/corp/board';
 import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import { CorpBoardRow } from './CorpBoardRow';
@@ -127,7 +128,9 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
               type="button"
               aria-expanded={expanded}
               onClick={() => setExpanded((open) => !open)}
-              className="w-full cursor-pointer border-t border-line px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-accent uppercase tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+              className={textActionClassName(
+                'w-full border-t border-line px-3 py-2 text-left tabular-nums'
+              )}
             >
               {expanded
                 ? t('corp.cards.showFewer')
