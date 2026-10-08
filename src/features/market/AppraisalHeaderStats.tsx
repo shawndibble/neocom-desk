@@ -101,7 +101,7 @@ export function AppraisalHeaderStats({
         )}
       </Group>
       <Group title={t('market.appraisal.groupCargo')}>
-        <AppraisalVolumeChip totals={totals} />
+        <AppraisalVolumeChip totals={totals} emphasis />
         <StatChip label={t('market.appraisal.items')} value={itemCount} />
         {showRefine && (
           <StatChip
