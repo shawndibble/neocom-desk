@@ -4380,6 +4380,13 @@
       "emptyHint": "No ships in the assets of the chosen characters.",
       "showAllCharacters": "Show all characters",
       "inCargo": "In cargo",
+      "here": "Here",
+      "shipCount_one": "{{count}} ship",
+      "shipCount_other": "{{count}} ships",
+      "characterCount_one": "{{count}} character",
+      "characterCount_other": "{{count}} characters",
+      "summary": "{{ships}} across {{characters}} · nearest first",
+      "jumpsFrom": "Jumps from {{system}} (current system)",
       "unknownType": "Type #{{id}}",
       "columns": {
         "ship": "Ship",

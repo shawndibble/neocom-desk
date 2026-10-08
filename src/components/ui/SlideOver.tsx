@@ -17,6 +17,8 @@ interface SlideOverProps {
   side?: 'left' | 'right';
   /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
+  /** A panel holding a table: up to 64rem wide instead of the 25rem default. */
+  wide?: boolean;
   /** As `Modal`'s: `false` only for a panel a URL already backs, or Back is pushed twice. */
   closeOnBack?: boolean;
   /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
@@ -48,6 +50,7 @@ export function SlideOver({
   children,
   side = 'right',
   className,
+  wide = false,
   closeOnBack = true,
   returnFocusFallback,
 }: SlideOverProps) {
@@ -93,7 +96,8 @@ export function SlideOver({
             target.focus({ preventScroll: true });
           }}
           className={cx(
-            'outline-none fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
+            'outline-none fixed top-0 bottom-0 z-40 flex w-full flex-col pb-[env(safe-area-inset-bottom)] border-line-bright bg-panel shadow-lg shadow-black/50',
+            wide ? 'max-w-5xl' : 'max-w-[25rem]',
             SIDE_CLASS[side],
             className
           )}
