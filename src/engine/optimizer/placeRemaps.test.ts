@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
-
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import { placeRemaps, MAX_SUPPORTED_REMAPS } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
@@ -212,6 +211,7 @@ describe('placeRemaps', () => {
     const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
     // Work, not wall-clock: the DP prices only the chosen segments (one per
     // remap), while the O(R^2) grid it replaced priced every candidate cell.
+    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
     expect(pricing.calls).toBeLessThanOrEqual(remapCount + 1);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
     // Up to `remapCount` remapped segments plus an optional prefix.
@@ -353,7 +353,7 @@ describe('placeRemaps leading current-attributes segment', () => {
     // on rerun. placeRemaps and everything under it hold no mutable state (the
     // one module-level cache is a frozen-in-practice allocation list), so this
     // pins that: repeated calls, calls interleaved with other remap counts and
-    // clone states, and a deep-frozen input must all agree to the last bit.
+    // clone states, and a frozen input must all agree to the last bit.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower')
@@ -925,6 +925,7 @@ describe('placeRemaps single-remap fast path', () => {
     pricing.calls = 0;
     const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
+    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
     expect(pricing.calls).toBeLessThanOrEqual(steps.length);
   });
 });
@@ -1111,6 +1112,7 @@ describe('placeRemaps with Boosters', () => {
     // what a rewrite walking every step per segment would multiply.
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
     // Measured 22; a per-step walk per segment would be in the thousands.
+    expect(pricing.calls).toBeGreaterThan(0); // the spy is wired up
     expect(pricing.calls).toBeLessThan(200);
   });
 });
