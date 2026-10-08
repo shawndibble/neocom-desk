@@ -4816,7 +4816,11 @@
     "cooldownOnCooldownValue": "Until {{date}} ({{duration}} left)",
     "reauthTitle": "Log in again to see your clones",
     "reauthHint": "Log in again to fetch this character's jump clones.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "implantsReauthTitle": "Log in again to see the implants you are wearing",
+    "implantsReauthHint": "The implants plugged into your current clone need the read-implants permission, which this login did not grant.",
+    "jumpsAway": "Jumps away",
+    "unnamed": "Unnamed"
   },
   "pi": {
     "title": "Planetary Industry",

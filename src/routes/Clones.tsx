@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,11 +23,16 @@ import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStationName, loadStationSystemId } from '@/features/character/stations';
+import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
+import { loadCharacterImplantsWithStatus } from '@/features/skills/data';
+import { JumpsAwayText } from '@/features/character/assetBrowserRows';
+import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
+import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CachedResult } from '@/esi/cache';
-import type { CharacterClones, JumpClone } from '@/esi/endpoints';
+import type { CharacterClones, JumpClone, SkillQueueEntry } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -40,6 +45,7 @@ import { clonesCsvColumns } from '@/features/character/clonesCsv';
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
+const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 
 interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
@@ -47,6 +53,16 @@ interface Snapshot {
   clonesNeedsReauth: boolean;
   /** Effective level of Infomorph Synchronizing; 0 when unknown/untrained. */
   infomorphLevel: number;
+  /** Implants of the clone the Character is wearing; the Skills > Trained read, now loaded here too. */
+  wornImplants: CachedResult<number[]> | null;
+  /** The read-implants grant is missing (401/403): a banner above the table, never in place of it. */
+  implantsNeedsReauth: boolean;
+  /** The active training queue, loaded for the page's next layout; nothing renders from it yet. */
+  queueResult: CachedResult<SkillQueueEntry[]> | null;
+  /** The Character's current solar system; null when unresolved (missing grant, offline, uncached). */
+  characterSystemId: number | null;
+  /** Solar system of each clone location, keyed by `location_id`; null when it can't be resolved. */
+  systemIds: Map<number, number | null>;
   implantNames: Map<number, string>;
   /** Markup-stripped implant descriptions for the name tooltips; absent ids get no tooltip. */
   implantDescriptions: Map<number, string>;
@@ -62,12 +78,19 @@ async function loadClonesSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, corrected, sp] =
-    await Promise.all([
-      loadCharacterClones(characterId),
-      loadCorrectedSkills(characterId, Date.now(), { skipQueueWithoutScope: true }),
-      loadCharacterSpSummary(characterId, Date.now()),
-    ]);
+  const [
+    { cached: clonesResult, needsReauth: clonesNeedsReauth },
+    corrected,
+    sp,
+    { cached: wornImplants, needsReauth: implantsNeedsReauth },
+    characterSystemId,
+  ] = await Promise.all([
+    loadCharacterClones(characterId),
+    loadCorrectedSkills(characterId, Date.now(), { skipQueueWithoutScope: true }),
+    loadCharacterSpSummary(characterId, Date.now()),
+    loadCharacterImplantsWithStatus(characterId),
+    loadCharacterSolarSystemId(characterId),
+  ]);
   const loadedAt = Date.now();
   // Effective (issue #1236: min of queue-corrected trained and active), not
   // raw trained_skill_level — the cooldown should never read shorter than
@@ -99,6 +122,13 @@ async function loadClonesSnapshot(
   }
   const stationIds = idsForType('station');
   const structureIds = idsForType('structure');
+  const [stationSystems, structureSystems] = await Promise.all([
+    Promise.all(stationIds.map((id) => loadStationSystemId(id))),
+    Promise.all(structureIds.map((id) => loadStructureSystemId(characterId, id))),
+  ]);
+  const systemIds = new Map<number, number | null>();
+  stationIds.forEach((id, i) => systemIds.set(id, stationSystems[i] ?? null));
+  structureIds.forEach((id, i) => systemIds.set(id, structureSystems[i] ?? null));
   const [resolvedStations, resolvedStructures] = await Promise.all([
     // Every id here is an NPC station by `location_type`, and those come out
     // of the SDE snapshot rather than ESI (issue #655) — a map lookup per id,
@@ -124,6 +154,11 @@ async function loadClonesSnapshot(
     clonesResult,
     clonesNeedsReauth,
     infomorphLevel,
+    wornImplants,
+    implantsNeedsReauth,
+    queueResult: corrected.queueResult,
+    characterSystemId,
+    systemIds,
     implantNames,
     implantDescriptions,
     locationNames,
@@ -162,6 +197,9 @@ export function Clones() {
   const implantNames = data?.implantNames ?? NO_NAMES;
   const implantDescriptions = data?.implantDescriptions ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
+  const implantsNeedsReauth = data?.implantsNeedsReauth ?? false;
+  const characterSystemId = data?.characterSystemId ?? null;
+  const systemIds = data?.systemIds ?? NO_SYSTEMS;
   // Falls back to the last SP another tab already loaded for this character,
   // not straight to "—": this tab's own read is still in flight the instant
   // it mounts, and the shared header must not blank out a number the user
@@ -179,7 +217,41 @@ export function Clones() {
     [lastCloneJumpDate, infomorphLevel, loadedAt]
   );
 
+  // Jumps away from where the Character is now, on the saved route preference
+  // (the Travel route rule). Filled in after the first paint: a progressive
+  // enhancement, so a slow graph never holds the clones back.
+  const basis = useJumpBasis();
+  const [jumpsAway, setJumpsAway] = useState<{
+    key: string;
+    byLocation: ReadonlyMap<number, JumpsAwayResult>;
+  } | null>(null);
+  const jumpsKey = `${basis.key}:${characterSystemId}:${loadedAt}`;
+  useEffect(() => {
+    if (!basis.hydrated || loadedAt === 0) return;
+    let cancelled = false;
+    void Promise.all(
+      [...systemIds].map(async ([locationId, systemId]): Promise<[number, JumpsAwayResult]> => {
+        if (characterSystemId === null) {
+          return [locationId, { kind: 'unknown', reason: 'noLocation' }];
+        }
+        if (systemId === null) return [locationId, { kind: 'unknown', reason: 'noRoute' }];
+        return [locationId, await jumpsBetween(characterSystemId, systemId, basis)];
+      })
+    ).then((entries) => {
+      if (!cancelled) setJumpsAway({ key: jumpsKey, byLocation: new Map(entries) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [basis, characterSystemId, systemIds, loadedAt, jumpsKey]);
+  const jumpsByLocation = jumpsAway?.key === jumpsKey ? jumpsAway.byLocation : undefined;
+
   const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
+
+  const homeJumps =
+    homeLocation?.location_id === undefined
+      ? undefined
+      : jumpsByLocation?.get(homeLocation.location_id);
 
   const homeLocationName =
     homeLocation?.location_id === undefined
@@ -207,7 +279,15 @@ export function Clones() {
         sortValue: (clone) => `${cloneName(clone) ?? ''}\u0000${locationLabel(clone)}`,
         render: (clone) => {
           const name = cloneName(clone);
-          if (name === undefined) return locationLabel(clone);
+          if (name === undefined) {
+            return (
+              <span className="[overflow-wrap:anywhere]">
+                <span className="text-text-dim">{t('clones.unnamed')}</span>
+                <span className="text-text-dim"> · </span>
+                <span>{locationLabel(clone)}</span>
+              </span>
+            );
+          }
           return (
             <span className="[overflow-wrap:anywhere]">
               <span className="text-text">{name}</span>
@@ -215,6 +295,21 @@ export function Clones() {
             </span>
           );
         },
+      },
+      {
+        id: 'jumps',
+        header: t('clones.jumpsAway'),
+        sortValue: (clone) => {
+          const result = jumpsByLocation?.get(clone.location_id);
+          return result?.kind === 'known' ? result.jumps : Number.MAX_SAFE_INTEGER;
+        },
+        render: (clone) => (
+          <JumpsAwayText
+            result={jumpsByLocation?.get(clone.location_id)}
+            t={t}
+            locationId={clone.location_id}
+          />
+        ),
       },
       {
         id: 'implants',
@@ -235,7 +330,7 @@ export function Clones() {
               )),
       },
     ];
-  }, [t, locationNames, implantNames, implantDescriptions]);
+  }, [t, locationNames, implantNames, implantDescriptions, jumpsByLocation]);
   const csvColumns = useMemo(
     () => clonesCsvColumns(t, { locationNames, implantNames }),
     [t, locationNames, implantNames]
@@ -319,6 +414,16 @@ export function Clones() {
                 <span>
                   <span className="text-text-dim">{t('clones.homeLocation')}: </span>
                   {homeLocationName}
+                  {homeJumps && (
+                    <span className="text-text-dim">
+                      {' · '}
+                      <JumpsAwayText
+                        result={homeJumps}
+                        t={t}
+                        locationId={homeLocation?.location_id}
+                      />
+                    </span>
+                  )}
                 </span>
               )}
               {lastStationChangeDate && (
@@ -341,6 +446,17 @@ export function Clones() {
                 }
               />
             </div>
+            {implantsNeedsReauth && (
+              <div className="border-b border-line p-3">
+                <GrantBanner
+                  characterId={activeCharacterId}
+                  endpoints={['getCharacterImplants']}
+                  title={t('clones.implantsReauthTitle')}
+                  hint={t('clones.implantsReauthHint')}
+                  actionLabel={t('clones.reauthAction')}
+                />
+              </div>
+            )}
             {clonesResult.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.offlineTitle')}
