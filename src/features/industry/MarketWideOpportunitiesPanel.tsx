@@ -517,9 +517,7 @@ export function MarketWideOpportunitiesPanel({
         row.iskPerDay === null ? (
           // Still reading this product's sales: a blank dash would read as no sales at all.
           dailySales.pending > 0 && !dailySales.sales.has(row.productTypeID) ? (
-            <span className="text-text-dim" role="status" aria-label={t('common.loading')}>
-              …
-            </span>
+            <span className="text-text-dim">…</span>
           ) : (
             t('common.unknown')
           )
