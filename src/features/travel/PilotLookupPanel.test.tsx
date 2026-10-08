@@ -36,7 +36,10 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
 }));
 vi.mock('./pilotKillmailFit', () => ({ loadKillmailFit: mocks.loadKillmailFit }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
-vi.mock('@/sde/loadSde', () => ({ loadTypes: mocks.loadTypes }));
+vi.mock('@/sde/loadSde', () => ({
+  loadTypes: mocks.loadTypes,
+  loadGroupCategories: async () => ({}),
+}));
 vi.mock('@/engine/fitting/fittingShare', () => ({ encodeFittingShare: mocks.encodeFittingShare }));
 vi.mock('./pilotLookup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pilotLookup')>()),
@@ -173,6 +176,25 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(screen.queryByText('3 names, Local list')).toBeNull();
     expect(probe.search).toBe('?pilot=42');
+  });
+
+  it('puts Copy Share Link beside Clear for a D-Scan, and nothing of the kind for a Local list', async () => {
+    renderTab();
+    const box = screen.getByRole('combobox', { name: 'Pilot' });
+    const lines = ['626', '587', '626', '587'].map((id) => id + String.fromCharCode(9) + 'X');
+    fireEvent.paste(box, {
+      clipboardData: { getData: () => lines.join(String.fromCharCode(10)) },
+    });
+    expect(await screen.findByText('4 lines, D-Scan')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.paste(screen.getByRole('combobox', { name: 'Pilot' }), {
+      clipboardData: { getData: () => ['Alpha One', 'Beta Two'].join(String.fromCharCode(10)) },
+    });
+    expect(await screen.findByText('2 names, Local list')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).toBeNull();
   });
 
   it('says so when no pilot has the name', async () => {

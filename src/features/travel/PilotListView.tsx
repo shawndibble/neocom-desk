@@ -46,7 +46,9 @@ export function PilotListView({
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} onOpen={onOpen} />
   ) : (
-    <DscanClasses paste={paste} />
+    <Panel className="space-y-4">
+      <DscanSummaryView typeIds={paste.typeIds} />
+    </Panel>
   );
 }
 
@@ -90,6 +92,7 @@ function LocalList({
     {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
+      stickyStart: true,
       sortValue: (row) => row.name.toLowerCase(),
       // Corporation and Alliance are dropped on a phone; the corporation rides under the name instead.
       render: (row) => (
@@ -102,6 +105,22 @@ function LocalList({
           )}
         </>
       ),
+    },
+    {
+      id: 'corporation',
+      phoneHidden: true,
+      header: t('travel.pilot.list.corporation'),
+      sortValue: (row) => row.corporationName?.toLowerCase(),
+      render: (row) => row.corporationName ?? dash,
+      className: 'text-text-dim',
+    },
+    {
+      id: 'alliance',
+      phoneHidden: true,
+      header: t('travel.pilot.list.alliance'),
+      sortValue: (row) => row.allianceName?.toLowerCase(),
+      render: (row) => row.allianceName ?? dash,
+      className: 'text-text-dim',
     },
     {
       id: 'danger',
@@ -133,23 +152,6 @@ function LocalList({
       className: 'tabular-nums',
       sortValue: (row) => (row.state.kind === 'stats' ? row.state.stats.kills : undefined),
       render: (row) => (row.state.kind === 'stats' ? row.state.stats.kills.toLocaleString() : dash),
-    },
-    // After the figures, so the numbers sit beside the name they belong to; the last column takes the slack.
-    {
-      id: 'corporation',
-      phoneHidden: true,
-      header: t('travel.pilot.list.corporation'),
-      sortValue: (row) => row.corporationName?.toLowerCase(),
-      render: (row) => row.corporationName ?? dash,
-      className: 'text-text-dim',
-    },
-    {
-      id: 'alliance',
-      phoneHidden: true,
-      header: t('travel.pilot.list.alliance'),
-      sortValue: (row) => row.allianceName?.toLowerCase(),
-      render: (row) => row.allianceName ?? dash,
-      className: 'text-text-dim',
     },
   ];
 
@@ -210,14 +212,6 @@ type ShareState =
   | { status: 'failed' }
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
-
-function DscanClasses({ paste }: { paste: DscanPaste }) {
-  return (
-    <Panel className="space-y-4">
-      <DscanSummaryView typeIds={paste.typeIds} />
-    </Panel>
-  );
-}
 
 /**
  * "Copy Share Link" for a pasted D-Scan: a labelled action (DESIGN.md §6c)
