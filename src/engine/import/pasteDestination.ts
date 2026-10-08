@@ -2,8 +2,9 @@
  * Where a page-level paste belongs (the app-wide paste router,
  * `app/GlobalPasteRouter.tsx`): an EFT fit opens in Fittings, an item list —
  * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
- * a Local list or D-Scan in Pilot Lookup, a skill plan (in-game or EVEMon
- * text) in the Skills planner, an in-game chat link on the item or
+ * a blueprint list in a new Build Group, a Local list or D-Scan in Pilot Lookup,
+ * a skill plan (in-game or EVEMon text) in the Skills planner, an in-game chat
+ * link on the item or
  * system page it names, and anything else is left alone.
  *
  * Destinations live in one registry, `PASTE_DETECTORS`. Its order IS the
@@ -18,6 +19,7 @@
  * a sentence that happens to start with "Tritanium" stays a no-op.
  */
 import { parseChatLink } from '@/engine/import/chatLink';
+import { looksLikeBlueprintList } from '@/engine/import/blueprintList';
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import { parseSkillPlanPaste, type SkillCatalog } from '@/engine/import/skillPlanPaste';
 import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/appraisalMatch';
@@ -25,7 +27,7 @@ import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
 export type PasteDestination =
-  'fitting' | 'chatLink' | 'dscan' | 'skillPlan' | 'appraisal' | 'pilotList';
+  'fitting' | 'chatLink' | 'dscan' | 'blueprintList' | 'skillPlan' | 'appraisal' | 'pilotList';
 
 export interface PasteSources {
   /** The market catalogue, keyed by lower-case item name. */
@@ -34,6 +36,11 @@ export interface PasteSources {
   hullNames: ReadonlySet<string>;
   /** Skill names, lower-case — the Skills planner importer's own catalog. */
   skillByName: SkillCatalog;
+  /**
+   * Lower-case name of every blueprint and reaction formula, buildable or not.
+   * Absent (or empty) means no blueprint list can be recognised.
+   */
+  blueprintNames?: ReadonlySet<string>;
 }
 
 /**
@@ -73,6 +80,13 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
     // every one starting with a numeric type id is unmistakably a scan.
     id: 'dscan',
     detect: (text) => (classifyPilotPaste(text)?.kind === 'dscan' ? 'match' : 'pass'),
+  },
+  {
+    // Ahead of the item list, which a blueprint list also reads as: most
+    // lines being blueprints makes it a Build Group, never an appraisal.
+    id: 'blueprintList',
+    detect: (text, { blueprintNames }) =>
+      blueprintNames && looksLikeBlueprintList(text, blueprintNames) ? 'match' : 'pass',
   },
   {
     // Ahead of the item list, and all-or-nothing: skill books are market items,

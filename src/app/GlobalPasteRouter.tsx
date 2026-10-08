@@ -11,6 +11,7 @@ import {
   isTypingTarget,
   OVERLAY_SELECTOR,
   type FittingLoadState,
+  type IndustryBlueprintListState,
   type MarketAppraiseState,
   type PilotListState,
   type SkillPlanImportState,
@@ -58,6 +59,10 @@ const DESTINATIONS: Record<
     SKILL_PLANS_PATH,
     { state: { skillPlanImportText: text } satisfies SkillPlanImportState },
   ],
+  blueprintList: (text) => [
+    '/industry',
+    { state: { blueprintListText: text } satisfies IndustryBlueprintListState },
+  ],
   pilotList: pilotLookup,
   dscan: pilotLookup,
 };
@@ -72,19 +77,24 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
     { loadAppraisalCatalogue },
     { loadHullNames },
     { loadSkillNameMap },
+    { loadBlueprintNames },
   ] = await Promise.all([
     import('@/engine/import/pasteDestination'),
     import('@/features/market/appraisalData'),
     import('@/features/fittings/hullNames'),
     import('@/features/skills/typeCatalog'),
+    import('@/features/industry/blueprintNames'),
   ]);
-  const [catalogue, hullNames, skillByName] = await Promise.all([
+  const [catalogue, hullNames, skillByName, blueprintNames] = await Promise.all([
     loadAppraisalCatalogue(),
     loadHullNames(),
     // A skill catalogue that won't load costs only the skill-plan route.
     loadSkillNameMap().catch(() => new Map<string, { typeID: number }>()),
+    // Without the blueprint data a blueprint list is just not recognised; the
+    // fit and item-list pastes must not depend on it.
+    loadBlueprintNames().catch(() => undefined),
   ]);
-  return pasteDestination(text, { catalogue, hullNames, skillByName });
+  return pasteDestination(text, { catalogue, hullNames, skillByName, blueprintNames });
 }
 
 /**

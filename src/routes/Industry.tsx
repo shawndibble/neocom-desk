@@ -3,7 +3,15 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, DataAgeBadge, EmptyState, Modal, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  Modal,
+  Spinner,
+  Toast,
+  useTimedToast,
+} from '@/components/ui';
 import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
@@ -57,7 +65,13 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
-import type { IndustryFitImportState } from '@/lib/shortcuts';
+import { applyBlueprintPaste, previewBlueprintPaste } from '@/features/industry/blueprintPaste';
+import { loadBlueprintNames } from '@/features/industry/blueprintNames';
+import type {
+  BlueprintPasteNoticeState,
+  IndustryBlueprintListState,
+  IndustryFitImportState,
+} from '@/lib/shortcuts';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
@@ -154,6 +168,74 @@ export function Industry() {
     setFitImportSeedText(text);
     setFitImportOpen(true);
   }, [location.key, location.state]);
+  // A pasted blueprint list (the app-wide paste router) becomes a Build Group
+  // once the data it needs is in, then the pilot lands on that group. The
+  // navigation's own state is cleared first so Back never replays the paste.
+  const [blueprintPasteNote, setBlueprintPasteNote] = useState<string | null>(null);
+  useTimedToast(blueprintPasteNote, () => setBlueprintPasteNote(null));
+  const handledBlueprintPasteKey = useRef<string | null>(null);
+  useEffect(() => {
+    const text = (location.state as Partial<IndustryBlueprintListState> | null)?.blueprintListText;
+    if (!text || handledBlueprintPasteKey.current === location.key) return;
+    if (activeCharacterId === null || !plans || !catalog || !buildGroupsHydrated) return;
+    handledBlueprintPasteKey.current = location.key;
+    void (async () => {
+      try {
+        const preview = previewBlueprintPaste(text, catalog, await loadBlueprintNames());
+        void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+        const result = await applyBlueprintPaste(preview, {
+          characterId: activeCharacterId,
+          plans,
+          ownedBlueprints,
+          defaultsFrom: mostRecentlyUpdatedPlan(plans),
+          // Off disk for the same reason as `createPlan`.
+          facilityDefaults: await loadActivityFacilityDefaults(),
+          assumedMe,
+          assumedTe,
+          buildGroups,
+          setBuildGroups,
+          groupName: t('industry.blueprintPasteGroupName'),
+        });
+        if (!result) {
+          setBlueprintPasteNote(
+            [
+              t('industry.blueprintPasteNone'),
+              t('industry.blueprintPasteSkipped', { count: preview.skipped }),
+            ].join(' ')
+          );
+          return;
+        }
+        await setExpandedGroups(
+          withGroupExpanded(expandedGroups, activeCharacterId, result.groupId, true)
+        );
+        void navigate(`/industry/groups/${result.groupId}`, {
+          state: {
+            blueprintPasteNotice: { skipped: preview.skipped, reused: result.reused },
+          } satisfies BlueprintPasteNoticeState,
+        });
+      } catch {
+        setBlueprintPasteNote(t('industry.blueprintPasteFailed'));
+      }
+    })();
+  }, [
+    location.key,
+    location.state,
+    location.pathname,
+    location.search,
+    activeCharacterId,
+    plans,
+    catalog,
+    buildGroupsHydrated,
+    ownedBlueprints,
+    assumedMe,
+    assumedTe,
+    buildGroups,
+    setBuildGroups,
+    expandedGroups,
+    setExpandedGroups,
+    navigate,
+    t,
+  ]);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
@@ -752,6 +834,8 @@ export function Industry() {
             </Button>
           </div>
         </Modal>
+
+        {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
 
         {fitImportOpen && catalog && (
           <FitImportDialog

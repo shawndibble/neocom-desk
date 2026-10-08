@@ -32,6 +32,10 @@ vi.mock('@/features/skills/typeCatalog', () => ({
   loadSkillNameMap: () => Promise.resolve(new Map([['gunnery', { typeID: 3300 }]])),
 }));
 
+vi.mock('@/features/industry/blueprintNames', () => ({
+  loadBlueprintNames: () => Promise.resolve(new Set(['rifter blueprint', 'merlin blueprint'])),
+}));
+
 const FIT = '[Rifter, Kite]\n\nDamage Control II';
 
 function Where() {
@@ -83,6 +87,16 @@ describe('GlobalPasteRouter', () => {
     await paste(document.body, 'Gunnery V');
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/skills/plans'));
     expect(screen.getByTestId('where')).toHaveTextContent('"skillPlanImportText"');
+  });
+
+  it('turns a pasted blueprint list into a Build Group on Industry', async () => {
+    renderRouter();
+    await paste(
+      document.body,
+      ['Rifter Blueprint', 'Merlin Blueprint'].join(String.fromCharCode(10))
+    );
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/industry'));
+    expect(screen.getByTestId('where')).toHaveTextContent('"blueprintListText"');
   });
 
   it('opens a pasted type link as that item over the current page', async () => {
