@@ -4234,6 +4234,26 @@
       "moreLabel": "More actions for this entry",
       "unassignAction": "Unassign…",
       "valueLine": "Est. value {{value}} ISK on the day mined",
+      "breakdown": {
+        "title": "How this was priced",
+        "summary": "{{hub}} buy · {{form}} ore · {{tax}}% tax",
+        "compressed": "Compressed",
+        "raw": "Raw",
+        "edited": "Edited by hand",
+        "copy": "Copy as text",
+        "copied": "Copied",
+        "drift": "Unit prices are re-read for the day mined and can differ from the figures this bill was frozen at ({{value}} ISK).",
+        "source": {
+          "saved": "Saved snapshot",
+          "historical": "Historical buy",
+          "live": "Live buy price",
+          "live-sell": "Live sell price (no buy orders)",
+          "none": "No price"
+        },
+        "headerText": "Mining tax estimate, {{date}} in {{system}} — {{hub}} buy prices, {{form}} ore, {{tax}}% tax",
+        "lineText": "{{name}}: {{quantity}} × {{unit}} = {{value}} ISK ({{source}})",
+        "totalText": "Estimated value {{value}} ISK, tax owed {{tax}} ISK"
+      },
       "editAction": "Edit…",
       "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed."
     },
