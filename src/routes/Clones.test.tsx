@@ -67,7 +67,22 @@ const server = setupServer(
   http.get(`${ESI}/characters/${CHAR_ID}/location`, () =>
     HttpResponse.json({ solar_system_id: 30000142 })
   ),
-  http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.json([19540])),
+  http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.json([19541])),
+  http.get(`${ESI}/universe/systems/30000142`, () =>
+    HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9459 })
+  ),
+  // Only the worn implant has a price; the jump clone's implant has none.
+  http.get('https://market.fuzzwork.co.uk/aggregates/', ({ request }) => {
+    const types = new URL(request.url).searchParams.get('types')?.split(',') ?? [];
+    const body: Record<string, unknown> = {};
+    for (const id of types) {
+      body[id] =
+        id === '19541'
+          ? { sell: { min: '2500000', volume: '1', orderCount: '1' } }
+          : { sell: { orderCount: '0' } };
+    }
+    return HttpResponse.json(body);
+  }),
   http.get(`${ESI}/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
   http.get(`${ESI}/universe/stations/60003760`, () =>
     HttpResponse.json({
@@ -119,9 +134,19 @@ const server = setupServer(
       published: true,
     })
   ),
+  http.get(`${ESI}/universe/types/19541`, () =>
+    HttpResponse.json({
+      type_id: 19541,
+      name: 'Worn Implant',
+      description: '',
+      group_id: 300,
+      published: true,
+    })
+  ),
   http.post(`${ESI}/universe/names`, () =>
     HttpResponse.json([
       { id: 19540, name: 'High-grade Ascendancy Alpha', category: 'inventory_type' },
+      { id: 19541, name: 'Worn Implant', category: 'inventory_type' },
     ])
   )
 );
@@ -224,6 +249,7 @@ describe('Clones', () => {
     render(<App />);
 
     expect(await screen.findByText('Type #19540')).toBeInTheDocument();
+    expect(screen.getByText('Type #19541')).toBeInTheDocument();
     expect(screen.queryByText('High-grade Ascendancy Alpha')).not.toBeInTheDocument();
     expect(typeRequests).toBe(1);
   });
@@ -251,18 +277,16 @@ describe('Clones', () => {
     );
     render(<App />);
     const alpha = await screen.findByText('Alpha');
-    expect(alpha.closest('td')).toHaveTextContent(
-      'Alpha · Jita IV - Moon 4 - Caldari Navy Assembly Plant'
-    );
+    expect(alpha.closest('li')).toHaveTextContent(/^Alpha\s*Jita IV - Moon 4 - Caldari Navy/);
     expect(screen.getByText('Beta')).toBeInTheDocument();
-    const cells = screen
+    const rows = screen
       .getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
-      .map((el) => el.closest('td'))
-      .filter((td) => td !== null);
-    const unnamed = cells.filter((td) => !/Alpha|Beta/.test(td.textContent ?? ''));
+      .map((el) => el.closest('li'))
+      .filter((li) => li !== null);
+    const unnamed = rows.filter((li) => !/Alpha|Beta/.test(li.textContent ?? ''));
     expect(unnamed).toHaveLength(2);
-    for (const td of unnamed) {
-      expect(td).toHaveTextContent(/^Unnamed · Jita IV - Moon 4 - Caldari Navy Assembly Plant/);
+    for (const li of unnamed) {
+      expect(li).toHaveTextContent(/^Unnamed\s*Jita IV - Moon 4 - Caldari Navy/);
     }
   });
 
@@ -361,7 +385,7 @@ describe('Clones', () => {
     render(<App />);
     await screen.findByText('High-grade Ascendancy Alpha');
     await waitFor(async () => {
-      expect((await db.esiCache.get([CHAR_ID, 'implants']))?.value).toEqual([19540]);
+      expect((await db.esiCache.get([CHAR_ID, 'implants']))?.value).toEqual([19541]);
       expect(await db.esiCache.get([CHAR_ID, 'skillqueue'])).toBeDefined();
     });
   });
@@ -370,10 +394,37 @@ describe('Clones', () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: 'implants', value: [19540], fetchedAt: 1 });
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.error()));
     render(<App />);
-    await screen.findByText('High-grade Ascendancy Alpha');
+    expect(await screen.findAllByText('High-grade Ascendancy Alpha')).toHaveLength(2);
     expect(
       screen.queryByText('Log in again to see the implants you are wearing')
     ).not.toBeInTheDocument();
+  });
+
+  it('states the jump cooldown once, as shared by every clone', async () => {
+    render(<App />);
+    expect(await screen.findByText(/Until/)).toBeInTheDocument();
+    expect(screen.getAllByText(/shared by every clone/)).toHaveLength(1);
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+    expect(screen.getAllByText('Jump Cooldown')).toHaveLength(1);
+    expect(screen.getByText(/Infomorph Synchronizing: -3 h/)).toBeInTheDocument();
+  });
+
+  it('lists the clone being worn first, its implants linking to Show info, with count and value', async () => {
+    render(<App />);
+    const worn = await screen.findByRole('link', { name: 'Worn Implant' });
+    expect(worn).toHaveAttribute('href', '/clones?info=type-19541');
+    const row = worn.closest('li')?.parentElement?.closest('li') ?? null;
+    expect(row).toHaveTextContent('Wearing now');
+    expect(row).toHaveTextContent('Jita');
+    expect(row).toHaveTextContent('1 implant');
+    expect(await screen.findAllByText(/at risk if podded/)).toHaveLength(1);
+    await waitFor(() => expect(row).toHaveTextContent(/2\.5M/));
+    // The jump clone's implant has no price: said, not counted as free.
+    const clone = screen
+      .getByRole('link', { name: 'High-grade Ascendancy Alpha' })
+      .closest('li')
+      ?.parentElement?.closest('li');
+    await waitFor(() => expect(clone).toHaveTextContent('1 unpriced'));
   });
 
   it('prompts a re-login for a missing read-implants grant without hiding the clones table', async () => {

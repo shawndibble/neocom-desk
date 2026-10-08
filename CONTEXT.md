@@ -1057,6 +1057,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   is what makes shorthand's one-fraction-digit rounding (`1,250,000,000` and
   `1,254,000,000` both render `1.25B`-ish) safe to accept. See
   `docs/context/decisions/` for the rule the rollout follows.
+- **Shared jump cooldown**: The single clone-jump cooldown a Character has, common to every Jump Clone (not per clone); the Clones page states it once.
+- **Worn clone**: The clone a Character is in right now, whose implants are the Character's fitted implants; listed on the Clones page as "Wearing now" and distinct from its Jump Clones.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends — `last_clone_jump_date` plus `24 - ` the Effective Skill Level of Infomorph Synchronizing hours (level 0 when skills can't be read, so late, never early). A Scheduled Push event. A Character who has never jumped never fires (issue #2316).
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (`engine/courierDeadline.ts`, never `date_expired`) falls within a Character's configured lead time (`courierDeliveryDueLeadHours`, default 6h) — a Scheduled Push warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only contracts the Character themselves accepted; a deadline already past fires nothing (issue #1713).
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
