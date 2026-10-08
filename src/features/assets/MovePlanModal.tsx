@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
   Button,
+  Caret,
   Checkbox,
   Disclosure,
   Modal,
@@ -13,7 +14,12 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull, type MovePlan } from '@/engine/assets/movePlan';
@@ -48,6 +54,8 @@ import {
 const SHIP_CATEGORY_ID = 6;
 const HAULER_CLASS = 'Haulers and Industrial Ships';
 const HULL_CONCURRENCY = 4;
+/** More stacks than this and the picker opens with every pickup group folded. */
+const COLLAPSE_ABOVE = 12;
 
 interface Loaded {
   sources: MovePlanSource[];
@@ -139,6 +147,8 @@ export function MovePlanModal({
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
+  /** Collapsed pickup groups, `characterId:locationId`. */
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [planFailed, setPlanFailed] = useState(false);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
@@ -157,13 +167,19 @@ export function MovePlanModal({
     setDestSystem(null);
     setDestStation(null);
     setCompareOpen(false);
+    setCollapsed(new Set());
     setPlanFailed(false);
     setWorking(false);
     session.current += 1;
     /* eslint-enable react-hooks/set-state-in-effect */
     load(characterIds).then(
       (data) => {
-        if (live) setLoaded(data);
+        if (!live) return;
+        // A long list opens folded: the group headers are the overview.
+        if (data.stacks.length > COLLAPSE_ABOVE) {
+          setCollapsed(new Set(data.stacks.map((st) => `${st.characterId}:${st.locationId}`)));
+        }
+        setLoaded(data);
       },
       () => {
         if (live) setFailed(true);
@@ -285,7 +301,7 @@ export function MovePlanModal({
 
   return (
     <Modal open={open} onClose={onClose} title={t('assets.movePlan.title')} placement="sheet-full">
-      <div className="flex flex-col gap-3 text-sm">
+      <div className="flex min-h-full flex-col gap-3 text-sm">
         {open && <HullSource characterId={activeCharacterId} intoRef={hullSource} />}
         {filterControl}
         {failed ? (
@@ -313,52 +329,6 @@ export function MovePlanModal({
           />
         ) : (
           <>
-            <section aria-label={t('assets.movePlan.whatToMove')} className="flex flex-col gap-2">
-              <h3 className="font-medium">{t('assets.movePlan.whatToMove')}</h3>
-              {loaded.stacks.length === 0 && (
-                <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
-              )}
-              {[...grouped].map(([characterId, byPlace]) => (
-                <div key={characterId} className="flex flex-col gap-1">
-                  <h4 className="font-medium">
-                    {loaded.sources.find((s) => s.characterId === characterId)?.name}
-                  </h4>
-                  {[...byPlace].map(([locationId, stacks]) => {
-                    const keys = stacks.map((s) => s.key);
-                    const all = keys.every((k) => selected.has(k));
-                    return (
-                      <div key={locationId} className="flex flex-col">
-                        <label
-                          className={`${tappableRowClassName} flex items-center gap-2 text-text-dim`}
-                        >
-                          <Checkbox
-                            checked={all}
-                            onChange={(e) => toggle(keys, e.target.checked)}
-                            aria-label={t('assets.movePlan.selectAllAt', {
-                              place: placeLabel(locationId),
-                            })}
-                          />
-                          {placeLabel(locationId)}
-                        </label>
-                        {stacks.map((s) => (
-                          <label
-                            key={s.key}
-                            className={`${tappableRowClassName} flex items-center gap-2 pl-6`}
-                          >
-                            <Checkbox
-                              checked={selected.has(s.key)}
-                              onChange={(e) => toggle([s.key], e.target.checked)}
-                            />
-                            <span className="min-w-0 flex-1 truncate">{name(s.typeId)}</span>
-                            <span className="text-text-dim">× {s.quantity.toLocaleString()}</span>
-                          </label>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </section>
             <section aria-label={t('assets.movePlan.whereTo')} className="flex flex-col gap-2">
               <h3 className="font-medium">{t('assets.movePlan.whereTo')}</h3>
               <SolarSystemPicker
@@ -391,8 +361,106 @@ export function MovePlanModal({
                 </Select>
               )}
             </section>
+            <section aria-label={t('assets.movePlan.whatToMove')} className="flex flex-col gap-2">
+              <h3 className="font-medium">{t('assets.movePlan.whatToMove')}</h3>
+              {loaded.stacks.length === 0 && (
+                <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
+              )}
+              {/* Bounded: the destination above and the action bar below stay on
+                  screen however many stacks there are. */}
+              <div className="max-h-[min(24rem,45dvh)] overflow-y-auto overscroll-contain rounded-xs border border-line">
+                {[...grouped].map(([characterId, byPlace]) => {
+                  const characterName = loaded.sources.find(
+                    (s) => s.characterId === characterId
+                  )?.name;
+                  const characterKeys = [...byPlace.values()].flatMap((stacks) =>
+                    stacks.map((s) => s.key)
+                  );
+                  return (
+                    <div key={characterId} className="flex flex-col">
+                      <div
+                        className={`${tappableRowClassName} sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-panel-2 px-2 font-medium`}
+                      >
+                        <GroupCheckbox
+                          keys={characterKeys}
+                          selected={selected}
+                          onToggle={toggle}
+                          label={t('assets.movePlan.selectAllFor', { character: characterName })}
+                        />
+                        {characterName}
+                      </div>
+                      {[...byPlace].map(([locationId, stacks]) => {
+                        const keys = stacks.map((s) => s.key);
+                        const groupKey = `${characterId}:${locationId}`;
+                        const isOpen = !collapsed.has(groupKey);
+                        const picked = keys.filter((k) => selected.has(k)).length;
+                        return (
+                          <div key={locationId} className="flex flex-col border-b border-line">
+                            <div className="flex items-center gap-1 px-2 text-text-dim">
+                              <GroupCheckbox
+                                keys={keys}
+                                selected={selected}
+                                onToggle={toggle}
+                                label={t('assets.movePlan.selectAllAt', {
+                                  place: placeLabel(locationId),
+                                })}
+                              />
+                              <button
+                                type="button"
+                                aria-expanded={isOpen}
+                                onClick={() =>
+                                  setCollapsed((prev) => {
+                                    const next = new Set(prev);
+                                    if (isOpen) next.add(groupKey);
+                                    else next.delete(groupKey);
+                                    return next;
+                                  })
+                                }
+                                className={`${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} flex min-w-0 flex-1 items-center gap-1.5 text-left`}
+                              >
+                                <Caret expanded={isOpen} />
+                                <span className="min-w-0 flex-1 truncate">
+                                  {placeLabel(locationId)}
+                                </span>
+                                <span className="shrink-0 text-xs tabular-nums">
+                                  {t('assets.movePlan.groupCount', {
+                                    picked,
+                                    count: keys.length,
+                                  })}
+                                </span>
+                              </button>
+                            </div>
+                            {isOpen &&
+                              stacks.map((s) => (
+                                <label
+                                  key={s.key}
+                                  className={`${tappableRowClassName} flex items-center gap-2 pr-2 pl-8`}
+                                >
+                                  <Checkbox
+                                    checked={selected.has(s.key)}
+                                    onChange={(e) => toggle([s.key], e.target.checked)}
+                                  />
+                                  <span className="min-w-0 flex-1 truncate">{name(s.typeId)}</span>
+                                  <span className="text-text-dim tabular-nums">
+                                    × {s.quantity.toLocaleString()}
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
             {planFailed && <p className="text-text-dim">{t('assets.movePlan.planFailed')}</p>}
-            <div className="flex justify-end gap-2">
+            {/* Sticky rather than a Modal footer prop: the sheet's body is the
+                scroller (same bar FilterBar's sheet uses). */}
+            <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex items-center gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+              <span className="min-w-0 flex-1 text-xs text-text-dim" aria-live="polite">
+                {t('assets.movePlan.picked', { count: selected.size })}
+              </span>
               <Button variant="ghost" onClick={onClose}>
                 {t('assets.movePlan.cancel')}
               </Button>
@@ -409,6 +477,34 @@ export function MovePlanModal({
         )}
       </div>
     </Modal>
+  );
+}
+
+/** Select-all box for a group: ticked when every key is, mixed when some are. */
+function GroupCheckbox({
+  keys,
+  selected,
+  onToggle,
+  label,
+}: {
+  keys: readonly string[];
+  selected: ReadonlySet<string>;
+  onToggle: (keys: readonly string[], on: boolean) => void;
+  label: string;
+}) {
+  const count = keys.filter((k) => selected.has(k)).length;
+  const all = keys.length > 0 && count === keys.length;
+  return (
+    <label className={`${tappableRowClassName} flex items-center`}>
+      <Checkbox
+        ref={(el) => {
+          if (el) el.indeterminate = count > 0 && !all;
+        }}
+        checked={all}
+        onChange={(e) => onToggle(keys, e.target.checked)}
+        aria-label={label}
+      />
+    </label>
   );
 }
 
