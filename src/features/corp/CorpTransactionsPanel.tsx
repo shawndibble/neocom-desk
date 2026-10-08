@@ -59,6 +59,7 @@ import type { CorporationWalletTransaction } from '@/esi/endpoints';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import {
   CORP_TRANSACTIONS_COLUMN_IDS,
+  CORP_TRANSACTIONS_PHONE_OFF_BY_DEFAULT,
   useVisibleCorpTransactionsColumns,
   type CorpTransactionsColumnId,
 } from './corpTransactionsColumns';
@@ -193,7 +194,6 @@ export function CorpTransactionsPanel({
       {
         id: 'side',
         header: t('wallet.side'),
-        phoneHidden: true,
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
@@ -208,7 +208,6 @@ export function CorpTransactionsPanel({
       {
         id: 'unitPrice',
         header: t('wallet.unitPrice'),
-        phoneHidden: true,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatIsk(txn.unit_price, 2),
@@ -229,7 +228,8 @@ export function CorpTransactionsPanel({
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleCorpTransactionsColumns,
-    CORP_TRANSACTIONS_COLUMN_IDS
+    CORP_TRANSACTIONS_COLUMN_IDS,
+    CORP_TRANSACTIONS_PHONE_OFF_BY_DEFAULT
   );
   const columnsById = useMemo(
     () =>

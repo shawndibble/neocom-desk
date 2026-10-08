@@ -200,7 +200,7 @@ describe('OrderHistoryPanel — phone', () => {
     });
   }
 
-  it('stays a plain table, shedding side and state below sm (issued is the default sort: it stays)', async () => {
+  it('stays a plain table, with side and state unticked by default (issued is the default sort: it stays)', async () => {
     load([historyOrder({ volume_remain: 1, volume_total: 3 })]);
     renderPanel();
 
@@ -208,10 +208,10 @@ describe('OrderHistoryPanel — phone', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(within(row).getByText('1 / 3')).toBeInTheDocument();
     const cell = (label: string) => row.querySelector(`td[data-label="${label}"]`);
-    expect(cell('Side')).toHaveClass('max-sm:hidden');
-    expect(cell('Issued')).not.toHaveClass('max-sm:hidden');
-    expect(cell('State')).toHaveClass('max-sm:hidden');
-    expect(cell('Price')).not.toHaveClass('max-sm:hidden');
+    expect(cell('Side')).toBeNull();
+    expect(cell('State')).toBeNull();
+    expect(cell('Issued')).not.toBeNull();
+    expect(cell('Price')).not.toBeNull();
   });
 
   it('sorts by price from the column header', async () => {

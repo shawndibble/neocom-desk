@@ -43,6 +43,7 @@ import {
 } from './orderHistoryFilter';
 import {
   ORDER_HISTORY_COLUMN_IDS,
+  ORDER_HISTORY_PHONE_OFF_BY_DEFAULT,
   useVisibleOrderHistoryColumns,
   type OrderHistoryColumnId,
 } from './orderHistoryColumns';
@@ -205,7 +206,6 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'side',
         header: t('orders.side'),
-        phoneHidden: true,
         sortValue: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
         render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
       },
@@ -238,7 +238,6 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'state',
         header: t('orders.state'),
-        phoneHidden: true,
         className: 'text-text-dim',
         sortValue: (order) => order.state,
         render: (order) => order.state,
@@ -257,7 +256,11 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
     isVisible: isColumnVisible,
     toggle: toggleColumn,
     reset: resetColumns,
-  } = useColumnVisibility(useVisibleOrderHistoryColumns, ORDER_HISTORY_COLUMN_IDS);
+  } = useColumnVisibility(
+    useVisibleOrderHistoryColumns,
+    ORDER_HISTORY_COLUMN_IDS,
+    ORDER_HISTORY_PHONE_OFF_BY_DEFAULT
+  );
   // `item` is not in `ORDER_HISTORY_COLUMN_IDS` — the row's identity, never optional.
   const tableColumns = useMemo(
     () =>
