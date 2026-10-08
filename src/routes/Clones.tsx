@@ -271,6 +271,7 @@ function CloneCard({
   implantDescriptions,
   prices,
   training,
+  current = false,
 }: {
   heading: ReactNode;
   place: string;
@@ -283,12 +284,18 @@ function CloneCard({
   prices: PriceMap | undefined;
   /** Queue time in this clone; absent when there is no verdict. */
   training?: { row: CloneRow | undefined; best: boolean };
+  /** The clone the Character is wearing now: set apart from the jump clones. */
+  current?: boolean;
 }) {
   const { t } = useTranslation();
   const value = prices ? sumImplantValue(implantIds, prices) : null;
   const delta = training?.row?.deltaSeconds ?? null;
   return (
-    <li className="space-y-1 border-b border-line px-3 py-2 text-sm last:border-b-0">
+    <li
+      className={`space-y-1.5 rounded-xs border p-3 text-sm ${
+        current ? 'border-accent/60 bg-accent/5 md:col-span-2' : 'border-line bg-panel-2'
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="[overflow-wrap:anywhere]">{heading}</span>
         <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
@@ -482,6 +489,8 @@ export function Clones() {
   };
   const homeSecurity = securityOf(homeLocation?.location_id);
   const hasWorn = data?.wornImplants != null;
+  // The summary cards need loaded clones data; every other state lives in the list panel.
+  const showSummary = !(loading && !data) && !clonesNeedsReauth && !error && clonesResult !== null;
 
   // Which clone is best for the active queue (the engine does the numbers).
   const sort = useClonesSort((state) => state.value);
@@ -606,12 +615,116 @@ export function Clones() {
       />
       <OverviewSubNav />
 
+      {showSummary && (
+        <>
+          <div className="grid gap-4 text-sm md:grid-cols-3">
+            <Panel className="h-full">
+              <section aria-label={t('clones.cooldown')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.cooldownShared')}
+                </h3>
+                <StatChip
+                  label={t('clones.cooldown')}
+                  tone={cooldownTone}
+                  value={
+                    cooldown.onCooldown && cooldown.readyAt
+                      ? t('clones.cooldownOnCooldownValue', {
+                          date: formatTimestamp(cooldown.readyAt, timeZone),
+                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
+                        })
+                      : t('clones.cooldownReadyValue')
+                  }
+                />
+                <div
+                  role="progressbar"
+                  aria-label={t('clones.cooldown')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(cooldownFraction * 100)}
+                  className="h-1.5 overflow-hidden rounded-full bg-line"
+                >
+                  <div
+                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
+                    style={{ width: `${cooldownFraction * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-text-dim">
+                  {lastCloneJumpDate &&
+                    `${t('clones.lastJump', {
+                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
+                    })} · `}
+                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
+                </p>
+              </section>
+            </Panel>
+            <Panel className="h-full">
+              <section aria-label={t('clones.youAreIn')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.youAreIn')}
+                </h3>
+                <p>
+                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
+                  {characterSystemId !== null && securities.has(characterSystemId) && (
+                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
+                  )}
+                </p>
+                {hasWorn && (
+                  <p className="text-xs text-text-dim">
+                    {t('clones.implantCount', { count: wornIds.length })}
+                    {wornValue && wornValue.unpriced < wornIds.length && (
+                      <>
+                        {' · '}
+                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
+                        {wornValue.unpriced > 0 &&
+                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
+                      </>
+                    )}
+                  </p>
+                )}
+              </section>
+            </Panel>
+            {homeLocationName && (
+              <Panel className="h-full">
+                <section aria-label={t('clones.respawn')} className="space-y-1">
+                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('clones.respawn')}
+                  </h3>
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
+                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
+                    <JumpsAwayText
+                      result={homeJumps}
+                      t={t}
+                      locationId={homeLocation?.location_id}
+                      linkClassName={TOUCH_LINK}
+                    />
+                  </p>
+                  {lastStationChangeDate && (
+                    <p className="text-xs text-text-dim">
+                      {t('clones.lastStationChange', {
+                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
+                      })}
+                    </p>
+                  )}
+                </section>
+              </Panel>
+            )}
+          </div>
+          {verdictCard && (
+            <CloneVerdictCard
+              state={verdictCard}
+              names={training?.skillNames ?? NO_NAMES}
+              timeZone={timeZone}
+            />
+          )}
+        </>
+      )}
+
       {/*
-        Data age and Refresh ride on the panel's own toolbar rather than up
-        beside the character's name: they describe *this* tab's data, and above
-        the tabs is the block every tab shares. One panel wraps every branch so
-        that toolbar — the only way back from a failed or empty load — is there
-        in all of them, not just when there are rows to show.
+        The summary cards above the list carry no title or toolbar of their
+        own. Data age, Refresh and Export ride on the clone list's toolbar
+        below, and that one panel wraps every branch so the toolbar — the only
+        way back from a failed or empty load — is there in all of them.
       */}
       <Panel
         title={t('clones.title')}
@@ -650,98 +763,6 @@ export function Clones() {
           <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
         ) : (
           <>
-            {/* Home clone and cooldown were their own Panel; panels don't nest,
-                so this becomes this one's first row, hairline-separated from
-                whatever follows. It renders whenever clones data loaded at
-                all, not only when there are jump clones — a character with a
-                home clone and zero jump clones still has both to show. */}
-            <div className="grid gap-3 border-b border-line px-3 py-3 text-sm md:grid-cols-3">
-              <section aria-label={t('clones.cooldown')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.cooldownShared')}
-                </h3>
-                <StatChip
-                  label={t('clones.cooldown')}
-                  tone={cooldownTone}
-                  value={
-                    cooldown.onCooldown && cooldown.readyAt
-                      ? t('clones.cooldownOnCooldownValue', {
-                          date: formatTimestamp(cooldown.readyAt, timeZone),
-                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                        })
-                      : t('clones.cooldownReadyValue')
-                  }
-                />
-                <div
-                  role="progressbar"
-                  aria-label={t('clones.cooldown')}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(cooldownFraction * 100)}
-                  className="h-1.5 overflow-hidden rounded-full bg-line"
-                >
-                  <div
-                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
-                    style={{ width: `${cooldownFraction * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-text-dim">
-                  {lastCloneJumpDate &&
-                    `${t('clones.lastJump', {
-                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
-                    })} · `}
-                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
-                </p>
-              </section>
-              <section aria-label={t('clones.youAreIn')} className="space-y-1">
-                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('clones.youAreIn')}
-                </h3>
-                <p>
-                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
-                  {characterSystemId !== null && securities.has(characterSystemId) && (
-                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
-                  )}
-                </p>
-                {hasWorn && (
-                  <p className="text-xs text-text-dim">
-                    {t('clones.implantCount', { count: wornIds.length })}
-                    {wornValue && wornValue.unpriced < wornIds.length && (
-                      <>
-                        {' · '}
-                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
-                        {wornValue.unpriced > 0 &&
-                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
-                      </>
-                    )}
-                  </p>
-                )}
-              </section>
-              {homeLocationName && (
-                <section aria-label={t('clones.respawn')} className="space-y-1">
-                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('clones.respawn')}
-                  </h3>
-                  <p className="flex flex-wrap items-center gap-x-2">
-                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
-                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
-                    <JumpsAwayText
-                      result={homeJumps}
-                      t={t}
-                      locationId={homeLocation?.location_id}
-                      linkClassName={TOUCH_LINK}
-                    />
-                  </p>
-                  {lastStationChangeDate && (
-                    <p className="text-xs text-text-dim">
-                      {t('clones.lastStationChange', {
-                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
-                      })}
-                    </p>
-                  )}
-                </section>
-              )}
-            </div>
             {implantsNeedsReauth && (
               <div className="border-b border-line p-3">
                 <GrantBanner
@@ -758,13 +779,6 @@ export function Clones() {
                 {t('common.offlineTitle')}
               </p>
             )}
-            {verdictCard && (
-              <CloneVerdictCard
-                state={verdictCard}
-                names={training?.skillNames ?? NO_NAMES}
-                timeZone={timeZone}
-              />
-            )}
             {clones.length > 1 && (
               <div className="overflow-x-auto border-b border-line px-3 py-2">
                 <SegmentedControl<ClonesSort>
@@ -779,9 +793,10 @@ export function Clones() {
               </div>
             )}
             {(clones.length > 0 || hasWorn) && (
-              <ul aria-label={t('clones.title')}>
+              <ul aria-label={t('clones.title')} className="grid gap-3 p-3 md:grid-cols-2">
                 {hasWorn && (
                   <CloneCard
+                    current
                     heading={<span className="font-semibold">{t('clones.wearingNow')}</span>}
                     place={characterSystemName ?? t('clones.unknownPlace')}
                     security={

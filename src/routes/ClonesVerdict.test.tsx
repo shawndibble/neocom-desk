@@ -246,6 +246,12 @@ describe('Clones training verdict', () => {
     ).toBeInTheDocument();
     expect(within(card).getByRole('img', { name: /^Stay in this clone/ })).toBeInTheDocument();
     expect(within(card).getByRole('img', { name: /^Best alternative/ })).toBeInTheDocument();
+    // The queue is one link, not a skill-by-skill legend.
+    expect(within(card).getByRole('link', { name: 'View queue' })).toHaveAttribute(
+      'href',
+      '/overview'
+    );
+    expect(within(card).queryByText(/^Queue: /)).not.toBeInTheDocument();
     // The winning clone carries the badge, with its time and delta.
     expect(await screen.findAllByText('Best for training')).toHaveLength(2); // sort tab + badge
     expect(screen.getAllByText(/sooner/).length).toBeGreaterThan(1);

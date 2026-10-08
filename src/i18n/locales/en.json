@@ -4801,7 +4801,7 @@
       "stayAlone": "You have no other clone to compare.",
       "barStay": "Stay in this clone",
       "barBest": "Best alternative",
-      "legend": "Queue: {{skills}}",
+      "viewQueue": "View queue",
       "segment": "{{skill}}: {{duration}}",
       "barLabel": "{{label}}: {{duration}}",
       "unknownSkill": "Skill #{{id}}",
