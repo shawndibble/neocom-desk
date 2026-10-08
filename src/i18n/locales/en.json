@@ -8887,7 +8887,7 @@
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",
-      "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded.",
+      "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once.",
       "searchLabel": "Pilot",
       "searchPlaceholder": "Pilot name",
       "suggestionsLabel": "Matching pilots",
