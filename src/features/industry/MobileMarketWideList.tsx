@@ -20,7 +20,7 @@ import { iskToneClass } from '@/features/character/format';
 import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatPercent } from './format';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
 import { ORDER_DEPTH_TONE } from './opportunityMetrics';
 import { SkillGateMarker } from './SkillGateMarker';
@@ -29,7 +29,9 @@ import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 
 interface MobileMarketWideListProps {
   /** The page being shown: filtered, sorted and cut. */
-  rows: readonly MarketWideResultRow[];
+  rows: readonly MarketWideDayRow[];
+  /** The daily-sales share (percent) ISK/day assumes; named in its tooltip. */
+  salesShare: string;
   /** Every row the filters let through, of which `rows` is the top. */
   total: number;
   sort: DataTableSort;
@@ -43,9 +45,17 @@ interface MobileMarketWideListProps {
 
 /** The desktop table's sortable column ids, so the two share one URL sort. */
 type SortFieldId =
-  'iskPerHour' | 'margin' | 'duration' | 'buildCost' | 'product' | 'blueprintSource' | 'orderDepth';
+  | 'iskPerHour'
+  | 'iskPerDay'
+  | 'margin'
+  | 'duration'
+  | 'buildCost'
+  | 'product'
+  | 'blueprintSource'
+  | 'orderDepth';
 const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'iskPerHour',
+  'iskPerDay',
   'margin',
   'duration',
   'buildCost',
@@ -55,15 +65,21 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
 ];
 
 /** The fields with a figure to show; a sort by any other leads with ISK/hour. */
-type FigureId = 'iskPerHour' | 'margin' | 'duration' | 'buildCost';
-const FIGURE_ORDER: readonly FigureId[] = ['iskPerHour', 'margin', 'duration', 'buildCost'];
+type FigureId = 'iskPerHour' | 'iskPerDay' | 'margin' | 'duration' | 'buildCost';
+const FIGURE_ORDER: readonly FigureId[] = [
+  'iskPerHour',
+  'iskPerDay',
+  'margin',
+  'duration',
+  'buildCost',
+];
 
 interface Figure {
   node: ReactNode;
   toneClassName?: string;
 }
 
-function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Figure {
+function figureFor(id: FigureId, row: MarketWideDayRow, unknown: string): Figure {
   switch (id) {
     case 'iskPerHour':
       return row.iskPerHour === null
@@ -76,6 +92,18 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
               </>
             ),
             toneClassName: iskToneClass(row.iskPerHour),
+          };
+    case 'iskPerDay':
+      return row.iskPerDay === null
+        ? { node: unknown }
+        : {
+            node: (
+              <>
+                {row.iskPerDay > 0 ? '+' : ''}
+                <IskAmount value={row.iskPerDay} decimals={0} />
+              </>
+            ),
+            toneClassName: iskToneClass(row.iskPerDay),
           };
     case 'margin':
       return row.marginPct === null
@@ -93,6 +121,7 @@ function figureFor(id: FigureId, row: MarketWideResultRow, unknown: string): Fig
 
 export function MobileMarketWideList({
   rows,
+  salesShare,
   total,
   sort,
   onSortChange,
@@ -107,6 +136,7 @@ export function MobileMarketWideList({
 
   const fieldLabel: Record<SortFieldId, string> = {
     iskPerHour: t('industry.iskPerHour'),
+    iskPerDay: t('industry.iskPerDay'),
     margin: t('industry.margin'),
     duration: t('industry.time'),
     buildCost: t('industry.buildCost'),
@@ -208,6 +238,12 @@ export function MobileMarketWideList({
                     return (
                       <span key={id} className={figure.toneClassName}>
                         {fieldLabel[id]}: {figure.node}
+                        {id === 'iskPerDay' && (
+                          <InfoTooltip
+                            label={t('industry.iskPerDayTooltip', { share: salesShare })}
+                            content={t('industry.iskPerDayTooltip', { share: salesShare })}
+                          />
+                        )}
                       </span>
                     );
                   })}

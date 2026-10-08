@@ -88,23 +88,27 @@ export function OwedBalances({
 
   return (
     <section aria-label={t('miningTax.balancesLabel')} className="space-y-2">
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.balancesLabel')}
-        </span>
-        {owed.length > 0 ? (
-          <>
-            <span className="text-base font-semibold text-isk-neg tabular-nums">
-              {formatIsk(owedTotal)} ISK
-            </span>
-            <span className="text-xs text-text-dim">
-              {t('miningTax.owed.acrossPayees', { count: owed.length })}
-            </span>
-          </>
-        ) : (
-          <span className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</span>
-        )}
-      </p>
+      {/* One owed Payee: the single card already carries the name and the
+          same amount, so the summary would only repeat it (issue #3065). */}
+      {owed.length !== 1 && (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-[0.6875rem] font-semibold text-text-dim">
+            {t('miningTax.balancesLabel')}
+          </span>
+          {owed.length > 1 ? (
+            <>
+              <span className="text-base font-semibold text-isk-neg tabular-nums">
+                {formatIsk(owedTotal)} ISK
+              </span>
+              <span className="text-xs text-text-dim">
+                {t('miningTax.owed.acrossPayees', { count: owed.length })}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</span>
+          )}
+        </p>
+      )}
 
       {cardCount > 0 && (
         <div className={cx('grid grid-cols-1 gap-2', !wide && 'sm:grid-cols-2 xl:grid-cols-3')}>
