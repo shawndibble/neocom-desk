@@ -7,7 +7,7 @@ import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
 import { WHAT_WE_STORE_GROUPS } from './whatWeStore';
 
-const QUESTIONS = 8;
+const QUESTIONS = 9;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq() {
@@ -109,6 +109,7 @@ describe('FaqPanel — What We Store', () => {
       'piPicks',
       'miningTax',
       'fittings',
+      'netWorthSnapshots',
       'notificationFeed',
       'settings',
     ]);
@@ -151,6 +152,9 @@ describe('FaqPanel — What We Store', () => {
     for (const question of questions) expect(question).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: 'How do I delete my data?' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'How do I force an update?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'How do I install Neocom Desk as an app?' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'What notifications arrive when the app is closed?' })
     ).toBeInTheDocument();

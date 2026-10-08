@@ -98,6 +98,7 @@ import { planProgress } from '@/engine/planProgress';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
+import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
 import {
@@ -1993,6 +1994,18 @@ export function PlanEditor({
           totalSp={totalSp}
           unallocatedSp={unallocatedSp}
           cloneState={cloneState}
+        />
+      ),
+    },
+    {
+      id: 'skills-to-buy',
+      title: t('plans.skillsToBuy.title'),
+      content: (
+        <SkillsToBuyPanel
+          entries={plan.entries}
+          trainedSkills={trainedSkills}
+          trainedSkillsKnown={trainedSkillsKnown}
+          nameFor={nameFor}
         />
       ),
     },

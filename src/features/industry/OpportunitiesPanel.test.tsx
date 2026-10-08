@@ -263,6 +263,7 @@ describe('OpportunitiesPanel', () => {
 
     expect(await screen.findByText('Pricing settings changed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.getByText(/More than 10 blueprints/)).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 

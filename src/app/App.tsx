@@ -26,6 +26,7 @@ import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { StaleStoresReloader } from './StaleStoresReloader';
 import { ReloadPrompt } from './ReloadPrompt';
 import { InstallPrompt } from './InstallPrompt';
+import './installApp'; // registers the beforeinstallprompt listener at boot
 import { BootScreen } from './BootScreen';
 import { ROUTER_BASENAME } from './routerPath';
 import { Spinner } from '@/components/ui';

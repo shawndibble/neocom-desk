@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   SP_EXTRACTION_FLOOR_SP,
   extractableSp,
+  extractionNet,
+  extractionTotalIsk,
   extractorCount,
   isSpExtractionReady,
 } from './spExtraction';
@@ -55,5 +57,31 @@ describe('extractorCount', () => {
     expect(extractorCount(5_499_999)).toBe(0);
     expect(extractorCount(5_500_000)).toBe(1);
     expect(extractorCount(5_999_999)).toBe(1);
+  });
+});
+
+describe('extractionNet', () => {
+  it('is injector sell minus extractor cost', () => {
+    expect(extractionNet(900, 300)).toBe(600);
+  });
+
+  it('keeps a negative net as is', () => {
+    expect(extractionNet(300, 900)).toBe(-600);
+  });
+
+  it('is null when either price is missing, never 0', () => {
+    expect(extractionNet(null, 300)).toBeNull();
+    expect(extractionNet(900, null)).toBeNull();
+  });
+});
+
+describe('extractionTotalIsk', () => {
+  it('multiplies the net by the whole extractors the SP fills', () => {
+    expect(extractionTotalIsk(SP_EXTRACTION_FLOOR_SP + 1_200_000, 600)).toBe(1_200);
+  });
+
+  it('is 0 with no extractor ready, and null when unpriced', () => {
+    expect(extractionTotalIsk(SP_EXTRACTION_FLOOR_SP, 600)).toBe(0);
+    expect(extractionTotalIsk(SP_EXTRACTION_FLOOR_SP + 1_000_000, null)).toBeNull();
   });
 });

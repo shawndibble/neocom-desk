@@ -29,3 +29,27 @@ export function isSpExtractionReady(totalSp: number, thresholdSp: number): boole
 export function extractorCount(totalSp: number): number {
   return Math.floor(extractableSp(totalSp) / SP_EXTRACTION_CHUNK_SP);
 }
+
+/** Large Skill Injector (public/data/market/types.json). */
+export const LARGE_SKILL_INJECTOR_TYPE_ID = 40520;
+
+/** Skill Extractor (public/data/market/types.json). */
+export const SKILL_EXTRACTOR_TYPE_ID = 40519;
+
+/**
+ * ISK earned by one extraction: sell the injector, minus buying the
+ * extractor. Before sales tax and broker fees. Null — never 0 — when either
+ * side has no sell orders, so "unpriceable" can't read as "break-even".
+ */
+export function extractionNet(
+  injectorSell: number | null,
+  extractorSell: number | null
+): number | null {
+  if (injectorSell === null || extractorSell === null) return null;
+  return injectorSell - extractorSell;
+}
+
+/** Net ISK across every extractor the character's SP fills right now. */
+export function extractionTotalIsk(totalSp: number, net: number | null): number | null {
+  return net === null ? null : net * extractorCount(totalSp);
+}

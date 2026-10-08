@@ -31,7 +31,11 @@ const VELDSPAR = 1230;
 const ZEOLITES = 45490;
 /** Jita — a real solar system id, pre-seeded below so `loadSystemNameAndSecurity` never fetches it live. */
 const SOLAR_SYSTEM_ID = 30000142;
-const ENTRY_DATE = '2026-09-08';
+/** Relative to today (UTC): a fixed date ages out of the Overview's recent-days window. */
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
+const ENTRY_DATE = daysAgo(3);
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
 const GLOBAL_CACHE_CHARACTER_ID = 0;
 
@@ -57,7 +61,7 @@ const OVERVIEW_TABLE = 'Overview';
  */
 async function mockMarketHistory(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/markets/*/history*', async (route) => {
-    const body = ['2026-09-06', '2026-09-07', ENTRY_DATE].map((date) => ({
+    const body = [daysAgo(5), daysAgo(4), ENTRY_DATE].map((date) => ({
       date,
       average: 4200.5,
       highest: 4400,

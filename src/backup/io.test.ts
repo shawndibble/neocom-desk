@@ -183,19 +183,23 @@ describe('restoring an existing-format backup file', () => {
         };
       },
     };
+  /** Tables created after the frozen file was captured: it holds no rows for them. */
+  const POSTDATES_FIXTURE: ReadonlySet<string> = new Set(['netWorthSnapshots']); // #2865
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
-    Object.entries(FULL_RECORDS).map(([table, record]) => [
-      table,
-      (LEGACY_RESHAPES[table as keyof typeof FULL_RECORDS] ?? ((r: unknown) => r))({
-        ...record,
-        ...Object.fromEntries(
-          (LEGACY_OMISSIONS[table as keyof typeof FULL_RECORDS] ?? []).map((key) => [
-            key,
-            undefined,
-          ])
-        ),
-      }),
-    ])
+    Object.entries(FULL_RECORDS)
+      .filter(([table]) => !POSTDATES_FIXTURE.has(table))
+      .map(([table, record]) => [
+        table,
+        (LEGACY_RESHAPES[table as keyof typeof FULL_RECORDS] ?? ((r: unknown) => r))({
+          ...record,
+          ...Object.fromEntries(
+            (LEGACY_OMISSIONS[table as keyof typeof FULL_RECORDS] ?? []).map((key) => [
+              key,
+              undefined,
+            ])
+          ),
+        }),
+      ])
   );
 
   it.each(Object.entries(LEGACY_EXPECTED_RECORDS))(
@@ -208,7 +212,7 @@ describe('restoring an existing-format backup file', () => {
 
   it('restores a row into every Editable Data table the registry declares', async () => {
     await importBackup(FIXTURE, FIXTURE_PASSWORD);
-    for (const c of EDITABLE_COLLECTIONS) {
+    for (const c of EDITABLE_COLLECTIONS.filter((c) => !POSTDATES_FIXTURE.has(c.table))) {
       expect({ [c.table]: await db.table(c.table).count() }).toEqual({ [c.table]: 1 });
     }
   });
