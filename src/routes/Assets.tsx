@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { ReactNode } from 'react';
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -70,6 +71,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -650,6 +652,7 @@ function isUnresolvedParent(
 
 /** Character assets, browsed one level at a time. Read-only, cached for offline. */
 export function Assets() {
+  const isPhone = useIsPhone();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const viewedCharacterId = useViewedCharacterId();
@@ -1633,6 +1636,48 @@ export function Assets() {
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
 
+  // Phone station header (#2989): security · ISK · jumps on a second line, so the
+  // top line is the back button and the full-width station name. An absent item
+  // (unknown security, jumps still loading) drops out with its dot.
+  const phoneFacts = (() => {
+    if (!isPhone || pathStationId === null || !resolved.station) return null;
+    const { station } = resolved;
+    const resolvedStation = !isUnresolvedParent(station, mergedLocationNames);
+    const facts: { key: string; node: ReactNode }[] = [];
+    const security = resolvedStation ? securityForStation(station.locationId) : null;
+    if (security !== null && security !== undefined) {
+      facts.push({ key: 'security', node: <SecurityValue security={security} /> });
+    }
+    if (currentTotals) {
+      facts.push({
+        key: 'isk',
+        node: (
+          <span className="text-isk-pos">
+            <IskAmount value={currentTotals.estimatedValue} decimals={0} />
+          </span>
+        ),
+      });
+    }
+    const jumps = resolvedStation
+      ? jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
+      : undefined;
+    if (jumps) {
+      facts.push({
+        key: 'jumps',
+        node: (
+          <JumpsAwayText
+            result={jumps}
+            t={t}
+            locationId={station.locationId}
+            preference={routeOverride}
+            linkClassName="inline-flex min-h-11 items-center"
+          />
+        ),
+      });
+    }
+    return facts.length > 0 ? facts : null;
+  })();
+
   return (
     <ItemActionsProvider page={itemActions}>
       <div
@@ -1913,6 +1958,16 @@ export function Assets() {
                           </span>
                         )}
                       </h2>
+                      {phoneFacts && (
+                        <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
+                          {phoneFacts.map((fact, index) => (
+                            <span key={fact.key} className="flex items-center gap-1">
+                              {index > 0 && <span aria-hidden="true">·</span>}
+                              {fact.node}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {crumbs.length > 1 && (
                         <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
                           {crumbs.slice(0, -1).map((crumb, index) => (
@@ -1926,7 +1981,8 @@ export function Assets() {
                         </span>
                       )}
                     </div>
-                    {resolved.station &&
+                    {!phoneFacts &&
+                      resolved.station &&
                       !isUnresolvedParent(resolved.station, mergedLocationNames) && (
                         <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                           <SecurityValue
@@ -1942,7 +1998,7 @@ export function Assets() {
                           />
                         </span>
                       )}
-                    {currentTotals && (
+                    {currentTotals && !phoneFacts && (
                       <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
                         <span className="hidden sm:inline">
                           {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
