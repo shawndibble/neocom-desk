@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { AddRow, Warn } from '@/components/ui/icons';
@@ -426,6 +427,7 @@ function Readout({
           {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
         </p>
       )}
+      {overBudget && gauge !== 'droneBandwidth' && <MakeItFitTrigger />}
     </div>
   );
 }
