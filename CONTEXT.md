@@ -873,6 +873,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   or dropped when it was logged in error — without leaving Records. That menu
   item is Records' only delete: its rows navigate, so there is no edit modal
   here to hold a danger button like the per-plan panel's.
+- **Run Loss**: Units of a **Production Run** destroyed or lost before they sold (issue #2851), recorded as their own synced record — several per run — with an optional insurance payout (a wallet-journal payout or typed ISK). It writes the lost units off Unsold cost and Open inventory value and counts the insurance as untaxed proceeds; the run's cost is still charged in full by Realized profit. Reached from the Sold… menu's "Mark as lost…".
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived
