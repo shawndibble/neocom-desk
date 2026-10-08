@@ -409,7 +409,7 @@ describe('ProductionLogPanel', () => {
     await runsTable();
 
     await user.click(await screen.findByRole('button', { name: 'More sale options' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete production run' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete production run…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
