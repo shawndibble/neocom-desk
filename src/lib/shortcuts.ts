@@ -21,6 +21,17 @@ export interface FittingLoadState {
 }
 
 /**
+ * Router `location.state` shape the app-wide paste router
+ * (`app/GlobalPasteRouter.tsx`) navigates `/skills/plans` with: a pasted skill
+ * plan. The list page makes a new plan for it and hands the text on to that
+ * plan's editor, which opens its Import dialog on it. The same state shape
+ * reaches the editor, so the producer and both consumers share one type.
+ */
+export interface SkillPlanImportState {
+  readonly skillPlanImportText: string;
+}
+
+/**
  * Router `location.state` shape a Fitting's Export menu navigates `/industry`
  * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
  * on arrival ("Manufacture Plan"). Shared so the producer

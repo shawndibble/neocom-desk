@@ -8,8 +8,11 @@ import {
   OVERLAY_SELECTOR,
   type FittingLoadState,
   type MarketAppraiseState,
+  type SkillPlanImportState,
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
+
+const SKILL_PLANS_PATH = '/skills/plans';
 
 /** Per destination: where the paste goes, carrying its text in route state. */
 const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state: unknown }]> = {
@@ -21,6 +24,10 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
   ],
+  skillPlan: (text) => [
+    SKILL_PLANS_PATH,
+    { state: { skillPlanImportText: text } satisfies SkillPlanImportState },
+  ],
 };
 
 /**
@@ -28,19 +35,30 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
  * catalogue load on the first page-level paste, not with the signed-in shell.
  */
 async function classifyPaste(text: string): Promise<PasteDestination | null> {
-  const [{ pasteDestination }, { loadAppraisalCatalogue }, { loadHullNames }] = await Promise.all([
+  const [
+    { pasteDestination },
+    { loadAppraisalCatalogue },
+    { loadHullNames },
+    { loadSkillNameMap },
+  ] = await Promise.all([
     import('@/engine/import/pasteDestination'),
     import('@/features/market/appraisalData'),
     import('@/features/fittings/hullNames'),
+    import('@/features/skills/typeCatalog'),
   ]);
-  const [catalogue, hullNames] = await Promise.all([loadAppraisalCatalogue(), loadHullNames()]);
-  return pasteDestination(text, { catalogue, hullNames });
+  const [catalogue, hullNames, skillByName] = await Promise.all([
+    loadAppraisalCatalogue(),
+    loadHullNames(),
+    loadSkillNameMap(),
+  ]);
+  return pasteDestination(text, { catalogue, hullNames, skillByName });
 }
 
 /**
  * The app-wide paste router: Ctrl+V / Cmd+V anywhere on a page — not into a
  * field — with an EFT fit or an item list on the clipboard opens it in
- * Fittings or the Appraisal straight away. No confirm step: a mistaken paste
+ * Fittings or the Appraisal straight away, and a skill plan opens the Skills
+ * planner with the import ready. No confirm step: a mistaken paste
  * is one Back away, and every page keeps its own state across the trip.
  *
  * Mounted once from `Layout`. Steps aside for a focused field and for any

@@ -1,8 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { db } from '@/db';
 import { PageHeader, Spinner } from '@/components/ui';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { scheduleSync } from '@/sync';
+import type { SkillPlanImportState } from '@/lib/shortcuts';
+import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributesPane } from '@/features/skills/planner/AttributesPane';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
@@ -56,6 +61,31 @@ export function SkillPlans() {
     ]
   );
   const isDesktop = useIsDesktop();
+
+  // A skill plan pasted anywhere (`app/GlobalPasteRouter.tsx`) lands here: it
+  // gets a plan of its own and that plan's editor opens the Import dialog on
+  // the text. A fresh plan, never the pilot's existing one — importing appends
+  // to a plan, and which one was meant is not something a paste can say.
+  const navigate = useNavigate();
+  const location = useLocation();
+  const importText = (location.state as Partial<SkillPlanImportState> | null)?.skillPlanImportText;
+  const importedText = useRef<string | null>(null);
+  const remapCount = remapInfo?.available ?? 0;
+  useEffect(() => {
+    if (!hydrated || activeCharacterId === null || !importText) return;
+    // The state is spent only once the plan exists; the guard keeps a
+    // re-render in between from making a second plan.
+    if (importedText.current === importText) return;
+    importedText.current = importText;
+    const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapCount);
+    void db.skillPlans.add(plan).then(() => {
+      if (isSyncConfigured()) scheduleSync(activeCharacterId);
+      void navigate(`/skills/plans/${plan.id}`, {
+        replace: true,
+        state: { skillPlanImportText: importText } satisfies SkillPlanImportState,
+      });
+    });
+  }, [hydrated, activeCharacterId, importText, remapCount, navigate, t]);
 
   if (!hydrated) {
     return (

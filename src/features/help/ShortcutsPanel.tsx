@@ -74,7 +74,7 @@ export function ShortcutsPanel() {
           <Row label={t('shortcuts.paste')}>
             <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
           </Row>
-          {(['pasteFitting', 'pasteItems'] as const).map((key) => (
+          {(['pasteFitting', 'pasteItems', 'pasteSkillPlan'] as const).map((key) => (
             <Row key={key} label={t(`shortcuts.${key}`)}>
               <span className="text-text">{t(`shortcuts.${key}Opens`)}</span>
             </Row>

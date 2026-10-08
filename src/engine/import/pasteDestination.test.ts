@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
-import { pasteDestination } from '@/engine/import/pasteDestination';
+import { pasteDestination, type PasteSources } from '@/engine/import/pasteDestination';
 
 const CATALOGUE: AppraisalCatalogue = new Map(
   ['Rifter', 'Damage Control II', 'Tritanium', 'Pyerite', 'Nocxium', 'Warp Disruptor II'].map(
@@ -9,7 +9,11 @@ const CATALOGUE: AppraisalCatalogue = new Map(
 );
 
 const HULLS: ReadonlySet<string> = new Set(['rifter']);
-const SOURCES = { catalogue: CATALOGUE, hullNames: HULLS };
+const SKILLS = new Map([
+  ['gunnery', { typeID: 3300 }],
+  ['small hybrid turret', { typeID: 3301 }],
+]);
+const SOURCES = { catalogue: CATALOGUE, hullNames: HULLS, skillByName: SKILLS };
 
 const FIT = ['[Rifter, Kite Fit]', '', 'Damage Control II', '', 'Warp Disruptor II'].join('\n');
 
@@ -59,6 +63,49 @@ describe('pasteDestination', () => {
   it('ignores prose and links', () => {
     expect(pasteDestination('Tritanium is cheap today', SOURCES)).toBeNull();
     expect(pasteDestination('https://example.com/fit?id=4', SOURCES)).toBeNull();
+  });
+
+  describe('skill plans', () => {
+    // Skill books are market items too, so the catalogue knows the skill names.
+    const WITH_BOOKS: PasteSources = {
+      ...SOURCES,
+      catalogue: new Map([
+        ...CATALOGUE,
+        ['gunnery', { typeId: 100, name: 'Gunnery' }],
+        ['small hybrid turret', { typeId: 101, name: 'Small Hybrid Turret' }],
+      ]),
+    };
+
+    it('sends an in-game skill plan to the Skills planner', () => {
+      expect(pasteDestination('Gunnery V\nSmall Hybrid Turret IV', WITH_BOOKS)).toBe('skillPlan');
+    });
+
+    it('sends an EVEMon plan with arabic levels and SP notes to the Skills planner', () => {
+      expect(pasteDestination('Gunnery 4 (1,000 SP)\r\nSmall Hybrid Turret 3', WITH_BOOKS)).toBe(
+        'skillPlan'
+      );
+    });
+
+    it('keeps an item list whose names collide with skills in the Appraisal', () => {
+      expect(pasteDestination('Gunnery\t500\nSmall Hybrid Turret\t20', WITH_BOOKS)).toBe(
+        'appraisal'
+      );
+      expect(pasteDestination('Gunnery x3\nSmall Hybrid Turret x2', WITH_BOOKS)).toBe('appraisal');
+    });
+
+    it('keeps a list mixing skill names with other items in the Appraisal', () => {
+      expect(pasteDestination('Gunnery 5\nTritanium 10\nPyerite 20', WITH_BOOKS)).toBe('appraisal');
+    });
+
+    it('ignores a plan with a line that is not a skill at all', () => {
+      expect(pasteDestination('Gunnery V\nsee you in local', WITH_BOOKS)).toBeNull();
+    });
+
+    it('still reads a bracketed fit as a fit', () => {
+      expect(pasteDestination('[Rifter, Gunnery 5]\n\nDamage Control II', WITH_BOOKS)).toBe(
+        'fitting'
+      );
+    });
   });
 
   it('ignores an empty or whitespace paste', () => {
