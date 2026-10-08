@@ -69,17 +69,29 @@ interface JumpsAwayTextProps {
   locationId?: number;
   /** The page's own route picker, carried into the route the count opens. */
   preference?: RoutePreferenceKind | null;
+  /** Extra classes for the route link, e.g. a touch-target box. */
+  linkClassName?: string;
 }
 
 /** Renders nothing until its route call settles — a progressive enhancement, never load-blocking. */
-export function JumpsAwayText({ result, t, locationId, preference }: JumpsAwayTextProps) {
+export function JumpsAwayText({
+  result,
+  t,
+  locationId,
+  preference,
+  linkClassName,
+}: JumpsAwayTextProps) {
   if (!result) return null;
   if (result.kind === 'known') {
     const text = t('assets.jumpsAway.value', { count: result.jumps });
     return locationId === undefined ? (
       <span className="tabular-nums">{text}</span>
     ) : (
-      <PlaceJumpsLink locationId={locationId} preference={preference} className="tabular-nums">
+      <PlaceJumpsLink
+        locationId={locationId}
+        preference={preference}
+        className={cx('tabular-nums', linkClassName)}
+      >
         {text}
       </PlaceJumpsLink>
     );

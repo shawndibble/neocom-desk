@@ -304,3 +304,61 @@ describe('sortShortestFirst', () => {
     expect(() => sortShortestFirst([step(99, 1)], skillMap(), options)).toThrow(/99/);
   });
 });
+
+describe('milestone deadlines', () => {
+  const skills = skillMap(
+    skill(1, 'perception', 'willpower'),
+    skill(2, 'perception', 'willpower'),
+    skill(3, 'intelligence', 'memory'),
+    skill(4, 'intelligence', 'memory')
+  );
+  const plan = [step(1, 1), step(3, 1), step(2, 1), step(4, 1)];
+  const ms = (skillTypeID: number, level: number, id = 'm') => ({
+    id,
+    name: id,
+    skillTypeID,
+    level,
+  });
+  const keys = (steps: readonly PlanStep[]) => steps.map((s) => `${s.skillTypeID}:${s.level}`);
+
+  it("finishes the milestone's skills before the rest", () => {
+    const out = suggestReorder(plan, skills, undefined, [ms(4, 1)]);
+    expect(keys(out)).toEqual(['4:1', '1:1', '2:1', '3:1']);
+    expect(isValidOrder(out, skills)).toBe(true);
+  });
+
+  it('includes in-plan prerequisites in the deadline', () => {
+    const s2 = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(3, 'intelligence', 'memory', [{ typeID: 1, level: 1 }]),
+      skill(4, 'intelligence', 'memory')
+    );
+    const out = suggestReorder([step(4, 1), step(1, 1), step(3, 1)], s2, undefined, [ms(3, 1)]);
+    expect(keys(out)).toEqual(['1:1', '3:1', '4:1']);
+  });
+
+  it('keeps milestones in their current anchor order', () => {
+    const out = suggestReorder(plan, skills, undefined, [ms(4, 1, 'b'), ms(1, 1, 'a')]);
+    expect(keys(out).slice(0, 2)).toEqual(['1:1', '4:1']);
+  });
+
+  it('does not let a High priority cross a deadline', () => {
+    const out = suggestReorder(plan, skills, new Map([[2, 'high' as const]]), [ms(4, 1)]);
+    expect(keys(out)[0]).toBe('4:1');
+  });
+
+  it('ignores a milestone whose anchor is not in the plan', () => {
+    expect(suggestReorder(plan, skills, undefined, [ms(9, 1)])).toEqual(
+      suggestReorder(plan, skills)
+    );
+  });
+
+  it('applies to sortShortestFirst too', () => {
+    const out = sortShortestFirst(plan, skills, {
+      attributes: FLAT_ATTRS,
+      milestones: [ms(4, 1)],
+    });
+    expect(keys(out)[0]).toBe('4:1');
+    expect(sortedKey(out)).toBe(sortedKey(plan));
+  });
+});

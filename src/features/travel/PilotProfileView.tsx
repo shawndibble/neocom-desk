@@ -36,6 +36,7 @@ export interface PilotProfileViewProps {
 export function PilotProfileView(props: PilotProfileViewProps) {
   const { characterId } = props.profile;
   const [stats, setStats] = useState<PilotStatsResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,12 +46,17 @@ export function PilotProfileView(props: PilotProfileViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, attempt]);
+
+  function retryStats() {
+    setStats(null);
+    setAttempt((n) => n + 1);
+  }
 
   return (
     <div className="space-y-4">
       <PilotIdentity {...props} />
-      <ZkillStatsSection stats={stats} />
+      <ZkillStatsSection stats={stats} onRetry={retryStats} />
       <PilotKillmailsSection characterId={characterId} />
     </div>
   );

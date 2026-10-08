@@ -85,6 +85,7 @@ import {
   NOTIFICATION_FEED,
   PLANET_RICHNESS,
   PRODUCTION_ORDER_WATCHES,
+  PRODUCTION_LOSSES,
   PRODUCTION_RUNS,
   PRODUCTION_SALE_LINKS,
   SKILL_PLANS,
@@ -875,9 +876,10 @@ async function syncEditableCollection(spec: EditableCollection, ctx: SyncContext
  * list, and would otherwise linger forever in "already linked" checks.
  */
 export async function markProductionRunDeleted(characterId: number, runId: string): Promise<void> {
-  const [saleLinks, orderWatches] = await Promise.all([
+  const [saleLinks, orderWatches, losses] = await Promise.all([
     db.productionSaleLinks.where('runId').equals(runId).toArray(),
     db.productionOrderWatches.where('runId').equals(runId).toArray(),
+    db.productionLosses.where('runId').equals(runId).toArray(),
   ]);
   await recordBulkDeletion(
     characterId,
@@ -890,6 +892,12 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
     orderWatches.map((w) => w.id),
     tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
     (ids) => db.productionOrderWatches.bulkDelete(ids)
+  );
+  await recordBulkDeletion(
+    characterId,
+    losses.map((l) => l.id),
+    tombstoneKey(PRODUCTION_LOSSES, characterId),
+    (ids) => db.productionLosses.bulkDelete(ids)
   );
   await recordDeletion(characterId, runId, tombstoneKey(PRODUCTION_RUNS, characterId), () =>
     db.productionRuns.delete(runId)
@@ -917,6 +925,13 @@ export async function removeProductionOrderWatch(
     watchId,
     tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
     () => db.productionOrderWatches.delete(watchId)
+  );
+}
+
+/** Remove a Run Loss — same tombstone reasoning as removeProductionSaleLink. */
+export async function removeProductionLoss(characterId: number, lossId: string): Promise<void> {
+  await recordDeletion(characterId, lossId, tombstoneKey(PRODUCTION_LOSSES, characterId), () =>
+    db.productionLosses.delete(lossId)
   );
 }
 
