@@ -16,7 +16,7 @@ Three panels, definition lists (two columns from `md`, one on phone), each row =
 
 - "Keyboard shortcuts": first row "Open the command palette" with the chord (Cmd+K on Apple platforms via `isApplePlatform`, Ctrl K otherwise; `commandPaletteDisplayKey`; not a `SHORTCUTS` row, fires inside text fields). Then every `SHORTCUTS` entry (`src/lib/shortcuts.ts`): `C` switch character, `O` Overview, `M` Market, `I` Industry, `W` Wallet, `P` Planetary Industry, `A` Alerts, `T` Mining tax, `,` Settings, `?` show this list (allows Shift), `Esc` close the open dialog (native, no handler). Dispatch in `app/useKeyboardShortcuts.ts`. Single-key shortcuts are always on (no off switch).
 - "On a page": "These work inside text boxes too. Every fitting edit is in the address bar, so your browser's Back button is undo." Rows: save fitting (Mod+S), save as new copy (Mod+Shift+S), submit a pasted list or fit (Mod+Enter, any paste box).
-- "Paste anywhere": hint that outside a text field a pasted fit or item list opens where it belongs; rows Paste (Cmd/Ctrl V), EFT fitting -> "Opens in Fittings", Item list -> "Opens in Appraisal" (`app/GlobalPasteRouter.tsx`).
+- "Paste anywhere": hint that outside a text field a pasted fit, skill plan or item list opens where it belongs; rows Paste (Cmd/Ctrl V), EFT fitting -> "Opens in Fittings", Item list -> "Opens in Appraisal", Skill plan -> "Opens in the Skills planner" (`app/GlobalPasteRouter.tsx`).
 
 ## FAQ tab
 

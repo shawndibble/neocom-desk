@@ -162,6 +162,7 @@ import { useJumpCloneImplantSets } from './jumpCloneImplants';
 import { resolvePlanBoosters, toBoosters } from './planBooster';
 import { BoosterList } from './BoosterList';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
+import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
 import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
@@ -281,6 +282,15 @@ export function PlanEditor({
   useEffect(() => {
     if (focusName) navigate(location.pathname, { replace: true, state: null });
   }, [focusName, location.pathname, navigate]);
+  // A skill plan pasted anywhere opens this editor with the Import dialog
+  // already on it (`routes/SkillPlans.tsx` made the plan). Held in state so the
+  // location can be spent at once: a reload or Back must not reopen it.
+  const pastedPlanText = (location.state as Partial<SkillPlanImportState> | null)
+    ?.skillPlanImportText;
+  const [importSeed, setImportSeed] = useState(pastedPlanText ?? null);
+  useEffect(() => {
+    if (pastedPlanText) navigate(location.pathname, { replace: true, state: null });
+  }, [pastedPlanText, location.pathname, navigate]);
   const [copyConfirm, setCopyConfirm] = useState(false);
   const { show: showCopyConfirm } = useAutoDismiss<boolean>(setCopyConfirm, false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -290,7 +300,7 @@ export function PlanEditor({
   // Ties each Optimize menu item's `aria-label` (the mode name) to its hint
   // span via `aria-describedby`, so the "why" still reaches screen readers.
   const optimizeHintId = useId();
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(importSeed !== null);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   // `cancel` covers the early-cancel-on-Undo case below; `show` supersedes a
   // pending confirmation rather than racing it (Append's 4s vs. Replace's
@@ -2291,8 +2301,13 @@ export function PlanEditor({
             setUndoImport(null);
             showImportConfirm(appendedCountMessage(entries), 4000);
             setImportOpen(false);
+            setImportSeed(null);
           }}
-          onClose={() => setImportOpen(false)}
+          onClose={() => {
+            setImportOpen(false);
+            setImportSeed(null);
+          }}
+          initialText={importSeed ?? undefined}
           nameFor={nameFor}
           trainedSkills={trainedSkills}
         />

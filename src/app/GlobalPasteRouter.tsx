@@ -14,8 +14,11 @@ import {
   type IndustryBlueprintListState,
   type MarketAppraiseState,
   type PilotListState,
+  type SkillPlanImportState,
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
+
+const SKILL_PLANS_PATH = '/skills/plans';
 
 /** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
 const pilotLookup = (text: string): [string, { state: unknown }] => [
@@ -52,6 +55,10 @@ const DESTINATIONS: Record<
       { state: ENTITY_INFO_PUSHED_STATE },
     ];
   },
+  skillPlan: (text) => [
+    SKILL_PLANS_PATH,
+    { state: { skillPlanImportText: text } satisfies SkillPlanImportState },
+  ],
   blueprintList: (text) => [
     '/industry',
     { state: { blueprintListText: text } satisfies IndustryBlueprintListState },
@@ -69,21 +76,25 @@ async function classifyPaste(text: string): Promise<PasteDestination | null> {
     { pasteDestination },
     { loadAppraisalCatalogue },
     { loadHullNames },
+    { loadSkillNameMap },
     { loadBlueprintNames },
   ] = await Promise.all([
     import('@/engine/import/pasteDestination'),
     import('@/features/market/appraisalData'),
     import('@/features/fittings/hullNames'),
+    import('@/features/skills/typeCatalog'),
     import('@/features/industry/blueprintNames'),
   ]);
-  const [catalogue, hullNames, blueprintNames] = await Promise.all([
+  const [catalogue, hullNames, skillByName, blueprintNames] = await Promise.all([
     loadAppraisalCatalogue(),
     loadHullNames(),
+    // A skill catalogue that won't load costs only the skill-plan route.
+    loadSkillNameMap().catch(() => new Map<string, { typeID: number }>()),
     // Without the blueprint data a blueprint list is just not recognised; the
     // fit and item-list pastes must not depend on it.
     loadBlueprintNames().catch(() => undefined),
   ]);
-  return pasteDestination(text, { catalogue, hullNames, blueprintNames });
+  return pasteDestination(text, { catalogue, hullNames, skillByName, blueprintNames });
 }
 
 /**

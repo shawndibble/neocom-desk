@@ -14,6 +14,7 @@ import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSort
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { exportRows } from '@/lib/downloadCsv';
 import type { TypeMap } from '@/sde/types';
 
@@ -153,13 +154,12 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
 });
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -184,7 +184,24 @@ beforeEach(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/assets');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render, so no test pays for the first one. A worker's first
+  // `App` render — compiling the lazy route chunks, warming jsdom and React —
+  // lands on whichever test runs first and can outlast its 1s `findByText`
+  // under parallel load. Done here under the hook's own budget.
+  await routeChunks.loadAssets();
+  await resetSession();
+  const { unmount } = render(<App />);
+  await screen.findByText(JITA, undefined, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+  clearMarketPriceCache();
+}, 30_000);
+
+beforeEach(resetSession);
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -28,6 +28,10 @@ vi.mock('@/features/fittings/hullNames', () => ({
   loadHullNames: () => Promise.resolve(new Set(['rifter'])),
 }));
 
+vi.mock('@/features/skills/typeCatalog', () => ({
+  loadSkillNameMap: () => Promise.resolve(new Map([['gunnery', { typeID: 3300 }]])),
+}));
+
 vi.mock('@/features/industry/blueprintNames', () => ({
   loadBlueprintNames: () => Promise.resolve(new Set(['rifter blueprint', 'merlin blueprint'])),
 }));
@@ -76,6 +80,13 @@ describe('GlobalPasteRouter', () => {
     await paste(document.body, 'Tritanium\t1,000\nDamage Control II\t2');
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/market/appraisal'));
     expect(screen.getByTestId('where')).toHaveTextContent('"appraiseText"');
+  });
+
+  it('opens a pasted skill plan in the Skills planner', async () => {
+    renderRouter();
+    await paste(document.body, 'Gunnery V');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/skills/plans'));
+    expect(screen.getByTestId('where')).toHaveTextContent('"skillPlanImportText"');
   });
 
   it('turns a pasted blueprint list into a Build Group on Industry', async () => {

@@ -8336,13 +8336,14 @@
     "saveFittingAsNew": "Save the fitting as a new copy (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit, blueprint list, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
     "pasteDestinations": {
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
       "chatLink": { "label": "Chat link", "opens": "Opens the item or system page" },
       "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
       "blueprintList": { "label": "Blueprint list", "opens": "Creates a Build Group of plans" },
+      "skillPlan": { "label": "Skill plan", "opens": "Opens in the Skills planner" },
       "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
       "pilotList": { "label": "Local list", "opens": "Opens in Pilot Lookup" }
     }

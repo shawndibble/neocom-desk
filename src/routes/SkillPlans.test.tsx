@@ -266,6 +266,26 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
+  it('makes a plan for a pasted skill plan and opens its Import dialog already parsed', async () => {
+    // What GlobalPasteRouter navigates with: react-router keeps location state under `usr`.
+    window.history.replaceState(
+      { usr: { skillPlanImportText: 'Gunnery V' }, key: 'paste', idx: 0 },
+      '',
+      '/skills/plans'
+    );
+    render(<App />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    expect(await within(dialog).findByText(/Detected: skill plan/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/paste/i)).toHaveValue('Gunnery V');
+
+    const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+    expect(stored).toHaveLength(1);
+    expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`);
+    // Spent: a reload must not reopen the dialog or make a second plan.
+    expect((window.history.state as { usr: unknown }).usr).toBeNull();
+  });
+
   it('renames a plan from the list, scheduling a sync', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
