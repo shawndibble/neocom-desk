@@ -9,6 +9,7 @@ import {
   loadCharacterSkillsWithStatus,
   loadCharacterAttributes,
   loadCharacterImplants,
+  loadCharacterImplantsWithStatus,
   loadCharacterSkillQueue,
   loadCharacterSkillQueueWithStatus,
   loadUniverseType,
@@ -165,6 +166,34 @@ describe('loadCharacterImplants', () => {
       fromCache: true,
       truncated: false,
     });
+  });
+});
+
+describe('loadCharacterImplantsWithStatus', () => {
+  const url = `${ESI_BASE_URL}/characters/${CHAR_ID}/implants`;
+
+  it('fetches and caches the worn clone implants', async () => {
+    server.use(http.get(url, () => HttpResponse.json([19540, 19541])));
+    const result = await loadCharacterImplantsWithStatus(CHAR_ID);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual([19540, 19541]);
+    expect((await db.esiCache.get([CHAR_ID, 'implants']))?.value).toEqual([19540, 19541]);
+  });
+
+  it('falls back to the cache offline', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'implants', value: [19540], fetchedAt: 1 });
+    server.use(http.get(url, () => HttpResponse.error()));
+    const result = await loadCharacterImplantsWithStatus(CHAR_ID);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual([19540]);
+    expect(result.cached?.fromCache).toBe(true);
+  });
+
+  it('reports needsReauth on a 403 with nothing cached', async () => {
+    server.use(http.get(url, () => HttpResponse.json({ error: 'scope' }, { status: 403 })));
+    const result = await loadCharacterImplantsWithStatus(CHAR_ID);
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });
 
