@@ -550,7 +550,7 @@ export function Clones() {
                 <p>
                   {characterSystemName ?? t('clones.unknownPlace')}{' '}
                   {characterSystemId !== null && securities.has(characterSystemId) && (
-                    <SecurityStatus security={securities.get(characterSystemId) as number} />
+                    <SecurityStatus security={securities.get(characterSystemId) ?? 0} />
                   )}
                 </p>
                 {hasWorn && (
@@ -560,6 +560,8 @@ export function Clones() {
                       <>
                         {' · '}
                         <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
+                        {wornValue.unpriced > 0 &&
+                          ` · ${t('clones.unpriced', { count: wornValue.unpriced })}`}
                       </>
                     )}
                   </p>
@@ -622,14 +624,6 @@ export function Clones() {
                     prices={prices}
                   />
                 )}
-                {clones.length === 0 && (
-                  <CachedEmptyState
-                    result={clonesResult}
-                    title={t('clones.emptyTitle')}
-                    hint={t('clones.emptyHint')}
-                    fetchedTitle={t('clones.emptyFetchedTitle')}
-                  />
-                )}
                 {clones.map((clone) => {
                   const name = clone.name?.trim() || undefined;
                   return (
@@ -660,6 +654,14 @@ export function Clones() {
                   );
                 })}
               </ul>
+            )}
+            {clones.length === 0 && (
+              <CachedEmptyState
+                result={clonesResult}
+                title={t('clones.emptyTitle')}
+                hint={t('clones.emptyHint')}
+                fetchedTitle={t('clones.emptyFetchedTitle')}
+              />
             )}
           </>
         )}
