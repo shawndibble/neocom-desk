@@ -378,7 +378,7 @@ export function MovePlanModal({
                   );
                   return (
                     <div key={characterId} className="flex flex-col">
-                      <label
+                      <div
                         className={`${tappableRowClassName} sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-panel-2 px-2 font-medium`}
                       >
                         <GroupCheckbox
@@ -388,7 +388,7 @@ export function MovePlanModal({
                           label={t('assets.movePlan.selectAllFor', { character: characterName })}
                         />
                         {characterName}
-                      </label>
+                      </div>
                       {[...byPlace].map(([locationId, stacks]) => {
                         const keys = stacks.map((s) => s.key);
                         const groupKey = `${characterId}:${locationId}`;
@@ -397,16 +397,14 @@ export function MovePlanModal({
                         return (
                           <div key={locationId} className="flex flex-col border-b border-line">
                             <div className="flex items-center gap-1 px-2 text-text-dim">
-                              <label className={`${tappableRowClassName} flex items-center`}>
-                                <GroupCheckbox
-                                  keys={keys}
-                                  selected={selected}
-                                  onToggle={toggle}
-                                  label={t('assets.movePlan.selectAllAt', {
-                                    place: placeLabel(locationId),
-                                  })}
-                                />
-                              </label>
+                              <GroupCheckbox
+                                keys={keys}
+                                selected={selected}
+                                onToggle={toggle}
+                                label={t('assets.movePlan.selectAllAt', {
+                                  place: placeLabel(locationId),
+                                })}
+                              />
                               <button
                                 type="button"
                                 aria-expanded={isOpen}
@@ -497,14 +495,16 @@ function GroupCheckbox({
   const count = keys.filter((k) => selected.has(k)).length;
   const all = keys.length > 0 && count === keys.length;
   return (
-    <Checkbox
-      ref={(el) => {
-        if (el) el.indeterminate = count > 0 && !all;
-      }}
-      checked={all}
-      onChange={(e) => onToggle(keys, e.target.checked)}
-      aria-label={label}
-    />
+    <label className={`${tappableRowClassName} flex items-center`}>
+      <Checkbox
+        ref={(el) => {
+          if (el) el.indeterminate = count > 0 && !all;
+        }}
+        checked={all}
+        onChange={(e) => onToggle(keys, e.target.checked)}
+        aria-label={label}
+      />
+    </label>
   );
 }
 
