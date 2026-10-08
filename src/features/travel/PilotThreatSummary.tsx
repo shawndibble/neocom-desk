@@ -7,7 +7,13 @@
  */
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
-import type { ThreatVerdict } from '@/engine/pilotList/threatVerdict';
+import {
+  ACTIVE_MIN_KILLS,
+  DANGEROUS_MIN_DANGER_RATIO,
+  DANGEROUS_MIN_KILLS,
+  THREAT_WINDOW_DAYS,
+  type ThreatVerdict,
+} from '@/engine/pilotList/threatVerdict';
 import { formatAge } from '@/lib/age';
 
 /** A gang share from here up is worth saying; below it, solo is the norm worth nothing. */
@@ -31,13 +37,18 @@ export function PilotThreatSummary({
   if (verdict.recentKills === 0) {
     sentence =
       age === null
-        ? t('travel.pilot.threat.inactive')
-        : t('travel.pilot.threat.inactiveLast', { age });
+        ? t('travel.pilot.threat.inactive', { days: THREAT_WINDOW_DAYS })
+        : t('travel.pilot.threat.inactiveLast', { age, days: THREAT_WINDOW_DAYS });
   } else if (verdict.mainSpace === null) {
-    sentence = t('travel.pilot.threat.summary', { count: verdict.recentKills, age });
+    sentence = t('travel.pilot.threat.summary', {
+      count: verdict.recentKills,
+      days: THREAT_WINDOW_DAYS,
+      age,
+    });
   } else {
     sentence = t('travel.pilot.threat.summaryIn', {
       count: verdict.recentKills,
+      days: THREAT_WINDOW_DAYS,
       space: t(`common.spaceOption.${verdict.mainSpace}`).toLowerCase(),
       age,
     });
@@ -55,10 +66,18 @@ export function PilotThreatSummary({
         {sentence}
         <InfoTooltip
           label={t('common.aboutLabel', { label: t('travel.pilot.threat.label') })}
-          content={t('travel.pilot.threat.help')}
+          content={t('travel.pilot.threat.help', {
+            days: THREAT_WINDOW_DAYS,
+            dangerousKills: DANGEROUS_MIN_KILLS,
+            dangerRatio: DANGEROUS_MIN_DANGER_RATIO,
+            activeKills: ACTIVE_MIN_KILLS,
+          })}
         />
       </p>
       {facts.length > 0 && <p className="text-xs text-text-dim">{facts.join(' · ')}</p>}
+      {!verdict.dangerKnown && verdict.recentKills >= DANGEROUS_MIN_KILLS && (
+        <p className="text-xs text-warning">{t('travel.pilot.threat.dangerUnknown')}</p>
+      )}
     </div>
   );
 }

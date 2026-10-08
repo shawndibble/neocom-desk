@@ -8958,16 +8958,17 @@
           "low": "Low threat",
           "inactive": "Inactive"
         },
-        "help": "Read from their kills in the last 90 days and zKillboard's all-time danger ratio. Dangerous: 10 or more recent kills and a danger ratio of 50 or more. Active: 3 or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
-        "inactive": "No kills in the last 90 days.",
-        "inactiveLast": "No kills in the last 90 days. Last kill {{age}} ago.",
-        "summary_one": "{{count}} kill in the last 90 days. Last kill {{age}} ago.",
-        "summary_other": "{{count}} kills in the last 90 days. Last kill {{age}} ago.",
-        "summaryIn_one": "{{count}} kill in the last 90 days, mostly in {{space}}. Last kill {{age}} ago.",
-        "summaryIn_other": "{{count}} kills in the last 90 days, mostly in {{space}}. Last kill {{age}} ago.",
+        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time danger ratio. Dangerous: {{dangerousKills}} or more recent kills and a danger ratio of {{dangerRatio}} or more. Active: {{activeKills}} or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
+        "inactive": "No kills in the last {{days}} days.",
+        "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}} ago.",
+        "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}} ago.",
+        "summary_other": "{{count}} kills in the last {{days}} days. Last kill {{age}} ago.",
+        "summaryIn_one": "{{count}} kill in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
+        "summaryIn_other": "{{count}} kills in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
         "gangs": "{{value}}% in gangs",
         "pods": "{{value}}% of kills are pods",
-        "pending": "Checking"
+        "pending": "Checking",
+        "dangerUnknown": "zKillboard's danger ratio could not be read, so this may understate the threat."
       },
       "activity": {
         "title": "Where they kill",

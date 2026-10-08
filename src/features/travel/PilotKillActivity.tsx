@@ -40,7 +40,11 @@ function monthName(key: string): string {
   });
 }
 
-/** The loading, failed and ready states share one fetch: `PilotProfileView` owns it and hands it down. */
+/**
+ * The self-fetching form, for a caller with no other use for the kills.
+ * `PilotProfileView` fetches once itself (the verdict reads the same kills)
+ * and draws `PilotKillActivityView` directly.
+ */
 export function PilotKillActivity({ characterId }: { characterId: number }) {
   const { history, retry } = usePilotKillHistory(characterId);
   return <PilotKillActivityView history={history} onRetry={retry} />;
