@@ -11,7 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
 import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
   STAT_CHIP_TONE_TEXT_CLASS,
+  MenuItem,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
@@ -46,6 +47,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { useRowStartPlan } from './rowStartPlan';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -346,6 +348,34 @@ export function OpportunitiesPanel({
     itemName: string;
     regionId: number;
   } | null>(null);
+
+  // The desktop twin of the phone card's "…" menu: the shared item menu plus
+  // Price history, the one action the ranked row's click doesn't carry.
+  function rowContextMenu(row: OpportunityRow, tr: ReactElement) {
+    const { productTypeID, productName } = row.candidate.catalogEntry;
+    if (productTypeID === null) return tr;
+    return (
+      <ItemContextMenu
+        typeId={productTypeID}
+        itemName={productName}
+        extraItems={
+          <MenuItem
+            onSelect={() =>
+              setHistoryItem({
+                typeId: productTypeID,
+                itemName: productName,
+                regionId: row.hub.regionId,
+              })
+            }
+          >
+            {t('industry.opportunitiesPriceHistory')}
+          </MenuItem>
+        }
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   const showCharacterFilter = characterCandidates.length > 1;
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
@@ -723,6 +753,8 @@ export function OpportunitiesPanel({
             virtualize="auto"
             label={t('industry.opportunitiesTitle')}
             onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+            rowContextMenu={rowContextMenu}
+            rowMoreActions
             {...sortProps}
           />
         </div>

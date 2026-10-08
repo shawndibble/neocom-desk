@@ -406,7 +406,7 @@ Realized profit (`engine/industry/realizedProfit.ts`): total cost = material + j
 
 - Add batch-aware ISK/hr option (priced runs selector, slot-aware throughput) to Ranked.
 - Fold order depth/sell-through (daily volume already fetched for rarely-sold) into a liquidity-adjusted score or sort.
-- Expose price history and a context menu on desktop Opportunities rows (parity with phone).
+- (Done, #2843) Price history and a row context menu on desktop Opportunities rows.
 - Show "N excluded: missing price" disclosure on Market-Wide.
 - Include corp blueprints as an opt-in source for Ranked and scan "owned".
 - Persist Ranked rows (Dexie) keyed by inputs key so reloads do not force recompute above 10.

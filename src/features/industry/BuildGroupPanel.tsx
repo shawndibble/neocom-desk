@@ -429,7 +429,6 @@ export function BuildGroupPanel({
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
-        phoneHidden: true,
         align: 'right',
         render: (material) => {
           const owned = ownedStockMap.get(material.typeID);
