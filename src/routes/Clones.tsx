@@ -9,7 +9,7 @@ import {
   Panel,
   SegmentedControl,
   Spinner,
-  StatChip,
+  STAT_CHIP_TONE_TEXT_CLASS,
   Tooltip,
   type StatChipTone,
 } from '@/components/ui';
@@ -77,6 +77,7 @@ const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const NO_SECURITIES: ReadonlyMap<number, number> = new Map();
 const NO_IDS: readonly number[] = [];
 /** Touch-sized on a phone, compact beside a pointer. */
+/** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
 const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
 
 interface Snapshot {
@@ -296,11 +297,14 @@ function CloneCard({
         current ? 'border-accent/60 bg-accent/5 md:col-span-2' : 'border-line bg-panel-2'
       }`}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
         <span className="[overflow-wrap:anywhere]">{heading}</span>
-        <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
-        {security !== undefined && <SecurityStatus security={security} />}
-        {jumps}
+        {/* Place, security and jumps are one phrase: they wrap together, never apart. */}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+          <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
+          {security !== undefined && <SecurityStatus security={security} />}
+          {jumps}
+        </span>
       </div>
       {training?.row?.totalSeconds != null && (
         <p className="flex flex-wrap items-center gap-x-2 text-xs">
@@ -325,7 +329,7 @@ function CloneCard({
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
         <>
-          <ul className="flex flex-wrap gap-x-3 gap-y-0.5">
+          <ul className="flex flex-wrap gap-x-3 gap-y-0">
             {implantIds.map((id) => (
               <li key={id}>
                 <ImplantLink
@@ -460,6 +464,16 @@ export function Clones() {
   const cooldownHours = cloneJumpCooldownHours(infomorphLevel);
   const cooldownFraction = cooldownProgress(lastCloneJumpDate, cooldownHours, new Date(loadedAt));
 
+  // Empty (no element at all) when there is no last jump and no reduction to state.
+  const cooldownNote = [
+    lastCloneJumpDate &&
+      t('clones.lastJump', {
+        date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
+      }),
+    infomorphLevel > 0 && t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
 
   const homeJumps =
@@ -617,24 +631,23 @@ export function Clones() {
 
       {showSummary && (
         <>
-          <div className="grid gap-4 text-sm md:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 text-sm">
             <Panel className="h-full">
               <section aria-label={t('clones.cooldown')} className="space-y-1">
                 <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('clones.cooldownShared')}
                 </h3>
-                <StatChip
-                  label={t('clones.cooldown')}
-                  tone={cooldownTone}
-                  value={
-                    cooldown.onCooldown && cooldown.readyAt
-                      ? t('clones.cooldownOnCooldownValue', {
-                          date: formatTimestamp(cooldown.readyAt, timeZone),
-                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                        })
-                      : t('clones.cooldownReadyValue')
-                  }
-                />
+                {/* The header above names it; the value wraps rather than sitting in a nowrap chip. */}
+                <p
+                  className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[cooldownTone]}`}
+                >
+                  {cooldown.onCooldown && cooldown.readyAt
+                    ? t('clones.cooldownOnCooldownValue', {
+                        date: formatTimestamp(cooldown.readyAt, timeZone),
+                        duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
+                      })
+                    : t('clones.cooldownReadyValue')}
+                </p>
                 <div
                   role="progressbar"
                   aria-label={t('clones.cooldown')}
@@ -648,13 +661,7 @@ export function Clones() {
                     style={{ width: `${cooldownFraction * 100}%` }}
                   />
                 </div>
-                <p className="text-xs text-text-dim">
-                  {lastCloneJumpDate &&
-                    `${t('clones.lastJump', {
-                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
-                    })} · `}
-                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
-                </p>
+                {cooldownNote && <p className="text-xs text-text-dim">{cooldownNote}</p>}
               </section>
             </Panel>
             <Panel className="h-full">
