@@ -8,6 +8,7 @@ import {
   type InstallPromptVariant,
   type BeforeInstallPromptEvent,
 } from './installPromptRules';
+import { useInstallApp } from './installApp';
 import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 
 const INSTRUCTION_KEYS = {
@@ -65,6 +66,8 @@ export function InstallPrompt() {
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
+    // A prompt event is single-use; Settings' copy of it is spent too.
+    useInstallApp.setState({ deferredPrompt: null });
     await deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     void setValue(true);

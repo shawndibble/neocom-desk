@@ -75,7 +75,9 @@ import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
-import { isSpExtractionReady } from '@/engine/spExtraction';
+import { extractionTotalIsk, extractorCount, isSpExtractionReady } from '@/engine/spExtraction';
+import { formatIskCompact } from '@/lib/isk';
+import { useExtractionPrices } from '@/features/character/useExtractionPrices';
 import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import {
   availableCharacterColumns,
@@ -645,6 +647,7 @@ function openJobsColumn(
 function buildColumns(
   t: (key: string, options?: Record<string, unknown>) => string,
   spExtractionThresholdSp: number,
+  extractionNet: number | null,
   onToggleStarred: (characterId: number) => void,
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
@@ -824,7 +827,15 @@ function buildColumns(
           : Number(isSpExtractionReady(row.totalSp, spExtractionThresholdSp)),
       render: (row) =>
         row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
-          <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>{t('characters.spReadyYes')}</span>
+          <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>
+            {t('characters.spReadyYes')}
+            {extractionNet !== null && (
+              <>
+                {' · '}
+                <IskAmount value={extractionTotalIsk(row.totalSp, extractionNet) ?? 0} />
+              </>
+            )}
+          </span>
         ) : (
           '—'
         ),
@@ -906,6 +917,7 @@ export function Characters() {
   const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
   const hydrateSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
 
+  const extractionPrices = useExtractionPrices();
   const alertCounts = useAlertCountsByCharacter();
   const notificationPrefs = useNotificationPreferences((state) => state.value);
   const notTrainingAlertEnabledFor = (characterId: number) =>
@@ -966,6 +978,7 @@ export function Characters() {
   const columnsById = buildColumns(
     t,
     spExtractionThreshold,
+    extractionPrices.net,
     (id) => void handleToggleStar(id),
     timeZone,
     groupsValue.groups,
@@ -1401,6 +1414,24 @@ export function Characters() {
    * carries membership per row instead, and `GroupSectionHeader`'s
    * rename/reorder/delete stay card-view only.
    */
+  const extractorsReady = tableRows.reduce(
+    (sum, row) =>
+      row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThreshold)
+        ? sum + extractorCount(row.totalSp)
+        : sum,
+    0
+  );
+  const extractionSummary =
+    !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
+      ? null
+      : extractionPrices.net === null
+        ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
+        : t('characters.extractionTotal', {
+            isk: formatIskCompact(extractionPrices.net * extractorsReady),
+            each: formatIskCompact(extractionPrices.net),
+            hub: extractionPrices.hubName,
+          });
+
   function renderTable(rows: readonly CharacterRow[]) {
     return (
       // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
@@ -1408,6 +1439,9 @@ export function Characters() {
       // view-mobile-scroll-roster-overview-split.md): a real, comparable
       // table stays a table, and scrolls sideways instead, at every width.
       <div className="overflow-x-auto">
+        {extractionSummary && (
+          <p className="mb-2 text-[0.6875rem] text-text-dim">{extractionSummary}</p>
+        )}
         <DataTable
           {...charactersExport.tableProps}
           columns={activeColumnIds.map((id) => columnsById[id])}

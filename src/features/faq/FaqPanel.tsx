@@ -9,7 +9,7 @@ import {
 import { cx } from '@/lib/cx';
 import { Caret } from '@/components/ui/Disclosure';
 import { tabPath } from '@/lib/pageTabs';
-import { HELP_TABS } from '@/app/pageTabs';
+import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import { WHAT_WE_STORE_GROUPS, type WhatWeStoreGroup } from './whatWeStore';
 
 const LINK = inlineLinkClassName;
@@ -132,6 +132,20 @@ export function FaqPanel() {
           <p>{t('settings.faq.a.delete')}</p>
           <p className="text-text-dim">{t('settings.faq.store.notes.removal')}</p>
         </>
+      ),
+    },
+    {
+      id: 'install',
+      questionKey: 'settings.faq.q.install',
+      answer: (
+        <p>
+          <Trans
+            i18nKey="settings.faq.a.install"
+            components={{
+              link: <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={LINK} />,
+            }}
+          />
+        </p>
       ),
     },
     {
