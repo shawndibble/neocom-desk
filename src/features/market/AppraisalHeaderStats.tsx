@@ -77,14 +77,14 @@ export function AppraisalHeaderStats({
       <Group title={t('market.appraisal.groupWorth')}>
         <StatChip
           label={t('market.appraisal.sellTotal')}
-          value={<FullIskTotal value={totals.sell} />}
+          value={<FullIskTotal value={totals.sell} compact />}
           tone="accent"
           emphasis
           tooltip={t('market.appraisal.sellTotalHelp')}
         />
         <StatChip
           label={t('market.appraisal.buyTotal')}
-          value={<FullIskTotal value={totals.buy} />}
+          value={<FullIskTotal value={totals.buy} compact />}
           tooltip={t('market.appraisal.buyTotalHelp')}
         />
         <StatChip

@@ -1059,7 +1059,7 @@ describe('AppraisalPanel — the row as an item', () => {
   describe('Sell and Buy totals', () => {
     afterEach(() => configureClipboard(null));
 
-    it('read in full with the shorthand after, and copy the full figure on click', async () => {
+    it('read as shorthand only, and copy the full figure on click', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
@@ -1067,7 +1067,7 @@ describe('AppraisalPanel — the row as an item', () => {
       renderPanel({ controller: controller({ result: outcome() }) });
 
       const sell = screen.getByRole('button', { name: 'Copy 1,386,400 ISK' });
-      expect(sell).toHaveTextContent('1,386,400 ISK (1.4M)');
+      expect(sell).toHaveTextContent(/^1\.4M$/);
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
@@ -1146,14 +1146,14 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
       hydrated: true,
     });
     renderPanel({ controller: controller() });
-    const recent = screen.getByRole('combobox', { name: 'Recent' });
+    const recent = screen.getByRole('combobox', { name: 'Load a recent list' });
     const box = screen.getByRole('textbox');
     expect(recent.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('hides Recent when nothing was saved', () => {
     renderPanel({ controller: controller() });
-    expect(screen.queryByRole('combobox', { name: 'Recent' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Load a recent list' })).not.toBeInTheDocument();
   });
 
   it('copies the full multibuy when nothing is subtracted', async () => {
@@ -1241,7 +1241,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     });
     const appraiseText = vi.fn();
     renderPanel({ controller: controller({ appraiseText }) });
-    await userEvent.click(screen.getByRole('combobox', { name: 'Recent' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Load a recent list' }));
     await userEvent.click(await screen.findByRole('option', { name: /Tritanium, Pyerite/ }));
     expect(appraiseText).toHaveBeenCalledWith('Tritanium 5\nPyerite 3');
   });
