@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   JUMP_RANGES,
+  adoptGameBaseline,
   effectiveCurrentSystem,
   isJumpRange,
   jumpRangeSystems,
@@ -91,5 +92,28 @@ describe('effectiveCurrentSystem', () => {
       systemId: NEAR,
       source: 'game',
     });
+  });
+
+  it('keeps a pick made before ESI had answered, whatever ESI then reports', () => {
+    // Slow ESI while travelling: the first answer may be where you were, not where you are.
+    expect(effectiveCurrentSystem(HERE, { systemId: FAR, gameSystemId: null })).toEqual({
+      systemId: FAR,
+      source: 'picked',
+    });
+  });
+});
+
+describe('adoptGameBaseline', () => {
+  it('stamps a pick made before ESI answered with the first location it reports', () => {
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: null }, HERE)).toEqual({
+      systemId: FAR,
+      gameSystemId: HERE,
+    });
+  });
+
+  it('changes nothing without a pick, without a game location, or with a baseline already', () => {
+    expect(adoptGameBaseline(null, HERE)).toBeNull();
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: null }, null)).toBeNull();
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: NEAR }, HERE)).toBeNull();
   });
 });

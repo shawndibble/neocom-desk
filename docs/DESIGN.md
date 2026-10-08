@@ -866,6 +866,8 @@ clear when it changes (a different Character).
 | A box sized like a field                             | A control (§6)                                                                                                                                                                                                                                                                                                                                                            |
 | Warning box with a `Button` "Retry"                  | A read failed and nothing is cached: the data is unknown, not empty (PI `EsiDidntAnswer`). Retry re-runs the read                                                                                                                                                                                                                                                         |
 
+No typed arrow (`→` `↗` `›`) ends a link label; leaving the app is `Icon.External`, a row that goes elsewhere is a trailing `CaretRight`.
+
 Retired meanings, each with its replacement:
 
 | Retired                                               | Use instead                                                                      |

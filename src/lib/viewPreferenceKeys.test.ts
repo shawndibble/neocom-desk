@@ -34,6 +34,7 @@ const PINNED = [
   'piPlanControls',
   'planColumnVisibility.v2',
   'planGroupingMode',
+  'walletJournalBreakdownOpen',
 ];
 
 describe('VIEW_PREFERENCE_KEYS', () => {
