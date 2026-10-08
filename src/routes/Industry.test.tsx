@@ -793,6 +793,46 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
     // Build Opportunities reads no pricing input, so it's unaffected and
     // renders alongside the now-mounted panel.
     expect(await screen.findByRole('heading', { name: 'Build Opportunities' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: "What's profitable" })).toBeInTheDocument();
+    const profitable = screen.getByRole('heading', { name: "What's profitable" });
+    expect(profitable).toBeInTheDocument();
+    // Owning no blueprints leaves the order alone: the market-wide scan leads.
+    expect(
+      profitable.compareDocumentPosition(
+        screen.getByRole('heading', { name: 'Build Opportunities' })
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+});
+
+describe('Industry: Opportunities page order with owned blueprints (#3071)', () => {
+  it('leads with Build Opportunities and folds the market-wide scan under it', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 601,
+            type_id: 638,
+            runs: -1,
+            material_efficiency: 10,
+            time_efficiency: 20,
+            quantity: 1,
+            location_id: 60003760,
+            location_flag: 'Hangar',
+          },
+        ])
+      )
+    );
+    window.history.pushState({}, '', '/industry/opportunities');
+    render(<App />);
+
+    const ranked = await screen.findByRole('heading', { name: 'Build Opportunities' });
+    const profitable = await screen.findByRole('heading', { name: "What's profitable" });
+    expect(
+      ranked.compareDocumentPosition(profitable) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    const section = profitable.closest('section')!;
+    expect(
+      await within(section).findByRole('button', { name: 'Show details' })
+    ).toBeInTheDocument();
   });
 });

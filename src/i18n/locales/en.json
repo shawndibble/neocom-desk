@@ -2976,6 +2976,8 @@
     "opportunitiesStockAny": "Any",
     "opportunitiesStockMostly": "{{pct}}%+ covered",
     "opportunitiesStockFull": "Fully covered",
+    "opportunitiesStockMostlyShort": "{{pct}}%+",
+    "opportunitiesStockFullShort": "Full",
     "opportunitiesStockEmptyTitle": "No builds match your stock",
     "opportunitiesStockEmptyHint": "None of these blueprints are covered enough by what you own, or they have no price yet.",
     "opportunitiesOrderDepthLabel": "Depth",
@@ -9261,6 +9263,8 @@
       "title": "Route rules",
       "show": "Show route rules",
       "hide": "Hide route rules",
+      "more": "More route options",
+      "moreOn": "{{count}} on",
       "travelSettings": "Your travel settings · used everywhere the app counts jumps",
       "preferenceLabel": "Route preference",
       "preference": {
