@@ -300,6 +300,9 @@
       "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
+      "alsoSaveLabel": "Also save to My Fittings",
+      "myFittingsFailedTitle": "Saved to EVE, but not to My Fittings",
+      "myFittingsFailed": "It's in your in-game list, but we couldn't save it to My Fittings. Use Save to keep it there.",
       "close": "Close"
     },
     "missingSkills": {
@@ -782,6 +785,8 @@
       "shareLink": "Copy Share Link",
       "eft": "Copy Fitting",
       "multibuy": "Copy multibuy list",
+      "multibuyMinusOwned": "Copy multibuy list, minus owned",
+      "allOwned": "You already own everything on this list.",
       "eveXml": "Download EVE XML",
       "manufacturePlan": "Manufacture Plan",
       "appraise": "Appraise in Market",
@@ -793,7 +798,8 @@
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
         "eft": "Fitting copied",
-        "multibuy": "Multibuy list copied"
+        "multibuy": "Multibuy list copied",
+        "multibuyMinusOwned": "Multibuy list copied, minus what you hold in {{station}}"
       },
       "downloaded": {
         "eveXml": "Fitting XML downloaded"
@@ -1856,7 +1862,7 @@
     "cancel": "Cancel",
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
-    "emptyHint": "Create a plan to start training toward a goal.",
+    "emptyHint": "Create a plan to start training toward a goal. Import your in-game queue, start from a Certified Plan, or pick a ship in the Ship Tree.",
     "backToList": "Back to plans",
     "yourEntries": "Your entries",
     "yourEntriesEmpty": "No entries yet. Add a skill to get started.",
@@ -7786,6 +7792,14 @@
       "thanksTitle": "Say thanks",
       "thanksBody": "In game: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations welcome, never expected. The app stays free.",
+      "skillsTitle": "Finding skills to train",
+      "skillsIntro": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
+      "skillsQueue": "Copy your in-game queue: Skills > Plans > a plan > Import > From skill queue.",
+      "skillsCertified": "Follow a CCP career path: Skills > Plans > From a Certified Plan.",
+      "skillsShip": "Fly a hull: Ship Tree > a ship > Skills & Mastery.",
+      "skillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
+      "skillsSearch": "Know the name: search in the plan editor, or browse Skills > Trained and add the next level.",
+      "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",
       "tabShortcuts": "Shortcuts"
     },
     "displayTitle": "Display",
