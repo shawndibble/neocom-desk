@@ -1026,11 +1026,17 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   "Open Neocom Desk" carries it into the live Appraisal tab. Not a quote: it
   commits nobody to buying at those prices.
 - **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan
-  text (capped in size), never just the counts. The recipient's class counts
-  and ship list are rebuilt from that text by the same parsing and class
-  mapping Pilot Lookup's live D-Scan view uses. Read-only; "Open Neocom Desk"
-  carries the scan into the live view. Cannot be revoked: expiry is the only
-  end of the link.
+  text (capped in size), never just the counts. The recipient's **Fleet
+  board** is rebuilt from that text by the same parsing and role mapping
+  Pilot Lookup's live D-Scan view uses. Read-only; a visitor with a Character
+  gets "Open Neocom Desk", which carries the scan into the live view, and one
+  with none gets "Log in" with a "Choose permissions" link. Cannot be revoked:
+  expiry is the only end of the link.
+- **Fleet board**: A D-Scan read as its ships grouped by role (Capitals,
+  Industrial, Transport, Support, DPS, Drones and deployables, Structures and
+  wrecks). One share bar shows each role's count and percent and expands to
+  the distance of every ship from the scanner, by role. Counts and distances
+  only: D-Scan gives no bearing and never names a pilot.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**

@@ -306,6 +306,15 @@ describe('post-login landing', () => {
     expect(takeLoginReturnTo()).toBe('/ships/fittings?f=abc');
   });
 
+  it('Add Character from a Share Link page keeps the page it stashed (#3075)', async () => {
+    setLoginReturnTo('/pilot-lookup?share=abc');
+    window.history.replaceState(null, '', '/share/abc');
+
+    await beginAddCharacterLogin();
+
+    expect(takeLoginReturnTo()).toBe('/pilot-lookup?share=abc');
+  });
+
   it('a retry restarts the landing clock along with the new Pending Login', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {

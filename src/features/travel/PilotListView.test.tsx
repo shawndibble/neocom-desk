@@ -120,7 +120,7 @@ describe('PilotListView (Local list)', () => {
 });
 
 describe('DscanShareControl', () => {
-  const scan = (text: string) => ({ kind: 'dscan' as const, typeIds: [626], text });
+  const scan = (text: string) => ({ kind: 'dscan' as const, typeIds: [626], rows: [], text });
   const TAB = String.fromCharCode(9);
   const NL = String.fromCharCode(10);
   const SCAN = ['626', '587', '626', '587']
