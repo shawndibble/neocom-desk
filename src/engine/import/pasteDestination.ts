@@ -2,7 +2,8 @@
  * Where a page-level paste belongs (the app-wide paste router,
  * `app/GlobalPasteRouter.tsx`): an EFT fit opens in Fittings, an item list —
  * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
- * a Local list or D-Scan in Pilot Lookup, and anything else is left alone.
+ * a Local list or D-Scan in Pilot Lookup, an in-game chat link on the item or
+ * system page it names, and anything else is left alone.
  *
  * Destinations live in one registry, `PASTE_DETECTORS`. Its order IS the
  * priority: the first detector to claim a paste wins, so a new format goes
@@ -15,12 +16,13 @@
  * needs most of its lines to be real item names. A pasted URL, a chat line or
  * a sentence that happens to start with "Tritanium" stays a no-op.
  */
+import { parseChatLink } from '@/engine/import/chatLink';
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
-export type PasteDestination = 'fitting' | 'dscan' | 'appraisal' | 'pilotList';
+export type PasteDestination = 'fitting' | 'chatLink' | 'dscan' | 'appraisal' | 'pilotList';
 
 export interface PasteSources {
   /** The market catalogue, keyed by lower-case item name. */
@@ -55,6 +57,11 @@ export const PASTE_DETECTORS: readonly PasteDetector[] = [
       const shipName = parseEftFit(text).shipName.trim().toLowerCase();
       return shipName !== '' && hullNames.has(shipName) ? 'match' : 'veto';
     },
+  },
+  {
+    // A `showinfo:` link is unmistakable, so it outranks the list readers.
+    id: 'chatLink',
+    detect: (text) => (parseChatLink(text) === null ? 'pass' : 'match'),
   },
   {
     // Ahead of the item list: a D-Scan's rows also read as `Name<tab>...`, but

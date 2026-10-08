@@ -74,6 +74,29 @@ describe('GlobalPasteRouter', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('"appraiseText"');
   });
 
+  it('opens a pasted type link as that item over the current page', async () => {
+    renderRouter();
+    await paste(document.body, '<url=showinfo:587>Rifter</url>');
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('/overview {"entityInfo":true}')
+    );
+  });
+
+  it('opens a pasted system link in Route Safety', async () => {
+    renderRouter();
+    await paste(document.body, '<url=showinfo:5//30000142>Jita</url>');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/travel/route'));
+  });
+
+  it('stays put for a chat link to something with no page', async () => {
+    renderRouter();
+    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
+    classify.mockClear();
+    await paste(document.body, '<url=showinfo:2//98000001>Corp</url>');
+    await waitFor(() => expect(classify).toHaveReturnedWith(null));
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
+  });
+
   it('stays put for text that is neither', async () => {
     renderRouter();
     const classify = vi.mocked(pasteDestinationModule.pasteDestination);

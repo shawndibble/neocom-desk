@@ -8333,6 +8333,7 @@
     "paste": "Paste",
     "pasteDestinations": {
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
+      "chatLink": { "label": "Chat link", "opens": "Opens the item or system page" },
       "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
       "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
       "pilotList": { "label": "Local list", "opens": "Opens in Pilot Lookup" }
