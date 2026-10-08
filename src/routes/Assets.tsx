@@ -77,6 +77,7 @@ import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
+import { formatAge } from '@/lib/age';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
@@ -1679,6 +1680,7 @@ export function Assets() {
                 <TableActionsMenu
                   name={t('assets.title')}
                   label={t('assets.tools.label')}
+                  triggerText={t('assets.tools.label')}
                   tableExport={assetsExport}
                   size="md"
                 >
@@ -1699,14 +1701,17 @@ export function Assets() {
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
                     {t('assets.myShips.title')}
+                    <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={loading} onSelect={refresh}>
+                    {t('assets.refresh')}
+                    {assetsResult && (
+                      <span className="ml-auto pl-3 text-text-dim">
+                        {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
+                      </span>
+                    )}
                   </DropdownMenuItem>
                 </TableActionsMenu>
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('assets.refresh')}
-                  disabled={loading}
-                  onClick={refresh}
-                />
               </div>
             </>
           }
