@@ -26,7 +26,7 @@ export type PilotListRowState =
   | { kind: 'stats'; stats: PilotStats };
 
 export interface PilotListRow {
-  /** The name as pasted, or as ESI spells it once resolved. */
+  /** The name as pasted: also the row's key, so it never changes while the row loads. */
   name: string;
   characterId: number | null;
   corporationName: string | null;
@@ -59,7 +59,7 @@ export async function loadPilotList(
     const hit = byName.get(row.name.toLowerCase());
     return hit === undefined
       ? { ...row, state: { kind: 'not-found' } }
-      : { ...row, name: hit.name, characterId: hit.id };
+      : { ...row, characterId: hit.id };
   });
   if (signal?.aborted) return;
   onRows(rows);

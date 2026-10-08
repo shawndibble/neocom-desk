@@ -78,6 +78,7 @@ function LocalList({
     },
     {
       id: 'corporation',
+      phoneHidden: true,
       header: t('travel.pilot.list.corporation'),
       sortValue: (row) => row.corporationName?.toLowerCase(),
       render: (row) => row.corporationName ?? dash,
@@ -85,6 +86,7 @@ function LocalList({
     },
     {
       id: 'alliance',
+      phoneHidden: true,
       header: t('travel.pilot.list.alliance'),
       sortValue: (row) => row.allianceName?.toLowerCase(),
       render: (row) => row.allianceName ?? dash,

@@ -44,7 +44,7 @@ describe('loadPilotList', () => {
 
     expect(mocks.postUniverseIds).toHaveBeenCalledTimes(1);
     expect(last.map((r) => [r.name, r.state.kind])).toEqual([
-      ['Alpha', 'no-history'],
+      ['alpha', 'no-history'],
       ['Beta', 'unreachable'],
       ['Nobody', 'not-found'],
     ]);
