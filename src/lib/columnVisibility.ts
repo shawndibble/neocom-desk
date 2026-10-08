@@ -44,6 +44,9 @@ export function createColumnVisibilitySetting<Id extends string>({
   });
 }
 
+/** Stable default, so an omitted argument doesn't re-run the memo every render. */
+const NONE: readonly never[] = [];
+
 export interface ColumnVisibility<Id extends string> {
   visible: readonly Id[];
   isVisible: (id: Id) => boolean;
@@ -65,7 +68,7 @@ export interface ColumnVisibility<Id extends string> {
 export function useColumnVisibility<Id extends string>(
   store: LocalSettingStore<readonly Id[]>,
   defaultVisible: readonly Id[],
-  phoneOffByDefault: readonly Id[] = []
+  phoneOffByDefault: readonly Id[] = NONE
 ): ColumnVisibility<Id> {
   const stored = store((state) => state.value);
   const isPhone = useIsPhone();
