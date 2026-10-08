@@ -2611,7 +2611,7 @@
     "productionLogFilteredEmptyHint": "Try widening the date range.",
     "dateFromLabel": "From",
     "dateToLabel": "To",
-    "jobsTitle": "Active jobs",
+    "jobsTitle": "Jobs",
     "jobsRefresh": "Refresh",
     "jobsEmptyTitle": "No active jobs cached",
     "jobsEmptyHint": "Refresh once you're back online to fetch this character's running industry jobs.",
