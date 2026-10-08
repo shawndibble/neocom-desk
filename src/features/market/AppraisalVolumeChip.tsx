@@ -21,6 +21,7 @@ export function AppraisalVolumeChip({
   return (
     <StatChip
       label={t('market.appraisal.totalVolume')}
+      emphasis
       value={
         partial
           ? t('market.appraisal.totalVolumePartialValue', { value })

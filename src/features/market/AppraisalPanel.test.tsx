@@ -157,12 +157,12 @@ describe('AppraisalPanel', () => {
   });
 
   describe('volume (issue #2337)', () => {
-    it('shows each row’s m³ and a Total volume tile', () => {
+    it('shows each row’s m³ and a Volume tile', () => {
       renderPanel({ controller: controller({ result: outcome() }) });
       expect(screen.getByRole('columnheader', { name: /Volume \(m³\)/ })).toBeInTheDocument();
       const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
       expect(within(row).getByText('1,240.5')).toBeInTheDocument();
-      expect(screen.getByText('Total volume')).toBeInTheDocument();
+      expect(screen.getByText('Volume')).toBeInTheDocument();
       expect(screen.getByText('1,255.5 m³')).toBeInTheDocument();
     });
 
@@ -242,8 +242,8 @@ describe('AppraisalPanel', () => {
 
     it('renders both net-of-fees chips once the active Character is resolved', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      expect(screen.getByText('You receive, selling now')).toBeInTheDocument();
-      expect(screen.getByText('You receive, listing')).toBeInTheDocument();
+      expect(screen.getByText('Selling now')).toBeInTheDocument();
+      expect(screen.getByText('Listing')).toBeInTheDocument();
     });
 
     it('excludes a row unpriced on the buy side from the instant net only', () => {
@@ -259,8 +259,8 @@ describe('AppraisalPanel', () => {
           result: netOutcome({ accountingLevel: null, brokerRelationsLevel: null }),
         }),
       });
-      expect(screen.queryByText('You receive, selling now')).not.toBeInTheDocument();
-      expect(screen.queryByText('You receive, listing')).not.toBeInTheDocument();
+      expect(screen.queryByText('Selling now')).not.toBeInTheDocument();
+      expect(screen.queryByText('Listing')).not.toBeInTheDocument();
     });
 
     it('notes the net chips are always priced at 100% market when Price % differs (issue #1748)', () => {
@@ -275,7 +275,7 @@ describe('AppraisalPanel', () => {
 
     it('wraps whole chips in the totals strip rather than scrolling sideways', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
-      const strip = screen.getByText('You receive, selling now').closest('.flex-wrap');
+      const strip = screen.getByText('Selling now').closest('.flex-wrap');
       expect(strip).not.toBeNull();
       expect(strip).not.toHaveClass('overflow-x-auto');
     });
@@ -1087,15 +1087,44 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
       }),
     });
     const youGet = screen.getByRole('region', { name: 'You get' });
-    expect(within(youGet).getByText('You receive, selling now')).toBeInTheDocument();
-    expect(within(youGet).getByText('You receive, listing')).toBeInTheDocument();
+    expect(within(youGet).getByText('Selling now')).toBeInTheDocument();
+    expect(within(youGet).getByText('Listing')).toBeInTheDocument();
     const worth = screen.getByRole('region', { name: "It's worth" });
     for (const label of ['Sell total', 'Buy total', 'Spread']) {
       expect(within(worth).getByText(label)).toBeInTheDocument();
     }
     const cargo = screen.getByRole('region', { name: 'Cargo' });
-    expect(within(cargo).getByText('Total volume')).toBeInTheDocument();
+    expect(within(cargo).getByText('Volume')).toBeInTheDocument();
     expect(within(cargo).getByText('Items')).toBeInTheDocument();
+  });
+
+  it('emphasises exactly one figure in each header group', () => {
+    renderPanel({
+      controller: controller({
+        result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
+      }),
+    });
+    for (const region of ['You get', "It's worth", 'Cargo']) {
+      expect(
+        screen.getByRole('region', { name: region }).querySelectorAll('.text-sm.font-semibold')
+      ).toHaveLength(1);
+    }
+  });
+
+  it('puts the Recent select above the paste box', () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    renderPanel({ controller: controller() });
+    const recent = screen.getByRole('combobox', { name: 'Recent' });
+    const box = screen.getByRole('textbox');
+    expect(recent.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hides Recent when nothing was saved', () => {
+    renderPanel({ controller: controller() });
+    expect(screen.queryByRole('combobox', { name: 'Recent' })).not.toBeInTheDocument();
   });
 
   it('offers both copy actions in one menu', async () => {
