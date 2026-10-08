@@ -405,7 +405,7 @@ describe('Clones', () => {
     expect(await screen.findByText(/Until/)).toBeInTheDocument();
     expect(screen.getAllByText(/shared by every clone/)).toHaveLength(1);
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
-    expect(screen.getAllByText('Jump Cooldown')).toHaveLength(1);
+    expect(screen.queryByText('Jump Cooldown')).not.toBeInTheDocument();
     expect(screen.getByText(/Infomorph Synchronizing: -3 h/)).toBeInTheDocument();
   });
 
