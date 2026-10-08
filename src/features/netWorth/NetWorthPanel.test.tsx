@@ -26,7 +26,6 @@ const snap = (characterId: number, wallet: number): NetWorthSnapshotRow => ({
   day: '2026-10-07',
   wallet,
   assetValue: 1000,
-  plexValue: 200,
   escrow: 30,
   sellStock: 4,
   hubId: 'jita',
@@ -86,7 +85,7 @@ describe('NetWorthPanel, several Characters', () => {
     renderPanel();
 
     // (100 + 1000 + 200 + 30 + 4) + (500 + 1000 + 200 + 30 + 4) = 3068
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,068$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^2,668$/));
     expect(screen.getByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Not included: Cy/)).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Balance by character' });
@@ -97,45 +96,45 @@ describe('NetWorthPanel, several Characters', () => {
     await seed({ covered: [1, 2, 3] });
     renderPanel();
     const table = await screen.findByRole('table', { name: 'Balance by character' });
-    for (const name of ['ISK', 'Assets', 'PLEX', 'Order escrow', 'Sell orders', 'Net worth']) {
+    for (const name of ['ISK', 'Assets', 'Order escrow', 'Sell orders', 'Net worth']) {
       expect(await within(table).findByRole('columnheader', { name })).toBeInTheDocument();
     }
     const row = within(table).getByText('Ava').closest('tr')!;
-    expect(await within(row).findByText(/^1,334/)).toBeInTheDocument();
+    expect(await within(row).findByText(/^1,134/)).toBeInTheDocument();
   });
 
   it('switching a layer off changes the total and says what is excluded', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
-    await openSeries(user);
-    await user.click(await screen.findByRole('option', { name: 'PLEX' }));
     await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,709$/));
-    expect(screen.getByText('Excludes PLEX')).toBeInTheDocument();
+    await openSeries(user);
+    await user.click(await screen.findByRole('option', { name: 'Order escrow' }));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,619$/));
+    expect(screen.getByText('Excludes Order escrow')).toBeInTheDocument();
   });
 
   it('cannot switch off the last layer', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,709$/));
     await openSeries(user);
-    for (const name of ['Assets', 'PLEX', 'Order escrow', 'Sell orders', 'ISK']) {
+    for (const name of ['Assets', 'Order escrow', 'Sell orders', 'ISK']) {
       await user.click(await screen.findByRole('option', { name }));
     }
     // ISK was the last one standing, so the click on it changed nothing.
     expect(screen.getByRole('option', { name: 'ISK' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: 'Layers: 1 of 5' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers: 1 of 4' })).toBeInTheDocument();
   });
 
   it('a Character checkbox hides its line and total, and the last one cannot be unchecked', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2] });
     const { onDrill } = renderPanel();
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,068$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^2,668$/));
     await user.click(screen.getByRole('checkbox', { name: 'Show Bo on the chart' }));
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,334$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,134$/));
     expect(screen.getByRole('checkbox', { name: 'Show Ava on the chart' })).toBeDisabled();
     // The checkbox is not a drill.
     expect(onDrill).not.toHaveBeenCalled();
@@ -154,7 +153,7 @@ describe('NetWorthPanel, several Characters', () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,709$/));
     await openSeries(user);
     await user.click(await screen.findByRole('option', { name: 'Assets' }));
     await vi.waitFor(async () =>
@@ -174,7 +173,6 @@ describe('NetWorthPanel, one Character', () => {
       within(table).getAllByRole('link', { name })[index]!.getAttribute('href');
     expect(href('Journal')).toBe('/wallet/journal');
     expect(href('Assets')).toBe('/assets');
-    expect(href('PLEX in assets')).toBe('/assets?q=PLEX');
     expect(href('Open orders', 0)).toBe('/market/orders');
     expect(href('Open orders', 1)).toBe('/market/orders');
 
@@ -186,9 +184,9 @@ describe('NetWorthPanel, one Character', () => {
     await seed({ covered: [1] });
     renderPanel({ mode: 'single', characters: [A], stats: <p>EverMarks</p> });
     expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
-    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,334$/));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,134$/));
     expect(screen.getByText('EverMarks')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Layers: 5 of 5' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers: 4 of 4' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText(/ only$/)).toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
@@ -204,7 +202,7 @@ describe('NetWorthPanel, one Character', () => {
     await seed({ covered: [1] });
     renderPanel({ mode: 'single', characters: [A] });
     expect(await screen.findByText(/Layers start on/)).toBeInTheDocument();
-    expect(screen.getByText(/Hangar PLEX only/)).toBeInTheDocument();
+    expect(screen.queryByText(/PLEX/)).not.toBeInTheDocument();
   });
 });
 
