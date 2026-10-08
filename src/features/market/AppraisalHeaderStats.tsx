@@ -47,7 +47,7 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   return (
-    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
