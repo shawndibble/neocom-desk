@@ -6974,6 +6974,14 @@
       }
     },
     "appraisal": {
+      "copied_one": "{{list}} copied · {{count}} item",
+      "copied_other": "{{list}} copied · {{count}} items",
+      "copyList": {
+        "sellNow": "Sell now",
+        "list": "List at undercut",
+        "refine": "Refine",
+        "multibuy": "Multibuy"
+      },
       "pasteTitle": "Paste",
       "pasteLabel": "Items from inventory, multibuy or a fitting",
       "pastePlaceholder": "Tritanium\t124,500\nDamage Control II\t3\nNocxium 220",
@@ -6993,10 +7001,6 @@
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
       "columnsButton": "Columns",
       "columnsMenuTitle": "Columns",
-      "copySellList": "Copy sell list",
-      "copyMenu": "Copy",
-      "copyMultibuy": "Copy multibuy",
-      "multibuyCopied": "Multibuy copied",
       "groupYouGet": "You get",
       "groupWorth": "It's worth",
       "groupCargo": "Cargo",
@@ -7019,8 +7023,6 @@
       "holdOver": "Does not fit in one trip.",
       "holdUnknown_one": "{{count}} item has no known volume and is left out.",
       "holdUnknown_other": "{{count}} items have no known volume and are left out.",
-      "sellListCopied": "Sell list copied",
-      "sellListHelp": "Copy a sell list for every item, one price step under the cheapest seller at {{hub}}, ready to paste into EVE's Sell Items window via Import prices.",
       "columnQuantity": "Qty",
       "columnItem": "Item",
       "columnBuyEach": "Buy each",
