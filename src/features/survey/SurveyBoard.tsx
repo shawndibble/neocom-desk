@@ -16,6 +16,7 @@ import {
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { AddScanResult } from './scanResult';
 import { oreTone } from './surveyTones';
@@ -235,6 +236,9 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
               value={summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
             />
             <StatChip label={t('survey.statRocks')} value={summary.rocksLeft} />
+            {summary.iskLeft !== null && (
+              <StatChip label={t('survey.statIsk')} value={formatIskCompact(summary.iskLeft)} />
+            )}
           </StatChips>
 
           {scans.length > 1 && (

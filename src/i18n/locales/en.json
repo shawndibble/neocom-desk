@@ -3941,6 +3941,7 @@
     "statDone": "Done at",
     "statTimeLeft": "Time left",
     "statRocks": "Rocks left",
+    "statIsk": "ISK left",
     "unitVolume": "{{value}} m³",
     "unitPace": "{{value}} m³/s",
     "eveTime": "{{time}} EVE",

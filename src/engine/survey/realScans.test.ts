@@ -32,5 +32,7 @@ describe('two real scans of one ice mine', () => {
     expect(s.percent).toBe(13);
     expect(s.pace).toBeCloseTo(26_000 / 600, 6);
     expect(s.rocksLeft).toBe(5);
+    // The scanner's own ISK column, summed: 615,000 + 5,120,000 + 7,790,000 + 9,840,000 + 11,300,000.
+    expect(s.iskLeft).toBe(34_665_000);
   });
 });

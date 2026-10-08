@@ -12,7 +12,7 @@ const METRES_PER: Record<string, number> = { m: 1, km: 1000, au: 149_597_870_700
 
 const NUMBER = '[\\d.,]+';
 const ROW = new RegExp(
-  `^(.+?)\\s+(${NUMBER})\\s+(${NUMBER})\\s*m(?:3|³)\\s+(?:${NUMBER}\\s*ISK\\s+)?(${NUMBER})\\s*(km|m|AU)$`,
+  `^(.+?)\\s+(${NUMBER})\\s+(${NUMBER})\\s*m(?:3|³)\\s+(?:(${NUMBER})\\s*ISK\\s+)?(${NUMBER})\\s*(km|m|AU)$`,
   'i'
 );
 
@@ -38,7 +38,8 @@ export function parseSurveyScan(text: string): SurveyRock[] | null {
       ore: match[1],
       units: num(match[2]),
       volume: num(match[3]),
-      distanceM: num(match[4]) * METRES_PER[match[5].toLowerCase()],
+      ...(match[4] === undefined ? {} : { isk: num(match[4]) }),
+      distanceM: num(match[5]) * METRES_PER[match[6].toLowerCase()],
     });
   }
   if (rocks.length === 0) return null;

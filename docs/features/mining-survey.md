@@ -20,7 +20,7 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - A Survey Scanner copy is one row per rock, `ore  units  volume m3  ISK  distance`, tab separated (runs of spaces also read), with an optional ore-name header line above each group. Anything else is not a scan: the parser needs every line to be one.
 - Ctrl+V anywhere in the app with a scan on the clipboard goes to this tab (`survey` is the first paste detector, strict enough that no item list or fit matches). The first scan starts a Survey (a `survey` Share Link); later ones add to it. Pasting into the box adds at once.
 - Progress is volume mined of everything the scans have shown. Rocks are matched between scans by ore, biggest first, each taking the smallest earlier rock at least as big. A rock that shrank or vanished was mined; a rock never seen before extends the field. The scanner's range is far, so a rock drifting out of range is not handled.
-- Each ore is shown against what the scans first showed of it (plus any that came into range), as a percent left; an ore mined out stays on the list at 0%. A scan pasted again unchanged is ignored: it shows nothing new and would only add an interval with no mining.
+- Each ore is shown against what the scans first showed of it (plus any that came into range), as a percent left; an ore mined out stays on the list at 0%. A scan whose rocks match any earlier scan is ignored, even with a newer scan in between: mining only removes ore, so the same rocks can't be a later state. ISK left is the scanner's own ISK column summed over the latest scan.
 - Pace is volume mined over the last three intervals divided by their time; ETA is the volume left over that pace from the latest scan. One scan gives neither.
 - Copy chat message: four lines, none wider than 50 visible characters, bold only. A cleared field is three lines with the total mining time.
 - Anyone with the link can add a scan with no sign-in; the page re-reads every 20 s while visible.
@@ -37,6 +37,8 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 
 ## Observed gaps
 
-- "Your share" from the personal mining ledger (system and day granular), and ISK left from the scanner's ISK column, are not built.
+- "Your share" from the personal mining ledger (system and day granular) is not built; it needs a system picker.
+- A "Field cleared" state needs a scan with every rock at 0 m³. The scanner prints no rows for an empty field, so the finish message may never show; a "Mark cleared" control or clearing at the finish time are the fallbacks.
+- A genuinely older scan that was never pasted before is read as the newest, because a scan's time is when it was pasted.
 - A survey has no "stop sharing": a create-only share can only expire.
 - A junk-paste flood is bounded only by the per-scan size cap and the 7-day expiry.

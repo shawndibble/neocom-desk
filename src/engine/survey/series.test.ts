@@ -117,6 +117,23 @@ describe('summarizeSurvey', () => {
     expect(s.pace).toBe(1);
   });
 
+  it('ignores a stale repaste of an earlier scan, even with a newer scan in between', () => {
+    // A, then B, then A again (a pilot pastes what was still on their clipboard).
+    const a: [string, number][] = [
+      ['X', 500],
+      ['X', 300],
+    ];
+    const b: [string, number][] = [
+      ['X', 500],
+      ['X', 200],
+    ];
+    const s = summarizeSurvey([scan(0, ...a), scan(5, ...b), scan(9, ...a)])!;
+    expect(s.points).toHaveLength(2);
+    expect(s.lastAt).toBe(T0 + 5 * MIN);
+    expect(s.leftVolume).toBe(700);
+    expect(s.intervals[0]).toMatchObject({ mined: 100, added: 0 });
+  });
+
   it('reads a scan repasted unchanged as one scan', () => {
     const rocks: [string, number][] = [
       ['A', 400],

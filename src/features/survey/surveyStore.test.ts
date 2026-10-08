@@ -101,8 +101,8 @@ describe('loadSurvey', () => {
       ok: true,
       expiresAt: EXPIRES,
       scans: [
-        { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, distanceM: 20_000 }] },
-        { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, distanceM: 20_000 }] },
+        { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
+        { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
       ],
     });
   });

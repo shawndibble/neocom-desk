@@ -47,7 +47,7 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
   const rows: VolumeRow[] = summary.points.map((p, i) => {
     const row: VolumeRow = { at: p.at, total: p.total };
     for (const ore of summary.oreNames) row[ore] = p.byOre[ore] ?? 0;
-    if (i > 0) row.delta = summary.points[i - 1].total - p.total;
+    if (i > 0) row.delta = summary.intervals[i - 1].mined;
     return row;
   });
   if (summary.etaAt !== null) {

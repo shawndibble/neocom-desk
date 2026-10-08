@@ -12,10 +12,10 @@ const SCAN = [
 describe('parseSurveyScan', () => {
   it('reads ore, units, volume and distance from tab-separated rows', () => {
     expect(parseSurveyScan(SCAN)).toEqual([
-      { ore: 'Pyroxeres', units: 8016, volume: 2404, distanceM: 33_000 },
-      { ore: 'Pyroxeres II-Grade', units: 9840, volume: 2952, distanceM: 13_000 },
-      { ore: 'Pyroxeres III-Grade', units: 4268, volume: 1280, distanceM: 34_000 },
-      { ore: 'Veldspar', units: 82608, volume: 8260, distanceM: 23_000 },
+      { ore: 'Pyroxeres', units: 8016, volume: 2404, isk: 184_000, distanceM: 33_000 },
+      { ore: 'Pyroxeres II-Grade', units: 9840, volume: 2952, isk: 221_000, distanceM: 13_000 },
+      { ore: 'Pyroxeres III-Grade', units: 4268, volume: 1280, isk: 107_000, distanceM: 34_000 },
+      { ore: 'Veldspar', units: 82608, volume: 8260, isk: 772_000, distanceM: 23_000 },
     ]);
   });
 
@@ -26,7 +26,9 @@ describe('parseSurveyScan', () => {
 
   it('accepts m3 written as m³, CRLF line endings, blank lines and plain metres', () => {
     const rows = parseSurveyScan('Scordite\t35,162\t5,274 m³\t570,000.00 ISK\t950 m\r\n\r\n');
-    expect(rows).toEqual([{ ore: 'Scordite', units: 35162, volume: 5274, distanceM: 950 }]);
+    expect(rows).toEqual([
+      { ore: 'Scordite', units: 35162, volume: 5274, isk: 570_000, distanceM: 950 },
+    ]);
   });
 
   it('accepts a row without the ISK column and distances in AU', () => {
@@ -43,9 +45,9 @@ describe('parseSurveyScan', () => {
       'Scordite\t35,162\t5,274 m3\t570,000.00 ISK\t36 km',
     ].join('\n');
     expect(parseSurveyScan(text)).toEqual([
-      { ore: 'Pyroxeres II-Grade', units: 2312, volume: 693, distanceM: 8656 },
-      { ore: 'Pyroxeres II-Grade', units: 9840, volume: 2952, distanceM: 12_000 },
-      { ore: 'Scordite', units: 35162, volume: 5274, distanceM: 36_000 },
+      { ore: 'Pyroxeres II-Grade', units: 2312, volume: 693, isk: 51_900, distanceM: 8656 },
+      { ore: 'Pyroxeres II-Grade', units: 9840, volume: 2952, isk: 221_000, distanceM: 12_000 },
+      { ore: 'Scordite', units: 35162, volume: 5274, isk: 570_000, distanceM: 36_000 },
     ]);
   });
 
@@ -59,8 +61,8 @@ describe('parseSurveyScan', () => {
       'Clear Icicle\t29\t29,000 m3\t5,940,000.00 ISK\t7,222 m',
     ].join('\n');
     expect(parseSurveyScan(ice)).toEqual([
-      { ore: 'Clear Icicle', units: 25, volume: 25_000, distanceM: 28_000 },
-      { ore: 'Clear Icicle', units: 29, volume: 29_000, distanceM: 7222 },
+      { ore: 'Clear Icicle', units: 25, volume: 25_000, isk: 5_120_000, distanceM: 28_000 },
+      { ore: 'Clear Icicle', units: 29, volume: 29_000, isk: 5_940_000, distanceM: 7222 },
     ]);
   });
 

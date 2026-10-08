@@ -54,6 +54,9 @@ describe('SurveyBoard', () => {
     expect(screen.getByText('43.3 m³/s')).toBeTruthy();
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
+    // The scanner's own ISK column, summed.
+    expect(screen.getByText('ISK left')).toBeTruthy();
+    expect(screen.getByText(/^34\.\d+M$/)).toBeTruthy();
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 

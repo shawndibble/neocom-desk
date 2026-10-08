@@ -11,6 +11,8 @@ export interface SurveyRock {
   volume: number;
   /** Ore units still in the rock, as the scanner reports them. */
   units?: number;
+  /** The scanner's own ISK value for what is left in the rock. */
+  isk?: number;
   /** Distance from the scanning ship, metres. */
   distanceM?: number;
 }
@@ -57,6 +59,8 @@ export interface SurveySummary {
   /** Whole percent mined. Reads 100 only once the field is empty. */
   percent: number;
   rocksLeft: number;
+  /** The scanner's ISK value of everything left, summed; null when no row carried one. */
+  iskLeft: number | null;
   /** Ores still in the field, biggest first. */
   ores: SurveyOre[];
   intervals: SurveyInterval[];
@@ -124,12 +128,17 @@ const signature = (scan: SurveyScan): string =>
 
 export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | null {
   const scans: SurveyScan[] = [];
+  const seen = new Set<string>();
   for (const s of [...input].sort((a, b) => a.at - b.at)) {
     const previous = scans[scans.length - 1];
     if (previous !== undefined && previous.at === s.at) continue;
-    // The same scan pasted again shows nothing new; keeping it would only add
-    // an interval with no mining, which drags the pace down.
-    if (previous !== undefined && signature(previous) === signature(s)) continue;
+    // A scan the survey already has shows nothing new. Next to the one before
+    // it, it would add an interval with no mining (dragging the pace down);
+    // after a newer scan, it would read as the field growing back. Mining only
+    // ever removes ore, so the same rocks can't be a later state.
+    const sig = signature(s);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
     scans.push(s);
   }
   if (scans.length === 0) return null;
@@ -201,6 +210,9 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     leftVolume,
     percent,
     rocksLeft: last.rocks.length,
+    iskLeft: last.rocks.some((r) => r.isk !== undefined)
+      ? last.rocks.reduce((sum, r) => sum + (r.isk ?? 0), 0)
+      : null,
     ores,
     intervals,
     points,
