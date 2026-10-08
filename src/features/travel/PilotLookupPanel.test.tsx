@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   fetchPilotStats: vi.fn(),
   loadTypeNames: vi.fn(),
   fetchPilotKillmails: vi.fn(),
+  fetchPilotKillHistory: vi.fn(),
   loadKillmailFit: vi.fn(),
   resolveNames: vi.fn(),
   loadTypes: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: mocks.fetchPilotStats,
   fetchPilotKillmails: mocks.fetchPilotKillmails,
+  fetchPilotKillHistory: mocks.fetchPilotKillHistory,
 }));
 vi.mock('./pilotKillmailFit', () => ({ loadKillmailFit: mocks.loadKillmailFit }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
@@ -48,7 +50,17 @@ vi.mock('./pilotLookup', async (importOriginal) => ({
 }));
 
 // A pasted Local list's zKillboard lookups stay pending: these tests are about the strip and the box.
-vi.mock('./pilotListData', () => ({ loadPilotList: () => new Promise(() => undefined) }));
+vi.mock('./pilotListData', () => ({
+  loadPilotList: () => new Promise(() => undefined),
+  loadViewerContext: () =>
+    Promise.resolve({ contacts: new Map(), corporationId: null, allianceId: null }),
+}));
+vi.mock('./useHereSpace', () => ({
+  useHereSpace: () => ({
+    current: { systemId: null, source: null, pick: () => undefined, clearPick: () => undefined },
+    space: null,
+  }),
+}));
 
 import { PilotLookupPanel } from './PilotLookupPanel';
 
@@ -105,6 +117,7 @@ describe('PilotLookupPanel', () => {
     mocks.loadPilotProfile.mockResolvedValue(PROFILE);
     mocks.fetchPilotStats.mockResolvedValue(STATS);
     mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+    mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [] });
     mocks.resolveNames.mockResolvedValue(
       new Map([
         [900, 'Victim Pilot'],
@@ -176,6 +189,71 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(screen.queryByText('3 names, Local list')).toBeNull();
     expect(probe.search).toBe('?pilot=42');
+  });
+
+  describe('a name box with one name per line', () => {
+    const NL = String.fromCharCode(10);
+
+    it('looks one name up on Enter, as it always did', async () => {
+      mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' });
+      fireEvent.change(box, { target: { value: 'some pilot' } });
+      fireEvent.keyDown(box, { key: 'Enter' });
+      expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    });
+
+    it('keeps Enter for a new line once there is a list, and Ctrl+Enter looks it up', async () => {
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' });
+      fireEvent.change(box, { target: { value: 'Alpha One' + NL + 'Beta Two' } });
+
+      expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(true);
+      expect(screen.queryByText('2 names, Local list')).toBeNull();
+      expect(mocks.resolvePilotByName).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+      expect(await screen.findByText('2 names, Local list')).toBeTruthy();
+    });
+
+    it('looks a typed list up with the Look up button too', async () => {
+      renderTab();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+        target: { value: 'Alpha One' + NL + 'Beta Two' + NL + 'Gamma Three' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      expect(await screen.findByText('3 names, Local list')).toBeTruthy();
+    });
+
+    it('says so when a line does not look like a pilot name', async () => {
+      renderTab();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+        target: { value: 'Alpha One' + NL + 'not <a> name!' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      expect(
+        await screen.findByText(/One of the lines doesn't look like a pilot name/)
+      ).toBeTruthy();
+      expect(screen.queryByText('2 names, Local list')).toBeNull();
+    });
+
+    it('suggests for the line being typed and fills only that line', async () => {
+      mocks.granted = true;
+      mocks.searchMailRecipients.mockResolvedValue([{ characterId: 7, name: 'Nimjia' }]);
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' }) as HTMLTextAreaElement;
+      fireEvent.focus(box);
+      const text = 'Zakof' + NL + 'Nim';
+      box.setSelectionRange(text.length, text.length);
+      fireEvent.change(box, { target: { value: text, selectionStart: text.length } });
+
+      const option = await screen.findByRole('option', { name: 'Nimjia' }, { timeout: 2000 });
+      expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'Nim', expect.any(AbortSignal));
+      fireEvent.mouseDown(option);
+      expect(box.value).toBe('Zakof' + NL + 'Nimjia');
+      // Picking one name of a list does not open that pilot.
+      expect(probe.search).toBe('');
+    });
   });
 
   it('puts Copy Share Link beside Clear for a D-Scan, and nothing of the kind for a Local list', async () => {
