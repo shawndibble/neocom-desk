@@ -1348,6 +1348,20 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
     });
 
+    it('shows the ship class under the name and a summary line', async () => {
+      server.use(
+        http.get('https://esi.evetech.net/universe/groups/25', () =>
+          HttpResponse.json({ group_id: 25, name: 'Frigate' })
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+
+      expect(await within(panel).findByText('Frigate')).toBeInTheDocument();
+      expect(within(panel).getByText('1 ship across 1 character · nearest first')).toBeVisible();
+    });
+
     it('a row is one link into the ship’s location', async () => {
       const user = userEvent.setup();
       render(<App />);

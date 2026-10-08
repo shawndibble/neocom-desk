@@ -1718,7 +1718,17 @@ export function Assets() {
           onClose={closeMyShips}
           characterIds={shipCharacterIds}
           activeCharacterId={activeCharacterId}
-          filterControl={crossCharacterFilterMeta}
+          filterControl={
+            crossCharacterCandidates.length > 1 ? (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={crossCharacterFilter}
+                onChange={(chars: CharacterFilterValue) => setView({ chars })}
+                characterCount={crossCharacterCandidates.length}
+                variant="field"
+              />
+            ) : undefined
+          }
           onShowAllCharacters={
             !shipsFilterIsAll && crossCharacterCandidates.length > 1
               ? () => setView({ chars: 'all' })
