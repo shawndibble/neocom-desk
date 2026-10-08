@@ -17,6 +17,7 @@ import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
+import type { TaxPriceSource } from '@/engine/miningTax/priceBasis';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
@@ -24,6 +25,7 @@ import { formatLocalDate } from '@/lib/localDate';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
+import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -40,6 +42,11 @@ interface RowDetailModalProps {
   /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
+  /** Which price tier produced each `pricesFor` number — feeds the price breakdown. */
+  priceSourcesFor?: (
+    hubId: string | undefined,
+    date: string
+  ) => ReadonlyMap<number, TaxPriceSource>;
   payees: readonly PayeeRecord[];
   /**
    * Prices at a given Payee's hub on a given date, forwarded to
@@ -104,6 +111,7 @@ export function RowDetailModal({
   systemName,
   systemSecurity,
   typeNames,
+  priceSourcesFor,
   payees,
   pricesFor,
   busy,
@@ -281,6 +289,17 @@ export function RowDetailModal({
               ))}
             </ul>
           </div>
+        )}
+
+        {assigned && assignment && (
+          <PriceBreakdownCard
+            assignment={assignment}
+            payee={payee}
+            systemName={systemName}
+            typeNames={typeNames}
+            pricesFor={pricesFor}
+            priceSourcesFor={priceSourcesFor}
+          />
         )}
 
         {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (

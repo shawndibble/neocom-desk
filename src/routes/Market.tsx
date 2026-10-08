@@ -1,3 +1,4 @@
+import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
@@ -757,6 +758,7 @@ export function Market() {
           and order book wasted half a 1440px monitor at 6xl — while the
           other tabs keep their reading width. */}
       <div className={`mx-auto space-y-4 ${tab === 'browser' ? 'max-w-[96rem]' : 'max-w-6xl'}`}>
+        {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}
           actions={

@@ -102,6 +102,8 @@ export interface OrderDetailView {
   hubsFailed: boolean;
   /** The cost-basis ledger's fee lines at the relist floor — null without a floor, a cost basis, or the owner's skills (the ledger then drops them). */
   relistFees: RelistFees | null;
+  /** The owner's Accounting level, for the structure-fee net preview. Undefined without skills. */
+  accountingLevel?: number;
 }
 
 /** The region-book and price-history caches' key for one item in one region. */
@@ -188,5 +190,6 @@ export function assembleOrderDetailView(
       : undefined,
     hubsFailed: caches.hubBidsFailed.has(row.typeId),
     relistFees: relistFees(row, skills),
+    accountingLevel: skills?.accountingLevel,
   };
 }

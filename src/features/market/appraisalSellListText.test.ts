@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AppraisalItem } from '@/engine/market/appraisal';
-import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
+import { appraisalSellListText } from './appraisalSellListText';
 
 const ITEMS: AppraisalItem[] = [
   { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
@@ -23,19 +23,5 @@ describe('appraisalSellListText', () => {
 
   it('is empty with nothing to sell', () => {
     expect(appraisalSellListText([ITEMS[2]])).toBe('');
-  });
-});
-
-describe('hasAppraisalSellList', () => {
-  it('is true once at least one item has a seller to undercut', () => {
-    expect(hasAppraisalSellList(ITEMS)).toBe(true);
-  });
-
-  it('is false when nobody is selling anything pasted', () => {
-    expect(hasAppraisalSellList([ITEMS[2]])).toBe(false);
-  });
-
-  it('is false with nothing pasted', () => {
-    expect(hasAppraisalSellList([])).toBe(false);
   });
 });

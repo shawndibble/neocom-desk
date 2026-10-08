@@ -67,12 +67,15 @@ import type { AddTarget } from './addTarget';
 import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface ResourceBarProps {
+  /** CPU, powergrid and calibration can be fixed by swaps; drone bandwidth and the like cannot. */
+  makeItFit?: boolean;
   label: string;
   used: number | null;
   total: number | null;
@@ -84,7 +87,7 @@ interface ResourceBarProps {
  * each time the readout goes from within budget to over (a Character switch
  * that re-states it included) — the `null` gap while it recomputes doesn't count.
  */
-function ResourceBar({ label, used, total }: ResourceBarProps) {
+function ResourceBar({ label, used, total, makeItFit: showMakeItFit }: ResourceBarProps) {
   const { t } = useTranslation();
   const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
@@ -119,6 +122,11 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
         <p className="pl-30 text-right text-xs text-danger">
           {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
         </p>
+      )}
+      {overBudget && showMakeItFit && (
+        <div className="flex justify-end">
+          <MakeItFitTrigger />
+        </div>
       )}
     </div>
   );
@@ -813,16 +821,19 @@ export function FittingRackList({
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar
+            makeItFit
             label={t('fittings.list.cpu')}
             used={stats?.cpuUsed ?? null}
             total={stats?.cpuTotal ?? null}
           />
           <ResourceBar
+            makeItFit
             label={t('fittings.list.powergrid')}
             used={stats?.powergridUsed ?? null}
             total={stats?.powergridTotal ?? null}
           />
           <ResourceBar
+            makeItFit
             label={t('fittings.list.calibration')}
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}

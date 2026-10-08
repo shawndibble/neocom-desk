@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rollupProductionRuns, summarizeProductionRun } from './productionRunSummary';
 import type {
+  ProductionLossRecord,
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   ProductionSaleLinkRecord,
@@ -54,6 +55,55 @@ function orderWatch(
     ...overrides,
   };
 }
+
+function loss(overrides: Partial<ProductionLossRecord> = {}): ProductionLossRecord {
+  return {
+    id: '1:loss:1',
+    characterId: 1,
+    runId: 'run-1',
+    quantity: 4,
+    lostAt: Date.now(),
+    insurancePayout: 0,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    ...overrides,
+  };
+}
+
+describe('summarizeProductionRun with losses', () => {
+  it('leaves a run without losses unchanged', () => {
+    const s = summarizeProductionRun(run(), [], [], {}, undefined, []);
+    expect(s.quantityLost).toBe(0);
+    expect(s.profit.profit).toBe(-550_000);
+  });
+
+  it('writes lost units off open inventory and counts insurance as proceeds', () => {
+    const s = summarizeProductionRun(run(), [], [], {}, undefined, [
+      loss({ quantity: 4, insurancePayout: 100_000 }),
+    ]);
+    expect(s.quantityLost).toBe(4);
+    expect(s.remaining).toBe(6);
+    expect(s.openInventoryValue).toBe(330_000);
+    expect(s.profit.profit).toBe(-450_000);
+    expect(s.status).toBe('open');
+  });
+
+  it('sums several loss records and closes the run once sold plus lost covers it', () => {
+    const s = summarizeProductionRun(run(), [saleLink({ quantity: 3 })], [], {}, undefined, [
+      loss({ quantity: 4 }),
+      loss({ id: '1:loss:2', quantity: 3, insurancePayout: 50_000 }),
+    ]);
+    expect(s.quantityLost).toBe(7);
+    expect(s.remaining).toBe(0);
+    expect(s.status).toBe('closed');
+  });
+
+  it('ignores losses that belong to another run', () => {
+    const s = summarizeProductionRun(run(), [], [], {}, undefined, [loss({ runId: 'other' })]);
+    expect(s.quantityLost).toBe(0);
+    expect(s.status).toBe('new');
+  });
+});
 
 describe('summarizeProductionRun', () => {
   it('is "new" with zero remaining sold and the full quantity as open inventory', () => {
@@ -126,7 +176,14 @@ describe('summarizeProductionRun', () => {
 });
 
 describe('rollupProductionRuns', () => {
-  const base = { saleLinks: [], orderWatches: [], quantitySold: 0, remaining: 0 };
+  const base = {
+    saleLinks: [],
+    orderWatches: [],
+    losses: [],
+    quantityLost: 0,
+    quantitySold: 0,
+    remaining: 0,
+  };
   const row = (status: 'new' | 'open' | 'closed', profit: number) =>
     ({
       ...base,

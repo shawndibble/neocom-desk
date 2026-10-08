@@ -1,8 +1,9 @@
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
-import { Spinner } from '@/components/ui';
+import { Spinner, Toast, useTimedToast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
@@ -21,6 +22,7 @@ import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
+import type { BlueprintPasteNoticeState } from '@/lib/shortcuts';
 
 const NO_PLANS: BuildPlanRecord[] = [];
 
@@ -33,6 +35,7 @@ const NO_PLANS: BuildPlanRecord[] = [];
 export function IndustryGroupPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { groupId } = useParams<{ groupId: string }>();
   const workspace = useIndustryWorkspace();
   const {
@@ -47,6 +50,21 @@ export function IndustryGroupPage() {
   } = workspace;
 
   const itemActions = usePageItemActions({ activeCharacterId });
+
+  // What a blueprint paste just did, read once from the navigation that
+  // brought the pilot here; it fades, and a reload does not bring it back.
+  const [pasteNote, setPasteNote] = useState<string | null>(() => {
+    const notice = (location.state as Partial<BlueprintPasteNoticeState> | null)
+      ?.blueprintPasteNotice;
+    if (!notice) return null;
+    const parts = [
+      t(notice.reused ? 'industry.blueprintPasteReused' : 'industry.blueprintPasteCreated'),
+    ];
+    if (notice.skipped > 0)
+      parts.push(t('industry.blueprintPasteSkipped', { count: notice.skipped }));
+    return parts.join(' ');
+  });
+  useTimedToast(pasteNote, () => setPasteNote(null), 12000);
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null || groupId === undefined) return undefined;
@@ -170,6 +188,7 @@ export function IndustryGroupPage() {
           />
         )}
       </div>
+      {pasteNote && <Toast message={pasteNote} />}
     </ItemActionsProvider>
   );
 }
