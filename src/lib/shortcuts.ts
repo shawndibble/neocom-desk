@@ -21,6 +21,25 @@ export interface FittingLoadState {
 }
 
 /**
+ * Router `location.state` shape the app-wide paste router
+ * (`app/GlobalPasteRouter.tsx`) navigates `/skills/plans` with: a pasted skill
+ * plan. The list page makes a new plan for it and hands the text on to that
+ * plan's editor, which opens its Import dialog on it. The same state shape
+ * reaches the editor, so the producer and both consumers share one type.
+ */
+export interface SkillPlanImportState {
+  readonly skillPlanImportText: string;
+}
+
+/**
+ * Router `location.state` shape the app-wide paste router navigates
+ * `/pilot-lookup` with: a pasted Local list or D-Scan, checked on arrival.
+ */
+export interface PilotListState {
+  readonly pilotListText: string;
+}
+
+/**
  * Router `location.state` shape a Fitting's Export menu navigates `/industry`
  * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
  * on arrival ("Manufacture Plan"). Shared so the producer
@@ -29,6 +48,22 @@ export interface FittingLoadState {
  */
 export interface IndustryFitImportState {
   readonly fitImportText: string;
+}
+
+/**
+ * Router `location.state` shape the paste router navigates `/industry` with
+ * for a pasted blueprint list: the text, turned into a Build Group on arrival.
+ */
+export interface IndustryBlueprintListState {
+  readonly blueprintListText: string;
+}
+
+/**
+ * Router `location.state` shape a Build Group's page opens with right after a
+ * blueprint paste created (or reused) it: what the pilot should be told.
+ */
+export interface BlueprintPasteNoticeState {
+  readonly blueprintPasteNotice: { readonly skipped: number; readonly reused: boolean };
 }
 
 /**

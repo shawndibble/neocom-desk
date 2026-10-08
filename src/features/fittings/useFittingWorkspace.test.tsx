@@ -402,3 +402,77 @@ describe('useFittingWorkspace — drone launch edge cases', () => {
     useActiveCharacter.setState({ activeCharacterId: null });
   });
 });
+
+describe('useFittingWorkspace — an oversized Fitting survives a reload (#2954)', () => {
+  const OVERSIZED: Fitting = {
+    ...RIFTER,
+    drones: [],
+    cargo: Array.from({ length: 501 }, (_, i) => ({ typeId: 1000 + i, quantity: 1 })),
+  };
+  const oversizedLoad: LoadedFitting = {
+    kind: 'fitting',
+    source: 'in-game',
+    fitting: OVERSIZED,
+    unresolved: [],
+  };
+
+  function renderAtPath(path: string) {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
+    );
+    return renderHook(() => ({ workspace: useFittingWorkspace(), location: useLocation() }), {
+      wrapper,
+    });
+  }
+
+  beforeEach(async () => {
+    await db.settings.clear();
+  });
+
+  it('keeps a draft, leaves the URL clean, and a fresh editor with no ?f= restores it', async () => {
+    const first = renderAtPath('/ships/fittings');
+    await act(() => first.result.current.workspace.openLoaded(oversizedLoad));
+    expect(first.result.current.workspace.tooLargeToShare).toBe(true);
+    expect(first.result.current.location.search).toBe('');
+    first.unmount();
+
+    const reloaded = renderAtPath('/ships/fittings');
+    await waitFor(() => expect(reloaded.result.current.workspace.fitting).toEqual(OVERSIZED));
+    expect(reloaded.result.current.workspace.tooLargeToShare).toBe(true);
+  });
+
+  it('an edit past the link limit leaves the stale ?f= behind, so a reload restores the edit', async () => {
+    const linked = await renderAt({ ...RIFTER, drones: [] });
+    act(() => linked.result.current.workspace.edit(() => OVERSIZED));
+    await waitFor(() => expect(linked.result.current.location.search).toBe(''));
+    expect(linked.result.current.workspace.fitting).toEqual(OVERSIZED);
+    expect(linked.result.current.workspace.tooLargeToShare).toBe(true);
+    await waitFor(async () => expect(await db.settings.get('fittingDraft')).toBeDefined());
+    linked.unmount();
+
+    const reloaded = renderAtPath('/ships/fittings');
+    await waitFor(() => expect(reloaded.result.current.workspace.fitting).toEqual(OVERSIZED));
+  });
+
+  it('never overrides an explicit ?f=, and drops the draft', async () => {
+    const first = renderAtPath('/ships/fittings');
+    await act(() => first.result.current.workspace.openLoaded(oversizedLoad));
+    first.unmount();
+
+    const encoded = await encodeFittingShare(fittingToShareInput({ ...RIFTER, drones: [] }));
+    if (!encoded.ok) throw new Error('encode failed');
+    const linked = renderAtPath(`/ships/fittings/edit?f=${encoded.payload}`);
+    await waitFor(() => expect(linked.result.current.workspace.fitting?.cargo).toEqual([]));
+    expect(linked.result.current.workspace.tooLargeToShare).toBe(false);
+    await waitFor(async () => expect(await db.settings.get('fittingDraft')).toBeUndefined());
+  });
+
+  it('opening a link-sized Fitting clears the draft', async () => {
+    const view = renderAtPath('/ships/fittings');
+    await act(() => view.result.current.workspace.openLoaded(oversizedLoad));
+    await waitFor(async () => expect(await db.settings.get('fittingDraft')).toBeDefined());
+
+    await act(() => view.result.current.workspace.openFitting({ ...RIFTER, drones: [] }));
+    await waitFor(async () => expect(await db.settings.get('fittingDraft')).toBeUndefined());
+  });
+});

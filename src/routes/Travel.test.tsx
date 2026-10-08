@@ -32,12 +32,20 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+/** The system picker's text box; the Route rules ship picker is a combobox too. */
+async function systemPickerInput(): Promise<HTMLElement> {
+  const boxes = await screen.findAllByRole('combobox');
+  return boxes.find((box) => box.tagName === 'INPUT') ?? boxes[0];
+}
+
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   // A smartbomb, for the zKillboard column's tag.
   loadTypes: vi.fn(async () => ({ '3995': { name: 'Large EMP Smartbomb II', groupID: 72 } })),
   loadBlueprints: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
+  loadShipMass: vi.fn(async () => ({})),
+  loadWormholeMass: vi.fn(async () => ({})),
 }));
 
 let lawlessSystems: ReadonlySet<number> = new Set();
@@ -488,7 +496,7 @@ describe('Travel › Route Safety › Stops', () => {
 
     await screen.findByRole('table', { name: 'Systems on the route' });
     await user.click(screen.getByRole('button', { name: 'Add a stop' }));
-    await user.type(await screen.findByRole('combobox'), 'Sobas');
+    await user.type(await systemPickerInput(), 'Sobas');
     await user.click(await screen.findByRole('option', { name: /Sobaseki/ }));
 
     expect(stopsInLink()).toBe(`${UEDAMA},${SOBASEKI}`);
@@ -1005,7 +1013,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         await screen.findByText('Add a stop to fly there through the pinned wormhole.')
       ).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Add a stop' }));
-      await user.type(await screen.findByRole('combobox'), 'Ueda');
+      await user.type(await systemPickerInput(), 'Ueda');
       await user.click(await screen.findByRole('option', { name: /Uedama/ }));
 
       expect(pinInLink()).toBe('uedama');

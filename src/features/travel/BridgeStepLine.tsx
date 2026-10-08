@@ -6,6 +6,7 @@
 import { useTranslation } from 'react-i18next';
 import type { AnsiblexGate } from '@/engine/route/ansiblex';
 import type { RouteSafetyRow } from '@/engine/route/routeSafety';
+import { MassNote } from './MassNote';
 import { routeSystemName } from './routeSystemName';
 
 /** A jump over a bridge, between the two route systems it joins. */
@@ -40,6 +41,7 @@ export function BridgeStepLine({ step }: { step: BridgeStep }) {
           <span className="min-w-0 truncate text-text-dim">{bridge.name}</span>
         </>
       )}
+      <MassNote hole="bridge" />
     </div>
   );
 }

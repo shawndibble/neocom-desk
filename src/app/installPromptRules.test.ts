@@ -107,14 +107,22 @@ describe('selectInstallPromptVariant', () => {
 describe('selectInstallAppVariant', () => {
   const base = { isStandalone: false, deferredPromptAvailable: false, platform: null } as const;
 
+  const android = { ...base, platform: 'android' } as const;
+
+  it('hides on desktop, whatever the browser offers', () => {
+    expect(selectInstallAppVariant({ ...base })).toBe('none');
+    expect(selectInstallAppVariant({ ...base, deferredPromptAvailable: true })).toBe('none');
+    expect(selectInstallAppVariant({ ...base, isStandalone: true })).toBe('none');
+  });
+
   it('reports installed when already standalone', () => {
     expect(
-      selectInstallAppVariant({ ...base, isStandalone: true, deferredPromptAvailable: true })
+      selectInstallAppVariant({ ...android, isStandalone: true, deferredPromptAvailable: true })
     ).toBe('installed');
   });
 
   it('prefers the native prompt whenever the browser offered one', () => {
-    expect(selectInstallAppVariant({ ...base, deferredPromptAvailable: true })).toBe('native');
+    expect(selectInstallAppVariant({ ...android, deferredPromptAvailable: true })).toBe('native');
   });
 
   it('gives per-browser steps where the event never fires', () => {
@@ -125,8 +133,7 @@ describe('selectInstallAppVariant', () => {
     );
   });
 
-  it('falls back to a browser-menu pointer on desktop and Android Chromium', () => {
-    expect(selectInstallAppVariant({ ...base })).toBe('menu');
-    expect(selectInstallAppVariant({ ...base, platform: 'android' })).toBe('menu');
+  it('falls back to a browser-menu pointer on Android Chromium', () => {
+    expect(selectInstallAppVariant({ ...android })).toBe('menu');
   });
 });

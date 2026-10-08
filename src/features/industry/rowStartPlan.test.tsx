@@ -147,6 +147,7 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
         iskPerHour: null,
         marginPct: null,
         profit: null,
+        materials: [],
         totalCost: 0,
         revenue: null,
       },

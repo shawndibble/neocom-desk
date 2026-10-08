@@ -88,6 +88,8 @@ beforeEach(() => {
     corpName: 'Federal Navy Academy',
     offersFetchedAt: null,
     offersFromCache: false,
+    offersError: false,
+    reloadOffers: () => {},
     rows: [],
     catalog: null,
     playerLp: 12_000,
@@ -309,6 +311,8 @@ describe('LoyaltyStore filters', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [ITEM_ROW],
       catalog: null,
       playerLp: 12_000,
@@ -327,6 +331,31 @@ describe('LoyaltyStore filters', () => {
     expect(await screen.findByText(ITEM_ROW.itemName)).toBeInTheDocument();
   });
 
+  it('shows an error with Try again, not an empty store, when the offers load failed', async () => {
+    const reloadOffers = vi.fn();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: null,
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: true,
+      reloadOffers,
+      rows: [],
+      catalog: null,
+      playerLp: 0,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore();
+
+    expect(screen.getByText("Couldn't load this LP store")).toBeInTheDocument();
+    expect(screen.queryByText('No offers')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(reloadOffers).toHaveBeenCalledTimes(1);
+  });
+
   it('offers no Reset filters when the corporation has no offers at all', () => {
     renderStore();
     expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
@@ -340,6 +369,8 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [ITEM_ROW],
       catalog: null,
       playerLp: 12_000,
@@ -359,6 +390,8 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [ITEM_ROW, BLUEPRINT_ROW],
       catalog: null,
       playerLp: 12_000,
@@ -389,6 +422,8 @@ describe('LoyaltyStore linked offer', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [ITEM_ROW, BLUEPRINT_ROW],
       catalog: null,
       playerLp: 12_000,
@@ -412,6 +447,8 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [ITEM_ROW, BLUEPRINT_ROW, UNRESOLVED_BLUEPRINT_ROW],
       catalog: { byProductTypeID: new Map([[300, { blueprintTypeID: 999 }]]) },
       playerLp: 12_000,
@@ -467,6 +504,8 @@ describe('LoyaltyStore blueprint badge (issue #882)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows: [BLUEPRINT_ROW],
       catalog: null,
       playerLp: 12_000,
@@ -526,6 +565,8 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows,
       catalog: null,
       playerLp: 12_000,
@@ -671,6 +712,8 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
       rows,
       catalog: null,
       playerLp: 12_000,

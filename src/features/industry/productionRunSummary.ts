@@ -5,6 +5,7 @@
  * disagree about what "sold" or "closed" means for the same run.
  */
 import type {
+  ProductionLossRecord,
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   ProductionSaleLinkRecord,
@@ -20,13 +21,17 @@ export interface ProductionRunSummary {
   run: ProductionRunRecord;
   saleLinks: ProductionSaleLinkRecord[];
   orderWatches: (ProductionOrderWatchRecord & { filled: number })[];
+  /** This run's Run Loss records (issue #2851). */
+  losses: ProductionLossRecord[];
+  /** Units written off across every loss record. */
+  quantityLost: number;
   profit: RealizedProfitResult;
   quantitySold: number;
-  /** `run.quantity - quantitySold`, floored at zero. */
+  /** `run.quantity - quantitySold - quantityLost`, floored at zero. */
   remaining: number;
-  /** `'new'` — nothing sold yet. `'open'` — partially sold. `'closed'` — fully sold. */
+  /** `'new'` — nothing sold or lost yet. `'open'` — partly accounted for. `'closed'` — every unit sold or lost. */
   status: ProductionRunStatus;
-  /** Cost-basis value (at this run's own cost/unit) of the units not yet sold. */
+  /** Cost-basis value (at this run's own cost/unit) of the units neither sold nor lost. */
   openInventoryValue: number;
 }
 
@@ -49,8 +54,12 @@ export function summarizeProductionRun(
    * fallback `realizedProfit`'s own doc comment anticipates. Absent/0 =
    * standings assumed 0, today's behaviour.
    */
-  standing?: ResolvedStandings
+  standing?: ResolvedStandings,
+  losses: readonly ProductionLossRecord[] = []
 ): ProductionRunSummary {
+  const runLosses = losses.filter((l) => l.runId === run.id);
+  const quantityLost = runLosses.reduce((sum, l) => sum + l.quantity, 0);
+  const insurancePayout = runLosses.reduce((sum, l) => sum + l.insurancePayout, 0);
   const runSaleLinks = saleLinks.filter((l) => l.runId === run.id);
   const runOrderWatches = orderWatches
     .filter((w) => w.runId === run.id)
@@ -74,17 +83,20 @@ export function summarizeProductionRun(
     brokerFeeableRevenue: watchRevenue,
     brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
     standing,
+    insurancePayout,
   });
 
-  const remaining = Math.max(0, run.quantity - quantitySold);
+  const remaining = Math.max(0, run.quantity - quantitySold - quantityLost);
   const costPerUnit = run.quantity > 0 ? run.totalCost / run.quantity : 0;
   const status: ProductionRunStatus =
-    quantitySold === 0 ? 'new' : remaining === 0 ? 'closed' : 'open';
+    quantitySold + quantityLost === 0 ? 'new' : remaining === 0 ? 'closed' : 'open';
 
   return {
     run,
     saleLinks: runSaleLinks,
     orderWatches: runOrderWatches,
+    losses: runLosses,
+    quantityLost,
     profit,
     quantitySold,
     remaining,

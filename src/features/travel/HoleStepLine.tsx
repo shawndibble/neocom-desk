@@ -18,6 +18,7 @@ import type { TheraConnection } from '@/engine/route/theraConnections';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatCountdown } from '@/lib/duration';
+import { MassNote } from './MassNote';
 import { routeSystemName } from './routeSystemName';
 
 /** A jump through a hole, between the two route systems it joins. */
@@ -152,6 +153,7 @@ export function HoleStepLine({
           </>
         )}
       </Button>
+      <MassNote hole={hole} />
     </div>
   );
 }
