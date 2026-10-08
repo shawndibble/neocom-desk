@@ -164,6 +164,7 @@ export function JournalTable({
   // question — until the pilot toggles it, then their choice sticks.
   const isNarrow = useIsNarrow();
   const storedBreakdownOpen = useJournalBreakdownPref((state) => state.value);
+  const breakdownPrefHydrated = useJournalBreakdownPref((state) => state.hydrated);
   const hydrateBreakdownOpen = useJournalBreakdownPref((state) => state.hydrate);
   const setStoredBreakdownOpen = useJournalBreakdownPref((state) => state.setValue);
   useEffect(() => {
@@ -268,7 +269,8 @@ export function JournalTable({
           />
         }
       />
-      {breakdown.rows.length > 0 && (
+      {/* Held back until the stored choice has loaded, so a pilot who folded it never sees it flash open. */}
+      {breakdown.rows.length > 0 && breakdownPrefHydrated && (
         <CollapsiblePanel
           title={t('wallet.journalBreakdownTitle')}
           expanded={breakdownOpen}
