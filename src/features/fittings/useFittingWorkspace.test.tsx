@@ -441,6 +441,19 @@ describe('useFittingWorkspace — an oversized Fitting survives a reload (#2954)
     expect(reloaded.result.current.workspace.tooLargeToShare).toBe(true);
   });
 
+  it('an edit past the link limit leaves the stale ?f= behind, so a reload restores the edit', async () => {
+    const linked = await renderAt({ ...RIFTER, drones: [] });
+    act(() => linked.result.current.workspace.edit(() => OVERSIZED));
+    await waitFor(() => expect(linked.result.current.location.search).toBe(''));
+    expect(linked.result.current.workspace.fitting).toEqual(OVERSIZED);
+    expect(linked.result.current.workspace.tooLargeToShare).toBe(true);
+    await waitFor(async () => expect(await db.settings.get('fittingDraft')).toBeDefined());
+    linked.unmount();
+
+    const reloaded = renderAtPath('/ships/fittings');
+    await waitFor(() => expect(reloaded.result.current.workspace.fitting).toEqual(OVERSIZED));
+  });
+
   it('never overrides an explicit ?f=, and drops the draft', async () => {
     const first = renderAtPath('/ships/fittings');
     await act(() => first.result.current.workspace.openLoaded(oversizedLoad));
