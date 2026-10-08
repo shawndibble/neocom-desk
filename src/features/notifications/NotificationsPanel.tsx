@@ -118,6 +118,10 @@ import {
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
+import { Link } from 'react-router-dom';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { tabPath } from '@/lib/pageTabs';
+import { SETTINGS_TABS } from '@/app/pageTabs';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -528,7 +532,10 @@ export function NotificationsPanel() {
             role="status"
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
           >
-            {t('settings.notifications.installRequiredNotice')}
+            {t('settings.notifications.installRequiredNotice')}{' '}
+            <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={inlineLinkClassName}>
+              {t('settings.notifications.installRequiredLink')}
+            </Link>
           </p>
         )}
         {permission === 'default' && !installRequired && (

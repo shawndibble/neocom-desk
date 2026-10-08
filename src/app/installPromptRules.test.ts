@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { detectInstallPlatform, selectInstallPromptVariant } from './installPromptRules';
+import {
+  detectInstallPlatform,
+  selectInstallPromptVariant,
+  selectInstallAppVariant,
+} from './installPromptRules';
 
 const UA = {
   iphoneSafari:
@@ -97,5 +101,32 @@ describe('selectInstallPromptVariant', () => {
   it('gives Safari and other iOS browsers their own instructions', () => {
     expect(selectInstallPromptVariant({ ...base, platform: 'ios-safari' })).toBe('ios-safari');
     expect(selectInstallPromptVariant({ ...base, platform: 'ios-other' })).toBe('ios-other');
+  });
+});
+
+describe('selectInstallAppVariant', () => {
+  const base = { isStandalone: false, deferredPromptAvailable: false, platform: null } as const;
+
+  it('reports installed when already standalone', () => {
+    expect(
+      selectInstallAppVariant({ ...base, isStandalone: true, deferredPromptAvailable: true })
+    ).toBe('installed');
+  });
+
+  it('prefers the native prompt whenever the browser offered one', () => {
+    expect(selectInstallAppVariant({ ...base, deferredPromptAvailable: true })).toBe('native');
+  });
+
+  it('gives per-browser steps where the event never fires', () => {
+    expect(selectInstallAppVariant({ ...base, platform: 'ios-safari' })).toBe('ios-safari');
+    expect(selectInstallAppVariant({ ...base, platform: 'ios-other' })).toBe('ios-other');
+    expect(selectInstallAppVariant({ ...base, platform: 'android-firefox' })).toBe(
+      'android-firefox'
+    );
+  });
+
+  it('falls back to a browser-menu pointer on desktop and Android Chromium', () => {
+    expect(selectInstallAppVariant({ ...base })).toBe('menu');
+    expect(selectInstallAppVariant({ ...base, platform: 'android' })).toBe('menu');
   });
 });
