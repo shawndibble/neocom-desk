@@ -22,6 +22,7 @@ import type { MaterialSourcingMap } from '@/engine/industry/types';
 import { applySourcingPatch } from './sourcingEdits';
 import {
   applyToGroupOwnedStock,
+  groupOwnedDifference,
   groupMaterialTypeIdKey,
   materialTypeIdKey,
   ownedStockView,
@@ -353,5 +354,29 @@ describe('"Use none" in each store', () => {
     const ledger: Record<number, number> = { 34: 5, 35: 2 };
     applyToGroupOwnedStock(ledger, changes);
     expect(ledger).toEqual({ 35: 2 });
+  });
+});
+
+describe('groupOwnedDifference', () => {
+  const mats = [
+    { typeID: 34, name: 'Tritanium' },
+    { typeID: 35, name: 'Pyerite' },
+  ];
+  it('is null when every count agrees, a missing count being 0 on both sides', () => {
+    expect(groupOwnedDifference(mats, {}, undefined)).toBeNull();
+    expect(groupOwnedDifference(mats, { 34: { ownedQuantity: 5 } }, { 34: 5 })).toBeNull();
+    expect(groupOwnedDifference(mats, { 34: { ownedQuantity: 0 } }, {})).toBeNull();
+  });
+  it('names the material with the largest gap, ties to the lowest typeID', () => {
+    expect(groupOwnedDifference(mats, { 34: { ownedQuantity: 10 } }, { 34: 4, 35: 1 })).toEqual({
+      typeID: 34,
+      name: 'Tritanium',
+      group: 4,
+      plan: 10,
+    });
+    expect(groupOwnedDifference(mats, { 35: { ownedQuantity: 3 } }, { 34: 3 })?.typeID).toBe(34);
+  });
+  it('ignores ledger entries for materials the plan does not list', () => {
+    expect(groupOwnedDifference(mats, {}, { 999: 7 })).toBeNull();
   });
 });

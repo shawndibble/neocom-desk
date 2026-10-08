@@ -4,7 +4,7 @@
 
 User goal: "who do I have standing with, who is blocked/watched, and do my alts agree?"
 
-Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/character/{contacts,contactsFilter,contactsAcrossCharacters,contactStandings,contactAffiliation,contactsCsv,CharacterFilterControl,characterFilterUrlParam,StandingTag}.ts(x)`, `src/components/ui/{StandingIcon,standingTier}.ts(x)`, `src/app/pageTabs.ts:23` (`CONTACTS_TABS`: `character`, `across`).
+Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/character/{contacts,contactsFilter,contactsAcrossCharacters,contactStandings,contactAffiliation,contactsCsv,CharacterFilterControl,characterFilterUrlParam,StandingTag}.ts(x)`, `src/components/ui/{StandingIcon,standingTier}.ts(x)`, `src/app/pageTabs.ts:23` (`CONTACTS_TABS`: `character`, `across`, `standings`).
 
 ## Summary
 
@@ -31,9 +31,9 @@ Code: `src/routes/Contacts.tsx`, `src/routes/contactsColumns.ts`, `src/features/
 - View is `across` only if `tab === 'across'` and (data not loaded yet or more than one Character) (`Contacts.tsx:1001`). With one Character `/contacts/across` silently renders This character, and the switch is not shown (decision `20260912-211914-across-characters-reads-cached-contacts-and-fetches-on`).
 - Scope gate: `routeScopes.ts:269`, endpoints `getCharacterContacts`, `getCharacterContactLabels`, `postUniverseNames`; strings `contacts`.
 
-## NPC standings (not here)
+## NPC standings (Standings tab)
 
-This page lists personal contacts only. The Character's standings with NPC corporations and factions are read (`features/character/standings.ts`, `useTradeHubStandings.ts`) only to compute broker fees and refine tax and are never listed (#2859). Standings to a contact are the contact's own number, not these.
+`/contacts/standings` lists the Character's NPC faction, corp and agent standings (`ContactsStandings.tsx`, rows from `features/character/npcStandingsRows.ts`): name, kind, standing with the tier icon, and a "Used for fees" marker on the Trade Hub owner corps and factions the broker-fee path applies (#2859). Other NPC stations use their own owner and agents never count; refine/reprocessing applies no standing. A missing standings scope shows a `GrantBanner` in the tab, not an empty table. Skill-adjusted effective standing is not shown. Standings to a contact are the contact's own number, not these.
 
 ## States
 

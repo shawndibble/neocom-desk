@@ -34,6 +34,7 @@ import {
   resolveTaxUnitPrice,
   type SidePrices,
   type SnapshotDay,
+  type TaxPriceSource,
 } from '@/engine/miningTax/priceBasis';
 
 export interface UnitPrices {
@@ -56,6 +57,8 @@ export interface UnitPrices {
    * `unpriced`, but an estimate the pilot should be able to see and override.
    */
   sellFallback: Set<number>;
+  /** Which tier of `resolveTaxUnitPrice` priced each raw typeId — shown in the row detail's price breakdown. */
+  sources?: Map<number, TaxPriceSource>;
 }
 
 /** The hub a Payee's `hubId` names, or Jita when it names none (or one this build does not know). */
@@ -126,6 +129,7 @@ async function resolvePricesForHubAcrossDates(
     const prices = new Map<number, number>();
     const unpriced = new Set<number>();
     const sellFallback = new Set<number>();
+    const sources = new Map<number, TaxPriceSource>();
     for (const typeId of unique) {
       const pid = pricedTypeId(typeId);
       const resolved = resolveTaxUnitPrice({
@@ -138,13 +142,14 @@ async function resolvePricesForHubAcrossDates(
       });
       const price = resolved.price ?? 0;
       prices.set(typeId, price);
+      sources.set(typeId, resolved.source);
       if (resolved.source === 'live-sell') sellFallback.add(typeId);
       // A quoted zero counts as unpriced: an order book that bids nothing
       // values the ore no better than one with no orders at all, and the
       // pilot needs to know before sending the bill either way.
       if (price <= 0) unpriced.add(typeId);
     }
-    byDate.set(date, { prices, unpriced, sellFallback });
+    byDate.set(date, { prices, unpriced, sellFallback, sources });
   }
   return { byDate };
 }
@@ -188,10 +193,16 @@ export interface DatedUnitPrices {
   unpriced: Set<number>;
   /** Per hub, per date, the raw typeIds valued at today's live sell for want of any buy side — see `UnitPrices.sellFallback`. */
   sellFallbackByHubAndDate: ReadonlyMap<TradeHub['id'], ReadonlyMap<string, ReadonlySet<number>>>;
+  /** Per hub, per date, which price tier priced each raw typeId. */
+  sourcesByHubAndDate?: ReadonlyMap<
+    TradeHub['id'],
+    ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
+  >;
 }
 
 const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_TYPES: ReadonlySet<number> = new Set();
+const NO_SOURCES: ReadonlyMap<number, TaxPriceSource> = new Map();
 
 /**
  * Prices at the hub `hubId` names on `date`, falling back to the default
@@ -223,6 +234,20 @@ export function sellFallbackAtHubOnDate(
     data.sellFallbackByHubAndDate.get(hub.id)?.get(date) ??
     data.sellFallbackByHubAndDate.get(DEFAULT_TRADE_HUB.id)?.get(date) ??
     NO_TYPES
+  );
+}
+
+/** Which price tier priced each type on `date` at the hub `hubId` names — read like `pricesAtHubOnDate`, so the two describe one book. */
+export function sourcesAtHubOnDate(
+  data: DatedUnitPrices,
+  hubId: string | undefined,
+  date: string
+): ReadonlyMap<number, TaxPriceSource> {
+  const hub = hubForPayee(hubId);
+  return (
+    data.sourcesByHubAndDate?.get(hub.id)?.get(date) ??
+    data.sourcesByHubAndDate?.get(DEFAULT_TRADE_HUB.id)?.get(date) ??
+    NO_SOURCES
   );
 }
 
@@ -268,13 +293,19 @@ export async function loadDatedUnitPricesByHub(
     TradeHub['id'],
     ReadonlyMap<string, ReadonlySet<number>>
   >();
+  const sourcesByHubAndDate = new Map<
+    TradeHub['id'],
+    ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
+  >();
   for (const [hubId, result] of loaded) {
+    const sourcesByDate = new Map<string, ReadonlyMap<number, TaxPriceSource>>();
     const byDate = new Map<string, ReadonlyMap<number, number>>();
     const sellByDate = new Map<string, ReadonlySet<number>>();
     const hubUnpriced = new Set<number>();
     for (const [date, dayResult] of result.byDate) {
       byDate.set(date, dayResult.prices);
       sellByDate.set(date, dayResult.sellFallback);
+      sourcesByDate.set(date, dayResult.sources ?? NO_SOURCES);
       for (const typeId of dayResult.unpriced) {
         hubUnpriced.add(typeId);
         unpriced.add(typeId);
@@ -282,7 +313,8 @@ export async function loadDatedUnitPricesByHub(
     }
     byHubAndDate.set(hubId, byDate);
     sellFallbackByHubAndDate.set(hubId, sellByDate);
+    sourcesByHubAndDate.set(hubId, sourcesByDate);
     unpricedByHub.set(hubId, hubUnpriced);
   }
-  return { byHubAndDate, unpricedByHub, unpriced, sellFallbackByHubAndDate };
+  return { byHubAndDate, unpricedByHub, unpriced, sellFallbackByHubAndDate, sourcesByHubAndDate };
 }

@@ -159,6 +159,14 @@ service cloud.firestore {
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();
       }
+
+      match /productionLosses/{lossId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
     }
 
     // Device registrations (issue #356, ADR 0010): written only by the
@@ -271,7 +279,7 @@ service cloud.firestore {
         && shareId.matches('^[0-9A-Za-z]{9}$')
         && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.keys().hasAll(['type', 'payload', 'createdAt', 'expiresAt'])
-        && request.resource.data.type in ['appraisal', 'fitting']
+        && request.resource.data.type in ['appraisal', 'fitting', 'dscan']
         && request.resource.data.payload is map
         && request.resource.data.createdAt == request.time
         && request.resource.data.expiresAt is timestamp
@@ -282,7 +290,10 @@ service cloud.firestore {
             && request.resource.data.payload.items.size() <= 1000))
         && (request.resource.data.type != 'fitting'
           || (request.resource.data.payload.code is string
-            && request.resource.data.payload.code.size() <= 20100));
+            && request.resource.data.payload.code.size() <= 20100))
+        && (request.resource.data.type != 'dscan'
+          || (request.resource.data.payload.text is string
+            && request.resource.data.payload.text.size() <= 50000));
       allow update, delete: if false;
     }
     // Everything else: implicit deny.

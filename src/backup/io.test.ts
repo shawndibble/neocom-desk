@@ -184,7 +184,7 @@ describe('restoring an existing-format backup file', () => {
       },
     };
   /** Tables created after the frozen file was captured: it holds no rows for them. */
-  const POSTDATES_FIXTURE: ReadonlySet<string> = new Set(['netWorthSnapshots']); // #2865
+  const POSTDATES_FIXTURE: ReadonlySet<string> = new Set(['netWorthSnapshots', 'productionLosses']); // #2865, #2851
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
     Object.entries(FULL_RECORDS)
       .filter(([table]) => !POSTDATES_FIXTURE.has(table))

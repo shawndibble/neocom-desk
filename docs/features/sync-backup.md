@@ -43,6 +43,7 @@ Registry (`src/sync/syncedCollections.ts:651`, order = sync order), remoteName -
 | `productionRuns`               | `productionRuns`                    | delete                                 |
 | `productionSaleLinks`          | `productionSaleLinks`               | delete                                 |
 | `productionOrderWatches`       | `productionOrderWatches`            | delete                                 |
+| `productionLosses`             | `productionLosses`                  | delete                                 |
 | `netWorthSnapshots`            | `netWorthSnapshots`                 | delete                                 |
 | `payees`                       | `payees`                            | delete                                 |
 | `fittings`                     | `fittings`                          | delete                                 |
