@@ -95,6 +95,7 @@ import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMo
 import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
 import { planProgress } from '@/engine/planProgress';
+import { assumptionsSummary } from './assumptionsSummary';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
@@ -1708,6 +1709,16 @@ export function PlanEditor({
     },
   ];
 
+  const skillsToBuy = (collapsible: boolean) => (
+    <SkillsToBuyPanel
+      entries={plan.entries}
+      trainedSkills={trainedSkills}
+      trainedSkillsKnown={trainedSkillsKnown}
+      nameFor={nameFor}
+      collapsible={collapsible}
+    />
+  );
+
   const toolSections: PlanToolSection[] = [
     {
       id: 'actions',
@@ -1873,151 +1884,191 @@ export function PlanEditor({
               {t('plans.attributesImpossible', { total: attributeBaseline.reportedTotal })}
             </p>
           )}
+        </div>
+      ),
+    },
+    // Skills to buy is an output, not a setting, so it sits right under the
+    // attributes it is read beside rather than last. Below `lg` it is not in
+    // this pane at all: the row in the main column puts it outside the
+    // collapsed pane.
+    ...(isDesktop
+      ? [
+          {
+            id: 'skills-to-buy',
+            title: t('plans.skillsToBuy.title'),
+            content: skillsToBuy(false),
+          },
+        ]
+      : []),
+    // Alpha, the What-If Implants and the Booster change every number on the
+    // page, and injectors are costed under Alpha, so they share one closed
+    // row; its summary keeps whatever is set visible.
+    {
+      id: 'assumptions',
+      title: t('plans.assumptions.title'),
+      group: {
+        summary: assumptionsSummary(
+          {
+            alpha: cloneState === 'alpha',
+            whatIf,
+            matchedJumpClone: matchedCloneId !== null,
+            // What the scheduler applies, not every row: a prefilled accelerator
+            // with no expiry yet is costed as none.
+            boosterCount: activeBoosters.length,
+          },
+          t
+        ),
+        sections: [
+          {
+            id: 'assumption-controls',
+            title: t('plans.assumptions.title'),
+            hideTitle: true,
+            content: (
+              <div className="space-y-2 text-xs">
+                <label className={`flex items-center gap-1.5 ${tappableRowClassName}`}>
+                  <Checkbox
+                    checked={cloneState === 'alpha'}
+                    disabled={!cloneStatesHydrated}
+                    onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
+                  />
+                  {t('plans.alphaClone')}
+                </label>
+                <p className="text-[0.6875rem] text-text-dim">{t('plans.alphaCloneNote')}</p>
+                {alphaCappedSteps.size > 0 && (
+                  <p className="text-warning">
+                    {t('plans.alphaCappedCount', { count: alphaCappedSteps.size })}
+                  </p>
+                )}
 
-          <label className={`flex items-center gap-1.5 ${tappableRowClassName}`}>
-            <Checkbox
-              checked={cloneState === 'alpha'}
-              disabled={!cloneStatesHydrated}
-              onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
-            />
-            {t('plans.alphaClone')}
-          </label>
-          <p className="text-[0.6875rem] text-text-dim">{t('plans.alphaCloneNote')}</p>
-          {alphaCappedSteps.size > 0 && (
-            <p className="text-warning">
-              {t('plans.alphaCappedCount', { count: alphaCappedSteps.size })}
-            </p>
-          )}
+                <div className="flex items-center gap-1">
+                  <label className="flex flex-1 items-center justify-between gap-2">
+                    {t('plans.whatIfImplants')}
+                    <Select
+                      value={
+                        matchedCloneId !== null
+                          ? `clone:${matchedCloneId}`
+                          : whatIf.kind === 'custom'
+                            ? 'custom'
+                            : whatIf.preset
+                      }
+                      // Picking 'custom' freezes what is in force into five editable
+                      // slots without changing a number (toCustomSelection).
+                      onValueChange={(value) => {
+                        const clone = jumpClones.find((c) => `clone:${c.id}` === value);
+                        setWhatIf(
+                          clone
+                            ? cloneSelection(clone)
+                            : value === 'custom'
+                              ? toCustomSelection(whatIf, implants)
+                              : { kind: 'preset', preset: value as WhatIfImplantPreset }
+                        );
+                      }}
+                    >
+                      <SelectTrigger
+                        size="md"
+                        aria-label={t('plans.whatIfImplants')}
+                        className="w-36"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
+                          <SelectItem key={preset} value={preset}>
+                            {preset === 'none'
+                              ? t('plans.whatIfNone')
+                              : preset === 'current'
+                                ? t('plans.whatIfCurrent')
+                                : preset}
+                          </SelectItem>
+                        ))}
+                        {jumpClones.map((clone) => (
+                          <SelectItem key={clone.id} value={`clone:${clone.id}`}>
+                            {t('plans.whatIfJumpClone', { label: clone.label })}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  {marketGroupLink(
+                    t('plans.whatIfMarketLink'),
+                    ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID
+                  )}
+                </div>
 
-          <div className="flex items-center gap-1">
-            <label className="flex flex-1 items-center justify-between gap-2">
-              {t('plans.whatIfImplants')}
-              <Select
-                value={
-                  matchedCloneId !== null
-                    ? `clone:${matchedCloneId}`
-                    : whatIf.kind === 'custom'
-                      ? 'custom'
-                      : whatIf.preset
-                }
-                // Picking 'custom' freezes what is in force into five editable
-                // slots without changing a number (toCustomSelection).
-                onValueChange={(value) => {
-                  const clone = jumpClones.find((c) => `clone:${c.id}` === value);
-                  setWhatIf(
-                    clone
-                      ? cloneSelection(clone)
-                      : value === 'custom'
-                        ? toCustomSelection(whatIf, implants)
-                        : { kind: 'preset', preset: value as WhatIfImplantPreset }
-                  );
-                }}
-              >
-                <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
-                    <SelectItem key={preset} value={preset}>
-                      {preset === 'none'
-                        ? t('plans.whatIfNone')
-                        : preset === 'current'
-                          ? t('plans.whatIfCurrent')
-                          : preset}
-                    </SelectItem>
-                  ))}
-                  {jumpClones.map((clone) => (
-                    <SelectItem key={clone.id} value={`clone:${clone.id}`}>
-                      {t('plans.whatIfJumpClone', { label: clone.label })}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            {marketGroupLink(t('plans.whatIfMarketLink'), ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID)}
-          </div>
-
-          {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
+                {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
               CHA), which a uniform preset cannot say. One row of five, shown
               only under "Custom" (pick it, or edit a value): editing one
               leaves the other four alone. Under a preset a one-line readout
               says what the plan is being costed against. The three-letter codes are the same abbreviation the
               entry list's attribute-pair badge uses; each input's accessible
               name spells the attribute out. */}
-          {whatIf.kind === 'custom' ? (
-            <div
-              role="group"
-              aria-label={t('plans.whatIfPerAttribute')}
-              className="grid grid-cols-5 gap-1"
-            >
-              {ATTRIBUTE_NAMES.map((name) => (
-                <label key={name} className="flex flex-col items-center gap-0.5">
-                  <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
-                    {attributeShort(name)}
-                  </span>
-                  <TextInput
-                    size="md"
-                    type="number"
-                    min={MIN_IMPLANT_BONUS}
-                    max={MAX_IMPLANT_BONUS}
-                    step={1}
-                    aria-label={t('plans.whatIfAttributeBonus', {
-                      attribute: t(`skills.attr.${name}`),
-                    })}
-                    value={effectiveImplants[name]}
-                    onChange={(e) =>
-                      setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
-                    }
-                    // `field-no-spinner` (src/styles/index.css): Chrome draws
-                    // the spin buttons on hover and focus into a 29.6px content
-                    // box, taking about half of it and shoving the digit left —
-                    // so the cell under the cursor would break the row's
-                    // alignment with the other four.
-                    className="field-no-spinner w-full text-center"
-                  />
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[0.6875rem] text-text-dim">
-              {ATTRIBUTE_NAMES.map(
-                (name) => `${attributeShort(name)} +${effectiveImplants[name]}`
-              ).join(' · ')}
-            </p>
-          )}
+                {whatIf.kind === 'custom' ? (
+                  <div
+                    role="group"
+                    aria-label={t('plans.whatIfPerAttribute')}
+                    className="grid grid-cols-5 gap-1"
+                  >
+                    {ATTRIBUTE_NAMES.map((name) => (
+                      <label key={name} className="flex flex-col items-center gap-0.5">
+                        <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+                          {attributeShort(name)}
+                        </span>
+                        <TextInput
+                          size="md"
+                          type="number"
+                          min={MIN_IMPLANT_BONUS}
+                          max={MAX_IMPLANT_BONUS}
+                          step={1}
+                          aria-label={t('plans.whatIfAttributeBonus', {
+                            attribute: t(`skills.attr.${name}`),
+                          })}
+                          value={effectiveImplants[name]}
+                          onChange={(e) =>
+                            setWhatIf(
+                              setWhatIfBonus(whatIf, implants, name, Number(e.target.value))
+                            )
+                          }
+                          // `field-no-spinner` (src/styles/index.css): Chrome draws
+                          // the spin buttons on hover and focus into a 29.6px content
+                          // box, taking about half of it and shoving the digit left —
+                          // so the cell under the cursor would break the row's
+                          // alignment with the other four.
+                          className="field-no-spinner w-full text-center"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[0.6875rem] text-text-dim">
+                    {ATTRIBUTE_NAMES.map(
+                      (name) => `${attributeShort(name)} +${effectiveImplants[name]}`
+                    ).join(' · ')}
+                  </p>
+                )}
 
-          <BoosterList
-            boosters={planBoosters}
-            detectedAccelerator={detectedAccelerator}
-            onChange={(boosters) => onUpdate({ boosters })}
-          />
-        </div>
-      ),
-    },
-    {
-      id: 'injectors',
-      title: t('plans.injectors.title'),
-      content: (
-        <InjectorFactsPanel
-          scheduled={scheduled}
-          totalSp={totalSp}
-          unallocatedSp={unallocatedSp}
-          cloneState={cloneState}
-        />
-      ),
-    },
-    {
-      id: 'skills-to-buy',
-      title: t('plans.skillsToBuy.title'),
-      content: (
-        <SkillsToBuyPanel
-          entries={plan.entries}
-          trainedSkills={trainedSkills}
-          trainedSkillsKnown={trainedSkillsKnown}
-          nameFor={nameFor}
-        />
-      ),
+                <BoosterList
+                  boosters={planBoosters}
+                  detectedAccelerator={detectedAccelerator}
+                  onChange={(boosters) => onUpdate({ boosters })}
+                />
+              </div>
+            ),
+          },
+          {
+            id: 'injectors',
+            title: t('plans.injectors.title'),
+            content: (
+              <InjectorFactsPanel
+                scheduled={scheduled}
+                totalSp={totalSp}
+                unallocatedSp={unallocatedSp}
+                cloneState={cloneState}
+              />
+            ),
+          },
+        ],
+      },
     },
   ];
 
@@ -2093,6 +2144,10 @@ export function PlanEditor({
             ))}
           </div>
         )}
+
+        {/* Below `lg` the plan tools are one collapsed row, which would bury
+            the one output worth reading first; this row sits outside them. */}
+        {!isDesktop && <Panel padded={false}>{skillsToBuy(true)}</Panel>}
 
         {!isDesktop && toolsPane}
 

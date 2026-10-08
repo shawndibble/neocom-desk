@@ -209,6 +209,7 @@ test('adds a second accelerator on a phone, with a full sm-tier remove control (
   await page.setViewportSize(PHONE);
 
   await page.getByRole('button', { name: /plan tools/i }).click();
+  await page.getByRole('button', { name: /^assumptions/i }).click();
   const addAccelerator = page.getByRole('button', { name: 'Add accelerator' });
   await addAccelerator.click();
   await addAccelerator.click();
@@ -250,6 +251,7 @@ test('the Skill injectors panel renders with a priced Large Skill Injector at 39
   await page.setViewportSize(PHONE);
 
   await page.getByRole('button', { name: 'Plan tools' }).click();
+  await page.getByRole('button', { name: /^assumptions/i }).click();
   await expect(page.getByRole('heading', { name: 'Skill injectors' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Large Skill Injector' })).toBeVisible();
   // IskAmount's visually hidden text carries the exact figure the compact
@@ -403,4 +405,83 @@ test('a non-Current what-if lens shows a chip in the header strip at 390px', asy
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+/**
+ * Plan editor reorganisation: Skills to buy is an output, so it must not be
+ * the last thing in the tools. Asserted as invariants (no overlap, no
+ * horizontal overflow, reachable without opening anything), not pixel offsets.
+ */
+test('Skills to buy has its own visible row at 390px, without opening Plan tools', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [PLAN_ENTRY]);
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  const row = page.getByRole('button', { name: /^skills to buy/i });
+  await expect(row).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Plan tools' })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  );
+  // On the first screen, above the entry list.
+  const box = await row.evaluate((el) => el.getBoundingClientRect());
+  expect(box.bottom).toBeLessThan(PHONE.height);
+  expect(box.height).toBeGreaterThanOrEqual(36);
+
+  await row.click();
+  await expect(page.getByRole('button', { name: 'Copy multibuy list' })).toBeVisible();
+
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  expect(overflows).toBe(false);
+
+  // The expanded row and Plan tools are separate blocks: the row's whole
+  // panel ends before Plan tools starts.
+  const rowPanelBottom = await row.evaluate((el) => {
+    let node: Element | null = el;
+    while (node && !node.matches('section')) node = node.parentElement;
+    return (node ?? el).getBoundingClientRect().bottom;
+  });
+  const toolsTop = await page
+    .getByRole('button', { name: 'Plan tools' })
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(toolsTop).toBeGreaterThanOrEqual(rowPanelBottom);
+});
+
+test('Skills to buy sits under Attributes near the top of the sidebar at 1280px, with Assumptions closed', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [PLAN_ENTRY]);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+  await page.setViewportSize(DESKTOP);
+
+  const attributes = page.getByRole('heading', { name: 'Attributes' });
+  const skillsToBuy = page.getByRole('heading', { name: 'Skills to buy' });
+  const assumptions = page.getByRole('button', { name: /^assumptions/i });
+  await expect(skillsToBuy).toBeVisible();
+  await expect(assumptions).toHaveAttribute('aria-expanded', 'false');
+
+  const [a, s, m] = await Promise.all(
+    [attributes, skillsToBuy, assumptions].map((l) =>
+      l.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, scrollTop: window.scrollY };
+      })
+    )
+  );
+  // Strictly stacked in that order, no overlap, and Skills to buy within the
+  // first screen rather than ~1,070px down.
+  expect(s.top).toBeGreaterThan(a.bottom);
+  expect(m.top).toBeGreaterThan(s.bottom);
+  expect(s.top + s.scrollTop).toBeLessThan(DESKTOP.height);
+
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  expect(overflows).toBe(false);
 });

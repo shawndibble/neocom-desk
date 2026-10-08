@@ -93,4 +93,42 @@ describe('PlanToolsPane', () => {
     // title can't drift with the badge's ticking text.
     expect(screen.getByRole('heading', { name: 'Attributes' }).textContent).toBe('Attributes');
   });
+  it('folds a group into one closed Disclosure row with its summary, opened on click', async () => {
+    const user = userEvent.setup();
+    render(
+      <PlanToolsPane
+        asDisclosure={false}
+        sections={[
+          ...SECTIONS,
+          {
+            id: 'assumptions',
+            title: 'Assumptions',
+            group: {
+              summary: 'Alpha · Booster',
+              sections: [
+                {
+                  id: 'inner',
+                  title: 'Inner',
+                  hideTitle: true,
+                  content: <button type="button">Inner control</button>,
+                },
+              ],
+            },
+          },
+        ]}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /^assumptions/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('Alpha · Booster');
+    expect(screen.queryByRole('button', { name: 'Inner control' })).toBeNull();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Inner control' })).toBeInTheDocument();
+    // hideTitle: the group's own row names it, so no second heading.
+    expect(screen.queryByRole('heading', { name: 'Inner' })).toBeNull();
+  });
 });
