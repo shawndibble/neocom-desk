@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount } from '@/components/ui';
+import { IskAmount, IskFigureGroup } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -49,14 +50,17 @@ export function SkillsToBuyPanel({
     if (!hubHydrated || typeIds.length === 0) return;
     let cancelled = false;
     const key = `${hub.id}:${typeKey}`;
-    void Promise.all([getHubPrices(hub, typeIds), getRegionSellPrices(hub.regionId, typeIds)]).then(
-      ([hubAgg, region]) => {
+    void Promise.all([getHubPrices(hub, typeIds), getRegionSellPrices(hub.regionId, typeIds)])
+      .then(([hubAgg, region]) => {
         if (cancelled) return;
         const hubMap = new Map<number, number | null>();
         for (const [id, agg] of hubAgg) hubMap.set(id, agg?.sellMin ?? null);
         setPrices({ key, hub: hubMap, region });
-      }
-    );
+      })
+      .catch(() => {
+        // A failed fetch reads as "no sell orders", never as an endless "Loading".
+        if (!cancelled) setPrices({ key, hub: new Map(), region: new Map() });
+      });
     return () => {
       cancelled = true;
     };
@@ -91,7 +95,7 @@ export function SkillsToBuyPanel({
   };
 
   return (
-    <div className="space-y-2 text-xs">
+    <IskFigureGroup className="space-y-2 text-xs">
       <ul className="space-y-1">
         {facts.rows.map((row) => (
           <li key={row.typeID} className="flex items-center justify-between gap-2">
@@ -121,17 +125,13 @@ export function SkillsToBuyPanel({
           {t('plans.skillsToBuy.unpriced', { count: facts.unpricedCount })}
         </p>
       )}
-      <button
-        type="button"
-        className="text-accent underline-offset-2 hover:underline"
-        onClick={() => void copy()}
-      >
+      <button type="button" className={inlineLinkClassName} onClick={() => void copy()}>
         {copyState === 'copied'
           ? t('plans.skillsToBuy.copied')
           : copyState === 'failed'
             ? t('plans.skillsToBuy.copyFailed')
             : t('plans.skillsToBuy.copy')}
       </button>
-    </div>
+    </IskFigureGroup>
   );
 }
