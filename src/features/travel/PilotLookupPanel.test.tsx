@@ -146,10 +146,36 @@ describe('PilotLookupPanel', () => {
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
     expect(probe.search).toBe('?pilot=42');
     expect(await screen.findByText('1,043')).toBeTruthy();
-    expect(screen.getByText('99.2%')).toBeTruthy();
+    expect(screen.queryByText('99.2%')).toBeNull();
     expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
     expect(await screen.findByText('Kronos')).toBeTruthy();
     expect(screen.getByText('317 kills')).toBeTruthy();
+  });
+
+  it('shows a Threat badge beside the name once the kills and the danger ratio are in', async () => {
+    const day = 86_400_000;
+    mocks.fetchPilotKillHistory.mockResolvedValue({
+      ok: true,
+      kills: Array.from({ length: 12 }, (_, i) => ({
+        timeMs: Date.now() - (i + 1) * day,
+        space: 'nullsec',
+        systemId: 1,
+        victimShipTypeId: i < 4 ? 670 : 587,
+        ownShipTypeId: 20,
+      })),
+    });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
+    // "Dangerous" is also the danger meter's high end: the badge is the one in the name row.
+    expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
+    expect(screen.getByText(/12 kills in the last 90 days, mostly in nullsec/)).toBeTruthy();
+    expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
   });
 
   it('suggests matches with the search scope and selects one', async () => {
@@ -350,13 +376,16 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByText('No kills or losses on zKillboard')).toBeNull();
   });
 
-  // zKillboard's own Snuggly/Dangerous scale is quoted, ends and all (decision
-  // 20261002-145207); the app adds no verdict of its own.
-  it('states numbers, never a verdict, in its copy (decision 20260912-172628)', () => {
-    const copy = JSON.stringify(en.travel.pilot).toLowerCase();
-    for (const word of ['safe', 'hostile', 'threat', 'avoid']) {
+  // The Threat verdict (decision 20261008-181210) says how threatening a pilot
+  // looks and nothing more: no copy calls a pilot safe, hostile or one to avoid.
+  // The one place "safe" appears is the help text's "never means safe".
+  it('never calls a pilot safe, hostile or to be avoided (decision 20261008-181210)', () => {
+    const { help, ...rest } = en.travel.pilot.threat;
+    const copy = JSON.stringify({ ...en.travel.pilot, threat: rest }).toLowerCase();
+    for (const word of ['safe', 'hostile', 'avoid']) {
       expect(copy).not.toContain(word);
     }
+    expect(help).toContain('never means safe');
   });
 
   describe('recent kills and losses', () => {

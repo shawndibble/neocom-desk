@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 
@@ -45,9 +46,18 @@ describe('PilotKillActivity', () => {
     });
   });
 
+  it('keeps the six-month chart folded until it is asked for', async () => {
+    renderSection();
+    const section = await screen.findByRole('region', { name: 'Where they kill' });
+    expect(within(section).queryByRole('img', { name: /Kills per month by space/ })).toBeNull();
+    const toggle = within(section).getByRole('button', { name: /Kills per month/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('labels the chart: a legend for every colour drawn, month names, and the kills per month', async () => {
     renderSection();
     const section = await screen.findByRole('region', { name: 'Where they kill' });
+    await userEvent.click(within(section).getByRole('button', { name: /Kills per month/ }));
     const chart = within(section).getByRole('img', { name: /Kills per month by space/ });
     expect(chart).toBeTruthy();
     // Blue is wormhole space: say so, and only name colours that appear.
