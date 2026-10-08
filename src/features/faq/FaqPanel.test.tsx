@@ -34,6 +34,7 @@ function questionButtons(): HTMLElement[] {
 const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.notificationFeedPrefs': /notification preferences/i,
   'sync.piCustomsRates': /customs rate overrides/i,
+  'sync.structureBrokerFees': /structure broker fees/i,
   'sync.marketHub': /trade hub/i,
   'sync.marketPricePercent': /appraisal price %/i,
   'sync.industryFacilityDefaults': /industry facility/i,

@@ -102,6 +102,7 @@ import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
 import { useOrderDetail } from './useOrderDetail';
+import { useStructureFees } from './structureFees';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
 import {
@@ -226,6 +227,10 @@ export function OpenOrdersPanel() {
    * (`useOrderDetail`'s own doc).
    */
   const orderDetail = useOrderDetail();
+  const structureFees = useStructureFees((state) => state.value);
+  useEffect(() => {
+    void useStructureFees.getState().hydrate();
+  }, []);
 
   /** One column-visibility setting shared by every per-problem-group table below. */
   const {
@@ -270,9 +275,16 @@ export function OpenOrdersPanel() {
       problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
       standingsByOrder: snapshot.standingsByOrder,
+      structureFees,
       now: snapshot.now,
     });
-  }, [snapshot, deepCompetitionByOrderId, orderDetail.caches.structureBooks, stationNames]);
+  }, [
+    snapshot,
+    deepCompetitionByOrderId,
+    orderDetail.caches.structureBooks,
+    stationNames,
+    structureFees,
+  ]);
 
   /**
    * The highlighted row, found across every group before any fold/filter

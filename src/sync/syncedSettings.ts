@@ -25,6 +25,10 @@
 // long as the account has any Character — the same "never deleted, only
 // emptied" shape the Quickbar's local row already carries. So the tombstone
 // edge above doesn't bite this key.
+// sync.structureBrokerFees: the owner's broker fee the pilot typed per player
+// structure, as one structureId -> percent map (same shape and reasoning as
+// sync.piCustomsRates below; never deleted, only emptied). See
+// src/features/market/structureFees.ts.
 // sync.piCustomsRates: the PI Advisor's per-system customs rate overrides.
 // One key holding a systemId -> rate map, for the same reason the key above
 // holds every Character: mergeSettings is whole-value LWW per key and this
@@ -280,6 +284,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.structureBrokerFees',
   'sync.targetSkillPlan',
 ];
 
