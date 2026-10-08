@@ -78,7 +78,7 @@ export function SoldSplitButton({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onWatch}>{t('industry.watchOpenOrder')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={onManual}>{t('industry.manualSale')}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={onLost}>{t('industry.markAsLost')}…</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onLost}>{t('industry.markAsLostMenu')}</DropdownMenuItem>
             {losses.map((loss) => {
               const named = losses.length > 1;
               const detail = {
@@ -87,7 +87,7 @@ export function SoldSplitButton({
               };
               return [
                 <DropdownMenuItem key={`${loss.id}:edit`} onSelect={() => onEditLoss?.(loss)}>
-                  {named ? t('industry.editLossNamed', detail) : `${t('industry.editLoss')}`}
+                  {named ? t('industry.editLossNamed', detail) : t('industry.editLoss')}
                 </DropdownMenuItem>,
                 <DropdownMenuItem key={`${loss.id}:remove`} onSelect={() => onRemoveLoss?.(loss)}>
                   {named ? t('industry.removeLossNamed', detail) : t('industry.removeLoss')}

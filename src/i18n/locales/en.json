@@ -2516,6 +2516,7 @@
     "manualSaleHint": "Record a disposal that isn't in your wallet history or open orders — gifted, sold privately, or reprocessed and sold as something else.",
     "manualSaleQuantityError": "Enter a quantity greater than 0.",
     "markAsLost": "Mark as lost",
+    "markAsLostMenu": "Mark as lost…",
     "editLoss": "Edit loss…",
     "editLossNamed": "Edit loss: {{count}} lost, {{date}}…",
     "removeLoss": "Remove loss",

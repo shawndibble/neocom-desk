@@ -6,6 +6,13 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { SourcingInput } from './MaterialsTable';
 import type { LossInsuranceMode, RunLoss } from './useRunLoss';
 
+function todayInput(): string {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
 /**
  * The two dialogs `useRunLoss`'s state drives (issue #2851): the Mark as
  * lost / Edit loss form with its live net-loss preview, and the one-step
@@ -70,7 +77,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
                 <input
                   type="date"
                   value={dialog.form.date}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayInput()}
                   onChange={(e) => loss.setLossForm((f) => ({ ...f, date: e.target.value }))}
                   className="h-9 rounded-xs border border-line bg-panel-2 px-2 text-xs"
                 />

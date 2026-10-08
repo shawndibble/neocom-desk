@@ -30,7 +30,10 @@ interface LossDialogState {
   runId: string;
   runQuantity: number;
   totalCost: number;
-  /** Units neither sold nor lost by any *other* loss record — the most this loss may claim. */
+  quantitySold: number;
+  /** Units lost by the run's *other* loss records (excludes the one being edited). */
+  otherLost: number;
+  /** Units neither sold nor lost by any other record — the most this loss may claim. */
   unaccounted: number;
   /** Set when editing an existing loss. */
   lossId: string | null;
@@ -80,6 +83,8 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
       runId: row.run.id,
       runQuantity: row.run.quantity,
       totalCost: row.run.totalCost,
+      quantitySold: row.quantitySold,
+      otherLost,
       unaccounted,
       lossId: existing?.id ?? null,
       walletAvailable: false,
@@ -149,9 +154,8 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
     const quantityLost = unmaskNumber(dialog.form.quantity) ?? 0;
     const error = validateLossQuantity({
       quantity: dialog.runQuantity,
-      quantitySold: 0,
-      // `unaccounted` already excludes this loss's own units and the run's sales.
-      otherLost: dialog.runQuantity - dialog.unaccounted,
+      quantitySold: dialog.quantitySold,
+      otherLost: dialog.otherLost,
       quantityLost,
     });
     if (error) {
