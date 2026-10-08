@@ -1,6 +1,14 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, FieldError, Modal, Radio, SegmentedControl } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  FieldError,
+  Modal,
+  Radio,
+  SegmentedControl,
+  TextInput,
+} from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { SourcingInput } from './MaterialsTable';
@@ -74,12 +82,12 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
               </label>
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.lossDate')}
-                <input
+                <TextInput
+                  size="sm"
                   type="date"
                   value={dialog.form.date}
                   max={todayInput()}
                   onChange={(e) => loss.setLossForm((f) => ({ ...f, date: e.target.value }))}
-                  className="h-9 rounded-xs border border-line bg-panel-2 px-2 text-xs"
                 />
               </label>
             </div>
@@ -143,12 +151,12 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
 
             <label className="flex flex-col gap-1 text-xs">
               {t('industry.lossNote')}
-              <input
+              <TextInput
+                size="sm"
                 type="text"
                 maxLength={120}
                 value={dialog.form.note}
                 onChange={(e) => loss.setLossForm((f) => ({ ...f, note: e.target.value }))}
-                className="h-9 rounded-xs border border-line bg-panel-2 px-2 text-xs"
               />
             </label>
 

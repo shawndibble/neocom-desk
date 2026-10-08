@@ -36,13 +36,19 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
 }));
 vi.mock('./pilotKillmailFit', () => ({ loadKillmailFit: mocks.loadKillmailFit }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
-vi.mock('@/sde/loadSde', () => ({ loadTypes: mocks.loadTypes }));
+vi.mock('@/sde/loadSde', () => ({
+  loadTypes: mocks.loadTypes,
+  loadGroupCategories: async () => ({}),
+}));
 vi.mock('@/engine/fitting/fittingShare', () => ({ encodeFittingShare: mocks.encodeFittingShare }));
 vi.mock('./pilotLookup', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pilotLookup')>()),
   resolvePilotByName: mocks.resolvePilotByName,
   loadPilotProfile: mocks.loadPilotProfile,
 }));
+
+// A pasted Local list's zKillboard lookups stay pending: these tests are about the strip and the box.
+vi.mock('./pilotListData', () => ({ loadPilotList: () => new Promise(() => undefined) }));
 
 import { PilotLookupPanel } from './PilotLookupPanel';
 
@@ -146,6 +152,49 @@ describe('PilotLookupPanel', () => {
     fireEvent.mouseDown(option);
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(probe.search).toBe('?pilot=42');
+  });
+
+  it('tells an empty page that a Local list or D-Scan can be pasted', () => {
+    renderTab();
+    expect(screen.getByText(/paste a Local list or a D-Scan/i)).toBeTruthy();
+  });
+
+  it('keeps the search box beside the list strip, so one pilot needs no Clear first', async () => {
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.paste(screen.getByRole('combobox', { name: 'Pilot' }), {
+      clipboardData: {
+        getData: () => ['Alpha One', 'Beta Two', 'Gamma Three'].join(String.fromCharCode(10)),
+      },
+    });
+    expect(await screen.findByText('3 names, Local list')).toBeTruthy();
+    const box = screen.getByRole('combobox', { name: 'Pilot' });
+
+    fireEvent.change(box, { target: { value: 'some pilot' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    expect(screen.queryByText('3 names, Local list')).toBeNull();
+    expect(probe.search).toBe('?pilot=42');
+  });
+
+  it('puts Copy Share Link beside Clear for a D-Scan, and nothing of the kind for a Local list', async () => {
+    renderTab();
+    const box = screen.getByRole('combobox', { name: 'Pilot' });
+    const lines = ['626', '587', '626', '587'].map((id) => id + String.fromCharCode(9) + 'X');
+    fireEvent.paste(box, {
+      clipboardData: { getData: () => lines.join(String.fromCharCode(10)) },
+    });
+    expect(await screen.findByText('4 lines, D-Scan')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.paste(screen.getByRole('combobox', { name: 'Pilot' }), {
+      clipboardData: { getData: () => ['Alpha One', 'Beta Two'].join(String.fromCharCode(10)) },
+    });
+    expect(await screen.findByText('2 names, Local list')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).toBeNull();
   });
 
   it('says so when no pilot has the name', async () => {

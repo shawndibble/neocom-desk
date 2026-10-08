@@ -58,6 +58,12 @@ interface IconButtonProps extends Omit<
    * job is to explain. Leave off when the tap does something.
    */
   openOnTap?: boolean;
+  /**
+   * Tier 2 (DESIGN.md §6c Header controls): text shown beside the icon from
+   * `md` up. Icon-only below `md`. Keep it a substring of `label`; the
+   * accessible name and tooltip are unchanged.
+   */
+  visibleLabel?: string;
   className?: string;
 }
 
@@ -90,6 +96,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     tone = 'default',
     size = 'md',
     openOnTap,
+    visibleLabel,
     className = '',
     ...rest
   },
@@ -109,6 +116,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           variant,
           tone,
           size,
+          withText: visibleLabel !== undefined,
           pressed,
           // `aria-disabled` (a tooltip-bearing inert button) must not hover either.
           disabled: disabled || rest['aria-disabled'] === true || rest['aria-disabled'] === 'true',
@@ -118,6 +126,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         <span aria-hidden="true" className="flex items-center justify-center">
           {icon}
         </span>
+        {visibleLabel !== undefined && (
+          <span aria-hidden="true" className="hidden text-xs font-medium md:inline">
+            {visibleLabel}
+          </span>
+        )}
       </button>
     </Tooltip>
   );

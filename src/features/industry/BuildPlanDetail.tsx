@@ -130,7 +130,6 @@ import { PlanSlotLine } from './PlanSlotLine';
 import { categoryForActivity } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
-import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
@@ -2067,11 +2066,8 @@ export function BuildPlanDetail({
         )}
       </div>
 
-      <UnloggedDeliveriesBadge
-        characterId={plan.characterId}
-        blueprintTypeId={plan.blueprintTypeID}
-      />
       <ProductionRunsPanel
+        blueprintTypeId={plan.blueprintTypeID}
         characterId={plan.characterId}
         buildPlanId={plan.id}
         defaults={

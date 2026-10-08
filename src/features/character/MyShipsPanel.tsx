@@ -190,7 +190,7 @@ interface MyShipsPanelProps {
   route: JumpBasis;
 }
 
-/** Phone: a wrapping card (ship line, then character, place, Sec, Jumps). `sm` up: the table grid. */
+/** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. */
 const ROW_GRID =
   'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_1rem] sm:gap-y-0.5';
 
@@ -366,22 +366,25 @@ export function MyShipsPanel({
                       </span>
                     )}
                   </span>
-                  <span role="cell" className="min-w-0 text-xs break-words text-text-dim">
+                  <span
+                    role="cell"
+                    className="min-w-0 text-xs break-words text-text-dim max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+                  >
                     {state.data.characterNames.get(row.characterId)}
                   </span>
                   <span
                     role="cell"
-                    className="min-w-0 text-xs break-words max-sm:grow max-sm:basis-40"
+                    className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full"
                   >
                     {name}
                     {trail && <span className="text-text-dim"> · {trail}</span>}
                   </span>
-                  <span role="cell" className="text-xs">
+                  <span role="cell" className="text-xs max-sm:order-4">
                     <SecurityValue
                       security={typeof systemId === 'number' ? places.security.get(systemId) : null}
                     />
                   </span>
-                  <span role="cell" className="text-xs whitespace-nowrap">
+                  <span role="cell" className="text-xs whitespace-nowrap max-sm:order-5">
                     {jumps?.kind === 'known' && jumps.jumps === 0 ? (
                       <span>{t('assets.myShips.here')}</span>
                     ) : (

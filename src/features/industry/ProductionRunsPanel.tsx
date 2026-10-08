@@ -42,6 +42,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { productionRunsCsvColumns } from './productionRunsCsv';
+import { UnloggedDeliveriesBadge } from './UnloggedDeliveriesBadge';
 
 interface ProductionRunsPanelProps {
   characterId: number;
@@ -55,6 +56,8 @@ interface ProductionRunsPanelProps {
     sourceJobId?: number;
   } | null;
   productTypeID: number | null;
+  /** The plan's blueprint: when set, the header shows how many of its delivered jobs were never logged. */
+  blueprintTypeId?: number;
   productName: string;
   skills: SkillLevels;
   /** The plan owner's standing toward the plan's Trade Hub NPC owner (issue #1238), for each run's realized-profit broker fee. Absent/0 = standings assumed 0. */
@@ -97,6 +100,7 @@ export function ProductionRunsPanel({
   buildPlanId,
   defaults,
   productTypeID,
+  blueprintTypeId,
   productName,
   skills,
   standing,
@@ -247,10 +251,22 @@ export function ProductionRunsPanel({
     <>
       <CollapsiblePanel
         title={t('industry.productionRuns')}
+        wrapMeta
         meta={
-          rollup.count > 0 && (
-            <span className="text-xs tabular-nums text-text-dim">{runsSummary}</span>
-          )
+          // Its own line under the title on a phone (the title stays whole
+          // beside the header controls); nothing at all when there is
+          // neither a summary nor an unlogged-delivery chip to say.
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:basis-full empty:hidden">
+            {rollup.count > 0 && (
+              <span className="text-xs tabular-nums text-text-dim">{runsSummary}</span>
+            )}
+            {blueprintTypeId !== undefined && (
+              <UnloggedDeliveriesBadge
+                characterId={characterId}
+                blueprintTypeId={blueprintTypeId}
+              />
+            )}
+          </span>
         }
         expanded={expanded}
         collapsible={runs.length > 0}

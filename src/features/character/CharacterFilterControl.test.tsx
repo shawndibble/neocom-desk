@@ -110,13 +110,29 @@ describe('CharacterFilterControl', () => {
     expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toBeInTheDocument();
   });
 
-  describe('the icon-only phone trigger', () => {
-    it('renders both an icon (hidden at md) and the text label (hidden below md)', () => {
+  describe('the phone trigger', () => {
+    it('renders an icon (hidden at md), a truncating short label below md and the full label from md', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
       const trigger = screen.getByRole('button', { name: 'This character' });
-      const [iconSlot, textSlot] = trigger.children;
+      const [iconSlot, phoneText, mdText] = trigger.children;
       expect(iconSlot).toHaveClass('md:hidden');
-      expect(textSlot).toHaveClass('hidden', 'md:inline');
+      expect(phoneText).toHaveClass('truncate', 'md:hidden');
+      expect(phoneText).not.toHaveClass('hidden');
+      expect(phoneText).toHaveTextContent('This character');
+      expect(mdText).toHaveClass('hidden', 'md:inline');
+    });
+
+    it('names the All scope with a short form and the count below md', () => {
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="all"
+          onChange={() => {}}
+          characterCount={3}
+        />
+      );
+      const trigger = screen.getByRole('button');
+      expect(trigger.children[1]).toHaveTextContent('All · 3');
     });
 
     it("shows the AllCharacters glyph for 'all' and the active Character's own portrait for 'current'", () => {
@@ -135,7 +151,7 @@ describe('CharacterFilterControl', () => {
 
     it("defaults to the sm touch tier (a panel meta row's own IconButton size)", () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
-      expect(screen.getByRole('button')).toHaveClass('h-9', 'w-9');
+      expect(screen.getByRole('button')).toHaveClass('h-9', 'min-w-9');
     });
 
     it("matches the larger md tier when a PageHeader's own actions cluster needs it", () => {
@@ -147,7 +163,7 @@ describe('CharacterFilterControl', () => {
           size="md"
         />
       );
-      expect(screen.getByRole('button')).toHaveClass('h-11', 'w-11');
+      expect(screen.getByRole('button')).toHaveClass('h-11', 'min-w-11');
     });
   });
 });

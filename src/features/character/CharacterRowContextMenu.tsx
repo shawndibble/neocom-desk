@@ -58,7 +58,7 @@ export function CharacterRowContextMenu({
           ))}
           <MenuSeparator />
           <MenuItem className="text-danger" onSelect={onRemove}>
-            {t('characters.removeButtonLabel', { name })}
+            {t('characters.removeMenuLabel', { name })}
           </MenuItem>
         </>
       }

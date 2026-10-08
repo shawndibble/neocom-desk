@@ -395,7 +395,12 @@ export function Calendar() {
               skillPlanError={data?.skillPlanError ?? null}
               onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
             />
-            <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
+            <TableActionsMenu
+              name={t('calendar.title')}
+              tableExport={eventsExport}
+              size="md"
+              showLabel
+            />
             <IconButton
               icon={<Icon.Refresh />}
               label={t('calendar.refresh')}

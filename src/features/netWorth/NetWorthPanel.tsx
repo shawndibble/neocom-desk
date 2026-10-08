@@ -5,7 +5,6 @@
  * whose rows drill into that Character.
  */
 import { lazy, Suspense, useEffect, useMemo, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
 import {
@@ -17,6 +16,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import * as Icon from '@/components/ui/icons';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -40,7 +40,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
-import { LAYER_LABEL_KEYS, LAYER_LINKS, LAYER_SWATCH } from './layerMeta';
+import { LAYER_LABEL_KEYS, LAYER_SWATCH } from './layerMeta';
 import { useNetWorthHiddenCharacters, useNetWorthHiddenLayers } from './netWorthSettings';
 import { buildTableRows, type NetWorthTableRow } from './tableRows';
 import { useNetWorthData } from './useNetWorthData';
@@ -116,8 +116,18 @@ function LayerPicker({
   return (
     <MultiSelect
       trigger={
-        <Button size="md">
-          {t('wallet.netWorth.seriesButton', { shown: selected.size, total: listed.length })}
+        <Button
+          size="md"
+          aria-label={t('wallet.netWorth.layersButton', {
+            shown: selected.size,
+            total: listed.length,
+          })}
+        >
+          <span aria-hidden="true">{t('wallet.netWorth.layersNoun')}</span>
+          <span aria-hidden="true" className="text-text-dim tabular-nums">
+            {selected.size} / {listed.length}
+          </span>
+          <Icon.Expanded aria-hidden="true" className="text-text-dim" />
         </Button>
       }
       options={options}
@@ -126,85 +136,6 @@ function LayerPicker({
       onToggle={onToggle}
       searchPlaceholder={t('wallet.netWorth.seriesSearch')}
       noResultsLabel={t('wallet.netWorth.seriesNoResults')}
-    />
-  );
-}
-
-interface LayerRow {
-  id: LayerId;
-  value: number;
-  share: number;
-  shown: boolean;
-}
-
-function LayerTable({
-  values,
-  listed,
-  shown,
-}: {
-  values: LayerValues;
-  listed: readonly LayerId[];
-  shown: readonly LayerId[];
-}) {
-  const { t } = useTranslation();
-  const total = netWorthOf(values, shown);
-  const rows = useMemo<LayerRow[]>(
-    () =>
-      listed.map((id) => ({
-        id,
-        value: values[id],
-        share: total > 0 && shown.includes(id) ? values[id] / total : 0,
-        shown: shown.includes(id),
-      })),
-    [values, listed, shown, total]
-  );
-  const columns = useMemo<DataTableColumn<LayerRow>[]>(
-    () => [
-      {
-        id: 'layer',
-        header: t('wallet.netWorth.layerColumn'),
-        stickyStart: true,
-        render: (row) => (
-          <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className={cx('size-2.5 rounded-xs', LAYER_SWATCH[row.id])} />
-            {t(LAYER_LABEL_KEYS[row.id])}
-          </span>
-        ),
-      },
-      {
-        id: 'value',
-        header: t('wallet.netWorth.valueColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (row) => formatIsk(row.value),
-      },
-      {
-        id: 'share',
-        header: t('wallet.netWorth.shareColumn'),
-        align: 'right',
-        className: 'tabular-nums text-text-dim',
-        render: (row) => (row.shown ? `${(row.share * 100).toFixed(1)}%` : '—'),
-      },
-      {
-        id: 'opens',
-        header: t('wallet.netWorth.opensColumn'),
-        render: (row) => (
-          <Link to={LAYER_LINKS[row.id]} state={{ from: 'wallet' }} className={inlineLinkClassName}>
-            {t(`wallet.netWorth.opens.${row.id}`)}
-          </Link>
-        ),
-      },
-    ],
-    [t]
-  );
-  return (
-    <DataTable
-      label={t('wallet.netWorth.layersTable')}
-      columns={columns}
-      rows={rows}
-      rowKey={(row) => row.id}
-      rowClassName={(row) => (row.shown ? undefined : 'opacity-50')}
-      responsive="table"
     />
   );
 }
@@ -350,6 +281,7 @@ export function NetWorthPanel({
         id: 'character',
         header: t('wallet.balanceCharacterColumn'),
         stickyStart: true,
+        stickyStartOnPanel: true,
         render: (row) => (
           <span className={row.covered ? undefined : 'text-text-dim'}>
             {row.characterName}
@@ -493,11 +425,6 @@ export function NetWorthPanel({
         <p className="mt-2 text-xs text-text-dim">{t('wallet.netWorth.gapNote')}</p>
       )}
       <p className="mt-2 text-[0.6875rem] text-text-dim">{t('wallet.netWorth.footnote')}</p>
-      {mode === 'single' && singleLatest && (
-        <div className="mt-3">
-          <LayerTable values={singleLatest} listed={listed} shown={shown} />
-        </div>
-      )}
     </Panel>
   );
 

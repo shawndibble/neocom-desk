@@ -90,7 +90,7 @@ export function SoldSplitButton({
                   {named ? t('industry.editLossNamed', detail) : t('industry.editLoss')}
                 </DropdownMenuItem>,
                 <DropdownMenuItem key={`${loss.id}:remove`} onSelect={() => onRemoveLoss?.(loss)}>
-                  {named ? t('industry.removeLossNamed', detail) : t('industry.removeLoss')}
+                  {named ? t('industry.removeLossNamedMenu', detail) : t('industry.removeLossMenu')}
                 </DropdownMenuItem>,
               ];
             })}
@@ -102,7 +102,7 @@ export function SoldSplitButton({
               onSelect={onDelete}
               className="text-danger data-[highlighted]:text-danger"
             >
-              {t('industry.deleteProductionRun')}
+              {t('industry.deleteProductionRunMenu')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

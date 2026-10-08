@@ -62,3 +62,56 @@ for (const size of [
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+/**
+ * Layout invariants for the Clones summary strip and Settings > Data age
+ * (no overlap between the strip's columns, no sideways page scroll).
+ */
+for (const size of [
+  { width: 1024, height: 768 },
+  { width: 390, height: 844 },
+]) {
+  test(`the clones summary strip does not overlap and the page does not scroll sideways at ${size.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    await signInAndGoto(page, './clones');
+    const strip = page.getByRole('region', { name: 'You are in' });
+    await expect(strip).toBeVisible();
+    const boxes = [];
+    for (const name of ['Jump Cooldown', 'You are in']) {
+      boxes.push(await page.getByRole('region', { name }).boundingBox());
+    }
+    const [a, b] = boxes as { x: number; y: number; width: number; height: number }[];
+    const apart =
+      a.x + a.width <= b.x + 1 ||
+      b.x + b.width <= a.x + 1 ||
+      a.y + a.height <= b.y + 1 ||
+      b.y + b.height <= a.y + 1;
+    expect(apart).toBe(true);
+    // The cooldown header is said once (the old chip label repeated it).
+    await expect(page.getByText('Jump Cooldown', { exact: true })).toHaveCount(0);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
+
+test('Settings > Data age stays inside a 390px page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInAndGoto(page, './clones');
+  await expect(page.getByRole('region', { name: 'You are in' })).toBeVisible();
+  // Client-side navigation: the Data age list is session-only, built from this
+  // visit's fetches, so a reload would empty it.
+  await page.evaluate(() => {
+    const base = location.pathname.replace(/\/clones\/?$/, '');
+    history.pushState({}, '', `${base}/settings/dataAge`);
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page.getByRole('heading', { name: /^Data age$/i })).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+});
