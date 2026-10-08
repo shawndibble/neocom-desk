@@ -207,11 +207,11 @@ describe('OpportunitiesPanel', () => {
       expect(onStartPlan).not.toHaveBeenCalled();
     });
 
-    it('has no row menu or More-actions button: Plan is the row’s one control', async () => {
+    it('offers Price history in the row menu and a More-actions button, as the phone card does', async () => {
       const { row } = await renderWithRow(1000);
+      expect(within(row).getByRole('button', { name: /More actions/ })).toBeInTheDocument();
       fireEvent.contextMenu(row);
-      expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
-      expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+      expect(await screen.findByRole('menuitem', { name: 'Price history' })).toBeInTheDocument();
     });
 
     it('gives the row a "Plan" button that fires onStartPlan with its catalog entry (issue #1781)', async () => {
