@@ -2121,6 +2121,16 @@
       "alphaOverCap": "This plan needs {{sp}} more SP than an Alpha clone can hold (cap {{cap}} SP).",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
+    "assumptions": {
+      "title": "Assumptions",
+      "defaults": "Defaults",
+      "alpha": "Alpha",
+      "implantsPreset": "{{preset}} implants",
+      "noImplants": "No implants",
+      "customImplants": "Custom implants",
+      "jumpCloneImplants": "Jump clone implants",
+      "booster": "Booster"
+    },
     "skillsToBuy": {
       "title": "Skills to buy",
       "unknown": "Unknown until your skills load.",

@@ -98,11 +98,12 @@ Sections (labelled, one panel on desktop, Disclosure on mobile):
    - Remap optimizer supports at most 2 remaps (`MAX_SUPPORTED_REMAPS`, `src/engine/optimizer/placeRemaps.ts:110`); note "Evaluated with {count} remaps. This plan allows more; placement beyond that is not available yet."
 2. Attributes
    - Current sheet note; "attributes impossible" warning when ESI total is not 99 (falls back to default spread).
+3. Skills to buy (`SkillsToBuyPanel.tsx`): directly under Attributes. Distinct untrained plan skills ("Unknown until your skills load" before ESI answers), each with its lowest sell at the selected hub (region fallback; "No sell orders at {hub}"), Total cost, unpriced count, Copy multibuy list. Below `lg` it is not in the pane: it is its own closed row ("Skills to buy" with the total beside it, `collapsible`) above Plan tools, expanding in place.
+4. Assumptions: one closed-by-default Disclosure (`PlanToolSection.group`) whose row summarises what is set ("Alpha · +5 implants · Booster", or "Defaults"; `assumptionsSummary.ts`). Opens onto:
    - Alpha clone checkbox (per Character, synced `sync.skillCloneStates`; Alpha = half speed + Alpha caps; count of capped levels).
    - What-if implants: Select (None / Current / Jump clone {label} / Custom), per-attribute implant bonus inputs, Market link to attribute enhancers. Per-plan, travels with Duplicate.
    - Booster list (`BoosterList.tsx`): ordered cerebral accelerators ("Accelerator N"), Bonus, Starts (or "Already running"), Expires, quick picks "+Nh"/"+Nd", Add/Remove, inline overlap rejection (EVE has one booster slot), "Expired" state, notice when ESI attributes already include an accelerator ("taken back out of your base sheet"), "does not report when an accelerator runs out" note. Market link to cerebral accelerators.
-3. Skill injectors (`InjectorFactsPanel.tsx`): "If injected now:" SP still to train, Unallocated SP, SP gap, Large Skill Injectors needed, SP left over, Price per injector (sell min at the selected Trade Hub via `useMarketHub`), Total cost, "No sell orders at {hub}", "Unknown until your total SP loads", "already covered by unallocated SP", Alpha caveat.
-4. Skills to buy (`SkillsToBuyPanel.tsx`): distinct untrained plan skills ("Unknown until your skills load" before ESI answers), each with its lowest sell at the selected hub (region fallback; "No sell orders at {hub}"), Total cost, unpriced count, Copy multibuy list.
+   - Skill injectors (`InjectorFactsPanel.tsx`): "If injected now:" SP still to train, Unallocated SP, SP gap, Large Skill Injectors needed, SP left over, Price per injector (sell min at the selected Trade Hub via `useMarketHub`), Total cost, "No sell orders at {hub}", "Unknown until your total SP loads", "already covered by unallocated SP", Alpha caveat.
 5. Import / Export - not in pane; rendered in the page header (portal).
 
 ### 2d. Import / Export (page header)

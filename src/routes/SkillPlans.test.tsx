@@ -190,6 +190,18 @@ async function openPlanTools() {
   }
 }
 
+/**
+ * Alpha, What-if implants, Booster and Skill injectors sit one level inside
+ * Plan tools, under a closed-by-default Assumptions row. Opens it; call after
+ * `openPlanTools`.
+ */
+async function openAssumptions() {
+  const toggle = screen.getByRole('button', { name: /^assumptions/i });
+  if (toggle.getAttribute('aria-expanded') === 'false') {
+    await userEvent.setup().click(toggle);
+  }
+}
+
 /** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
 async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: 'Optimize' }));
@@ -583,8 +595,10 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
     expect(within(section).getByText('Intelligence')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
     expect(section.querySelector('time')).not.toBeNull();
-    // The what-if lens sits directly beneath the sheet it reinterprets.
-    expect(within(section).getByLabelText('What-if implants')).toBeInTheDocument();
+    // The what-if lens is not in this section: it sits in the closed Assumptions row.
+    expect(within(section).queryByLabelText('What-if implants')).toBeNull();
+    await openAssumptions();
+    expect(screen.getByLabelText('What-if implants')).toBeInTheDocument();
   });
 });
 
@@ -1359,6 +1373,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
+    await openAssumptions();
     await screen.findByText('Your entries');
 
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
@@ -1522,6 +1537,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
+    await openAssumptions();
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
@@ -1549,6 +1565,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
+    await openAssumptions();
 
     expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
 
@@ -1568,6 +1585,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
+    await openAssumptions();
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
@@ -1593,6 +1611,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     const first = render(<App />);
     await openPlanTools();
+    await openAssumptions();
 
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
@@ -1617,6 +1636,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     first.unmount();
     render(<App />);
     await openPlanTools();
+    await openAssumptions();
 
     expect(await screen.findByLabelText('Expires')).toHaveValue('2099-01-01T00:00');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');

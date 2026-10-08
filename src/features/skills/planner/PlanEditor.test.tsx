@@ -22,6 +22,17 @@ vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(und
 const loadCharacterSkillQueue =
   vi.fn<(characterId: number) => Promise<CachedResult<SkillQueueEntry[]> | null>>();
 
+// Skills to buy prices its list at the hub: Skill A (10) sells for 1.5M, Skill B
+// (20) has no sell orders, so the row's total and its "without a price" note
+// both have something to say.
+vi.mock('@/market/prices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/prices')>()),
+  getHubPrices: vi.fn(async (_hub: unknown, ids: readonly number[]) => {
+    return new Map(ids.filter((id) => id === 10).map((id) => [id, { sellMin: 1_500_000 }]));
+  }),
+  getRegionSellPrices: vi.fn(async () => new Map<number, number | null>()),
+}));
+
 vi.mock('./jumpCloneImplants', () => ({ useJumpCloneImplantSets: () => [] }));
 
 vi.mock('../data', () => ({
@@ -215,6 +226,14 @@ async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
 
+/**
+ * The Assumptions disclosure (Alpha, What-if implants, Booster, Skill
+ * injectors) is closed by default, one level inside Plan tools.
+ */
+async function openAssumptions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^assumptions/i }));
+}
+
 /** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
 async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: 'Optimize' }));
@@ -268,6 +287,7 @@ describe('PlanEditor tools pane', () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
+    await openAssumptions(user);
 
     const actions = sectionFor('Actions');
     const attributesSection = sectionFor('Attributes');
@@ -299,12 +319,13 @@ describe('PlanEditor tools pane', () => {
     // Attributes: the sheet every estimate is costed against, then the two
     // what-if lenses over it — which change the numbers, not the plan.
     expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
-    expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
+    // The lenses live one level in, under the closed-by-default Assumptions
+    // row, not in the Attributes section.
+    expect(within(attributesSection).queryByLabelText('What-if implants')).toBeNull();
+    expect(screen.getByLabelText('What-if implants')).toBeInTheDocument();
     // No accelerator configured, so the Booster section is its empty state:
     // just the affordance to add one.
-    expect(
-      within(attributesSection).getByRole('button', { name: 'Add accelerator' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
 
     // Import/Export: plan-level file operations, now icon buttons portaled
     // into the route's page header rather than a tools-pane section.
@@ -1036,6 +1057,112 @@ describe('PlanEditor tools pane placement', () => {
   });
 });
 
+describe('PlanEditor Assumptions disclosure', () => {
+  it('is closed by default and reads Defaults when nothing is set', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    const toggle = screen.getByRole('button', { name: /^assumptions/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('Defaults');
+    // Closed: none of the four blocks it holds is mounted.
+    expect(screen.queryByLabelText('Alpha clone')).toBeNull();
+    expect(screen.queryByLabelText('What-if implants')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add accelerator' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Skill injectors' })).toBeNull();
+  });
+
+  it('opens on Alpha, What-if implants, Booster and Skill injectors', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+    await openAssumptions(user);
+
+    expect(screen.getByRole('button', { name: /^assumptions/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(screen.getByLabelText('Alpha clone')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Skill injectors' })).toBeInTheDocument();
+  });
+
+  it('summarises what is set while closed', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      plan: {
+        ...PLAN,
+        whatIfImplants: { kind: 'preset', preset: '+5' },
+        boosters: [{ enabled: true, bonus: 12, startsAt: null, expiresAt: Date.UTC(2099, 0, 1) }],
+      },
+    });
+    await openTools(user);
+
+    expect(screen.getByRole('button', { name: /^assumptions/i })).toHaveTextContent(
+      '+5 implants · Booster'
+    );
+  });
+});
+
+describe('PlanEditor Skills to buy placement', () => {
+  it('sits directly under Attributes in the sidebar at `lg`+, ahead of the Assumptions row', () => {
+    withDesktopViewport(() => {
+      renderEditor();
+
+      const sidebar = screen.getByTestId('plan-list-pane').closest('aside');
+      if (!sidebar) throw new Error('expected a sidebar');
+      const headings = within(sidebar)
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent);
+      expect(headings).toEqual(['Actions', 'Attributes', 'Skills to buy']);
+
+      const skillsToBuy = within(sidebar).getByRole('heading', { name: 'Skills to buy' });
+      const assumptions = within(sidebar).getByRole('button', { name: /^assumptions/i });
+      expect(
+        skillsToBuy.compareDocumentPosition(assumptions) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+  });
+
+  it('gets its own row with the total below `lg`, outside the collapsed Plan tools', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    // Plan tools stays collapsed; the row is on screen anyway.
+    expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5M ISK/i });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /copy multibuy list/i })).toBeNull();
+
+    await user.click(row);
+
+    expect(row).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Copy multibuy list' })).toBeInTheDocument();
+    expect(
+      screen.getByText('1 skill without a price is left out of the total.')
+    ).toBeInTheDocument();
+    // Plan tools is untouched, and holds no second copy of the list.
+    expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('keeps the list out of the expanded Plan tools below `lg`', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    expect(screen.queryByRole('heading', { name: 'Skills to buy' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^skills to buy/i })).toHaveLength(1);
+  });
+});
+
 describe('PlanEditor: the attributes every estimate is costed against', () => {
   it("shows ESI's own reading, not the scheduler's fallback base sheet", async () => {
     const user = userEvent.setup();
@@ -1075,11 +1202,12 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
       },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     const section = sectionFor('Attributes');
     expect(within(section).getByText('22 base + 3 implant = 25')).toBeInTheDocument();
 
-    await user.click(within(section).getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
 
     // The lens re-costs the plan; it does not rewrite the character. "Current
@@ -1240,6 +1368,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Current');
     expect(screen.getByText('INT +0 · MEM +3 · PER +4 · WIL +0 · CHA +0')).toBeInTheDocument();
@@ -1250,6 +1379,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
     await chooseWhatIf(user, 'Custom');
 
     // Measured: five fields across a 294px sidebar leaves a 29.6px content
@@ -1267,6 +1397,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
 
     await chooseWhatIf(user, '+4');
 
@@ -1280,6 +1411,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
+    await openAssumptions(user);
 
     await chooseWhatIf(user, 'Custom');
 
@@ -1297,6 +1429,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
 
     await chooseWhatIf(user, '+4');
     await chooseWhatIf(user, 'Custom');
@@ -1312,6 +1445,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
     await chooseWhatIf(user, 'Custom');
 
     const memory = screen.getByLabelText('Memory implant bonus');
@@ -1325,6 +1459,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
 
     await chooseWhatIf(user, '+5');
     await chooseWhatIf(user, 'Custom');
@@ -1343,6 +1478,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(
       screen.getByRole('link', { name: 'View attribute enhancer implants in Market' })
@@ -1394,6 +1530,7 @@ describe('PlanEditor Character details assumption note (issue #1526)', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
+    await openAssumptions(user);
     await chooseWhatIf(user, 'None');
 
     await waitFor(() => {
@@ -1407,6 +1544,7 @@ describe('PlanEditor booster market link (issue #407)', () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(screen.getByRole('link', { name: 'View cerebral accelerators in Market' }));
 
@@ -1432,6 +1570,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('12');
@@ -1442,6 +1581,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('');
     expect(screen.getByText(/costed as if you had none/i)).toBeInTheDocument();
@@ -1451,6 +1591,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
+    await openAssumptions(user);
 
     const bonus = screen.getByLabelText('Bonus');
     await user.clear(bonus);
@@ -1465,6 +1606,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
       attributeBaseline: { ...ACCELERATED, acceleratorBonus: 4 },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('4');
   });
@@ -1473,6 +1615,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
+    await openAssumptions(user);
 
     await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
 
@@ -1483,6 +1626,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(screen.getByRole('button', { name: '+12h' }));
 
@@ -1501,6 +1645,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+4' }));
@@ -1512,6 +1657,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
+    await openAssumptions(user);
     await chooseWhatIf(user, 'Custom');
 
     const perception = screen.getByLabelText('Perception implant bonus');
@@ -1533,6 +1679,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       plan: { ...PLAN, whatIfImplants: { kind: 'preset', preset: '+5' } },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
     expect(screen.getByText('INT +5 · MEM +5 · PER +5 · WIL +5 · CHA +5')).toBeInTheDocument();
@@ -1544,6 +1691,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
 
@@ -1558,6 +1706,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
+    await openAssumptions(user);
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
@@ -1591,6 +1740,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
@@ -1608,6 +1758,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     const expires = screen.getByLabelText<HTMLInputElement>('Expires');
     await user.clear(expires);
@@ -1623,6 +1774,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     await user.clear(screen.getByLabelText('Expires'));
     await user.tab();
@@ -1639,6 +1791,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     const expires = screen.getByLabelText<HTMLInputElement>('Expires');
     await user.clear(expires);
@@ -1669,6 +1822,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: null } },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     const bonus = screen.getByLabelText('Bonus');
     await user.clear(bonus);
@@ -1696,6 +1850,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
       },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     // The unticked legacy row reads as no row at all, and the detected
     // accelerator still does not prefill over that answer.
@@ -1717,6 +1872,7 @@ describe('a character with no accelerator', () => {
     const user = userEvent.setup();
     renderEditor(vi.fn(), attributeBaseline === undefined ? {} : { attributeBaseline });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
@@ -1737,6 +1893,7 @@ describe('an attribute sheet nothing explains', () => {
       },
     });
     await openTools(user);
+    await openAssumptions(user);
 
     expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
@@ -2037,6 +2194,7 @@ describe('Clone State (#1233)', () => {
     // answer from leaking into any other test's Character.
     renderEditor(vi.fn(), { characterId: 1233 });
     await openTools(user);
+    await openAssumptions(user);
 
     // Omega by default: nothing is flagged.
     const toggle = screen.getByLabelText<HTMLInputElement>('Alpha clone');

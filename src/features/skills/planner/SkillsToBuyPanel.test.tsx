@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
@@ -12,7 +13,7 @@ vi.mock('@/market/prices', () => ({
 const nameFor = (id: number) => `Skill ${id}`;
 const entries = [{ skillTypeID: 1 }, { skillTypeID: 1 }, { skillTypeID: 2 }, { skillTypeID: 3 }];
 
-function renderPanel(known = true) {
+function renderPanel(known = true, collapsible = false) {
   return render(
     <MemoryRouter>
       <SkillsToBuyPanel
@@ -20,6 +21,7 @@ function renderPanel(known = true) {
         trainedSkills={new Map([[3, {}]])}
         trainedSkillsKnown={known}
         nameFor={nameFor}
+        collapsible={collapsible}
       />
     </MemoryRouter>
   );
@@ -40,5 +42,20 @@ describe('SkillsToBuyPanel', () => {
   it('says unknown until trained skills load', () => {
     renderPanel(false);
     expect(screen.getByText(/Unknown until your skills load/)).toBeInTheDocument();
+  });
+  it('collapsible: a closed row with the total beside the title, expanding to the same list', async () => {
+    const user = userEvent.setup();
+    renderPanel(true, true);
+
+    // Skill 1 sells for 1000 at the hub; Skill 2 falls back to the 500 region price.
+    const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5K ISK/i });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Skill 1')).toBeNull();
+
+    await user.click(row);
+
+    expect(screen.getByText('Skill 1')).toBeInTheDocument();
+    expect(screen.getByText(/Total cost/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy multibuy/i })).toBeInTheDocument();
   });
 });
