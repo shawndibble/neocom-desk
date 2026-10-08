@@ -2149,12 +2149,23 @@
       "alphaOverCap": "This plan needs {{sp}} more SP than an Alpha clone can hold (cap {{cap}} SP).",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
+    "assumptions": {
+      "title": "Assumptions",
+      "defaults": "Defaults",
+      "alpha": "Alpha",
+      "implantsPreset": "{{preset}} implants",
+      "noImplants": "No implants",
+      "customImplants": "Custom implants",
+      "jumpCloneImplants": "Jump clone implants",
+      "booster": "Booster"
+    },
     "skillsToBuy": {
       "title": "Skills to buy",
       "unknown": "Unknown until your skills load.",
       "none": "You already have every skill in this plan.",
       "noSellOrders": "No sell orders at {{hub}}",
       "total": "Total cost",
+      "rowSummary": "{{priced}} priced · {{unpriced}} without a price",
       "unpriced_one": "{{count}} skill without a price is left out of the total.",
       "unpriced_other": "{{count}} skills without a price are left out of the total.",
       "copy": "Copy multibuy list",
