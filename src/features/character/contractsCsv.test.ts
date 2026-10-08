@@ -90,4 +90,9 @@ describe('contractsCsvColumns', () => {
       '2026-09-01T00:00:00Z'
     );
   });
+
+  it('exports the full expiry timestamp, not a date alone', () => {
+    const col = contractsCsvColumns(t, nameFor).find((c) => c.header === 'contracts.expires')!;
+    expect(col.value(contract())).toBe('2026-08-29T12:00:00Z');
+  });
 });
