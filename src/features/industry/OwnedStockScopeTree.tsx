@@ -92,7 +92,7 @@ export function OwnedStockScopeTree({
               )}
               aria-expanded={open}
               onClick={() => toggleExpanded(station.key)}
-              className="grid min-h-11 w-6 shrink-0 place-items-center md:min-h-7 touch:min-h-11"
+              className={`grid w-6 shrink-0 place-items-center ${tappableRowClassName}`}
             >
               <Caret expanded={open} />
             </button>
