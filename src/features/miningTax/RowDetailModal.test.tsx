@@ -368,10 +368,18 @@ describe('RowDetailModal — price breakdown', () => {
     });
     expect(screen.getByText('Saved snapshot')).toBeInTheDocument();
     expect(screen.getByText(/buy · .* ore · 10% tax/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Copy as text' }));
+    expect(screen.queryByRole('button', { name: 'Copy pricing as text' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy pricing as text' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Copied');
     const text = write.mock.calls[0][0] as string;
     expect(text).toContain('Veldspar: 250 × 10 = 2,500 ISK (Saved snapshot)');
     expect(text).toContain('10% tax');
     configureClipboard(null);
+  });
+
+  it('offers no copy item when the row has no breakdown', async () => {
+    renderModal('unassigned', null);
+    expect(screen.queryByRole('button', { name: 'More actions for this entry' })).toBeNull();
   });
 });
