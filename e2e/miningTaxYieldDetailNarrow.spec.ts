@@ -31,7 +31,11 @@ const VELDSPAR = 1230;
 const ZEOLITES = 45490;
 /** Jita — a real solar system id, pre-seeded below so `loadSystemNameAndSecurity` never fetches it live. */
 const SOLAR_SYSTEM_ID = 30000142;
-const ENTRY_DATE = '2026-09-08';
+/** Relative to today: ESI keeps the mining ledger 30 days, so a fixed date ages out of the Overview and the spec fails on the calendar alone. */
+function utcDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+}
+const ENTRY_DATE = utcDaysAgo(2);
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
 const GLOBAL_CACHE_CHARACTER_ID = 0;
 
@@ -57,7 +61,7 @@ const OVERVIEW_TABLE = 'Overview';
  */
 async function mockMarketHistory(page: Page): Promise<void> {
   await page.route('https://esi.evetech.net/markets/*/history*', async (route) => {
-    const body = ['2026-09-06', '2026-09-07', ENTRY_DATE].map((date) => ({
+    const body = [utcDaysAgo(4), utcDaysAgo(3), ENTRY_DATE].map((date) => ({
       date,
       average: 4200.5,
       highest: 4400,
