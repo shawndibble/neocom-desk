@@ -49,7 +49,7 @@ import { isCardOwnClick, useRowStartPlan } from './rowStartPlan';
 import { formatIsk } from '@/lib/isk';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
-import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
+import { ORDER_DEPTH_TONE, stockCoverage, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import type { OpportunityRow } from './opportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
@@ -74,7 +74,8 @@ interface MobileOpportunityListProps {
   nameForCharacter: (characterId: number) => string;
 }
 
-type SortFieldId = 'iskPerHour' | 'unitMargin' | 'margin' | 'duration';
+type SortFieldId =
+  'iskPerHour' | 'unitMargin' | 'margin' | 'stockCovers' | 'stillToBuy' | 'duration';
 
 interface HeroValue {
   node: ReactNode;
@@ -143,6 +144,22 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
         };
       },
     },
+    stockCovers: {
+      label: t('industry.opportunitiesStockCovers'),
+      sortValue: (row) => stockCoverage(row)?.coveredPct,
+      hero: (row) => {
+        const value = stockCoverage(row)?.coveredPct;
+        return { node: value === undefined ? unknown : formatPercent(value) };
+      },
+    },
+    stillToBuy: {
+      label: t('industry.opportunitiesStillToBuy'),
+      sortValue: (row) => stockCoverage(row)?.stillToBuyIsk,
+      hero: (row) => {
+        const value = stockCoverage(row)?.stillToBuyIsk;
+        return { node: value === undefined ? unknown : <IskAmount value={value} decimals={0} /> };
+      },
+    },
     duration: {
       label: t('industry.time'),
       sortValue: (row) => row.result.seconds,
@@ -151,7 +168,14 @@ function sortFields(t: ReturnType<typeof useTranslation>['t']): Record<
   };
 }
 
-const SORT_FIELD_ORDER: readonly SortFieldId[] = ['iskPerHour', 'unitMargin', 'margin', 'duration'];
+const SORT_FIELD_ORDER: readonly SortFieldId[] = [
+  'iskPerHour',
+  'unitMargin',
+  'margin',
+  'stockCovers',
+  'stillToBuy',
+  'duration',
+];
 
 const identicalRowKey = (row: OpportunityRow) =>
   identicalBlueprintKey(String(row.candidate.characterId), row.candidate.blueprint);

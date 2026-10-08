@@ -155,6 +155,7 @@ describe('OpportunitiesPanel', () => {
           },
           result: {
             seconds: 60,
+            materials: [],
             iskPerHour: null,
             marginPct: null,
             profit: null,
@@ -286,6 +287,7 @@ describe('OpportunitiesPanel', () => {
         },
         result: {
           seconds: 60,
+          materials: [],
           iskPerHour: null,
           marginPct: null,
           profit: null,
