@@ -300,6 +300,9 @@
       "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
+      "alsoSaveLabel": "Also save to My Fittings",
+      "myFittingsFailedTitle": "Saved to EVE, but not to My Fittings",
+      "myFittingsFailed": "It's in your in-game list, but we couldn't save it to My Fittings. Use Save to keep it there.",
       "close": "Close"
     },
     "missingSkills": {
