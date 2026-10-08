@@ -191,6 +191,23 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByText("This pilot couldn't be found")).toBeNull();
   });
 
+  it('retries the profile after an outage, and shows its age once loaded', async () => {
+    mocks.loadPilotProfile.mockRejectedValueOnce(new Error('offline'));
+    renderTab('/pilot-lookup?pilot=42');
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.loadPilotProfile).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.querySelector('time')).not.toBeNull());
+  });
+
+  it('retries zKillboard stats after a failure', async () => {
+    mocks.fetchPilotStats.mockResolvedValueOnce({ kind: 'failed' });
+    renderTab('/pilot-lookup?pilot=42');
+    await screen.findByText("zKillboard couldn't be reached");
+    const calls = mocks.fetchPilotStats.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.fetchPilotStats.mock.calls.length).toBe(calls + 1));
+  });
+
   it('shows no history apart from a failure', async () => {
     mocks.fetchPilotStats.mockResolvedValue({ kind: 'no-history' });
     renderTab('/pilot-lookup?pilot=42');
@@ -274,6 +291,15 @@ describe('PilotLookupPanel', () => {
       expect(screen.getByRole('link', { name: /^More on zKillboard/ }).getAttribute('href')).toBe(
         'https://zkillboard.com/character/42/'
       );
+    });
+
+    it('says so when the list hit its cap', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: Array.from({ length: 25 }, (_, i) => ({ ...INLINE_KILL, killmailId: 900 + i })),
+      });
+      renderTab('/pilot-lookup?pilot=42');
+      expect(await screen.findByText(/Showing the latest 25/)).toBeTruthy();
     });
 
     it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {

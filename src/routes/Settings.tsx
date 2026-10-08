@@ -15,6 +15,7 @@ import {
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
+import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
@@ -1104,6 +1105,7 @@ export function Settings() {
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
                 <UpdatePanel />
+                <InstallAppPanel />
                 <ExportPanel />
                 <ImportPanel />
               </div>

@@ -155,6 +155,7 @@ describe('OpportunitiesPanel', () => {
           },
           result: {
             seconds: 60,
+            materials: [],
             iskPerHour: null,
             marginPct: null,
             profit: null,
@@ -263,6 +264,7 @@ describe('OpportunitiesPanel', () => {
 
     expect(await screen.findByText('Pricing settings changed')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.getByText(/More than 10 blueprints/)).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
@@ -285,6 +287,7 @@ describe('OpportunitiesPanel', () => {
         },
         result: {
           seconds: 60,
+          materials: [],
           iskPerHour: null,
           marginPct: null,
           profit: null,

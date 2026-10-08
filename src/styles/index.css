@@ -316,6 +316,28 @@
     content: none;
   }
 
+  /* A labelless text-button cell (Active Jobs' "Log production"): its own
+     row at the card's foot, button at its natural width and a 44px tap
+     height. Not `dt-actions`, whose fixed 44px square is for an icon button
+     and squeezes a labelled one into a sliver. */
+  .dt-stacked td.dt-action-row {
+    padding-left: 0;
+    padding-top: 0.25rem;
+    min-height: 0;
+  }
+
+  .dt-stacked td.dt-action-row::before {
+    content: none;
+  }
+
+  .dt-stacked td.dt-action-row:empty {
+    display: none;
+  }
+
+  .dt-stacked td.dt-action-row button {
+    min-height: 2.75rem;
+  }
+
   /*
    * Two-value-per-row cards (`DataTable`'s `stackColumns={2}`).
    *

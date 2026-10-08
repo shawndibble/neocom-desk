@@ -14,6 +14,7 @@
 import type {
   BuildPlanRecord,
   FittingRecord,
+  NetWorthSnapshotRecord,
   MiningTaxAssignmentRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -196,6 +197,18 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
   updatedAt: UPDATED_AT,
 };
 
+export const FULL_NET_WORTH_SNAPSHOT: Required<NetWorthSnapshotRecord> = {
+  id: '1:2026-10-07',
+  characterId: 1,
+  day: '2026-10-07',
+  wallet: 1_500_000_000,
+  assetValue: 42_000_000_000,
+  plexValue: 3_000_000_000,
+  escrow: 250_000_000,
+  hubId: 'jita',
+  updatedAt: UPDATED_AT,
+};
+
 /** One full record per synced Dexie table, keyed by table name. */
 export const FULL_RECORDS = {
   skillPlans: FULL_SKILL_PLAN,
@@ -206,6 +219,7 @@ export const FULL_RECORDS = {
   productionRuns: FULL_PRODUCTION_RUN,
   productionSaleLinks: FULL_PRODUCTION_SALE_LINK,
   productionOrderWatches: FULL_PRODUCTION_ORDER_WATCH,
+  netWorthSnapshots: FULL_NET_WORTH_SNAPSHOT,
   payees: FULL_PAYEE,
   fittings: FULL_FITTING,
   miningTaxAssignments: FULL_MINING_TAX_ASSIGNMENT,

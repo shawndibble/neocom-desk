@@ -217,7 +217,8 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    const rows = await screen.findAllByRole('row');
+    const breakdown = await screen.findByRole('table', { name: 'Where the ISK went' });
+    const rows = (await screen.findAllByRole('row')).filter((row) => !breakdown.contains(row));
     // header + 2 entries, newest (2026-08-02) first
     expect(rows).toHaveLength(3);
     expect(screen.getByText('Bounty')).toBeInTheDocument();
@@ -378,6 +379,23 @@ describe('Wallet', () => {
     expect(screen.queryByText('Donation')).toBeNull();
   });
 
+  it('breaks the journal down by ref type and filters on a row click (issue #2858)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
+    await user.click(bountyRow);
+    expect(screen.queryByText('Donation')).toBeNull();
+    // The breakdown ignores the ref-type filter, so every type is still listed.
+    expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
+
+    await user.click(bountyRow);
+    expect(await screen.findByText('Donation')).toBeInTheDocument();
+  });
+
   it('tones the filtered net total by sign (issue #1961)', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -388,7 +406,9 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
-    const net = await screen.findByText('+1,000.00');
+    const net = (await screen.findAllByText('+1,000.00')).find((el) =>
+      el.parentElement?.textContent?.includes('1 entry')
+    ) as HTMLElement;
     expect(net).toHaveClass('text-isk-pos');
     expect(net.parentElement).toHaveTextContent('1 entry · net +1,000.00');
   });

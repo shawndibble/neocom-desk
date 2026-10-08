@@ -98,6 +98,7 @@ import { planProgress } from '@/engine/planProgress';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
+import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
 import {
@@ -1168,7 +1169,7 @@ export function PlanEditor({
    */
   function handleOptimizeForMe() {
     if (scheduled.length === 0) return;
-    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap);
+    const suggested = suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones);
     const reorderedEntries = applyReorderSuggestion(editable.entries, suggested);
     const reorderedSchedule = schedulePlan(
       {
@@ -1567,7 +1568,7 @@ export function PlanEditor({
     if (scheduled.length === 0) return;
     setReorderPreview({
       kind: 'attributes',
-      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
+      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap, plan.milestones),
     });
     showReorderConfirm('attributes');
   }
@@ -1580,7 +1581,7 @@ export function PlanEditor({
       steps: sortShortestFirst(
         scheduled,
         catalog.engineSkills,
-        { attributes, implants: effectiveImplants, cloneState },
+        { attributes, implants: effectiveImplants, cloneState, milestones: plan.milestones },
         priorityMap
       ),
     });
@@ -1993,6 +1994,18 @@ export function PlanEditor({
           totalSp={totalSp}
           unallocatedSp={unallocatedSp}
           cloneState={cloneState}
+        />
+      ),
+    },
+    {
+      id: 'skills-to-buy',
+      title: t('plans.skillsToBuy.title'),
+      content: (
+        <SkillsToBuyPanel
+          entries={plan.entries}
+          trainedSkills={trainedSkills}
+          trainedSkillsKnown={trainedSkillsKnown}
+          nameFor={nameFor}
         />
       ),
     },

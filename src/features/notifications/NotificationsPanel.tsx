@@ -118,8 +118,13 @@ import {
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
+import { Link } from 'react-router-dom';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { tabPath } from '@/lib/pageTabs';
+import { SETTINGS_TABS } from '@/app/pageTabs';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
+import { usePushFailure } from './pushFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
@@ -247,6 +252,11 @@ export function NotificationsPanel() {
 
   const { permission, refresh: refreshPermission } = useNotificationPermission();
   const setPromptState = useNotificationPromptState((state) => state.setValue);
+  const pushFailure = usePushFailure((state) => state.value);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    void usePushFailure.getState().hydrate();
+  }, []);
 
   // Records the ask here too, so someone who ignored the one-time explainer and
   // came to Settings instead is not offered it again on the next load.
@@ -254,6 +264,17 @@ export function NotificationsPanel() {
     const { permission: outcome } = await enableWebPush();
     await setPromptState(promptStateAfterAsk(outcome));
     refreshPermission();
+  }
+
+  // Retry is the same call as Enable: permission is already granted, so it
+  // only re-registers, and the outcome files itself (cleared or re-recorded).
+  async function retryPushRegistration() {
+    setRetrying(true);
+    try {
+      await enableWebPush();
+    } finally {
+      setRetrying(false);
+    }
   }
 
   // iOS delivers Web Push only to an installed PWA (issue #356 AC1) — the
@@ -517,6 +538,21 @@ export function NotificationsPanel() {
               {t('settings.notifications.blockedNotice')}
             </p>
           ))}
+        {pushFailure && permission === 'granted' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
+            <p role="status" className="min-w-0 flex-1 text-xs text-warning">
+              {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}
+            </p>
+            <Button
+              size="sm"
+              variant="primary"
+              loading={retrying}
+              onClick={() => void retryPushRegistration()}
+            >
+              {t('settings.notifications.pushRetryButton')}
+            </Button>
+          </div>
+        )}
         {/*
           `permission` reads 'unsupported' here, not 'default' — a
           non-installed iOS Safari tab has no Notification API to ask at
@@ -528,7 +564,10 @@ export function NotificationsPanel() {
             role="status"
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
           >
-            {t('settings.notifications.installRequiredNotice')}
+            {t('settings.notifications.installRequiredNotice')}{' '}
+            <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={inlineLinkClassName}>
+              {t('settings.notifications.installRequiredLink')}
+            </Link>
           </p>
         )}
         {permission === 'default' && !installRequired && (

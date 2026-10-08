@@ -58,3 +58,24 @@ export function selectInstallPromptVariant(state: {
   if (state.deferredPromptAvailable) return 'native';
   return state.platform === 'android' ? 'none' : state.platform;
 }
+
+export type InstallAppVariant =
+  'installed' | 'native' | 'menu' | Exclude<InstallPlatform, 'android'>;
+
+/**
+ * What Settings' "Install this app" panel shows. Unlike the one-time banner it
+ * ignores `seen` and has no mobile-only restriction: it is the later path for
+ * someone who dismissed the banner. Where the browser gave no native prompt
+ * and has no known menu steps (desktop, Android Chromium) it falls back to a
+ * generic pointer at the browser's own menu.
+ */
+export function selectInstallAppVariant(state: {
+  isStandalone: boolean;
+  deferredPromptAvailable: boolean;
+  platform: InstallPlatform | null;
+}): InstallAppVariant {
+  if (state.isStandalone) return 'installed';
+  if (state.deferredPromptAvailable) return 'native';
+  if (state.platform === null || state.platform === 'android') return 'menu';
+  return state.platform;
+}

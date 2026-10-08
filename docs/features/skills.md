@@ -102,7 +102,8 @@ Sections (labelled, one panel on desktop, Disclosure on mobile):
    - What-if implants: Select (None / Current / Jump clone {label} / Custom), per-attribute implant bonus inputs, Market link to attribute enhancers. Per-plan, travels with Duplicate.
    - Booster list (`BoosterList.tsx`): ordered cerebral accelerators ("Accelerator N"), Bonus, Starts (or "Already running"), Expires, quick picks "+Nh"/"+Nd", Add/Remove, inline overlap rejection (EVE has one booster slot), "Expired" state, notice when ESI attributes already include an accelerator ("taken back out of your base sheet"), "does not report when an accelerator runs out" note. Market link to cerebral accelerators.
 3. Skill injectors (`InjectorFactsPanel.tsx`): "If injected now:" SP still to train, Unallocated SP, SP gap, Large Skill Injectors needed, SP left over, Price per injector (sell min at the selected Trade Hub via `useMarketHub`), Total cost, "No sell orders at {hub}", "Unknown until your total SP loads", "already covered by unallocated SP", Alpha caveat.
-4. Import / Export - not in pane; rendered in the page header (portal).
+4. Skills to buy (`SkillsToBuyPanel.tsx`): distinct untrained plan skills ("Unknown until your skills load" before ESI answers), each with its lowest sell at the selected hub (region fallback; "No sell orders at {hub}"), Total cost, unpriced count, Copy multibuy list.
+5. Import / Export - not in pane; rendered in the page header (portal).
 
 ### 2d. Import / Export (page header)
 
@@ -165,7 +166,7 @@ CCP's baked combat certificates graded for the active Character, by area rather 
 
 ## Ways to find and add skills (discovery paths)
 
-Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). None of these paths is guided for a returning player; Help/FAQ has no Skills text.
+Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). Settings > Help lists the main paths (`HelpPanel.tsx`), and the empty Plans list points at queue import, Certified Plan and Ship Tree.
 
 | Intent                      | Where                                                 | How                                                                                                           |
 | --------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -183,21 +184,21 @@ Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, 
 
 ## Ordering tools (one plan, several goals)
 
-| Tool                                                       | Effect                                                                                                      | Limit                                                                                                                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Drag handle (pointer or keyboard)                          | Exact manual order                                                                                          | Drop refused if a skill lands after a dependant or strands a sibling level                                                    |
-| Priority High / Normal / Low per entry                     | Steers Reorder only; a prerequisite inherits the most urgent priority of its dependants (`planPriority.ts`) | Three levels; no "ship" tag. Mark every skill of ship A High, ship B Normal, to finish A first                                |
-| Group by Priority                                          | Shows bands "{Label} priority"                                                                              | View only, device-local                                                                                                       |
-| Optimize > Reorder only / Shortest first / Optimize for me | Reorders within priority; groups by attribute pair for speed (`reorderSuggestion.ts:100`)                   | Preview in a Modal, Accept or Reject. Priority only affects interleaving, so it is a soft preference, not a hard "A before B" |
-| Plan Milestones ("Fly Loki")                               | Named goal at a (skill, level); shows its projected finish; "Next milestone" chip                           | Milestones do NOT steer the optimizer (no reference in `src/engine/optimizer`)                                                |
-| Separate Skill Plan per ship                               | Each plan has its own time and finish; Duplicate or Copy to character                                       | One target plan receives adds; skills shared by two ships get counted in each plan separately                                 |
-| Remap markers / Optimize at my markers                     | Place attribute remaps where they help the order                                                            | Optimizer supports at most 2 remaps                                                                                           |
+| Tool                                                       | Effect                                                                                                                   | Limit                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Drag handle (pointer or keyboard)                          | Exact manual order                                                                                                       | Drop refused if a skill lands after a dependant or strands a sibling level                                               |
+| Priority High / Normal / Low per entry                     | Steers Reorder only; a prerequisite inherits the most urgent priority of its dependants (`planPriority.ts`)              | Three levels; no "ship" tag. Use Plan Milestones to finish ship A before B                                               |
+| Group by Priority                                          | Shows bands "{Label} priority"                                                                                           | View only, device-local                                                                                                  |
+| Optimize > Reorder only / Shortest first / Optimize for me | Finishes each milestone deadline first, then within priority groups by attribute pair for speed (`reorderSuggestion.ts`) | Preview in a Modal, Accept or Reject. Priority only affects interleaving within a milestone deadline                     |
+| Plan Milestones ("Fly Loki")                               | Named goal at a (skill, level); shows its projected finish; "Next milestone" chip                                        | Reorder / Optimize treat a milestone as a hard deadline: its skills and prerequisites finish first (`splitByMilestones`) |
+| Separate Skill Plan per ship                               | Each plan has its own time and finish; Duplicate or Copy to character                                                    | One target plan receives adds; skills shared by two ships get counted in each plan separately                            |
+| Remap markers / Optimize at my markers                     | Place attribute remaps where they help the order                                                                         | Optimizer supports at most 2 remaps                                                                                      |
 
-No tool says "finish ship A fully, then B, using the best order inside each". Closest: priority High on A's skills, then Reorder.
+To finish ship A fully, then B, with the best order inside each: put a Plan Milestone on each ship's final skill (order follows their current position), then Reorder.
 
 ## Buying skills (skill books)
 
-Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). No plan-level shopping list exists.
+Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). The plan editor's "Skills to buy" tools-pane section (`SkillsToBuyPanel.tsx`) lists the plan's untrained skills, priced at the selected Trade Hub (hub station, else its region), with a total and a multibuy copy.
 
 | Need                         | Where                                                                                                 | Behavior                                                                                                                                                                                                         |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +207,7 @@ Modern EVE has no separate skill book item: the skill's own typeID is the market
 | Cost of reaching the SP      | Plan tools > Skill injectors                                                                          | Large Skill Injectors needed and price at hub; covers SP gap, not which skills to buy                                                                                                                            |
 | Buy several skills           | none                                                                                                  | Open each skill's modal, or search each in Market Browser                                                                                                                                                        |
 
-Gaps: no total book cost for a plan; no "skills in this plan I do not own" list; Trained inspector does not show price (modal does).
+Gaps: Trained inspector does not show price (modal does).
 
 ## Shared bits
 

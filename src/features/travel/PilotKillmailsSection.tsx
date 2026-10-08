@@ -22,6 +22,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import {
   characterZkillUrl,
   fetchPilotKillmails,
+  PILOT_KILLMAIL_LIMIT,
   type KillmailDetail,
   type KillmailParty,
   type PilotKillmail,
@@ -48,6 +49,7 @@ function nameIds(detail: KillmailDetail | null): number[] {
 export function PilotKillmailsSection({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const [result, setResult] = useState<PilotKillmailsResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [expanded, setExpanded] = useState<ReadonlyMap<number, Expanded>>(new Map());
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
@@ -64,7 +66,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,9 +143,18 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           {t('travel.pilot.recent.loading')}
         </p>
       ) : !result.ok ? (
-        <p role="status" className="text-xs text-warning">
-          {t('travel.pilot.recent.failed')}
-        </p>
+        <div role="status" className="flex items-center gap-2 text-xs text-warning">
+          <span>{t('travel.pilot.recent.failed')}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setResult(null);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            {t('travel.pilot.retry')}
+          </Button>
+        </div>
       ) : entries.length === 0 ? (
         <p className="text-xs text-text-dim">{t('travel.pilot.recent.empty')}</p>
       ) : (
@@ -162,6 +173,11 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           ))}
         </ul>
       )}
+      {result?.ok && entries.length >= PILOT_KILLMAIL_LIMIT ? (
+        <p className="text-xs text-text-dim">
+          {t('travel.pilot.recent.capped', { count: PILOT_KILLMAIL_LIMIT })}
+        </p>
+      ) : null}
     </section>
   );
 }
