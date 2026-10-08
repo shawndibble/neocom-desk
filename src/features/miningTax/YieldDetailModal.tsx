@@ -33,6 +33,7 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
+import { UnpricedIsk } from './UnpricedIsk';
 import { VolumeDisplay } from './volumeDisplay';
 import {
   yieldOreCsvColumns,
@@ -346,7 +347,7 @@ export function YieldDetailModal({
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
             <p className="mt-1 text-xl font-semibold tabular-nums">
-              <IskAmount value={valuation.rawValue} decimals={0} />
+              <UnpricedIsk valuation={valuation} value={valuation.rawValue} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
@@ -362,7 +363,7 @@ export function YieldDetailModal({
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">
-                  <IskAmount value={valuation.refineValue} decimals={0} />
+                  <UnpricedIsk valuation={valuation} value={valuation.refineValue} />
                 </p>
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {
