@@ -84,3 +84,16 @@ const TIME_OPTIONS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-d
 export function formatTimeOfDay(date: Date, timeZone?: string): string {
   return date.toLocaleTimeString(undefined, { ...TIME_OPTIONS, timeZone });
 }
+
+/**
+ * A timestamp split where it can wrap: `date` carries its trailing separator
+ * ("10/7/2026, "), `time` the clock ("11:47 PM"). `date + time` is exactly
+ * `formatTimestamp`. A locale whose output does not end in the time-only
+ * rendering comes back whole in `date`, unsplit.
+ */
+export function splitTimestamp(date: Date, timeZone?: string): { date: string; time: string } {
+  const full = formatTimestamp(date, timeZone);
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone });
+  if (!time || !full.endsWith(time)) return { date: full, time: '' };
+  return { date: full.slice(0, full.length - time.length), time };
+}

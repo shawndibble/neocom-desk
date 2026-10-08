@@ -17,7 +17,7 @@ import {
 } from '@/features/character/walletJournalFilter';
 import { formatIsk } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { splitTimestamp } from '@/lib/timestamp';
 
 /** The journal's default order, newest first. */
 export const JOURNAL_SORT = { columnId: 'date', direction: 'desc' } as const;
@@ -78,7 +78,18 @@ export function useJournalColumnsBuilder(): (
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (entry) => formatTimestamp(new Date(entry.date), timeZone),
+        // Date over time on a phone, freeing width for Description; one line from `sm` up.
+        render: (entry) => {
+          const { date, time } = splitTimestamp(new Date(entry.date), timeZone);
+          const body = date.trimEnd();
+          return (
+            <>
+              <span className="max-sm:block">{body}</span>
+              <span className="max-sm:hidden">{date.slice(body.length)}</span>
+              {time && <span className="max-sm:block">{time}</span>}
+            </>
+          );
+        },
         sortValue: (entry) => entry.date,
       },
       {
@@ -91,7 +102,9 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'description',
         header: t('wallet.description'),
-        phoneHidden: true,
+        // Wraps in its cell on a phone, where the table scrolls sideways rather than stretch.
+        className:
+          'max-sm:min-w-40 max-sm:max-w-64 max-sm:whitespace-normal [overflow-wrap:anywhere]',
         render: (entry) => {
           const transaction = linkFor(entry);
           return (

@@ -108,15 +108,15 @@ test.describe('Corp Wallet narrow tables', () => {
 
     // One division: nothing to fold, so no caret.
     await expect(page.getByRole('button', { name: 'Show all divisions' })).toBeHidden();
-    // The shared journal table (also `/wallet`): Description and Balance are
-    // shed below `sm`, the header sort buttons stay.
+    // The shared journal table (also `/wallet`): Balance is shed below `sm`,
+    // Description stays, and the header sort buttons stay.
     const table = page.getByRole('table', { name: 'Journal' });
     const firstAmount = table
       .locator('tbody tr:not(.dt-spacer)')
       .first()
       .locator('td[data-label="Amount"]');
     await expect(firstAmount).toContainText('900');
-    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeHidden();
+    await expect(table.getByRole('columnheader', { name: /Description/ })).toBeVisible();
 
     const amountHeader = table.getByRole('button', { name: /Amount/ });
     await amountHeader.click();
