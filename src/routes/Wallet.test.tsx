@@ -319,7 +319,7 @@ describe('Wallet', () => {
         await seedSecond();
         window.history.pushState({}, '', `/wallet/journal?${key}=92`);
         render(<App />);
-        expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+        expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
         expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
       }
     );
@@ -328,7 +328,7 @@ describe('Wallet', () => {
       await seedSecond();
       window.history.pushState({}, '', '/wallet/journal?char=92');
       const plain = render(<App />);
-      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
       expect(
         within(screen.getByRole('main')).queryByRole('link', { name: 'Wallet' })
       ).not.toBeInTheDocument();
@@ -340,7 +340,7 @@ describe('Wallet', () => {
         '/wallet/journal?char=92'
       );
       render(<App />);
-      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
       expect(
         within(screen.getByRole('main')).getByRole('link', { name: /Wallet/ })
       ).toHaveAttribute('href', '/wallet');
@@ -351,17 +351,18 @@ describe('Wallet', () => {
       await db.tokens.update(92, { scopes: [] });
       window.history.pushState({}, '', '/wallet/journal?char=92');
       render(<App />);
-      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
       expect(
         (await screen.findAllByRole('button', { name: /grant|log in again/i })).length
       ).toBeGreaterThan(0);
     });
   });
 
-  it('says the Journal reads one Character (issue #2846)', async () => {
+  it('keeps the Journal panel header free of a Character portrait and scope label (issue #2993)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    expect(await screen.findByText('Pilot One only')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+    expect(screen.queryByText(/ only$/)).not.toBeInTheDocument();
   });
 
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
