@@ -125,6 +125,7 @@ interface OfferDetailProps {
   priceBasis: PriceBasis;
   lpBasis: LpBasis;
   concord: ConcordRate | null;
+  concordPending: boolean;
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
@@ -141,6 +142,7 @@ function OfferDetail({
   priceBasis,
   lpBasis,
   concord,
+  concordPending,
   playerLp,
   useOwnMaterials,
   onToggleUseOwnMaterials,
@@ -249,7 +251,7 @@ function OfferDetail({
             )}
           </div>
           <div className={`text-3xl font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp)}`}>
-            {lpBasis === 'concord' && !concord
+            {lpBasis === 'concord' && !concord && !concordPending
               ? t('loyaltyStore.noConcordExchange')
               : shownIskPerLp === null
                 ? '—'
@@ -480,7 +482,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   // The exchange rate is a faction rule keyed off the corporation's faction,
   // which the offers feed does not carry: it comes from the bundled LP corporation list.
-  const [concord, setConcord] = useState<ConcordRate | null>(null);
+  // `undefined` until the list loads (or when it fails), so a corporation that does have an
+  // exchange never reads "no exchange" in the meantime.
+  const [concordState, setConcord] = useState<ConcordRate | null | undefined>(undefined);
+  const concord = concordState ?? null;
+  const concordPending = concordState === undefined;
   useEffect(() => {
     let live = true;
     void loadLpCorporations()
@@ -627,13 +633,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         sortValue: (row) => shownIskPerLp(row) ?? undefined,
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
         render: (row) => {
+          if (lpBasis === 'concord' && concordPending) return '—';
           if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
           const value = shownIskPerLp(row);
           return value === null ? '—' : value.toFixed(1);
         },
       },
     }),
-    [t, lpBasis, concord, shownIskPerLp]
+    [t, lpBasis, concord, concordPending, shownIskPerLp]
   );
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
@@ -735,7 +742,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         />
       ) : (
         <>
-          {lpBasis === 'concord' && (
+          {lpBasis === 'concord' && !concordPending && (
             <p className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
               {concord
                 ? t(
@@ -785,6 +792,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       priceBasis={priceBasis}
       lpBasis={lpBasis}
       concord={concord}
+      concordPending={concordPending}
       playerLp={playerLp}
       useOwnMaterials={useOwnMaterialsFor.has(selectedRow.offer.offer_id)}
       onToggleUseOwnMaterials={() => toggleUseOwnMaterials(selectedRow.offer.offer_id)}
