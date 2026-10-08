@@ -13,7 +13,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
-import { loadLoyaltyStoreOffers, loadCorporationName } from './store';
+import { loadLoyaltyStoreOffersStatus, loadCorporationName } from './store';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
@@ -37,6 +37,9 @@ export interface LoyaltyStoreResult {
   corpName: string | null;
   offersFetchedAt: Date | null;
   offersFromCache: boolean;
+  /** ESI did not answer and nothing was cached — not the same as an empty store. */
+  offersError: boolean;
+  reloadOffers: () => void;
   rows: LoyaltyOfferRow[];
   /** For resolving a blueprint's material names in the detail panel. */
   catalog: BlueprintCatalog | null;
@@ -65,6 +68,8 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [offers, setOffers] = useState<LoyaltyStoreOffer[] | null>(null);
   const [offersFetchedAt, setOffersFetchedAt] = useState<Date | null>(null);
   const [offersFromCache, setOffersFromCache] = useState(false);
+  const [offersError, setOffersError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [playerLp, setPlayerLp] = useState(0);
   const [skills, setSkills] = useState<SkillLevels>({});
@@ -74,11 +79,13 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [offersResult, name] = await Promise.all([
-        loadLoyaltyStoreOffers(corporationId),
+      setOffersError(false);
+      const [{ result: offersResult, failed }, name] = await Promise.all([
+        loadLoyaltyStoreOffersStatus(corporationId),
         loadCorporationName(corporationId),
       ]);
       if (cancelled) return;
+      setOffersError(failed);
       setOffers(offersResult?.data ?? []);
       setOffersFetchedAt(offersResult?.fetchedAt ?? null);
       setOffersFromCache(offersResult?.fromCache ?? false);
@@ -87,7 +94,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     return () => {
       cancelled = true;
     };
-  }, [corporationId]);
+  }, [corporationId, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,6 +230,8 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     corpName,
     offersFetchedAt,
     offersFromCache,
+    offersError,
+    reloadOffers: () => setReloadKey((k) => k + 1),
     rows,
     catalog,
     playerLp,
