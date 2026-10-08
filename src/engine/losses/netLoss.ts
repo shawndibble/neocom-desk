@@ -87,6 +87,8 @@ export interface InsuranceJournalRow {
 
 /** Insurance pays out within minutes of the loss; later positive rows belong to other losses. */
 export const INSURANCE_WINDOW_MS = 60 * 60_000;
+/** Journal and killmail clocks come from different services; allow a few minutes either way. */
+const INSURANCE_SKEW_MS = 5 * 60_000;
 
 /**
  * The payout for a loss: positive `insurance` journal rows (premiums are
@@ -101,7 +103,7 @@ export function matchInsurance(
   const candidates = journal
     .filter((row) => row.ref_type === 'insurance' && (row.amount ?? 0) > 0)
     .map((row) => ({ amount: row.amount ?? 0, delta: Date.parse(row.date) - killTimeMs }))
-    .filter(({ delta }) => delta >= 0 && delta <= INSURANCE_WINDOW_MS)
+    .filter(({ delta }) => delta >= -INSURANCE_SKEW_MS && delta <= INSURANCE_WINDOW_MS)
     .sort((a, b) => a.delta - b.delta);
   if (candidates.length === 0) return null;
   return { amount: candidates[0].amount, estimate: candidates.length > 1 };

@@ -82,6 +82,11 @@ describe('matchInsurance', () => {
     expect(matchInsurance(rows, killTime)).toEqual({ amount: 900, estimate: false });
   });
 
+  it('tolerates a payout stamped a little before the killmail', () => {
+    const rows = [row(1, '2026-10-01T11:58:00Z', 900)];
+    expect(matchInsurance(rows, killTime)).toEqual({ amount: 900, estimate: false });
+  });
+
   it('labels an ambiguous match an estimate and picks the closest in time', () => {
     const rows = [row(1, '2026-10-01T12:00:30Z', 900), row(2, '2026-10-01T12:03:00Z', 300)];
     expect(matchInsurance(rows, killTime)).toEqual({ amount: 900, estimate: true });

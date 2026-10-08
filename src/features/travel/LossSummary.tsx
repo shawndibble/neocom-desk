@@ -21,7 +21,8 @@ interface LossSummaryProps {
   zkbValue: number | null;
 }
 
-type Insurance = { state: 'none' } | { state: 'found'; value: LossInsurance | null };
+type Insurance =
+  { state: 'loading' } | { state: 'failed' } | { state: 'done'; value: LossInsurance | null };
 
 export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const { t } = useTranslation();
@@ -30,7 +31,8 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const hydrateHub = useMarketHub((state) => state.hydrate);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const [prices, setPrices] = useState<ReadonlyMap<number, number | null> | null>(null);
-  const [journal, setJournal] = useState<Insurance>({ state: 'none' });
+  const [pricesFailed, setPricesFailed] = useState(false);
+  const [payout, setPayout] = useState<Insurance>({ state: 'loading' });
   useEffect(() => {
     void hydrateHub();
   }, [hydrateHub]);
@@ -53,7 +55,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
         setPrices(map);
       })
       .catch(() => {
-        if (!cancelled) setPrices(new Map());
+        if (!cancelled) setPricesFailed(true);
       });
     return () => {
       cancelled = true;
@@ -69,17 +71,26 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
     loadWalletJournal(activeCharacterId)
       .then((result) => {
         if (cancelled) return;
-        setJournal({
-          state: 'found',
+        setPayout({
+          state: 'done',
           value: result === null ? null : matchInsurance(result.data, killTime),
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setPayout({ state: 'failed' });
+      });
     return () => {
       cancelled = true;
     };
   }, [isOwnLoss, activeCharacterId, detail.time]);
 
+  if (pricesFailed) {
+    return (
+      <p role="status" className="text-xs text-warning">
+        {t('travel.pilot.recent.lossSummary.pricesFailed')}
+      </p>
+    );
+  }
   if (prices === null) {
     return (
       <p role="status" className="text-xs text-text-dim">
@@ -91,7 +102,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const loss = computeNetLoss({
     victim: detail.victim,
     prices,
-    insurance: journal.state === 'found' ? journal.value : null,
+    insurance: payout.state === 'done' ? payout.value : null,
     zkbValue,
   });
   const row = (label: string, value: string, strong = false) => (
@@ -119,9 +130,15 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
                 ? 'travel.pilot.recent.lossSummary.insuranceEstimate'
                 : 'travel.pilot.recent.lossSummary.insurance'
             ),
-            loss.insurance ? `−${formatIsk(loss.insurance.amount)}` : '—'
+            payout.state === 'loading'
+              ? '…'
+              : loss.insurance
+                ? `−${formatIsk(loss.insurance.amount)}`
+                : '—'
           )}
-        {isOwnLoss && row(t('travel.pilot.recent.lossSummary.net'), formatIsk(loss.net), true)}
+        {isOwnLoss &&
+          payout.state === 'done' &&
+          row(t('travel.pilot.recent.lossSummary.net'), formatIsk(loss.net), true)}
       </dl>
       {loss.dropped > 0 && (
         <p className="text-text-dim">

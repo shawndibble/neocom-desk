@@ -8630,6 +8630,7 @@
           "title": "Loss summary",
           "heading": "What it cost, {{hub}} sell",
           "loading": "Pricing the loss…",
+          "pricesFailed": "Market prices couldn't be loaded, so this loss can't be priced right now.",
           "hull": "Hull",
           "fitted": "Fitted modules",
           "cargo": "Cargo",
