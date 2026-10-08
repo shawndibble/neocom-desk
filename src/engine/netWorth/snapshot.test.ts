@@ -31,7 +31,6 @@ const base = {
     [34, 6],
     [PLEX, 4_000_000],
   ]),
-  plexPrice: 5_000_000,
 };
 
 describe('utcDay', () => {
@@ -41,7 +40,7 @@ describe('utcDay', () => {
 });
 
 describe('buildSnapshotRow', () => {
-  it('splits PLEX out of the asset value and prices it at the PLEX price', () => {
+  it('keeps PLEX out of the asset value', () => {
     const row = buildSnapshotRow(base);
     expect(row).toEqual({
       id: '1:2026-10-07',
@@ -49,7 +48,6 @@ describe('buildSnapshotRow', () => {
       day: '2026-10-07',
       wallet: 1_000,
       assetValue: 60,
-      plexValue: 25_000_000,
       escrow: 300,
       sellStock: 30,
       hubId: 'jita',
@@ -71,23 +69,22 @@ describe('buildSnapshotRow', () => {
     ).toBe(0);
   });
 
-  it('counts only hangar PLEX, and never as asset value', () => {
+  it('never counts PLEX, in a hangar or elsewhere', () => {
     const row = buildSnapshotRow({
       ...base,
-      assets: [{ type_id: PLEX, quantity: 5, item_id: 2, location_flag: 'CorpDeliveries' }],
+      assets: [
+        { type_id: PLEX, quantity: 5, item_id: 2, location_flag: 'Hangar' },
+        { type_id: PLEX, quantity: 5, item_id: 3, location_flag: 'CorpDeliveries' },
+      ],
     });
-    expect(row?.plexValue).toBe(0);
     expect(row?.assetValue).toBe(0);
+    expect(row).not.toHaveProperty('plexValue');
   });
 
   it('writes no row when a source is missing a permission', () => {
     expect(buildSnapshotRow({ ...base, wallet: null })).toBeNull();
     expect(buildSnapshotRow({ ...base, assets: null })).toBeNull();
     expect(buildSnapshotRow({ ...base, orders: null })).toBeNull();
-  });
-
-  it('records PLEX as 0 rather than guessing when the PLEX price is unavailable', () => {
-    expect(buildSnapshotRow({ ...base, plexPrice: null })?.plexValue).toBe(0);
   });
 });
 

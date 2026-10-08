@@ -21,7 +21,6 @@ const row = (
   day,
   wallet: 100,
   assetValue: 50,
-  plexValue: 20,
   escrow: 10,
   sellStock: 5,
   hubId: 'jita',
@@ -30,11 +29,10 @@ const row = (
 });
 
 describe('layerValues / netWorthOf', () => {
-  it('splits a row into the five layers, reading a missing sell stock as 0', () => {
+  it('splits a row into the four layers, reading a missing sell stock as 0', () => {
     expect(layerValues(row('2026-10-01'))).toEqual({
       isk: 100,
       assets: 50,
-      plex: 20,
       escrow: 10,
       sellOrders: 5,
     });
@@ -43,19 +41,19 @@ describe('layerValues / netWorthOf', () => {
 
   it('sums only the shown layers', () => {
     const v = layerValues(row('2026-10-01'));
-    expect(netWorthOf(v, LAYER_IDS)).toBe(185);
-    expect(netWorthOf(v, ['isk', 'plex'])).toBe(120);
+    expect(netWorthOf(v, LAYER_IDS)).toBe(165);
+    expect(netWorthOf(v, ['isk', 'escrow'])).toBe(110);
   });
 });
 
 describe('toggleHidden', () => {
   it('hides and re-shows an id', () => {
-    expect(toggleHidden([], 'plex', LAYER_IDS)).toEqual(['plex']);
-    expect(toggleHidden(['plex'], 'plex', LAYER_IDS)).toEqual([]);
+    expect(toggleHidden([], 'escrow', LAYER_IDS)).toEqual(['escrow']);
+    expect(toggleHidden(['escrow'], 'escrow', LAYER_IDS)).toEqual([]);
   });
 
   it('refuses to hide the last visible one', () => {
-    const hidden = ['assets', 'plex', 'escrow', 'sellOrders'] as const;
+    const hidden = ['assets', 'escrow', 'escrow', 'sellOrders'] as const;
     expect(toggleHidden(hidden, 'isk', LAYER_IDS)).toEqual(hidden);
   });
 
@@ -141,7 +139,7 @@ describe('totalsFor', () => {
 
   it('sums shown layers over included, un-hidden Characters only', () => {
     const t = totalsFor(latest, { included: [1, 2], hidden: [2], shown: LAYER_IDS });
-    expect(t.total).toBe(185);
+    expect(t.total).toBe(165);
     expect(t.perLayer.isk).toBe(100);
   });
 

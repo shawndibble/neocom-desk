@@ -830,8 +830,8 @@ export interface NetWorthSnapshotRecord {
   wallet: number;
   /** Assets priced at `hubId` that day, PLEX stacks removed. */
   assetValue: number;
-  /** Hangar PLEX × the global PLEX price. */
-  plexValue: number;
+  /** Legacy: hangar PLEX × the PLEX price, written by early snapshots. No longer written, shown or counted. */
+  plexValue?: number;
   /** Escrow held by open buy orders. */
   escrow: number;
   /** Remaining sell-order stock; absent on rows written before it existed. */

@@ -3734,19 +3734,17 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Hangar PLEX only. Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
         "assets": "Assets",
-        "plex": "PLEX",
         "escrow": "Order escrow",
         "sellOrders": "Sell orders"
       },
       "opens": {
         "isk": "Journal",
         "assets": "Assets",
-        "plex": "PLEX in assets",
         "escrow": "Open orders",
         "sellOrders": "Open orders"
       }
