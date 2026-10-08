@@ -460,7 +460,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
   const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
 
-  // The wallet journal's "Mining tax →" link (`paymentDeepLink.ts`): opens the
+  // The wallet journal's "Mining tax" link (`paymentDeepLink.ts`): opens the
   // detail of the row that transaction paid. Latched on mount and spent at
   // once, like `useHighlightParam`, so a reload or a later refresh can't
   // reopen the modal after the pilot closed it. Searches every row, not the

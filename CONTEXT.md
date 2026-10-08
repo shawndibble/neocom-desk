@@ -536,7 +536,11 @@ here — they go one per file in `docs/context/decisions/`.
   the victim's fit with Open in Fittings (the killmail is read only then).
   Numbers, never a verdict: no pilot is called hostile or safe. "No
   zKillboard history" and "zKillboard couldn't be reached" are different
-  answers.
+  answers. A pasted or typed **Local list** is grouped by what each pilot
+  means to you: red and orange contacts, killed in the kind of space you are
+  in (your Current System's), killed elsewhere, quiet for 30 days, and
+  friendly (your corporation, alliance and blue contacts) last. Each row
+  gives kills in high, low and null space with how long ago the newest was.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes,
   entered by hand in Settings → Travel — ESI cannot read the game client's own
   autopilot avoidance list. Synced across devices as ids; shown with each
