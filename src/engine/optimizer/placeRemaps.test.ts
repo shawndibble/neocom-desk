@@ -1,8 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
+
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import { placeRemaps, MAX_SUPPORTED_REMAPS } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
+
+// Counts the segment pricings `placeRemaps` asks `bestAttributes` for. The
+// "stays fast" tests assert on these instead of a wall-clock budget: the work
+// done is the same on every machine, while elapsed time swings with CI load.
+const pricing = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/engine/optimizer/bestAttributes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/engine/optimizer/bestAttributes')>();
+  const counted =
+    <A extends unknown[], R>(fn: (...args: A) => R) =>
+    (...args: A): R => {
+      pricing.calls++;
+      return fn(...args);
+    };
+  return {
+    ...actual,
+    bestAttributesForPairs: counted(actual.bestAttributesForPairs),
+    bestAttributesAtBoundaries: counted(actual.bestAttributesAtBoundaries),
+  };
+});
 
 const skill = (
   typeID: number,
@@ -188,13 +208,11 @@ describe('placeRemaps', () => {
       for (let level = 1; level <= 5; level++) steps.push({ skillTypeID: typeID, level });
     }
     expect(steps).toHaveLength(200);
-    const start = performance.now();
+    pricing.calls = 0;
     const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
-    // 500 ms, not the 3 s this used to allow: the O(R^2) grid took ~2.0 s
-    // here, so the old bound passed before the fix and guarded nothing.
-    // Measured ~13 ms at remapCount 3 and ~21 ms at 5, so this has room for a
-    // slow machine while still failing if the grid ever comes back.
-    expect(performance.now() - start).toBeLessThan(500);
+    // Work, not wall-clock: the DP prices only the chosen segments (one per
+    // remap), while the O(R^2) grid it replaced priced every candidate cell.
+    expect(pricing.calls).toBeLessThanOrEqual(remapCount + 1);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
     // Up to `remapCount` remapped segments plus an optional prefix.
     expect(result.segments.length).toBeLessThanOrEqual(remapCount + 1);
@@ -328,6 +346,32 @@ describe('placeRemaps leading current-attributes segment', () => {
     expect(result.totalSeconds).toBeCloseTo(2 * (8000 / 37.5) * 60, 6);
     expect(result.totalSeconds).toBeLessThanOrEqual(result.currentSeconds);
     expect(result.savingsSeconds).toBeCloseTo(result.currentSeconds - result.totalSeconds, 6);
+  });
+
+  it('N=1: is a pure function of its inputs, whatever ran before it (#3074)', () => {
+    // CI once returned 42338 s here against the 25600 s optimum, then passed
+    // on rerun. placeRemaps and everything under it hold no mutable state (the
+    // one module-level cache is a frozen-in-practice allocation list), so this
+    // pins that: repeated calls, calls interleaved with other remap counts and
+    // clone states, and a deep-frozen input must all agree to the last bit.
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory'),
+      skill(2, 'perception', 'willpower')
+    );
+    const current: Attributes = Object.freeze({
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    });
+    const steps = Object.freeze([...levels(1, 3), ...levels(2, 3)]);
+    const run = () => placeRemaps(steps, skills, { remapCount: 1, currentAttributes: current });
+    const first = run();
+    placeRemaps(steps, skills, { remapCount: 2, currentAttributes: current, cloneState: 'alpha' });
+    placeRemaps(steps, skills, { remapCount: 0, currentAttributes: current });
+    expect(run()).toEqual(first);
+    expect(first.totalSeconds).toBeCloseTo(2 * (8000 / 37.5) * 60, 6);
   });
 
   it('flags remapped segments remap: true and the no-remap fallback remap: false', () => {
@@ -874,16 +918,15 @@ describe('placeRemaps single-remap fast path', () => {
   });
 
   it('stays linear in pair runs: 200 runs with one remap', () => {
-    // Generous ceiling: the O(R^2) grid took ~3.8 s at R = 145 and ~10 s at
-    // R = 236 on the dev machine, the suffix scan ~50-90 ms. This catches a
-    // regression back to the grid without asserting a tight timing.
+    // Counts segment pricings rather than elapsed time: the suffix scan
+    // prices one segment per run edge (R of them), where the O(R^2) grid
+    // priced every (i, j) cell. Machine speed can't move this number.
     const { steps, skills } = generatePlan(200, 4242);
-    const start = performance.now();
+    pricing.calls = 0;
     const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
-    const elapsed = performance.now() - start;
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    expect(elapsed).toBeLessThan(2500);
-  }, 120000);
+    expect(pricing.calls).toBeLessThanOrEqual(steps.length);
+  });
 });
 
 describe('placeRemaps with Boosters', () => {
@@ -1053,7 +1096,7 @@ describe('placeRemaps with Boosters', () => {
     // rewrite risks slowing down: walking every step for a segment that
     // never actually sees the Booster lapse.
     const { steps: genSteps, skills: genSkills } = generatePlan(300, 7331);
-    const start = performance.now();
+    pricing.calls = 0;
     const result = placeRemaps(genSteps, genSkills, {
       remapCount: 2,
       currentAttributes: CURRENT,
@@ -1062,13 +1105,14 @@ describe('placeRemaps with Boosters', () => {
         startDate: START,
       },
     });
-    // 10 s, not 3 s: measured ~1.0 s on the dev machine but 3.08 s on a
-    // shared CI runner (test-shard 4, 2026-09-25), which failed the old
-    // bound with nothing wrong. A rewrite walking every step per segment is
-    // an order of magnitude slower, so this still catches it.
-    expect(performance.now() - start).toBeLessThan(10_000);
+    // Elapsed time failed this on a shared CI runner (3.08 s against a 3 s
+    // bound, test-shard 4, 2026-09-25) with nothing wrong, so count pricings
+    // instead. Every pricing here is a walk over a segment's steps, which is
+    // what a rewrite walking every step per segment would multiply.
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-  }, 30_000);
+    // Measured 22; a per-step walk per segment would be in the thousands.
+    expect(pricing.calls).toBeLessThan(200);
+  });
 });
 
 /**
