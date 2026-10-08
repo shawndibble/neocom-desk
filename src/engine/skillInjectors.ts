@@ -17,7 +17,7 @@ const LARGE_INJECTOR_BRACKETS: readonly { belowSp: number; yieldSp: number }[] =
 
 /**
  * Most SP an Alpha clone can hold; injectors work past the 5M free-training
- * point but stop here (EVE Uni "Alpha clone"; CCP Alpha page).
+ * point but stop here (EVE Uni "Alpha clone"; figure not re-checked against CCP's page).
  */
 export const ALPHA_SP_CAP = 20_000_000;
 

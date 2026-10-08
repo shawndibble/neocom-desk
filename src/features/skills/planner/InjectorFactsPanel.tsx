@@ -122,7 +122,9 @@ export function InjectorFactsPanel({
           })}
         </p>
       )}
-      {cloneState === 'alpha' && <p className="text-warning">{t('plans.injectors.alphaCaveat')}</p>}
+      {cloneState === 'alpha' && facts.alphaShortfallSp === 0 && (
+        <p className="text-warning">{t('plans.injectors.alphaCaveat')}</p>
+      )}
     </div>
   );
 }
