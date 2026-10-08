@@ -1104,6 +1104,22 @@ describe('PlanEditor Assumptions disclosure', () => {
       '+5 implants · Booster'
     );
   });
+
+  it('does not claim a Booster the scheduler is not applying', async () => {
+    const user = userEvent.setup();
+    // A detected in-game accelerator prefills a row with no expiry, which is
+    // costed as none; the closed row must not say otherwise.
+    renderEditor(vi.fn(), {
+      attributeBaseline: {
+        kind: 'accelerated',
+        acceleratorBonus: 12,
+        attributes: { intelligence: 17, memory: 26, perception: 22, willpower: 17, charisma: 17 },
+      },
+    });
+    await openTools(user);
+
+    expect(screen.getByRole('button', { name: /^assumptions/i })).toHaveTextContent('Defaults');
+  });
 });
 
 describe('PlanEditor Skills to buy placement', () => {
@@ -1137,6 +1153,8 @@ describe('PlanEditor Skills to buy placement', () => {
     );
     const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5M ISK/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
+    // Closed, the row says how complete that total is.
+    expect(screen.getByText('1 priced · 1 without a price')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy multibuy list/i })).toBeNull();
 
     await user.click(row);

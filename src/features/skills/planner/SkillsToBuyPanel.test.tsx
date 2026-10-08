@@ -51,9 +51,11 @@ describe('SkillsToBuyPanel', () => {
     const row = await screen.findByRole('button', { name: /^skills to buy.*1\.5K ISK/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Skill 1')).toBeNull();
+    expect(screen.getByText('2 priced · 0 without a price')).toBeInTheDocument();
 
     await user.click(row);
 
+    expect(screen.queryByText(/without a price/)).toBeNull();
     expect(screen.getByText('Skill 1')).toBeInTheDocument();
     expect(screen.getByText(/Total cost/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy multibuy/i })).toBeInTheDocument();

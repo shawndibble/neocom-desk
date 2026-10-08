@@ -87,7 +87,7 @@ Orphaned Plan Milestones (entry removed) show as warning text with a remove Icon
 - Empty: "No entries yet. Add a skill to get started." Compute failure: "Couldn't compute this plan: {message}".
 - Milestone modal (`MilestoneModal.tsx`): name input (placeholder `Goal name (e.g. "Fly Loki")`), Save / Cancel. Milestones anchor by (skillTypeID, level), not position (`src/engine/skillPlanMilestones.ts`).
 
-### 2c. Plan tools pane (`PlanToolsPane.tsx`, sections built in `PlanEditor.tsx:1700-2040`)
+### 2c. Plan tools pane (`PlanToolsPane.tsx`, sections built in `toolSections` in `PlanEditor.tsx`)
 
 Sections (labelled, one panel on desktop, Disclosure on mobile):
 

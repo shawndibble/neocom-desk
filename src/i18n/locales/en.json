@@ -2137,6 +2137,7 @@
       "none": "You already have every skill in this plan.",
       "noSellOrders": "No sell orders at {{hub}}",
       "total": "Total cost",
+      "rowSummary": "{{priced}} priced · {{unpriced}} without a price",
       "unpriced_one": "{{count}} skill without a price is left out of the total.",
       "unpriced_other": "{{count}} skills without a price are left out of the total.",
       "copy": "Copy multibuy list",

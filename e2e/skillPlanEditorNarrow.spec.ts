@@ -439,13 +439,17 @@ test('Skills to buy has its own visible row at 390px, without opening Plan tools
   );
   expect(overflows).toBe(false);
 
-  // The row and Plan tools are separate blocks: neither overlaps the other.
-  const tools = await page.getByRole('button', { name: 'Plan tools' }).evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    return { top: r.top };
+  // The expanded row and Plan tools are separate blocks: the row's whole
+  // panel ends before Plan tools starts.
+  const rowPanelBottom = await row.evaluate((el) => {
+    let node: Element | null = el;
+    while (node && !node.matches('section')) node = node.parentElement;
+    return (node ?? el).getBoundingClientRect().bottom;
   });
-  const open = await row.evaluate((el) => el.getBoundingClientRect().bottom);
-  expect(tools.top).toBeGreaterThanOrEqual(open);
+  const toolsTop = await page
+    .getByRole('button', { name: 'Plan tools' })
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(toolsTop).toBeGreaterThanOrEqual(rowPanelBottom);
 });
 
 test('Skills to buy sits under Attributes near the top of the sidebar at 1280px, with Assumptions closed', async ({
@@ -471,10 +475,10 @@ test('Skills to buy sits under Attributes near the top of the sidebar at 1280px,
     )
   );
   // Strictly stacked in that order, no overlap, and Skills to buy within the
-  // first two screens of the page rather than ~1,070px down.
+  // first screen rather than ~1,070px down.
   expect(s.top).toBeGreaterThan(a.bottom);
   expect(m.top).toBeGreaterThan(s.bottom);
-  expect(s.top + s.scrollTop).toBeLessThan(DESKTOP.height * 2);
+  expect(s.top + s.scrollTop).toBeLessThan(DESKTOP.height);
 
   const overflows = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth

@@ -1912,7 +1912,9 @@ export function PlanEditor({
             alpha: cloneState === 'alpha',
             whatIf,
             matchedJumpClone: matchedCloneId !== null,
-            boosterCount: planBoosters.length,
+            // What the scheduler applies, not every row: a prefilled accelerator
+            // with no expiry yet is costed as none.
+            boosterCount: activeBoosters.length,
           },
           t
         ),

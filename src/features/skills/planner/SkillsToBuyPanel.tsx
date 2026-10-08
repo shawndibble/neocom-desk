@@ -152,15 +152,28 @@ export function SkillsToBuyPanel({
   if (!collapsible) return content;
 
   return (
-    <Disclosure
-      label={t('plans.skillsToBuy.title')}
-      // Plain text, not `IskAmount`: its tooltip trigger is a tab stop, and a
-      // second one inside the toggle button is nested interactive content.
-      trailing={loaded && facts ? `${formatIskCompact(facts.total)} ISK` : undefined}
-      expanded={expanded}
-      onToggle={() => setExpanded((open) => !open)}
-    >
-      <div className="p-3">{content}</div>
-    </Disclosure>
+    <>
+      <Disclosure
+        label={t('plans.skillsToBuy.title')}
+        // Plain text, not `IskAmount`: its tooltip trigger is a tab stop, and a
+        // second one inside the toggle button is nested interactive content.
+        trailing={loaded && facts ? `${formatIskCompact(facts.total)} ISK` : undefined}
+        expanded={expanded}
+        onToggle={() => setExpanded((open) => !open)}
+      >
+        <div className="p-3">{content}</div>
+      </Disclosure>
+      {/* Closed, the row says how complete its total is; open, the list's own
+          "without a price" note says it. Outside the toggle so it stays out of
+          the button's accessible name. */}
+      {!expanded && loaded && facts && (
+        <p className="px-2.5 pt-1 pb-2 pl-7 text-[0.6875rem] text-text-dim">
+          {t('plans.skillsToBuy.rowSummary', {
+            priced: facts.rows.length - facts.unpricedCount,
+            unpriced: facts.unpricedCount,
+          })}
+        </p>
+      )}
+    </>
   );
 }
