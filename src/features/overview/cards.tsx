@@ -51,7 +51,7 @@ import {
 } from './boardSeverity';
 import { contractsDeadlineNote, mailSummary } from './boardSummary';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
-import { extractableSp, extractorCount } from '@/engine/spExtraction';
+import { extractableSp, extractionTotalIsk, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import type { CorpBoardItem } from '@/engine/corp/board';
@@ -550,6 +550,7 @@ export function ComingUpCard({
 export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
   const { t } = useTranslation();
   const severity = spExtractionSeverity(data);
+  const price = data.price;
   const tone = severity === 'watch' ? 'watch' : 'clear';
   return (
     <BoardCard
@@ -578,7 +579,27 @@ export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
           value={data.totalSp === null ? 0 : extractorCount(data.totalSp)}
           severity={tone}
         />
+        {price && (
+          <NumberTile
+            label={t('overview.board.extractionNet')}
+            value={
+              data.totalSp === null || !price.loaded
+                ? '…'
+                : price.net === null
+                  ? '—'
+                  : formatIskCompact(extractionTotalIsk(data.totalSp, price.net) ?? 0)
+            }
+            severity="clear"
+          />
+        )}
       </TileRow>
+      {price && (
+        <p className="mt-2 text-[0.6875rem] text-text-dim">
+          {price.loaded && price.net === null
+            ? t('plans.injectors.noSellOrders', { hub: price.hubName })
+            : t('overview.board.extractionBasis', { hub: price.hubName })}
+        </p>
+      )}
     </BoardCard>
   );
 }

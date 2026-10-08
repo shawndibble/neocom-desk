@@ -289,6 +289,8 @@ export interface SpExtractionBoardData {
   /** Whether the pilot turned SP Extraction monitoring on. Off, nothing is ever flagged. */
   monitoring: boolean;
   thresholdSp: number;
+  /** Net ISK per extraction at the saved hub; `loaded` false while the hub answers. */
+  price?: { hubName: string; loaded: boolean; net: number | null };
 }
 
 // --- Mail -------------------------------------------------------------------
