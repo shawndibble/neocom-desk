@@ -158,12 +158,15 @@ async function loadWalletSnapshot(
 interface PersonalFillsSnapshot {
   transactions: readonly WalletTransactionCommon[];
   typeNames: Map<number, string>;
+  /** The fetch stopped at its page cap: older journal lines stay unnamed. */
+  truncated: boolean;
 }
 
 async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
-  const transactions = (await loadWalletTransactions(characterId))?.data ?? [];
+  const result = await loadWalletTransactions(characterId);
+  const transactions = result?.data ?? [];
   const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
-  return { transactions, typeNames };
+  return { transactions, typeNames, truncated: result?.truncated ?? false };
 }
 
 /**
@@ -405,6 +408,7 @@ export function Wallet() {
 
   const personalTransactions = personalFills.data?.transactions ?? EMPTY_FILLS;
   const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
+  const itemNamesTruncated = personalFills.data?.truncated ?? false;
   const personalLinkFor = useMemo(
     () => journalTransactionLinks(personalTransactions),
     [personalTransactions]
@@ -835,6 +839,11 @@ export function Wallet() {
               {journalTruncated && (
                 <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                </p>
+              )}
+              {itemNamesTruncated && (
+                <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+                  {t('wallet.journalItemNamesCappedHint')}
                 </p>
               )}
               <JournalTable

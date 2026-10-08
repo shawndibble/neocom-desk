@@ -58,7 +58,12 @@ import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import { ORDER_DEPTH_RANK, ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { buildOpportunityCandidates, hubForCharacter, type OpportunityRow } from './opportunities';
+import {
+  AUTO_RECALCULATE_MAX,
+  buildOpportunityCandidates,
+  hubForCharacter,
+  type OpportunityRow,
+} from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { StartPlanButton } from './StartPlanButton';
@@ -550,6 +555,11 @@ export function OpportunitiesPanel({
         <Button size="sm" onClick={refresh} disabled={loading}>
           {t('industry.opportunitiesRefresh')}
         </Button>
+      )}
+      {manualRefreshOnly && (
+        <span className="text-xs text-text-dim">
+          {t('industry.opportunitiesManualOnly', { count: AUTO_RECALCULATE_MAX })}
+        </span>
       )}
     </>
   );
