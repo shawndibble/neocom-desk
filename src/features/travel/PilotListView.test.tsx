@@ -57,6 +57,7 @@ function row(name: string, over: Partial<PilotListRow> = {}): PilotListRow {
     standing: null,
     ownOrganization: null,
     kills: { kind: 'skipped' },
+    danger: { kind: 'idle' },
     ...over,
   };
 }
@@ -101,6 +102,16 @@ describe('PilotListView (Local list)', () => {
 
   const headings = () =>
     screen.getAllByRole('heading', { level: 3 }).map((h) => h.firstChild?.textContent);
+
+  it('puts a Threat badge beside each looked-up pilot, and none where there is nothing to read', async () => {
+    renderList();
+    await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
+    const badgeOf = (name: string) =>
+      screen.getByText(name).closest('td')?.querySelector('span.inline-flex')?.textContent;
+    expect(badgeOf('Nullbear')).toContain('Low threat');
+    expect(badgeOf('Sleeper')).toContain('Inactive');
+    expect(badgeOf('Offline') ?? null).toBeNull();
+  });
 
   it('groups pilots by what they mean to you, in a fixed order', async () => {
     renderList();

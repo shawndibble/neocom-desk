@@ -8950,6 +8950,25 @@
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name. Shift+Enter adds another name; Ctrl+Enter looks up the whole list.",
       "searchHintExact": "Type the pilot's full name and press Enter. Shift+Enter adds another name; Ctrl+Enter looks up the whole list. Suggestions need this character's search permission.",
+      "threat": {
+        "label": "Threat",
+        "level": {
+          "dangerous": "Dangerous",
+          "active": "Active",
+          "low": "Low threat",
+          "inactive": "Inactive"
+        },
+        "help": "Read from their kills in the last 90 days and zKillboard's all-time danger ratio. Dangerous: 10 or more recent kills and a danger ratio of 50 or more. Active: 3 or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
+        "inactive": "No kills in the last 90 days.",
+        "inactiveLast": "No kills in the last 90 days. Last kill {{age}} ago.",
+        "summary_one": "{{count}} kill in the last 90 days. Last kill {{age}} ago.",
+        "summary_other": "{{count}} kills in the last 90 days. Last kill {{age}} ago.",
+        "summaryIn_one": "{{count}} kill in the last 90 days, mostly in {{space}}. Last kill {{age}} ago.",
+        "summaryIn_other": "{{count}} kills in the last 90 days, mostly in {{space}}. Last kill {{age}} ago.",
+        "gangs": "{{value}}% in gangs",
+        "pods": "{{value}}% of kills are pods",
+        "pending": "Checking"
+      },
       "activity": {
         "title": "Where they kill",
         "failed": "zKillboard couldn't be reached.",
@@ -9130,9 +9149,7 @@
       "losses": "Losses",
       "iskDestroyed": "ISK destroyed",
       "iskLost": "ISK lost",
-      "iskEfficiency": "ISK efficiency",
       "soloKills": "Solo kills",
-      "iskEfficiencyHelp": "ISK destroyed ÷ (ISK destroyed + ISK lost). Above 50% means they kill more value than they lose.",
       "dangerMeter": "Danger",
       "dangerMeterHelp": "zKillboard's danger ratio, 0–100%, as zKillboard states it: snuggly at 0, dangerous at 100.",
       "snuggly": "Snuggly",
