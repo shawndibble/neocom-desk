@@ -85,6 +85,7 @@ import { YieldDetailModal } from './YieldDetailModal';
 import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
+import { UnpricedIsk } from './UnpricedIsk';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
@@ -93,8 +94,6 @@ const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
-import { UnpricedIsk } from './UnpricedIsk';
-
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
   return sumVolume(
     row.entry.oreLines,
