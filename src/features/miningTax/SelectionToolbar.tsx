@@ -49,7 +49,7 @@ interface ToolbarAction {
  * are blocked: Combine first (the one a pilot cannot guess), then Dismiss, then
  * Select all.
  */
-const REASON_PRIORITY = ['combine', 'dismiss', 'select-all'];
+const REASON_PRIORITY: string[] = ['combine', 'dismiss', 'select-all'];
 
 /**
  * What can be done with the checked rows (issue #539), shown directly above
@@ -60,7 +60,7 @@ const REASON_PRIORITY = ['combine', 'dismiss', 'select-all'];
  * `REASON_PRIORITY`; Settle up and Link payment explain themselves to assistive
  * tech only, via `aria-describedby`): a Combine button that vanishes teaches
  * nothing about why these particular three rows can't be combined. The reason
- * is real visible text, never a `title` attribute — a native `disabled` button
+ * is real visible text (except Settle up / Link payment, see below), never a `title` attribute — a native `disabled` button
  * fires no pointer or focus events in Chromium or Firefox, so a tooltip on one
  * can never be read (and the same is true of Radix's `Tooltip`, which needs a
  * live trigger).

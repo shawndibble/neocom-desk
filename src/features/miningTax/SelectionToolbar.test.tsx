@@ -70,8 +70,11 @@ describe('SelectionToolbar', () => {
       bar({ combine: { ok: false, reason: 'too-few' } as never })
     );
     expect(visibleReasons(container)).toHaveLength(1);
+    const combineReason = container.querySelector('p')?.textContent;
     rerender(bar({ combine: { ok: false, reason: 'too-few' } as never, dismissCount: 0 }));
     expect(visibleReasons(container)).toHaveLength(1);
+    // Combine outranks Dismiss.
+    expect(container.querySelector('p')?.textContent).toBe(combineReason);
     rerender(bar({ dismissCount: 0, canSelectAll: false }));
     expect(visibleReasons(container)).toHaveLength(1);
   });

@@ -92,7 +92,7 @@ export function OwedBalances({
           same amount, so the summary would only repeat it (issue #3065). */}
       {owed.length !== 1 && (
         <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-xs font-semibold text-text-dim">
+          <span className="text-[0.6875rem] font-semibold text-text-dim">
             {t('miningTax.balancesLabel')}
           </span>
           {owed.length > 1 ? (
