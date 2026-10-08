@@ -20,7 +20,7 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import type { CharacterFitting } from '@/esi/endpoints';
 import type { Fitting } from '@/engine/fittings/types';
@@ -42,7 +42,7 @@ interface SaveToEveDialogProps {
    * Saves the open Fitting to My Fittings (the normal Save). Offered as an "Also save to My
    * Fittings" checkbox only when given — omit it for a Fitting that is already saved.
    */
-  onSaveToMyFittings?: () => Promise<unknown>;
+  onSaveToMyFittings?: () => Promise<boolean>;
 }
 
 export function SaveToEveDialog({
@@ -115,17 +115,18 @@ export function SaveToEveDialog({
         return;
       }
       onSaved();
+      let mineFailed = false;
       if (onSaveToMyFittings && alsoSave) {
-        try {
-          await onSaveToMyFittings();
-        } catch {
-          setMyFittingsFailed(true);
-          return;
-        }
+        // False means the workspace had nothing to write (a save already in flight, an unencodable Fitting).
+        mineFailed = await onSaveToMyFittings().then(
+          (saved) => !saved,
+          () => true
+        );
       }
+      if (mineFailed) setMyFittingsFailed(true);
       if (result.overwriteError !== null) {
         setOverwriteFailure({ name: trimmed, message: result.overwriteError });
-      } else {
+      } else if (!mineFailed) {
         onClose();
       }
     } finally {
@@ -133,28 +134,26 @@ export function SaveToEveDialog({
     }
   }
 
-  if (myFittingsFailed) {
+  if (myFittingsFailed || overwriteFailure !== null) {
     return (
-      <Modal open={open} onClose={onClose} title={t('fittings.saveToEve.myFittingsFailedTitle')}>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={
+          myFittingsFailed
+            ? t('fittings.saveToEve.myFittingsFailedTitle')
+            : t('fittings.saveToEve.overwriteFailedTitle')
+        }
+      >
         <div className="space-y-3">
-          <p className="text-sm text-text">{t('fittings.saveToEve.myFittingsFailed')}</p>
-          <div className="flex justify-end">
-            <Button variant="primary" onClick={onClose}>
-              {t('fittings.saveToEve.close')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    );
-  }
-
-  if (overwriteFailure !== null) {
-    return (
-      <Modal open={open} onClose={onClose} title={t('fittings.saveToEve.overwriteFailedTitle')}>
-        <div className="space-y-3">
-          <p className="text-sm text-text">
-            {t('fittings.saveToEve.overwriteFailed', overwriteFailure)}
-          </p>
+          {myFittingsFailed && (
+            <p className="text-sm text-text">{t('fittings.saveToEve.myFittingsFailed')}</p>
+          )}
+          {overwriteFailure !== null && (
+            <p className="text-sm text-text">
+              {t('fittings.saveToEve.overwriteFailed', overwriteFailure)}
+            </p>
+          )}
           <div className="flex justify-end">
             <Button variant="primary" onClick={onClose}>
               {t('fittings.saveToEve.close')}
@@ -211,9 +210,7 @@ export function SaveToEveDialog({
         )}
         <p className="text-xs text-text-dim">{t('fittings.saveToEve.dropsNote')}</p>
         {onSaveToMyFittings && (
-          <label
-            className={`${touchCheckboxLabelClassName} inline-flex items-center gap-2 text-sm`}
-          >
+          <label className={`${tappableRowClassName} inline-flex items-center gap-2 text-sm`}>
             <Checkbox checked={alsoSave} onChange={(e) => setAlsoSave(e.target.checked)} />
             {t('fittings.saveToEve.alsoSaveLabel')}
           </label>

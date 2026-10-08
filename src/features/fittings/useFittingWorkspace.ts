@@ -136,8 +136,8 @@ export interface FittingWorkspace extends FittingEvaluation {
   /**
    * The explicit "Save to My Fittings": the only thing here that writes
    * Dexie. Updates the record the Fitting was opened from, else adds one.
+   * Resolves true once written; false when there was nothing to save.
    */
-  /** Resolves true once the Fitting is written to My Fittings; false when there was nothing to save. */
   save: () => Promise<boolean>;
   /**
    * "Save as new…" (issue #1747): always adds a new My Fittings record from

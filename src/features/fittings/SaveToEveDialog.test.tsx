@@ -239,4 +239,41 @@ describe('SaveToEveDialog', () => {
     expect(onSaved).toHaveBeenCalled();
     expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
   });
+
+  it('treats a My Fittings save that wrote nothing as a failure', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={vi.fn().mockResolvedValue(false)}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
+  });
+
+  it('shows both warnings when the overwrite delete and My Fittings save both fail', async () => {
+    saveFittingToEveMock.mockResolvedValue({
+      ok: true,
+      fittingId: 2,
+      overwriteError: 'gone wrong',
+    });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={vi.fn().mockResolvedValue(false)}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
+    expect(screen.getByText(/gone wrong/)).toBeInTheDocument();
+  });
 });
