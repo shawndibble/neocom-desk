@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Checkbox,
   Modal,
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import type { CharacterFitting } from '@/esi/endpoints';
 import type { Fitting } from '@/engine/fittings/types';
@@ -36,6 +38,11 @@ interface SaveToEveDialogProps {
   description?: string;
   /** Called once the save itself succeeds (whether or not the overwrite delete also did) — the caller refreshes its In-game Fittings list. */
   onSaved: () => void;
+  /**
+   * Saves the open Fitting to My Fittings (the normal Save). Offered as an "Also save to My
+   * Fittings" checkbox only when given — omit it for a Fitting that is already saved.
+   */
+  onSaveToMyFittings?: () => Promise<unknown>;
 }
 
 export function SaveToEveDialog({
@@ -45,11 +52,13 @@ export function SaveToEveDialog({
   fitting,
   description = '',
   onSaved,
+  onSaveToMyFittings,
 }: SaveToEveDialogProps) {
   const { t } = useTranslation();
   const [name, setName] = useState(() => clampFittingName(fitting.name));
   const [existing, setExisting] = useState<CharacterFitting[]>([]);
   const [target, setTarget] = useState<string>(NEW_TARGET);
+  const [alsoSave, setAlsoSave] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   /** The save was refused for want of the Fittings Permission, which a re-login can grant. */
@@ -59,6 +68,8 @@ export function SaveToEveDialog({
     name: string;
     message: string;
   } | null>(null);
+  /** EVE took the save but the follow-up My Fittings save threw. */
+  const [myFittingsFailed, setMyFittingsFailed] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -68,6 +79,8 @@ export function SaveToEveDialog({
     setErrorMessage(null);
     setNeedsPermission(false);
     setOverwriteFailure(null);
+    setMyFittingsFailed(false);
+    setAlsoSave(true);
     void (async () => {
       try {
         const { cached } = await loadInGameFittings(characterId);
@@ -102,6 +115,14 @@ export function SaveToEveDialog({
         return;
       }
       onSaved();
+      if (onSaveToMyFittings && alsoSave) {
+        try {
+          await onSaveToMyFittings();
+        } catch {
+          setMyFittingsFailed(true);
+          return;
+        }
+      }
       if (result.overwriteError !== null) {
         setOverwriteFailure({ name: trimmed, message: result.overwriteError });
       } else {
@@ -110,6 +131,21 @@ export function SaveToEveDialog({
     } finally {
       setSaving(false);
     }
+  }
+
+  if (myFittingsFailed) {
+    return (
+      <Modal open={open} onClose={onClose} title={t('fittings.saveToEve.myFittingsFailedTitle')}>
+        <div className="space-y-3">
+          <p className="text-sm text-text">{t('fittings.saveToEve.myFittingsFailed')}</p>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={onClose}>
+              {t('fittings.saveToEve.close')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
   }
 
   if (overwriteFailure !== null) {
@@ -174,6 +210,14 @@ export function SaveToEveDialog({
           </div>
         )}
         <p className="text-xs text-text-dim">{t('fittings.saveToEve.dropsNote')}</p>
+        {onSaveToMyFittings && (
+          <label
+            className={`${touchCheckboxLabelClassName} inline-flex items-center gap-2 text-sm`}
+          >
+            <Checkbox checked={alsoSave} onChange={(e) => setAlsoSave(e.target.checked)} />
+            {t('fittings.saveToEve.alsoSaveLabel')}
+          </label>
+        )}
         {overwriteTarget && (
           <p role="alert" className="text-xs text-warning">
             {t('fittings.saveToEve.overwriteConfirm', { name: overwriteTarget.name })}

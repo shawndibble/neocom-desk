@@ -137,7 +137,8 @@ export interface FittingWorkspace extends FittingEvaluation {
    * The explicit "Save to My Fittings": the only thing here that writes
    * Dexie. Updates the record the Fitting was opened from, else adds one.
    */
-  save: () => Promise<void>;
+  /** Resolves true once the Fitting is written to My Fittings; false when there was nothing to save. */
+  save: () => Promise<boolean>;
   /**
    * "Save as new…" (issue #1747): always adds a new My Fittings record from
    * what's on screen, leaving the record the Fitting was opened from
@@ -430,23 +431,24 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const save = useCallback(async () => {
     const current = latestFittingRef.current;
-    if (activeCharacterId === null || current === null) return;
+    if (activeCharacterId === null || current === null) return false;
     // What is saved is what is on screen: a launch still waiting on stats
     // would change the Fitting after the record was written.
     launchPendingRef.current = null;
     // Encoded now rather than read from the URL, which lags an edit until its
     // own async encode lands.
-    if (savingRef.current) return;
+    if (savingRef.current) return false;
     savingRef.current = true;
     try {
       const encoded = await encodeFittingShare(fittingToShareInput(current));
-      if (!encoded.ok) return;
+      if (!encoded.ok) return false;
       // The record may have been deleted from the list since it was opened;
       // then this is a new save. A live one keeps its name, which the list
       // may have renamed since the Fitting was opened.
       const target = await resolveSaveTarget(savedId, activeCharacterId, current.name);
       const record = await saveFitting(activeCharacterId, { ...target, code: encoded.payload });
       setSavedId(record.id);
+      return true;
     } finally {
       savingRef.current = false;
     }
