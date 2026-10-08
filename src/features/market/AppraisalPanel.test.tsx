@@ -1059,7 +1059,7 @@ describe('AppraisalPanel — the row as an item', () => {
   describe('Sell and Buy totals', () => {
     afterEach(() => configureClipboard(null));
 
-    it('read in full with the shorthand after, and copy the full figure on click', async () => {
+    it('read as shorthand only, and copy the full figure on click', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
@@ -1067,7 +1067,7 @@ describe('AppraisalPanel — the row as an item', () => {
       renderPanel({ controller: controller({ result: outcome() }) });
 
       const sell = screen.getByRole('button', { name: 'Copy 1,386,400 ISK' });
-      expect(sell).toHaveTextContent('1,386,400 ISK (1.4M)');
+      expect(sell).toHaveTextContent(/^1\.4M$/);
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
