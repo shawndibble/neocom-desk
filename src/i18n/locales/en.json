@@ -8271,8 +8271,8 @@
       "servicesCount_other": "{{count}} offline",
       "criticalCount_one": "{{count}} critical",
       "criticalCount_other": "{{count}} critical",
-      "more_one": "{{count}} more not shown",
-      "more_other": "{{count}} more not shown"
+      "showAll": "Show all {{count}}",
+      "showFewer": "Show fewer"
     }
   },
   "publicInfo": {
