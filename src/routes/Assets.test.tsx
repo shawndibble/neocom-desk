@@ -49,6 +49,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
+  loadCompressedOreTypeIds: vi.fn(async () => ({})),
 }));
 
 // Only reached by the "View in Market" navigation test below: Market Browser
