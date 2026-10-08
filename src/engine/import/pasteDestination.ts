@@ -2,7 +2,7 @@
  * Where a page-level paste belongs (the app-wide paste router,
  * `app/GlobalPasteRouter.tsx`): an EFT fit opens in Fittings, an item list —
  * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
- * and anything else is left alone.
+ * a Local list or D-Scan in Pilot Lookup, and anything else is left alone.
  *
  * Deliberately conservative, since the router acts on pastes the pilot never
  * aimed at a field: a fit needs a header naming a real hull, and an item list
@@ -12,8 +12,9 @@
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import { matchAppraisalEntries, type AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
-export type PasteDestination = 'fitting' | 'appraisal';
+export type PasteDestination = 'fitting' | 'appraisal' | 'pilotList';
 
 export interface PasteSources {
   /** The market catalogue, keyed by lower-case item name. */
@@ -36,9 +37,14 @@ export function pasteDestination(
   }
 
   const entries = parseAppraisalPaste(text);
-  if (entries.length === 0) return null;
-  const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
-  // A strict majority: a list the pilot copied out of the game rarely has
-  // more than a stray unknown line, while prose rarely has more than one hit.
-  return matched.length > unmatched.length ? 'appraisal' : null;
+  if (entries.length > 0) {
+    const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
+    // A strict majority: a list the pilot copied out of the game rarely has
+    // more than a stray unknown line, while prose rarely has more than one hit.
+    if (matched.length > unmatched.length) return 'appraisal';
+  }
+
+  // Last, so an item list never reads as pilot names: two or more lines that
+  // all look like names (Local), or all like D-Scan rows.
+  return classifyPilotPaste(text) === null ? null : 'pilotList';
 }

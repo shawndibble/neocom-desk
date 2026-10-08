@@ -5,10 +5,11 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
+  CollapsiblePanel,
   ColumnPickerMenu,
   DataTable,
   DateRangeFields,
@@ -31,11 +32,15 @@ import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   journalNetTotal,
+  journalRefTypeBreakdown,
+  toggleBreakdownRefType,
+  type RefTypeBreakdownRow,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { clampIskZero } from '@/lib/isk';
+import { clampIskZero, formatIsk } from '@/lib/isk';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
@@ -117,6 +122,8 @@ interface JournalTableProps {
   onFilterChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
   filteredJournal: readonly WalletJournalEntry[];
+  /** The journal under the date range and text filters only, for the ref-type breakdown. */
+  breakdownJournal: readonly WalletJournalEntry[];
   journalColumns: DataTableColumn<WalletJournalEntry>[];
   label: string;
   /**
@@ -140,6 +147,7 @@ export function JournalTable({
   onFilterChange,
   refTypeOptions,
   filteredJournal,
+  breakdownJournal,
   journalColumns,
   label,
   highlightRowKey = null,
@@ -148,6 +156,64 @@ export function JournalTable({
   tableExport,
 }: JournalTableProps) {
   const { t } = useTranslation();
+  const breakdown = useMemo(() => journalRefTypeBreakdown(breakdownJournal), [breakdownJournal]);
+  // Open on desktop, folded on a phone where the headline alone answers the question.
+  const isNarrow = useIsNarrow();
+  const [breakdownOpen, setBreakdownOpen] = useState(!isNarrow);
+  const breakdownColumns = useMemo<DataTableColumn<RefTypeBreakdownRow>[]>(
+    () => [
+      {
+        id: 'refType',
+        header: t('wallet.journalBreakdownRefType'),
+        render: (row) => humanizeRefType(row.refType),
+        sortValue: (row) => row.refType,
+      },
+      {
+        id: 'income',
+        header: t('wallet.journalBreakdownIncome'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.income, 2),
+        sortValue: (row) => row.income,
+      },
+      {
+        id: 'expense',
+        header: t('wallet.journalBreakdownExpense'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.expense, 2),
+        sortValue: (row) => row.expense,
+      },
+      {
+        id: 'net',
+        header: t('wallet.journalBreakdownNet'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (row) => (clampIskZero(row.net, 2) === 0 ? '' : iskToneClass(row.net)),
+        render: (row) => signedIsk(row.net, 2),
+        sortValue: (row) => row.net,
+      },
+    ],
+    [t]
+  );
+  const breakdownHeadline = (
+    <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+      <span>
+        {t('wallet.journalBreakdownIn')}{' '}
+        <span className="text-isk-pos">{formatIsk(breakdown.totalIn, 2)}</span>
+      </span>
+      <span>
+        {t('wallet.journalBreakdownOut')}{' '}
+        <span className="text-isk-neg">{formatIsk(breakdown.totalOut, 2)}</span>
+      </span>
+      <span>
+        {t('wallet.journalBreakdownNet')}{' '}
+        <span className={clampIskZero(breakdown.net, 2) === 0 ? '' : iskToneClass(breakdown.net)}>
+          {signedIsk(breakdown.net, 2)}
+        </span>
+      </span>
+    </span>
+  );
   const filteredNet = useMemo(() => journalNetTotal(filteredJournal), [filteredJournal]);
   // One store for both journals, so hiding a column on one hides it on the other.
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
@@ -194,6 +260,30 @@ export function JournalTable({
           />
         }
       />
+      {breakdown.rows.length > 0 && (
+        <CollapsiblePanel
+          title={t('wallet.journalBreakdownTitle')}
+          expanded={breakdownOpen}
+          onToggle={() => setBreakdownOpen((open) => !open)}
+          labels={{
+            show: t('wallet.journalBreakdownShow'),
+            hide: t('wallet.journalBreakdownHide'),
+          }}
+          padded={false}
+          collapsedSummary={<div className="px-3 py-2">{breakdownHeadline}</div>}
+        >
+          <div className="px-3 py-2">{breakdownHeadline}</div>
+          <DataTable
+            label={t('wallet.journalBreakdownTitle')}
+            columns={breakdownColumns}
+            rows={breakdown.rows}
+            rowKey={(row) => row.refType}
+            selectedRowKey={filter.refType}
+            onRowClick={(row) => onFilterChange(toggleBreakdownRefType(filter, row.refType))}
+            responsive="table"
+          />
+        </CollapsiblePanel>
+      )}
       {filterIsActive && filteredJournal.length > 0 && (
         <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
           <Trans

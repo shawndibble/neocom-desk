@@ -84,7 +84,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 - Shortcuts: Mod+S save, Mod+Shift+S save as new (`useChord`; listed in Help > Shortcuts).
 - Disabled states with reason: needs Character, too large, needs permission.
 - My Fittings: Dexie table `fittings` (`id, characterId`), per-Character, synced like a Payee (`myFittings.ts`, `@/sync` `markFittingDeleted`/`scheduleSync`).
-- Save to EVE (`SaveToEveDialog.tsx`, `saveToEve.ts`): name, target "New In-game Fitting" or "Replace <name>" (confirm text; delete after successful create; partial-failure dialog "Saved, but the old Fitting is still there"). Drops module state, charge binding, implants (`dropsNote`). Needs `esi-fittings.write_fittings.v1` (`GrantBanner` if absent); ESI POST/DELETE `/characters/{id}/fittings/`.
+- Save to EVE (`SaveToEveDialog.tsx`, `saveToEve.ts`): name, target "New In-game Fitting" or "Replace <name>" (confirm text; delete after successful create; partial-failure dialog "Saved, but the old Fitting is still there"). Drops module state, charge binding, implants (`dropsNote`). For a not-yet-saved Fitting an "Also save to My Fittings" checkbox (default on) runs the normal Save after a successful EVE save; a failure there gets its own dialog and leaves the EVE save in place. Needs `esi-fittings.write_fittings.v1` (`GrantBanner` if absent); ESI POST/DELETE `/characters/{id}/fittings/`.
 
 ### Ring / List
 

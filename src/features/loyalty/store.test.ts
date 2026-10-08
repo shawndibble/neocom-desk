@@ -4,7 +4,7 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID, resetRevalidationState } from '@/esi/cache';
-import { loadLoyaltyStoreOffers, loadCorporationName } from './store';
+import { loadLoyaltyStoreOffers, loadLoyaltyStoreOffersStatus, loadCorporationName } from './store';
 
 const CORP_ID = 1000135;
 const server = setupServer();
@@ -67,6 +67,17 @@ describe('loadLoyaltyStoreOffers', () => {
       expect(reread?.data).toEqual(payload);
       expect(reread?.fromCache).toBe(true);
     });
+  });
+});
+
+describe('loadLoyaltyStoreOffersStatus', () => {
+  it('reports failed when ESI does not answer and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/loyalty/stores/${CORP_ID}/offers/`, () => HttpResponse.error())
+    );
+    const { result, failed } = await loadLoyaltyStoreOffersStatus(CORP_ID);
+    expect(result).toBeNull();
+    expect(failed).toBe(true);
   });
 });
 

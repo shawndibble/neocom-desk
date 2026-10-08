@@ -463,7 +463,10 @@ export function Wallet() {
     JOURNAL_FIELD_TO_PARAM,
     EMPTY_JOURNAL_FILTER_PARAMS
   );
-  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalRowsFilter);
+  const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
+    journal,
+    journalRowsFilter
+  );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 
   const visibleWalletBalances = useMemo(() => {
@@ -851,6 +854,7 @@ export function Wallet() {
                 onFilterChange={setJournalFilter}
                 refTypeOptions={refTypeOptions}
                 filteredJournal={filteredJournal}
+                breakdownJournal={breakdownJournal}
                 journalColumns={journalColumns}
                 label={t('wallet.journalTab')}
                 sort={journalSortProps.sort}
