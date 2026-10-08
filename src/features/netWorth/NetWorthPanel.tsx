@@ -19,7 +19,7 @@ import {
 import { Checkbox } from '@/components/ui/Checkbox';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
 import { iskToneClass } from '@/features/character/format';
@@ -310,14 +310,17 @@ export function NetWorthPanel({
           const lastOne = checked && included.length === 1;
           return (
             // A tap here toggles the line; it must not also drill into the row.
-            <span onClick={(event) => event.stopPropagation()}>
+            <label
+              className={touchCheckboxLabelClassName}
+              onClick={(event) => event.stopPropagation()}
+            >
               <Checkbox
                 aria-label={t('wallet.netWorth.showCharacter', { name: row.characterName })}
                 checked={checked}
                 disabled={!row.covered || lastOne}
                 onChange={() => toggleCharacter(row.characterId)}
               />
-            </span>
+            </label>
           );
         },
       },
