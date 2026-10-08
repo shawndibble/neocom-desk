@@ -5,6 +5,8 @@ import {
   activeWalletJournalFilterCount,
   filterWalletJournal,
   journalNetTotal,
+  journalRefTypeBreakdown,
+  toggleBreakdownRefType,
   journalRefTypes,
   type WalletJournalFilter,
 } from './walletJournalFilter';
@@ -165,5 +167,61 @@ describe('journalNetTotal', () => {
 
   it('is zero for no entries', () => {
     expect(journalNetTotal([])).toBe(0);
+  });
+});
+
+describe('journalRefTypeBreakdown', () => {
+  it('is all zero for an empty journal', () => {
+    expect(journalRefTypeBreakdown([])).toEqual({ totalIn: 0, totalOut: 0, net: 0, rows: [] });
+  });
+
+  it('splits income and expense per ref type and sums the totals', () => {
+    const result = journalRefTypeBreakdown([
+      entry({ id: 1, ref_type: 'market_transaction', amount: 500 }),
+      entry({ id: 2, ref_type: 'market_transaction', amount: -200 }),
+      entry({ id: 3, ref_type: 'bounty_prize', amount: 100 }),
+      entry({ id: 4, ref_type: 'broker_fee', amount: -50 }),
+    ]);
+    expect(result.totalIn).toBe(600);
+    expect(result.totalOut).toBe(250);
+    expect(result.net).toBe(350);
+    expect(result.rows.find((r) => r.refType === 'market_transaction')).toEqual({
+      refType: 'market_transaction',
+      income: 500,
+      expense: 200,
+      net: 300,
+      count: 2,
+    });
+  });
+
+  it('sorts by absolute net, largest first, ties by ref type', () => {
+    const result = journalRefTypeBreakdown([
+      entry({ id: 1, ref_type: 'b', amount: 10 }),
+      entry({ id: 2, ref_type: 'a', amount: -10 }),
+      entry({ id: 3, ref_type: 'c', amount: -500 }),
+    ]);
+    expect(result.rows.map((r) => r.refType)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('counts a missing amount as zero', () => {
+    const result = journalRefTypeBreakdown([entry({ amount: undefined })]);
+    expect(result.net).toBe(0);
+    expect(result.rows[0].net).toBe(0);
+  });
+});
+
+describe('toggleBreakdownRefType', () => {
+  it('sets the ref type, keeping the other criteria', () => {
+    const f: WalletJournalFilter = {
+      ...EMPTY_WALLET_JOURNAL_FILTER,
+      text: 'x',
+      startDate: '2026-01-01',
+    };
+    expect(toggleBreakdownRefType(f, 'tax')).toEqual({ ...f, refType: 'tax' });
+  });
+
+  it('clears it when already active', () => {
+    const f: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, refType: 'tax' };
+    expect(toggleBreakdownRefType(f, 'tax').refType).toBeNull();
   });
 });

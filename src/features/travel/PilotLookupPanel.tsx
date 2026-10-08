@@ -9,8 +9,10 @@
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import {
   Button,
+  DataAgeBadge,
   EmptyState,
   FilterField,
   PageHeader,
@@ -23,8 +25,10 @@ import {
   MIN_RECIPIENT_SEARCH_LENGTH,
   searchMailRecipients,
 } from '@/features/character/mailRecipientSearch';
+import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -35,6 +39,7 @@ import {
   type PilotProfile,
   type PilotSummary,
 } from './pilotLookup';
+import { PilotListView } from './PilotListView';
 import { PilotProfileView } from './PilotProfileView';
 
 const PILOT_PARAMS = { pilot: optionalIdParam() };
@@ -46,6 +51,19 @@ export function PilotLookupPanel() {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
   const [resolved, setResolved] = useState<PilotSummary | null>(null);
+  const location = useLocation();
+  // The pasted list lives here, not in the URL, so it survives a trip to one
+  // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
+  const [list, setList] = useState<PilotPaste | null>(null);
+  const [handledListKey, setHandledListKey] = useState<string | null>(null);
+
+  // Adopted during render, once per navigation (`location.key`), rather than in an effect.
+  const routedText = (location.state as Partial<PilotListState> | null)?.pilotListText;
+  if (routedText && handledListKey !== location.key) {
+    setHandledListKey(location.key);
+    const pasted = classifyPilotPaste(routedText);
+    if (pasted !== null) setList(pasted);
+  }
 
   return (
     <div className="space-y-4">
@@ -53,10 +71,20 @@ export function PilotLookupPanel() {
       <Panel>
         <PilotSearch
           resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
-          onSelect={(pilot) => setParams({ pilot: pilot.characterId }, { push: true })}
+          list={list}
+          onList={setList}
+          onSelect={(pilot) => {
+            setList(null);
+            setParams({ pilot: pilot.characterId }, { push: true });
+          }}
         />
       </Panel>
-      {params.pilot === null ? (
+      {params.pilot === null && list !== null ? (
+        <PilotListView
+          paste={list}
+          onOpen={(characterId) => setParams({ pilot: characterId }, { push: true })}
+        />
+      ) : params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
       ) : (
         <PilotResult key={params.pilot} characterId={params.pilot} onResolved={setResolved} />
@@ -73,10 +101,14 @@ type ResolveState =
 
 function PilotSearch({
   resolved,
+  list,
+  onList,
   onSelect,
 }: {
   /** The pilot in the URL once its profile has loaded. */
   resolved: PilotSummary | null;
+  list: PilotPaste | null;
+  onList: (paste: PilotPaste | null) => void;
   onSelect: (pilot: PilotSummary) => void;
 }) {
   const { t } = useTranslation();
@@ -187,6 +219,22 @@ function PilotSearch({
   const listOpen = open && shown.length > 0;
   const label = t('travel.pilot.searchLabel');
 
+  if (list !== null) {
+    // The one smart box, collapsed: the paste is a token, not a wall of text.
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-text">
+          {list.kind === 'local'
+            ? t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })
+            : t('travel.pilot.list.tokenDscan', { count: list.typeIds.length })}
+        </span>
+        <Button type="button" onClick={() => onList(null)}>
+          {t('travel.pilot.list.clear')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
       <div className="flex flex-wrap items-end gap-3">
@@ -218,6 +266,12 @@ function PilotSearch({
               onBlur={() => {
                 typing.current = false;
                 setOpen(false);
+              }}
+              onPaste={(e) => {
+                const pasted = classifyPilotPaste(e.clipboardData.getData('text/plain'));
+                if (pasted === null) return;
+                e.preventDefault();
+                onList(pasted);
               }}
               onKeyDown={handleKeyDown}
               className="w-full"
@@ -278,7 +332,7 @@ type ProfileState =
   | { kind: 'loading' }
   | { kind: 'unknown' }
   | { kind: 'failed' }
-  | { kind: 'ready'; profile: PilotProfile };
+  | { kind: 'ready'; profile: PilotProfile; fetchedAt: Date };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
 function PilotResult({
@@ -290,13 +344,18 @@ function PilotResult({
 }) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileState>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     void loadPilotProfile(characterId)
       .then((loaded) => {
         if (cancelled) return;
-        setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
+        setProfile(
+          loaded === null
+            ? { kind: 'unknown' }
+            : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
+        );
         if (loaded !== null) onResolved({ characterId, name: loaded.name });
       })
       .catch(() => {
@@ -305,7 +364,12 @@ function PilotResult({
     return () => {
       cancelled = true;
     };
-  }, [characterId, onResolved]);
+  }, [characterId, attempt, onResolved]);
+
+  function retry() {
+    setProfile({ kind: 'loading' });
+    setAttempt((n) => n + 1);
+  }
 
   if (profile.kind === 'loading') {
     return (
@@ -319,6 +383,11 @@ function PilotResult({
       <EmptyState
         title={t('travel.pilot.profileFailedTitle')}
         hint={t('travel.pilot.profileFailedHint')}
+        action={
+          <Button size="sm" onClick={retry}>
+            {t('travel.pilot.retry')}
+          </Button>
+        }
       />
     );
   }
@@ -328,7 +397,7 @@ function PilotResult({
     );
   }
   return (
-    <Panel>
+    <Panel actions={<DataAgeBadge date={profile.fetchedAt} alwaysVisible />}>
       <PilotProfileView profile={profile.profile} />
     </Panel>
   );

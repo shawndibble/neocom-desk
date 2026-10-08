@@ -299,7 +299,10 @@ function CorpJournalPanel({
   offlineTitleKey,
 }: CorpJournalPanelProps) {
   const { t } = useTranslation();
-  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, rowsFilter);
+  const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
+    journal,
+    rowsFilter
+  );
   const journalCsvColumns = useMemo(() => walletJournalCsvColumns(t), [t]);
   // Named after the division, so exporting two divisions never overwrites the
   // same file (issue #413).
@@ -359,6 +362,7 @@ function CorpJournalPanel({
             onFilterChange={onFilterChange}
             refTypeOptions={refTypeOptions}
             filteredJournal={filteredJournal}
+            breakdownJournal={breakdownJournal}
             journalColumns={journalColumns}
             label={t('wallet.journalTab')}
             sort={sort}

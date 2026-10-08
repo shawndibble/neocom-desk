@@ -32,7 +32,15 @@ export function FittingExportNotice({ notice }: { notice: string | null }) {
 
 /** Export's menu items, for whichever menu holds them. */
 export function FittingExportItems({
-  actions: { copy, copyShareLink, downloadEveXml, openInAppraisal, openManufacturePlan },
+  actions: {
+    canSubtractOwned,
+    copy,
+    copyMultibuyMinusOwned,
+    copyShareLink,
+    downloadEveXml,
+    openInAppraisal,
+    openManufacturePlan,
+  },
   price,
 }: {
   actions: FittingExport;
@@ -50,6 +58,11 @@ export function FittingExportItems({
       <DropdownMenuItem onSelect={() => void copy('multibuy')}>
         {t('fittings.export.multibuy')}
       </DropdownMenuItem>
+      {canSubtractOwned && (
+        <DropdownMenuItem onSelect={() => void copyMultibuyMinusOwned()}>
+          {t('fittings.export.multibuyMinusOwned')}
+        </DropdownMenuItem>
+      )}
       <DropdownMenuItem onSelect={() => void downloadEveXml()}>
         {t('fittings.export.eveXml')}
       </DropdownMenuItem>

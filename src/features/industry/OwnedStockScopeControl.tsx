@@ -1,24 +1,27 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  MultiSelect,
+  Modal,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  type MultiSelectGroup,
 } from '@/components/ui';
 import {
-  collectStockContainers,
   collectStockLocations,
-  ownedStockLocationKey,
   type DetectedOwnedStockMap,
   type OwnedStockLocation,
   type OwnedStockScope,
 } from '@/engine/industry/ownedStock';
+import { buildScopeTree, stationState } from '@/engine/industry/ownedStockScopeTree';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { OwnedStockDetection } from './ownedStockDetection';
+import { OwnedStockScopeTree } from './OwnedStockScopeTree';
 
 interface OwnedStockScopeControlProps {
   /** Absent, or `{ mode: 'everywhere' }`, means every placement counts — today's only behavior before this control existed. */
@@ -56,6 +59,11 @@ interface OwnedStockScopeControlProps {
  * column it governs — not in the plan's Location & market settings, where it
  * reads as another thing about where the job runs rather than about which of
  * your hangars the table may count.
+ *
+ * The picker is one nested tree (issue #2941): stations, with corp hangars and
+ * containers under each. A popover on desktop; a bottom sheet with Apply and
+ * Cancel on a phone, where a tree edited live under the thumb is easy to
+ * disturb.
  */
 export function OwnedStockScopeControl({
   scope,
@@ -66,94 +74,48 @@ export function OwnedStockScopeControl({
   corpAssetsToggle,
 }: OwnedStockScopeControlProps) {
   const { t } = useTranslation();
+  const isNarrow = useIsNarrow();
   const locations = useMemo(() => collectStockLocations(detectedStock), [detectedStock]);
+  const stations = useMemo(() => buildScopeTree(detectedStock), [detectedStock]);
   const mode = scope?.mode ?? 'everywhere';
-  const selected = useMemo(() => (scope?.mode === 'selected' ? scope.locations : []), [scope]);
-  const containers = useMemo(() => collectStockContainers(detectedStock), [detectedStock]);
-  const excludedContainers = useMemo(
-    () => (scope?.mode === 'selected' ? (scope.excludedContainers ?? []) : []),
-    [scope]
-  );
-  const selectedKeys = useMemo(() => new Set(selected.map(ownedStockLocationKey)), [selected]);
-  const byKey = useMemo(
-    () => new Map(locations.map((location) => [ownedStockLocationKey(location), location])),
-    [locations]
-  );
+  const selectedLocations = scope?.mode === 'selected' ? scope.locations : [];
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [draft, setDraft] = useState<OwnedStockScope | undefined>(scope);
 
   function labelFor(location: OwnedStockLocation): string {
+    const owner =
+      location.corporationId !== undefined
+        ? detection.corporationNameFor(location.corporationId)
+        : detection.characterNameFor(location.characterId);
     return t('industry.detectedOwnedPlacement', {
-      character: ownerNameFor(location),
+      character: owner,
       location: detection.locationLabelFor(location),
     });
   }
 
-  function ownerNameFor(location: OwnedStockLocation): string {
-    return location.corporationId !== undefined
-      ? detection.corporationNameFor(location.corporationId)
-      : detection.characterNameFor(location.characterId);
-  }
+  const pickedCount = stations.filter((s) => stationState(scope, s) !== 'empty').length;
+  const trigger = (
+    <Button
+      size="sm"
+      aria-haspopup="dialog"
+      {...(isNarrow
+        ? {
+            onClick: () => {
+              // Seeded on open, not in an effect: a cancelled draft must not resurrect itself.
+              setDraft(scope);
+              setSheetOpen(true);
+            },
+          }
+        : {})}
+    >
+      {t('industry.ownedStockScopeSelectedCount', { count: pickedCount })}
+    </Button>
+  );
+  const closeSheet = () => setSheetOpen(false);
 
-  function toggle(location: OwnedStockLocation) {
-    const key = ownedStockLocationKey(location);
-    const next = selectedKeys.has(key)
-      ? selected.filter((l) => ownedStockLocationKey(l) !== key)
-      : [...selected, location];
-    onChange({
-      mode: 'selected',
-      locations: next,
-      ...(excludedContainers.length > 0 ? { excludedContainers } : {}),
-    });
-  }
-
-  function toggleContainer(containerId: number) {
-    const next = excludedContainers.includes(containerId)
-      ? excludedContainers.filter((id) => id !== containerId)
-      : [...excludedContainers, containerId];
-    onChange({
-      mode: 'selected',
-      locations: selected,
-      ...(next.length > 0 ? { excludedContainers: next } : {}),
-    });
-  }
-
-  // Only containers at a still-selected location are worth listing: excluding
-  // one at a location that is already out of scope would change nothing.
-  const containerOptions = containers
-    .filter((c) => selectedKeys.has(ownedStockLocationKey(c)))
-    .map((c) => ({
-      id: String(c.containerId),
-      label: t('industry.ownedStockScopeContainerOption', {
-        id: c.containerId,
-        owner: ownerNameFor(c),
-        location: detection.locationLabelFor(c),
-      }),
-    }));
-
-  // Grouped only once a corp placement actually exists (issue #798): a plan
-  // with no Corp Assets contribution shows the same flat, ungrouped list it
-  // always has — a "Personal" header with nothing to distinguish it from
-  // would be noise. Not memoized: `locations` itself already is, and
-  // splitting/labeling a handful of already-collected locations is cheap.
-  const personalLocations = locations.filter((location) => location.corporationId === undefined);
-  const corpLocations = locations.filter((location) => location.corporationId !== undefined);
-  const toOption = (location: OwnedStockLocation) => ({
-    id: ownedStockLocationKey(location),
-    label: labelFor(location),
-  });
-  const locationGroups: readonly MultiSelectGroup<string>[] =
-    corpLocations.length === 0
-      ? [{ label: '', options: personalLocations.map(toOption) }]
-      : [
-          {
-            label: t('industry.ownedStockScopeGroupPersonal'),
-            options: personalLocations.map(toOption),
-          },
-          { label: t('industry.ownedStockScopeGroupCorp'), options: corpLocations.map(toOption) },
-        ];
-
-  // Two children, not one wrapper: the label-and-select line, and the chip
-  // list as a block of its own beneath. Splitting them is what stops the
-  // line's height from jumping when "Selected" is chosen.
+  // Two children, not one wrapper: the label-and-select line, and the picker
+  // as a block of its own beneath. Splitting them is what stops the line's
+  // height from jumping when "Selected" is chosen.
   //
   // The label sits inline with the select from `sm` up and stacks above it
   // below that — the same breakpoint the plan's own settings grid folds at, so
@@ -179,7 +141,10 @@ export function OwnedStockScopeControl({
               // "use all" before the player has chosen anything to exclude.
               onChange(
                 value === 'selected'
-                  ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
+                  ? {
+                      mode: 'selected',
+                      locations: selectedLocations.length > 0 ? selectedLocations : locations,
+                    }
                   : undefined
               );
             }}
@@ -197,41 +162,53 @@ export function OwnedStockScopeControl({
         </div>
       </div>
       {mode === 'selected' &&
-        (locations.length === 0 ? (
+        (stations.length === 0 ? (
           <span className="text-xs text-text-dim">{t('industry.ownedStockScopeNoLocations')}</span>
+        ) : isNarrow ? (
+          <>
+            {trigger}
+            <Modal
+              open={sheetOpen}
+              onClose={closeSheet}
+              title={t('industry.ownedStockScopeLabel')}
+              placement="sheet"
+            >
+              <OwnedStockScopeTree
+                stations={stations}
+                scope={draft}
+                onChange={setDraft}
+                labelFor={labelFor}
+              />
+              <div className="sticky bottom-0 -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] mt-3 flex gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+                <Button className="flex-1" onClick={closeSheet}>
+                  {t('filters.cancel')}
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={() => {
+                    onChange(draft);
+                    closeSheet();
+                  }}
+                >
+                  {t('filters.apply')}
+                </Button>
+              </div>
+            </Modal>
+          </>
         ) : (
-          <MultiSelect
-            trigger={
-              <Button size="sm">
-                {t('industry.ownedStockScopeSelectedCount', { count: selected.length })}
-              </Button>
-            }
-            groups={locationGroups}
-            selected={selectedKeys}
-            onToggle={(key) => {
-              const location = byKey.get(key);
-              if (location) toggle(location);
-            }}
-            searchPlaceholder={t('industry.ownedStockScopeSearchPlaceholder')}
-            noResultsLabel={t('industry.ownedStockScopeNoResults')}
-          />
+          <Popover>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent align="start" className="max-h-80 w-80 overflow-y-auto p-2">
+              <OwnedStockScopeTree
+                stations={stations}
+                scope={scope}
+                onChange={onChange}
+                labelFor={labelFor}
+              />
+            </PopoverContent>
+          </Popover>
         ))}
-      {mode === 'selected' && containerOptions.length > 0 && (
-        <MultiSelect
-          trigger={
-            <Button size="sm">
-              {t('industry.ownedStockScopeExcludedContainersCount', {
-                count: excludedContainers.length,
-              })}
-            </Button>
-          }
-          groups={[{ label: '', options: containerOptions }]}
-          selected={new Set(excludedContainers.map(String))}
-          onToggle={(id) => toggleContainer(Number(id))}
-          searchPlaceholder={t('industry.ownedStockScopeSearchPlaceholder')}
-          noResultsLabel={t('industry.ownedStockScopeNoResults')}
-        />
-      )}
     </>
   );
 }

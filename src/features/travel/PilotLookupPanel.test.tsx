@@ -192,6 +192,23 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByText("This pilot couldn't be found")).toBeNull();
   });
 
+  it('retries the profile after an outage, and shows its age once loaded', async () => {
+    mocks.loadPilotProfile.mockRejectedValueOnce(new Error('offline'));
+    renderTab('/pilot-lookup?pilot=42');
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.loadPilotProfile).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.querySelector('time')).not.toBeNull());
+  });
+
+  it('retries zKillboard stats after a failure', async () => {
+    mocks.fetchPilotStats.mockResolvedValueOnce({ kind: 'failed' });
+    renderTab('/pilot-lookup?pilot=42');
+    await screen.findByText("zKillboard couldn't be reached");
+    const calls = mocks.fetchPilotStats.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.fetchPilotStats.mock.calls.length).toBe(calls + 1));
+  });
+
   it('shows no history apart from a failure', async () => {
     mocks.fetchPilotStats.mockResolvedValue({ kind: 'no-history' });
     renderTab('/pilot-lookup?pilot=42');
