@@ -231,7 +231,11 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     offersFetchedAt,
     offersFromCache,
     offersError,
-    reloadOffers: () => setReloadKey((k) => k + 1),
+    reloadOffers: () => {
+      // Back to the spinner, not the empty-store copy, while the retry runs.
+      setOffers(null);
+      setReloadKey((k) => k + 1);
+    },
     rows,
     catalog,
     playerLp,
