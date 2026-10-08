@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
+import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull, type MovePlan } from '@/engine/assets/movePlan';
 import {
   CharacterScopeReadout,
@@ -25,7 +26,10 @@ import { loadStationName, loadStationSystemId } from '@/features/character/stati
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
-import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
+import {
+  useFittingCatalogue,
+  type FittingCatalogue,
+} from '@/features/fittings/useFittingCatalogue';
 import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
@@ -138,8 +142,7 @@ export function MovePlanModal({
   const [planFailed, setPlanFailed] = useState(false);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
-  const catalogue = useFittingCatalogue();
-  const { profile } = usePilotProfile(activeCharacterId);
+  const hullSource = useRef<HullSourceData>({ catalogue: null, profile: null });
   const hullCapacity = useRef(new Map<number, number | null>());
   const idsKey = characterIds.join(',');
 
@@ -202,6 +205,7 @@ export function MovePlanModal({
   const hasDestination = destSystem !== null || destStation !== null;
 
   async function loadHulls(): Promise<MoveHull[]> {
+    const { catalogue, profile } = hullSource.current;
     if (!catalogue || !profile || !loaded) return [];
     const haulers =
       buildHullCatalogue([...catalogue.groupsById.values()], catalogue.marketTypes).find(
@@ -282,6 +286,7 @@ export function MovePlanModal({
   return (
     <Modal open={open} onClose={onClose} title={t('assets.movePlan.title')} placement="sheet-full">
       <div className="flex flex-col gap-3 text-sm">
+        {open && <HullSource characterId={activeCharacterId} intoRef={hullSource} />}
         {filterControl}
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
@@ -405,6 +410,30 @@ export function MovePlanModal({
       </div>
     </Modal>
   );
+}
+
+interface HullSourceData {
+  catalogue: FittingCatalogue | null;
+  profile: PilotProfile | null;
+}
+
+/**
+ * Loads the fitting catalogue and pilot profile only while the modal is open,
+ * so the Assets page does not pull the fitting data on every visit.
+ */
+function HullSource({
+  characterId,
+  intoRef,
+}: {
+  characterId: number | null;
+  intoRef: { current: HullSourceData };
+}) {
+  const catalogue = useFittingCatalogue();
+  const { profile } = usePilotProfile(characterId);
+  useEffect(() => {
+    intoRef.current = { catalogue, profile };
+  }, [intoRef, catalogue, profile]);
+  return null;
 }
 
 function PlanResult({
