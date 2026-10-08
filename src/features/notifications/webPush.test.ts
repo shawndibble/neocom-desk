@@ -88,6 +88,16 @@ describe('enableWebPush', () => {
     expect(usePushFailure.getState().value).toMatchObject({ reason: 'server-rejected' });
   });
 
+  it('does not record a failure when the backend rejects only some characters', async () => {
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue({
+      deviceId: 'd',
+      registered: [2],
+      rejected: [1],
+    });
+    await enableWebPush();
+    expect(usePushFailure.getState().value).toBeNull();
+  });
+
   it('requests permission but does not register when support is unsupported', async () => {
     vi.mocked(webPushSupport).mockReturnValue('unsupported');
     const result = await enableWebPush();

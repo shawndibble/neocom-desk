@@ -54,7 +54,7 @@ export function recordPushFailure(err: unknown, now = Date.now()): Promise<void>
 }
 
 /** Records a failure with an already-known reason (a rejected, not thrown, result). */
-export function recordPushFailureReason(reason: PushFailureReason, now = Date.now()) {
+function recordPushFailureReason(reason: PushFailureReason, now = Date.now()) {
   return usePushFailure.getState().setValue({ reason, at: now });
 }
 
@@ -68,9 +68,12 @@ export function clearPushFailure(): Promise<void> {
  * token, or `skipIfUnchanged` hit), which says nothing about a standing failure
  * either way — so it leaves the record alone.
  */
-export function settlePushRegistration(result: { rejected: readonly number[] } | null): void {
+export function settlePushRegistration(
+  result: { registered: readonly number[]; rejected: readonly number[] } | null
+): void {
   if (result === null) return;
-  void (result.rejected.length > 0
-    ? recordPushFailureReason('server-rejected')
-    : clearPushFailure());
+  // Only an every-character rejection is a failure: a partial one still
+  // delivers for the characters that registered.
+  const allRejected = result.registered.length === 0 && result.rejected.length > 0;
+  void (allRejected ? recordPushFailureReason('server-rejected') : clearPushFailure());
 }
