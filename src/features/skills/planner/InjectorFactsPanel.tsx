@@ -6,6 +6,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices, type HubAggregate } from '@/market/prices';
 import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/spExtraction';
+import { ALPHA_SP_CAP } from '@/engine/skillInjectors';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
 
@@ -56,7 +57,7 @@ export function InjectorFactsPanel({
     };
   }, [hub, hubHydrated]);
 
-  const facts = buildInjectorFacts(scheduled, totalSp, unallocatedSp, aggregate);
+  const facts = buildInjectorFacts(scheduled, totalSp, unallocatedSp, aggregate, cloneState);
 
   if (facts.spUnknown) {
     return <p className="text-[0.6875rem] text-text-dim">{t('plans.injectors.spUnknown')}</p>;
@@ -113,6 +114,14 @@ export function InjectorFactsPanel({
           <dd>{priceCell(facts.priceTotal)}</dd>
         </div>
       </dl>
+      {facts.alphaShortfallSp > 0 && (
+        <p className="text-warning">
+          {t('plans.injectors.alphaOverCap', {
+            sp: facts.alphaShortfallSp.toLocaleString(),
+            cap: ALPHA_SP_CAP.toLocaleString(),
+          })}
+        </p>
+      )}
       {cloneState === 'alpha' && <p className="text-warning">{t('plans.injectors.alphaCaveat')}</p>}
     </div>
   );
