@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
+import { enableWebPush } from '@/features/notifications/webPush';
+import { clearPushFailure, usePushFailure } from '@/features/notifications/pushFailure';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -90,6 +92,11 @@ vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
   return { ...actual, runForegroundPoll: vi.fn(async () => {}) };
 });
 
+vi.mock('@/features/notifications/webPush', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/notifications/webPush')>();
+  return { ...actual, enableWebPush: vi.fn(actual.enableWebPush) };
+});
+
 /**
  * Same reasoning for the boot cache warm-up: it starts in the first idle slot
  * (`bootPrefetch.ts`; a 2 s timer under jsdom), which lands mid-test here and
@@ -154,6 +161,7 @@ beforeEach(async () => {
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
+  usePushFailure.setState({ value: null, hydrated: true });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
     hydrated: true,
@@ -684,6 +692,37 @@ describe('Settings — Notifications (issue #170)', () => {
         outcome: 'default',
       });
     });
+  });
+
+  it('shows a Retry row for a stored push failure; Retry re-registers and clears it, toggles stay on (issue #2844)', async () => {
+    const user = userEvent.setup();
+    stubNotification('granted');
+    usePushFailure.setState({ value: { reason: 'network', at: 1 }, hydrated: true });
+    vi.mocked(enableWebPush).mockImplementationOnce(async () => {
+      await clearPushFailure();
+      return { support: 'supported', permission: 'granted' };
+    });
+    render(<App />);
+    await notificationsPanel();
+
+    expect(await screen.findByText(/couldn't reach the server/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(enableWebPush).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.queryByText(/couldn't reach the server/i)).not.toBeInTheDocument()
+    );
+  });
+
+  it('shows no push failure row when nothing failed', async () => {
+    stubNotification('granted');
+    render(<App />);
+    await notificationsPanel();
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled()
+    );
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('never requests permission on its own when the grant is already settled', async () => {
