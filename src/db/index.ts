@@ -995,6 +995,8 @@ export interface IndustryJobHistoryRecord {
   jobs: IndustryJob[];
   /** Epoch ms of the newest ESI fetch merged in. */
   fetchedAt: number;
+  /** Delivered jobs the pilot dismissed from "not logged" (issue #2991). Absent = none. */
+  dismissedJobIds?: number[];
 }
 
 /**
