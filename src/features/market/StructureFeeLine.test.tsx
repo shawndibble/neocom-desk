@@ -45,9 +45,9 @@ describe('StructureFeesList', () => {
   it('lists a set fee and removes it', async () => {
     await db.settings.put({ key: SYNCED_STRUCTURE_FEES_KEY, value: { 1000000000001: 2.5 } });
     render(<StructureFeesList />);
-    expect(await screen.findByText(/2\.5% owner fee/)).toBeTruthy();
+    expect(await screen.findByText(/3% broker fee/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Remove fee for/ }));
     await waitFor(() => expect(useStructureFees.getState().value).toEqual({}));
-    expect(screen.queryByText(/owner fee/)).toBeNull();
+    expect(screen.queryByText(/Unknown Structure/)).toBeNull();
   });
 });

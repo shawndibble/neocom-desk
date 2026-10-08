@@ -6827,7 +6827,7 @@
       "useNpc": "Use NPC station fees",
       "settingsTitle": "Market fees",
       "settingsHelp": "Broker fees you set for player structures. Skills and standings do not change them.",
-      "settingsRow": "{{name}}: {{pct}}% owner fee",
+      "settingsRow": "{{name}}: {{pct}}% broker fee",
       "remove": "Remove fee for {{name}}",
       "removeButton": "Remove"
     },

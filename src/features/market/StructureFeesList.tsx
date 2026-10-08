@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { structureBrokerPct } from '@/engine/market/structureFee';
 import { useStructureFees, withoutStructureFee } from './structureFees';
 
 /**
@@ -29,7 +30,12 @@ export function StructureFeesList() {
           const name = `${t('market.unknownStructure')} #${id}`;
           return (
             <li key={id} className="flex items-center justify-between gap-3 py-1.5">
-              <span>{t('market.structureFee.settingsRow', { name, pct })}</span>
+              <span>
+                {t('market.structureFee.settingsRow', {
+                  name,
+                  pct: Math.round(structureBrokerPct(pct) * 100) / 100,
+                })}
+              </span>
               <Button
                 size="sm"
                 variant="ghost"
