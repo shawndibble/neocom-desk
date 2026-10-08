@@ -114,7 +114,7 @@ export function shortOreNames(names: readonly string[]): Record<string, string> 
 const fill = (template: string, values: Record<string, string | number>): string =>
   template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`));
 
-function clock(epochMs: number): string {
+export function formatEveClock(epochMs: number): string {
   const d = new Date(epochMs);
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
@@ -178,7 +178,7 @@ export function surveyChatMessage(
     summary.etaAt === null
       ? labels.waiting
       : fill(labels.done, {
-          time: clock(summary.etaAt),
+          time: formatEveClock(summary.etaAt),
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
