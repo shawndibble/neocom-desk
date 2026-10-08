@@ -2,11 +2,11 @@
  * What a stored D-Scan **Share Link** holds (issue #2943): the raw scan text,
  * not the counts, so the recipient's view is rebuilt by the same parsing and
  * class mapping the live D-Scan view runs (`classifyPilotPaste`,
- * `bucketDscan`) and the two can never disagree.
+ * `buildFleetBoard`) and the two can never disagree.
  *
  * Pure: the Firestore read/write around it lives in `features/share`.
  */
-import { classifyPilotPaste } from './parsePilotPaste';
+import { classifyPilotPaste, type DscanRow } from './parsePilotPaste';
 
 export const DSCAN_SNAPSHOT_VERSION = 1;
 
@@ -34,13 +34,17 @@ export function buildDscanSnapshot(text: string): BuildDscanSnapshotResult {
 }
 
 /** The scan a stored payload holds, or null when it is malformed, oversized or not a D-Scan. */
-export function parseDscanSnapshot(payload: unknown): { text: string; typeIds: number[] } | null {
+export function parseDscanSnapshot(
+  payload: unknown
+): { text: string; typeIds: number[]; rows: DscanRow[] } | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const { v, text } = payload as { v?: unknown; text?: unknown };
   if (v !== DSCAN_SNAPSHOT_VERSION || typeof text !== 'string') return null;
   if (text.length > MAX_DSCAN_SNAPSHOT_CHARS) return null;
   const paste = classifyPilotPaste(text);
-  return paste?.kind === 'dscan' ? { text: paste.text, typeIds: paste.typeIds } : null;
+  return paste?.kind === 'dscan'
+    ? { text: paste.text, typeIds: paste.typeIds, rows: paste.rows }
+    : null;
 }
 
 export function dscanSnapshotReuseKey(snapshot: DscanSnapshot): string {

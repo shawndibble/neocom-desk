@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, StatChip, StatChips } from '@/components/ui';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
-import { DscanSummaryView } from './PilotListView';
+import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
+import { FleetBoard } from './FleetBoard';
 
-export type DscanShareState = { status: 'invalid' } | { status: 'ready'; typeIds: number[] };
+export type DscanShareState = { status: 'invalid' } | { status: 'ready'; rows: DscanRow[] };
 
 /**
  * The **Shared D-Scan** a Share Link opens (`routes/SharedLink.tsx`): the
- * scan's ships counted by class, rebuilt from the stored raw text by the same
+ * scan's ships grouped by role (the Fleet board), rebuilt from the stored raw text by the same
  * view the live Pilot Lookup uses. Read-only; "Open Neocom Desk" carries the
  * scan into the live view.
  */
@@ -35,7 +36,7 @@ export function DscanShareScreen({
           <StatChips className="border-b border-line px-1 py-2">
             <StatChip
               label={t('dscanShare.linesLabel')}
-              value={state.typeIds.length.toLocaleString()}
+              value={state.rows.length.toLocaleString()}
             />
             <StatChip
               label={t('dscanShare.expiresLabel')}
@@ -43,7 +44,7 @@ export function DscanShareScreen({
             />
           </StatChips>
           <Panel>
-            <DscanSummaryView typeIds={state.typeIds} />
+            <FleetBoard rows={state.rows} />
           </Panel>
         </>
       )}

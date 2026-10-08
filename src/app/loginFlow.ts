@@ -106,12 +106,15 @@ function rememberThisPage(): void {
  * Add Character lands where it ordinarily does, so a landing a grant left
  * behind (pressed, then abandoned on EVE's page) must not steer it. Two pages
  * keep the stash: `/login`, where a Fitting Share Code's "Open in Neocom Desk"
- * (#1544) sent the visitor with its landing already stashed, and `/callback`,
- * whose Retry fallback restarts the very login that landing belongs to.
+ * (#1544) sent the visitor with its landing already stashed, `/callback`,
+ * whose Retry fallback restarts the very login that landing belongs to, and
+ * `/share`, whose "Log in" stashes the shared page before it starts (#3075).
  */
 function forgetStrayLanding(): void {
   const here = currentRouterPath();
-  if (!isOnRoute(here, '/login') && !isOnRoute(here, '/callback')) clearLoginReturnTo();
+  if (!isOnRoute(here, '/login') && !isOnRoute(here, '/callback') && !isOnRoute(here, '/share')) {
+    clearLoginReturnTo();
+  }
 }
 
 /**

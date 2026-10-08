@@ -28,9 +28,8 @@ import {
 } from '@/engine/pilotList/dscanSnapshot';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
-import { bucketDscan, type DscanSummary } from '@/engine/pilotList/dscanClasses';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
-import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { FleetBoard } from './FleetBoard';
 import { loadPilotList, type PilotListRow } from './pilotListData';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
@@ -47,7 +46,7 @@ export function PilotListView({
     <LocalList key={paste.names.join('|')} paste={paste} onOpen={onOpen} />
   ) : (
     <Panel className="space-y-4">
-      <DscanSummaryView typeIds={paste.typeIds} />
+      <FleetBoard rows={paste.rows} />
     </Panel>
   );
 }
@@ -321,76 +320,5 @@ export function DscanShareControl({
         </div>
       )}
     </>
-  );
-}
-
-/** A D-Scan's ships counted by class — shared by the live view and a Shared D-Scan, so both bucket identically. */
-export function DscanSummaryView({ typeIds }: { typeIds: readonly number[] }) {
-  const { t } = useTranslation();
-  const [summary, setSummary] = useState<{ summary: DscanSummary; names: Map<number, string> }>();
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
-      if (cancelled) return;
-      const result = bucketDscan(typeIds, (typeId) => {
-        const type = types[String(typeId)];
-        return type === undefined
-          ? undefined
-          : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
-      });
-      const names = new Map<number, string>();
-      for (const c of result.classes) {
-        for (const { typeId } of c.types)
-          names.set(typeId, types[String(typeId)]?.name ?? `#${typeId}`);
-      }
-      setSummary({ summary: result, names });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // Keyed on the ids themselves: a caller re-parsing the same scan hands a new array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeIds.join(',')]);
-
-  if (summary === undefined) {
-    return (
-      <div className="flex justify-center py-10">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
-  if (summary.summary.classes.length === 0) {
-    return (
-      <EmptyState
-        title={t('travel.pilot.dscan.emptyTitle')}
-        hint={t('travel.pilot.dscan.emptyHint')}
-      />
-    );
-  }
-  return (
-    <div className="space-y-4">
-      {summary.summary.classes.map((c) => (
-        <section key={c.bucket} aria-label={t(`travel.pilot.dscan.bucket.${c.bucket}`)}>
-          <h3 className="text-sm font-semibold text-text">
-            {t(`travel.pilot.dscan.bucket.${c.bucket}`)}{' '}
-            <span className="tabular-nums text-text-dim">{c.total}</span>
-          </h3>
-          <ul className="mt-1 space-y-0.5 text-xs text-text-dim">
-            {c.types.map(({ typeId, count }) => (
-              <li key={typeId} className="flex gap-2">
-                <span className="w-8 text-right tabular-nums">{count}</span>
-                <span>{summary.names.get(typeId)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      {summary.summary.leftOut > 0 && (
-        <p className="text-xs text-text-dim">
-          {t('travel.pilot.dscan.leftOut', { count: summary.summary.leftOut })}
-        </p>
-      )}
-    </div>
   );
 }
