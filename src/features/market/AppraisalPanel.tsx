@@ -553,7 +553,7 @@ export function AppraisalPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_minmax(0,1fr)] lg:items-start">
       <Panel
         title={t('market.appraisal.pasteTitle')}
         meta={
@@ -898,22 +898,25 @@ export function AppraisalPanel({
                 </p>
               )}
 
-              <DataTable
-                {...tableExport.tableProps}
-                columns={columns}
-                rows={tableRows}
-                rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
-                rowKey={(row) => row.typeId}
-                label={t('market.appraisal.resultTitle')}
-                className="pb-1"
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
-                // Five or six short figures a card: one per line runs a priced
-                // row to six, and hiding a column buys the same height at the
-                // cost of a figure.
-                stackColumns={2}
-                mobileSort
-              />
+              {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
+              <div className="min-w-0 overflow-x-auto">
+                <DataTable
+                  {...tableExport.tableProps}
+                  columns={columns}
+                  rows={tableRows}
+                  rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
+                  rowKey={(row) => row.typeId}
+                  label={t('market.appraisal.resultTitle')}
+                  className="pb-1"
+                  rowContextMenu={rowContextMenu}
+                  rowMoreActions
+                  // Five or six short figures a card: one per line runs a priced
+                  // row to six, and hiding a column buys the same height at the
+                  // cost of a figure.
+                  stackColumns={2}
+                  mobileSort
+                />
+              </div>
             </>
           )}
         </Panel>
