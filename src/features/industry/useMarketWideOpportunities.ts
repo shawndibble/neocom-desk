@@ -42,6 +42,8 @@ export interface UseMarketWideOpportunitiesResult {
   /** True once a scan has completed at least once — distinguishes "never run" from "ran, found nothing". */
   hasRun: boolean;
   error: boolean;
+  /** When the last successful scan finished; null before one has. */
+  fetchedAt: Date | null;
   /** Blueprint sources the last scan couldn't read — rows needing one may be missing. */
   unavailableSources: BlueprintSource[];
   /**
@@ -66,8 +68,16 @@ export function useMarketWideOpportunities({
     loading: boolean;
     hasRun: boolean;
     error: boolean;
+    fetchedAt: Date | null;
     unavailableSources: BlueprintSource[];
-  }>({ rows: [], loading: false, hasRun: false, error: false, unavailableSources: [] });
+  }>({
+    rows: [],
+    loading: false,
+    hasRun: false,
+    error: false,
+    fetchedAt: null,
+    unavailableSources: [],
+  });
 
   // Guards against a stale scan's result landing after a newer one started
   // (e.g. the pilot hits "Scan" twice in a row).
@@ -111,12 +121,20 @@ export function useMarketWideOpportunities({
             loading: false,
             hasRun: true,
             error: false,
+            fetchedAt: new Date(),
             unavailableSources: loaded.unavailable,
           });
         })
         .catch(() => {
           if (runToken.current !== token) return;
-          setState({ rows: [], loading: false, hasRun: true, error: true, unavailableSources: [] });
+          setState({
+            rows: [],
+            loading: false,
+            hasRun: true,
+            error: true,
+            fetchedAt: null,
+            unavailableSources: [],
+          });
         });
     },
     [hub, trees, catalog, modifiers, options, standing, characterIds]

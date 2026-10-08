@@ -6,18 +6,19 @@ Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, chara
 
 ## Feature summary
 
-| Feature                      | Where                          | Notes                                                                                                       |
-| ---------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Name search with suggestions | Search panel                   | Combobox, >= 3 chars, 300 ms debounce, max 15 hits; needs the active Character's search scope               |
-| Exact-name lookup            | Search panel (Enter / Look up) | Public `POST /universe/ids`; works without the scope                                                        |
-| Shareable lookup             | URL `?pilot=<characterId>`     | Pushes history; opens on that pilot                                                                         |
-| Identity block               | Result                         | Portrait, name, corporation (link), alliance (link or "no alliance"), security status, age, zKillboard link |
-| Stat tiles                   | Result                         | Kills, Losses, ISK destroyed, ISK lost, ISK efficiency, Solo kills                                          |
-| Ratio meters                 | Result                         | Snuggly <-> Dangerous, Solo <-> Gang (zKillboard's own 0-100)                                               |
-| Top ships                    | Result                         | Up to 5 hulls used on kills, bars, Show info links                                                          |
-| Recent kills and losses      | Result                         | Newest 25 merged; expandable rows with victim fit + Open in Fittings                                        |
-| Show Info Character tab      | `PublicInfoModal`              | Same `PilotProfileView` reused (corp/alliance switch tabs)                                                  |
-| Command palette              | Ctrl/Cmd+K                     | Page entry only                                                                                             |
+| Feature                      | Where                          | Notes                                                                                                                           |
+| ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Name search with suggestions | Search panel                   | Combobox, >= 3 chars, 300 ms debounce, max 15 hits; needs the active Character's search scope                                   |
+| Exact-name lookup            | Search panel (Enter / Look up) | Public `POST /universe/ids`; works without the scope                                                                            |
+| Shareable lookup             | URL `?pilot=<characterId>`     | Pushes history; opens on that pilot                                                                                             |
+| Identity block               | Result                         | Portrait, name, corporation (link), alliance (link or "no alliance"), security status, age, zKillboard link                     |
+| Stat tiles                   | Result                         | Kills, Losses, ISK destroyed, ISK lost, ISK efficiency, Solo kills                                                              |
+| Ratio meters                 | Result                         | Snuggly <-> Dangerous, Solo <-> Gang (zKillboard's own 0-100)                                                                   |
+| Top ships                    | Result                         | Up to 5 hulls used on kills, bars, Show info links                                                                              |
+| Recent kills and losses      | Result                         | Newest 25 merged; expandable rows with victim fit + Open in Fittings                                                            |
+| Pasted Local list / D-Scan   | Search box, global paste       | 2+ lines. Local: sortable table (danger, gang, kills), max 40 names; D-Scan: ships counted by class. Decision `20261007-224716` |
+| Show Info Character tab      | `PublicInfoModal`              | Same `PilotProfileView` reused (corp/alliance switch tabs)                                                                      |
+| Command palette              | Ctrl/Cmd+K                     | Page entry only                                                                                                                 |
 
 ## Access, routing, scopes
 
@@ -25,7 +26,7 @@ Glossary (CONTEXT.md): **Pilot Lookup** - portrait, corporation, alliance, chara
 - Nav: Intel group, `mobileTab: true`, icon `NavPilotLookup` (`src/app/navDestinations.ts:245`). Title `nav.pilotLookup`.
 - Legacy redirects: `/travel/pilot` -> `/pilot-lookup` (`src/app/legacyPaths.ts:10`, query kept); defaulted `/travel?pilot=` -> `/pilot-lookup` (`src/routes/Travel.tsx:25-31`).
 - Scope: only suggestions use one - `esi-search.search_structures.v1` (`getCharacterSearch`, `src/esi/registry.ts:573`), gated by `useEndpointsGranted(['getCharacterSearch'])` and an active Character (`PilotLookupPanel.tsx:75`). Without it the hint reads "Type the pilot's full name and press Enter. Suggestions need this character's search permission." and exact-name lookup still works. No grant banner or Grant button on the page.
-- Layout: `mx-auto max-w-6xl`; `PageHeader` title `nav.pilotLookup`; no tabs; no data-age badge.
+- Layout: `mx-auto max-w-6xl`; `PageHeader` title `nav.pilotLookup`; no tabs; `DataAgeBadge` on the profile panel (when the profile loaded).
 
 ## Data sources
 
@@ -168,7 +169,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 | Row expand       | failed                              | retry on next expand                                     |
 | Row expand       | no fit / empty fit                  | text lines                                               |
 | Open in Fittings | busy / failed                       | disabled button / `role=alert`                           |
-| Rate limiting    | zKillboard 429 or any non-ok        | same as failed; no retry control; no cache               |
+| Rate limiting    | zKillboard 429 or any non-ok        | same as failed; Try again control; no cache              |
 
 ## Mobile vs desktop
 
@@ -229,8 +230,8 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 - Kills/losses list fixed at 25 with no pagination, filter or sort; "More on zKillboard" is the only way further.
 - No employment history, standings or contact add on this page.
 - No copy-link or share button; sharing relies on the address bar.
-- No data-age badge on the page; stats/killmail cache is memory-only (10 min, reload refetches) and shows no age.
-- No retry control on stats or killmail failure; the user must re-run the lookup or reload (failures not cached).
+- The badge dates the profile load only; stats/killmail cache is memory-only (10 min, reload refetches) and shows no age.
+- Profile, stats and killmail failures each offer a Try again control (failures are not cached, so it refetches).
 - Killmail row shows only victim or final blow; no attacker count, damage, or location detail.
 - Top ships use zKillboard's all-time "ships used on kills" only; no losses-by-hull or recent-activity timeline.
 - Show Info Character tab and this page duplicate one view; Show Info does not link to `/pilot-lookup`.
@@ -242,7 +243,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 ## Improvement ideas
 
 - Fill the input from the loaded pilot; show a Copy link control.
-- Retry button for stats, killmails and fits; surface 429 distinctly.
+- Retry button for fits; surface 429 distinctly.
 - Pagination or "load more" and side filter (kills/losses) on the recent list; show attacker count and damage.
 - Losses-by-hull and recent-activity timeline from zKillboard stats.
 - Grant button next to the suggestion hint when the search scope is missing.

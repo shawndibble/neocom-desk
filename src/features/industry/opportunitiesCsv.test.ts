@@ -14,7 +14,13 @@ function opportunity(runs: number, profit: number | null): OpportunityRow {
       blueprint: { runs },
       catalogEntry: { productName: 'Rifter', blueprint: { products: [{ quantity: 1 }] } },
     },
-    result: { profit, marginPct: profit === null ? null : 10, seconds: 7200, iskPerHour: profit },
+    result: {
+      profit,
+      marginPct: profit === null ? null : 10,
+      seconds: 7200,
+      iskPerHour: profit,
+      materials: [{ ownedQuantity: 5, remainingQuantity: 5, unitPrice: 10, lineCost: 50 }],
+    },
     orderDepth: 'thin',
   } as unknown as OpportunityRow;
 }
@@ -30,6 +36,8 @@ describe('opportunitiesCsvColumns', () => {
       'industry.runs',
       'industry.opportunitiesUnitMargin',
       'industry.csvMarginPct',
+      'industry.opportunitiesStockCovers',
+      'industry.opportunitiesStillToBuy',
       'industry.csvTimeSeconds',
       'industry.iskPerHour',
       'industry.opportunitiesOrderDepthLabel',
@@ -44,6 +52,8 @@ describe('opportunitiesCsvColumns', () => {
       5,
       200,
       10,
+      50,
+      50,
       7200,
       1000,
       'industry.opportunitiesOrderDepth.thin',
@@ -56,7 +66,7 @@ describe('opportunitiesCsvColumns', () => {
     expect(values[3]).toBeNull();
     expect(values[4]).toBeNull();
     expect(values[5]).toBeNull();
-    expect(values[7]).toBeNull();
+    expect(values[9]).toBeNull();
   });
 });
 

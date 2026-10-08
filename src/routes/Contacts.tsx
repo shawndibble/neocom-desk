@@ -23,6 +23,7 @@ import {
   SearchInput,
   Spinner,
   StandingIcon,
+  Tabs,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -88,6 +89,8 @@ import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
 import { CONTACTS_TABS } from '@/app/pageTabs';
+import { tabBarTabs } from '@/lib/pageTabs';
+import { ContactsStandings } from './ContactsStandings';
 
 interface Snapshot {
   contactsResult: CachedResult<CharacterContact[]> | null;
@@ -1070,6 +1073,27 @@ export function Contacts() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  // One Character's roster has nothing to compare against, so no "Across characters" tab.
+  const tabBar = (
+    <Tabs
+      label={t('contacts.title')}
+      value={tab}
+      onChange={(id) => setTab(id as typeof tab)}
+      tabs={tabBarTabs(CONTACTS_TABS)
+        .filter((item) => item.id !== 'across' || acrossLists.length > 1)
+        .map((item) => ({ id: item.id, label: t(item.labelKey) }))}
+    />
+  );
+  if (tab === 'standings') {
+    return (
+      <div className="mx-auto max-w-6xl space-y-4">
+        <PageHeader title={t('contacts.title')} />
+        {tabBar}
+        <ContactsStandings characterId={activeCharacterId} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
@@ -1109,6 +1133,8 @@ export function Contacts() {
           </>
         }
       />
+
+      {tabBar}
 
       {/* Shared with the second tab: a name typed into the box, or a type
           switched off, means the same thing on either. The standing chips do
