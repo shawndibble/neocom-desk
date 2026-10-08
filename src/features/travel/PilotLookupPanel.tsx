@@ -39,7 +39,7 @@ import {
   type PilotProfile,
   type PilotSummary,
 } from './pilotLookup';
-import { PilotListView } from './PilotListView';
+import { DscanShareControl, PilotListView } from './PilotListView';
 import { PilotProfileView } from './PilotProfileView';
 import { useSharedDscanSeed } from './sharedDscanSeed';
 
@@ -57,7 +57,6 @@ export function PilotLookupPanel() {
   // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
   const [list, setList] = useState<PilotPaste | null>(null);
   const [handledListKey, setHandledListKey] = useState<string | null>(null);
-  const characterId = useActiveCharacter((state) => state.activeCharacterId);
   // "Open Neocom Desk" on a Shared D-Scan arrives as `?share=<id>`.
   useSharedDscanSeed((text) => {
     const pasted = classifyPilotPaste(text);
@@ -89,7 +88,6 @@ export function PilotLookupPanel() {
       {params.pilot === null && list !== null ? (
         <PilotListView
           paste={list}
-          characterId={characterId}
           onOpen={(characterId) => setParams({ pilot: characterId }, { push: true })}
         />
       ) : params.pilot === null ? (
@@ -229,112 +227,115 @@ function PilotSearch({
   const listOpen = open && shown.length > 0;
   const label = t('travel.pilot.searchLabel');
 
-  if (list !== null) {
-    // The one smart box, collapsed: the paste is a token, not a wall of text.
-    return (
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm text-text">
-          {list.kind === 'local'
-            ? t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })
-            : t('travel.pilot.list.tokenDscan', { count: list.typeIds.length })}
-        </span>
-        <Button type="button" onClick={() => onList(null)}>
-          {t('travel.pilot.list.clear')}
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      <div className="flex flex-wrap items-end gap-3">
-        <FilterField label={label} stretch={false}>
-          <div className="relative w-72 max-w-full">
-            <TextInput
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={listOpen}
-              aria-controls={listOpen ? listboxId : undefined}
-              aria-activedescendant={
-                listOpen && highlight !== null ? `${listboxId}-option-${highlight}` : undefined
-              }
-              aria-label={label}
-              placeholder={t('travel.pilot.searchPlaceholder')}
-              autoComplete="off"
-              value={query}
-              onChange={(e) => {
-                // Typing supersedes a lookup in flight, and another query's hits must not linger.
-                latestLookup.current++;
-                typing.current = true;
-                setQuery(e.target.value);
-                setSuggestions([]);
-                setOpen(true);
-                setHighlight(null);
-                setResolve({ kind: 'idle' });
-              }}
-              onFocus={() => setOpen(true)}
-              onBlur={() => {
-                typing.current = false;
-                setOpen(false);
-              }}
-              onPaste={(e) => {
-                const pasted = classifyPilotPaste(e.clipboardData.getData('text/plain'));
-                if (pasted === null) return;
-                e.preventDefault();
-                onList(pasted);
-              }}
-              onKeyDown={handleKeyDown}
-              className="w-full"
-            />
-            {listOpen && (
-              <ul
-                id={listboxId}
-                role="listbox"
-                aria-label={t('travel.pilot.suggestionsLabel')}
-                className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
-              >
-                {shown.map((pilot, i) => (
-                  <li
-                    key={pilot.characterId}
-                    id={`${listboxId}-option-${i}`}
-                    role="option"
-                    aria-selected={highlight === i}
-                    className={cx(
-                      'cursor-pointer px-3 py-1.5 text-xs text-text',
-                      'hover:bg-panel-2',
-                      highlight === i && 'bg-panel-2'
-                    )}
-                    onMouseEnter={() => setHighlight(i)}
-                    // Keeps the input focused — a plain click would blur it first and close the list.
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      choose(pilot);
-                    }}
-                  >
-                    {pilot.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </FilterField>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={trimmed === '' || resolve.kind === 'resolving'}
-        >
-          {t('travel.pilot.lookUp')}
-        </Button>
-      </div>
-      <p className="text-xs text-text-dim">
-        {canSuggest ? t('travel.pilot.searchHintSuggest') : t('travel.pilot.searchHintExact')}
-      </p>
-      <p role="status" aria-live="polite" className="text-xs">
-        {resolve.kind === 'resolving' && t('travel.pilot.resolving')}
-        {resolve.kind === 'not-found' && t('travel.pilot.notFound', { name: resolve.name })}
-        {resolve.kind === 'failed' && t('travel.pilot.resolveFailed')}
-      </p>
-    </form>
+    <div className="space-y-3">
+      {list !== null && (
+        // The paste collapsed to a token, not a wall of text. The search box stays
+        // below it, so one pilot can be looked up without clearing the list first.
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-text">
+            {list.kind === 'local'
+              ? t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })
+              : t('travel.pilot.list.tokenDscan', { count: list.typeIds.length })}
+          </span>
+          {list.kind === 'dscan' && (
+            <DscanShareControl paste={list} characterId={activeCharacterId} />
+          )}
+          <Button type="button" size="sm" onClick={() => onList(null)}>
+            {t('travel.pilot.list.clear')}
+          </Button>
+        </div>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <div className="flex flex-wrap items-end gap-3">
+          <FilterField label={label} stretch={false}>
+            <div className="relative w-72 max-w-full">
+              <TextInput
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={listOpen}
+                aria-controls={listOpen ? listboxId : undefined}
+                aria-activedescendant={
+                  listOpen && highlight !== null ? `${listboxId}-option-${highlight}` : undefined
+                }
+                aria-label={label}
+                placeholder={t('travel.pilot.searchPlaceholder')}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => {
+                  // Typing supersedes a lookup in flight, and another query's hits must not linger.
+                  latestLookup.current++;
+                  typing.current = true;
+                  setQuery(e.target.value);
+                  setSuggestions([]);
+                  setOpen(true);
+                  setHighlight(null);
+                  setResolve({ kind: 'idle' });
+                }}
+                onFocus={() => setOpen(true)}
+                onBlur={() => {
+                  typing.current = false;
+                  setOpen(false);
+                }}
+                onPaste={(e) => {
+                  const pasted = classifyPilotPaste(e.clipboardData.getData('text/plain'));
+                  if (pasted === null) return;
+                  e.preventDefault();
+                  onList(pasted);
+                }}
+                onKeyDown={handleKeyDown}
+                className="w-full"
+              />
+              {listOpen && (
+                <ul
+                  id={listboxId}
+                  role="listbox"
+                  aria-label={t('travel.pilot.suggestionsLabel')}
+                  className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
+                >
+                  {shown.map((pilot, i) => (
+                    <li
+                      key={pilot.characterId}
+                      id={`${listboxId}-option-${i}`}
+                      role="option"
+                      aria-selected={highlight === i}
+                      className={cx(
+                        'cursor-pointer px-3 py-1.5 text-xs text-text',
+                        'hover:bg-panel-2',
+                        highlight === i && 'bg-panel-2'
+                      )}
+                      onMouseEnter={() => setHighlight(i)}
+                      // Keeps the input focused — a plain click would blur it first and close the list.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        choose(pilot);
+                      }}
+                    >
+                      {pilot.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </FilterField>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={trimmed === '' || resolve.kind === 'resolving'}
+          >
+            {t('travel.pilot.lookUp')}
+          </Button>
+        </div>
+        <p className="text-xs text-text-dim">
+          {canSuggest ? t('travel.pilot.searchHintSuggest') : t('travel.pilot.searchHintExact')}
+        </p>
+        <p role="status" aria-live="polite" className="text-xs">
+          {resolve.kind === 'resolving' && t('travel.pilot.resolving')}
+          {resolve.kind === 'not-found' && t('travel.pilot.notFound', { name: resolve.name })}
+          {resolve.kind === 'failed' && t('travel.pilot.resolveFailed')}
+        </p>
+      </form>
+    </div>
   );
 }
 

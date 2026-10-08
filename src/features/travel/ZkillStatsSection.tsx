@@ -148,10 +148,12 @@ export function ZkillStatsSection({
   const s = stats.stats;
   const figures = killFigures(t, s);
   return (
-    <section aria-label={t('travel.pilot.statsLabel')} className="space-y-3">
+    // A flex column so a phone can lead with the figures (`order-first`) while the
+    // meters keep their place first from `md` up and the DOM order stays put.
+    <section aria-label={t('travel.pilot.statsLabel')} className="flex flex-col gap-3">
       <ZkillRatioMeters stats={s} />
       <StatTiles
-        className="md:grid-cols-6"
+        className="order-first md:order-none md:grid-cols-6"
         items={[
           figures.kills,
           figures.losses,
@@ -165,7 +167,9 @@ export function ZkillStatsSection({
           { label: t('travel.pilot.soloKills'), value: s.soloKills.toLocaleString() },
         ]}
       />
-      <ZkillStatsNote stats={stats} subject="pilot" />
+      <div className="order-first md:order-none">
+        <ZkillStatsNote stats={stats} subject="pilot" />
+      </div>
       {/* Half the modal's width on desktop: bars stretched across all of it
           make the spread between hulls harder to compare, not easier. */}
       {s.topShips.length > 0 && (

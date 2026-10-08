@@ -44,6 +44,9 @@ vi.mock('./pilotLookup', async (importOriginal) => ({
   loadPilotProfile: mocks.loadPilotProfile,
 }));
 
+// A pasted Local list's zKillboard lookups stay pending: these tests are about the strip and the box.
+vi.mock('./pilotListData', () => ({ loadPilotList: () => new Promise(() => undefined) }));
+
 import { PilotLookupPanel } from './PilotLookupPanel';
 
 const PROFILE = {
@@ -145,6 +148,30 @@ describe('PilotLookupPanel', () => {
     expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'some', expect.any(AbortSignal));
     fireEvent.mouseDown(option);
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    expect(probe.search).toBe('?pilot=42');
+  });
+
+  it('tells an empty page that a Local list or D-Scan can be pasted', () => {
+    renderTab();
+    expect(screen.getByText(/paste a Local list or a D-Scan/i)).toBeTruthy();
+  });
+
+  it('keeps the search box beside the list strip, so one pilot needs no Clear first', async () => {
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.paste(screen.getByRole('combobox', { name: 'Pilot' }), {
+      clipboardData: {
+        getData: () => ['Alpha One', 'Beta Two', 'Gamma Three'].join(String.fromCharCode(10)),
+      },
+    });
+    expect(await screen.findByText('3 names, Local list')).toBeTruthy();
+    const box = screen.getByRole('combobox', { name: 'Pilot' });
+
+    fireEvent.change(box, { target: { value: 'some pilot' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    expect(screen.queryByText('3 names, Local list')).toBeNull();
     expect(probe.search).toBe('?pilot=42');
   });
 

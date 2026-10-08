@@ -33,7 +33,7 @@ describe('Shared D-Scan', () => {
 
     const live = render(
       <MemoryRouter>
-        <PilotListView paste={sender} characterId={null} onOpen={() => undefined} />
+        <PilotListView paste={sender} onOpen={() => undefined} />
       </MemoryRouter>
     );
     await screen.findByText('Ragnarok');

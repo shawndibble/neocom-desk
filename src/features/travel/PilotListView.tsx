@@ -13,10 +13,10 @@ import {
   Button,
   DataTable,
   EmptyState,
-  IconButton,
   Panel,
   Spinner,
   TextInput,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -39,17 +39,14 @@ type DscanPaste = Extract<PilotPaste, { kind: 'dscan' }>;
 export function PilotListView({
   paste,
   onOpen,
-  characterId,
 }: {
   paste: PilotPaste;
   onOpen: (characterId: number) => void;
-  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
-  characterId: number | null;
 }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} onOpen={onOpen} />
   ) : (
-    <DscanClasses paste={paste} characterId={characterId} />
+    <DscanClasses paste={paste} />
   );
 }
 
@@ -93,25 +90,18 @@ function LocalList({
     {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
-      stickyStart: true,
       sortValue: (row) => row.name.toLowerCase(),
-      render: (row) => row.name,
-    },
-    {
-      id: 'corporation',
-      phoneHidden: true,
-      header: t('travel.pilot.list.corporation'),
-      sortValue: (row) => row.corporationName?.toLowerCase(),
-      render: (row) => row.corporationName ?? dash,
-      className: 'text-text-dim',
-    },
-    {
-      id: 'alliance',
-      phoneHidden: true,
-      header: t('travel.pilot.list.alliance'),
-      sortValue: (row) => row.allianceName?.toLowerCase(),
-      render: (row) => row.allianceName ?? dash,
-      className: 'text-text-dim',
+      // Corporation and Alliance are dropped on a phone; the corporation rides under the name instead.
+      render: (row) => (
+        <>
+          {row.name}
+          {row.corporationName && (
+            <span className="block truncate text-[0.6875rem] text-text-dim sm:hidden">
+              {row.corporationName}
+            </span>
+          )}
+        </>
+      ),
     },
     {
       id: 'danger',
@@ -127,6 +117,7 @@ function LocalList({
     },
     {
       id: 'gang',
+      phoneHidden: true,
       header: t('travel.pilot.list.gang'),
       align: 'right',
       className: 'tabular-nums',
@@ -142,6 +133,23 @@ function LocalList({
       className: 'tabular-nums',
       sortValue: (row) => (row.state.kind === 'stats' ? row.state.stats.kills : undefined),
       render: (row) => (row.state.kind === 'stats' ? row.state.stats.kills.toLocaleString() : dash),
+    },
+    // After the figures, so the numbers sit beside the name they belong to; the last column takes the slack.
+    {
+      id: 'corporation',
+      phoneHidden: true,
+      header: t('travel.pilot.list.corporation'),
+      sortValue: (row) => row.corporationName?.toLowerCase(),
+      render: (row) => row.corporationName ?? dash,
+      className: 'text-text-dim',
+    },
+    {
+      id: 'alliance',
+      phoneHidden: true,
+      header: t('travel.pilot.list.alliance'),
+      sortValue: (row) => row.allianceName?.toLowerCase(),
+      render: (row) => row.allianceName ?? dash,
+      className: 'text-text-dim',
     },
   ];
 
@@ -203,7 +211,27 @@ type ShareState =
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
 
-function DscanClasses({ paste, characterId }: { paste: DscanPaste; characterId: number | null }) {
+function DscanClasses({ paste }: { paste: DscanPaste }) {
+  return (
+    <Panel className="space-y-4">
+      <DscanSummaryView typeIds={paste.typeIds} />
+    </Panel>
+  );
+}
+
+/**
+ * "Copy Share Link" for a pasted D-Scan: a labelled action (DESIGN.md §6c)
+ * that sits in the status strip beside Clear. The stored-link field it may
+ * need when the clipboard refuses opens on a line of its own.
+ */
+export function DscanShareControl({
+  paste,
+  characterId,
+}: {
+  paste: DscanPaste;
+  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
+  characterId: number | null;
+}) {
   const { t } = useTranslation();
   const [share, setShare] = useState<ShareState>({ status: 'idle' });
   const [sharedPaste, setSharedPaste] = useState(paste);
@@ -250,55 +278,55 @@ function DscanClasses({ paste, characterId }: { paste: DscanPaste; characterId: 
     }
   }
 
+  const tooltip = tooLarge
+    ? t('travel.pilot.dscan.shareTooLarge', { max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString() })
+    : share.status === 'saving'
+      ? t('travel.pilot.dscan.shareSaving')
+      : share.status === 'failed'
+        ? t('travel.pilot.dscan.shareFailed')
+        : share.status === 'copied'
+          ? t('travel.pilot.dscan.shareCopied')
+          : undefined;
+  const button = (
+    <Button
+      size="sm"
+      disabled={
+        characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
+      }
+      onClick={() => void handleShare()}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+        {t('travel.pilot.dscan.share')}
+      </span>
+    </Button>
+  );
+
   return (
-    <Panel className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {share.status === 'manual' && (
-          <>
-            <label
-              htmlFor="pilot-dscan-share-url"
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-            >
-              {t('travel.pilot.dscan.shareReady')}
-            </label>
-            <TextInput
-              id="pilot-dscan-share-url"
-              size="sm"
-              readOnly
-              value={share.url}
-              onFocus={(event) => event.currentTarget.select()}
-              className="min-w-0 flex-1 font-mono"
-            />
-            <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
-              {t('travel.pilot.dscan.shareCopy')}
-            </Button>
-          </>
-        )}
-        <IconButton
-          size="sm"
-          icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-          label={t('travel.pilot.dscan.share')}
-          tooltip={
-            tooLarge
-              ? t('travel.pilot.dscan.shareTooLarge', {
-                  max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString(),
-                })
-              : share.status === 'saving'
-                ? t('travel.pilot.dscan.shareSaving')
-                : share.status === 'failed'
-                  ? t('travel.pilot.dscan.shareFailed')
-                  : share.status === 'copied'
-                    ? t('travel.pilot.dscan.shareCopied')
-                    : undefined
-          }
-          disabled={
-            characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
-          }
-          onClick={() => void handleShare()}
-        />
-      </div>
-      <DscanSummaryView typeIds={paste.typeIds} />
-    </Panel>
+    <>
+      {tooltip === undefined ? button : <Tooltip content={tooltip}>{button}</Tooltip>}
+      {share.status === 'manual' && (
+        <div className="flex w-full items-center gap-2">
+          <label
+            htmlFor="pilot-dscan-share-url"
+            className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
+            {t('travel.pilot.dscan.shareReady')}
+          </label>
+          <TextInput
+            id="pilot-dscan-share-url"
+            size="sm"
+            readOnly
+            value={share.url}
+            onFocus={(event) => event.currentTarget.select()}
+            className="min-w-0 flex-1 font-mono"
+          />
+          <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
+            {t('travel.pilot.dscan.shareCopy')}
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 
