@@ -486,11 +486,13 @@ describe('Market Browser', () => {
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
+    // The hub is one station, which the scope bar names: rows don't repeat it.
     expect(
-      within(sellTable).getByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
+      within(sellTable).queryByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
         exact: false,
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    expect(within(sellTable).queryByRole('columnheader', { name: /Location/ })).toBeNull();
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
     expect(within(buyTable).getByText('500,000')).toBeInTheDocument();
