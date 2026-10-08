@@ -246,7 +246,8 @@
         "killmail-not-found": "That killmail couldn't be found on zKillboard.",
         "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
-      "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link — reloading this page will lose it.",
+      "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link.",
+      "tooLargeToShareDraft": "A draft is kept on this device, so a reload brings it back until you open another Fitting.",
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
       "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}",

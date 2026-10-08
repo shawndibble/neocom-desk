@@ -16,6 +16,11 @@
  * or dropping the set is what switches it. The evaluation applies it.
  * `profile` itself (exposed to fit checks/candidates) always stays the
  * active Character's own.
+ *
+ * A Fitting too large for a link writes no `?f=`, so it is kept as a
+ * device-local draft (`fittingDraft.ts`, issue #2954): restored when the
+ * editor opens with no `?f=`, and cleared the moment any link-sized Fitting
+ * or a `?f=` takes over. A draft never overrides an explicit `?f=`.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -23,7 +28,7 @@ import { renameFittingById, resolveSaveTarget, saveFitting } from './myFittings'
 import { resolveCoalesce, resolveShareCodeChange } from './fittingShareSession';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
-import { FITTING_EDIT_PATH, fittingEditLocation } from './fittingRoutes';
+import { FITTING_EDIT_PATH, FITTINGS_PATH, fittingEditLocation } from './fittingRoutes';
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
@@ -31,6 +36,7 @@ import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fi
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { launchDrones, launchLimitsFrom } from '@/engine/fittings/fittingEdit';
 import { loadFittingFromText } from './loadFittingFromText';
+import { clearFittingDraft, readFittingDraft, writeFittingDraft } from './fittingDraft';
 import { defaultImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import type {
   Fitting,
@@ -193,6 +199,10 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [lastLoad, setLastLoad] = useState<LoadOutcome | null>(null);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const tooLargeRef = useRef(false);
+  useLayoutEffect(() => {
+    tooLargeRef.current = tooLargeToShare;
+  });
 
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
@@ -202,7 +212,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   // Fitting it wrote, so the effect shows that object as-is instead of
   // decoding its own write back into an identical copy (which would
   // recalculate stats twice per click).
-  const ownWriteRef = useRef<{ code: string; fitting: Fitting | null } | null>(null);
+  const ownWriteRef = useRef<{ code: string | null; fitting: Fitting | null } | null>(null);
   // A saved Fitting being opened: the decode effect names the Fitting after
   // it (the share code carries no name) and keeps `savedId` for it.
   const savingRef = useRef(false);
@@ -255,15 +265,32 @@ export function useFittingWorkspace(): FittingWorkspace {
       // pushes rather than overwriting the entry just navigated to.
       lastWriteRef.current = null;
     }
+    if (shareCode !== null) void clearFittingDraft();
+    if (shareCode === null && adopted !== null) {
+      // An oversized Fitting that left a stale `?f=` (see `leaveShareCode`): already on screen.
+      latestFittingRef.current = adopted;
+      setShareError(null);
+      setFitting(adopted);
+      return;
+    }
     if (shareCode === null) {
       latestFittingRef.current = null;
       // Synchronous, not a subscription, so the rule's usual "derive during
       // render instead" advice doesn't apply; matches the house pattern in
       // features/industry/useOpportunities.ts.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       setFitting(null);
       setShareError(null);
-      return;
+      // An oversized Fitting that was open comes back, unless something opened first.
+      void readFittingDraft().then((draft) => {
+        if (cancelled || draft === null || latestFittingRef.current !== null) return;
+        latestFittingRef.current = draft;
+        setTooLargeToShare(true);
+        setFitting(draft);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     if (adopted !== null) {
       latestFittingRef.current = adopted;
@@ -302,6 +329,18 @@ export function useFittingWorkspace(): FittingWorkspace {
     };
   }, [shareCode]);
 
+  // An oversized Fitting beside a `?f=` (the Fitting it grew from) would lose
+  // to that stale code on reload, so the URL leaves the editor for the bare
+  // library path; the Fitting stays open and its draft comes back from there.
+  const leaveShareCode = useCallback(
+    (oversized: Fitting) => {
+      if (new URLSearchParams(locationRef.current.search).get('f') === null) return;
+      ownWriteRef.current = { code: null, fitting: oversized };
+      void navigate(FITTINGS_PATH);
+    },
+    [navigate]
+  );
+
   // Shared tail for "a Fitting is now open, whether it arrived by Load, by
   // In-game Fittings, or by URL": re-encodes it as a Fitting Share Code and writes
   // `?f=`, or — too large to link — keeps it open locally, same as a
@@ -326,6 +365,10 @@ export function useFittingWorkspace(): FittingWorkspace {
               { fitting: current, writeUrl: true }
             : { code: encoded.payload };
       if (launch) setLaunchRequest((n) => n + 1);
+      if (!encoded.ok) {
+        void writeFittingDraft(loaded);
+        leaveShareCode(loaded);
+      } else void clearFittingDraft();
       if (encoded.ok) {
         // The decode effect above picks this up and sets `fitting`. Only
         // actually flags "mine" when the code is really changing: an
@@ -341,7 +384,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         setFitting(loaded);
       }
     },
-    [shareCode, setShareCode]
+    [shareCode, setShareCode, leaveShareCode]
   );
 
   const loadFromInput = useCallback(
@@ -396,7 +439,11 @@ export function useFittingWorkspace(): FittingWorkspace {
       const next = change(current);
       latestFittingRef.current = next;
       setFitting(next);
-      if (history === 'none') return;
+      if (history === 'none') {
+        // A rename or launch on an oversized Fitting must reach its draft too.
+        if (tooLargeRef.current) void writeFittingDraft(next);
+        return;
+      }
 
       const seq = ++editSeqRef.current;
       void (async () => {
@@ -406,7 +453,12 @@ export function useFittingWorkspace(): FittingWorkspace {
         // Too large for a link: stays open locally, as a too-large paste does,
         // until an edit brings it back under the limit.
         setTooLargeToShare(!encoded.ok);
-        if (!encoded.ok) return;
+        if (!encoded.ok) {
+          void writeFittingDraft(next);
+          leaveShareCode(next);
+          return;
+        }
+        void clearFittingDraft();
         // See resolveCoalesce's own doc for why this is judged against the
         // last edit that actually wrote, not the last one asked for.
         const { coalesce, next: nextRun } = resolveCoalesce(
@@ -420,7 +472,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         setShareCode(encoded.payload, { push: !coalesce && history === 'push' });
       })();
     },
-    [setShareCode]
+    [setShareCode, leaveShareCode]
   );
   const edit = useCallback(
     (change: FittingChange, coalesceKey?: string) => applyEdit(change, { coalesceKey }),
@@ -495,6 +547,8 @@ export function useFittingWorkspace(): FittingWorkspace {
   const openSaved = useCallback(
     (record: { id: string; name: string; code: string }) => {
       pendingOpenRef.current = { code: record.code, name: record.name };
+      editSeqRef.current++;
+      void clearFittingDraft();
       setSavedId(record.id);
       setLastLoad(null);
       setTooLargeToShare(false);
