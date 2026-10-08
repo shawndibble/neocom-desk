@@ -69,7 +69,7 @@ test('Journal "Transactions →" link rests in the accent colour at 1440px', asy
 
 /**
  * Journal on a phone: a ledger read across columns, so a plain table
- * (DESIGN.md §6c Restraint) with Description and Balance shed (`phoneHidden`)
+ * (DESIGN.md §6c Restraint) with Description and Balance off by default (`phoneOffByDefault`)
  * and the header sort buttons still on screen.
  */
 test.describe('Journal phone table', () => {

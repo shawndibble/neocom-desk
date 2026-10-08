@@ -77,7 +77,6 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'description',
         header: t('wallet.description'),
-        phoneHidden: true,
         render: (entry) => {
           const transaction = linkFor(entry);
           return (
@@ -104,7 +103,6 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'balance',
         header: t('wallet.balanceCol'),
-        phoneHidden: true,
         align: 'right',
         className: 'tabular-nums text-text-dim',
         render: (entry) =>

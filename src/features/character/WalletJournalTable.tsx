@@ -39,6 +39,7 @@ import { clampIskZero } from '@/lib/isk';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
+  WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT,
   type WalletJournalColumnId,
 } from './walletJournalColumns';
 
@@ -152,7 +153,8 @@ export function JournalTable({
   // One store for both journals, so hiding a column on one hides it on the other.
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleWalletJournalColumns,
-    WALLET_JOURNAL_COLUMN_IDS
+    WALLET_JOURNAL_COLUMN_IDS,
+    WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT
   );
   const columnsById = useMemo(
     () =>

@@ -98,6 +98,11 @@ export interface DataTableColumn<T> {
    * phone sheds its low-value columns this way instead of stacking into
    * cards. Ignored in the stacked card layout, where every cell is a labelled
    * row. The column still sorts and exports.
+   *
+   * Only for a table with no Columns menu: a pilot can't tick back a column
+   * that has no control to point at. A table with a Columns menu does not set
+   * this; it lists the columns that start unticked on a phone in
+   * `useColumnVisibility`'s `phoneOffByDefault`, so the menu stays truthful.
    */
   phoneHidden?: boolean;
   render: (row: T) => ReactNode;

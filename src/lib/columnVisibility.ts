@@ -9,7 +9,8 @@
  * Leave the table's identity column (item name, character name) out of `ids`:
  * a table that can lose the column naming its rows has lost its rows.
  */
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useIsPhone } from './useIsPhone';
 import { createLocalSetting, type LocalSettingStore } from './useLocalSetting';
 
 export interface ColumnVisibilityOptions<Id extends string> {
@@ -53,13 +54,27 @@ export interface ColumnVisibility<Id extends string> {
 /**
  * Hydrates the store on mount and hands back what `ColumnPickerMenu` and the
  * table's column filter need. `defaultVisible` is what `reset` restores — the
- * same list given to `createColumnVisibilitySetting`.
+ * same list given to `createColumnVisibilitySetting` (the same array: "nothing
+ * stored yet" is recognised by the store still holding that reference).
+ *
+ * `phoneOffByDefault` names columns that start unticked on a phone with no
+ * stored selection — the compact default a wide table used to get from
+ * `phoneHidden`. They are only a default: ticking one shows it, and a stored
+ * selection is read exactly as saved at every width.
  */
 export function useColumnVisibility<Id extends string>(
   store: LocalSettingStore<readonly Id[]>,
-  defaultVisible: readonly Id[]
+  defaultVisible: readonly Id[],
+  phoneOffByDefault: readonly Id[] = []
 ): ColumnVisibility<Id> {
-  const visible = store((state) => state.value);
+  const stored = store((state) => state.value);
+  const isPhone = useIsPhone();
+  const phoneDefault = useMemo(
+    () => defaultVisible.filter((id) => !phoneOffByDefault.includes(id)),
+    [defaultVisible, phoneOffByDefault]
+  );
+  const resetTo = isPhone ? phoneDefault : defaultVisible;
+  const visible = isPhone && stored === defaultVisible ? phoneDefault : stored;
   const setValue = store((state) => state.setValue);
   const hydrate = store((state) => state.hydrate);
 
@@ -77,8 +92,8 @@ export function useColumnVisibility<Id extends string>(
     [visible, setValue]
   );
   const reset = useCallback(() => {
-    void setValue(defaultVisible);
-  }, [defaultVisible, setValue]);
+    void setValue(resetTo);
+  }, [resetTo, setValue]);
 
   return { visible, isVisible, toggle, reset };
 }
