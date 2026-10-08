@@ -97,6 +97,8 @@ function PilotSearch({
   const typing = useRef(false);
 
   useEffect(() => {
+    // The pilot left the URL: coming back to it must seed again, even over edited text.
+    if (resolved === null) seededId.current = null;
     const seed = searchBoxSeed({
       resolved,
       seededId: seededId.current,
