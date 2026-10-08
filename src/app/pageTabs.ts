@@ -23,6 +23,7 @@ import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'character', labelKey: 'contacts.tabThisCharacter' },
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
+  { id: 'standings', labelKey: 'contacts.tabStandings' },
 ]);
 
 /** Travel (issue #2328), with Thera/Turnur (#2330). Pilot Lookup is its own page now. */
