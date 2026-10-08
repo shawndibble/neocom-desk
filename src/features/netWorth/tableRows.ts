@@ -17,7 +17,7 @@ export interface NetWorthTableRow {
   needsReauth: boolean;
 }
 
-const EMPTY_LAYERS: LayerValues = { isk: 0, assets: 0, plex: 0, escrow: 0, sellOrders: 0 };
+const EMPTY_LAYERS: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
 
 export function buildTableRows(input: {
   characters: readonly { characterId: number; name: string }[];

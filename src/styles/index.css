@@ -209,6 +209,64 @@
   }
 
   /*
+   * Edge fade: a bar that overflows fades out at whichever end still has
+   * tabs beyond it (right at rest, left once scrolled, both mid-way), so a
+   * tab cut off at the edge reads as "swipe for more" and not as a clipped
+   * label. Driven by the scroller's own scroll position, so a bar that fits
+   * keeps both fades at their 0 initial value and is untouched. Browsers
+   * without scroll-driven animations just get the cut-off tab.
+   */
+  @property --tab-fade-l {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --tab-fade-r {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @keyframes tab-fade-left {
+    0% {
+      --tab-fade-l: 0px;
+    }
+    4%,
+    100% {
+      --tab-fade-l: 1.5rem;
+    }
+  }
+
+  @keyframes tab-fade-right {
+    0%,
+    96% {
+      --tab-fade-r: 1.5rem;
+    }
+    100% {
+      --tab-fade-r: 0px;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .tab-scroller {
+      /* A tab scrolled into view stops clear of the fade, not under it. */
+      scroll-padding-inline: 1.5rem;
+      animation:
+        tab-fade-left linear both,
+        tab-fade-right linear both;
+      animation-timeline: scroll(self inline);
+      mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 var(--tab-fade-l),
+        #000 calc(100% - var(--tab-fade-r)),
+        transparent
+      );
+    }
+  }
+
+  /*
    * Responsive collapse for `DataTable` (docs/DESIGN.md §4).
    *
    * Below `sm` a dense table cannot be a table: measured on a 390px viewport,

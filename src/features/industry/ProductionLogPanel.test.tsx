@@ -315,6 +315,21 @@ describe('ProductionLogPanel', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the tables outside the totals grid, so no-chart totals never sit beside an empty column', async () => {
+    await addRun({ id: 'run-1' });
+    await addRun({ id: 'run-2' });
+
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: Wrapper }
+    );
+
+    const table = await runsTable();
+    const totalsGrid = screen.getByText('Total realized profit').closest('.grid');
+    expect(totalsGrid).not.toBeNull();
+    expect(totalsGrid).not.toContainElement(table);
+  });
+
   it('shows a profit-history chart once runs span at least two distinct days, and hides it again once the date filter narrows to one day', async () => {
     const old = Date.parse('2026-01-01T00:00:00Z');
     const recent = Date.parse('2026-08-15T00:00:00Z');
@@ -409,7 +424,7 @@ describe('ProductionLogPanel', () => {
     await runsTable();
 
     await user.click(await screen.findByRole('button', { name: 'More sale options' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete production run' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete production run…' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 

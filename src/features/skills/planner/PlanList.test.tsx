@@ -33,7 +33,7 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       />
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       />
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');

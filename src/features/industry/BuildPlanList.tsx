@@ -459,7 +459,7 @@ function PlanRow({
       <MenuItem onSelect={() => onDuplicate(plan.id)}>{t('industry.duplicate')}</MenuItem>
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => onDelete(plan.id)}>
-        {t('industry.delete')}
+        {t('industry.deleteMenu')}
       </MenuItem>
     </>
   );
@@ -648,7 +648,7 @@ function GroupHeader({
     <>
       <MenuItem onSelect={startRename}>{t('industry.rename')}</MenuItem>
       <MenuItem className="text-danger" onSelect={onDelete}>
-        {t('industry.deleteGroup')}
+        {t('industry.deleteGroupMenu')}
       </MenuItem>
     </>
   );

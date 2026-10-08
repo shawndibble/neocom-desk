@@ -9,7 +9,6 @@ import type { LayerId } from '@/engine/netWorth/series';
 export const LAYER_LABEL_KEYS: Record<LayerId, string> = {
   isk: 'wallet.netWorth.layers.isk',
   assets: 'wallet.netWorth.layers.assets',
-  plex: 'wallet.netWorth.layers.plex',
   escrow: 'wallet.netWorth.layers.escrow',
   sellOrders: 'wallet.netWorth.layers.sellOrders',
 };
@@ -17,7 +16,6 @@ export const LAYER_LABEL_KEYS: Record<LayerId, string> = {
 export const LAYER_COLOR: Record<LayerId, string> = {
   isk: 'var(--color-kind-planet-extraction)',
   assets: 'var(--color-kind-calendar-event)',
-  plex: 'var(--color-kind-industry-job)',
   escrow: 'var(--color-kind-skill-training)',
   sellOrders: 'var(--color-kind-skill-plan)',
 };
@@ -25,18 +23,8 @@ export const LAYER_COLOR: Record<LayerId, string> = {
 export const LAYER_SWATCH: Record<LayerId, string> = {
   isk: 'bg-kind-planet-extraction',
   assets: 'bg-kind-calendar-event',
-  plex: 'bg-kind-industry-job',
   escrow: 'bg-kind-skill-training',
   sellOrders: 'bg-kind-skill-plan',
-};
-
-/** Where each layer drill-down link lands (the "Opens" column). */
-export const LAYER_LINKS: Record<LayerId, string> = {
-  isk: '/wallet/journal',
-  assets: '/assets',
-  plex: '/assets?q=PLEX',
-  escrow: '/market/orders',
-  sellOrders: '/market/orders',
 };
 
 /** Character line hues, cycled; a repeat gets a dash pattern so hue is never the only cue. */

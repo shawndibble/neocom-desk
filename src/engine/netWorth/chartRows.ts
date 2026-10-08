@@ -20,7 +20,7 @@ export interface StackRow {
   total: number;
 }
 
-const ZERO: LayerValues = { isk: 0, assets: 0, plex: 0, escrow: 0, sellOrders: 0 };
+const ZERO: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
 
 /** Only the wallet exists off a snapshot day; the other layers are drawn as a hatched band, not a value. */
 export function stackRows(series: CharacterSeries, shown: readonly LayerId[]): StackRow[] {

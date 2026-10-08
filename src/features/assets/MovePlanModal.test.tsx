@@ -106,4 +106,27 @@ describe('MovePlanModal', () => {
     expect(screen.getByRole('button', { name: 'Choose destination…' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
+
+  it('folds a pickup group and keeps its picks, and selects a whole Character at once', async () => {
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything for alice/i }));
+    expect(screen.getByText('3 stacks picked')).toBeTruthy();
+
+    const amarr = screen.getByRole('button', { name: /amarr viii/i });
+    expect(amarr.getAttribute('aria-expanded')).toBe('true');
+    await user.click(amarr);
+    expect(amarr.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Pyerite')).toBeNull();
+    expect(screen.getByText('3 stacks picked')).toBeTruthy();
+  });
+
+  it('keeps Show plan disabled until there is a destination and a pick', async () => {
+    const user = await open();
+    const show = screen.getByRole('button', { name: 'Show plan' });
+    expect((show as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getByRole('checkbox', { name: /select everything at jita 4-4/i }));
+    expect((show as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    expect((show as HTMLButtonElement).disabled).toBe(false);
+  });
 });

@@ -857,7 +857,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   storage: a marker is an entry-list _position_, while a milestone means "when
   these skills are done, wherever they end up."
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
-- **Dismissed delivery**: A delivered manufacturing or reaction job in Active Jobs' History that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
+- **Dismissed delivery**: A delivered manufacturing or reaction job in the Jobs panel's History segment that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,
   regardless of which Build Plan it came from, grouped by item. Distinct
@@ -1125,7 +1125,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   on it. The four System Labels are the Mail page's folder filter: a
   multi-select toggle group, so any subset of them can be shown at once (see
   `docs/context/decisions/`, 2026-09-07).
-- **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX removed), hangar PLEX and buy-order escrow on one UTC day — numbers only, kept forever, synced as Editable Data, written once a day by the Tab Leader (`src/engine/netWorth/snapshot.ts`). A day the app was not opened has no row and is never interpolated.
+- **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX removed and never counted: the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day — numbers only, kept forever, synced as Editable Data, written once a day by the Tab Leader (`src/engine/netWorth/snapshot.ts`). A day the app was not opened has no row and is never interpolated.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work — the **Foreground Poller**, the background sync sweep; each job elects its own — so several open tabs do it once, not once each. Always a visible tab: leadership is a Web Lock requested on becoming visible and given up on becoming hidden, so with every tab hidden nobody leads. Where the browser lacks Web Locks every tab is its own leader. Cache prefetch is not elected; it warms the tab it runs in (`src/lib/tabLeader.ts`).
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Throughput** (planetary): a **second budget, independent of the Pin

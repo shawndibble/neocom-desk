@@ -265,7 +265,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold…' });
 
-    await chooseSoldMenuItem(user, 'Delete production run');
+    await chooseSoldMenuItem(user, 'Delete production run…');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
@@ -282,7 +282,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold…' });
 
-    await chooseSoldMenuItem(user, 'Delete production run');
+    await chooseSoldMenuItem(user, 'Delete production run…');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
@@ -565,7 +565,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
     await screen.findByText('2 lost');
 
-    await chooseSoldMenuItem(user, 'Remove loss');
+    await chooseSoldMenuItem(user, 'Remove loss…');
     const dialog = await screen.findByRole('dialog', { name: 'Remove loss' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove loss' }));
 

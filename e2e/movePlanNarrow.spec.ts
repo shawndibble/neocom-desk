@@ -49,10 +49,11 @@ test('Plan a move sheet fits a phone and keeps its actions reachable', async ({ 
   const sheetFitsWidth = await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth);
   expect(sheetFitsWidth).toBe(true);
 
-  // Cancel is reachable without leaving the sheet.
+  // The destination and the action bar are on screen without scrolling.
+  await expect(dialog.getByRole('button', { name: 'Pick a system' })).toBeInViewport();
   const cancel = dialog.getByRole('button', { name: 'Cancel' });
-  await cancel.scrollIntoViewIfNeeded();
   await expect(cancel).toBeInViewport();
+  await expect(dialog.getByRole('button', { name: 'Show plan' })).toBeInViewport();
   await cancel.click();
   await expect(dialog).toBeHidden();
 });
