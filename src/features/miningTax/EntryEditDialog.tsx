@@ -301,7 +301,7 @@ export function EntryEditDialog({
                   aria-label={t('miningTax.entryEdit.dayValueLabel', {
                     date: singleDayValue.date,
                   })}
-                  className="[&_input]:pr-7"
+                  className="[&_input]:pr-7 [&_input]:font-semibold [&_input]:placeholder:text-text"
                   value={dayOverrides[singleDayValue.id] ?? ''}
                   defaultAmount={Math.round(singleDayValue.estimatedValue)}
                   onChange={(value) =>
