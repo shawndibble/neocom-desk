@@ -88,7 +88,7 @@ Layout (`THREE_COLUMN_QUERY` 100rem):
 
 ### Ring / List
 
-- Ring (`FittingRing.tsx`, `engine/fittings/ringLayout.ts`): slot tiles by rack (high, medium, low, rig, subsystem), cargo tiles, CPU / powergrid / calibration / drone bandwidth gauges with over-by state, hardpoint counters (turret/launcher, over-hull warning), rack count and "N can't use" (missing skills) badges, drone count "x of y launched". Empty-slot click opens Add targeted at that slot. Keyboard-operable tiles.
+- Ring (`FittingRing.tsx`, `engine/fittings/ringLayout.ts`): slot tiles by rack (high, medium, low, rig, subsystem), cargo tiles, CPU / powergrid / calibration / drone bandwidth gauges with over-by state, hardpoint counters (turret/launcher, over-hull warning), rack count and "N can't use" (missing skills) badges, drone count "x of y launched". Empty-slot click opens Add targeted at that slot. A click on a fitted module steps its state (`nextModuleState`: offline, online, active, overload, skipping what it cannot reach, wrapping to offline; a subsystem does not cycle); Enter/Space still select, `S` cycles from the keyboard, a long-press or drag never cycles, and Back undoes it. Keyboard-operable tiles.
 - List (`FittingRackList.tsx`, `FittingModuleList.tsx`): same racks as rows with resource meters, state control, charge, remove, drag-to-move, variations; drones section (bay, launch squares, quantity); cargo section with hold m3.
 - Ring/List toggle persisted as setting `fittingsView` (`fittingViewPreference.ts`).
 - Drag and drop (pointer only; `fittingDrag.ts`): browser item onto slot/rack, module onto another slot, drone onto Drones to launch, charge onto module. Touch long-press is the row menu instead.

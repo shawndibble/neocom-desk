@@ -61,6 +61,9 @@ export function ShortcutsPanel() {
           <Row label={t('shortcuts.saveFittingAsNew')}>
             <kbd className={KBD}>{modChordDisplayKey(apple, 'S', { shift: true })}</kbd>
           </Row>
+          <Row label={t('shortcuts.cycleModuleState')}>
+            <kbd className={KBD}>S</kbd>
+          </Row>
           <Row label={t('shortcuts.submitPaste')}>
             <kbd className={KBD}>{modChordDisplayKey(apple, 'Enter')}</kbd>
           </Row>
