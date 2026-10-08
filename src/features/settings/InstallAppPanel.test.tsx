@@ -7,6 +7,8 @@ import { InstallAppPanel } from './InstallAppPanel';
 
 const iosSafariUA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+const androidUA =
+  'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36';
 const desktopUA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
 
@@ -28,12 +30,19 @@ describe('InstallAppPanel', () => {
     expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
   });
 
+  it('renders nothing on desktop', () => {
+    const { container } = render(<InstallAppPanel />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('falls back to a browser-menu pointer when no prompt was captured', () => {
+    setUserAgent(androidUA);
     render(<InstallAppPanel />);
     expect(screen.getByText(/browser's menu/)).toBeInTheDocument();
   });
 
   it('offers the captured native prompt', async () => {
+    setUserAgent(androidUA);
     const prompt = vi.fn().mockResolvedValue(undefined);
     useInstallApp.setState({
       deferredPrompt: {
@@ -48,6 +57,7 @@ describe('InstallAppPanel', () => {
   });
 
   it('says so when already installed', () => {
+    setUserAgent(androidUA);
     window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
     render(<InstallAppPanel />);
     expect(screen.getByText(/is installed on this device/)).toBeInTheDocument();

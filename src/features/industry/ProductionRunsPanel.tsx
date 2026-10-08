@@ -33,6 +33,8 @@ import {
 } from './productionRunColumns';
 import { validateProductionRunInput, type ProductionRunInput } from './productionRunInput';
 import { SaleLinkingModals } from './SaleLinkingControls';
+import { RunLossModals } from './RunLossModals';
+import { useRunLoss } from './useRunLoss';
 import { useSaleLinking } from './useSaleLinking';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -134,11 +136,17 @@ export function ProductionRunsPanel({
       () => db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
       [characterId]
     ) ?? [];
+  const losses =
+    useLiveQuery(
+      () => db.productionLosses.where('characterId').equals(characterId).toArray(),
+      [characterId]
+    ) ?? [];
 
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
+  const runLoss = useRunLoss(characterId, losses);
 
   const rows: ProductionRunSummary[] = runs.map((run) =>
-    summarizeProductionRun(run, saleLinks, orderWatches, skills, standing)
+    summarizeProductionRun(run, saleLinks, orderWatches, skills, standing, losses)
   );
 
   const editingRow = editingRunId ? rows.find((r) => r.run.id === editingRunId) : undefined;
@@ -232,7 +240,7 @@ export function ProductionRunsPanel({
     realizedProfitColumn(t, skills, () => standing),
     quantitySoldColumn(t),
     statusColumn(t),
-    soldActionsColumn(sale),
+    soldActionsColumn(sale, runLoss),
   ];
 
   return (
@@ -373,6 +381,7 @@ export function ProductionRunsPanel({
       </Modal>
 
       <SaleLinkingModals sale={sale} />
+      <RunLossModals loss={runLoss} />
     </>
   );
 }

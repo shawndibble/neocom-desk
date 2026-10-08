@@ -204,7 +204,7 @@ Table order: Character (only if shown), Date (range for combined), System, Payee
 
 ## Reconciling with the corp's numbers
 
-App reads only the Character's own ledger; corp observer data (moon id, timestamps) needs the Accountant role, which a renter lacks. No corp-figure import and no moon-level view exist. Likely causes of a mismatch and the fix for each:
+An assigned row's detail has a "How this was priced" card (per-ore unit price, price tier, hub, ore form, tax %) with **Copy as text** to paste to the landlord (#2832); unit prices are re-read for the mined date, the total is the frozen bill. App reads only the Character's own ledger; corp observer data (moon id, timestamps) needs the Accountant role, which a renter lacks. No corp-figure import and no moon-level view exist. Likely causes of a mismatch and the fix for each:
 
 | Cause                          | Check                                                                                                                  | Fix                                                                                                                                                                      |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -25,8 +25,3 @@ export function appraisalSellListText(items: readonly AppraisalItem[]): string {
     .filter((line): line is string => line !== null)
     .join('\n');
 }
-
-/** The copy control gates on this rather than `items.length` — a pile priced entirely via LP or refine, with nobody selling, has rows to show but nothing to list. */
-export function hasAppraisalSellList(items: readonly AppraisalItem[]): boolean {
-  return items.some((item) => appraisalUndercut(item) !== null);
-}

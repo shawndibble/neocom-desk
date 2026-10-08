@@ -135,21 +135,26 @@ export function TableActionsMenu<T>({
   tableExport,
   children,
   size = 'sm',
+  label: labelOverride,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
   tableExport: TableExport<T>;
   children?: ReactNode;
   size?: 'sm' | 'md';
+  /** Replaces the default "<name> actions" button name when the menu is a page's named tools menu. */
+  label?: string;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const exportOnly = !children;
-  const label = exportOnly
-    ? t('common.tableExport.exportButtonLabel', { name })
-    : t('common.tableExport.menuLabel', { name });
+  const label =
+    labelOverride ??
+    (exportOnly
+      ? t('common.tableExport.exportButtonLabel', { name })
+      : t('common.tableExport.menuLabel', { name }));
   // An `md` button sits in a toolbar beside other md controls (a column
   // picker), whose glyphs are md too.
   const iconSize = size === 'md' ? Icon.ICON_SIZE.md : Icon.ICON_SIZE.sm;
