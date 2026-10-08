@@ -7,6 +7,8 @@ interface CollapsiblePanelProps {
   title: string;
   /** The one-line read shown beside the title whether open or closed. */
   meta?: ReactNode;
+  /** Passed to `Panel`: on a phone `meta` drops to its own line under the title. */
+  wrapMeta?: boolean;
   /** Header controls other than the caret; always visible. */
   actions?: ReactNode;
   expanded: boolean;
@@ -51,6 +53,7 @@ interface CollapsiblePanelProps {
 export function CollapsiblePanel({
   title,
   meta,
+  wrapMeta,
   actions,
   expanded,
   onToggle,
@@ -66,6 +69,7 @@ export function CollapsiblePanel({
     <Panel
       title={title}
       meta={meta}
+      wrapMeta={wrapMeta}
       className={className}
       padded={padded}
       actions={
