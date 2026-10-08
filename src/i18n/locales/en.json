@@ -8625,7 +8625,23 @@
         "noFit": "This victim wasn't in a ship that can be fitted.",
         "emptyFit": "Nothing was fitted.",
         "openInFittings": "Open in Fittings",
-        "openFailed": "This fit couldn't be opened in Fittings."
+        "openFailed": "This fit couldn't be opened in Fittings.",
+        "lossSummary": {
+          "title": "Loss summary",
+          "heading": "What it cost, {{hub}} sell",
+          "loading": "Pricing the loss…",
+          "hull": "Hull",
+          "fitted": "Fitted modules",
+          "cargo": "Cargo",
+          "lost": "Lost",
+          "insurance": "Insurance (from your Wallet Journal)",
+          "insuranceEstimate": "Insurance (estimate)",
+          "net": "Net loss",
+          "dropped": "Of which {{value}} dropped as loot.",
+          "unpriced_one": "{{count}} item has no sell price here and counts as zero.",
+          "unpriced_other": "{{count}} items have no sell price here and count as zero.",
+          "zkb": "zKillboard valued it at {{value}} when it died."
+        }
       }
     },
     "preferenceLabel": "Route",
