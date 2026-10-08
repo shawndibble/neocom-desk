@@ -50,6 +50,11 @@ describe('scope tree selection', () => {
     expect(stationState(toggleStation(whole, station), station)).toBe('empty');
   });
 
+  it('clicking a partial station completes it to the whole station', () => {
+    const partial = toggleHangar(undefined, station, 3);
+    expect(stationState(toggleStation(partial, station), station)).toBe('checked');
+  });
+
   it('a hangar alone makes the station partial and counts only that hangar', () => {
     const scope = toggleHangar(undefined, station, 3);
     expect(stationState(scope, station)).toBe('partial');

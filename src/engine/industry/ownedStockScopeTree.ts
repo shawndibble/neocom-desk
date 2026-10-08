@@ -149,14 +149,14 @@ function build(
   };
 }
 
-/** Checked or partial → cleared; empty → the whole station, everything under it. */
+/** Checked → cleared; partial or empty → the whole station, everything under it. */
 export function toggleStation(
   scope: OwnedStockScope | undefined,
   station: ScopeTreeStation
 ): SelectedScope {
   const s = asSelected(scope);
   const cleared = withoutStation(s, station);
-  if (stationState(s, station) !== 'empty') return cleared;
+  if (stationState(s, station) === 'checked') return cleared;
   return { ...cleared, locations: [...cleared.locations, station.location] };
 }
 

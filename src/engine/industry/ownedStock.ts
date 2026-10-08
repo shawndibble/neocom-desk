@@ -268,7 +268,9 @@ function resolvePlacement(
   let current = asset;
   const seen = new Set<number>([asset.item_id]);
   const done = (locationId: number, locationType: EngineAsset['location_type']) => {
-    const containerHangar = directParent ? corpHangarOf(directParent.location_flag) : undefined;
+    // A container nested in another container carries no division flag of its own; the chain's does.
+    const containerHangar =
+      hangar ?? (directParent ? corpHangarOf(directParent.location_flag) : undefined);
     const container =
       directParent && parentIsContainer
         ? {

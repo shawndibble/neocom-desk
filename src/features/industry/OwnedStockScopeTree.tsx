@@ -10,6 +10,7 @@ import {
   toggleContainer,
   toggleHangar,
   toggleStation,
+  type ScopeCheckState,
   type ScopeTreeStation,
 } from '@/engine/industry/ownedStockScopeTree';
 
@@ -26,7 +27,7 @@ function TriCheckbox({
   label,
   onToggle,
 }: {
-  state: 'checked' | 'partial' | 'empty';
+  state: ScopeCheckState;
   label: string;
   onToggle: () => void;
 }) {
