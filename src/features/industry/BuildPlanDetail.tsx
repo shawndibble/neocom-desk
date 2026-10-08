@@ -124,6 +124,8 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
+import { useNearestLowsecSystem } from './useNearestLowsecSystem';
+import { planReactionLocation } from './planReactionLocation';
 import { PlanSlotLine } from './PlanSlotLine';
 import { categoryForActivity } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -470,6 +472,53 @@ export function BuildPlanDetail({
     plan.reactionSecurity ?? 'highsec',
     (security) => onChange({ kind: 'derived', patch: { reactionSecurity: security } })
   );
+
+  // Reactions cannot run in highsec (issue #2908). The warning follows the
+  // place reactions are planned: the Reaction Location when Include Reactions
+  // is on, or the plan's own Build Location for a reaction-activity plan. An
+  // unchosen location is "not set", never highsec — its stored band is only a
+  // pricing default.
+  const reactionPlace = planReactionLocation(plan, activity);
+  const reactionsInHighsec = reactionPlace?.state === 'highsec';
+  const nearestLowsec = useNearestLowsecSystem(
+    plan.characterId,
+    reactionPlace?.system?.id ?? null,
+    reactionsInHighsec
+  );
+  const moveReactionsTo = (system: { id: number; name: string }) =>
+    update(
+      activity === 'reaction'
+        ? {
+            buildSystemId: system.id,
+            buildSystemName: system.name,
+            ...clearedBuildLocation,
+            security: 'lowsec',
+          }
+        : {
+            reactionBuildSystemId: system.id,
+            reactionBuildSystemName: system.name,
+            ...clearedReactionBuildLocation,
+            reactionSecurity: 'lowsec',
+          }
+    );
+  const chooseReactionLocation = () => {
+    setSetupOpen(true);
+    const inputId =
+      activity === 'reaction' ? 'build-location-input' : 'build-plan-reaction-location-input';
+    // The picker mounts with the opened Setup panel, so focus on the next frame.
+    requestAnimationFrame(() => document.getElementById(inputId)?.focus());
+  };
+  const reactionLocationBlock =
+    reactionPlace && reactionsInHighsec && reactionPlace.system
+      ? {
+          facilityName: reactionPlace.facilityName,
+          systemName: reactionPlace.system.name,
+          fix: nearestLowsec
+            ? { systemName: nearestLowsec.name, onApply: () => moveReactionsTo(nearestLowsec) }
+            : null,
+          onChoose: chooseReactionLocation,
+        }
+      : undefined;
 
   // Distinct from `pricesReady` below: that one collapses "still fetching"
   // and "the live ESI call failed" into the same false, which used to flash
@@ -1167,12 +1216,15 @@ export function BuildPlanDetail({
 
   // Read-only summary of the setup: plain label-over-value pairs, not chips —
   // a bordered, filled box reads as a button, and nothing here is clickable.
-  const setupFact = (label: string, value: string) => (
+  const setupFact = (label: string, value: string, warn = false) => (
     <div key={label} className="min-w-0">
       <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </dt>
-      <dd className="text-xs text-text tabular-nums">{value}</dd>
+      <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
+        {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
+        {value}
+      </dd>
     </div>
   );
   // ME/TE belong to the materials table's blueprint row, whose tier picker
@@ -1201,6 +1253,18 @@ export function BuildPlanDetail({
       ? [
           setupFact(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
           setupFact(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
+        ]
+      : []),
+    ...(includeReactions && activity !== 'reaction'
+      ? [
+          setupFact(
+            t('industry.reactionLocation'),
+            reactionBuildSystem === null
+              ? t('industry.reactionLocationEntryNotSet')
+              : (reactionBuildLocationName ??
+                  `${FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name} · ${reactionBuildSystem.name} · ${t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}`),
+            reactionsInHighsec
+          ),
         ]
       : []),
     setupFact(t('industry.tradeHub'), hub.systemName),
@@ -1233,6 +1297,7 @@ export function BuildPlanDetail({
           onBreakdownOpenChange={setBreakdownOpen}
           onLogProduction={() => setLogRequest((n) => n + 1)}
           logProductionDisabled={entry.productTypeID === null}
+          locationBlock={reactionLocationBlock}
           skillGate={topLevelSkillGate}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
@@ -1610,6 +1675,11 @@ export function BuildPlanDetail({
                             }
                           />
                         </BuildLocationPicker>
+                        {reactionsInHighsec && (
+                          <p className="text-xs text-warning">
+                            {t('industry.reactionBlocked.setupRule')}
+                          </p>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
