@@ -11,6 +11,7 @@ import {
   isTypingTarget,
   OVERLAY_SELECTOR,
   type FittingLoadState,
+  type IndustryBlueprintListState,
   type MarketAppraiseState,
   type PilotListState,
 } from '@/lib/shortcuts';
@@ -51,6 +52,10 @@ const DESTINATIONS: Record<
       { state: ENTITY_INFO_PUSHED_STATE },
     ];
   },
+  blueprintList: (text) => [
+    '/industry',
+    { state: { blueprintListText: text } satisfies IndustryBlueprintListState },
+  ],
   pilotList: pilotLookup,
   dscan: pilotLookup,
 };
@@ -60,13 +65,25 @@ const DESTINATIONS: Record<
  * catalogue load on the first page-level paste, not with the signed-in shell.
  */
 async function classifyPaste(text: string): Promise<PasteDestination | null> {
-  const [{ pasteDestination }, { loadAppraisalCatalogue }, { loadHullNames }] = await Promise.all([
+  const [
+    { pasteDestination },
+    { loadAppraisalCatalogue },
+    { loadHullNames },
+    { loadBlueprintNames },
+  ] = await Promise.all([
     import('@/engine/import/pasteDestination'),
     import('@/features/market/appraisalData'),
     import('@/features/fittings/hullNames'),
+    import('@/features/industry/blueprintNames'),
   ]);
-  const [catalogue, hullNames] = await Promise.all([loadAppraisalCatalogue(), loadHullNames()]);
-  return pasteDestination(text, { catalogue, hullNames });
+  const [catalogue, hullNames, blueprintNames] = await Promise.all([
+    loadAppraisalCatalogue(),
+    loadHullNames(),
+    // Without the blueprint data a blueprint list is just not recognised; the
+    // fit and item-list pastes must not depend on it.
+    loadBlueprintNames().catch(() => undefined),
+  ]);
+  return pasteDestination(text, { catalogue, hullNames, blueprintNames });
 }
 
 /**

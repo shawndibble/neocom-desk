@@ -40,6 +40,22 @@ export interface IndustryFitImportState {
 }
 
 /**
+ * Router `location.state` shape the paste router navigates `/industry` with
+ * for a pasted blueprint list: the text, turned into a Build Group on arrival.
+ */
+export interface IndustryBlueprintListState {
+  readonly blueprintListText: string;
+}
+
+/**
+ * Router `location.state` shape a Build Group's page opens with right after a
+ * blueprint paste created (or reused) it: what the pilot should be told.
+ */
+export interface BlueprintPasteNoticeState {
+  readonly blueprintPasteNotice: { readonly skipped: number; readonly reused: boolean };
+}
+
+/**
  * Marks an element that owns the keyboard while it is on screen but is not a
  * native `<dialog>` and carries no menu/listbox/dialog role the guard in
  * `app/useKeyboardShortcuts.ts` already recognises — today that means the
