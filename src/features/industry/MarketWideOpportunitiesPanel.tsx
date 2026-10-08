@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  DataAgeBadge,
   DataTable,
   EmptyState,
   CheckboxSelect,
@@ -232,14 +233,15 @@ export function MarketWideOpportunitiesPanel({
       setParams(paramsPatchFromFilter(next, MARKET_WIDE_FILTER.fieldToParam)),
     [setParams]
   );
-  const { rows, loading, hasRun, unavailableSources, run } = useMarketWideOpportunities({
-    hub,
-    trees,
-    catalog,
-    modifiers,
-    standing,
-    characterIds,
-  });
+  const { rows, loading, hasRun, error, fetchedAt, unavailableSources, run } =
+    useMarketWideOpportunities({
+      hub,
+      trees,
+      catalog,
+      modifiers,
+      standing,
+      characterIds,
+    });
   // A tier, category or source change re-scans (they apply before the top-N
   // cut); the build-cost cap only narrows the rows already ranked.
   const [shownLimit, setShownLimit] = useState(MARKET_WIDE_PAGE_SIZE);
@@ -610,6 +612,7 @@ export function MarketWideOpportunitiesPanel({
       }
       actions={
         <span className="flex items-center gap-2">
+          {hasRun && !loading && !error && fetchedAt && <DataAgeBadge date={fetchedAt} />}
           {hasRun && !loading && visibleRows.length > 0 && (
             <TableActionsMenu
               name={t('industry.marketOpportunitiesTitle')}
@@ -629,6 +632,17 @@ export function MarketWideOpportunitiesPanel({
         <div className="flex justify-center py-8">
           <Spinner label={t('industry.marketOpportunitiesScanning')} />
         </div>
+      ) : error ? (
+        <EmptyState
+          title={t('industry.marketOpportunitiesErrorTitle')}
+          hint={t('industry.marketOpportunitiesErrorHint')}
+          action={
+            <Button size="sm" onClick={() => scan(filter)}>
+              {t('industry.marketOpportunitiesRetry')}
+            </Button>
+          }
+          className="py-8"
+        />
       ) : !hasRun ? (
         <EmptyState
           title={t('industry.marketOpportunitiesEmptyTitle')}

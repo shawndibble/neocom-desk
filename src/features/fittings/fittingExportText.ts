@@ -32,13 +32,14 @@ export async function fittingShareCode(fitting: Fitting): Promise<string | null>
 
 /**
  * The text to copy, or null when a permanent link can't be made (the Fitting
- * is too large to encode). `cloneImplants` only trims the multibuy list — a
+ * is too large to encode). `cloneImplants` only trims the multibuy list (as does `owned`, stock held at a station) — a
  * link or EFT is the whole Fitting, set and all.
  */
 export async function exportFitting(
   kind: FittingExportKind,
   fitting: Fitting,
-  cloneImplants: readonly number[] = []
+  cloneImplants: readonly number[] = [],
+  owned?: ReadonlyMap<number, number>
 ): Promise<string | null> {
   if (kind === 'permanentLink') {
     const code = await fittingShareCode(fitting);
@@ -50,5 +51,5 @@ export async function exportFitting(
   if (kind === 'eveXml') return fittingToEveXml(fitting, nameFor);
   return kind === 'eft'
     ? fittingToEft(fitting, nameFor)
-    : fittingToMultibuy(fitting, nameFor, cloneImplants);
+    : fittingToMultibuy(fitting, nameFor, cloneImplants, owned);
 }

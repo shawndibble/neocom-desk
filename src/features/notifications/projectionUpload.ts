@@ -25,6 +25,7 @@
 import type { ProjectionRow } from '@/engine/projection';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { readNotificationPermission } from './permission';
+import { recordPushFailure, settlePushRegistration } from './pushFailure';
 
 export async function uploadProjectionRows(
   rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>
@@ -36,14 +37,17 @@ export async function uploadProjectionRows(
     const { registerDeviceForWebPush } = await import('@/sync/deviceRegistration');
     const registration = await navigator.serviceWorker.ready;
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-    await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
-      skipIfUnchanged: true,
-    });
+    settlePushRegistration(
+      await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
+        skipIfUnchanged: true,
+      })
+    );
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must
     // not fail because the Scheduled Push upload did.
     console.error('Scheduled Push projection upload failed', err);
+    void recordPushFailure(err);
   }
 }
 
