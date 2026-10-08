@@ -327,7 +327,9 @@ export function DscanSummaryView({ typeIds }: { typeIds: readonly number[] }) {
     return () => {
       cancelled = true;
     };
-  }, [typeIds]);
+    // Keyed on the ids themselves: a caller re-parsing the same scan hands a new array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeIds.join(',')]);
 
   if (summary === undefined) {
     return (
