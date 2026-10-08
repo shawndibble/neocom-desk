@@ -161,4 +161,119 @@ describe('SaveToEveDialog', () => {
       await screen.findByText(/EVE wouldn't remove the Fitting it was replacing: Fitting not found/)
     ).toBeInTheDocument();
   });
+
+  it('also saves to My Fittings after the EVE save, checked by default', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    const saveToMine = vi.fn().mockResolvedValue(true);
+    const onClose = vi.fn();
+    render(
+      <SaveToEveDialog
+        open
+        onClose={onClose}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={saveToMine}
+      />
+    );
+    expect(screen.getByRole('checkbox', { name: 'Also save to My Fittings' })).toBeChecked();
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(saveToMine).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('skips My Fittings when unchecked, and when the EVE save fails', async () => {
+    const saveToMine = vi.fn().mockResolvedValue(true);
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    const { unmount } = render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={saveToMine}
+      />
+    );
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Also save to My Fittings' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(saveToMine).not.toHaveBeenCalled();
+    unmount();
+
+    saveFittingToEveMock.mockResolvedValue({ ok: false, message: 'nope', needsPermission: false });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={saveToMine}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(saveToMine).not.toHaveBeenCalled();
+  });
+
+  it('hides the checkbox when no My Fittings save is offered', async () => {
+    render(
+      <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
+    );
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('reports a failed My Fittings save without undoing the EVE save', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    const onSaved = vi.fn();
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={onSaved}
+        onSaveToMyFittings={vi.fn().mockRejectedValue(new Error('disk full'))}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(onSaved).toHaveBeenCalled();
+    expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
+  });
+
+  it('treats a My Fittings save that wrote nothing as a failure', async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={vi.fn().mockResolvedValue(false)}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
+  });
+
+  it('shows both warnings when the overwrite delete and My Fittings save both fail', async () => {
+    saveFittingToEveMock.mockResolvedValue({
+      ok: true,
+      fittingId: 2,
+      overwriteError: 'gone wrong',
+    });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        onSaved={vi.fn()}
+        onSaveToMyFittings={vi.fn().mockResolvedValue(false)}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/couldn't save it to My Fittings/)).toBeInTheDocument();
+    expect(screen.getByText(/gone wrong/)).toBeInTheDocument();
+  });
 });

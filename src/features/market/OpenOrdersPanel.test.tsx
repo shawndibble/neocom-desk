@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { db } from '@/db';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -944,6 +945,85 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       // One of the three, where the page's own default matches two.
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+    });
+
+    describe('opened for a chosen Character (issue #2936)', () => {
+      beforeEach(async () => {
+        await db.characters.bulkPut([
+          { characterId: 1, name: 'Alpha', ownerHash: 'a', addedAt: 1 },
+          { characterId: 2, name: 'Bravo', ownerHash: 'b', addedAt: 2 },
+        ]);
+        await db.tokens.put({
+          characterId: 2,
+          accessToken: 't',
+          refreshToken: 'r',
+          expiresAt: Date.now() + 3_600_000,
+          scopes: [],
+        });
+        mockedLoadAll.mockResolvedValue(
+          snapshot([
+            {
+              characterId: 1,
+              characterName: 'Alpha',
+              orders: [BELOW_FLOOR_ORDER],
+              fetchedAt: Date.now(),
+              fromCache: false,
+              needsReauth: false,
+            },
+            {
+              characterId: 2,
+              characterName: 'Bravo',
+              orders: [EXPIRING_ORDER],
+              fetchedAt: Date.now(),
+              fromCache: false,
+              needsReauth: false,
+            },
+          ])
+        );
+      });
+      afterEach(async () => {
+        await db.characters.clear();
+        await db.tokens.clear();
+      });
+
+      it('shows only that Character, states whose data it is, and leaves the active one alone', async () => {
+        renderPanel('/market/orders?char=2');
+        expect(await screen.findByText('Bravo only')).toBeInTheDocument();
+        expect(await screen.findByText('1 of 1 orders match')).toBeInTheDocument();
+        expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
+      });
+
+      it('shows the crumb only when route state names the Wallet', async () => {
+        const plain = renderPanel('/market/orders?char=2');
+        await screen.findByText('Bravo only');
+        expect(screen.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument();
+        plain.unmount();
+        render(
+          <MemoryRouter
+            initialEntries={[
+              { pathname: '/market/orders', search: '?char=2', state: { origin: 'wallet' } },
+            ]}
+          >
+            <FakeItemActions actions={actions}>
+              {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
+            </FakeItemActions>
+          </MemoryRouter>
+        );
+        expect(await screen.findByRole('link', { name: /Wallet/ })).toHaveAttribute(
+          'href',
+          '/wallet'
+        );
+      });
+
+      it('shows the grant note for a Character without the orders scope', async () => {
+        mockedLoadAll.mockResolvedValue(snapshot([], [{ characterId: 2, name: 'Bravo' }]));
+        renderPanel('/market/orders?char=2');
+        expect(await screen.findByText('Bravo only')).toBeInTheDocument();
+        expect(
+          await screen.findByText('Bravo — Log in again to see your orders')
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/No open orders/i)).not.toBeInTheDocument();
+      });
     });
 
     it('opens narrowed to the character the link names', async () => {

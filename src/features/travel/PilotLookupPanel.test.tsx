@@ -163,6 +163,7 @@ describe('PilotLookupPanel', () => {
     renderTab('/pilot-lookup?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
+    expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('Some Pilot');
     expect(screen.getByText('-2.3')).toBeTruthy();
     expect(screen.getByRole('link', { name: /^zKillboard/ }).getAttribute('href')).toBe(
       'https://zkillboard.com/character/42/'
@@ -189,6 +190,23 @@ describe('PilotLookupPanel', () => {
     renderTab('/pilot-lookup?pilot=42');
     expect(await screen.findByText("EVE couldn't be reached")).toBeTruthy();
     expect(screen.queryByText("This pilot couldn't be found")).toBeNull();
+  });
+
+  it('retries the profile after an outage, and shows its age once loaded', async () => {
+    mocks.loadPilotProfile.mockRejectedValueOnce(new Error('offline'));
+    renderTab('/pilot-lookup?pilot=42');
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.loadPilotProfile).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.querySelector('time')).not.toBeNull());
+  });
+
+  it('retries zKillboard stats after a failure', async () => {
+    mocks.fetchPilotStats.mockResolvedValueOnce({ kind: 'failed' });
+    renderTab('/pilot-lookup?pilot=42');
+    await screen.findByText("zKillboard couldn't be reached");
+    const calls = mocks.fetchPilotStats.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(mocks.fetchPilotStats.mock.calls.length).toBe(calls + 1));
   });
 
   it('shows no history apart from a failure', async () => {

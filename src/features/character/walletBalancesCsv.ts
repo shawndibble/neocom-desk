@@ -1,18 +1,28 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { CharacterWalletBalance } from './wallet';
+import { LAYER_IDS, netWorthOf, type LayerId } from '@/engine/netWorth/series';
+import type { NetWorthTableRow } from '@/features/netWorth/tableRows';
+import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 
 /**
- * CSV columns for Wallet's balance-by-character table: the character, then
- * the balance as a raw number. A balance the table can't show (re-auth
- * needed, never loaded) is blank rather than 0 — a 0 would sum as if the
- * character were broke.
+ * CSV columns for Wallet's balance-by-character table: the character, one
+ * column per layer, then the net worth of the layers shown. A Character the
+ * table can't total (missing permission, re-auth needed) is blank rather than
+ * 0 — a 0 would sum as if the character were broke.
  */
-export function walletBalancesCsvColumns(t: CsvTranslate): CsvColumn<CharacterWalletBalance>[] {
+export function walletBalancesCsvColumns(
+  t: CsvTranslate,
+  shown: readonly LayerId[] = LAYER_IDS
+): CsvColumn<NetWorthTableRow>[] {
   return [
     { header: t('wallet.balanceCharacterColumn'), value: (row) => row.characterName },
+    ...LAYER_IDS.map((id) => ({
+      header: t(LAYER_LABEL_KEYS[id]),
+      value: (row: NetWorthTableRow) =>
+        row.needsReauth && id === 'isk' ? null : (row.layers?.[id] ?? null),
+    })),
     {
-      header: t('wallet.isk'),
-      value: (row) => (row.needsReauth ? null : (row.balanceResult?.data ?? null)),
+      header: t('wallet.netWorth.total'),
+      value: (row) => (row.layers && !row.needsReauth ? netWorthOf(row.layers, shown) : null),
     },
   ];
 }

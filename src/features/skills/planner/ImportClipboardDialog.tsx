@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Tabs, TextArea, type TabItem } from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
@@ -16,6 +16,8 @@ interface ImportClipboardDialogProps {
   nameFor: (skillTypeID: number) => string;
   /** To tag preview rows the character has already trained to (or past) the requested level (UX-REVIEW #7). */
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  /** Text to open on, already previewed — a skill plan pasted elsewhere in the app. */
+  initialText?: string;
 }
 
 /** True when the character is already trained to (or past) the entry's requested level. */
@@ -55,6 +57,7 @@ export function ImportClipboardDialog({
   onClose,
   nameFor,
   trainedSkills,
+  initialText,
 }: ImportClipboardDialogProps) {
   const { t } = useTranslation();
   const tabs: TabItem[] = [
@@ -62,9 +65,9 @@ export function ImportClipboardDialog({
     { id: 'file', label: t('plans.importFileTab') },
   ];
   const [tab, setTab] = useState<'paste' | 'file'>('paste');
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [preview, setPreview] = useState<ClipboardImportPreview | null>(null);
-  const [parsing, setParsing] = useState(false);
+  const [parsing, setParsing] = useState(initialText !== undefined);
   const [dragOver, setDragOver] = useState(false);
   const [pasteError, setPasteError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,11 +90,10 @@ export function ImportClipboardDialog({
     }
   }
 
-  async function handleParse() {
-    setParsing(true);
+  async function previewText(source: string) {
     try {
       const [skillByName, typeByName] = await Promise.all([loadSkillNameMap(), loadItemNameMap()]);
-      const result = await previewClipboardImport(text, {
+      const result = await previewClipboardImport(source, {
         skillByName,
         typeByName,
         loadType: loadUniverseType,
@@ -101,6 +103,19 @@ export function ImportClipboardDialog({
       setParsing(false);
     }
   }
+
+  function handleParse() {
+    setParsing(true);
+    return previewText(text);
+  }
+
+  // A pasted skill plan arrives ready to review: the Parse click is the step
+  // the pilot already took by pasting. Mount-only — `initialText` seeds the
+  // textarea (and `parsing`) once and is never re-sent.
+  useEffect(() => {
+    if (initialText) void previewText(initialText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
+  }, []);
 
   async function handleFile(file: File) {
     setParsing(true);

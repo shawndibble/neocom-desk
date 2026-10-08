@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  collectStockContainers,
   collectStockLocations,
   detectOwnedStock,
   filterStockByScope,
@@ -516,16 +515,129 @@ describe('container-level scope (issue #2869)', () => {
     expect(filterStockByScope(stock(), selected()).get(TRITANIUM)?.quantity).toBe(1000);
     expect(filterStockByScope(stock(), selected([])).get(TRITANIUM)?.quantity).toBe(1000);
   });
+});
 
-  it('lists every container holding stock, with its location', () => {
-    expect(collectStockContainers(stock())).toEqual([
-      {
-        containerId: CONTAINER,
-        typeId: 3465,
-        characterId: 1,
-        locationId: STATION,
-        locationType: 'station',
-      },
+describe('hangar-level scope (issue #2941)', () => {
+  const OFFICE = 900;
+  const CRATE = 701;
+  const CORP = 5000;
+  const office = asset({
+    item_id: OFFICE,
+    type_id: 27,
+    is_singleton: true,
+    location_flag: 'OfficeFolder',
+  });
+  const inOffice = (item_id: number, quantity: number, flag: string) =>
+    asset({
+      item_id,
+      type_id: TRITANIUM,
+      quantity,
+      location_id: OFFICE,
+      location_type: 'item',
+      location_flag: flag,
+    });
+  const crate = asset({
+    item_id: CRATE,
+    type_id: 3465,
+    is_singleton: true,
+    location_id: OFFICE,
+    location_type: 'item',
+    location_flag: 'CorpSAG2',
+  });
+  const crated = asset({
+    item_id: 50,
+    type_id: TRITANIUM,
+    quantity: 400,
+    location_id: CRATE,
+    location_type: 'item',
+    location_flag: 'AutoFit',
+  });
+  const stock = () =>
+    detectOwnedStock(
+      [
+        corpSource(1, CORP, [
+          office,
+          inOffice(10, 100, 'CorpSAG1'),
+          inOffice(11, 200, 'CorpSAG3'),
+          crate,
+          crated,
+        ]),
+      ],
+      MATERIALS
+    );
+  const station = {
+    characterId: 1,
+    corporationId: CORP,
+    locationId: STATION,
+    locationType: 'station' as const,
+  };
+  const scope = (extra: {
+    locations?: (typeof station)[];
+    hangars?: (typeof station & { division: number })[];
+    containers?: number[];
+  }) => ({ mode: 'selected' as const, locations: [], ...extra });
+
+  it('records hangar totals and does not treat the office folder as a container', () => {
+    const placement = stock().get(TRITANIUM)?.placements[0];
+    expect(placement?.quantity).toBe(700);
+    expect(placement?.hangars).toEqual(
+      expect.arrayContaining([
+        { division: 1, quantity: 100 },
+        { division: 3, quantity: 200 },
+        { division: 2, quantity: 400 },
+      ])
+    );
+    expect(placement?.containers).toEqual([
+      { containerId: CRATE, typeId: 3465, quantity: 400, hangar: 2 },
     ]);
+  });
+
+  it('a selected station counts every hangar and container', () => {
+    expect(
+      filterStockByScope(stock(), scope({ locations: [station] })).get(TRITANIUM)?.quantity
+    ).toBe(700);
+  });
+
+  it('a selected hangar counts only stock inside it, siblings excluded', () => {
+    const f = filterStockByScope(stock(), scope({ hangars: [{ ...station, division: 3 }] }));
+    expect(f.get(TRITANIUM)?.quantity).toBe(200);
+  });
+
+  it('a hangar includes the containers inside it', () => {
+    const f = filterStockByScope(stock(), scope({ hangars: [{ ...station, division: 2 }] }));
+    expect(f.get(TRITANIUM)?.quantity).toBe(400);
+  });
+
+  it('a selected container counts only its stock', () => {
+    const f = filterStockByScope(stock(), scope({ containers: [CRATE] }));
+    expect(f.get(TRITANIUM)?.quantity).toBe(400);
+  });
+
+  it('a hangar plus its container is not double-counted', () => {
+    const f = filterStockByScope(
+      stock(),
+      scope({ hangars: [{ ...station, division: 2 }], containers: [CRATE] })
+    );
+    expect(f.get(TRITANIUM)?.quantity).toBe(400);
+  });
+
+  it('drops the material when nothing selected matches', () => {
+    const f = filterStockByScope(stock(), scope({ hangars: [{ ...station, division: 7 }] }));
+    expect(f.size).toBe(0);
+  });
+
+  it('rows with no hangar flag stay station-level', () => {
+    const plain = detectOwnedStock(
+      [source(1, [asset({ item_id: 1, type_id: TRITANIUM, quantity: 50 })])],
+      MATERIALS
+    );
+    expect(plain.get(TRITANIUM)?.placements[0]?.hangars).toBeUndefined();
+    const f = filterStockByScope(
+      plain,
+      scope({
+        locations: [{ characterId: 1, locationId: STATION, locationType: 'station' } as never],
+      })
+    );
+    expect(f.get(TRITANIUM)?.quantity).toBe(50);
   });
 });

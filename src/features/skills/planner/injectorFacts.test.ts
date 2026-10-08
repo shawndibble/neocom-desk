@@ -44,4 +44,47 @@ describe('buildInjectorFacts', () => {
     expect(noOrders.pricePerInjector).toBeNull();
     expect(noOrders.priceTotal).toBeNull();
   });
+
+  describe('Alpha clone total-SP cap', () => {
+    // spToTrain 1.5M, unallocated 0 -> gap 1.5M.
+    it('matches Omega while the plan stays under the cap', () => {
+      const alpha = buildInjectorFacts(scheduled, 10_000_000, 0, null, 'alpha');
+      const omega = buildInjectorFacts(scheduled, 10_000_000, 0, null, 'omega');
+      expect(alpha).toEqual(omega);
+      expect(alpha.alphaShortfallSp).toBe(0);
+    });
+
+    it('clamps the gap to the headroom below the cap and reports the shortfall', () => {
+      // headroom = 20M - 19.5M = 500k of the 1.5M gap
+      const facts = buildInjectorFacts(scheduled, 19_500_000, 0, null, 'alpha');
+      expect(facts.gapSp).toBe(1_500_000);
+      expect(facts.alphaShortfallSp).toBe(1_000_000);
+      expect(facts.count).toBe(2); // 2 x 400k covers 500k, not the 4 an Omega needs
+      expect(facts.none).toBe(false);
+    });
+
+    it('counts unallocated SP against the headroom', () => {
+      // bracket SP 19M + 500k = 19.5M -> headroom 500k; gap = 1.5M - 500k = 1M
+      const facts = buildInjectorFacts(scheduled, 19_000_000, 500_000, null, 'alpha');
+      expect(facts.alphaShortfallSp).toBe(500_000);
+    });
+
+    it('needs no injectors and no price once already at the cap', () => {
+      const facts = buildInjectorFacts(scheduled, 20_000_000, 0, { sellMin: 700_000_000 }, 'alpha');
+      expect(facts.count).toBe(0);
+      expect(facts.priceTotal).toBeNull();
+      expect(facts.none).toBe(false);
+      expect(facts.alphaShortfallSp).toBe(1_500_000);
+    });
+
+    it('prices the clamped count', () => {
+      const facts = buildInjectorFacts(scheduled, 19_500_000, 0, { sellMin: 100 }, 'alpha');
+      expect(facts.priceTotal).toBe(200);
+    });
+
+    it('leaves Omega and an unset clone state uncapped', () => {
+      expect(buildInjectorFacts(scheduled, 19_500_000, 0, null, 'omega').alphaShortfallSp).toBe(0);
+      expect(buildInjectorFacts(scheduled, 19_500_000, 0, null).alphaShortfallSp).toBe(0);
+    });
+  });
 });

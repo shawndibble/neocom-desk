@@ -25,6 +25,10 @@
 // long as the account has any Character — the same "never deleted, only
 // emptied" shape the Quickbar's local row already carries. So the tombstone
 // edge above doesn't bite this key.
+// sync.structureBrokerFees: the owner's broker fee the pilot typed per player
+// structure, as one structureId -> percent map (same shape and reasoning as
+// sync.piCustomsRates below; never deleted, only emptied). See
+// src/features/market/structureFees.ts.
 // sync.piCustomsRates: the PI Advisor's per-system customs rate overrides.
 // One key holding a systemId -> rate map, for the same reason the key above
 // holds every Character: mergeSettings is whole-value LWW per key and this
@@ -185,6 +189,12 @@
 // follow the pilot across devices. Off is a value, not an absence. See
 // features/miningTax/oreForm.ts. No `legacyKey`: new.
 //
+// sync.oreRefiningStructureRate (issue #2836): the refining yield a pilot types for
+// 'My structure' in the Assets "What to do with this ore" dialog (ESI cannot read a
+// structure's rate); 0 means an NPC station at the 50% base. Player-entered data,
+// so it syncs. See features/assets/oreDecision/refiningFacility.ts. Set to 0
+// rather than unset. No `legacyKey`: new.
+//
 // sync.navHidden: the pages and views the pilot hid from the rail and the More
 // sheet — a list of nav paths, one for the whole account for the same reason
 // as the Overview's hidden cards below: "I don't do PI" is about the pilot.
@@ -259,6 +269,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxOreValueMode',
   'sync.navHidden',
   'sync.notificationFeedPrefs',
+  'sync.oreRefiningStructureRate',
   'sync.overviewCardOrder',
   'sync.overviewHiddenCards',
   'sync.piCustomsRates',
@@ -273,6 +284,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.structureBrokerFees',
   'sync.targetSkillPlan',
 ];
 

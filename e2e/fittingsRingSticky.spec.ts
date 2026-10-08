@@ -61,5 +61,25 @@ test.describe('Open Fitting Ring column stays in view', () => {
         )
       ).toBe(true);
     });
+
+    test(`keeps the Ring readouts in the first viewport at ${width}x${height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await signInAndGoto(page, './ships/fittings');
+      await answerAnyType(page);
+      await openRifter(page);
+
+      const cpu = page.getByRole('meter', { name: /CPU/ }).first();
+      await expect(cpu).toBeVisible();
+      const box = await cpu.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+        )
+      ).toBe(true);
+    });
   }
 });
