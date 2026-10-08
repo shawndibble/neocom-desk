@@ -80,6 +80,7 @@ import {
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
   sellFallbackAtHubOnDate,
+  sourcesAtHubOnDate,
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
 import { loadOreFormNames, readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
@@ -710,6 +711,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
    */
   function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
     return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
+  }
+
+  /** Which price tier produced each of `pricesFor`'s numbers — the row detail's breakdown. */
+  function priceSourcesFor(hubId: string | undefined, date: string) {
+    return sourcesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
   }
 
   /**
@@ -2055,6 +2061,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           status={detailTarget.status}
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
+          priceSourcesFor={priceSourcesFor}
           typeNames={data.typeNames}
           payees={allPayees}
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}

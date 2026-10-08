@@ -15,6 +15,8 @@ interface StatChipProps {
   /** `info` draws an "i" for a note on this value; the default "?" explains the label's term. */
   tooltipGlyph?: 'help' | 'info';
   testId?: string;
+  /** The one figure a group leads with: larger and full-strength text; the rest stay body weight. */
+  emphasis?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function StatChip({
   tooltip,
   tooltipGlyph,
   testId,
+  emphasis = false,
 }: StatChipProps) {
   const { t } = useTranslation();
   return (
@@ -49,7 +52,11 @@ export function StatChip({
           glyph={tooltipGlyph}
         />
       )}
-      <span className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}>{value}</span>
+      <span
+        className={`tabular-nums ${emphasis ? 'text-sm font-semibold' : 'font-medium'} ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}
+      >
+        {value}
+      </span>
     </span>
   );
 }

@@ -26,6 +26,8 @@ function summary(): ProductionRunSummary {
       updatedAt: LOGGED,
     },
     saleLinks: [],
+    losses: [],
+    quantityLost: 0,
     orderWatches: [],
     profit: {
       totalCost: 1000,
@@ -34,6 +36,7 @@ function summary(): ProductionRunSummary {
       salesTax: 10,
       brokerFee: 5,
       netRevenue: 785,
+      insurance: 0,
       profit: -215,
       marginPct: -26.875,
     },

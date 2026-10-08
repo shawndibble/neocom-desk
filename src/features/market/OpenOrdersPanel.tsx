@@ -41,6 +41,12 @@ import {
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
+import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -102,6 +108,7 @@ import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
 import { useOrderDetail } from './useOrderDetail';
+import { useStructureFees } from './structureFees';
 import { SetWaypointMenuItem } from '@/features/travel/SetWaypointMenuItem';
 import { itemKey } from './orderDetailView';
 import {
@@ -158,6 +165,7 @@ interface ActiveChipDisplay {
 /** Market's Open Orders tab: every selling character's open market orders, worklisted by problem. */
 export function OpenOrdersPanel() {
   const { t } = useTranslation();
+  const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadOpenOrdersSnapshot,
     undefined,
@@ -226,6 +234,10 @@ export function OpenOrdersPanel() {
    * (`useOrderDetail`'s own doc).
    */
   const orderDetail = useOrderDetail();
+  const structureFees = useStructureFees((state) => state.value);
+  useEffect(() => {
+    void useStructureFees.getState().hydrate();
+  }, []);
 
   /** One column-visibility setting shared by every per-problem-group table below. */
   const {
@@ -235,7 +247,30 @@ export function OpenOrdersPanel() {
     reset: resetColumns,
   } = useColumnVisibility(useVisibleOpenOrderColumns, OPEN_ORDER_COLUMN_IDS);
 
-  const snapshot = data;
+  // A Character named in the URL narrows the whole page to that Character —
+  // its rows, grant notes and skipped note — and is stated by the readout.
+  const viewedCharacter = useLiveQuery(
+    async () =>
+      viewedCharacterId === undefined ? undefined : db.characters.get(viewedCharacterId),
+    [viewedCharacterId]
+  );
+  const viewedLacksOrdersScope = useCharacterLacksEndpoints(viewedCharacterId ?? null, [
+    'getCharacterOrders',
+  ]);
+  const snapshot = useMemo(
+    () =>
+      data && viewedCharacterId !== undefined
+        ? {
+            ...data,
+            openOrders: {
+              ...data.openOrders,
+              entries: data.openOrders.entries.filter((e) => e.characterId === viewedCharacterId),
+              skipped: data.openOrders.skipped.filter((s) => s.characterId === viewedCharacterId),
+            },
+          }
+        : data,
+    [data, viewedCharacterId]
+  );
 
   const deepCompetitionByOrderId = useMemo(() => {
     const m = new Map<number, { competitors: readonly CompetingOrder[]; truncated: boolean }>();
@@ -270,9 +305,16 @@ export function OpenOrdersPanel() {
       problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
       standingsByOrder: snapshot.standingsByOrder,
+      structureFees,
       now: snapshot.now,
     });
-  }, [snapshot, deepCompetitionByOrderId, orderDetail.caches.structureBooks, stationNames]);
+  }, [
+    snapshot,
+    deepCompetitionByOrderId,
+    orderDetail.caches.structureBooks,
+    stationNames,
+    structureFees,
+  ]);
 
   /**
    * The highlighted row, found across every group before any fold/filter
@@ -653,6 +695,31 @@ export function OpenOrdersPanel() {
       }
     >
       <div className="space-y-2 px-3 pt-2">
+        {viewedCharacterId !== undefined && (
+          <div className="flex items-center gap-3">
+            <WalletOriginCrumb />
+            {viewedCharacter && (
+              <CharacterScopeReadout
+                scope="one"
+                characterId={viewedCharacter.characterId}
+                characterName={viewedCharacter.name}
+              />
+            )}
+          </div>
+        )}
+        {viewedCharacterId !== undefined &&
+          viewedLacksOrdersScope &&
+          !reauthEntries.some((e) => e.characterId === viewedCharacterId) && (
+            <GrantBanner
+              characterId={viewedCharacterId}
+              characterName={viewedCharacter?.name}
+              endpoints={['getCharacterOrders']}
+              variant="ghost"
+              title={t('orders.reauthTitle')}
+              hint={t('orders.reauthHint')}
+              actionLabel={t('orders.reauthAction')}
+            />
+          )}
         {allRows.length > 0 && (
           <p className="text-xs text-text-dim">
             {[

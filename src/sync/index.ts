@@ -141,6 +141,12 @@ export async function removeProductionSaleLink(characterId: number, linkId: stri
   return removeProductionSaleLink(characterId, linkId);
 }
 
+/** Remove a Run Loss, tombstoned so it does not resurrect. */
+export async function removeProductionLoss(characterId: number, lossId: string): Promise<void> {
+  const { removeProductionLoss } = await import('./planSync');
+  return removeProductionLoss(characterId, lossId);
+}
+
 /** Stop watching an open sell order for a Production Run, tombstoned so it does not resurrect. */
 export async function removeProductionOrderWatch(
   characterId: number,

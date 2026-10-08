@@ -1,3 +1,4 @@
+import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import {
   createContext,
   useCallback,
@@ -16,10 +17,8 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
-  DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   IconButton,
   IskAmount,
   PageHeader,
@@ -53,6 +52,9 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
+import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { MyShipsPanel } from '@/features/character/MyShipsPanel';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -75,6 +77,7 @@ import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
+import { formatAge } from '@/lib/age';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
@@ -116,7 +119,7 @@ import {
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
@@ -649,9 +652,10 @@ function isUnresolvedParent(
 export function Assets() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadAssetsSnapshot,
-    undefined,
+    viewedCharacterId,
     { cacheKey: 'assets' }
   );
 
@@ -726,7 +730,10 @@ export function Assets() {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  const crossCharacterFilter = view.chars;
+  // Viewing a named Character is a fixed scope: the cross-Character filter
+  // (and its legacy `chars` value, which here named the Character) stands down.
+  const crossCharacterFilter: CharacterFilterValue =
+    viewedCharacterId === undefined ? view.chars : 'current';
   const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
     crossCharacterFilter,
     activeCharacterId
@@ -744,8 +751,12 @@ export function Assets() {
   // Absent for a one-Character account: "This character" and "All characters"
   // then resolve to the same pilot, leaving a control that cannot change
   // anything (`OpenOrdersPanel`'s precedent).
+  const viewedCharacter =
+    viewedCharacterId === undefined
+      ? undefined
+      : (allCharactersQuery ?? []).find((c) => c.characterId === viewedCharacterId);
   const crossCharacterFilterMeta =
-    crossCharacterCandidates.length > 1 ? (
+    crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
       <CharacterFilterControl
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
@@ -1638,6 +1649,7 @@ export function Assets() {
           'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
         )}
       >
+        <FromWalletCrumb />
         <PageHeader
           title={t('assets.title')}
           // `CharacterFilterControl` rides here rather than in `actions` per
@@ -1647,6 +1659,14 @@ export function Assets() {
           // is" role the decision describes for a panel's own `meta`.
           meta={
             <>
+              <WalletOriginCrumb />
+              {viewedCharacter && (
+                <CharacterScopeReadout
+                  scope="one"
+                  characterId={viewedCharacter.characterId}
+                  characterName={viewedCharacter.name}
+                />
+              )}
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
@@ -1657,45 +1677,41 @@ export function Assets() {
           actions={
             <>
               <div className="ml-auto flex items-center gap-1.5">
-                <IconButton
-                  icon={<Icon.FlatList />}
-                  label={t('assets.allItemsToggle')}
-                  pressed={allItemsView}
-                  onClick={() => setView({ all: !allItemsView })}
-                />
-                <IconButton
-                  icon={<Icon.Route />}
-                  label={t('assets.consolidate.toggle')}
-                  pressed={showConsolidate}
-                  onClick={() => setShowConsolidate((open) => !open)}
-                />
-                <IconButton
-                  icon={<Icon.Select />}
-                  label={t('assets.select.toggle')}
-                  pressed={selectMode}
-                  onClick={toggleSelectMode}
-                />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      icon={<Icon.Settings />}
-                      label={t('assets.tools.label')}
-                      size="md"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
-                      {t('assets.myShips.title')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('assets.refresh')}
-                  disabled={loading}
-                  onClick={refresh}
-                />
+                <TableActionsMenu
+                  name={t('assets.title')}
+                  label={t('assets.tools.label')}
+                  triggerText={t('assets.tools.label')}
+                  tableExport={assetsExport}
+                  size="md"
+                >
+                  <DropdownMenuCheckboxItem
+                    checked={allItemsView}
+                    onCheckedChange={(on) => setView({ all: on })}
+                  >
+                    {t('assets.allItemsToggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={showConsolidate}
+                    onCheckedChange={setShowConsolidate}
+                  >
+                    {t('assets.consolidate.toggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
+                    {t('assets.select.toggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
+                    {t('assets.myShips.title')}
+                    <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={loading} onSelect={refresh}>
+                    {t('assets.refresh')}
+                    {assetsResult && (
+                      <span className="ml-auto pl-3 text-text-dim">
+                        {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                </TableActionsMenu>
               </div>
             </>
           }
@@ -1707,7 +1723,17 @@ export function Assets() {
           onClose={closeMyShips}
           characterIds={shipCharacterIds}
           activeCharacterId={activeCharacterId}
-          filterControl={crossCharacterFilterMeta}
+          filterControl={
+            crossCharacterCandidates.length > 1 ? (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={crossCharacterFilter}
+                onChange={(chars: CharacterFilterValue) => setView({ chars })}
+                characterCount={crossCharacterCandidates.length}
+                variant="field"
+              />
+            ) : undefined
+          }
           onShowAllCharacters={
             !shipsFilterIsAll && crossCharacterCandidates.length > 1
               ? () => setView({ chars: 'all' })
@@ -2243,7 +2269,8 @@ function NodeRowView({
       onToggleSelection={() => onToggleSelection([asset.item_id])}
       t={t}
       wrap={(children) => (
-        <ItemContextMenu
+        <OreItemMenu
+          quantity={asset.quantity}
           typeId={asset.type_id}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
@@ -2251,7 +2278,7 @@ function NodeRowView({
           onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
         >
           {children}
-        </ItemContextMenu>
+        </OreItemMenu>
       )}
     />
   );

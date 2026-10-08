@@ -6,28 +6,29 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 
 ## Summary
 
-| Feature                                          | Where                                       | Notes                                                         |
-| ------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------- |
-| Location list (root `/assets`)                   | `Assets.tsx:1118-1190`                      | one row per location; pinned first, unresolved last           |
-| Drill-down (`/assets/<locationId>/<seg>/…`)      | `engine/assetPath.ts`                       | station → ship/container/bay → items; Back + breadcrumb       |
-| Search (`?q=`)                                   | `Assets.tsx:683`                            | name substring, flattens to result list, across all locations |
-| "All items" flat view (`?all=1`)                 | `Assets.tsx:1627`                           | every item, sortable, no drill-down                           |
-| Min-value filter (`?min=`)                       | `Assets.tsx:1742-1750`                      | flat views only; ISK shorthand accepted                       |
-| Flat sort (Name/Value/Quantity)                  | `assetSortPreference.ts`                    | device-local                                                  |
-| Location sort (Name/Value/Item count/Jumps away) | `stationSortPreference.ts`                  | device-local; pins always first                               |
-| Cross-character search (`?chars=`)               | `Assets.tsx:719-798`                        | This/All Characters; only while a search is active            |
-| Station Pins                                     | `stationPins.ts`, `LocationRow`             | 3-state cycle, synced Editable Data                           |
-| Jumps away + security                            | `Assets.tsx:1237-1466`                      | lazy, bounded to pinned/visible/open locations                |
-| Route preference select                          | `Assets.tsx:1905`                           | this-view override of Travel default                          |
-| Select mode + bulk actions                       | `Assets.tsx:1658`                           | Quickbar, Compare, copy names, select all                     |
-| Item context menu                                | `features/market/ItemContextMenu.tsx`       | right-click / long-press / More actions                       |
-| Item name link                                   | `assetBrowserRows.tsx` `ItemRow`            | name → Show info (Item Detail)                                |
-| Value estimates + totals                         | `engine/assetTree.ts`                       | average price; BPC from contract listings                     |
-| BPO/BPC badge                                    | `assetBrowserRows.tsx:134-148`              | blueprint stacks                                              |
-| Open in Fittings                                 | `Assets.tsx:1841-1855`                      | shown on a ship level                                         |
-| CSV/XLSX/copy export                             | `assetsCsv.ts`                              | active Character, search-matched only                         |
-| Re-login, offline, truncated, stale-link states  | `Assets.tsx:1691-1722,1939`                 |                                                               |
-| Command Palette "Assets" group                   | `features/commandPalette/assetsProvider.ts` | item → `/assets?q=`                                           |
+| Feature                                                    | Where                                       | Notes                                                                                                                                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Location list (root `/assets`)                             | `Assets.tsx:1118-1190`                      | one row per location; pinned first, unresolved last                                                                                                                                            |
+| Drill-down (`/assets/<locationId>/<seg>/…`)                | `engine/assetPath.ts`                       | station → ship/container/bay → items; Back + breadcrumb                                                                                                                                        |
+| Search (`?q=`)                                             | `Assets.tsx:683`                            | name substring, flattens to result list, across all locations                                                                                                                                  |
+| "All items" flat view (`?all=1`)                           | `Assets.tsx:1627`                           | every item, sortable, no drill-down                                                                                                                                                            |
+| Min-value filter (`?min=`)                                 | `Assets.tsx:1742-1750`                      | flat views only; ISK shorthand accepted                                                                                                                                                        |
+| Flat sort (Name/Value/Quantity)                            | `assetSortPreference.ts`                    | device-local                                                                                                                                                                                   |
+| Location sort (Name/Value/Item count/Jumps away)           | `stationSortPreference.ts`                  | device-local; pins always first                                                                                                                                                                |
+| Open for one Character (`?char=<id>`, alias `?chars=<id>`) | `Assets.tsx`                                | Shows that Character's assets with a "Name only" readout and, from the Wallet chart, a ‹ Wallet crumb; the active Character is not switched. A Character without the scope gets its grant note |
+| Cross-character search (`?chars=`)                         | `Assets.tsx:719-798`                        | This/All Characters; only while a search is active                                                                                                                                             |
+| Station Pins                                               | `stationPins.ts`, `LocationRow`             | 3-state cycle, synced Editable Data                                                                                                                                                            |
+| Jumps away + security                                      | `Assets.tsx:1237-1466`                      | lazy, bounded to pinned/visible/open locations                                                                                                                                                 |
+| Route preference select                                    | `Assets.tsx:1905`                           | this-view override of Travel default                                                                                                                                                           |
+| Select mode + bulk actions                                 | `Assets.tsx:1658`                           | Quickbar, Compare, copy names, select all                                                                                                                                                      |
+| Item context menu                                          | `features/market/ItemContextMenu.tsx`       | right-click / long-press / More actions                                                                                                                                                        |
+| Item name link                                             | `assetBrowserRows.tsx` `ItemRow`            | name → Show info (Item Detail)                                                                                                                                                                 |
+| Value estimates + totals                                   | `engine/assetTree.ts`                       | average price; BPC from contract listings                                                                                                                                                      |
+| BPO/BPC badge                                              | `assetBrowserRows.tsx:134-148`              | blueprint stacks                                                                                                                                                                               |
+| Open in Fittings                                           | `Assets.tsx:1841-1855`                      | shown on a ship level                                                                                                                                                                          |
+| CSV/XLSX/copy export                                       | `assetsCsv.ts`                              | active Character, search-matched only                                                                                                                                                          |
+| Re-login, offline, truncated, stale-link states            | `Assets.tsx:1691-1722,1939`                 |                                                                                                                                                                                                |
+| Command Palette "Assets" group                             | `features/commandPalette/assetsProvider.ts` | item → `/assets?q=`                                                                                                                                                                            |
 
 ## Route, nav, gating
 
@@ -65,7 +66,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 `PageHeader` title "Assets":
 
 - Meta: `DataAgeBadge` (assets fetch), the Character filter control (`CharacterFilterControl`, size md; hidden for one-Character accounts), small spinner "Searching other characters…" while cross-character data loads.
-- Actions (right): **All items** toggle (`FlatList` icon, pressed state), **Select** toggle (select mode), `TableActionsMenu` (export), **Refresh**.
+- Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Consolidate, Select, My ships (hint "nearest first"), **Refresh** (with the data's age) and Export table ▸.
 - Below: `SearchInput` "Search items…" — only shown when assets are loaded and no re-login needed. Debounced 250 ms for matching; input stays instant.
 - Select-mode bar (when on) between search and list.
 - List panel fills the viewport height (`h-[calc(100dvh-…)]`); only the list scrolls (virtualized with TanStack Virtual, overscan 10, measured heights because rows wrap on phones).
