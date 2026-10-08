@@ -1113,6 +1113,18 @@
         "coreFuel": "Core fuel {{before}} → {{after}} per activation"
       }
     },
+    "makeItFit": {
+      "trigger": "Make it fit…",
+      "title": "Make it fit",
+      "searching": "Trying every variant swap…",
+      "hint": "Smallest changes that bring the Fitting under budget. Click one to apply it.",
+      "swap": "{{from}} → {{to}}",
+      "nothingFits": "No swap or pair of swaps brings this Fitting under budget. Try a bigger skill, an implant, or a different module.",
+      "fits": "This Fitting is already within its CPU, powergrid and calibration budget.",
+      "noPrice": "No price for these",
+      "saves": "Saves",
+      "costs": "Costs"
+    },
     "variations": {
       "title": "Variations",
       "swapTitle": "Swap for a variation",
