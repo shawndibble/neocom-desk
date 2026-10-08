@@ -5,14 +5,14 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { formatDuration } from '@/lib/duration';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow } from './marketWideOpportunities';
 import { MobileMarketWideList } from './MobileMarketWideList';
 
 const row = (
   productTypeID: number,
   productName: string,
-  extra: Partial<MarketWideResultRow> = {}
-): MarketWideResultRow =>
+  extra: Partial<MarketWideDayRow> = {}
+): MarketWideDayRow =>
   ({
     productTypeID,
     productName,
@@ -20,12 +20,13 @@ const row = (
     blueprintSource: 'contract',
     priceCapped: false,
     iskPerHour: 2_000_000,
+    iskPerDay: 40_000_000,
     buildCost: 5_000_000,
     orderDepth: 'deep',
     marginPct: 18.4,
     seconds: 3600,
     ...extra,
-  }) as unknown as MarketWideResultRow;
+  }) as unknown as MarketWideDayRow;
 
 const rows = [
   row(200, 'Widget Beta', { blueprintSource: 'owned', marginPct: 22.5 }),
@@ -41,6 +42,7 @@ function renderList(
       {withItemActions(
         <MobileMarketWideList
           rows={rows}
+          salesShare="10"
           total={812}
           sort={{ columnId: 'iskPerHour', direction: 'desc' }}
           onSortChange={onSortChange}
@@ -107,5 +109,16 @@ describe('MobileMarketWideList', () => {
     const beta = within(card('Widget Beta'));
     expect(beta.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     expect(beta.getByRole('button', { name: /Start a plan/ })).toBeInTheDocument();
+  });
+});
+
+describe('ISK/day', () => {
+  it('shows ISK/day beside ISK/hour, and a dash while daily sales are loading', () => {
+    renderList({
+      rows: [row(400, 'Widget Delta'), row(500, 'Widget Epsilon', { iskPerDay: null })],
+    });
+    expect(within(card('Widget Delta')).getByText(/ISK\/day:/)).toBeInTheDocument();
+    expect(within(card('Widget Delta')).getByTestId('hero')).toHaveTextContent('ISK/hour');
+    expect(within(card('Widget Epsilon')).getByText(/ISK\/day:\s*—/)).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@ import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import type { OpportunityRow } from './opportunities';
 import type { OwnedBlueprintRow } from './ownedBlueprints';
-import type { MarketWideResultRow } from './marketWideOpportunities';
+import type { MarketWideDayRow } from './marketWideOpportunities';
 import { isCardOwnClick, startPlanOnce, useRowStartPlan } from './rowStartPlan';
 import { StartPlanButton } from './StartPlanButton';
 import { MobileOpportunityList } from './MobileOpportunityList';
@@ -232,16 +232,18 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
       blueprintSource: 'contract',
       priceCapped: false,
       iskPerHour: 1,
+      iskPerDay: 1,
       buildCost: 1,
       orderDepth: 'deep',
       marginPct: 1,
       seconds: 60,
-    } as unknown as MarketWideResultRow;
+    } as unknown as MarketWideDayRow;
     const onStartPlan = vi.fn(() => Promise.resolve(false));
     render(
       wrap(
         <MobileMarketWideList
           rows={[mw]}
+          salesShare="10"
           total={1}
           sort={{ columnId: 'iskPerHour', direction: 'desc' }}
           onSortChange={() => {}}
