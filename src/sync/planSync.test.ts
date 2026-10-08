@@ -28,6 +28,7 @@ import {
   markBuildPlansDeleted,
   markPlanDeleted,
   markProductionRunDeleted,
+  removeProductionLoss,
   removeProductionOrderWatch,
   removeProductionSaleLink,
   resetSyncHalt,
@@ -138,6 +139,7 @@ const PLANET_RICHNESS_PATH = 'characters/char:1/planetRichness';
 const PRODUCTION_RUNS_PATH = 'characters/char:1/productionRuns';
 const PRODUCTION_SALE_LINKS_PATH = 'characters/char:1/productionSaleLinks';
 const PRODUCTION_ORDER_WATCHES_PATH = 'characters/char:1/productionOrderWatches';
+const PRODUCTION_LOSSES_PATH = 'characters/char:1/productionLosses';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
 
@@ -354,6 +356,7 @@ beforeEach(async () => {
     db.productionRuns.clear(),
     db.productionSaleLinks.clear(),
     db.productionOrderWatches.clear(),
+    db.productionLosses.clear(),
   ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
@@ -1241,6 +1244,30 @@ describe('triggerSync: Production Log (#525)', () => {
     expect(await db.productionOrderWatches.get('1:order:2001')).toBeUndefined();
     expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1001')?.deleted).toBe(true);
     expect(remoteStore.get(PRODUCTION_ORDER_WATCHES_PATH)?.get('1:order:2001')?.deleted).toBe(true);
+  });
+
+  it('cascades markProductionRunDeleted to the run’s losses and removeProductionLoss tombstones one', async () => {
+    const lossRow = (id: string) => ({
+      id,
+      characterId: 1,
+      runId: 'run-1',
+      quantity: 2,
+      lostAt: Date.now() - 1000,
+      insurancePayout: 0,
+      createdAt: Date.now() - 1000,
+      updatedAt: Date.now() - 1000,
+    });
+    await db.productionRuns.put(productionRun());
+    await db.productionLosses.bulkPut([lossRow('1:loss:a'), lossRow('1:loss:b')]);
+    await triggerSync(1);
+
+    await removeProductionLoss(1, '1:loss:a');
+    await markProductionRunDeleted(1, 'run-1');
+    await triggerSync(1);
+
+    expect(await db.productionLosses.count()).toBe(0);
+    expect(remoteStore.get(PRODUCTION_LOSSES_PATH)?.get('1:loss:a')?.deleted).toBe(true);
+    expect(remoteStore.get(PRODUCTION_LOSSES_PATH)?.get('1:loss:b')?.deleted).toBe(true);
   });
 
   it('gives two sale links against the same run independent documents, so linking different sales on two devices never collides (issue #525 finding 1/2)', async () => {

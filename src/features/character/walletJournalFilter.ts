@@ -76,6 +76,59 @@ export function journalNetTotal(entries: readonly WalletJournalEntry[]): number 
   return entries.reduce((total, entry) => total + (entry.amount ?? 0), 0);
 }
 
+export interface RefTypeBreakdownRow {
+  refType: string;
+  /** Sum of the positive amounts. */
+  income: number;
+  /** Sum of the negative amounts, as a positive magnitude. */
+  expense: number;
+  net: number;
+  count: number;
+}
+
+export interface JournalBreakdown {
+  totalIn: number;
+  /** A positive magnitude. */
+  totalOut: number;
+  net: number;
+  /** One row per ref type, largest absolute net first. */
+  rows: RefTypeBreakdownRow[];
+}
+
+/** Where the ISK came from and went: income, expense and net per `ref_type` (issue #2858). A missing `amount` counts as zero. */
+export function journalRefTypeBreakdown(entries: readonly WalletJournalEntry[]): JournalBreakdown {
+  const byType = new Map<string, RefTypeBreakdownRow>();
+  for (const entry of entries) {
+    const amount = entry.amount ?? 0;
+    const row = byType.get(entry.ref_type) ?? {
+      refType: entry.ref_type,
+      income: 0,
+      expense: 0,
+      net: 0,
+      count: 0,
+    };
+    if (amount > 0) row.income += amount;
+    else row.expense -= amount;
+    row.net += amount;
+    row.count += 1;
+    byType.set(entry.ref_type, row);
+  }
+  const rows = [...byType.values()].sort(
+    (a, b) => Math.abs(b.net) - Math.abs(a.net) || a.refType.localeCompare(b.refType)
+  );
+  const totalIn = rows.reduce((sum, row) => sum + row.income, 0);
+  const totalOut = rows.reduce((sum, row) => sum + row.expense, 0);
+  return { totalIn, totalOut, net: totalIn - totalOut, rows };
+}
+
+/** A breakdown row click: select that ref type, or clear it when it is already the one selected. */
+export function toggleBreakdownRefType(
+  filter: WalletJournalFilter,
+  refType: string
+): WalletJournalFilter {
+  return { ...filter, refType: filter.refType === refType ? null : refType };
+}
+
 /**
  * The distinct raw `ref_type` values present in a journal, sorted. Empties are
  * dropped: an empty option value reads as "nothing selected" to the filter's
