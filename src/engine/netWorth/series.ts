@@ -19,6 +19,18 @@ export function layerValues(row: NetWorthSnapshotRow): LayerValues {
   };
 }
 
+/**
+ * The layers worth offering: ISK and Assets always, the rest only when some
+ * snapshot day holds a non-zero value for them. Reads rows as stored, so a
+ * layer an older row lacks appears once any row carries it.
+ */
+export function listedLayers(snapshots: readonly NetWorthSnapshotRow[]): LayerId[] {
+  const values = snapshots.map(layerValues);
+  return LAYER_IDS.filter(
+    (id) => id === 'isk' || id === 'assets' || values.some((v) => v[id] !== 0)
+  );
+}
+
 export function netWorthOf(values: LayerValues, shown: readonly LayerId[]): number {
   return shown.reduce((sum, id) => sum + values[id], 0);
 }
