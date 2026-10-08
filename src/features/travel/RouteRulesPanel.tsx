@@ -13,6 +13,9 @@
  *   And Use jump bridges (issue #2478), with the Ansiblex list behind it:
  *   a device-local default, since the list itself never leaves the device.
  *
+ * Those two groups sit behind one "More route options" disclosure (issue #3084),
+ * closed by default, with an "N on" readout in its header while either is on.
+ *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -23,6 +26,7 @@ import {
   Button,
   Checkbox,
   CollapsiblePanel,
+  Disclosure,
   Select,
   SelectContent,
   SelectItem,
@@ -123,11 +127,14 @@ export function RouteHoleFields({
   onChange,
   bridges,
   bare = false,
+  nested = false,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
   bare?: boolean;
+  /** Inside a disclosure that already draws the rule and padding above it. */
+  nested?: boolean;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
@@ -135,7 +142,11 @@ export function RouteHoleFields({
   const { hulls } = useRouteShipMass();
   const shipTypeId = useRouteShipTypeId((state) => state.value);
   return (
-    <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
+    <section
+      className={
+        bare ? 'space-y-3 text-xs' : nested ? 'space-y-3' : 'space-y-3 border-t border-line pt-4'
+      }
+    >
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
       <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
@@ -302,10 +313,12 @@ export function RouteRulesPanel({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [expanded, setExpanded] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const penaltyId = useId();
   // Held until every setting is read, so a click cannot write a default over a stored value.
   const { settingsHydrated, podKillsUnavailable } = useRouteRules();
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
+  const moreOn = Number(holeQuery.enabled) + Number(bridges.bridgeQuery.enabled);
 
   return (
     <CollapsiblePanel
@@ -357,7 +370,17 @@ export function RouteRulesPanel({
             />
           </section>
 
-          <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} />
+          <Disclosure
+            label={t('travel.rules.more')}
+            trailing={moreOn > 0 ? t('travel.rules.moreOn', { count: moreOn }) : undefined}
+            expanded={moreOpen}
+            onToggle={() => setMoreOpen((open) => !open)}
+            className="-mx-3 border-t border-line"
+          >
+            <div className="p-3">
+              <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} nested />
+            </div>
+          </Disclosure>
         </div>
       ) : (
         <Spinner />
