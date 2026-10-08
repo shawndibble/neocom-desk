@@ -3877,8 +3877,7 @@
     "journalBreakdownOut": "Out",
     "journalBreakdownNet": "Net",
     "journalBreakdownRefType": "Ref type",
-    "journalBreakdownIncome": "Income",
-    "journalBreakdownExpense": "Expense",
+    "journalBreakdownBothSides": "in {{in}} · out {{out}}",
     "journalBreakdownShow": "Show breakdown",
     "journalBreakdownHide": "Hide breakdown"
   },

@@ -467,6 +467,25 @@ describe('Wallet', () => {
     expect(await screen.findByText('Donation')).toBeInTheDocument();
   });
 
+  it('shows one compact signed Net column in the breakdown (issue #2995)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    const headers = within(breakdown)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers).toEqual(['Ref type', 'Net']);
+    const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
+    expect(bountyRow).toHaveTextContent('+1K');
+    // Single-sided ref types carry no second in/out line.
+    expect(breakdown).not.toHaveTextContent(/in S+ · out/);
+    // The In / Out / Net summary is compact, not full figures.
+    expect(screen.getAllByText('+500').length).toBeGreaterThan(0);
+  });
+
   it('tones the filtered net total by sign (issue #1961)', async () => {
     const user = userEvent.setup();
     render(<App />);
