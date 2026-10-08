@@ -12,6 +12,7 @@
  * counts the request as part of the tap.
  */
 import { requestNotificationPermission, type NotificationPermissionState } from './permission';
+import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
@@ -40,12 +41,13 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       const { registerDeviceForWebPush } = await deviceRegistration;
       const registration = await navigator.serviceWorker.ready;
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-      await registerDeviceForWebPush(vapidKey, registration);
+      settlePushRegistration(await registerDeviceForWebPush(vapidKey, registration));
     } catch (err) {
       // Registration failing must not undo a permission grant the browser
       // already gave — the user is still enrolled for the feed/foreground
       // channel either way, and this is retried on the next Enable tap.
       console.error('Web Push device registration failed', err);
+      void recordPushFailure(err);
     }
   }
   return { support, permission };

@@ -881,6 +881,32 @@ export interface ProductionSaleLinkRecord {
 }
 
 /**
+ * A Run Loss (issue #2851): units of a Production Run destroyed or lost
+ * before they sold, optionally offset by an insurance payout. One record per
+ * loss, like a sale link, so a run can carry several (5 lost now, 3 later).
+ * Writes the lost units off Unsold cost and counts `insurancePayout` as
+ * untaxed proceeds; it never changes how Realized profit charges the run cost.
+ */
+export interface ProductionLossRecord {
+  /** `${characterId}:loss:${journalEntryId}` for a picked payout, else `${characterId}:loss:${uuid}`. */
+  id: string;
+  characterId: number;
+  runId: string;
+  quantity: number;
+  /** Epoch ms of the day the units were lost. */
+  lostAt: number;
+  /** ISK paid out by insurance; 0 for none. */
+  insurancePayout: number;
+  /** The wallet-journal entry the payout was picked from, when it was. */
+  journalEntryId?: number;
+  /** Optional short note. */
+  note?: string;
+  createdAt: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/**
  * One of the character's own open sell orders, watched for fills against a
  * Production Run's output ("Watch Open Order", issue #525) — tracks
  * `volume_remain` directly rather than a wallet-transaction lookup, so it
@@ -1045,6 +1071,7 @@ export const db = new Dexie('neocom') as Dexie & {
   productionRuns: EntityTable<ProductionRunRecord, 'id'>;
   productionSaleLinks: EntityTable<ProductionSaleLinkRecord, 'id'>;
   productionOrderWatches: EntityTable<ProductionOrderWatchRecord, 'id'>;
+  productionLosses: EntityTable<ProductionLossRecord, 'id'>;
   payees: EntityTable<PayeeRecord, 'id'>;
   fittings: EntityTable<FittingRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
@@ -1544,4 +1571,35 @@ db.version(22).stores({
   ansiblexGates: 'id',
   industryJobHistory: 'characterId',
   netWorthSnapshots: 'id, characterId',
+});
+
+// Adds `productionLosses`, Run Loss records (issue #2851).
+db.version(23).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
+  netWorthSnapshots: 'id, characterId',
+  productionLosses: 'id, characterId, runId',
 });

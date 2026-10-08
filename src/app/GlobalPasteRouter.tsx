@@ -8,6 +8,7 @@ import {
   OVERLAY_SELECTOR,
   type FittingLoadState,
   type MarketAppraiseState,
+  type PilotListState,
 } from '@/lib/shortcuts';
 import { MARKET_TABS } from './pageTabs';
 
@@ -20,6 +21,10 @@ const DESTINATIONS: Record<PasteDestination, (text: string) => [string, { state:
   appraisal: (text) => [
     tabPath(MARKET_TABS, 'appraisal'),
     { state: { appraiseText: text } satisfies MarketAppraiseState },
+  ],
+  pilotList: (text) => [
+    '/pilot-lookup',
+    { state: { pilotListText: text } satisfies PilotListState },
   ],
 };
 

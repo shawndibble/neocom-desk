@@ -29,6 +29,7 @@ import {
   type PilotKillmailsResult,
 } from '@/lib/zkillboard';
 import { loadTypes } from '@/sde/loadSde';
+import { LossSummary } from './LossSummary';
 import { loadKillmailFit, type KillmailFitResult } from './pilotKillmailFit';
 
 type TypeLabel = (typeId: number) => string;
@@ -49,6 +50,7 @@ function nameIds(detail: KillmailDetail | null): number[] {
 export function PilotKillmailsSection({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const [result, setResult] = useState<PilotKillmailsResult | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [expanded, setExpanded] = useState<ReadonlyMap<number, Expanded>>(new Map());
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
@@ -65,7 +67,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,9 +144,18 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           {t('travel.pilot.recent.loading')}
         </p>
       ) : !result.ok ? (
-        <p role="status" className="text-xs text-warning">
-          {t('travel.pilot.recent.failed')}
-        </p>
+        <div role="status" className="flex items-center gap-2 text-xs text-warning">
+          <span>{t('travel.pilot.recent.failed')}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setResult(null);
+              setAttempt((n) => n + 1);
+            }}
+          >
+            {t('travel.pilot.retry')}
+          </Button>
+        </div>
       ) : entries.length === 0 ? (
         <p className="text-xs text-text-dim">{t('travel.pilot.recent.empty')}</p>
       ) : (
@@ -263,6 +274,11 @@ function KillmailRow({
       {isOpen && (
         <div id={panelId} className="border-t border-line bg-panel-2 px-3 py-2">
           <KillmailFit read={read} typeLabel={typeLabel} />
+          {entry.side === 'loss' && detail !== null && (
+            <div className="mt-2 border-t border-line pt-2">
+              <LossSummary detail={detail} zkbValue={entry.value} />
+            </div>
+          )}
         </div>
       )}
     </li>

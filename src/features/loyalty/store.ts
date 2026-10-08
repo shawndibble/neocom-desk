@@ -12,6 +12,7 @@ import {
 import {
   conditionalFetch,
   loadWithCache,
+  loadWithCacheStatus,
   GLOBAL_CACHE_CHARACTER_ID,
   STALE_AFTER,
   type CachedResult,
@@ -25,21 +26,33 @@ function corpNameCacheKey(corporationId: number): string {
   return `corp-name:${corporationId}`;
 }
 
-/** A corp's current LP store offers, or null if unresolvable (offline + uncached). */
-export async function loadLoyaltyStoreOffers(
+/**
+ * A corp's current LP store offers. `result` is null when unresolvable;
+ * `failed` says whether that is because ESI did not answer (and nothing was
+ * cached), so a page can show an error rather than an empty store.
+ */
+export async function loadLoyaltyStoreOffersStatus(
   corporationId: number
-): Promise<CachedResult<LoyaltyStoreOffer[]> | null> {
+): Promise<{ result: CachedResult<LoyaltyStoreOffer[]> | null; failed: boolean }> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getLoyaltyStoreOffers(corporationId, options)
   );
-  return loadWithCache(
+  const { cached, fetchFailed } = await loadWithCacheStatus(
     GLOBAL_CACHE_CHARACTER_ID,
     offersCacheKey(corporationId),
     fetchLive,
     // Offers change with balance passes / new content, not minute to minute —
     // same cadence as a station or universe type.
-    { staleAfterMs: STALE_AFTER.static, conditional }
+    { staleAfterMs: STALE_AFTER.static, conditional, reportFetchFailure: true }
   );
+  return { result: cached, failed: fetchFailed === true };
+}
+
+/** A corp's current LP store offers, or null if unresolvable (offline + uncached). */
+export async function loadLoyaltyStoreOffers(
+  corporationId: number
+): Promise<CachedResult<LoyaltyStoreOffer[]> | null> {
+  return (await loadLoyaltyStoreOffersStatus(corporationId)).result;
 }
 
 /** A corporation's display name, or null if unresolvable (offline + uncached). */
