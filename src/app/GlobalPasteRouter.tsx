@@ -43,9 +43,11 @@ const DESTINATIONS: Record<
   // `?info=type-<id>` a name link makes); a system opens Route Safety.
   chatLink: (text, here) => {
     const link = parseChatLink(text);
-    if (link?.kind === 'system') return [routeToHref(link.id), { state: null }];
+    // The detector already found a link; null only means "stay on this page".
+    if (link === null) return [`${here.pathname}${here.search}`, { state: null }];
+    if (link.kind === 'system') return [routeToHref(link.id), { state: null }];
     return [
-      entityInfoHref(here, { kind: 'type', id: link?.id ?? 0 }),
+      entityInfoHref(here, { kind: 'type', id: link.id }),
       { state: ENTITY_INFO_PUSHED_STATE },
     ];
   },
