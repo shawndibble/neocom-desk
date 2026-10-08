@@ -23,6 +23,8 @@ export interface IconButtonClassNameOptions {
   /** Toggle state — takes the accent treatment when on. */
   pressed?: boolean;
   disabled?: boolean;
+  /** The button also shows a text label from `md` up, so it is wider than a square there. */
+  withText?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export function iconButtonClassName({
   size = 'md',
   pressed,
   disabled = false,
+  withText = false,
   className = '',
 }: IconButtonClassNameOptions = {}): string {
   return cx(
@@ -52,11 +55,17 @@ export function iconButtonClassName({
     interactiveClassName,
     focusRingClassName,
     disabledClassName,
-    size === 'md'
-      ? 'size-11 md:size-9 touch:size-11'
-      : size === 'row'
-        ? 'size-11 md:size-7 touch:size-11'
-        : 'size-9 md:size-7 touch:size-9',
+    // A labelled button keeps the square box below `md` and swaps to auto width
+    // above it: one size utility per breakpoint, never two fighting at `md:`.
+    withText
+      ? size === 'sm' || size === 'row'
+        ? 'size-9 md:size-auto md:h-7 md:gap-1.5 md:px-2 touch:h-9 touch:min-w-9'
+        : 'size-11 md:size-auto md:h-9 md:gap-1.5 md:px-2.5 touch:h-11 touch:min-w-11'
+      : size === 'md'
+        ? 'size-11 md:size-9 touch:size-11'
+        : size === 'row'
+          ? 'size-11 md:size-7 touch:size-11'
+          : 'size-9 md:size-7 touch:size-9',
     // `border` alone here: each state below names its own border colour, so no
     // two border-colour utilities ever land on the element at once. Tailwind
     // resolves same-property utilities by stylesheet order, not by their order

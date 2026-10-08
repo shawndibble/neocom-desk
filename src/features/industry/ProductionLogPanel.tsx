@@ -599,28 +599,33 @@ export function ProductionLogPanel({
           </div>
         </div>
 
-        {runRows.length === 0 ? (
-          <EmptyState
-            title={t('industry.productionLogFilteredEmptyTitle')}
-            hint={t('industry.productionLogFilteredEmptyHint')}
-            className="py-6"
-          />
-        ) : (
-          <div className="min-w-0 space-y-4">
-            {profitHistoryPoints.length >= 2 && (
-              <Suspense
-                fallback={
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('common.loading')} />
-                  </div>
-                }
-              >
-                <LazyProductionProfitChart
-                  points={profitHistoryPoints}
-                  trend={profitHistoryTrend}
-                />
-              </Suspense>
-            )}
+        {runRows.length > 0 && profitHistoryPoints.length >= 2 && (
+          <div className="min-w-0">
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              }
+            >
+              <LazyProductionProfitChart points={profitHistoryPoints} trend={profitHistoryTrend} />
+            </Suspense>
+          </div>
+        )}
+      </div>
+
+      {runRows.length === 0 ? (
+        <EmptyState
+          title={t('industry.productionLogFilteredEmptyTitle')}
+          hint={t('industry.productionLogFilteredEmptyHint')}
+          className="py-6"
+        />
+      ) : (
+        <>
+          {/* Full width, outside the totals/chart grid: eight figure columns
+                do not fit the column beside the totals, and with no chart
+                the totals would otherwise sit beside an empty column. */}
+          <div className="mt-4 min-w-0 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
                 <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -674,8 +679,8 @@ export function ProductionLogPanel({
               </div>
             </CollapsiblePanel>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       <SaleLinkingModals sale={sale} />
       <RunLossModals loss={runLoss} />

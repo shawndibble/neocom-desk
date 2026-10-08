@@ -3,10 +3,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import type { PilotListRow } from './pilotListData';
 
-const mocks = vi.hoisted(() => ({ loadPilotList: vi.fn() }));
+const mocks = vi.hoisted(() => ({ loadPilotList: vi.fn(), syncConfigured: true }));
 vi.mock('./pilotListData', () => ({ loadPilotList: mocks.loadPilotList }));
+vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => mocks.syncConfigured }));
 
-import { PilotListView } from './PilotListView';
+import { DscanShareControl, PilotListView } from './PilotListView';
 
 function stats(dangerRatio: number, gangRatio: number, kills: number) {
   return {
@@ -78,7 +79,6 @@ describe('PilotListView (Local list)', () => {
   it('sorts by danger, highest first, and keeps unknown rows below', async () => {
     render(
       <PilotListView
-        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 0 }}
         onOpen={() => undefined}
       />
@@ -87,7 +87,7 @@ describe('PilotListView (Local list)', () => {
     const names = within(table)
       .getAllByRole('row')
       .slice(1)
-      .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+      .map((row) => within(row).getAllByRole('cell')[0]?.firstChild?.textContent);
     expect(names.slice(0, 2)).toEqual(['Risky', 'Calm']);
     expect(within(table).getByText('90%')).toBeTruthy();
   });
@@ -95,7 +95,6 @@ describe('PilotListView (Local list)', () => {
   it('tells the three missing-data states apart', async () => {
     render(
       <PilotListView
-        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 0 }}
         onOpen={() => undefined}
       />
@@ -110,7 +109,6 @@ describe('PilotListView (Local list)', () => {
     const onOpen = vi.fn();
     render(
       <PilotListView
-        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 12 }}
         onOpen={onOpen}
       />
@@ -118,5 +116,34 @@ describe('PilotListView (Local list)', () => {
     fireEvent.click(await screen.findByText('Risky'));
     expect(onOpen).toHaveBeenCalledWith(2);
     expect(screen.getByText(/12 more not looked up/)).toBeTruthy();
+  });
+});
+
+describe('DscanShareControl', () => {
+  const scan = (text: string) => ({ kind: 'dscan' as const, typeIds: [626], rows: [], text });
+  const TAB = String.fromCharCode(9);
+  const NL = String.fromCharCode(10);
+  const SCAN = ['626', '587', '626', '587']
+    .map((id) => [id, 'X', 'Ship', '1 km'].join(TAB))
+    .join(NL);
+  const share = () => screen.getByRole('button', { name: 'Copy Share Link' });
+
+  beforeEach(() => {
+    mocks.syncConfigured = true;
+  });
+
+  it('is a labelled button, enabled for a signed-in character', () => {
+    render(<DscanShareControl paste={scan(SCAN)} characterId={1} />);
+    expect(share()).toBeEnabled();
+  });
+
+  it('is disabled without a character', () => {
+    render(<DscanShareControl paste={scan(SCAN)} characterId={null} />);
+    expect(share()).toBeDisabled();
+  });
+
+  it('is disabled when the scan is too large to share', () => {
+    render(<DscanShareControl paste={scan(SCAN + NL + 'x'.repeat(60_000))} characterId={1} />);
+    expect(share()).toBeDisabled();
   });
 });

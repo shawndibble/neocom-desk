@@ -320,6 +320,7 @@ function DataAgePanel() {
       {
         id: 'updated',
         header: t('dataAge.columnUpdated'),
+        cardCorner: true,
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (entry) => entry.timestamp,
         render: (entry) => (
@@ -353,7 +354,10 @@ function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
-            responsive="table"
+            // §4a: a log read row by row, not compared across columns, so a
+            // phone gets a two-line card (endpoint, then character) with the
+            // age at the right, not a table wider than the screen.
+            stackLayout="dense"
           />
         )}
       </div>

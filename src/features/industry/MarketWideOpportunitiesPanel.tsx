@@ -596,7 +596,9 @@ export function MarketWideOpportunitiesPanel({
       pointerSurface="popover"
     >
       {(draft, setDraft) => (
-        <>
+        // Two controls per row in the phone sheet so Apply stays in view; the
+        // chips sit together on the last row. `lg:contents` leaves the popover as it was.
+        <div className="grid w-full grid-cols-2 gap-3 lg:contents">
           <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>
             <Select
               value={draft.maxBuildCost}
@@ -644,7 +646,7 @@ export function MarketWideOpportunitiesPanel({
           <div
             role="group"
             aria-label={t('industry.marketOpportunitiesFilters.skills')}
-            className="flex flex-wrap items-center gap-2"
+            className="flex flex-wrap items-center gap-2 max-lg:order-1"
           >
             <span className="text-text-dim">{t('industry.marketOpportunitiesFilters.skills')}</span>
             <FilterChip
@@ -681,7 +683,7 @@ export function MarketWideOpportunitiesPanel({
           <div
             role="group"
             aria-label={t('industry.marketOpportunitiesFilters.sales')}
-            className="flex flex-wrap items-center gap-2"
+            className="flex flex-wrap items-center gap-2 max-lg:order-1"
           >
             <span className="text-text-dim">{t('industry.marketOpportunitiesFilters.sales')}</span>
             <FilterChip
@@ -692,7 +694,7 @@ export function MarketWideOpportunitiesPanel({
               onToggle={() => setDraft({ ...draft, hideRarelySold: !draft.hideRarelySold })}
             />
           </div>
-        </>
+        </div>
       )}
     </FilterBar>
   );
@@ -807,6 +809,7 @@ export function MarketWideOpportunitiesPanel({
           ) : (
             <MobileMarketWideList
               rows={shownRows}
+              salesShare={filter.salesShare}
               total={visibleRows.length}
               {...sortProps}
               skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}

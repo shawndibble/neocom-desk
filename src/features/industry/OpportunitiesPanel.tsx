@@ -606,7 +606,11 @@ export function OpportunitiesPanel({
       value={stockFilter}
       onValueChange={(next) => setStockFilter(next as typeof stockFilter)}
     >
-      <SelectTrigger size="sm" aria-label={t('industry.opportunitiesUseMyStock')}>
+      <SelectTrigger
+        size="sm"
+        aria-label={t('industry.opportunitiesUseMyStock')}
+        className="min-w-0 flex-1"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -656,7 +660,9 @@ export function OpportunitiesPanel({
       {view === 'ranked' && stockFilterControl}
     </span>
   ) : (
-    <span className="flex items-center gap-2">
+    // A second header row on a phone, so the stock select gets the full width
+    // instead of colliding with the view picker and Refresh.
+    <span className="flex items-center gap-2 max-md:basis-full">
       {characterFilterControl}
       {view === 'ranked' && stockFilterControl}
     </span>
@@ -676,7 +682,7 @@ export function OpportunitiesPanel({
           <Button size="sm" onClick={refresh} disabled={loading}>
             {t('industry.opportunitiesRefresh')}
           </Button>
-          <span className="text-xs text-text-dim">
+          <span className="text-xs text-text-dim max-md:sr-only">
             {t('industry.opportunitiesManualOnly', { count: AUTO_RECALCULATE_MAX })}
           </span>
         </>
@@ -708,6 +714,7 @@ export function OpportunitiesPanel({
       title={title}
       leading={viewPicker}
       meta={meta}
+      wrapMeta
       actions={
         <span className="flex items-center gap-2">
           {pricingActions}

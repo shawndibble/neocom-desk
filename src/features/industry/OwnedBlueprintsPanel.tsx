@@ -446,6 +446,7 @@ export function OwnedBlueprintsPanel({
       title={title}
       leading={leading}
       meta={meta}
+      wrapMeta
       actions={
         <span className="flex items-center gap-2">
           {pricingActions}

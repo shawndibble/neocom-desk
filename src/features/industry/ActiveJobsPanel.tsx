@@ -727,7 +727,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
   const navigateToPlanWithSeed = useCallback(
     async (planId: string, job: Pick<ActiveJob, 'runs' | 'cost'> & { characterId: number }) => {
-      // Active Jobs' cross-character view (issue #607) can surface a done
+      // the Jobs panel's cross-character view (issue #607) can surface a done
       // job for a character other than the active one — the plan page
       // redirects away from any plan whose `characterId` isn't the active
       // Character's, so this job's own owner must become active first, or

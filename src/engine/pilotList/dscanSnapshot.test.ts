@@ -19,6 +19,7 @@ describe('dscan snapshot', () => {
     if (sender?.kind !== 'dscan') throw new Error('expected a D-Scan');
     expect(parsed?.typeIds).toEqual(sender.typeIds);
     expect(parsed?.text).toBe(sender.text);
+    expect(parsed?.rows).toEqual(sender.rows);
   });
 
   it('refuses text that is not a D-Scan', () => {

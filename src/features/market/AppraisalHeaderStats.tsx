@@ -47,7 +47,7 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   return (
-    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
@@ -77,14 +77,14 @@ export function AppraisalHeaderStats({
       <Group title={t('market.appraisal.groupWorth')}>
         <StatChip
           label={t('market.appraisal.sellTotal')}
-          value={<FullIskTotal value={totals.sell} />}
+          value={<FullIskTotal value={totals.sell} compact />}
           tone="accent"
           emphasis
           tooltip={t('market.appraisal.sellTotalHelp')}
         />
         <StatChip
           label={t('market.appraisal.buyTotal')}
-          value={<FullIskTotal value={totals.buy} />}
+          value={<FullIskTotal value={totals.buy} compact />}
           tooltip={t('market.appraisal.buyTotalHelp')}
         />
         <StatChip

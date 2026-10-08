@@ -138,6 +138,7 @@ export function TableActionsMenu<T>({
   size = 'sm',
   label: labelOverride,
   triggerText,
+  showLabel,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
@@ -148,6 +149,8 @@ export function TableActionsMenu<T>({
   label?: string;
   /** Shows the word on the trigger (grid icon, text, caret) instead of a bare ⋯ icon: a page's named Tools menu. */
   triggerText?: string;
+  /** Tier 2: an export-only trigger shows "Export" beside the download icon from `md` up. */
+  showLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
@@ -193,6 +196,11 @@ export function TableActionsMenu<T>({
             }
             label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
             size={size}
+            visibleLabel={
+              showLabel && exportOnly && copied === null
+                ? t('common.tableExport.exportVerb')
+                : undefined
+            }
           />
         )}
       </DropdownMenuTrigger>

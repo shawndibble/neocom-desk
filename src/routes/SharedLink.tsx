@@ -28,7 +28,7 @@ function appraisalState(share: StoredShare): AppraisalShareState {
 
 function dscanState(share: StoredShare): DscanShareState {
   const scan = parseDscanSnapshot(share.payload);
-  return scan === null ? { status: 'invalid' } : { status: 'ready', typeIds: scan.typeIds };
+  return scan === null ? { status: 'invalid' } : { status: 'ready', rows: scan.rows };
 }
 
 /**

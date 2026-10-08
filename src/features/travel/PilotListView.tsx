@@ -13,10 +13,10 @@ import {
   Button,
   DataTable,
   EmptyState,
-  IconButton,
   Panel,
   Spinner,
   TextInput,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -28,9 +28,8 @@ import {
 } from '@/engine/pilotList/dscanSnapshot';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { writeToClipboard } from '@/lib/clipboard';
-import { bucketDscan, type DscanSummary } from '@/engine/pilotList/dscanClasses';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
-import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { FleetBoard } from './FleetBoard';
 import { loadPilotList, type PilotListRow } from './pilotListData';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
@@ -39,17 +38,16 @@ type DscanPaste = Extract<PilotPaste, { kind: 'dscan' }>;
 export function PilotListView({
   paste,
   onOpen,
-  characterId,
 }: {
   paste: PilotPaste;
   onOpen: (characterId: number) => void;
-  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
-  characterId: number | null;
 }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} onOpen={onOpen} />
   ) : (
-    <DscanClasses paste={paste} characterId={characterId} />
+    <Panel className="space-y-4">
+      <FleetBoard rows={paste.rows} />
+    </Panel>
   );
 }
 
@@ -95,7 +93,17 @@ function LocalList({
       header: t('travel.pilot.list.pilot'),
       stickyStart: true,
       sortValue: (row) => row.name.toLowerCase(),
-      render: (row) => row.name,
+      // Corporation and Alliance are dropped on a phone; the corporation rides under the name instead.
+      render: (row) => (
+        <>
+          {row.name}
+          {row.corporationName && (
+            <span className="block truncate text-[0.6875rem] text-text-dim sm:hidden">
+              {row.corporationName}
+            </span>
+          )}
+        </>
+      ),
     },
     {
       id: 'corporation',
@@ -127,6 +135,7 @@ function LocalList({
     },
     {
       id: 'gang',
+      phoneHidden: true,
       header: t('travel.pilot.list.gang'),
       align: 'right',
       className: 'tabular-nums',
@@ -203,7 +212,19 @@ type ShareState =
   | { status: 'copied'; url: string }
   | { status: 'manual'; url: string };
 
-function DscanClasses({ paste, characterId }: { paste: DscanPaste; characterId: number | null }) {
+/**
+ * "Copy Share Link" for a pasted D-Scan: a labelled action (DESIGN.md §6c)
+ * that sits in the status strip beside Clear. The stored-link field it may
+ * need when the clipboard refuses opens on a line of its own.
+ */
+export function DscanShareControl({
+  paste,
+  characterId,
+}: {
+  paste: DscanPaste;
+  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
+  characterId: number | null;
+}) {
   const { t } = useTranslation();
   const [share, setShare] = useState<ShareState>({ status: 'idle' });
   const [sharedPaste, setSharedPaste] = useState(paste);
@@ -250,125 +271,54 @@ function DscanClasses({ paste, characterId }: { paste: DscanPaste; characterId: 
     }
   }
 
-  return (
-    <Panel className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {share.status === 'manual' && (
-          <>
-            <label
-              htmlFor="pilot-dscan-share-url"
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-            >
-              {t('travel.pilot.dscan.shareReady')}
-            </label>
-            <TextInput
-              id="pilot-dscan-share-url"
-              size="sm"
-              readOnly
-              value={share.url}
-              onFocus={(event) => event.currentTarget.select()}
-              className="min-w-0 flex-1 font-mono"
-            />
-            <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
-              {t('travel.pilot.dscan.shareCopy')}
-            </Button>
-          </>
-        )}
-        <IconButton
-          size="sm"
-          icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-          label={t('travel.pilot.dscan.share')}
-          tooltip={
-            tooLarge
-              ? t('travel.pilot.dscan.shareTooLarge', {
-                  max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString(),
-                })
-              : share.status === 'saving'
-                ? t('travel.pilot.dscan.shareSaving')
-                : share.status === 'failed'
-                  ? t('travel.pilot.dscan.shareFailed')
-                  : share.status === 'copied'
-                    ? t('travel.pilot.dscan.shareCopied')
-                    : undefined
-          }
-          disabled={
-            characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
-          }
-          onClick={() => void handleShare()}
-        />
-      </div>
-      <DscanSummaryView typeIds={paste.typeIds} />
-    </Panel>
-  );
-}
-
-/** A D-Scan's ships counted by class — shared by the live view and a Shared D-Scan, so both bucket identically. */
-export function DscanSummaryView({ typeIds }: { typeIds: readonly number[] }) {
-  const { t } = useTranslation();
-  const [summary, setSummary] = useState<{ summary: DscanSummary; names: Map<number, string> }>();
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
-      if (cancelled) return;
-      const result = bucketDscan(typeIds, (typeId) => {
-        const type = types[String(typeId)];
-        return type === undefined
-          ? undefined
-          : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
-      });
-      const names = new Map<number, string>();
-      for (const c of result.classes) {
-        for (const { typeId } of c.types)
-          names.set(typeId, types[String(typeId)]?.name ?? `#${typeId}`);
+  const tooltip = tooLarge
+    ? t('travel.pilot.dscan.shareTooLarge', { max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString() })
+    : share.status === 'saving'
+      ? t('travel.pilot.dscan.shareSaving')
+      : share.status === 'failed'
+        ? t('travel.pilot.dscan.shareFailed')
+        : share.status === 'copied'
+          ? t('travel.pilot.dscan.shareCopied')
+          : undefined;
+  const button = (
+    <Button
+      size="sm"
+      disabled={
+        characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
       }
-      setSummary({ summary: result, names });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // Keyed on the ids themselves: a caller re-parsing the same scan hands a new array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeIds.join(',')]);
+      onClick={() => void handleShare()}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+        {t('travel.pilot.dscan.share')}
+      </span>
+    </Button>
+  );
 
-  if (summary === undefined) {
-    return (
-      <div className="flex justify-center py-10">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
-  if (summary.summary.classes.length === 0) {
-    return (
-      <EmptyState
-        title={t('travel.pilot.dscan.emptyTitle')}
-        hint={t('travel.pilot.dscan.emptyHint')}
-      />
-    );
-  }
   return (
-    <div className="space-y-4">
-      {summary.summary.classes.map((c) => (
-        <section key={c.bucket} aria-label={t(`travel.pilot.dscan.bucket.${c.bucket}`)}>
-          <h3 className="text-sm font-semibold text-text">
-            {t(`travel.pilot.dscan.bucket.${c.bucket}`)}{' '}
-            <span className="tabular-nums text-text-dim">{c.total}</span>
-          </h3>
-          <ul className="mt-1 space-y-0.5 text-xs text-text-dim">
-            {c.types.map(({ typeId, count }) => (
-              <li key={typeId} className="flex gap-2">
-                <span className="w-8 text-right tabular-nums">{count}</span>
-                <span>{summary.names.get(typeId)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      {summary.summary.leftOut > 0 && (
-        <p className="text-xs text-text-dim">
-          {t('travel.pilot.dscan.leftOut', { count: summary.summary.leftOut })}
-        </p>
+    <>
+      {tooltip === undefined ? button : <Tooltip content={tooltip}>{button}</Tooltip>}
+      {share.status === 'manual' && (
+        <div className="flex w-full items-center gap-2">
+          <label
+            htmlFor="pilot-dscan-share-url"
+            className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
+            {t('travel.pilot.dscan.shareReady')}
+          </label>
+          <TextInput
+            id="pilot-dscan-share-url"
+            size="sm"
+            readOnly
+            value={share.url}
+            onFocus={(event) => event.currentTarget.select()}
+            className="min-w-0 flex-1 font-mono"
+          />
+          <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
+            {t('travel.pilot.dscan.shareCopy')}
+          </Button>
+        </div>
       )}
-    </div>
+    </>
   );
 }

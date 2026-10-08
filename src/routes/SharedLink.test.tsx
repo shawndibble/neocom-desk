@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -97,7 +97,7 @@ describe('SharedLink', () => {
     );
   });
 
-  it('sends a visitor with no Character through login first', async () => {
+  it('offers a visitor with no Character a login here, and a way to choose permissions first', async () => {
     vi.mocked(loadShare).mockResolvedValue({
       ok: true,
       share: { type: 'appraisal', payload: SNAPSHOT, expiresAt: Date.now() + 1000 },
@@ -105,12 +105,9 @@ describe('SharedLink', () => {
     renderAt('/share/abc123XYZ');
 
     await screen.findByText('Tritanium');
-    await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'Open Neocom Desk' })).toHaveAttribute(
-        'href',
-        '/login'
-      )
-    );
+    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Open Neocom Desk' })).toBeNull();
   });
 
   it('says an expired or unknown link has expired', async () => {
