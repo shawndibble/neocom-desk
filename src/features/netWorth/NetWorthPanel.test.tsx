@@ -97,7 +97,7 @@ describe('NetWorthPanel, several Characters', () => {
     renderPanel();
     const table = await screen.findByRole('table', { name: 'Balance by character' });
     for (const name of ['ISK', 'Assets', 'Order escrow', 'Sell orders', 'Net worth']) {
-      expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+      expect(await within(table).findByRole('columnheader', { name })).toBeInTheDocument();
     }
     const row = within(table).getByText('Ava').closest('tr')!;
     expect(await within(row).findByText(/^1,134/)).toBeInTheDocument();
@@ -203,5 +203,61 @@ describe('NetWorthPanel, one Character', () => {
     renderPanel({ mode: 'single', characters: [A] });
     expect(await screen.findByText(/Layers start on/)).toBeInTheDocument();
     expect(screen.queryByText(/PLEX/)).not.toBeInTheDocument();
+  });
+});
+
+describe('NetWorthPanel, layers with no value', () => {
+  const bare = (characterId: number): NetWorthSnapshotRow => ({
+    ...snap(characterId, 100),
+    plexValue: 0,
+    escrow: 0,
+    sellStock: 0,
+  });
+
+  async function seedBare() {
+    await seed({ covered: [1, 2] });
+    // Ava holds nothing optional; Bo has escrow.
+    await db.netWorthSnapshots.bulkPut([bare(1), { ...bare(2), escrow: 30 }]);
+  }
+
+  it('leaves out layers that are zero everywhere, from the picker and the table', async () => {
+    const user = userEvent.setup();
+    await seedBare();
+    renderPanel({ mode: 'single', characters: [A] });
+    expect(await screen.findByRole('button', { name: 'Series: 2 of 2' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Series:/ }));
+    expect(await screen.findByRole('option', { name: 'ISK' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Assets' })).toBeInTheDocument();
+    for (const name of ['PLEX', 'Order escrow', 'Sell orders']) {
+      expect(screen.queryByRole('option', { name })).toBeNull();
+    }
+    const table = screen.getByRole('table', { name: 'Net worth by layer' });
+    expect(within(table).queryByText('PLEX')).toBeNull();
+  });
+
+  it('lists a layer when another Character in view holds it', async () => {
+    await seedBare();
+    renderPanel({ characters: [A, B] });
+    await userEvent.click(await screen.findByRole('button', { name: 'Series: 3 of 3' }));
+    expect(await screen.findByRole('option', { name: 'Order escrow' })).toBeInTheDocument();
+  });
+
+  it('keeps the unticked setting for a layer that is empty now and returns later', async () => {
+    await seedBare();
+    useNetWorthHiddenLayers.setState({ value: ['escrow'], hydrated: true });
+    const { unmount } = render(
+      <MemoryRouter>
+        <NetWorthPanel
+          mode="single"
+          characters={[A]}
+          liveWallet={new Map()}
+          onDrill={vi.fn()}
+          onBack={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('button', { name: 'Series: 2 of 2' })).toBeInTheDocument();
+    expect(useNetWorthHiddenLayers.getState().value).toEqual(['escrow']);
+    unmount();
   });
 });
