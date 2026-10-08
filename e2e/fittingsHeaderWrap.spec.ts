@@ -61,7 +61,7 @@ function headerOf(page: Page) {
 /** Every action button's top edge, the header's height and the badge group's width, in one layout. */
 async function measure(page: Page) {
   const header = headerOf(page);
-  const names = ['Fittings', 'Compare', 'Export', 'Save'];
+  const names = ['Fittings', 'Export', 'Save', 'Fitting actions'];
   const buttons = names.map((name) => header.getByRole('button', { name, exact: false }).first());
   for (const [i, button] of buttons.entries()) await expect(button, names[i]).toBeVisible();
   const handles = await Promise.all(buttons.map((button) => button.elementHandle()));

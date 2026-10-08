@@ -215,6 +215,8 @@
       "title": "My Fittings",
       "save": "Save",
       "update": "Update",
+      "saveDestination": "Save to My Fittings",
+      "updateDestination": "Update in My Fittings",
       "saved": "Saved",
       "saveAsNew": "Save as new…",
       "saveAsNewTitle": "Save as new",
@@ -312,6 +314,7 @@
     },
     "mastery": {
       "chip": "Mastery",
+      "menuItem": "Mastery skills…",
       "tooltip": "{{name}} Mastery — the skills its tiers ask for and how long they take",
       "title": "{{name}} Mastery",
       "hideCompleted": "Hide completed",
@@ -358,6 +361,16 @@
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
       "tooltipCantUse": "Can’t use: missing skills",
+      "tooltipCycle": "Click to set {{state}}",
+      "state": {
+        "offline": "Offline",
+        "online": "Online",
+        "active": "Active",
+        "overload": "Overheated"
+      },
+      "legend": {
+        "title": "Module states"
+      },
       "tooltipEmpty": "{{rack}} {{index}}: empty. Click to add, or drop a module here.",
       "tooltipEmptyClick": "{{rack}} {{index}}: empty. Tap to add.",
       "tooltipEmptyCompact": "{{rack}} {{index}}: empty",
@@ -1128,9 +1141,24 @@
       "showing": "Showing the best {{shown}} of {{total}}.",
       "hint": "Smallest changes that bring the Fitting under budget. Click one to apply it.",
       "swap": "{{from}} → {{to}}",
-      "nothingFits": "No swap or pair of swaps brings this Fitting under budget. Try a bigger skill, an implant, or a different module.",
+      "nothingFits": "No swap or pair of swaps brings this Fitting under budget. Try a bigger skill, an implant, or a different module from the List.",
       "fits": "This Fitting is already within its CPU, powergrid and calibration budget.",
-      "noPrice": "No price for these",
+      "noPrice": "Options without a price show no cost.",
+      "details": "All changes",
+      "resistsLower": "resists lower",
+      "resistsHigher": "resists higher",
+      "resistsChanged": "resists changed",
+      "otherStats_one": "{{count}} other stat",
+      "otherStats_other": "{{count}} other stats",
+      "openList": "Open the module List",
+      "applied": "Swapped {{swap}}",
+      "slot": {
+        "high": "High slot {{index}}",
+        "medium": "Mid slot {{index}}",
+        "low": "Low slot {{index}}",
+        "rig": "Rig slot {{index}}",
+        "subsystem": "Subsystem {{index}}"
+      },
       "saves": "Saves",
       "costs": "Costs"
     },

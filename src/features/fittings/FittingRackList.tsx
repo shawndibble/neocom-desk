@@ -46,7 +46,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
-import { moduleKey } from '@/engine/fittings/skillGaps';
+import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
@@ -74,8 +74,6 @@ const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface ResourceBarProps {
-  /** CPU, powergrid and calibration can be fixed by swaps; drone bandwidth and the like cannot. */
-  makeItFit?: boolean;
   label: string;
   used: number | null;
   total: number | null;
@@ -87,7 +85,7 @@ interface ResourceBarProps {
  * each time the readout goes from within budget to over (a Character switch
  * that re-states it included) — the `null` gap while it recomputes doesn't count.
  */
-function ResourceBar({ label, used, total, makeItFit: showMakeItFit }: ResourceBarProps) {
+function ResourceBar({ label, used, total }: ResourceBarProps) {
   const { t } = useTranslation();
   const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
@@ -122,11 +120,6 @@ function ResourceBar({ label, used, total, makeItFit: showMakeItFit }: ResourceB
         <p className="pl-30 text-right text-xs text-danger">
           {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
         </p>
-      )}
-      {overBudget && showMakeItFit && (
-        <div className="flex justify-end">
-          <MakeItFitTrigger />
-        </div>
       )}
     </div>
   );
@@ -815,29 +808,36 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  const overFit =
+    resourceOverage(stats?.cpuUsed ?? null, stats?.cpuTotal ?? null) > 0 ||
+    resourceOverage(stats?.powergridUsed ?? null, stats?.powergridTotal ?? null) > 0 ||
+    resourceOverage(stats?.calibrationUsed ?? null, stats?.calibrationTotal ?? null) > 0;
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar
-            makeItFit
             label={t('fittings.list.cpu')}
             used={stats?.cpuUsed ?? null}
             total={stats?.cpuTotal ?? null}
           />
           <ResourceBar
-            makeItFit
             label={t('fittings.list.powergrid')}
             used={stats?.powergridUsed ?? null}
             total={stats?.powergridTotal ?? null}
           />
           <ResourceBar
-            makeItFit
             label={t('fittings.list.calibration')}
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}
           />
+          {/* CPU, powergrid and calibration can be fixed by swaps (drone bandwidth cannot), and all go through one dialog. */}
+          {overFit && (
+            <div className="flex justify-end">
+              <MakeItFitTrigger />
+            </div>
+          )}
           {dronesShown && (
             <ResourceBar
               label={t('fittings.list.droneBandwidth')}
