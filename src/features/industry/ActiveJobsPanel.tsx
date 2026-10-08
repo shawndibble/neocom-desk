@@ -586,7 +586,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               message: t('industry.historyDismissedToast'),
               onUndo: () => {
                 setHistoryToast(null);
-                void setJobDismissed(job.characterId, job.job_id, false);
+                void setJobDismissed(job.characterId, job.job_id, false).then((restored) => {
+                  if (!restored) setHistoryToast({ message: t('industry.historyDismissFailed') });
+                });
               },
             }
           : null
