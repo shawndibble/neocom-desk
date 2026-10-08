@@ -6560,7 +6560,7 @@
     "refresh": "Refresh",
     "emptyTitle": "No loyalty points cached",
     "emptyHint": "Couldn't load this character's loyalty point balances yet. Try again shortly.",
-    "emptyFetchedTitle": "No loyalty points",
+    "noneLine": "Loyalty Points: none ·",
     "corporation": "Corporation",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
