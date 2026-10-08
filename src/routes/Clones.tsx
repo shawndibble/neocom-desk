@@ -7,6 +7,7 @@ import {
   EmptyState,
   IconButton,
   Panel,
+  SegmentedControl,
   Spinner,
   StatChip,
   Tooltip,
@@ -50,6 +51,23 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
+import {
+  CloneVerdictCard,
+  type CloneVerdictCardState,
+} from '@/features/character/CloneVerdictCard';
+import {
+  loadCloneTrainingData,
+  WORN_CLONE_ID,
+  type CloneTrainingData,
+} from '@/features/character/cloneTraining';
+import {
+  CLONES_SORTS,
+  sortClones,
+  useClonesSort,
+  type ClonesSort,
+} from '@/features/character/clonesSort';
+import { cloneVerdict, MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/cloneVerdict';
+import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -70,8 +88,10 @@ interface Snapshot {
   wornImplants: CachedResult<number[]> | null;
   /** The read-implants grant is missing (401/403): a banner above the table, never in place of it. */
   implantsNeedsReauth: boolean;
-  /** The active training queue, loaded for the page's next layout; nothing renders from it yet. */
+  /** The active training queue. */
   queueResult: CachedResult<SkillQueueEntry[]> | null;
+  /** What the training verdict needs; null when the attribute sheet can't be read. */
+  training: CloneTrainingData | null;
   /** The Character's current solar system; null when unresolved (missing grant, offline, uncached). */
   characterSystemId: number | null;
   /** Solar system of each clone location, keyed by `location_id`; null when it can't be resolved. */
@@ -187,6 +207,16 @@ async function loadClonesSnapshot(
     if (name) locationNames.set(id, name);
   });
 
+  // The verdict needs the worn implants and the queue; either missing is its own one-line state.
+  const training =
+    corrected.queueResult && wornImplants && !signal.cancelled
+      ? await loadCloneTrainingData(characterId, loadedAt, {
+          jumpClones: clones,
+          wornImplantIds: wornImplants.data,
+          queue: corrected.queueResult.data,
+        }).catch(() => null)
+      : null;
+
   return {
     clonesResult,
     clonesNeedsReauth,
@@ -194,6 +224,7 @@ async function loadClonesSnapshot(
     wornImplants,
     implantsNeedsReauth,
     queueResult: corrected.queueResult,
+    training,
     characterSystemId,
     systemIds,
     characterSystemName: characterSystem?.name ?? null,
@@ -238,6 +269,7 @@ function CloneCard({
   implantNames,
   implantDescriptions,
   prices,
+  training,
 }: {
   heading: ReactNode;
   place: string;
@@ -248,9 +280,12 @@ function CloneCard({
   implantDescriptions: ReadonlyMap<number, string>;
   /** Undefined until the price read settles. */
   prices: PriceMap | undefined;
+  /** Queue time in this clone; absent when there is no verdict. */
+  training?: { row: CloneRow | undefined; best: boolean };
 }) {
   const { t } = useTranslation();
   const value = prices ? sumImplantValue(implantIds, prices) : null;
+  const delta = training?.row?.deltaSeconds ?? null;
   return (
     <li className="space-y-1 border-b border-line px-3 py-2 text-sm last:border-b-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -259,6 +294,25 @@ function CloneCard({
         {security !== undefined && <SecurityStatus security={security} />}
         {jumps}
       </div>
+      {training?.row?.totalSeconds != null && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs">
+          <span className="tabular-nums">
+            {t('clones.verdict.rowQueue', { duration: formatDuration(training.row.totalSeconds) })}
+          </span>
+          {delta !== null && Math.abs(delta) >= MIN_JUMP_GAIN_SECONDS && (
+            <span className={delta < 0 ? 'text-success' : 'text-text-dim'}>
+              {t(delta < 0 ? 'clones.verdict.rowSooner' : 'clones.verdict.rowLonger', {
+                duration: formatDuration(Math.abs(delta)),
+              })}
+            </span>
+          )}
+          {training.best && (
+            <span className="rounded-xs border border-success/60 px-1.5 text-[0.6875rem] font-semibold tracking-wide text-success uppercase">
+              {t('clones.verdict.badge')}
+            </span>
+          )}
+        </p>
+      )}
       {implantIds.length === 0 ? (
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
@@ -427,6 +481,97 @@ export function Clones() {
   };
   const homeSecurity = securityOf(homeLocation?.location_id);
   const hasWorn = data?.wornImplants != null;
+
+  // Which clone is best for the active queue (the engine does the numbers).
+  const sort = useClonesSort((state) => state.value);
+  const setSort = useClonesSort((state) => state.setValue);
+  const hydrateSort = useClonesSort((state) => state.hydrate);
+  const cloneStates = useCloneStates((state) => state.value);
+  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
+  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateSort();
+    void hydrateCloneStates();
+  }, [hydrateSort, hydrateCloneStates]);
+  const training = data?.training ?? null;
+  const readyAt = cooldown.onCooldown ? cooldown.readyAt : null;
+  const verdictResult = useMemo(() => {
+    if (!training || training.paused || !cloneStatesHydrated || activeCharacterId === null) {
+      return null;
+    }
+    return cloneVerdict({
+      queue: training.queue,
+      baseAttributes: training.baseAttributes,
+      clones: training.clones,
+      wornCloneId: WORN_CLONE_ID,
+      cloneState: cloneStateFor(cloneStates, activeCharacterId),
+      now: new Date(loadedAt),
+      cooldownReadyAt: readyAt,
+    });
+  }, [training, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAt, readyAt]);
+  const cloneLabel = (clone: JumpClone) => clone.name?.trim() || locationLabel(clone);
+  const verdictCard: CloneVerdictCardState | null = (() => {
+    if (!data) return null;
+    const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
+    if (data.wornImplants === null) return note(t('clones.verdict.noteImplants'));
+    if (data.queueResult === null) return note(t('clones.verdict.noteQueue'));
+    if (training === null) return note(t('clones.verdict.noteAttributes'));
+    if (training.paused) return note(t('clones.verdict.notePaused'));
+    if (!verdictResult) return null;
+    const { verdict } = verdictResult;
+    if (verdict.kind === 'none') return note(t('clones.verdict.noteEmpty'));
+    if (verdict.kind === 'stay') {
+      const rival = clones.find((c) => c.jump_clone_id === verdict.closest?.cloneId);
+      return {
+        kind: 'stay',
+        stay: verdict.stay,
+        closest:
+          verdict.closest && rival
+            ? { label: cloneLabel(rival), extraSeconds: verdict.closest.extraSeconds }
+            : null,
+      };
+    }
+    const target = clones.find((c) => c.jump_clone_id === verdict.cloneId);
+    if (!target) return null;
+    const route = jumpsByLocation?.get(target.location_id);
+    if (!route) return note(t('clones.verdict.noteRouting'));
+    if (route.kind === 'unknown') return note(t('clones.verdict.noteRoute'));
+    return {
+      kind: 'jump',
+      label: cloneLabel(target),
+      savedSeconds: verdict.savedSeconds,
+      attributes: verdict.attributes,
+      stay: verdict.stay,
+      best: verdict.best,
+      cooldownReadyAt: verdict.cooldownReadyAt,
+      route: {
+        locationId: target.location_id,
+        placeName: locationLabel(target),
+        jumps: route.jumps,
+      },
+    };
+  })();
+  const showTraining = verdictCard !== null && verdictCard.kind !== 'note';
+  const rowOf = (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id);
+  const sortedClones = sortClones(
+    clones.map((clone) => {
+      const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;
+      return {
+        clone,
+        id: clone.jump_clone_id,
+        locationId: clone.location_id,
+        deltaSeconds: showTraining ? (rowOf(clone.jump_clone_id)?.deltaSeconds ?? null) : null,
+        value:
+          implantValue &&
+          (implantValue.unpriced < clone.implants.length || clone.implants.length === 0)
+            ? implantValue.total
+            : null,
+      };
+    }),
+    sort,
+    jumpsByLocation
+  ).map((x) => x.clone);
+  const bestCloneId = showTraining ? (verdictResult?.bestCloneId ?? null) : null;
   const csvColumns = useMemo(
     () => clonesCsvColumns(t, { locationNames, implantNames }),
     [t, locationNames, implantNames]
@@ -608,6 +753,26 @@ export function Clones() {
                 {t('common.offlineTitle')}
               </p>
             )}
+            {verdictCard && (
+              <CloneVerdictCard
+                state={verdictCard}
+                names={training?.skillNames ?? NO_NAMES}
+                timeZone={timeZone}
+              />
+            )}
+            {clones.length > 1 && (
+              <div className="overflow-x-auto border-b border-line px-3 py-2">
+                <SegmentedControl<ClonesSort>
+                  label={t('clones.sort.label')}
+                  value={sort}
+                  onChange={(next) => void setSort(next)}
+                  options={CLONES_SORTS.map((value) => ({
+                    value,
+                    label: t(`clones.sort.${value}`),
+                  }))}
+                />
+              </div>
+            )}
             {(clones.length > 0 || hasWorn) && (
               <ul aria-label={t('clones.title')}>
                 {hasWorn && (
@@ -622,9 +787,14 @@ export function Clones() {
                     implantNames={implantNames}
                     implantDescriptions={implantDescriptions}
                     prices={prices}
+                    training={
+                      showTraining
+                        ? { row: rowOf(WORN_CLONE_ID), best: bestCloneId === WORN_CLONE_ID }
+                        : undefined
+                    }
                   />
                 )}
-                {clones.map((clone) => {
+                {sortedClones.map((clone) => {
                   const name = clone.name?.trim() || undefined;
                   return (
                     <CloneCard
@@ -650,6 +820,14 @@ export function Clones() {
                       implantNames={implantNames}
                       implantDescriptions={implantDescriptions}
                       prices={prices}
+                      training={
+                        showTraining
+                          ? {
+                              row: rowOf(clone.jump_clone_id),
+                              best: bestCloneId === clone.jump_clone_id,
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })}
