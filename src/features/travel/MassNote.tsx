@@ -9,7 +9,7 @@ import { bridgeMassVerdict, holeMassVerdict } from '@/engine/route/jumpMass';
 import { useRouteShipMass } from '@/features/route/routeShip';
 
 const MT = 1_000_000;
-const mt = (kg: number) => Math.round(kg / MT).toLocaleString();
+const mt = (kg: number) => (kg / MT).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
 export function MassNote({ hole }: { hole: { wormholeType: string | null } | 'bridge' }) {
   const { t } = useTranslation();

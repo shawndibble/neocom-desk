@@ -122,12 +122,15 @@ function RouteFacts({
   holeJumps,
   bridgeJumps,
   massBlocked,
+  shipName,
 }: {
   summary: RouteSafetySummary;
   holeJumps: number;
   bridgeJumps: number;
   /** Hole and bridge hops the chosen ship may not pass; the chip shows only when above 0. */
   massBlocked: number;
+  /** The hull the mass check runs for; shown only when the route flies a hole or bridge. */
+  shipName: string | null;
 }) {
   const { t } = useTranslation();
   const flownOtherwise = holeJumps > 0 || bridgeJumps > 0;
@@ -144,6 +147,9 @@ function RouteFacts({
         {holeJumps > 0 && <StatChip label={t('travel.summary.holesLabel')} value={holeJumps} />}
         {bridgeJumps > 0 && (
           <StatChip label={t('travel.summary.bridgesLabel')} value={bridgeJumps} />
+        )}
+        {flownOtherwise && shipName !== null && (
+          <StatChip label={t('travel.summary.shipLabel')} value={shipName} />
         )}
         {massBlocked > 0 && (
           <StatChip
@@ -453,6 +459,7 @@ function RouteBody({
                   holeJumps={trip.holeJumps}
                   bridgeJumps={trip.bridgeJumps}
                   massBlocked={massBlocked}
+                  shipName={mass.ship?.name ?? null}
                 />
               </SetWaypoints>
             )}

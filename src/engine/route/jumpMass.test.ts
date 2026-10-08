@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   ANSIBLEX_MAX_JUMP_MASS_KG,
   bridgeMassVerdict,
-  holeMassEstimate,
   holeMassVerdict,
   routeMassCheck,
   type HoleMassTable,
@@ -32,17 +31,6 @@ describe('holeMassVerdict', () => {
     expect(holeMassVerdict('Z999', 900 * MT, table)).toEqual({ kind: 'ok' });
     expect(holeMassVerdict(null, 900 * MT, table)).toEqual({ kind: 'ok' });
     expect(holeMassVerdict('K162', 900 * MT, table)).toEqual({ kind: 'ok' });
-  });
-});
-
-describe('holeMassEstimate', () => {
-  it('is how many jumps a fresh hole of that type passes at most, rounded down', () => {
-    expect(holeMassEstimate('M267', 98 * MT, table)).toEqual({ maxJumps: 10 });
-  });
-
-  it('is null for a ship that cannot pass at all, or an unknown type', () => {
-    expect(holeMassEstimate('Q063', 98 * MT, table)).toBeNull();
-    expect(holeMassEstimate('Z999', 98 * MT, table)).toBeNull();
   });
 });
 

@@ -32,7 +32,7 @@ describe('MassNote', () => {
     state.ship = { name: 'Megathron', massKg: 98_400_000 };
     render(<MassNote hole={{ wormholeType: 'Q063' }} />);
     expect(screen.getByRole('note')).toHaveTextContent(
-      'Too heavy for this hole, limit 62 Mt (Megathron is 98 Mt)'
+      'Too heavy for this hole, limit 62 Mt (Megathron is 98.4 Mt)'
     );
   });
 

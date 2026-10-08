@@ -35,17 +35,6 @@ export function holeMassVerdict(
   return limits ? verdictFor(limits[0], shipKg) : OK;
 }
 
-/** How many jumps a fresh hole of the type passes at most; `null` if unknown or the ship cannot pass. */
-export function holeMassEstimate(
-  wormholeType: string | null,
-  shipKg: number,
-  table: HoleMassTable
-): { maxJumps: number } | null {
-  const limits = wormholeType === null ? undefined : table[wormholeType];
-  if (!limits || shipKg <= 0 || shipKg > limits[0]) return null;
-  return { maxJumps: Math.floor(limits[1] / shipKg) };
-}
-
 export function bridgeMassVerdict(shipKg: number): MassVerdict {
   return verdictFor(ANSIBLEX_MAX_JUMP_MASS_KG, shipKg);
 }

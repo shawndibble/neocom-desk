@@ -34,6 +34,29 @@ export interface RouteShipMass {
 const NO_HULLS: readonly RouteShipOption[] = [];
 const NO_TABLE: HoleMassTable = {};
 
+interface MassTables {
+  hulls: readonly RouteShipOption[];
+  holeTable: HoleMassTable;
+}
+
+let tables: Promise<MassTables> | null = null;
+
+/** Built (and the hulls sorted) once, however many hops on the route ask. */
+function loadMassTables(): Promise<MassTables> {
+  tables ??= Promise.all([loadShipMass(), loadWormholeMass()])
+    .then(([ships, holeTable]) => ({
+      hulls: Object.entries(ships)
+        .map(([id, [name, , massKg]]) => ({ typeId: Number(id), name, massKg }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      holeTable,
+    }))
+    .catch((error: unknown) => {
+      tables = null;
+      throw error;
+    });
+  return tables;
+}
+
 /** The ship being moved and the mass tables, loaded once from the baked SDE files. */
 export function useRouteShipMass(): RouteShipMass {
   const typeId = useRouteShipTypeId((state) => state.value);
@@ -42,15 +65,11 @@ export function useRouteShipMass(): RouteShipMass {
   useEffect(() => {
     void useRouteShipTypeId.getState().hydrate();
     let live = true;
-    Promise.all([loadShipMass(), loadWormholeMass()])
-      .then(([ships, holes]) => {
+    loadMassTables()
+      .then((loaded) => {
         if (!live) return;
-        setHulls(
-          Object.entries(ships)
-            .map(([id, [name, , massKg]]) => ({ typeId: Number(id), name, massKg }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        );
-        setHoleTable(holes);
+        setHulls(loaded.hulls);
+        setHoleTable(loaded.holeTable);
       })
       // Without the tables there is simply no mass cue.
       .catch(() => {});

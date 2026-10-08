@@ -9127,6 +9127,7 @@
       "jumpsLabel": "Jumps",
       "byGateLabel": "By gate",
       "holesLabel": "Wormhole",
+      "shipLabel": "Ship",
       "massLabel": "Mass",
       "massValue_one": "{{count}} hop may not pass",
       "massValue_other": "{{count}} hops may not pass",
