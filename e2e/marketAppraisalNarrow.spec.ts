@@ -362,7 +362,11 @@ test.describe('Market Appraisal — stacked result card', () => {
       );
     expect(groups.length).toBeGreaterThanOrEqual(2);
 
+    // Side by side, as in the mockup, not reflowed to 2+1.
+    for (const g of groups) expect(g.box.top).toBeCloseTo(groups[0].box.top, 0);
+
     for (const [i, a] of groups.entries()) {
+      expect(a.chips.length).toBeGreaterThan(0);
       // A chip is never wider than the group that holds it.
       for (const chip of a.chips) {
         expect(chip.right).toBeLessThanOrEqual(a.box.right + 1);

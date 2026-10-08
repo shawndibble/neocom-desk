@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, StatChip, StatChips } from '@/components/ui';
+import { IskAmount, StatChip } from '@/components/ui';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -28,7 +28,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
       </h3>
-      <StatChips>{children}</StatChips>
+      {/* One readout per line, label left and value right (the mockup's shape), so a
+          wide value has the column to itself and can't run into a neighbour group. */}
+      <div className="flex min-w-0 flex-col [&>span]:w-full [&>span>span:last-child]:ml-auto">
+        {children}
+      </div>
     </section>
   );
 }
@@ -43,10 +47,7 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   return (
-    // Chips never wrap their own text, so a group must be at least as wide as
-    // its widest chip: auto-fit drops to 2+1 (or 1) columns instead of letting a
-    // value run into the next group or push the card past its column.
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-2">
+    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
