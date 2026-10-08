@@ -41,6 +41,7 @@ import {
 } from './pilotLookup';
 import { PilotListView } from './PilotListView';
 import { PilotProfileView } from './PilotProfileView';
+import { useSharedDscanSeed } from './sharedDscanSeed';
 
 const PILOT_PARAMS = { pilot: optionalIdParam() };
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
@@ -56,6 +57,12 @@ export function PilotLookupPanel() {
   // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
   const [list, setList] = useState<PilotPaste | null>(null);
   const [handledListKey, setHandledListKey] = useState<string | null>(null);
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  // "Open Neocom Desk" on a Shared D-Scan arrives as `?share=<id>`.
+  useSharedDscanSeed((text) => {
+    const pasted = classifyPilotPaste(text);
+    if (pasted !== null) setList(pasted);
+  });
 
   // Adopted during render, once per navigation (`location.key`), rather than in an effect.
   const routedText = (location.state as Partial<PilotListState> | null)?.pilotListText;
@@ -82,6 +89,7 @@ export function PilotLookupPanel() {
       {params.pilot === null && list !== null ? (
         <PilotListView
           paste={list}
+          characterId={characterId}
           onOpen={(characterId) => setParams({ pilot: characterId }, { push: true })}
         />
       ) : params.pilot === null ? (

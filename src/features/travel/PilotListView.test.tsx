@@ -78,6 +78,7 @@ describe('PilotListView (Local list)', () => {
   it('sorts by danger, highest first, and keeps unknown rows below', async () => {
     render(
       <PilotListView
+        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 0 }}
         onOpen={() => undefined}
       />
@@ -94,6 +95,7 @@ describe('PilotListView (Local list)', () => {
   it('tells the three missing-data states apart', async () => {
     render(
       <PilotListView
+        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 0 }}
         onOpen={() => undefined}
       />
@@ -108,6 +110,7 @@ describe('PilotListView (Local list)', () => {
     const onOpen = vi.fn();
     render(
       <PilotListView
+        characterId={null}
         paste={{ kind: 'local', names: ROWS.map((r) => r.name), overflow: 12 }}
         onOpen={onOpen}
       />

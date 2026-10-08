@@ -16,7 +16,13 @@ const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} '.-]*$/u;
 const DSCAN_LINE = /^(\d+)\t/;
 
 export type PilotPaste =
-  { kind: 'local'; names: string[]; overflow: number } | { kind: 'dscan'; typeIds: number[] };
+  | { kind: 'local'; names: string[]; overflow: number }
+  | {
+      kind: 'dscan';
+      typeIds: number[];
+      /** The scan, trimmed and one row per line: what a Share Link stores. */
+      text: string;
+    };
 
 export function classifyPilotPaste(text: string): PilotPaste | null {
   const lines = text
@@ -26,7 +32,11 @@ export function classifyPilotPaste(text: string): PilotPaste | null {
   if (lines.length < 2) return null;
 
   if (lines.every((line) => DSCAN_LINE.test(line))) {
-    return { kind: 'dscan', typeIds: lines.map((line) => Number(DSCAN_LINE.exec(line)?.[1])) };
+    return {
+      kind: 'dscan',
+      typeIds: lines.map((line) => Number(DSCAN_LINE.exec(line)?.[1])),
+      text: lines.join('\n'),
+    };
   }
 
   if (!lines.every((line) => line.length <= MAX_NAME_LENGTH && NAME_PATTERN.test(line))) {

@@ -9,7 +9,25 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, EmptyState, Panel, Spinner, type DataTableColumn } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  IconButton,
+  Panel,
+  Spinner,
+  TextInput,
+  type DataTableColumn,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { isSyncConfigured } from '@/app/syncStatus';
+import {
+  buildDscanSnapshot,
+  dscanSnapshotReuseKey,
+  MAX_DSCAN_SNAPSHOT_CHARS,
+} from '@/engine/pilotList/dscanSnapshot';
+import { createShareLink, existingShareLink } from '@/features/share/shareStore';
+import { writeToClipboard } from '@/lib/clipboard';
 import { bucketDscan, type DscanSummary } from '@/engine/pilotList/dscanClasses';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
@@ -21,14 +39,17 @@ type DscanPaste = Extract<PilotPaste, { kind: 'dscan' }>;
 export function PilotListView({
   paste,
   onOpen,
+  characterId,
 }: {
   paste: PilotPaste;
   onOpen: (characterId: number) => void;
+  /** Signs in to store a Share Link as this Character if no Firebase session exists yet; null disables Share. */
+  characterId: number | null;
 }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} onOpen={onOpen} />
   ) : (
-    <DscanClasses paste={paste} />
+    <DscanClasses paste={paste} characterId={characterId} />
   );
 }
 
@@ -174,7 +195,115 @@ function stateLabel(row: PilotListRow, t: (key: string) => string): string {
   }
 }
 
-function DscanClasses({ paste }: { paste: DscanPaste }) {
+/** The Share button's progress; `manual` is a stored link the browser wouldn't let us copy (as the Appraisal's). */
+type ShareState =
+  | { status: 'idle' }
+  | { status: 'saving' }
+  | { status: 'failed' }
+  | { status: 'copied'; url: string }
+  | { status: 'manual'; url: string };
+
+function DscanClasses({ paste, characterId }: { paste: DscanPaste; characterId: number | null }) {
+  const { t } = useTranslation();
+  const [share, setShare] = useState<ShareState>({ status: 'idle' });
+  const [sharedPaste, setSharedPaste] = useState(paste);
+  if (paste !== sharedPaste) {
+    setSharedPaste(paste);
+    setShare({ status: 'idle' });
+  }
+  const snapshot = buildDscanSnapshot(paste.text);
+  const tooLarge = !snapshot.ok && snapshot.reason === 'too-large';
+
+  /** Stores the scan's raw text and copies its short `/share/<id>` link; the same scan shared again gets the same link. */
+  async function handleShare() {
+    if (!snapshot.ok || characterId === null || share.status === 'saving') return;
+    const reuseKey = dscanSnapshotReuseKey(snapshot.value);
+    let url = existingShareLink('dscan', reuseKey);
+    if (url === null) {
+      setShare({ status: 'saving' });
+      try {
+        url = await createShareLink({
+          type: 'dscan',
+          payload: snapshot.value,
+          reuseKey,
+          characterId,
+        });
+      } catch {
+        setShare({ status: 'failed' });
+        return;
+      }
+    }
+    try {
+      await writeToClipboard(url);
+      setShare({ status: 'copied', url });
+    } catch {
+      setShare({ status: 'manual', url });
+    }
+  }
+
+  async function handleCopyShareUrl(url: string) {
+    try {
+      await writeToClipboard(url);
+      setShare({ status: 'copied', url });
+    } catch {
+      // Still on screen to copy by hand.
+    }
+  }
+
+  return (
+    <Panel className="space-y-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {share.status === 'manual' && (
+          <>
+            <label
+              htmlFor="pilot-dscan-share-url"
+              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+            >
+              {t('travel.pilot.dscan.shareReady')}
+            </label>
+            <TextInput
+              id="pilot-dscan-share-url"
+              size="sm"
+              readOnly
+              value={share.url}
+              onFocus={(event) => event.currentTarget.select()}
+              className="min-w-0 flex-1 font-mono"
+            />
+            <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
+              {t('travel.pilot.dscan.shareCopy')}
+            </Button>
+          </>
+        )}
+        <IconButton
+          size="sm"
+          icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+          label={t('travel.pilot.dscan.share')}
+          tooltip={
+            tooLarge
+              ? t('travel.pilot.dscan.shareTooLarge', {
+                  max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString(),
+                })
+              : share.status === 'saving'
+                ? t('travel.pilot.dscan.shareSaving')
+                : share.status === 'failed'
+                  ? t('travel.pilot.dscan.shareFailed')
+                  : share.status === 'copied'
+                    ? t('travel.pilot.dscan.shareCopied')
+                    : undefined
+          }
+          disabled={
+            characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
+          }
+          onClick={() => void handleShare()}
+        />
+      </div>
+      <DscanSummaryView typeIds={paste.typeIds} />
+    </Panel>
+  );
+}
+
+/** A D-Scan's ships counted by class — shared by the live view and a Shared D-Scan, so both bucket identically. */
+export function DscanSummaryView({ typeIds }: { typeIds: readonly number[] }) {
   const { t } = useTranslation();
   const [summary, setSummary] = useState<{ summary: DscanSummary; names: Map<number, string> }>();
 
@@ -182,7 +311,7 @@ function DscanClasses({ paste }: { paste: DscanPaste }) {
     let cancelled = false;
     void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
       if (cancelled) return;
-      const result = bucketDscan(paste.typeIds, (typeId) => {
+      const result = bucketDscan(typeIds, (typeId) => {
         const type = types[String(typeId)];
         return type === undefined
           ? undefined
@@ -198,7 +327,9 @@ function DscanClasses({ paste }: { paste: DscanPaste }) {
     return () => {
       cancelled = true;
     };
-  }, [paste]);
+    // Keyed on the ids themselves: a caller re-parsing the same scan hands a new array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeIds.join(',')]);
 
   if (summary === undefined) {
     return (
@@ -216,7 +347,7 @@ function DscanClasses({ paste }: { paste: DscanPaste }) {
     );
   }
   return (
-    <Panel className="space-y-4">
+    <div className="space-y-4">
       {summary.summary.classes.map((c) => (
         <section key={c.bucket} aria-label={t(`travel.pilot.dscan.bucket.${c.bucket}`)}>
           <h3 className="text-sm font-semibold text-text">
@@ -238,6 +369,6 @@ function DscanClasses({ paste }: { paste: DscanPaste }) {
           {t('travel.pilot.dscan.leftOut', { count: summary.summary.leftOut })}
         </p>
       )}
-    </Panel>
+    </div>
   );
 }

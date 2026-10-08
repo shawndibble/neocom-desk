@@ -7671,6 +7671,13 @@
     "invalidTitle": "This link isn't valid",
     "invalidHint": "The link may be corrupted or incomplete. Ask whoever sent it to share it again."
   },
+  "dscanShare": {
+    "title": "Shared D-Scan",
+    "linesLabel": "Scan lines",
+    "expiresLabel": "Expires",
+    "invalidTitle": "This link isn't valid",
+    "invalidHint": "The link may be corrupted or incomplete. Ask whoever sent it to share it again."
+  },
   "share": {
     "title": "Shared link",
     "openInApp": "Open Neocom Desk",
@@ -8818,7 +8825,14 @@
         "leftOut_one": "{{count}} other item left out (drones, probes, celestials).",
         "leftOut_other": "{{count}} other items left out (drones, probes, celestials).",
         "emptyTitle": "No ships or structures in this D-Scan",
-        "emptyHint": "Only ships, structures and wrecks are counted."
+        "emptyHint": "Only ships, structures and wrecks are counted.",
+        "share": "Copy Share Link",
+        "shareCopied": "Share Link copied — it works for 7 days",
+        "shareSaving": "Creating Share Link…",
+        "shareFailed": "Couldn't create the Share Link. Try again.",
+        "shareReady": "Share Link — works for 7 days",
+        "shareCopy": "Copy",
+        "shareTooLarge": "Too large to share as a link (over {{max}} characters)."
       },
       "unknownTitle": "This pilot couldn't be found",
       "unknownHint": "EVE has no pilot with this id. Check the link, or search by name.",

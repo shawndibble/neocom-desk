@@ -1012,7 +1012,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Share Link**: A short `/share/<id>` link to something a pilot chose to
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
-  **Shared Appraisal**, or a **Fitting**. It opens with or without a session,
+  **Shared Appraisal**, a **Shared D-Scan**, or a **Fitting**. It opens with or without a session,
   and says when it expires. It never names who shared it. A Fitting's Share
   Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
   in, it shows the Fitting at every skill level V; a logged-in visitor goes
@@ -1023,6 +1023,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   and the time it was priced. Never re-priced. Read-only to whoever opens it;
   "Open Neocom Desk" carries it into the live Appraisal tab. Not a quote: it
   commits nobody to buying at those prices.
+- **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan
+  text (capped in size), never just the counts. The recipient's class counts
+  and ship list are rebuilt from that text by the same parsing and class
+  mapping Pilot Lookup's live D-Scan view uses. Read-only; "Open Neocom Desk"
+  carries the scan into the live view. Cannot be revoked: expiry is the only
+  end of the link.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**
