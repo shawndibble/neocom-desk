@@ -6,8 +6,9 @@
  *
  * Destinations live in one registry, `PASTE_DETECTORS`. Its order IS the
  * priority: the first detector to claim a paste wins, so a new format goes
- * where it cannot hijack an earlier one. Adding a destination = one entry
- * here, one route in `GlobalPasteRouter`, and its Help strings.
+ * where it cannot hijack an earlier one. Adding a destination = its id in
+ * `PasteDestination`, one entry here, one route in `GlobalPasteRouter` (the
+ * typecheck flags a missing one), and its Help strings.
  *
  * Deliberately conservative, since the router acts on pastes the pilot never
  * aimed at a field: a fit needs a header naming a real hull, and an item list

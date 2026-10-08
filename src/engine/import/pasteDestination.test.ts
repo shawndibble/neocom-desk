@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import en from '@/i18n/locales/en.json';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
 import {
   detectPasteDestination,
@@ -122,5 +123,18 @@ describe('detectPasteDestination', () => {
 
   it('keeps the shipped order: fit, then item list, then pilot names', () => {
     expect(PASTE_DETECTORS.map((d) => d.id)).toEqual(['fitting', 'appraisal', 'pilotList']);
+  });
+
+  it('has Help strings for every registered destination', () => {
+    const help = en.shortcuts.pasteDestinations as Record<string, { label: string; opens: string }>;
+    for (const { id } of PASTE_DETECTORS) {
+      expect(help[id]?.label, id).toBeTruthy();
+      expect(help[id]?.opens, id).toBeTruthy();
+    }
+  });
+
+  it('prefers the fit over the item list when a paste reads as both', () => {
+    const fitOfItems = ['[Rifter, Items]', 'Tritanium', 'Pyerite', 'Nocxium'].join('\n');
+    expect(pasteDestination(fitOfItems, SOURCES)).toBe('fitting');
   });
 });
