@@ -20,14 +20,15 @@
  */
 
 import { isShipBayFlag, type EngineAsset } from '../assetTree';
-import type { OwnedStockLocation, OwnedStockScope } from './types';
+import { corpAssetGroupId } from '../corp/assetDivisions';
+import type { OwnedStockHangar, OwnedStockLocation, OwnedStockScope } from './types';
 
 // Re-exported from here too: every existing caller of this module already
 // imports its owned-stock types from `./ownedStock`, and the canonical
 // definitions live in `./types` alongside `MaterialSourcing`/`RigLevel` etc.
 // — the same module `BuildPlanRecord`'s other persisted-field types come
 // from (`src/db/index.ts`).
-export type { OwnedStockLocation, OwnedStockScope };
+export type { OwnedStockHangar, OwnedStockLocation, OwnedStockScope };
 
 /** `EngineAsset` plus the packaged/assembled flag this module filters on. */
 export interface StockAsset extends EngineAsset {
@@ -68,23 +69,27 @@ export interface OwnedStockPlacement {
    * per location, so totals and breakdown rows are unchanged.
    */
   containers?: OwnedStockContainerHolding[];
+  /**
+   * How much of `quantity` sits in each corp hangar division 1-7 (issue
+   * #2941), containers inside the division included. Absent when no row
+   * carried a hangar flag (personal assets, or a cache that predates the
+   * flag): such stock is station-level and only a selected station counts it.
+   */
+  hangars?: OwnedStockHangarHolding[];
+}
+
+export interface OwnedStockHangarHolding {
+  division: number;
+  quantity: number;
 }
 
 export interface OwnedStockContainerHolding {
   containerId: number;
+  /** Corp hangar division the container sits in, when known (issue #2941). */
+  hangar?: number;
   /** The container's own typeID, for labelling it. */
   typeId: number;
   quantity: number;
-}
-
-/** One container holding stock, for populating the "exclude containers" picker. */
-export interface OwnedStockContainer {
-  containerId: number;
-  typeId: number;
-  characterId: number;
-  corporationId?: number;
-  locationId: number;
-  locationType: EngineAsset['location_type'];
 }
 
 export interface DetectedOwnedStock {
@@ -139,12 +144,24 @@ export function filterStockByScope(
 
   const allowed = new Set(scope.locations.map(ownedStockLocationKey));
   const excluded = new Set(scope.excludedContainers ?? []);
+  const includedContainers = new Set(scope.containers ?? []);
+  const hangarsByLocation = new Map<string, Set<number>>();
+  for (const h of scope.hangars ?? []) {
+    const key = ownedStockLocationKey(h);
+    const set = hangarsByLocation.get(key) ?? new Set<number>();
+    set.add(h.division);
+    hangarsByLocation.set(key, set);
+  }
   const filtered: DetectedOwnedStockMap = new Map();
   for (const [typeID, entry] of stock) {
-    const placements = entry.placements
-      .filter((p) => allowed.has(ownedStockLocationKey(p)))
-      .map((p) => withoutContainers(p, excluded))
-      .filter((p) => p.quantity > 0);
+    const placements: OwnedStockPlacement[] = [];
+    for (const p of entry.placements) {
+      const key = ownedStockLocationKey(p);
+      const narrowed = allowed.has(key)
+        ? withoutContainers(p, excluded)
+        : narrowedTo(p, hangarsByLocation.get(key), includedContainers);
+      if (narrowed.quantity > 0) placements.push(narrowed);
+    }
     if (placements.length === 0) continue;
     filtered.set(typeID, {
       quantity: placements.reduce((sum, p) => sum + p.quantity, 0),
@@ -152,6 +169,33 @@ export function filterStockByScope(
     });
   }
   return filtered;
+}
+
+/**
+ * The part of a placement inside the chosen hangar divisions or containers
+ * (issue #2941), for a station that is not selected as a whole. A container
+ * inside a chosen hangar counts once, through the hangar.
+ */
+function narrowedTo(
+  placement: OwnedStockPlacement,
+  divisions: ReadonlySet<number> | undefined,
+  includedContainers: ReadonlySet<number>
+): OwnedStockPlacement {
+  const hangars = (placement.hangars ?? []).filter((h) => divisions?.has(h.division));
+  const containers = (placement.containers ?? []).filter(
+    (c) =>
+      includedContainers.has(c.containerId) || (c.hangar !== undefined && divisions?.has(c.hangar))
+  );
+  const viaHangars = hangars.reduce((sum, h) => sum + h.quantity, 0);
+  const viaContainers = containers
+    .filter((c) => c.hangar === undefined || !divisions?.has(c.hangar))
+    .reduce((sum, c) => sum + c.quantity, 0);
+  const narrowed: OwnedStockPlacement = { ...placement, quantity: viaHangars + viaContainers };
+  if (containers.length > 0) narrowed.containers = containers;
+  else delete narrowed.containers;
+  if (hangars.length > 0) narrowed.hangars = hangars;
+  else delete narrowed.hangars;
+  return narrowed;
 }
 
 function withoutContainers(
@@ -169,31 +213,6 @@ function withoutContainers(
   if (kept.length > 0) narrowed.containers = kept;
   else delete narrowed.containers;
   return narrowed;
-}
-
-/**
- * Every container holding any of the detected stock, for the scope picker's
- * "exclude containers" list. Order is not meaningful.
- */
-export function collectStockContainers(stock: DetectedOwnedStockMap): OwnedStockContainer[] {
-  const seen = new Map<string, OwnedStockContainer>();
-  for (const entry of stock.values()) {
-    for (const p of entry.placements) {
-      for (const c of p.containers ?? []) {
-        const key = `${ownedStockLocationKey(p)}#${c.containerId}`;
-        if (seen.has(key)) continue;
-        seen.set(key, {
-          containerId: c.containerId,
-          typeId: c.typeId,
-          characterId: p.characterId,
-          ...(p.corporationId !== undefined ? { corporationId: p.corporationId } : {}),
-          locationId: p.locationId,
-          locationType: p.locationType,
-        });
-      }
-    }
-  }
-  return [...seen.values()];
 }
 
 /**
@@ -238,24 +257,46 @@ function resolvePlacement(
 ): {
   locationId: number;
   locationType: EngineAsset['location_type'];
-  container?: { containerId: number; typeId: number };
+  container?: { containerId: number; typeId: number; hangar?: number };
+  hangar?: number;
 } | null {
   const directParent = asset.location_type === 'item' ? byItemId.get(asset.location_id) : undefined;
-  const container = directParent
-    ? { container: { containerId: directParent.item_id, typeId: directParent.type_id } }
-    : {};
+  // A corp's office folder is the hangars' parent, not a container players organize by.
+  const parentIsContainer =
+    directParent !== undefined && directParent.location_flag !== 'OfficeFolder';
+  let hangar: number | undefined;
   let current = asset;
   const seen = new Set<number>([asset.item_id]);
+  const done = (locationId: number, locationType: EngineAsset['location_type']) => {
+    const containerHangar = directParent ? corpHangarOf(directParent.location_flag) : undefined;
+    const container =
+      directParent && parentIsContainer
+        ? {
+            container: {
+              containerId: directParent.item_id,
+              typeId: directParent.type_id,
+              ...(containerHangar !== undefined ? { hangar: containerHangar } : {}),
+            },
+          }
+        : {};
+    return { locationId, locationType, ...container, ...(hangar !== undefined ? { hangar } : {}) };
+  };
   while (current.location_type === 'item') {
     if (isShipHeld(current.location_flag)) return null;
+    hangar ??= corpHangarOf(current.location_flag);
     const parent = byItemId.get(current.location_id);
-    if (!parent || seen.has(parent.item_id)) {
-      return { locationId: current.location_id, locationType: 'item', ...container };
-    }
+    if (!parent || seen.has(parent.item_id)) return done(current.location_id, 'item');
     seen.add(parent.item_id);
     current = parent;
   }
-  return { locationId: current.location_id, locationType: current.location_type, ...container };
+  hangar ??= corpHangarOf(current.location_flag);
+  return done(current.location_id, current.location_type);
+}
+
+/** The corp hangar division (1-7) a `location_flag` names, or undefined for anything else. */
+function corpHangarOf(locationFlag: string): number | undefined {
+  const group = corpAssetGroupId(locationFlag);
+  return typeof group === 'number' ? group : undefined;
 }
 
 /**
@@ -306,13 +347,14 @@ export function detectOwnedStock(
       if (a.is_singleton || !typeIDs.has(a.type_id)) continue;
       const resolved = resolvePlacement(a, byItemId);
       if (!resolved) continue;
-      const { container, ...where } = resolved;
+      const { container, hangar, ...where } = resolved;
       const placement: OwnedStockPlacement = {
         characterId,
         ...(corporationId !== undefined ? { corporationId } : {}),
         ...where,
         quantity: a.quantity,
         ...(container ? { containers: [{ ...container, quantity: a.quantity }] } : {}),
+        ...(hangar !== undefined ? { hangars: [{ division: hangar, quantity: a.quantity }] } : {}),
       };
 
       let byLocation = grouped.get(a.type_id);
@@ -324,6 +366,12 @@ export function detectOwnedStock(
       const existing = byLocation.get(key);
       if (existing) {
         existing.quantity += a.quantity;
+        if (hangar !== undefined) {
+          existing.hangars ??= [];
+          const line = existing.hangars.find((h) => h.division === hangar);
+          if (line) line.quantity += a.quantity;
+          else existing.hangars.push({ division: hangar, quantity: a.quantity });
+        }
         if (container) {
           existing.containers ??= [];
           const line = existing.containers.find((c) => c.containerId === container.containerId);
