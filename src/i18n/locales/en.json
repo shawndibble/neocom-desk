@@ -3210,7 +3210,7 @@
       },
       "clones": {
         "name": "Clones",
-        "desc": "Jump clones, fitted implants and the attributes your training time is actually running on.",
+        "desc": "Your jump clones with where they are, how far, and what each wears, the one jump cooldown they all share, and what you are wearing now.",
         "tag": "Read-only"
       },
       "industry": {
@@ -4812,6 +4812,18 @@
     "homeLocation": "Home Clone",
     "lastStationChange": "Last moved {{date}}",
     "cooldown": "Jump Cooldown",
+    "cooldownShared": "Jump cooldown · shared by every clone",
+    "lastJump": "Last jump {{date}}",
+    "infomorphReduction": "Infomorph Synchronizing: -{{hours}} h",
+    "youAreIn": "You are in",
+    "respawn": "Respawn (home clone)",
+    "wearingNow": "Wearing now",
+    "unknownPlace": "Unknown location",
+    "implantCount_one": "{{count}} implant",
+    "implantCount_other": "{{count}} implants",
+    "atRisk": "at risk if podded",
+    "unpriced_one": "{{count}} unpriced",
+    "unpriced_other": "{{count}} unpriced",
     "cooldownReadyValue": "Ready",
     "cooldownOnCooldownValue": "Until {{date}} ({{duration}} left)",
     "reauthTitle": "Log in again to see your clones",

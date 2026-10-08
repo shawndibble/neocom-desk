@@ -1,9 +1,8 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
-  DataTable,
   CachedEmptyState,
   EmptyState,
   IconButton,
@@ -11,7 +10,6 @@ import {
   Spinner,
   StatChip,
   Tooltip,
-  type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -26,6 +24,13 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
+import { loadSystemNameAndSecurity, loadSystemSecurity } from '@/features/character/systemSecurity';
+import { SecurityStatus } from '@/components/SecurityStatus';
+import { IskAmount } from '@/components/ui';
+import { useMarketHub } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+import { getHubPrices, getRegionSellPrices } from '@/market/prices';
+import { cooldownProgress, sumImplantValue } from '@/engine/implantValue';
 import { loadCharacterImplantsWithStatus } from '@/features/skills/data';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
@@ -37,7 +42,11 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
+import {
+  cloneJumpCooldown,
+  cloneJumpCooldownHours,
+  INFOMORPH_SYNCHRONIZING_SKILL_ID,
+} from '@/engine/cloneJump';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { clonesCsvColumns } from '@/features/character/clonesCsv';
@@ -46,6 +55,10 @@ import { clonesCsvColumns } from '@/features/character/clonesCsv';
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_CLONES: readonly JumpClone[] = [];
 const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
+const NO_SECURITIES: ReadonlyMap<number, number> = new Map();
+const NO_IDS: readonly number[] = [];
+/** Touch-sized on a phone, compact beside a pointer. */
+const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
 
 interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
@@ -63,6 +76,10 @@ interface Snapshot {
   characterSystemId: number | null;
   /** Solar system of each clone location, keyed by `location_id`; null when it can't be resolved. */
   systemIds: Map<number, number | null>;
+  /** Name of the Character's current system; null when unresolved. */
+  characterSystemName: string | null;
+  /** Security status of every system above, keyed by solar system id; absent when unresolved. */
+  securities: Map<number, number>;
   implantNames: Map<number, string>;
   /** Markup-stripped implant descriptions for the name tooltips; absent ids get no tooltip. */
   implantDescriptions: Map<number, string>;
@@ -101,7 +118,9 @@ async function loadClonesSnapshot(
   const homeLocation = clonesResult?.data.home_location;
 
   // Already superseded: skip the name resolves, their results would be discarded.
-  const implantTypeIds = signal.cancelled ? [] : [...new Set(clones.flatMap((c) => c.implants))];
+  const implantTypeIds = signal.cancelled
+    ? []
+    : [...new Set([...clones.flatMap((c) => c.implants), ...(wornImplants?.data ?? [])])];
   const [implantNames, implantDescriptions] = await Promise.all([
     loadTypeNames(implantTypeIds),
     loadImplantDescriptions(implantTypeIds),
@@ -140,6 +159,24 @@ async function loadClonesSnapshot(
     // signals a re-auth failure; the clone just renders with an id fallback.
     Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
   ]);
+  const securityIds = signal.cancelled
+    ? []
+    : [
+        ...new Set(
+          [...systemIds.values(), characterSystemId].filter((id): id is number => id !== null)
+        ),
+      ];
+  const [characterSystem, securityList] = await Promise.all([
+    characterSystemId === null || signal.cancelled
+      ? null
+      : loadSystemNameAndSecurity(characterSystemId),
+    Promise.all(securityIds.map((id) => loadSystemSecurity(id))),
+  ]);
+  const securities = new Map<number, number>();
+  securityIds.forEach((id, i) => {
+    const security = securityList[i];
+    if (security !== null && security !== undefined) securities.set(id, security);
+  });
   const locationNames = new Map<number, string>();
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];
@@ -159,6 +196,8 @@ async function loadClonesSnapshot(
     queueResult: corrected.queueResult,
     characterSystemId,
     systemIds,
+    characterSystemName: characterSystem?.name ?? null,
+    securities,
     implantNames,
     implantDescriptions,
     locationNames,
@@ -167,18 +206,88 @@ async function loadClonesSnapshot(
   };
 }
 
-/** An implant name linking to Market, with its description in a hover/focus tooltip when it has one. */
+/** An implant name linking to Show Info, with its description in a hover/focus tooltip when it has one. */
 function ImplantLink({
   typeId,
   name,
   description,
+  className,
 }: {
   typeId: number;
   name: string;
   description?: string;
+  className?: string;
 }) {
-  const link = <ItemInfoLink typeId={typeId}>{name}</ItemInfoLink>;
+  const link = (
+    <ItemInfoLink typeId={typeId} className={className}>
+      {name}
+    </ItemInfoLink>
+  );
   return description ? <Tooltip content={description}>{link}</Tooltip> : link;
+}
+
+type PriceMap = ReadonlyMap<number, number | null>;
+
+/** One clone's facts: where, how far, what it wears and what that is worth. */
+function CloneCard({
+  heading,
+  place,
+  security,
+  jumps,
+  implantIds,
+  implantNames,
+  implantDescriptions,
+  prices,
+}: {
+  heading: ReactNode;
+  place: string;
+  security: number | undefined;
+  jumps: ReactNode;
+  implantIds: readonly number[];
+  implantNames: ReadonlyMap<number, string>;
+  implantDescriptions: ReadonlyMap<number, string>;
+  /** Undefined until the price read settles. */
+  prices: PriceMap | undefined;
+}) {
+  const { t } = useTranslation();
+  const value = prices ? sumImplantValue(implantIds, prices) : null;
+  return (
+    <li className="space-y-1 border-b border-line px-3 py-2 text-sm last:border-b-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="[overflow-wrap:anywhere]">{heading}</span>
+        <span className="text-text-dim [overflow-wrap:anywhere]">{place}</span>
+        {security !== undefined && <SecurityStatus security={security} />}
+        {jumps}
+      </div>
+      {implantIds.length === 0 ? (
+        <p className="text-text-dim">{t('clones.noImplants')}</p>
+      ) : (
+        <>
+          <ul className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {implantIds.map((id) => (
+              <li key={id}>
+                <ImplantLink
+                  typeId={id}
+                  name={implantNames.get(id) ?? `Type #${id}`}
+                  description={implantDescriptions.get(id)}
+                  className={TOUCH_LINK}
+                />
+              </li>
+            ))}
+          </ul>
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-text-dim">
+            <span>{t('clones.implantCount', { count: implantIds.length })}</span>
+            {value && (
+              <span>
+                {value.unpriced < implantIds.length && <IskAmount value={value.total} />}
+                {value.unpriced > 0 && ` ${t('clones.unpriced', { count: value.unpriced })}`}
+              </span>
+            )}
+          </p>
+        </>
+      )}
+    </li>
+  );
 }
 
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
@@ -200,6 +309,9 @@ export function Clones() {
   const implantsNeedsReauth = data?.implantsNeedsReauth ?? false;
   const characterSystemId = data?.characterSystemId ?? null;
   const systemIds = data?.systemIds ?? NO_SYSTEMS;
+  const securities = data?.securities ?? NO_SECURITIES;
+  const characterSystemName = data?.characterSystemName ?? null;
+  const wornIds = data?.wornImplants?.data ?? NO_IDS;
   // Falls back to the last SP another tab already loaded for this character,
   // not straight to "—": this tab's own read is still in flight the instant
   // it mounts, and the shared header must not blank out a number the user
@@ -207,7 +319,7 @@ export function Clones() {
   const sp = data?.sp ?? getLastKnownSpSummary(activeCharacterId);
   const loadedAt = data?.loadedAt ?? 0;
 
-  const clones = clonesResult?.data.jump_clones ?? [];
+  const clones = useMemo(() => clonesResult?.data.jump_clones ?? NO_CLONES, [clonesResult]);
   const lastCloneJumpDate = clonesResult?.data.last_clone_jump_date ?? null;
   const homeLocation = clonesResult?.data.home_location;
   const lastStationChangeDate = clonesResult?.data.last_station_change_date ?? null;
@@ -246,6 +358,46 @@ export function Clones() {
   }, [basis, characterSystemId, systemIds, loadedAt, jumpsKey]);
   const jumpsByLocation = jumpsAway?.key === jumpsKey ? jumpsAway.byLocation : undefined;
 
+  // Implant values at the market hub: lowest sell there, else lowest in its
+  // region. Another progressive enhancement: the list shows before any price.
+  const hubId = useMarketHub((state) => state.value);
+  const hubHydrated = useMarketHub((state) => state.hydrated);
+  const hydrateHub = useMarketHub((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateHub();
+  }, [hydrateHub]);
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const priceIds = useMemo(
+    () => [...new Set([...clones.flatMap((c) => c.implants), ...wornIds])].sort((a, b) => a - b),
+    [clones, wornIds]
+  );
+  const priceKey = `${hub.id}:${priceIds.join(',')}`;
+  const [priced, setPriced] = useState<{ key: string; prices: PriceMap } | null>(null);
+  useEffect(() => {
+    if (!hubHydrated || priceIds.length === 0) return;
+    let cancelled = false;
+    void Promise.all([getHubPrices(hub, priceIds), getRegionSellPrices(hub.regionId, priceIds)])
+      .then(([hubAgg, region]) => {
+        if (cancelled) return;
+        const prices = new Map<number, number | null>();
+        for (const id of priceIds)
+          prices.set(id, hubAgg.get(id)?.sellMin ?? region.get(id) ?? null);
+        setPriced({ key: priceKey, prices });
+      })
+      .catch(() => {
+        // A failed read leaves every implant unpriced rather than an endless wait.
+        if (!cancelled) setPriced({ key: priceKey, prices: new Map() });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hub, hubHydrated, priceIds, priceKey]);
+  const prices = priced?.key === priceKey ? priced.prices : undefined;
+  const wornValue = prices ? sumImplantValue(wornIds, prices) : null;
+
+  const cooldownHours = cloneJumpCooldownHours(infomorphLevel);
+  const cooldownFraction = cooldownProgress(lastCloneJumpDate, cooldownHours, new Date(loadedAt));
+
   const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
 
   const homeJumps =
@@ -264,73 +416,17 @@ export function Clones() {
           { id: homeLocation.location_id }
         ));
 
-  const columns = useMemo<DataTableColumn<JumpClone>[]>(() => {
-    const locationLabel = (clone: JumpClone) =>
-      locationNames.get(clone.location_id) ??
-      t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
-        id: clone.location_id,
-      });
-    const cloneName = (clone: JumpClone) => clone.name?.trim() || undefined;
-    return [
-      {
-        id: 'location',
-        header: t('clones.location'),
-        // Name first, then location, so same-station clones order deterministically.
-        sortValue: (clone) => `${cloneName(clone) ?? ''}\u0000${locationLabel(clone)}`,
-        render: (clone) => {
-          const name = cloneName(clone);
-          if (name === undefined) {
-            return (
-              <span className="[overflow-wrap:anywhere]">
-                <span className="text-text-dim">{t('clones.unnamed')}</span>
-                <span className="text-text-dim"> · </span>
-                <span>{locationLabel(clone)}</span>
-              </span>
-            );
-          }
-          return (
-            <span className="[overflow-wrap:anywhere]">
-              <span className="text-text">{name}</span>
-              <span className="text-text-dim"> · {locationLabel(clone)}</span>
-            </span>
-          );
-        },
-      },
-      {
-        id: 'jumps',
-        header: t('clones.jumpsAway'),
-        sortValue: (clone) => {
-          const result = jumpsByLocation?.get(clone.location_id);
-          return result?.kind === 'known' ? result.jumps : Number.MAX_SAFE_INTEGER;
-        },
-        render: (clone) => (
-          <JumpsAwayText
-            result={jumpsByLocation?.get(clone.location_id)}
-            t={t}
-            locationId={clone.location_id}
-          />
-        ),
-      },
-      {
-        id: 'implants',
-        header: t('clones.implants'),
-        sortValue: (clone) => clone.implants.length,
-        render: (clone) =>
-          clone.implants.length === 0
-            ? t('clones.noImplants')
-            : clone.implants.map((id, index) => (
-                <Fragment key={id}>
-                  {index > 0 && ', '}
-                  <ImplantLink
-                    typeId={id}
-                    name={implantNames.get(id) ?? `Type #${id}`}
-                    description={implantDescriptions.get(id)}
-                  />
-                </Fragment>
-              )),
-      },
-    ];
-  }, [t, locationNames, implantNames, implantDescriptions, jumpsByLocation]);
+  const locationLabel = (clone: JumpClone) =>
+    locationNames.get(clone.location_id) ??
+    t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
+      id: clone.location_id,
+    });
+  const securityOf = (locationId: number | undefined) => {
+    const systemId = locationId === undefined ? null : (systemIds.get(locationId) ?? null);
+    return systemId === null ? undefined : securities.get(systemId);
+  };
+  const homeSecurity = securityOf(homeLocation?.location_id);
+  const hasWorn = data?.wornImplants != null;
   const csvColumns = useMemo(
     () => clonesCsvColumns(t, { locationNames, implantNames }),
     [t, locationNames, implantNames]
@@ -409,42 +505,90 @@ export function Clones() {
                 whatever follows. It renders whenever clones data loaded at
                 all, not only when there are jump clones — a character with a
                 home clone and zero jump clones still has both to show. */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-3 py-2 text-sm">
-              {homeLocationName && (
-                <span>
-                  <span className="text-text-dim">{t('clones.homeLocation')}: </span>
-                  {homeLocationName}
-                  {homeJumps && (
-                    <span className="text-text-dim">
-                      {' · '}
-                      <JumpsAwayText
-                        result={homeJumps}
-                        t={t}
-                        locationId={homeLocation?.location_id}
-                      />
-                    </span>
+            <div className="grid gap-3 border-b border-line px-3 py-3 text-sm md:grid-cols-3">
+              <section aria-label={t('clones.cooldown')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.cooldownShared')}
+                </h3>
+                <StatChip
+                  label={t('clones.cooldown')}
+                  tone={cooldownTone}
+                  value={
+                    cooldown.onCooldown && cooldown.readyAt
+                      ? t('clones.cooldownOnCooldownValue', {
+                          date: formatTimestamp(cooldown.readyAt, timeZone),
+                          duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
+                        })
+                      : t('clones.cooldownReadyValue')
+                  }
+                />
+                <div
+                  role="progressbar"
+                  aria-label={t('clones.cooldown')}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(cooldownFraction * 100)}
+                  className="h-1.5 overflow-hidden rounded-full bg-line"
+                >
+                  <div
+                    className={cooldown.onCooldown ? 'h-full bg-warning' : 'h-full bg-success'}
+                    style={{ width: `${cooldownFraction * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-text-dim">
+                  {lastCloneJumpDate &&
+                    `${t('clones.lastJump', {
+                      date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
+                    })} · `}
+                  {t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) })}
+                </p>
+              </section>
+              <section aria-label={t('clones.youAreIn')} className="space-y-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('clones.youAreIn')}
+                </h3>
+                <p>
+                  {characterSystemName ?? t('clones.unknownPlace')}{' '}
+                  {characterSystemId !== null && securities.has(characterSystemId) && (
+                    <SecurityStatus security={securities.get(characterSystemId) as number} />
                   )}
-                </span>
+                </p>
+                {hasWorn && (
+                  <p className="text-xs text-text-dim">
+                    {t('clones.implantCount', { count: wornIds.length })}
+                    {wornValue && wornValue.unpriced < wornIds.length && (
+                      <>
+                        {' · '}
+                        <IskAmount value={wornValue.total} /> {t('clones.atRisk')}
+                      </>
+                    )}
+                  </p>
+                )}
+              </section>
+              {homeLocationName && (
+                <section aria-label={t('clones.respawn')} className="space-y-1">
+                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('clones.respawn')}
+                  </h3>
+                  <p className="flex flex-wrap items-center gap-x-2">
+                    <span className="[overflow-wrap:anywhere]">{homeLocationName}</span>
+                    {homeSecurity !== undefined && <SecurityStatus security={homeSecurity} />}
+                    <JumpsAwayText
+                      result={homeJumps}
+                      t={t}
+                      locationId={homeLocation?.location_id}
+                      linkClassName={TOUCH_LINK}
+                    />
+                  </p>
+                  {lastStationChangeDate && (
+                    <p className="text-xs text-text-dim">
+                      {t('clones.lastStationChange', {
+                        date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
+                      })}
+                    </p>
+                  )}
+                </section>
               )}
-              {lastStationChangeDate && (
-                <span className="text-text-dim">
-                  {t('clones.lastStationChange', {
-                    date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
-                  })}
-                </span>
-              )}
-              <StatChip
-                label={t('clones.cooldown')}
-                tone={cooldownTone}
-                value={
-                  cooldown.onCooldown && cooldown.readyAt
-                    ? t('clones.cooldownOnCooldownValue', {
-                        date: formatTimestamp(cooldown.readyAt, timeZone),
-                        duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                      })
-                    : t('clones.cooldownReadyValue')
-                }
-              />
             </div>
             {implantsNeedsReauth && (
               <div className="border-b border-line p-3">
@@ -462,22 +606,60 @@ export function Clones() {
                 {t('common.offlineTitle')}
               </p>
             )}
-            {clones.length === 0 ? (
-              <CachedEmptyState
-                result={clonesResult}
-                title={t('clones.emptyTitle')}
-                hint={t('clones.emptyHint')}
-                fetchedTitle={t('clones.emptyFetchedTitle')}
-              />
-            ) : (
-              <DataTable
-                {...clonesExport.tableProps}
-                label={t('clones.title')}
-                columns={columns}
-                rows={clones}
-                rowKey={(clone) => clone.jump_clone_id}
-                mobileSort
-              />
+            {(clones.length > 0 || hasWorn) && (
+              <ul aria-label={t('clones.title')}>
+                {hasWorn && (
+                  <CloneCard
+                    heading={<span className="font-semibold">{t('clones.wearingNow')}</span>}
+                    place={characterSystemName ?? t('clones.unknownPlace')}
+                    security={
+                      characterSystemId === null ? undefined : securities.get(characterSystemId)
+                    }
+                    jumps={null}
+                    implantIds={wornIds}
+                    implantNames={implantNames}
+                    implantDescriptions={implantDescriptions}
+                    prices={prices}
+                  />
+                )}
+                {clones.length === 0 && (
+                  <CachedEmptyState
+                    result={clonesResult}
+                    title={t('clones.emptyTitle')}
+                    hint={t('clones.emptyHint')}
+                    fetchedTitle={t('clones.emptyFetchedTitle')}
+                  />
+                )}
+                {clones.map((clone) => {
+                  const name = clone.name?.trim() || undefined;
+                  return (
+                    <CloneCard
+                      key={clone.jump_clone_id}
+                      heading={
+                        name === undefined ? (
+                          <span className="text-text-dim">{t('clones.unnamed')}</span>
+                        ) : (
+                          <span className="text-text">{name}</span>
+                        )
+                      }
+                      place={locationLabel(clone)}
+                      security={securityOf(clone.location_id)}
+                      jumps={
+                        <JumpsAwayText
+                          result={jumpsByLocation?.get(clone.location_id)}
+                          t={t}
+                          locationId={clone.location_id}
+                          linkClassName={TOUCH_LINK}
+                        />
+                      }
+                      implantIds={clone.implants}
+                      implantNames={implantNames}
+                      implantDescriptions={implantDescriptions}
+                      prices={prices}
+                    />
+                  );
+                })}
+              </ul>
             )}
           </>
         )}
