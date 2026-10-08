@@ -171,7 +171,7 @@ Modal "Import a fit" (`industry.fitImportTitle`) opened from toolbar icon or rou
 ### 5.2 Group Rollup semantics (`engine/industry/groupRollup.ts`, `groupRollupView.ts`)
 
 - Each member re-resolved with owned-stock deduction off (`computeGroupResult: true`), member trees flattened two ways (`shoppingListMaterials` leaves for the buy list, `materialTableRows` for the display table), merged by type via `mergeCostLines` (per-job rounding kept; first real unit price wins; unpriced sticky).
-- Group Owned Overlay (`group.ownedStock`, `group.ownedStockScope`) nets once against both lists; display only, never writes to a member's `materialSourcing`. A member's own page can disagree with group totals (documented).
+- Group Owned Overlay (`group.ownedStock`, `group.ownedStockScope`) nets once against both lists; display only, never writes to a member's `materialSourcing`. A member's own page can disagree with group totals (documented): `GroupOwnedDiffersHint` shows one amber line under Owned Material Source naming the biggest gap, with an "Open the group" link.
 - Mixed hubs: totals still sum in ISK; multibuy split per hub (`shoppingByHub`); header copy disabled.
 - Verdict/profit unknown while any member loading/failed or any unpriced leaf (`computeGroupRollup.complete`).
 - List-row Profit (`computeGroupIndexStats`) = summed sale profit; page headline = Acquisition Verdict savings. Two different measures for one group.

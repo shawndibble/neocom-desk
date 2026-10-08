@@ -47,7 +47,7 @@ import type {
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
-import type { BuildGroupSnapshot } from './buildGroups';
+import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
 import {
   facilityContextFor,
@@ -97,6 +97,7 @@ import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
+import { GroupOwnedDiffersHint } from './GroupOwnedDiffersHint';
 import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
 import {
   buildRecipe,
@@ -109,6 +110,7 @@ import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
+  groupOwnedDifference,
   materialTypeIdKey,
   ownedStockView,
   planSourcingPatches,
@@ -223,6 +225,8 @@ interface BuildPlanDetailProps {
   onChange: (change: BuildPlanChange) => void;
   /** This plan's group's last Retarget (issue #632), or null when ungrouped or not yet Retargeted. */
   groupSnapshot: BuildGroupSnapshot | null;
+  /** This plan's Build Group (name, id, owned-stock ledger) for the owned-total-differs hint, or null when ungrouped. */
+  group?: (Pick<BuildGroup, 'id' | 'name'> & { ownedStock?: Record<number, number> }) | null;
   /**
    * The picker/override modal's "search BPC Sourcing" action (issue #839) —
    * navigates to `bpcSourcingHref(<typeID>)`. A prop rather
@@ -288,6 +292,7 @@ export function BuildPlanDetail({
   pricingInputs,
   onChange,
   groupSnapshot,
+  group = null,
   onSearchBpcSourcing,
   pendingLogProduction,
   pendingLogProductionKey,
@@ -1801,6 +1806,21 @@ export function BuildPlanDetail({
                       </Button>
                     </div>
                   }
+                />
+                <GroupOwnedDiffersHint
+                  difference={
+                    group
+                      ? groupOwnedDifference(
+                          visibleMaterials.map(({ typeID }) => ({
+                            typeID,
+                            name: nameForType(catalog, typeID),
+                          })),
+                          plan.materialSourcing,
+                          group.ownedStock
+                        )
+                      : null
+                  }
+                  group={group}
                 />
               </div>
               <MaterialsTable
