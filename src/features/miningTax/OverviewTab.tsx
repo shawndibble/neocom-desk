@@ -93,6 +93,8 @@ const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
+import { UnpricedIsk } from './UnpricedIsk';
+
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
   return sumVolume(
     row.entry.oreLines,
@@ -412,7 +414,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.rawValue} />,
       sortValue: (row) => row.valuation.rawValue,
       // Dense phone card's headline figure (`stackLayout="dense"` below) —
       // this is the column that's on by default, so it's the number a
@@ -424,7 +426,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.totalColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.rawValue} decimals={0} />,
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.rawValue} />,
       sortValue: (row) => row.valuation.rawValue,
       stackAffix: { before: `${t('miningTax.overview.totalColumn')} ` },
     },
@@ -433,7 +435,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.refineValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.refineValue} decimals={0} />,
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.refineValue} />,
       sortValue: (row) => row.valuation.refineValue,
       // Short, dense-meta-line label ("Refined 91.6M"): the full column
       // header ("Refined value") is right for a desktop table but repeats
