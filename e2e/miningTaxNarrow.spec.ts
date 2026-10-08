@@ -501,11 +501,26 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
   });
 });
 
-test.describe('Mining Tax phone card — tick box clears the card text', () => {
+/** Left/top/right/bottom of a cell's text (not the cell's padded box), by the cell's class. */
+async function textRect(row: Locator, cellSelector: string) {
+  return row
+    .locator(cellSelector)
+    .first()
+    .evaluate((cell) => {
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      const { left, top, right, bottom } = range.getBoundingClientRect();
+      return { left, top, right, bottom };
+    });
+}
+
+test.describe('Mining Tax phone card — tick box on the date line (#2983)', () => {
   // A coarse pointer grows the tick box's label to 44px (`touch:size-11`).
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
-  test('tick box sits left of the card text with a visible gap', async ({ page }) => {
+  test('tick box shares the date line, line two starts under it, nothing overflows', async ({
+    page,
+  }) => {
     await signInAndGoto(page);
     await seedPayeeBalance(page);
     await page.goto('./mining/tax');
@@ -513,19 +528,61 @@ test.describe('Mining Tax phone card — tick box clears the card text', () => {
     const box = page.getByLabel('Select this row');
     await expect(box).toHaveCount(1);
     const row = page.locator('tr', { has: box });
-    const boxRect = await box.locator('xpath=ancestor::label[1]').boundingBox();
-    const rowCells = row.locator('td:not(.dt-edge)');
-    const textLefts = await rowCells.evaluateAll((cells) =>
-      cells.map((c) => {
-        const range = document.createRange();
-        range.selectNodeContents(c);
-        return range.getBoundingClientRect();
-      })
+    const boxRect = (await box.boundingBox())!;
+    const labelRect = (await box.locator('xpath=ancestor::label[1]').boundingBox())!;
+    const date = await textRect(row, 'td.dt-primary');
+    const lineTwo = await textRect(row, 'td.dt-meta-first');
+    const status = await textRect(row, 'td.dt-edge-end');
+
+    // Date and box on one line, a small gap between them.
+    const boxMid = boxRect.y + boxRect.height / 2;
+    expect(Math.abs(boxMid - (date.top + date.bottom) / 2)).toBeLessThanOrEqual(6);
+    const gap = date.left - (boxRect.x + boxRect.width);
+    expect(gap).toBeGreaterThanOrEqual(4);
+    expect(gap).toBeLessThanOrEqual(12);
+    // Line two sits under the box, at the card's left edge, not indented to the date.
+    expect(lineTwo.top).toBeGreaterThanOrEqual(date.bottom - 2);
+    expect(Math.abs(lineTwo.left - boxRect.x)).toBeLessThanOrEqual(2);
+    // The status joins line two when it fits.
+    expect(Math.abs(status.top - lineTwo.top)).toBeLessThanOrEqual(6);
+    // The touch target still meets the floor, without the box's own cell carrying it.
+    expect(labelRect.width).toBeGreaterThanOrEqual(44);
+    expect(labelRect.height).toBeGreaterThanOrEqual(44);
+    // And nothing pushes the page sideways.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
-    const textLeft = Math.min(...textLefts.filter((r) => r.width > 0).map((r) => r.left));
-    // Gap between the label's right edge and the first text: not touching.
-    expect(textLeft - (boxRect!.x + boxRect!.width)).toBeGreaterThanOrEqual(4);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
+});
+
+test.describe('Mining Tax table row — tick box clears the date (#2983)', () => {
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+  ]) {
+    test(`gap between the box and the date at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+
+      const box = page.getByLabel('Select this row');
+      await expect(box).toHaveCount(1);
+      const row = page.locator('tr', { has: box });
+      const boxRect = (await box.boundingBox())!;
+      const date = await textRect(row, 'td.dt-primary');
+      const rowRect = (await row.boundingBox())!;
+
+      expect(date.left - (boxRect.x + boxRect.width)).toBeGreaterThanOrEqual(8);
+      // Little room left of the box.
+      expect(boxRect.x - rowRect.x).toBeLessThanOrEqual(12);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
 });
 
 /**

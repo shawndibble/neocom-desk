@@ -485,7 +485,11 @@ exactly the markup above.
   a tick box, a chevron and an `end` box can add `className="dt-dense-tight"` instead: the tick
   box, title, figure and button share line one, centred on each other (the
   button's 44px target overhangs rather than heightening the line), and line
-  two centres on a 28px `end` box (Hauling). BPC Sourcing uses it too,
+  two centres on a 28px `end` box (Hauling). A table with a tick box and no
+  chevron can add `className="dt-dense-lead"`: the box sits on the title's line with a small
+  gap, the card keeps its ordinary left padding so line two starts under the box, and a
+  coarse pointer's 44px target overhangs the padding instead of widening the cell (Mining
+  Tax). BPC Sourcing uses `dt-dense-tight` too,
   with neither box: its `cardCorner` is an ISK amount, wider than the
   pinned corner's room for a standing icon. The box is under §3's 36px
   touch tier on purpose: at 36px its height set the meta line's and opened a
