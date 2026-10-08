@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import en from '@/i18n/locales/en.json';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
-import { pasteDestination } from '@/engine/import/pasteDestination';
+import {
+  detectPasteDestination,
+  PASTE_DETECTORS,
+  pasteDestination,
+  type PasteDetector,
+} from '@/engine/import/pasteDestination';
 
 const CATALOGUE: AppraisalCatalogue = new Map(
   ['Rifter', 'Damage Control II', 'Tritanium', 'Pyerite', 'Nocxium', 'Warp Disruptor II'].map(
@@ -80,5 +86,55 @@ describe('pasteDestination', () => {
   it('ignores an empty or whitespace paste', () => {
     expect(pasteDestination('', SOURCES)).toBeNull();
     expect(pasteDestination('  \n\t\n', SOURCES)).toBeNull();
+  });
+});
+
+describe('detectPasteDestination', () => {
+  const claims = (id: string, verdict: 'match' | 'veto' | 'pass'): PasteDetector<string> => ({
+    id,
+    detect: () => verdict,
+  });
+
+  it('sends a paste matching two detectors to the higher-priority one', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'match'), claims('second', 'match')])
+    ).toBe('first');
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('second', 'match'), claims('first', 'match')])
+    ).toBe('second');
+  });
+
+  it('falls through a pass to the next detector', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'pass'), claims('second', 'match')])
+    ).toBe('second');
+  });
+
+  it('stops at a veto so lower-priority detectors cannot reread the paste', () => {
+    expect(
+      detectPasteDestination('x', SOURCES, [claims('first', 'veto'), claims('second', 'match')])
+    ).toBeNull();
+  });
+
+  it('does nothing when no detector is confident, or the paste is blank', () => {
+    expect(detectPasteDestination('x', SOURCES, [claims('first', 'pass')])).toBeNull();
+    expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
+  });
+
+  it('keeps the shipped order: fit, then item list, then pilot names', () => {
+    expect(PASTE_DETECTORS.map((d) => d.id)).toEqual(['fitting', 'appraisal', 'pilotList']);
+  });
+
+  it('has Help strings for every registered destination', () => {
+    const help = en.shortcuts.pasteDestinations as Record<string, { label: string; opens: string }>;
+    for (const { id } of PASTE_DETECTORS) {
+      expect(help[id]?.label, id).toBeTruthy();
+      expect(help[id]?.opens, id).toBeTruthy();
+    }
+  });
+
+  it('prefers the fit over the item list when a paste reads as both', () => {
+    const fitOfItems = ['[Rifter, Items]', 'Tritanium', 'Pyerite', 'Nocxium'].join('\n');
+    expect(pasteDestination(fitOfItems, SOURCES)).toBe('fitting');
   });
 });
