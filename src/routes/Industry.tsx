@@ -654,6 +654,45 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
+  const hasOwnedBlueprints = ownedBlueprints.length > 0;
+  const marketWidePanel = catalog && (
+    <MarketWideOpportunitiesPanel
+      key="market-wide"
+      hub={DEFAULT_TRADE_HUB}
+      trees={marketWideTrees}
+      catalog={catalog}
+      modifiers={modifiers}
+      activeCharacterId={activeCharacterId}
+      onStartPlan={handleStartPlan}
+      startFolded={hasOwnedBlueprints}
+    />
+  );
+  // Waits on the pricing-settings hydration gate (issue #2054): not mounting
+  // the panel until `assumedMe` has hydrated is enough to stop its first pass
+  // from pricing every candidate at the default, without threading a readiness
+  // flag into `useOpportunities` itself. Market-Wide Build Opportunities reads
+  // no pricing input, so it renders regardless.
+  const ownedRankingPanel = !catalog ? null : !pricingInputs.hydrated ? (
+    <div key="owned-ranking" className="flex justify-center py-16">
+      <Spinner label={t('common.loading')} />
+    </div>
+  ) : (
+    <OpportunitiesPanel
+      key="owned-ranking"
+      catalog={catalog}
+      pi={pi}
+      facilityDefaults={facilityDefaults}
+      activeCharacterId={activeCharacterId}
+      ownedStockSnapshot={workspace.ownedStockSnapshot}
+      assumedMe={assumedMe}
+      onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+      onStartPlan={handleStartPlan}
+      onDataAgeChange={setOpportunitiesDataAge}
+    />
+  );
+  const opportunitiesPanels = hasOwnedBlueprints
+    ? [ownedRankingPanel, marketWidePanel]
+    : [marketWidePanel, ownedRankingPanel];
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto max-w-7xl space-y-4">
@@ -679,40 +718,12 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
-                {/* First: "what's profitable" is the question most
-                    visits here come to answer; the owned-blueprint ranking
-                    below narrows it to what you already hold. */}
-                <MarketWideOpportunitiesPanel
-                  hub={DEFAULT_TRADE_HUB}
-                  trees={marketWideTrees}
-                  catalog={catalog}
-                  modifiers={modifiers}
-                  activeCharacterId={activeCharacterId}
-                  onStartPlan={handleStartPlan}
-                />
-                {/* Waits on the pricing-settings hydration gate (issue #2054):
-                    not mounting the panel until `assumedMe` has hydrated is
-                    enough to stop its first pass from pricing every candidate
-                    at the default, without threading a readiness flag into
-                    `useOpportunities` itself. Market-Wide Build Opportunities
-                    reads no pricing input, so it renders regardless. */}
-                {!pricingInputs.hydrated ? (
-                  <div className="flex justify-center py-16">
-                    <Spinner label={t('common.loading')} />
-                  </div>
-                ) : (
-                  <OpportunitiesPanel
-                    catalog={catalog}
-                    pi={pi}
-                    facilityDefaults={facilityDefaults}
-                    activeCharacterId={activeCharacterId}
-                    ownedStockSnapshot={workspace.ownedStockSnapshot}
-                    assumedMe={assumedMe}
-                    onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-                    onStartPlan={handleStartPlan}
-                    onDataAgeChange={setOpportunitiesDataAge}
-                  />
-                )}
+                {/* With owned blueprints the owned-blueprint ranking leads
+                    and "what's profitable" folds under it; with none, the
+                    market-wide scan is the whole answer and stays first,
+                    open. Keyed, so a late-arriving blueprint list reorders
+                    the two without remounting (and losing) a scan. */}
+                {opportunitiesPanels}
               </div>
             ) : tab === 'records' ? (
               <ProductionLogPanel
