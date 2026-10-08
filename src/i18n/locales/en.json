@@ -3396,7 +3396,7 @@
       "spExtractionReady_other": "{{count}} extractors ready",
       "spExtractionThreshold": "Flags at {{sp}} spare SP",
       "spExtractionOff": "Monitoring is off — turn it on in Settings",
-      "extractionNet": "Net / extraction",
+      "extractionNet": "Net each",
       "extractionBasis": "Sell Large Skill Injector − buy Skill Extractor at {{hub}}, before fees",
       "mail": "Mail",
       "mailUnread_one": "{{count}} unread",
