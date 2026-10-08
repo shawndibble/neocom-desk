@@ -181,6 +181,7 @@ describe('runHaulingScan, Any hub at one end', () => {
     expect(scan.rows).toHaveLength(MAX_BOOK_CANDIDATES);
     // Two books (origin and destination) per shortlisted item — no more.
     expect(getOrderBook).toHaveBeenCalledTimes(2 * MAX_BOOK_CANDIDATES);
+    expect(scan.capped).toBe(true);
   });
 
   it('keeps Any in the cache key', () => {

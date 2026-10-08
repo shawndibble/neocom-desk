@@ -276,6 +276,15 @@ describe('PilotLookupPanel', () => {
       );
     });
 
+    it('says so when the list hit its cap', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: Array.from({ length: 25 }, (_, i) => ({ ...INLINE_KILL, killmailId: 900 + i })),
+      });
+      renderTab('/pilot-lookup?pilot=42');
+      expect(await screen.findByText(/Showing the latest 25/)).toBeTruthy();
+    });
+
     it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {
       mocks.loadKillmailFit.mockResolvedValue(FIT);
       renderTab('/pilot-lookup?pilot=42');
