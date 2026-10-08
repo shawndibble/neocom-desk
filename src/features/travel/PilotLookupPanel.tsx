@@ -11,6 +11,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent 
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   EmptyState,
   FilterField,
   PageHeader,
@@ -244,19 +245,24 @@ type ProfileState =
   | { kind: 'loading' }
   | { kind: 'unknown' }
   | { kind: 'failed' }
-  | { kind: 'ready'; profile: PilotProfile };
+  | { kind: 'ready'; profile: PilotProfile; fetchedAt: Date };
 
 /** Mounted per pilot (keyed by id), so each lookup starts from `loading` with nothing stale. */
 function PilotResult({ characterId }: { characterId: number }) {
   const { t } = useTranslation();
   const [profile, setProfile] = useState<ProfileState>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     void loadPilotProfile(characterId)
       .then((loaded) => {
         if (!cancelled)
-          setProfile(loaded === null ? { kind: 'unknown' } : { kind: 'ready', profile: loaded });
+          setProfile(
+            loaded === null
+              ? { kind: 'unknown' }
+              : { kind: 'ready', profile: loaded, fetchedAt: new Date() }
+          );
       })
       .catch(() => {
         if (!cancelled) setProfile({ kind: 'failed' });
@@ -264,7 +270,12 @@ function PilotResult({ characterId }: { characterId: number }) {
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, attempt]);
+
+  function retry() {
+    setProfile({ kind: 'loading' });
+    setAttempt((n) => n + 1);
+  }
 
   if (profile.kind === 'loading') {
     return (
@@ -278,6 +289,11 @@ function PilotResult({ characterId }: { characterId: number }) {
       <EmptyState
         title={t('travel.pilot.profileFailedTitle')}
         hint={t('travel.pilot.profileFailedHint')}
+        action={
+          <Button size="sm" onClick={retry}>
+            {t('travel.pilot.retry')}
+          </Button>
+        }
       />
     );
   }
@@ -287,7 +303,7 @@ function PilotResult({ characterId }: { characterId: number }) {
     );
   }
   return (
-    <Panel>
+    <Panel actions={<DataAgeBadge date={profile.fetchedAt} alwaysVisible />}>
       <PilotProfileView profile={profile.profile} />
     </Panel>
   );

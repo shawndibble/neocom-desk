@@ -196,7 +196,7 @@ Observed gaps (Opportunities):
 - Ranked recompute is manual above 10 blueprints; assets-only changes do not invalidate cache (by design).
 - Ranked rows never price a blueprint acquisition gap (all owned by construction).
 - All owned: corp blueprints in containers show only "In container"; no corp assets cache for placement.
-- Header `DataAgeBadge` reports Ranked's blueprint fetch only; Market-Wide has no data-age indicator.
+- Header `DataAgeBadge` reports Ranked's blueprint fetch only; Market-Wide has its own `DataAgeBadge` (last completed scan) and a failed scan shows an error EmptyState with Try again.
 
 ## 7. Blueprint Acquisition modal (link-up, `BlueprintAcquisitionModal.tsx`)
 
@@ -284,7 +284,7 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 - Completed-job history is personal jobs only, from the first fetch after this shipped (ESI's completed-job window is not backfilled); Records still excludes unlogged jobs.
 - Log production unavailable for corp jobs; no corp dimension in the production log.
 - Price history and row menus missing on desktop Opportunities: see section 6 gaps and Q17.
-- Market-Wide: fixed hub, ME-0 approximation, no compare, no data-age badge.
+- Market-Wide: fixed hub, ME-0 approximation, no compare.
 - Ranked auto-recalc capped at 10 blueprints; manual Refresh above.
 - BPC Sourcing: 200-row cap, 10-type market BPO lookup, owned rows inert, active Character only for owned.
 - Records tab has no settings gear; date filter is the only filter.
@@ -400,14 +400,14 @@ Realized profit (`engine/industry/realizedProfit.ts`): total cost = material + j
 - Contract BPO and market BPO sources are off by default; first-time users see copies only.
 - Jobs list has no history, no row action beyond Log production, no ETA/queue planning.
 - Records has no item/plan search, no Character-account total, and no corp dimension.
-- Market-Wide has no data-age badge; ranking can silently omit products whose prices failed (unpriced material excluded, not listed).
+- Ranking on Market-Wide can silently omit products whose prices failed (unpriced material excluded, not listed).
 
 ## 20. Improvement ideas
 
 - Add batch-aware ISK/hr option (priced runs selector, slot-aware throughput) to Ranked.
 - Fold order depth/sell-through (daily volume already fetched for rarely-sold) into a liquidity-adjusted score or sort.
 - Expose price history and a context menu on desktop Opportunities rows (parity with phone).
-- Show "N excluded: missing price" disclosure on Market-Wide and a data-age badge.
+- Show "N excluded: missing price" disclosure on Market-Wide.
 - Include corp blueprints as an opt-in source for Ranked and scan "owned".
 - Persist Ranked rows (Dexie) keyed by inputs key so reloads do not force recompute above 10.
 - Market-Wide hub picker and ME assumption (reuse `assumedMe`).
