@@ -67,7 +67,7 @@ Character filter (`CharacterFilterControl`) rides in the Worth panel's meta. Abs
 
 One panel, the `NetWorthPanel` in `single` mode with the page's `stats` and `notices`; there is no separate Balance panel.
 
-- Title bar: "Worth", the Character filter (when the account has several), and a **Series** `MultiSelect` (button "Series: N of 4", options ISK / Assets / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
+- Title bar: "Worth", the Character filter (when the account has several), and a **Layers** `MultiSelect` (button "Layers: N of 4", options ISK / Assets / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
 - Stat row: **Net worth** (small-caps label, large figure toned by sign, whole ISK, no decimals; "—" when the Character lacks the wallet, assets or orders permission) and **EverMarks** to its right (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with an `InfoTooltip`. EverMarks shows "unknown" when loyalty is missing or needs re-auth.
 - No character portrait or "<name> only" readout: the page header already names the Character.
 - The exact wallet balance is no longer a figure of its own (user decision). It can still be read in the layer table under the chart (ISK row, whole ISK, the live balance); cents are not shown anywhere on this tab.
@@ -87,7 +87,7 @@ One panel, the `NetWorthPanel` in `single` mode with the page's `stats` and `not
 
 Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` (`series.ts`, `chartRows.ts`), tested there.
 
-- **Layers** (the title-bar Series dropdown; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). PLEX is not a layer: the PLEX Vault is not in ESI, so only hangar PLEX could show, which would mislead.
+- **Layers** (the title-bar Layers dropdown; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). PLEX is not a layer: the PLEX Vault is not in ESI, so only hangar PLEX could show, which would mislead.
 - **One Character:** layers stacked, plus a layer table (Layer, Value, Share, Opens). Opens links: ISK to `/wallet/journal`, Assets to `/assets`, Order escrow and Sell orders to `/market/orders`, each carrying `state.from = 'wallet'` so the landing page shows a "‹ Wallet" crumb (`FromWalletCrumb`).
 - **Several Characters** (the existing `?char=` filter): one line per Character; "Balance by character" gains a leading Show checkbox column (the last Character cannot be unchecked), one column per layer and a net worth column. A row or a chart line drills into that Character's own layered view as route state `?drill=<id>` (pushed, so Back undoes it); a "‹ All characters" crumb returns. Not `?character=`: that is the alert deep link `AlertCharacterSwitch` strips.
 - **Permissions:** a Character without the wallet, assets and orders scopes is left out of totals; the scope readout reads "All characters · N of M" with a tooltip naming who is missing.

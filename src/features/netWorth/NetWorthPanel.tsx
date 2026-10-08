@@ -270,6 +270,7 @@ export function NetWorthPanel({
         id: 'character',
         header: t('wallet.balanceCharacterColumn'),
         stickyStart: true,
+        stickyStartOnPanel: true,
         render: (row) => (
           <span className={row.covered ? undefined : 'text-text-dim'}>
             {row.characterName}
