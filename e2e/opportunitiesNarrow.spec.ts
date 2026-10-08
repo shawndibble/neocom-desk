@@ -117,8 +117,73 @@ test.describe('Opportunities — ranked phone list', () => {
     // The view picker stands in for the title, on the same line as the actions.
     const picker = page.getByRole('combobox', { name: 'View' });
     await expect(picker).toHaveText(/Ranked builds/);
-    const header = picker.locator('xpath=ancestor::header');
-    await expect.poll(async () => (await header.boundingBox())?.height ?? 0).toBeLessThan(56);
+  });
+
+  for (const width of [390, 360]) {
+    test(`the header controls do not overlap at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('./industry/opportunities');
+
+      const picker = page.getByRole('combobox', { name: 'View' });
+      const stock = page.getByRole('combobox', { name: 'Use my stock' });
+      await expect(picker).toBeVisible();
+      await expect(stock).toBeVisible();
+      const header = picker.locator('xpath=ancestor::header');
+      const controls = header.locator('button, [role="combobox"]');
+      await expect.poll(() => controls.count()).toBeGreaterThan(1);
+      const boxes = [];
+      for (const control of await controls.all()) {
+        const box = await control.boundingBox();
+        if (box) boxes.push(box);
+      }
+      for (const [i, a] of boxes.entries()) {
+        expect(a.x).toBeGreaterThanOrEqual(0);
+        expect(a.x + a.width).toBeLessThanOrEqual(width);
+        for (const b of boxes.slice(i + 1)) {
+          const apart =
+            a.x + a.width <= b.x + 0.5 ||
+            b.x + b.width <= a.x + 0.5 ||
+            a.y + a.height <= b.y + 0.5 ||
+            b.y + b.height <= a.y + 0.5;
+          expect(apart).toBe(true);
+        }
+      }
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+        )
+      ).toBe(true);
+    });
+  }
+
+  test("the What's profitable filter sheet shows Apply without scrolling at 390x844", async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    const panel = page.locator('section', {
+      has: page.getByRole('heading', { name: "What's profitable" }),
+    });
+    await panel.getByRole('button', { name: /^Filters/ }).click();
+    const apply = page.getByRole('dialog').getByRole('button', { name: 'Apply' });
+    await expect(apply).toBeVisible();
+    await expect
+      .poll(async () => {
+        const box = await apply.boundingBox();
+        return box ? box.y + box.height : Infinity;
+      })
+      .toBeLessThanOrEqual(PHONE.height);
+  });
+
+  test('the phone "Use my stock" select opens and picks a value', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    const stock = page.getByRole('combobox', { name: 'Use my stock' });
+    await stock.click();
+    await page.getByRole('option', { name: /full/i }).click();
+    await expect(stock).toHaveText(/full/i);
   });
 
   test('the "Sort by" trigger meets the touch tier at 390px (issue #1174)', async ({ page }) => {
