@@ -148,7 +148,8 @@ describe('PilotListView (Local list)', () => {
   it('shows the contact standing and where it came from', async () => {
     renderList();
     const hostile = await screen.findByRole('table', { name: 'Red and orange contacts' });
-    expect(within(hostile).getByText('Orange -5')).toBeTruthy();
+    // The Contacts page's own standing icon, naming whose contact it is.
+    expect(within(hostile).getByRole('img', { name: /standing \(-5\).*their corp/ })).toBeTruthy();
     expect(within(hostile).getByText('their corporation')).toBeTruthy();
   });
 
@@ -160,7 +161,7 @@ describe('PilotListView (Local list)', () => {
     const friendly = screen.getByRole('table', { name: 'Friendly' });
     expect(within(friendly).getByText('Corpmate')).toBeTruthy();
     expect(within(friendly).getByText('Your corporation')).toBeTruthy();
-    expect(within(friendly).getByText('Blue +10')).toBeTruthy();
+    expect(within(friendly).getByRole('img', { name: /standing \(10\)/ })).toBeTruthy();
   });
 
   it('links each name to the Show Info dialog, not another page', async () => {
@@ -178,6 +179,7 @@ describe('PilotListView (Local list)', () => {
   it('names the system it reads from, and lets you change it', async () => {
     renderList();
     expect(await screen.findByRole('button', { name: /Change your system/ })).toBeTruthy();
+    expect(screen.getByText('Last API system')).toBeTruthy();
   });
 });
 

@@ -8957,12 +8957,10 @@
         "none": "no kills",
         "last": "last {{age}}",
         "window": "Kills in the last 30 days, and how long ago the latest one in that space was.",
-        "chart": "Kills per month, last 6 months",
+        "chart": "Kills per month, by kind of space, last 6 months",
         "chartLabel": "Kills per month by space: {{summary}}",
-        "flew": "Flew on their kills",
         "killed": "Ships they killed",
-        "basis": "From their latest {{count}} kills on zKillboard.",
-        "latest": "Latest kills"
+        "basis": "From their latest {{count}} kills on zKillboard."
       },
       "linesInvalid": "One of the lines doesn't look like a pilot name. Names use letters, numbers, spaces and ' . -",
       "resolving": "Looking up…",
@@ -8998,23 +8996,17 @@
           "corporation": "Your corporation",
           "alliance": "Your alliance"
         },
-        "band": {
-          "red": "Red",
-          "orange": "Orange",
-          "neutral": "Neutral",
-          "blue": "Blue"
-        },
         "via": {
           "character": "this pilot",
           "corporation": "their corporation",
           "alliance": "their alliance"
         },
-        "hereLabel": "Reading from",
+        "hereLabel": "Last API system",
+        "hereLabelPicked": "System",
         "hereUnset": "Set your system",
         "hereChange": "Change your system, now {{system}}",
-        "hereFromGame": "from your location",
         "hereSetByYou": "set by you",
-        "hereHint": "Groups pilots by where they have killed. Pick another system to change it.",
+        "hereHint": "The last system the game reported for you, which can lag while you travel. Pilots are grouped by where they have killed; pick another system to change it.",
         "notFoundNames_one": "{{count}} name not found: {{names}}. Check the spelling — names must match exactly.",
         "notFoundNames_other": "{{count}} names not found: {{names}}. Check the spelling — names must match exactly.",
         "overflow": "First {{shown}} checked. {{count}} more not looked up.",
