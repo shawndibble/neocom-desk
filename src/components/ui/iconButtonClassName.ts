@@ -58,7 +58,7 @@ export function iconButtonClassName({
     // A labelled button keeps the square box below `md` and swaps to auto width
     // above it: one size utility per breakpoint, never two fighting at `md:`.
     withText
-      ? size === 'sm'
+      ? size === 'sm' || size === 'row'
         ? 'size-9 md:size-auto md:h-7 md:gap-1.5 md:px-2 touch:h-9 touch:min-w-9'
         : 'size-11 md:size-auto md:h-9 md:gap-1.5 md:px-2.5 touch:h-11 touch:min-w-11'
       : size === 'md'

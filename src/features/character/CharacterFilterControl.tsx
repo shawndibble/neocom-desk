@@ -210,7 +210,7 @@ export function CharacterFilterControl({
           aria-label={label}
           className={`${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
         >
-          <span aria-hidden="true" className="flex items-center justify-center md:hidden">
+          <span aria-hidden="true" className="flex shrink-0 items-center justify-center md:hidden">
             {isAll || activeCharacterId === null ? (
               <Icon.AllCharacters size={ICON_SIZE.md} />
             ) : (
