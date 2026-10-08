@@ -429,7 +429,6 @@ export function BuildGroupPanel({
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
-        phoneHidden: true,
         align: 'right',
         render: (material) => {
           const owned = ownedStockMap.get(material.typeID);
@@ -742,7 +741,7 @@ export function BuildGroupPanel({
           group page redesign) — Members and Materials sit side by side
           rather than competing with a nav rail and a 20rem list column for
           the same row. */}
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-4">
           <Panel title={t('industry.groupMembers')} padded={false}>
             <ul className="divide-y divide-line text-xs">

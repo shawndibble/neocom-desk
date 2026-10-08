@@ -34,6 +34,7 @@ function questionButtons(): HTMLElement[] {
 const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.notificationFeedPrefs': /notification preferences/i,
   'sync.piCustomsRates': /customs rate overrides/i,
+  'sync.structureBrokerFees': /structure broker fees/i,
   'sync.marketHub': /trade hub/i,
   'sync.marketPricePercent': /appraisal price %/i,
   'sync.industryFacilityDefaults': /industry facility/i,
@@ -56,6 +57,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
   'sync.miningTaxCompressedOre': /compressed ore/i,
+  'sync.oreRefiningStructureRate': /refining rate you type/i,
   'sync.miningTaxOreValueMode': /Assign form edits ore values/i,
   'sync.courierHighCollateralRatio': /courier collateral warning/i,
   'sync.bpcHideAuctions': /hide auctions/i,

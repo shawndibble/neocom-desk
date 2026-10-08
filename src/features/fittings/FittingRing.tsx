@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { AddRow, Warn } from '@/components/ui/icons';
@@ -80,11 +81,12 @@ import { MODULE_STATE_STYLE } from './moduleStateStyle';
 /**
  * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
  * about 57px — but never taller than the window leaves beside the tabs and
- * readouts (16rem is an estimate of them; past it the column scrolls), so
- * the sticky column still shows it whole; a short window (a
+ * readouts (24rem covers the header, tabs, panel header and the whole
+ * calibration / powergrid / CPU / sustained block, so the readouts end inside
+ * the first viewport; past it the column scrolls); a short window (a
  * landscape phone) keeps at least 20rem.
  */
-const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 16rem)))';
+const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 24rem)))';
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -426,6 +428,7 @@ function Readout({
           {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
         </p>
       )}
+      {overBudget && gauge !== 'droneBandwidth' && <MakeItFitTrigger />}
     </div>
   );
 }

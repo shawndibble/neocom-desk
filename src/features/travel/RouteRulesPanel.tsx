@@ -18,10 +18,16 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRouteShipMass, useRouteShipTypeId } from '@/features/route/routeShip';
 import {
   Button,
   Checkbox,
   CollapsiblePanel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SegmentedControl,
   Spinner,
   StatChip,
@@ -105,6 +111,8 @@ export function RouteBridgeFields({
   );
 }
 
+const NO_SHIP = 'none';
+
 /**
  * Route Safety's own group: whether, and through which holes and bridges,
  * routes may go. Shared with Settings → Travel (`bare`: the panel there
@@ -124,6 +132,8 @@ export function RouteHoleFields({
   const { t } = useTranslation();
   const lifeId = useId();
   const { enabled, settings } = query;
+  const { hulls } = useRouteShipMass();
+  const shipTypeId = useRouteShipTypeId((state) => state.value);
   return (
     <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
@@ -148,6 +158,27 @@ export function RouteHoleFields({
           fill
           uppercase={false}
         />
+      </div>
+      <div className="space-y-1.5">
+        <p className="font-semibold">{t('travel.holes.ship')}</p>
+        <Select
+          value={shipTypeId === null ? NO_SHIP : String(shipTypeId)}
+          onValueChange={(value) =>
+            void useRouteShipTypeId.getState().setValue(value === NO_SHIP ? null : Number(value))
+          }
+        >
+          <SelectTrigger size="sm" aria-label={t('travel.holes.ship')}>
+            <SelectValue placeholder={t('travel.holes.shipPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_SHIP}>{t('travel.holes.shipNone')}</SelectItem>
+            {hulls.map((hull) => (
+              <SelectItem key={hull.typeId} value={String(hull.typeId)}>
+                {hull.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={lifeId}>{t('travel.holes.minLifeBefore')}</label>

@@ -15,6 +15,12 @@ const LARGE_INJECTOR_BRACKETS: readonly { belowSp: number; yieldSp: number }[] =
   { belowSp: Infinity, yieldSp: 150_000 },
 ];
 
+/**
+ * Most SP an Alpha clone can hold; injectors work past the 5M free-training
+ * point but stop here (EVE Uni "Alpha clone"; figure not re-checked against CCP's page).
+ */
+export const ALPHA_SP_CAP = 20_000_000;
+
 /** SP one Large Skill Injector delivers, keyed by total SP *at the moment of injection*. */
 export function largeInjectorYield(totalSp: number): number {
   const bracket = LARGE_INJECTOR_BRACKETS.find((b) => totalSp < b.belowSp);
