@@ -13,15 +13,6 @@ interface AlphaCloneChipProps {
   skillName: (skillTypeId: number) => string;
 }
 
-/**
- * "Alpha OK" / "Omega only" for the open Fitting, by skill caps (see
- * `engine/fittings/alphaClone.ts`) — whoever flies it, so it shows without a
- * Character too. An icon, so the header stays one row: α in green when an
- * Alpha can fly it, Ω in warning yellow when it needs Omega. The verdict is
- * its accessible name; the tooltip (a tap on touch) explains it and names the
- * skill levels that keep an Alpha out. While loading it holds the badge's
- * place with an empty slot (issue #2255).
- */
 /** The verdict and what backs it: the badge's tooltip, and the phone menu's row. */
 function useAlphaVerdict({ blockers, skillName }: AlphaCloneChipProps) {
   const { t } = useTranslation();
@@ -66,6 +57,15 @@ export function AlphaCloneMenuRow(props: AlphaCloneChipProps) {
   );
 }
 
+/**
+ * "Alpha OK" / "Omega only" for the open Fitting, by skill caps (see
+ * `engine/fittings/alphaClone.ts`) — whoever flies it, so it shows without a
+ * Character too. An icon, so the header stays one row: α in green when an
+ * Alpha can fly it, Ω in warning yellow when it needs Omega. The verdict is
+ * its accessible name; the tooltip (a tap on touch) explains it and names the
+ * skill levels that keep an Alpha out. While loading it holds the badge's
+ * place with an empty slot (issue #2255).
+ */
 export function AlphaCloneChip(props: AlphaCloneChipProps) {
   const verdict = useAlphaVerdict(props);
   // Holds the badge's place until the verdict lands, so the header doesn't reflow.

@@ -433,7 +433,6 @@ function Readout({
   );
 }
 
-/** The ship's own render, falling back to its icon when the image server has none. */
 /** The four module-state border colours the tiles use, named — touch has no hover to learn them from. */
 function ModuleStateLegend() {
   const { t } = useTranslation();
@@ -456,6 +455,7 @@ function ModuleStateLegend() {
   );
 }
 
+/** The ship's own render, falling back to its icon when the image server has none. */
 function ShipRender({ typeId }: { typeId: number }) {
   const [failed, setFailed] = useState(false);
   const [renderedTypeId, setRenderedTypeId] = useState(typeId);
@@ -1188,6 +1188,10 @@ export function FittingRing({
           >
             <Readout gauge="cpu" budget={budgets.cpu} align="start" />
             <Readout gauge="powergrid" budget={budgets.powergrid} align="end" />
+            {/* Calibration can gate a fit too, but only earns a line on the phone when it is the one over. */}
+            {calFlash.overBudget && (
+              <Readout gauge="calibration" budget={budgets.calibration} align="start" />
+            )}
             {overFit && (
               <div className="col-span-2 text-center">
                 <MakeItFitTrigger />

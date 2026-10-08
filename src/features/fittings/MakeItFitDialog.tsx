@@ -32,7 +32,10 @@ function tradeOffSummary(changes: StatChange[], t: Translate): string {
   const ehp = changes.find((change) => change.key === 'ehp');
   const resists = changes.filter((change) => change.key.endsWith('Resonance'));
   const others = changes.length - resists.length - (ehp ? 1 : 0);
-  const net = resists.reduce((sum, change) => sum + (change.after - change.before), 0);
+  const deltas = resists.map((change) => change.after - change.before);
+  // Some up and some down: no honest direction, so say only that they changed.
+  const mixed = deltas.some((d) => d > 0) && deltas.some((d) => d < 0);
+  const net = mixed ? 0 : deltas.reduce((a, b) => a + b, 0);
   return [
     ehp ? changeLabel(ehp, t) : null,
     resists.length > 0
