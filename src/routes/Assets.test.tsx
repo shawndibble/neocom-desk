@@ -13,6 +13,7 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { configureClipboard } from '@/lib/clipboard';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { App } from '@/app/App';
 import { exportRows } from '@/lib/downloadCsv';
 import type { TypeMap } from '@/sde/types';
@@ -1596,6 +1597,54 @@ describe('jumps-away distance (issue #87)', () => {
     await user.click(await screen.findByRole('option', { name: 'Prefer shorter' }));
 
     expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+  });
+
+  describe('station header on a phone (#2989)', () => {
+    function phoneViewport() {
+      return vi.spyOn(window, 'matchMedia').mockImplementation(
+        (media: string) =>
+          ({
+            media,
+            matches: media === PHONE_QUERY,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }) as unknown as MediaQueryList
+      );
+    }
+
+    it('puts security · ISK · jumps on a second line, jumps opening the route', async () => {
+      const matchMedia = phoneViewport();
+      try {
+        window.history.pushState({}, '', '/assets/60003760');
+        render(<App />);
+
+        const jumps = await screen.findByRole('button', { name: '0 jumps' });
+        expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
+        const heading = screen.getByRole('heading', { level: 2 });
+        const facts = jumps.closest('span.flex-wrap') as HTMLElement;
+        // Name on its own line; the facts line follows it inside the same column.
+        expect(heading.parentElement).toContainElement(facts);
+        expect(facts).not.toContainElement(heading);
+        // One dot between each pair of items, none leading or trailing.
+        expect(facts.querySelectorAll('[aria-hidden="true"]')).toHaveLength(
+          facts.children.length - 1
+        );
+        expect(facts.textContent).toMatch(/^[^·].*·0 jumps$/);
+        expect(jumps.className).toContain('min-h-11');
+      } finally {
+        matchMedia.mockRestore();
+      }
+    });
+
+    it('leaves desktop with the security and jumps cluster beside the heading', async () => {
+      window.history.pushState({}, '', '/assets/60003760');
+      render(<App />);
+
+      const jumps = await screen.findByRole('button', { name: '0 jumps' });
+      expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
+      expect(jumps.closest('[class~="sm:flex"]')).not.toBeNull();
+      expect(jumps.className).not.toContain('min-h-11');
+    });
   });
 });
 
