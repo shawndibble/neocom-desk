@@ -94,10 +94,11 @@ export function IndustryPlanPage() {
   }
 
   const groups = buildGroupsFor(workspace.buildGroups, activeCharacterId);
-  const groupSnapshot =
+  const planGroup =
     plan.buildGroupId === undefined
       ? null
-      : (groups.find((g) => g.id === plan.buildGroupId)?.snapshot ?? null);
+      : (groups.find((g) => g.id === plan.buildGroupId) ?? null);
+  const groupSnapshot = planGroup?.snapshot ?? null;
 
   return (
     <ItemActionsProvider page={itemActions}>
@@ -139,6 +140,7 @@ export function IndustryPlanPage() {
             pricingInputs={pricingInputs}
             onChange={(change) => void applyBuildPlanChange(plan.id, change)}
             groupSnapshot={groupSnapshot}
+            group={planGroup}
             onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
             pendingLogProduction={pendingLogProduction}
             pendingLogProductionKey={location.key}

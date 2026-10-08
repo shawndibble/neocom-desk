@@ -357,6 +357,24 @@ describe('parseBuildGroups — ownedStock / ownedStockScope', () => {
     expect(parseBuildGroups(scope(['x']))).toEqual({});
   });
 
+  it('keeps hangars and containers on a selected scope and drops malformed ones (#2941)', () => {
+    const hangar = { characterId: 1, locationId: 5, locationType: 'station', division: 3 };
+    const scope = (extra: Record<string, unknown>) => ({
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          ownedStockScope: { mode: 'selected', locations: [], ...extra },
+        },
+      ],
+    });
+    const good = scope({ hangars: [hangar], containers: [7] });
+    expect(parseBuildGroups(good)).toEqual(good);
+    expect(parseBuildGroups(scope({ hangars: [{ ...hangar, division: 'x' }] }))).toEqual({});
+    expect(parseBuildGroups(scope({ containers: ['x'] }))).toEqual({});
+  });
+
   it('keeps a group with neither field at all — the pre-#697 shape', () => {
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
     expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });

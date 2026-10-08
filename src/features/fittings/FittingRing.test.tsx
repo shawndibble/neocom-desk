@@ -411,6 +411,25 @@ describe('FittingRing with the editor’s item actions', () => {
     );
   }
 
+  it('steps a fitted module through its reachable states on a click, and selects on Enter', () => {
+    const actions = fakeItemActions({ names });
+    const onSlotSelect = vi.fn();
+    renderRing(actions, { onSlotSelect });
+    // A mouse click carries detail 1: the active autocannon goes to overload.
+    fireEvent.click(screen.getByLabelText(/^High slots 1, active/), { detail: 1 });
+    expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
+    // The passive module tops out at online, so its click wraps to offline.
+    fireEvent.click(screen.getByLabelText(/^Low slots 1, online/), { detail: 1 });
+    expect(actions.setState).toHaveBeenCalledWith('low', 0, 'offline');
+    expect(onSlotSelect).not.toHaveBeenCalled();
+    // Enter/Space arrive as a click with no detail: they keep selecting.
+    fireEvent.click(screen.getByLabelText(/^High slots 1, active/));
+    expect(onSlotSelect).toHaveBeenCalledWith('high', 0);
+    // The keyboard cycles with S.
+    fireEvent.keyDown(screen.getByLabelText(/^Low slots 1, online/), { key: 's' });
+    expect(actions.setState).toHaveBeenCalledTimes(3);
+  });
+
   it('opens a fitted tile’s menu: its reachable states, unload, remove', async () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
