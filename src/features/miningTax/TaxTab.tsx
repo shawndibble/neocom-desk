@@ -1297,7 +1297,14 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     render: (dr) =>
       withDayLines(
         dr,
-        isPhone ? (
+        estimatedValueOf(dr) <= 0 ? (
+          // Zero or unpriced: a muted dash, left off the phone card's meta line
+          // rather than printing "· — value" on every row.
+          <span className="text-text-dim" data-dense-omit>
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">{t('miningTax.noPriceLabel')}</span>
+          </span>
+        ) : isPhone ? (
           <IskAmount value={estimatedValueOf(dr)} />
         ) : (
           `${formatIsk(estimatedValueOf(dr))} ISK`
@@ -1404,11 +1411,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       cardCorner: true,
       // Owed is the figure the page is about; settled history recedes.
       cellClassName: (dr) =>
-        dr.status === 'outstanding'
-          ? 'text-isk-neg'
-          : dr.status === 'paid' || dr.status === 'dismissed'
-            ? 'text-text-dim font-normal'
-            : undefined,
+        dr.status === 'outstanding' && taxOwedOf(dr) <= 0
+          ? 'text-text-dim'
+          : dr.status === 'outstanding'
+            ? 'text-isk-neg'
+            : dr.status === 'paid' || dr.status === 'dismissed'
+              ? 'text-text-dim font-normal'
+              : undefined,
       render: (dr) =>
         dr.assignment
           ? withDayLines(
