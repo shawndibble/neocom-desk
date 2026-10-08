@@ -1066,12 +1066,12 @@ describe('AppraisalPanel — the row as an item', () => {
       });
       renderPanel({ controller: controller({ result: outcome() }) });
 
-      const sell = screen.getByRole('button', { name: 'Copy 1,386,400 ISK' });
+      const sell = screen.getByRole('button', { name: 'Copy 1.4M ISK (1,386,400)' });
       expect(sell).toHaveTextContent(/^1\.4M$/);
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
-      expect(await screen.findByRole('status')).toHaveTextContent('Copied to clipboard');
+      expect(await screen.findByRole('status')).toHaveTextContent('Copied 1,386,400 ISK');
     });
   });
 });

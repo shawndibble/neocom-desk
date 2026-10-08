@@ -857,7 +857,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   storage: a marker is an entry-list _position_, while a milestone means "when
   these skills are done, wherever they end up."
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
-- **Dismissed delivery**: A delivered manufacturing or reaction job in Active Jobs' History that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
+- **Dismissed delivery**: A delivered manufacturing or reaction job in the Jobs panel's History segment that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,
   regardless of which Build Plan it came from, grouped by item. Distinct

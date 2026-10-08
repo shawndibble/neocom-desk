@@ -7334,6 +7334,8 @@
       "compareHubsShow": "Show hub comparison",
       "compareHubsHide": "Hide hub comparison",
       "copyTotal": "Copy {{amount}}",
+      "copyTotalCompact": "Copy {{short}} ISK ({{full}})",
+      "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
       "copiedToClipboard": "Copied to clipboard",
       "columnHub": "Hub"

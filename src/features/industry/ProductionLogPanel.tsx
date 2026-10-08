@@ -599,93 +599,88 @@ export function ProductionLogPanel({
           </div>
         </div>
 
-        {runRows.length === 0 ? (
-          <EmptyState
-            title={t('industry.productionLogFilteredEmptyTitle')}
-            hint={t('industry.productionLogFilteredEmptyHint')}
-            className="py-6"
-          />
-        ) : (
-          <>
-            {profitHistoryPoints.length >= 2 && (
-              <div className="min-w-0">
-                <Suspense
-                  fallback={
-                    <div className="flex justify-center py-8">
-                      <Spinner label={t('common.loading')} />
-                    </div>
-                  }
-                >
-                  <LazyProductionProfitChart
-                    points={profitHistoryPoints}
-                    trend={profitHistoryTrend}
-                  />
-                </Suspense>
-              </div>
-            )}
-            {/* Full width on a desktop: eight figure columns do not fit the
-                column beside the totals, and the one that clips is the one
-                that matters. The totals and the chart share the row above. */}
-            <div className="min-w-0 space-y-4 lg:col-span-2">
-              <div>
-                <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
-                  <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('industry.byItem')}
-                  </h3>
-                  <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
+        {runRows.length > 0 && profitHistoryPoints.length >= 2 && (
+          <div className="min-w-0">
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
                 </div>
-                <DataTable
-                  {...itemsExport.tableProps}
-                  columns={columns}
-                  rows={itemRows}
-                  rowKey={(r) => r.productTypeID}
-                  label={t('industry.byItem')}
-                  sort={knownSort(itemSort, columns)}
-                  onSortChange={setItemSort}
-                  mobileSort
-                  density="compact"
-                />
-              </div>
-
-              <CollapsiblePanel
-                title={t('industry.allProductionRuns')}
-                meta={<span className="text-xs tabular-nums text-text-dim">{runRows.length}</span>}
-                actions={
-                  <TableActionsMenu
-                    name={t('industry.allProductionRuns')}
-                    tableExport={runsExport}
-                  />
-                }
-                expanded={runsExpanded}
-                onToggle={() => setRunsExpanded((open) => !open)}
-                labels={{
-                  show: t('industry.productionLogShowRuns'),
-                  hide: t('industry.productionLogHideRuns'),
-                }}
-                padded={false}
-              >
-                <div className="overflow-x-auto">
-                  <DataTable
-                    {...runsExport.tableProps}
-                    columns={runColumns}
-                    rows={runRows}
-                    rowKey={(r) => r.run.id}
-                    label={t('industry.allProductionRuns')}
-                    sort={knownSort(runSort, runColumns)}
-                    onSortChange={setRunSort}
-                    mobileSort
-                    density="compact"
-                    onRowClick={
-                      onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined
-                    }
-                    rowClickable={(r) => r.planExists}
-                  />
-                </div>
-              </CollapsiblePanel>
-            </div>
-          </>
+              }
+            >
+              <LazyProductionProfitChart points={profitHistoryPoints} trend={profitHistoryTrend} />
+            </Suspense>
+          </div>
         )}
       </div>
+
+      {runRows.length === 0 ? (
+        <EmptyState
+          title={t('industry.productionLogFilteredEmptyTitle')}
+          hint={t('industry.productionLogFilteredEmptyHint')}
+          className="py-6"
+        />
+      ) : (
+        <>
+          {/* Full width, outside the totals/chart grid: eight figure columns
+                do not fit the column beside the totals, and with no chart
+                the totals would otherwise sit beside an empty column. */}
+          <div className="mt-4 min-w-0 space-y-4">
+            <div>
+              <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
+                <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('industry.byItem')}
+                </h3>
+                <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
+              </div>
+              <DataTable
+                {...itemsExport.tableProps}
+                columns={columns}
+                rows={itemRows}
+                rowKey={(r) => r.productTypeID}
+                label={t('industry.byItem')}
+                sort={knownSort(itemSort, columns)}
+                onSortChange={setItemSort}
+                mobileSort
+                density="compact"
+              />
+            </div>
+
+            <CollapsiblePanel
+              title={t('industry.allProductionRuns')}
+              meta={<span className="text-xs tabular-nums text-text-dim">{runRows.length}</span>}
+              actions={
+                <TableActionsMenu name={t('industry.allProductionRuns')} tableExport={runsExport} />
+              }
+              expanded={runsExpanded}
+              onToggle={() => setRunsExpanded((open) => !open)}
+              labels={{
+                show: t('industry.productionLogShowRuns'),
+                hide: t('industry.productionLogHideRuns'),
+              }}
+              padded={false}
+            >
+              <div className="overflow-x-auto">
+                <DataTable
+                  {...runsExport.tableProps}
+                  columns={runColumns}
+                  rows={runRows}
+                  rowKey={(r) => r.run.id}
+                  label={t('industry.allProductionRuns')}
+                  sort={knownSort(runSort, runColumns)}
+                  onSortChange={setRunSort}
+                  mobileSort
+                  density="compact"
+                  onRowClick={
+                    onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined
+                  }
+                  rowClickable={(r) => r.planExists}
+                />
+              </div>
+            </CollapsiblePanel>
+          </div>
+        </>
+      )}
 
       <SaleLinkingModals sale={sale} />
       <RunLossModals loss={runLoss} />

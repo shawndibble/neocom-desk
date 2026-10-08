@@ -42,7 +42,7 @@ function job(id: number, status: 'active' | 'ready', endOffsetMs: number) {
   };
 }
 
-test.describe('Active Jobs panel header', () => {
+test.describe('Jobs panel header', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
     await page.route(
