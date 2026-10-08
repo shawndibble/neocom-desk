@@ -245,11 +245,14 @@ export function NetWorthPanel({
   const missingNames = characters
     .filter((c) => !data.covered.has(c.characterId))
     .map((c) => c.name);
-  const included =
-    mode === 'multi' ? coveredIds.filter((id) => !hiddenCharacters.includes(id)) : coveredIds;
+  // Hidden ids are device-wide, so a filter can leave none visible; show them all then.
+  const unhidden = coveredIds.filter((id) => !hiddenCharacters.includes(id));
+  const included = mode === 'multi' && unhidden.length > 0 ? unhidden : coveredIds;
   const totals = useMemo(() => {
     const latestWithLive = new Map(
-      tableRows.flatMap((row) => (row.layers ? [[row.characterId, row.layers] as const] : []))
+      tableRows.flatMap((row) =>
+        row.layers && !row.needsReauth ? [[row.characterId, row.layers] as const] : []
+      )
     );
     return totalsFor(latestWithLive, { included, hidden: [], shown });
   }, [tableRows, included, shown]);

@@ -31,7 +31,7 @@ import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
 import { lineKey, type LineRow, type StackRow } from '@/engine/netWorth/chartRows';
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
-import { CHARACTER_COLORS, LAYER_COLOR, LAYER_LABEL_KEYS, characterStroke } from './layerMeta';
+import { LAYER_COLOR, LAYER_LABEL_KEYS, characterStroke } from './layerMeta';
 
 const MAX_X_TICKS = 5;
 const HATCH_ID = 'net-worth-hatch';
@@ -248,7 +248,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
                     type="linear"
                     dataKey={lineKey(line.characterId)}
                     name={line.name}
-                    stroke={color || CHARACTER_COLORS[0]}
+                    stroke={color}
                     strokeDasharray={dash}
                     strokeWidth={2}
                     dot={{ r: 2 }}

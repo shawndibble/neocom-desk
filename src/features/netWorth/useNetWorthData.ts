@@ -69,8 +69,15 @@ export function useNetWorthData(characterIds: readonly number[]): NetWorthData {
     new Map()
   );
   useEffect(() => {
-    if (walletIdsKey === '') return;
     let cancelled = false;
+    if (walletIdsKey === '') {
+      void Promise.resolve().then(() => {
+        if (!cancelled) setWalletDaily(new Map());
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     const walletIds = walletIdsKey.split(',').map(Number);
     const loaded = new Map<number, Map<string, number>>();
     void mapWithConcurrencyLimit(walletIds, ESI_FANOUT_CONCURRENCY, async (id) => {
