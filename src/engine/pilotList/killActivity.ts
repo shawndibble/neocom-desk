@@ -40,11 +40,16 @@ export interface KillSummary {
   recentCount: number;
 }
 
+/** The start of the window the per-space counts cover. */
+export function windowStart(nowMs: number): number {
+  return nowMs - ACTIVITY_WINDOW_DAYS * DAY_MS;
+}
+
 export function summarizeKills(kills: readonly KillRecord[], nowMs: number): KillSummary {
   const bySpace = Object.fromEntries(
     KILL_SPACES.map((space) => [space, { count: 0, lastMs: null }])
   ) as Record<KillSpace, SpaceActivity>;
-  const since = nowMs - ACTIVITY_WINDOW_DAYS * DAY_MS;
+  const since = windowStart(nowMs);
   let recentCount = 0;
   for (const kill of kills) {
     const recent = kill.timeMs >= since;

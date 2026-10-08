@@ -29,7 +29,13 @@ import {
   MAX_DSCAN_SNAPSHOT_CHARS,
 } from '@/engine/pilotList/dscanSnapshot';
 import { groupOf, PILOT_GROUP_ORDER, type PilotGroupId } from '@/engine/pilotList/grouping';
-import { ageTone, topShips, type AgeTone, type KillSpace } from '@/engine/pilotList/killActivity';
+import {
+  ageTone,
+  topShips,
+  windowStart,
+  type AgeTone,
+  type KillSpace,
+} from '@/engine/pilotList/killActivity';
 import { CharacterLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
@@ -43,6 +49,7 @@ import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
+import { SPACE_TEXT, STANDING_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
@@ -58,13 +65,6 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   );
 }
 
-const SPACE_TEXT: Record<KillSpace, string> = {
-  highsec: 'text-success',
-  lowsec: 'text-warning',
-  nullsec: 'text-danger',
-  wormhole: 'text-accent',
-};
-
 const AGE_TEXT: Record<AgeTone, string> = {
   fresh: 'font-semibold text-text',
   week: 'text-text-dim',
@@ -72,20 +72,13 @@ const AGE_TEXT: Record<AgeTone, string> = {
   none: 'text-text-dim opacity-60',
 };
 
-const STANDING_TEXT = {
-  red: 'text-danger',
-  orange: 'text-warning',
-  neutral: 'text-text-dim',
-  blue: 'text-accent',
-} as const;
-
 /** How many hulls a row names under "Flew on kills". */
 const ROW_HULLS = 2;
 
 function recentKills(row: PilotListRow, now: number) {
   if (row.kills.kind !== 'ready') return [];
   // Same window as the counts: what they flew lately, not years ago.
-  const since = now - 30 * 86_400_000;
+  const since = windowStart(now);
   return row.kills.kills.filter((kill) => kill.timeMs >= since);
 }
 
@@ -94,9 +87,7 @@ function byRecentActivity(a: PilotListRow, b: PilotListRow): number {
   const count = (row: PilotListRow) =>
     row.kills.kind === 'ready' ? row.kills.summary.recentCount : 0;
   const last = (row: PilotListRow) =>
-    row.kills.kind === 'ready'
-      ? Math.max(0, ...row.kills.kills.slice(0, 1).map((k) => k.timeMs))
-      : 0;
+    row.kills.kind === 'ready' ? (row.kills.kills[0]?.timeMs ?? 0) : 0;
   return count(b) - count(a) || last(b) - last(a) || a.name.localeCompare(b.name);
 }
 
@@ -211,7 +202,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     },
     ...spaces.map((space): DataTableColumn<PilotListRow> => ({
       id: space,
-      header: t(`common.spaceOption.${space === 'wormhole' ? 'wormhole' : space}`),
+      header: t(`common.spaceOption.${space}`),
       align: 'right',
       className: 'tabular-nums',
       render: (row) => <SpaceCell row={row} space={space} now={now} />,
@@ -229,7 +220,12 @@ function LocalList({ paste }: { paste: LocalPaste }) {
         );
         return hulls.length === 0
           ? '—'
-          : hulls.map((hull) => hullNames.get(hull.shipTypeId) ?? `#${hull.shipTypeId}`).join(', ');
+          : hulls
+              .map(
+                (hull) =>
+                  hullNames.get(hull.shipTypeId) ?? t('common.unknownType', { id: hull.shipTypeId })
+              )
+              .join(', ');
       },
     },
   ];

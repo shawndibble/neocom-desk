@@ -104,6 +104,14 @@ describe('fetchPilotKillHistory', () => {
     expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: true, kills: [] });
   });
 
+  it('fails, not "no kills", when the entries carry no killmail body to date them', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify([{ killmail_id: 1, zkb: { hash: 'h' } }])))
+    );
+    expect(await fetchPilotKillHistory(PILOT)).toEqual({ ok: false });
+  });
+
   it('fails when zKillboard answers with an error body instead of a list', async () => {
     vi.stubGlobal(
       'fetch',

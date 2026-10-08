@@ -424,6 +424,9 @@ export async function fetchPilotKillHistory(characterId: number): Promise<PilotK
     const body: unknown = await response.json();
     if (!Array.isArray(body)) return { ok: false };
     const kills = parseKillHistory(body, characterId);
+    // Entries that carry no killmail body (hash only) can't be dated: that is a
+    // list we couldn't read, never "no kills".
+    if (body.length > 0 && kills.length === 0) return { ok: false };
     pilotKillHistoryCache.set(characterId, { at: Date.now(), kills });
     return { ok: true, kills };
   } catch {

@@ -15,7 +15,6 @@ import {
   summarizeKills,
   topShips,
   type KillRecord,
-  type KillSpace,
 } from '@/engine/pilotList/killActivity';
 import { resolveStanding } from '@/engine/pilotList/standing';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -27,27 +26,7 @@ import { fetchPilotKillHistory } from '@/lib/zkillboard';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadViewerContext, type ViewerContext } from './pilotListData';
-
-const SPACE_TEXT: Record<KillSpace, string> = {
-  highsec: 'text-success',
-  lowsec: 'text-warning',
-  nullsec: 'text-danger',
-  wormhole: 'text-accent',
-};
-
-const SPACE_BAR: Record<KillSpace, string> = {
-  highsec: 'bg-success',
-  lowsec: 'bg-warning',
-  nullsec: 'bg-danger',
-  wormhole: 'bg-accent',
-};
-
-const STANDING_TEXT = {
-  red: 'text-danger',
-  orange: 'text-warning',
-  neutral: 'text-text-dim',
-  blue: 'text-accent',
-} as const;
+import { SPACE_BAR, SPACE_TEXT, STANDING_TEXT } from './pilotListStyles';
 
 /** Hulls listed under each of "Flew on their kills" and "Ships they killed". */
 const HULLS_SHOWN = 4;
