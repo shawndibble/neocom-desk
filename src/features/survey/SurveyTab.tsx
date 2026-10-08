@@ -15,7 +15,8 @@ import { isShareId } from '@/engine/share/shareId';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
-import { SurveyBoard, type AddScanResult } from './SurveyBoard';
+import { SurveyBoard } from './SurveyBoard';
+import { scanFailure, type AddScanResult } from './scanResult';
 import { useCurrentSurveyId } from './surveyPref';
 import { addSurveyScan, loadSurvey, startSurvey } from './surveyStore';
 import { useSurvey } from './useSurvey';
@@ -72,9 +73,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
         await refresh();
         return 'ok';
       } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        if (message === 'not-a-scan' || message === 'too-large') return message;
-        return 'failed';
+        return scanFailure(error);
       }
     },
     [characterId, currentId, refresh, setCurrentId, state]

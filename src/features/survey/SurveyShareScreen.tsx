@@ -14,7 +14,8 @@ import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
-import { SurveyBoard, type AddScanResult } from './SurveyBoard';
+import { SurveyBoard } from './SurveyBoard';
+import { scanFailure, type AddScanResult } from './scanResult';
 import { addSurveyScan } from './surveyStore';
 import { useSurvey } from './useSurvey';
 
@@ -31,9 +32,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
         await refresh();
         return 'ok';
       } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        if (message === 'not-a-scan' || message === 'too-large') return message;
-        return 'failed';
+        return scanFailure(error);
       }
     },
     [expiresAt, refresh, shareId]

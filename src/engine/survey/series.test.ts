@@ -90,10 +90,42 @@ describe('summarizeSurvey', () => {
   it('lists ores by volume left with rock counts', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500], ['Sylvite', 300])])!;
     expect(s.ores).toEqual([
-      { ore: 'Sylvite', rocks: 2, volume: 800 },
-      { ore: 'Bitumens', rocks: 1, volume: 50 },
+      { ore: 'Sylvite', rocks: 2, volume: 800, startVolume: 800 },
+      { ore: 'Bitumens', rocks: 1, volume: 50, startVolume: 50 },
     ]);
     expect(s.rocksLeft).toBe(3);
+  });
+
+  it('tracks each ore against what the scans first showed of it, mined-out ores last', () => {
+    const s = summarizeSurvey([
+      scan(0, ['A', 500], ['B', 300], ['C', 200]),
+      scan(5, ['A', 250], ['B', 300], ['D', 100]),
+    ])!;
+    expect(s.ores).toEqual([
+      { ore: 'B', rocks: 1, volume: 300, startVolume: 300 },
+      { ore: 'A', rocks: 1, volume: 250, startVolume: 500 },
+      { ore: 'D', rocks: 1, volume: 100, startVolume: 100 },
+      { ore: 'C', rocks: 0, volume: 0, startVolume: 200 },
+    ]);
+  });
+
+  it('ignores a scan identical to the one before it: no new data, no idle interval', () => {
+    const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 700]), scan(8, ['A', 700])])!;
+    expect(s.intervals).toHaveLength(1);
+    expect(s.points).toHaveLength(2);
+    expect(s.lastAt).toBe(T0 + 5 * MIN);
+    expect(s.pace).toBe(1);
+  });
+
+  it('reads a scan repasted unchanged as one scan', () => {
+    const rocks: [string, number][] = [
+      ['A', 400],
+      ['A', 300],
+      ['B', 200],
+    ];
+    const s = summarizeSurvey([scan(0, ...rocks), scan(3, ...rocks), scan(6, ...rocks)])!;
+    expect(s.points).toHaveLength(1);
+    expect(s.pace).toBeNull();
   });
 
   it('only reads 100% once the field is empty', () => {

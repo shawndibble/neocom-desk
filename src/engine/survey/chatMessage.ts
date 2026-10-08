@@ -145,7 +145,7 @@ function oreLine(
   short: Record<string, string>,
   labels: SurveyMessageLabels
 ): string {
-  const entries = ores.map((o) => `${o.rocks} ${short[o.ore]}`);
+  const entries = ores.filter((o) => o.rocks > 0).map((o) => `${o.rocks} ${short[o.ore]}`);
   const prefixWidth = fill(labels.left, { ores: '' }).length;
   const listed: string[] = [];
   for (let i = 0; i < entries.length; i++) {
@@ -182,7 +182,8 @@ export function surveyChatMessage(
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
-  const left = oreLine(summary.ores, shortOreNames(summary.ores.map((o) => o.ore)), labels);
+  const present = summary.ores.filter((o) => o.rocks > 0);
+  const left = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
 
   return [`${status}${SEPARATOR}${timing}`, bar(summary.percent, false), left, url].join('\n');
 }

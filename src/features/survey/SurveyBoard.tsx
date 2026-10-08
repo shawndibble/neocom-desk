@@ -4,7 +4,7 @@
  * `/share/<id>` page, so both read and behave the same; the caller supplies
  * the scans and what "add a scan" does.
  */
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner, StatChip, StatChips, TextArea } from '@/components/ui';
 import {
@@ -17,13 +17,12 @@ import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { writeToClipboard } from '@/lib/clipboard';
+import type { AddScanResult } from './scanResult';
 import { oreTone } from './surveyTones';
 
 const LazySurveyCharts = lazy(() =>
   import('./SurveyCharts').then((m) => ({ default: m.SurveyCharts }))
 );
-
-export type AddScanResult = 'ok' | 'not-a-scan' | 'too-large' | 'failed';
 
 interface SurveyBoardProps {
   scans: SurveyScan[];
@@ -40,14 +39,21 @@ type Flash = 'idle' | 'copied' | 'failed';
 
 function useFlash(): [Flash, (next: Flash) => void] {
   const [flash, setFlash] = useState<Flash>('idle');
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   return [
     flash,
     (next) => {
+      window.clearTimeout(timer.current);
       setFlash(next);
-      if (next !== 'idle') window.setTimeout(() => setFlash('idle'), 2000);
+      if (next !== 'idle') timer.current = window.setTimeout(() => setFlash('idle'), 2000);
     },
   ];
 }
+
+/** The label a copy button shows while it flashes the outcome of a copy. */
+const flashLabel = (flash: Flash, copied: string, failed: string, idle: string): string =>
+  flash === 'copied' ? copied : flash === 'failed' ? failed : idle;
 
 function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
   const { t } = useTranslation();
@@ -162,20 +168,22 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
                 variant="primary"
                 onClick={() => copy(surveyChatMessage(summary, url, labels), setChatFlash)}
               >
-                {chatFlash === 'copied'
-                  ? t('survey.copiedChat')
-                  : chatFlash === 'failed'
-                    ? t('survey.copyFailed')
-                    : t('survey.copyChat')}
+                {flashLabel(
+                  chatFlash,
+                  t('survey.copiedChat'),
+                  t('survey.copyFailed'),
+                  t('survey.copyChat')
+                )}
               </Button>
             )}
             {url !== null && (
               <Button onClick={() => copy(url, setLinkFlash)}>
-                {linkFlash === 'copied'
-                  ? t('survey.copiedLink')
-                  : linkFlash === 'failed'
-                    ? t('survey.copyFailed')
-                    : t('survey.copyLink')}
+                {flashLabel(
+                  linkFlash,
+                  t('survey.copiedLink'),
+                  t('survey.copyFailed'),
+                  t('survey.copyLink')
+                )}
               </Button>
             )}
             {actions}
@@ -252,28 +260,33 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
       {summary.ores.length > 0 && (
         <Panel title={t('survey.oresTitle')}>
           <ul className="space-y-2">
-            {summary.ores.map((ore) => (
-              <li key={ore.ore} className="space-y-1">
-                <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                  <span>{ore.ore}</span>
-                  <span className="text-text-dim tabular-nums">
-                    {t('survey.oreRow', {
-                      rocks: t('survey.oreRocks', { count: ore.rocks }),
-                      volume: formatCompactNumber(ore.volume),
-                    })}
-                  </span>
-                </div>
-                <div className="h-2 rounded-xs bg-line" aria-hidden="true">
-                  <div
-                    className="h-full rounded-xs"
-                    style={{
-                      width: `${Math.max(2, (ore.volume / left) * 100)}%`,
-                      background: oreTone(summary.oreNames.indexOf(ore.ore)),
-                    }}
-                  />
-                </div>
-              </li>
-            ))}
+            {summary.ores.map((ore) => {
+              const leftPercent =
+                ore.startVolume > 0 ? Math.round((ore.volume / ore.startVolume) * 100) : 0;
+              return (
+                <li key={ore.ore} className="space-y-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                    <span>{ore.ore}</span>
+                    <span className="text-text-dim tabular-nums">
+                      {t('survey.oreRow', {
+                        rocks: t('survey.oreRocks', { count: ore.rocks }),
+                        volume: formatCompactNumber(ore.volume),
+                        percent: leftPercent,
+                      })}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-xs bg-line" aria-hidden="true">
+                    <div
+                      className="h-full rounded-xs"
+                      style={{
+                        width: `${leftPercent}%`,
+                        background: oreTone(summary.oreNames.indexOf(ore.ore)),
+                      }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </Panel>
       )}

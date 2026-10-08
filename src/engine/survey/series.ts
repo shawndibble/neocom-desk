@@ -34,8 +34,12 @@ export interface SurveyInterval {
 
 export interface SurveyOre {
   ore: string;
+  /** Rocks of this ore still in the latest scan; 0 once the ore is mined out. */
   rocks: number;
+  /** m³ of it left. */
   volume: number;
+  /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
+  startVolume: number;
 }
 
 /** One scan as a point on the volume chart. */
@@ -85,31 +89,47 @@ const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + 
  * big (rocks only shrink). An earlier rock nothing matched is mined out; a
  * later rock nothing matched came into range and extends the field.
  */
-function diffScans(before: SurveyScan, after: SurveyScan): { mined: number; added: number } {
+function diffScans(
+  before: SurveyScan,
+  after: SurveyScan
+): { mined: number; added: number; addedByOre: Record<string, number> } {
   const unused = new Map<string, number[]>();
   for (const r of before.rocks) unused.set(r.ore, [...(unused.get(r.ore) ?? []), r.volume]);
   for (const list of unused.values()) list.sort((a, b) => a - b);
 
   let mined = 0;
   let added = 0;
+  const addedByOre: Record<string, number> = {};
   for (const rock of [...after.rocks].sort((a, b) => b.volume - a.volume)) {
     const list = unused.get(rock.ore) ?? [];
     const at = list.findIndex((v) => v >= rock.volume);
     if (at === -1) {
       added += rock.volume;
+      addedByOre[rock.ore] = (addedByOre[rock.ore] ?? 0) + rock.volume;
     } else {
       mined += list[at] - rock.volume;
       list.splice(at, 1);
     }
   }
   for (const list of unused.values()) for (const v of list) mined += v;
-  return { mined, added };
+  return { mined, added, addedByOre };
 }
+
+/** A scan's rocks as a comparable string, so a repaste of the same scan is recognised. */
+const signature = (scan: SurveyScan): string =>
+  scan.rocks
+    .map((r) => `${r.ore}|${r.volume}`)
+    .sort()
+    .join(';');
 
 export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | null {
   const scans: SurveyScan[] = [];
   for (const s of [...input].sort((a, b) => a.at - b.at)) {
-    if (scans.length > 0 && scans[scans.length - 1].at === s.at) continue;
+    const previous = scans[scans.length - 1];
+    if (previous !== undefined && previous.at === s.at) continue;
+    // The same scan pasted again shows nothing new; keeping it would only add
+    // an interval with no mining, which drags the pace down.
+    if (previous !== undefined && signature(previous) === signature(s)) continue;
     scans.push(s);
   }
   if (scans.length === 0) return null;
@@ -119,8 +139,13 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
   const leftVolume = total(last);
 
   const intervals: SurveyInterval[] = [];
+  const startByOre: Record<string, number> = {};
+  for (const rock of first.rocks) startByOre[rock.ore] = (startByOre[rock.ore] ?? 0) + rock.volume;
   for (let i = 1; i < scans.length; i++) {
-    const { mined, added } = diffScans(scans[i - 1], scans[i]);
+    const { mined, added, addedByOre } = diffScans(scans[i - 1], scans[i]);
+    for (const [ore, volume] of Object.entries(addedByOre)) {
+      startByOre[ore] = (startByOre[ore] ?? 0) + volume;
+    }
     const seconds = (scans[i].at - scans[i - 1].at) / 1000;
     intervals.push({
       from: scans[i - 1].at,
@@ -159,13 +184,17 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
   else percent = 100;
 
   const byOre = new Map<string, SurveyOre>();
+  for (const [ore, startVolume] of Object.entries(startByOre)) {
+    byOre.set(ore, { ore, rocks: 0, volume: 0, startVolume });
+  }
   for (const rock of last.rocks) {
-    const entry = byOre.get(rock.ore) ?? { ore: rock.ore, rocks: 0, volume: 0 };
+    const entry = byOre.get(rock.ore)!;
     entry.rocks += 1;
     entry.volume += rock.volume;
-    byOre.set(rock.ore, entry);
   }
-  const ores = [...byOre.values()].sort((a, b) => b.volume - a.volume);
+  const ores = [...byOre.values()].sort(
+    (a, b) => b.volume - a.volume || b.startVolume - a.startVolume
+  );
 
   return {
     startVolume,
