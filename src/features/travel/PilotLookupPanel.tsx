@@ -149,6 +149,8 @@ function PilotSearch({
   useEffect(() => {
     if (!canSuggest || activeCharacterId === null) return;
     if (trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH) return;
+    // A seeded or chosen name is already a pilot; only the user's typing asks ESI for matches.
+    if (!typing.current) return;
     const ticket = ++latestSearch.current;
     const controller = new AbortController();
     const id = setTimeout(() => {
