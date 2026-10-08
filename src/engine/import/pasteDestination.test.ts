@@ -70,7 +70,7 @@ describe('pasteDestination', () => {
 
   it('sends a D-Scan to Pilot Lookup', () => {
     expect(pasteDestination('626\tMy Vexor\tVexor\t1 km\n626\tB\tVexor\t2 km', SOURCES)).toBe(
-      'pilotList'
+      'dscan'
     );
   });
 
@@ -83,6 +83,18 @@ describe('pasteDestination', () => {
 
   it('keeps an item list with one unknown line in the Appraisal, not Pilot Lookup', () => {
     expect(pasteDestination('Tritanium\nPyerite\nNocxium\nMystery Box', SOURCES)).toBe('appraisal');
+  });
+
+  it('never appraises a D-Scan, even one whose names are real items', () => {
+    expect(
+      pasteDestination('1\tTritanium\tTritanium\t1 km\n2\tPyerite\tPyerite\t2 km', SOURCES)
+    ).toBe('dscan');
+  });
+
+  it('leaves a malformed scan alone', () => {
+    expect(
+      pasteDestination('626\tMy Vexor\tVexor\t1 km\nsee you in local, o7?', SOURCES)
+    ).toBeNull();
   });
 
   it('leaves a single name alone', () => {
@@ -132,8 +144,13 @@ describe('detectPasteDestination', () => {
     expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
   });
 
-  it('keeps the shipped order: fit, then item list, then pilot names', () => {
-    expect(PASTE_DETECTORS.map((d) => d.id)).toEqual(['fitting', 'appraisal', 'pilotList']);
+  it('keeps the shipped order: fit, D-Scan, item list, then Local list', () => {
+    expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
+      'fitting',
+      'dscan',
+      'appraisal',
+      'pilotList',
+    ]);
   });
 
   it('has Help strings for every registered destination', () => {
