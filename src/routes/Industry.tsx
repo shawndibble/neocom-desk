@@ -18,6 +18,9 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
+import { planReactionLocation } from '@/features/industry/planReactionLocation';
+import { industryActivityOf } from '@/engine/industry/types';
+import { toIndustryBlueprint } from '@/features/industry/blueprintCatalog';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
 import { MarketWideOpportunitiesPanel } from '@/features/industry/MarketWideOpportunitiesPanel';
@@ -363,6 +366,16 @@ export function Industry() {
     // The Runs column is the plan's own `runs` input (how many runs the
     // plan prices), not a count of logged Production Runs.
     const runsByPlanId = new Map((plans ?? []).map((plan) => [plan.id, plan.runs]));
+    const planById = new Map((plans ?? []).map((plan) => [plan.id, plan]));
+    // Reactions planned in highsec cannot run (issue #2908): the row reads
+    // "Fix location" and keeps its figures, dimmed.
+    const reactionsBlocked = (planId: string): boolean => {
+      const plan = planById.get(planId);
+      const entry = plan && catalog?.byBlueprintTypeID.get(plan.blueprintTypeID);
+      if (!plan || !entry) return false;
+      const activity = industryActivityOf(toIndustryBlueprint(entry.blueprint));
+      return planReactionLocation(plan, activity)?.state === 'highsec';
+    };
     for (const row of [...groupedRows, ...ungroupedRows]) {
       // Displayed figure is profit after fees (matches the detail page's
       // headline number) — but the Build/Buy verdict stays keyed off
@@ -377,7 +390,9 @@ export function Industry() {
       // still had a hub price.
       map.set(row.planId, {
         profit: row.result?.profit ?? null,
-        verdict: row.result?.recommendation ?? 'unknown',
+        verdict: reactionsBlocked(row.planId)
+          ? 'fixLocation'
+          : (row.result?.recommendation ?? 'unknown'),
         buildCost: row.result?.unpriceable ? null : (row.result?.totalCost ?? null),
         buyCost: row.result?.unpriceable ? null : (row.result?.buyCost ?? null),
         runs: runsByPlanId.get(row.planId) ?? 0,
@@ -386,7 +401,7 @@ export function Industry() {
       });
     }
     return map;
-  }, [groupedRows, ungroupedRows, plans]);
+  }, [groupedRows, ungroupedRows, plans, catalog]);
 
   const statsByGroupId = useMemo(() => {
     const rowByPlanId = new Map(groupedRows.map((row) => [row.planId, row]));
