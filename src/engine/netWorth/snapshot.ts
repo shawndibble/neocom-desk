@@ -25,6 +25,15 @@ export interface NetWorthSnapshotRow {
   updatedAt: number;
 }
 
+/**
+ * Whether a stored row predates a layer added since (an optional field, like
+ * `sellStock`): today's row is then re-read once rather than left reading 0.
+ * Add each new optional layer here.
+ */
+export function lacksLayer(row: NetWorthSnapshotRow): boolean {
+  return row.sellStock === undefined;
+}
+
 export function utcDay(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }

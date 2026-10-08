@@ -51,6 +51,59 @@ describe('recordNetWorthSnapshot', () => {
     ]);
   });
 
+  it('rewrites a same-day row that predates the Sell orders layer, once', async () => {
+    const stale = {
+      id: '1:2026-10-07',
+      characterId: 1,
+      day: '2026-10-07',
+      wallet: 90,
+      assetValue: 10,
+      plexValue: 0,
+      escrow: 7,
+      hubId: 'jita',
+      updatedAt: DAY1,
+    };
+    await db.netWorthSnapshots.put(stale);
+    const fetch = vi.fn(async () => ({
+      hubId: 'jita',
+      wallet: 100,
+      assets: [{ item_id: 1, type_id: 34, quantity: 2 }],
+      orders: [
+        { is_buy_order: true, escrow: 7 },
+        { is_buy_order: false, price: 10, volume_remain: 3 },
+        { is_buy_order: false, is_corporation: true, price: 100, volume_remain: 100 },
+      ],
+      priceByTypeId: new Map([[34, 5]]),
+      plexPrice: null,
+    }));
+    const sources = { fetch } satisfies SnapshotSources;
+    expect(await recordNetWorthSnapshot(1, sources, DAY1_LATER)).toBe('upgraded');
+    expect(await db.netWorthSnapshots.toArray()).toEqual([
+      { ...stale, wallet: 100, sellStock: 30, updatedAt: DAY1_LATER },
+    ]);
+    expect(await recordNetWorthSnapshot(1, sources, DAY1_LATER)).toBe('already-recorded');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a stale row alone when the inputs are missing', async () => {
+    const stale = {
+      id: '1:2026-10-07',
+      characterId: 1,
+      day: '2026-10-07',
+      wallet: 90,
+      assetValue: 10,
+      plexValue: 0,
+      escrow: 7,
+      hubId: 'jita',
+      updatedAt: DAY1,
+    };
+    await db.netWorthSnapshots.put(stale);
+    expect(await recordNetWorthSnapshot(1, { fetch: async () => null }, DAY1_LATER)).toBe(
+      'skipped'
+    );
+    expect(await db.netWorthSnapshots.toArray()).toEqual([stale]);
+  });
+
   it('writes a new row the next UTC day', async () => {
     const { sources } = sourcesWith();
     await recordNetWorthSnapshot(1, sources, DAY1);

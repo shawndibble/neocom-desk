@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSnapshotRow,
   findMissingDays,
+  lacksLayer,
   mergeSnapshotRows,
   snapshotId,
   utcDay,
@@ -120,5 +121,20 @@ describe('findMissingDays', () => {
   it('lists days with no row between the first and last, never interpolating', () => {
     expect(findMissingDays(['2026-10-01', '2026-10-04', '2026-10-02'])).toEqual(['2026-10-03']);
     expect(findMissingDays([])).toEqual([]);
+  });
+});
+
+describe('lacksLayer', () => {
+  const row = buildSnapshotRow(base) as NetWorthSnapshotRow;
+
+  it('is false for a row that carries every layer, even at 0', () => {
+    expect(lacksLayer(row)).toBe(false);
+    expect(lacksLayer({ ...row, sellStock: 0 })).toBe(false);
+  });
+
+  it('is true for a row written before the Sell orders layer existed', () => {
+    const old = { ...row };
+    delete old.sellStock;
+    expect(lacksLayer(old)).toBe(true);
   });
 });

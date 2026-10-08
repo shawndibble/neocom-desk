@@ -422,7 +422,9 @@ describe('FittingWhatToTrainPanel — skill detail', () => {
 
     const section = await screen.findByRole('region', { name: 'Tech II upgrades' });
     await user.click(
-      within(section).getByRole('button', { name: 'Add to plan: the skills for 425mm Railgun II' })
+      await within(section).findByRole('button', {
+        name: 'Add to plan: the skills for 425mm Railgun II',
+      })
     );
     await waitFor(async () => {
       expect(await planEntries()).toEqual([{ skillTypeID: 3315, targetLevel: 1 }]);
