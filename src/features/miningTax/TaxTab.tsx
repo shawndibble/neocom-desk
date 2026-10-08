@@ -80,6 +80,7 @@ import {
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
   sellFallbackAtHubOnDate,
+  sourcesAtHubOnDate,
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
 import { loadOreFormNames, readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
@@ -320,6 +321,9 @@ const TAX_URL_PARAMS = {
   'tax.character': characterFilterParam('all'),
   'tax.payee': payeeFilterParam(),
 };
+
+/** The tick-box column (and History's matching spacer): little room left of the box, the date cell's own padding as the gap after it. */
+const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
 
 const TAX_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
@@ -710,6 +714,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
    */
   function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
     return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
+  }
+
+  /** Which price tier produced each of `pricesFor`'s numbers — the row detail's breakdown. */
+  function priceSourcesFor(hubId: string | undefined, date: string) {
+    return sourcesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
   }
 
   /**
@@ -1334,7 +1343,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 // In the gutter left of the date, so a combined row's date
                 // keeps the same left edge as every other row's.
                 className={cx(
-                  'absolute top-0 -left-6 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent sm:inline-flex',
+                  'absolute top-0 -left-5 hidden size-5 items-center justify-center rounded-xs text-text-dim hover:text-accent sm:inline-flex',
                   interactiveClassName,
                   focusRingClassName
                 )}
@@ -1428,8 +1437,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           {
             id: 'select',
             header: '',
-            className: 'w-8 px-2',
-            headerCellClassName: 'sm:w-8',
+            className: SELECT_COLUMN_CLASS,
+            headerCellClassName: 'sm:w-9',
             stackEdge: 'start',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
@@ -1458,8 +1467,8 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           {
             id: 'spacer',
             header: '',
-            className: 'w-8 px-2',
-            headerCellClassName: 'sm:w-8',
+            className: SELECT_COLUMN_CLASS,
+            headerCellClassName: 'sm:w-9',
             render: () => null,
           } satisfies DataTableColumn<DisplayRow>,
         ]
@@ -1846,7 +1855,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                             {...taxExport.tableProps}
                             columns={openColumns}
                             rows={openRows}
-                            className="sm:table-fixed"
+                            className="dt-dense-lead sm:table-fixed"
                             rowKey={(dr) => dr.key}
                             label={t('miningTax.sections.openLabel')}
                             {...taxSort}
@@ -2055,6 +2064,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           status={detailTarget.status}
           systemName={systemName(detailTarget)}
           systemSecurity={systemSecurityOf(detailTarget)}
+          priceSourcesFor={priceSourcesFor}
           typeNames={data.typeNames}
           payees={allPayees}
           suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}

@@ -15,6 +15,7 @@ import type {
   BuildPlanRecord,
   PlanBooster,
   PlanetRichnessRecord,
+  ProductionLossRecord,
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   NetWorthSnapshotRecord,
@@ -87,6 +88,9 @@ export type RemoteProductionSaleLinkDoc = ProductionSaleLinkRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/productionOrderWatches/{id} (issue #525). */
 export type RemoteProductionOrderWatchDoc = ProductionOrderWatchRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionLosses/{id} (issue #2851). */
+export type RemoteProductionLossDoc = ProductionLossRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/netWorthSnapshots/{id} (issue #2865). */
 export type RemoteNetWorthSnapshotDoc = NetWorthSnapshotRecord & RemoteDoc;

@@ -3,6 +3,7 @@ import { requestNotificationPermission } from './permission';
 import { registerDeviceForWebPush } from '@/sync/deviceRegistration';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
+import { usePushFailure } from './pushFailure';
 
 vi.mock('./permission', () => ({
   requestNotificationPermission: vi.fn(),
@@ -18,6 +19,7 @@ const readyRegistration = {} as ServiceWorkerRegistration;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  usePushFailure.setState({ value: null, hydrated: true });
   vi.mocked(webPushSupport).mockReturnValue('supported');
   vi.mocked(requestNotificationPermission).mockResolvedValue('granted');
   vi.mocked(registerDeviceForWebPush).mockResolvedValue({
@@ -66,6 +68,34 @@ describe('enableWebPush', () => {
     vi.mocked(registerDeviceForWebPush).mockRejectedValue(new Error('network error'));
     const result = await enableWebPush();
     expect(result).toEqual({ support: 'supported', permission: 'granted' });
+  });
+
+  it('records a failure when registration throws, and clears it on the next success', async () => {
+    vi.mocked(registerDeviceForWebPush).mockRejectedValueOnce(new Error('network error'));
+    await enableWebPush();
+    expect(usePushFailure.getState().value).toMatchObject({ reason: 'unknown' });
+    await enableWebPush();
+    expect(usePushFailure.getState().value).toBeNull();
+  });
+
+  it('records a server-rejected failure when the backend rejects every character', async () => {
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue({
+      deviceId: 'd',
+      registered: [],
+      rejected: [1],
+    });
+    await enableWebPush();
+    expect(usePushFailure.getState().value).toMatchObject({ reason: 'server-rejected' });
+  });
+
+  it('does not record a failure when the backend rejects only some characters', async () => {
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue({
+      deviceId: 'd',
+      registered: [2],
+      rejected: [1],
+    });
+    await enableWebPush();
+    expect(usePushFailure.getState().value).toBeNull();
   });
 
   it('requests permission but does not register when support is unsupported', async () => {

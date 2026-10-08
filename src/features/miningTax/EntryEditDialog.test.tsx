@@ -168,6 +168,29 @@ describe('EntryEditDialog', () => {
     expect(input.members.d3).toEqual({ estimatedValue: 4_000, taxOwed: 200 });
   });
 
+  it('single-day entry: Estimated value is one editable tile, and clearing it restores the priced value', async () => {
+    useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
+    const { onSaved } = renderDialog([member('d3', '2026-10-03', { groupId: undefined })]);
+    expect(screen.getAllByText('Estimated value')).toHaveLength(1);
+    const box = screen.getByRole('textbox', { name: 'Estimated value on 2026-10-03' });
+    expect(box).toHaveAttribute('placeholder', '2,000');
+    fireEvent.change(box, { target: { value: '4000' } });
+    expect(screen.getByText('200')).toBeInTheDocument();
+    fireEvent.change(box, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    const [, input] = actionsMock.editEntry.mock.calls[0];
+    expect(input.members.d3.estimatedValue).toBe(2_000);
+  });
+
+  it('combined multi-day entry: a box per day, and the tile is a read-only total', () => {
+    useMiningTaxOreValueMode.setState({ value: false, hydrated: true });
+    renderDialog([member('d3', '2026-10-03'), member('d4', '2026-10-04')]);
+    expect(screen.getAllByRole('textbox', { name: /^Estimated value on / })).toHaveLength(2);
+    expect(screen.getByText('4,000')).toBeInTheDocument();
+  });
+
   it('reads the stored ore-values setting itself, even when Settings was never opened', async () => {
     useMiningTaxOreValueMode.setState({ value: false, hydrated: false });
     await db.settings.put({ key: MINING_TAX_ORE_VALUE_MODE_KEY, value: true });

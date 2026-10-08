@@ -43,6 +43,8 @@ import {
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
+import { MakeItFitContext } from '@/features/fittings/makeItFitContext';
+import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
 import { useChargeLoading } from '@/features/fittings/useChargeLoading';
@@ -145,6 +147,8 @@ function FittingsPage() {
   // Opened by an empty slot, or by "+ Add module" — which works before the
   // ship data (and so the empty slots) exists.
   const [addOpen, setAddOpen] = useState(false);
+  const [makeItFitOpen, setMakeItFitOpen] = useState(false);
+  const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useFittingViewPreference((state) => state.hydrated);
   const hydrateView = useFittingViewPreference((state) => state.hydrate);
@@ -504,7 +508,7 @@ function FittingsPage() {
 
   const editor = (
     <div className="min-w-0 space-y-3">
-      {editorBody}
+      <MakeItFitContext.Provider value={openMakeItFit}>{editorBody}</MakeItFitContext.Provider>
       {fightersShown && (
         <Panel title={t('fittings.fighters.title')}>
           <FittingFightersPanel
@@ -681,7 +685,7 @@ function FittingsPage() {
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
-              {t('fittings.load.tooLargeToShare')}
+              {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
             </p>
           )}
           {/* Only a Load that opened a Fitting describes this one; a failed Load's
@@ -770,6 +774,22 @@ function FittingsPage() {
               </div>
             ))}
 
+          <MakeItFitDialog
+            open={makeItFitOpen}
+            onClose={() => setMakeItFitOpen(false)}
+            variants={workspace.variants}
+            catalogue={catalogue}
+            placement={isPhone ? 'sheet' : 'center'}
+            onApply={(option) => {
+              edit((f) =>
+                option.swaps.reduce(
+                  (acc, swap) => swapModuleType(acc, swap.slot, swap.slotIndex, swap.toTypeId),
+                  f
+                )
+              );
+              setMakeItFitOpen(false);
+            }}
+          />
           <Modal
             open={saveAsNewOpen}
             onClose={() => setSaveAsNewOpen(false)}
@@ -812,6 +832,7 @@ function FittingsPage() {
               fitting={fitting}
               description={savedRecord?.notes ?? ''}
               onSaved={() => setInGameFittingsKey((key) => key + 1)}
+              onSaveToMyFittings={workspace.savedId === null ? workspace.save : undefined}
             />
           )}
           <Modal

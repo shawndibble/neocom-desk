@@ -867,3 +867,41 @@ describe('summariseOrderGroup', () => {
     expect(summary.worstGapPct).toBe(20);
   });
 });
+
+describe('buildOpenOrderRows — player-structure broker fee (issue #2911)', () => {
+  const STRUCTURE_ID = 1000000000001;
+  const costBases = new Map([
+    [1, { unitCost: 500, runId: 'run-1', runQuantity: 10, materialCost: 4000, jobFee: 1000 }],
+  ]);
+  const at = (overrides: Partial<BuildRowsInput> = {}) =>
+    baseInput({
+      snapshot: makeSnapshot([
+        makeEntry({
+          orders: [
+            makeOrder({ location_id: STRUCTURE_ID, volume_remain: 5000, volume_total: 5000 }),
+          ],
+        }),
+      ]),
+      costBases,
+      ...overrides,
+    });
+
+  it('keeps NPC rules while the structure has no fee set', () => {
+    const unset = firstRow(at());
+    const unrelated = firstRow(at({ structureFees: { 999: 5 } }));
+    expect(unrelated.floor?.relist).toBe(unset.floor?.relist);
+  });
+
+  it('raises only the relist floor once the structure fee is set', () => {
+    const npc = firstRow(at());
+    const set = firstRow(at({ structureFees: { [STRUCTURE_ID]: 5 } }));
+    expect(set.floor!.relist).toBeGreaterThan(npc.floor!.relist);
+    expect(set.floor!.fill).toBe(npc.floor!.fill);
+  });
+
+  it('treats an explicit 0% owner fee as set (SCC surcharge only)', () => {
+    const npc = firstRow(at());
+    const zero = firstRow(at({ structureFees: { [STRUCTURE_ID]: 0 } }));
+    expect(zero.floor!.relist).not.toBe(npc.floor!.relist);
+  });
+});
