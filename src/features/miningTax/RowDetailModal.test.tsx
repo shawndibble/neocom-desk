@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { configureClipboard } from '@/lib/clipboard';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { RowDetailModal } from './RowDetailModal';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -325,5 +326,37 @@ describe('RowDetailModal — a failed action', () => {
   it('shows no alert while nothing has failed', () => {
     renderModal('unassigned', null);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('RowDetailModal — price breakdown', () => {
+  const owed = {
+    id: 'a1',
+    characterId: 1,
+    date: '2026-09-08',
+    solarSystemId: 30000142,
+    payeeId: 'p1',
+    oreLines: [{ typeId: VELDSPAR, quantity: 250 }],
+    taxPct: 10,
+    estimatedValue: 2_500,
+    taxOwed: 250,
+    status: 'outstanding',
+    updatedAt: 1,
+  } as MiningTaxAssignmentRecord;
+
+  it('shows unit price, source and hub, and copies them as text', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(write);
+    renderModal('outstanding', owed, undefined, undefined, {
+      pricesFor: () => new Map([[VELDSPAR, 10]]),
+      priceSourcesFor: () => new Map([[VELDSPAR, 'saved' as const]]),
+    });
+    expect(screen.getByText('Saved snapshot')).toBeInTheDocument();
+    expect(screen.getByText(/buy · .* ore · 10% tax/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy as text' }));
+    const text = write.mock.calls[0][0] as string;
+    expect(text).toContain('Veldspar: 250 × 10 = 2,500 ISK (Saved snapshot)');
+    expect(text).toContain('10% tax');
+    configureClipboard(null);
   });
 });
