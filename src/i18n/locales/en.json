@@ -8333,8 +8333,9 @@
     "paste": "Paste",
     "pasteDestinations": {
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
+      "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
       "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
-      "pilotList": { "label": "Local list or D-Scan", "opens": "Opens in Pilot Lookup" }
+      "pilotList": { "label": "Local list", "opens": "Opens in Pilot Lookup" }
     }
   },
   "activityLog": {
