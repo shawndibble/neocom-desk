@@ -32,8 +32,8 @@ describe('summarizeSurvey', () => {
     ])!;
     expect(s.percent).toBe(60);
     expect(s.intervals).toEqual([
-      { from: T0, to: T0 + 5 * MIN, mined: 300, rate: 1 },
-      { from: T0 + 5 * MIN, to: T0 + 10 * MIN, mined: 300, rate: 1 },
+      { from: T0, to: T0 + 5 * MIN, mined: 300, added: 0, rate: 1 },
+      { from: T0 + 5 * MIN, to: T0 + 10 * MIN, mined: 300, added: 0, rate: 1 },
     ]);
     expect(s.pace).toBe(1);
     expect(s.etaAt).toBe(T0 + 10 * MIN + 400 * 1000);
@@ -56,11 +56,26 @@ describe('summarizeSurvey', () => {
     expect(s.leftVolume).toBe(700);
   });
 
-  it('a scan showing more ore than before gives no negative interval', () => {
-    const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 1100])])!;
-    expect(s.intervals[0].mined).toBe(0);
-    expect(s.pace).toBeNull();
-    expect(s.etaAt).toBeNull();
+  it('matches rocks between scans: a shrunk rock is mined, a new rock extends the field', () => {
+    // The 500 rock is mined down to 100, and a fresh 300 rock of another ore comes into range.
+    const s = summarizeSurvey([
+      scan(0, ['A', 500], ['A', 400]),
+      scan(5, ['A', 400], ['A', 100], ['B', 300]),
+    ])!;
+    expect(s.intervals[0]).toMatchObject({ mined: 400, added: 300 });
+    expect(s.startVolume).toBe(1200);
+    expect(s.leftVolume).toBe(800);
+    expect(s.percent).toBe(33);
+  });
+
+  it('a rock missing from the next scan counts as mined out', () => {
+    const s = summarizeSurvey([scan(0, ['A', 500], ['B', 100]), scan(5, ['A', 500])])!;
+    expect(s.intervals[0]).toMatchObject({ mined: 100, added: 0 });
+  });
+
+  it('matches within one ore only', () => {
+    const s = summarizeSurvey([scan(0, ['A', 500]), scan(5, ['B', 500])])!;
+    expect(s.intervals[0]).toMatchObject({ mined: 500, added: 500 });
   });
 
   it('lists ores by volume left with rock counts', () => {

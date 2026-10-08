@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { surveyChatMessage, shortOreNames, type SurveyMessageLabels } from './chatMessage';
+import {
+  MAX_LINE_WIDTH,
+  surveyChatMessage,
+  shortOreNames,
+  type SurveyMessageLabels,
+} from './chatMessage';
 import { summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
@@ -85,10 +90,10 @@ describe('surveyChatMessage', () => {
     expect(word(50)).toBe('Last rocks!'); // 95%
   });
 
-  it('caps the ore line at three and counts the rest', () => {
+  it('lists every ore that fits the line', () => {
     const s = summarizeSurvey([scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1])])!;
     expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
-      'Left: 1 A · 1 B · 1 C · +2 more'
+      'Left: 1 A · 1 B · 1 C · 1 D · 1 E'
     );
   });
 
@@ -97,5 +102,52 @@ describe('surveyChatMessage', () => {
     expect(surveyChatMessage(s, URL, labels)).toBe(
       ['Field cleared in 2h 56m', '▕' + '█'.repeat(20) + '▏ 100%', URL].join('\n')
     );
+  });
+});
+
+describe('chat message width', () => {
+  const visible = (line: string): number => line.replace(/<\/?b>/g, '').length;
+
+  it('shortens graded ore names to the ore and its grade numeral', () => {
+    expect(shortOreNames(['Pyroxeres', 'Pyroxeres II-Grade'])).toEqual({
+      Pyroxeres: 'Pyroxeres',
+      'Pyroxeres II-Grade': 'Pyroxeres II',
+    });
+  });
+
+  it('stays at four lines and fits the ore line to the width, listing the rest as a count', () => {
+    const s = summarizeSurvey([
+      scan(
+        0,
+        ['Veldspar', 90_000],
+        ['Veldspar II-Grade', 80_000],
+        ['Scordite', 70_000],
+        ['Scordite II-Grade', 60_000],
+        ['Pyroxeres', 50_000],
+        ['Pyroxeres II-Grade', 40_000],
+        ['Pyroxeres III-Grade', 30_000]
+      ),
+      scan(
+        10,
+        ['Veldspar', 80_000],
+        ['Veldspar II-Grade', 80_000],
+        ['Scordite', 60_000],
+        ['Scordite II-Grade', 60_000],
+        ['Pyroxeres', 40_000],
+        ['Pyroxeres II-Grade', 40_000],
+        ['Pyroxeres III-Grade', 30_000]
+      ),
+    ])!;
+    const lines = surveyChatMessage(s, URL, labels).split('\n');
+    expect(lines).toHaveLength(4);
+    for (const line of lines.slice(0, 3)) expect(visible(line)).toBeLessThanOrEqual(MAX_LINE_WIDTH);
+    expect(lines[2]).toMatch(/^Left: .*\+\d+ more$/);
+  });
+
+  it('never drops the biggest ore, even when its name alone is long', () => {
+    const s = summarizeSurvey([
+      scan(0, ['An Extremely Long Ore Name Indeed Mercoxit II-Grade', 5]),
+    ])!;
+    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toContain('Extremely');
   });
 });

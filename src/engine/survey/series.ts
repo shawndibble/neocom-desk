@@ -9,6 +9,10 @@ export interface SurveyRock {
   ore: string;
   /** Volume still in the rock, m³. */
   volume: number;
+  /** Ore units still in the rock, as the scanner reports them. */
+  units?: number;
+  /** Distance from the scanning ship, metres. */
+  distanceM?: number;
 }
 
 export interface SurveyScan {
@@ -20,8 +24,10 @@ export interface SurveyScan {
 export interface SurveyInterval {
   from: number;
   to: number;
-  /** m³ that left the field between the two scans; never negative. */
+  /** m³ that left the field between the two scans: rocks shrunk or gone. */
   mined: number;
+  /** m³ of rocks in the later scan that the earlier one never showed. */
+  added: number;
   /** m³/s over the interval. */
   rate: number;
 }
@@ -33,6 +39,7 @@ export interface SurveyOre {
 }
 
 export interface SurveySummary {
+  /** Everything the scans have shown of the field: the first scan plus rocks that came into range. */
   startVolume: number;
   leftVolume: number;
   /** Whole percent mined. Reads 100 only once the field is empty. */
@@ -59,6 +66,34 @@ export const PACE_INTERVALS = 3;
 
 const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
 
+/**
+ * What changed between two scans. A scan only shows the rocks in range, so
+ * totals alone can't be compared. Rocks are matched by ore: biggest first,
+ * each later rock takes the smallest earlier rock of that ore at least as
+ * big (rocks only shrink). An earlier rock nothing matched is mined out; a
+ * later rock nothing matched came into range and extends the field.
+ */
+function diffScans(before: SurveyScan, after: SurveyScan): { mined: number; added: number } {
+  const unused = new Map<string, number[]>();
+  for (const r of before.rocks) unused.set(r.ore, [...(unused.get(r.ore) ?? []), r.volume]);
+  for (const list of unused.values()) list.sort((a, b) => a - b);
+
+  let mined = 0;
+  let added = 0;
+  for (const rock of [...after.rocks].sort((a, b) => b.volume - a.volume)) {
+    const list = unused.get(rock.ore) ?? [];
+    const at = list.findIndex((v) => v >= rock.volume);
+    if (at === -1) {
+      added += rock.volume;
+    } else {
+      mined += list[at] - rock.volume;
+      list.splice(at, 1);
+    }
+  }
+  for (const list of unused.values()) for (const v of list) mined += v;
+  return { mined, added };
+}
+
 export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | null {
   const scans: SurveyScan[] = [];
   for (const s of [...input].sort((a, b) => a.at - b.at)) {
@@ -69,20 +104,22 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const first = scans[0];
   const last = scans[scans.length - 1];
-  const startVolume = total(first);
   const leftVolume = total(last);
 
   const intervals: SurveyInterval[] = [];
   for (let i = 1; i < scans.length; i++) {
-    const mined = Math.max(0, total(scans[i - 1]) - total(scans[i]));
+    const { mined, added } = diffScans(scans[i - 1], scans[i]);
     const seconds = (scans[i].at - scans[i - 1].at) / 1000;
     intervals.push({
       from: scans[i - 1].at,
       to: scans[i].at,
       mined,
+      added,
       rate: mined / seconds,
     });
   }
+
+  const startVolume = total(first) + intervals.reduce((sum, i) => sum + i.added, 0);
 
   const recent = intervals.slice(-PACE_INTERVALS);
   const minedRecent = recent.reduce((sum, i) => sum + i.mined, 0);
