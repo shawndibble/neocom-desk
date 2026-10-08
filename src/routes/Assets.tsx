@@ -1675,7 +1675,7 @@ export function Assets() {
         ),
       });
     }
-    return facts;
+    return facts.length > 0 ? facts : null;
   })();
 
   return (
