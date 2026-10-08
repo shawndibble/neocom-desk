@@ -60,22 +60,23 @@ export function selectInstallPromptVariant(state: {
 }
 
 export type InstallAppVariant =
-  'installed' | 'native' | 'menu' | Exclude<InstallPlatform, 'android'>;
+  'none' | 'installed' | 'native' | 'menu' | Exclude<InstallPlatform, 'android'>;
 
 /**
  * What Settings' "Install this app" panel shows. Unlike the one-time banner it
- * ignores `seen` and has no mobile-only restriction: it is the later path for
- * someone who dismissed the banner. Where the browser gave no native prompt
- * and has no known menu steps (desktop, Android Chromium) it falls back to a
- * generic pointer at the browser's own menu.
+ * ignores `seen`: it is the later path for someone who dismissed the banner.
+ * Still mobile-only like the banner: desktop browsers surface their own
+ * install affordance, so the panel is hidden there. Where an Android browser
+ * gave no native prompt it falls back to a pointer at the browser's menu.
  */
 export function selectInstallAppVariant(state: {
   isStandalone: boolean;
   deferredPromptAvailable: boolean;
   platform: InstallPlatform | null;
 }): InstallAppVariant {
+  if (state.platform === null) return 'none';
   if (state.isStandalone) return 'installed';
   if (state.deferredPromptAvailable) return 'native';
-  if (state.platform === null || state.platform === 'android') return 'menu';
+  if (state.platform === 'android') return 'menu';
   return state.platform;
 }
