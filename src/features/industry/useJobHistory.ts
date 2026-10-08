@@ -22,6 +22,8 @@ const NONE: never[] = [];
 export function useJobHistoryData(): {
   jobs: HistoryJobWithCharacter[] | undefined;
   runs: LoggedRunRef[] | undefined;
+  /** Dismissed job ids across Characters (EVE job ids are globally unique). */
+  dismissedJobIds: ReadonlySet<number>;
 } {
   const history = useLiveQuery(() => db.industryJobHistory.toArray(), []);
   const runs = useLiveQuery(() => db.productionRuns.toArray(), []);
@@ -30,7 +32,11 @@ export function useJobHistoryData(): {
       history?.flatMap((row) => row.jobs.map((job) => ({ ...job, characterId: row.characterId }))),
     [history]
   );
-  return { jobs, runs };
+  const dismissedJobIds = useMemo(
+    () => new Set(history?.flatMap((row) => row.dismissedJobIds ?? [])),
+    [history]
+  );
+  return { jobs, runs, dismissedJobIds };
 }
 
 /** Logged/unlogged state per job id for `jobs`. */
@@ -51,6 +57,7 @@ export function useUnloggedDeliveryCount(characterId: number, blueprintTypeId: n
   return useMemo(() => {
     const jobs = (stored?.jobs ?? []).map((job) => ({ ...job, characterId }));
     const states = classifyHistoryJobs(jobs, runs ?? NONE);
-    return countUnloggedDeliveries(jobs, states, { blueprintTypeId });
+    const dismissedJobIds = new Set(stored?.dismissedJobIds);
+    return countUnloggedDeliveries(jobs, states, { blueprintTypeId, dismissedJobIds });
   }, [stored, runs, characterId, blueprintTypeId]);
 }

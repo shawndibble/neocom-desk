@@ -21,6 +21,8 @@ import {
   Panel,
   SegmentedControl,
   Spinner,
+  Toast,
+  useTimedToast,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -61,6 +63,7 @@ import {
 import { LogProductionFromJobDialog } from './LogProductionFromJobDialog';
 import { countUnloggedDeliveries, isLoggableHistoryJob } from './jobHistory';
 import { useHistoryStates, useJobHistoryData } from './useJobHistory';
+import { setJobDismissed } from './jobHistoryStore';
 import { formatDuration } from '@/lib/duration';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -564,7 +567,33 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       .sort((a, b) => Date.parse(b.end_date) - Date.parse(a.end_date));
   }, [historyData.jobs, needsJobSlotFanOut, resolvedJobsFilter, characterId, characterNameById]);
   const historyStates = useHistoryStates(historyRows, historyData.runs);
-  const unloggedCount = countUnloggedDeliveries(historyRows, historyStates);
+  const dismissedJobIds = historyData.dismissedJobIds;
+  const unloggedCount = countUnloggedDeliveries(historyRows, historyStates, { dismissedJobIds });
+  const [historyToast, setHistoryToast] = useState<{ message: string; onUndo?: () => void } | null>(
+    null
+  );
+  useTimedToast(historyToast, () => setHistoryToast(null));
+  const setDismissed = useCallback(
+    async (job: JobRow, dismissed: boolean) => {
+      const ok = await setJobDismissed(job.characterId, job.job_id, dismissed);
+      if (!ok) {
+        setHistoryToast({ message: t('industry.historyDismissFailed') });
+        return;
+      }
+      setHistoryToast(
+        dismissed
+          ? {
+              message: t('industry.historyDismissedToast'),
+              onUndo: () => {
+                setHistoryToast(null);
+                void setJobDismissed(job.characterId, job.job_id, false);
+              },
+            }
+          : null
+      );
+    },
+    [t]
+  );
   const planIds = useLiveQuery(() => db.buildPlans.toCollection().primaryKeys(), []);
   const showHistorySegment = historyRows.length > 0 || historyView;
   const blockingNeedsReauth = !needsJobSlotFanOut && (result?.needsReauth ?? false);
@@ -913,6 +942,13 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 {t('industry.historyLogged')}
               </span>
             )}
+            {isLoggableHistoryJob(job) &&
+              historyStates.get(job.job_id)?.kind !== 'logged' &&
+              dismissedJobIds.has(job.job_id) && (
+                <span className="rounded-xs bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('industry.historyDismissed')}
+                </span>
+              )}
             {showHistoryCharacterColumn && job.characterName !== '' && (
               <span className="ml-1.5 shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem]">
                 <CharacterLink id={job.characterId}>{job.characterName}</CharacterLink>
@@ -971,10 +1007,16 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               </Link>
             ) : null;
           }
+          const dismissed = dismissedJobIds.has(job.job_id);
           return (
-            <Button size="sm" onClick={() => void handleLogProduction(job)}>
-              {t('industry.jobsLogProduction')}
-            </Button>
+            <span className="flex flex-wrap justify-end gap-1">
+              <Button size="sm" onClick={() => void handleLogProduction(job)}>
+                {t('industry.jobsLogProduction')}
+              </Button>
+              <Button size="sm" onClick={() => void setDismissed(job, !dismissed)}>
+                {dismissed ? t('industry.historyRestore') : t('industry.historyDismiss')}
+              </Button>
+            </span>
           );
         },
       },
@@ -983,6 +1025,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       t,
       nameForBlueprint,
       historyStates,
+      dismissedJobIds,
+      setDismissed,
       showHistoryCharacterColumn,
       planIdSet,
       openLoggedPlan,
@@ -1096,9 +1140,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       {historyView ? (
         collapsible && (
           <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-            <span className="text-text">
-              {t('industry.historySummary', { count: historyRows.length })}
-            </span>
             {unloggedCount > 0 && (
               <span className="font-semibold text-warning">
                 {t('industry.jobsUnloggedPhrase', { count: unloggedCount })}
@@ -1235,7 +1276,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 density="compact"
                 mobileSort
                 rowClassName={(job) =>
-                  isLoggableHistoryJob(job) && historyStates.get(job.job_id)?.kind !== 'logged'
+                  isLoggableHistoryJob(job) &&
+                  historyStates.get(job.job_id)?.kind !== 'logged' &&
+                  !dismissedJobIds.has(job.job_id)
                     ? 'bg-warning/10'
                     : undefined
                 }
@@ -1357,6 +1400,16 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             </div>
           )}
         </div>
+      )}
+      {historyToast && (
+        <Toast
+          message={historyToast.message}
+          undo={
+            historyToast.onUndo
+              ? { label: t('industry.historyUndo'), onUndo: historyToast.onUndo }
+              : undefined
+          }
+        />
       )}
       {logJobDialog && (
         <LogProductionFromJobDialog
