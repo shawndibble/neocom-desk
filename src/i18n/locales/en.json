@@ -2098,6 +2098,18 @@
       "none": "Your plan is already covered by unallocated SP — no injectors needed.",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
+    "skillsToBuy": {
+      "title": "Skills to buy",
+      "unknown": "Unknown until your skills load.",
+      "none": "You already have every skill in this plan.",
+      "noSellOrders": "No sell orders at {{hub}}",
+      "total": "Total cost",
+      "unpriced_one": "{{count}} skill without a price is left out of the total.",
+      "unpriced_other": "{{count}} skills without a price are left out of the total.",
+      "copy": "Copy multibuy list",
+      "copied": "Multibuy list copied",
+      "copyFailed": "Couldn't copy to the clipboard."
+    },
     "milestone": {
       "add": "Add milestone…",
       "addTitle": "Name this milestone",
@@ -2275,7 +2287,7 @@
     "quantity": "Qty",
     "unitPrice": "Unit price",
     "lineTotal": "Line total",
-    "unpriced": "No price",
+    "unpriced_one": "No price",
     "volume": "Volume",
     "totalVolume": "Total volume",
     "totalVolumeAtLeast": "At least {{volume}}",
@@ -4793,7 +4805,7 @@
       "raw": "A raw resource: sold as is, or refined on the way up",
       "tier": "Needs goods from several planets, so there is no per-planet figure",
       "tierChain": "Needs goods from several planets",
-      "unpriced": "The market has no price for it, so there is no figure",
+      "unpriced_one": "The market has no price for it, so there is no figure",
       "not-one-planet": "No single planet type makes it, so there is no per-planet figure",
       "no-fit": "One planet type can make it, but not at the Command Center level assumed here, so there is no figure"
     },
@@ -5256,7 +5268,7 @@
       "quickFoot": "Sorted by ISK per minute. Minutes are estimates.",
       "quickFootSaves": "A “saves” figure is income a full launchpad would lose: it is not in the quick-win total.",
       "quickFootNoPrices": "These need no hub prices, so no gain is shown. Minutes are estimates.",
-      "unpriced": "No ISK figure",
+      "unpriced_one": "No ISK figure",
       "saves": "saves ~",
       "win": {
         "restart_stopped_one": "Restart {{planet}}'s {{item}} extractor: it has stopped.",
