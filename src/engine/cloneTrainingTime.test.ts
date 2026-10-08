@@ -124,3 +124,9 @@ describe('cloneTrainingTimes', () => {
     });
   });
 });
+
+describe('cloneTrainingTimes worn clone', () => {
+  it('throws when the worn clone is not among the clones', () => {
+    expect(() => cloneTrainingTimes(input({ wornCloneId: 'nope' }))).toThrow(RangeError);
+  });
+});

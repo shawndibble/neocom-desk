@@ -18,7 +18,6 @@ export interface QueueEntryInput {
 
 export interface CloneInput {
   id: string | number;
-  label?: string;
   /** Attribute implant bonuses this clone carries (missing key = +0). */
   implants: Implants;
 }
@@ -105,7 +104,9 @@ function stayThenSwitchSeconds(
 export function cloneTrainingTimes(input: CloneTrainingInput): CloneTrainingResult[] {
   const { queue, baseAttributes, clones, wornCloneId, now, cooldownReadyAt, paused } = input;
   const cloneState = input.cloneState ?? 'omega';
-  const wornImplants = clones.find((c) => c.id === wornCloneId)?.implants ?? {};
+  const worn = clones.find((c) => c.id === wornCloneId);
+  if (!worn) throw new RangeError('wornCloneId must match one of clones');
+  const wornImplants = worn.implants;
   const at = (seconds: number) => new Date(now.getTime() + seconds * 1000);
 
   if (paused) {
