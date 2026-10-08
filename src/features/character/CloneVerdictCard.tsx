@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button } from '@/components/ui';
+import { Button, Tooltip } from '@/components/ui';
 import type { AttributeName } from '@/engine/types';
 import type { VerdictSegment } from '@/engine/cloneVerdict';
 import { useViewRoute } from '@/features/travel/useViewRoute';
@@ -59,15 +59,19 @@ function QueueBar({
         className="flex h-3 overflow-hidden rounded-xs bg-line"
       >
         {segments.map((s, i) => (
-          <div
+          <Tooltip
             key={`${s.skillTypeID}-${i}`}
-            title={t('clones.verdict.segment', {
+            openOnTap
+            content={t('clones.verdict.segment', {
               skill: skillName(t, names, s.skillTypeID),
               duration: formatDuration(s.seconds),
             })}
-            className={`${SEGMENT_TONES[i % SEGMENT_TONES.length]} border-r border-panel last:border-r-0`}
-            style={{ width: `${scale > 0 ? (s.seconds / scale) * 100 : 0}%` }}
-          />
+          >
+            <div
+              className={`${SEGMENT_TONES[i % SEGMENT_TONES.length]} border-r border-panel last:border-r-0`}
+              style={{ width: `${scale > 0 ? (s.seconds / scale) * 100 : 0}%` }}
+            />
+          </Tooltip>
         ))}
       </div>
     </div>
