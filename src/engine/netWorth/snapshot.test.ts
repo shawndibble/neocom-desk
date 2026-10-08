@@ -22,8 +22,9 @@ const base = {
   ],
   orders: [
     { is_buy_order: true, escrow: 300 },
-    { is_buy_order: false, escrow: 999 },
+    { is_buy_order: false, escrow: 999, price: 10, volume_remain: 3 },
     { is_buy_order: true },
+    { is_buy_order: false, is_corporation: true, price: 100, volume_remain: 100 },
   ],
   priceByTypeId: new Map([
     [34, 6],
@@ -49,6 +50,7 @@ describe('buildSnapshotRow', () => {
       assetValue: 60,
       plexValue: 25_000_000,
       escrow: 300,
+      sellStock: 30,
       hubId: 'jita',
       updatedAt: NOW,
     });
@@ -57,6 +59,14 @@ describe('buildSnapshotRow', () => {
   it('counts only buy-order escrow', () => {
     expect(
       buildSnapshotRow({ ...base, orders: [{ is_buy_order: false, escrow: 5 }] })?.escrow
+    ).toBe(0);
+  });
+
+  it('values remaining sell-order stock as volume_remain x price, skipping corp orders', () => {
+    expect(buildSnapshotRow(base)?.sellStock).toBe(30);
+    expect(
+      buildSnapshotRow({ ...base, orders: [{ is_buy_order: true, escrow: 5, price: 9 }] })
+        ?.sellStock
     ).toBe(0);
   });
 

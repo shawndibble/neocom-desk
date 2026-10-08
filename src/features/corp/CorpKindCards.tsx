@@ -17,8 +17,10 @@
  * the two would put "No moon chunks" in front of a Character who was never
  * allowed to ask (AC3).
  */
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel } from '@/components/ui';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { CorpBoardItem, CorpBoardItemKind } from '@/engine/corp/board';
 import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import { CorpBoardRow } from './CorpBoardRow';
@@ -27,7 +29,7 @@ import { CorpBoardRow } from './CorpBoardRow';
  * How many rows a card shows before it starts counting instead.
  *
  * Three, because the card's job is "is this kind healthy", and the fourth row
- * has never changed that answer. The rest are counted in the footer so the card
+ * has never changed that answer. The footer button expands the card to every row, so the card
  * never implies it is showing everything.
  */
 const ROWS_PER_CARD = 3;
@@ -86,8 +88,9 @@ interface CorpKindCardsProps {
 
 function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoardItem[] }) {
   const { t } = useTranslation();
-  const shown = items.slice(0, ROWS_PER_CARD);
-  const hidden = items.length - shown.length;
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? items : items.slice(0, ROWS_PER_CARD);
+  const hidden = items.length - ROWS_PER_CARD;
   const critical = items.filter((item) => item.severity === 'critical').length;
 
   return (
@@ -116,15 +119,23 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
             ))}
           </ul>
           {/*
-            Only when something is actually hidden. A footer reading "all 3
-            shown" states a non-fact to fill space, and `text-text-dim` rather
-            than `text-accent` because this is not a control — DESIGN.md §1
-            reserves accent for interactive things.
+            Only when the card is over the cap. The rows are already in
+            severity order, so expanding in place shows the rest in the same
+            order with the same row component (issue #2857).
           */}
           {hidden > 0 && (
-            <p className="border-t border-line px-3 py-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase tabular-nums">
-              {t('corp.cards.more', { count: hidden })}
-            </p>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+              className={textActionClassName(
+                'w-full border-t border-line px-3 py-2 text-left tabular-nums'
+              )}
+            >
+              {expanded
+                ? t('corp.cards.showFewer')
+                : t('corp.cards.showAll', { count: items.length })}
+            </button>
           )}
         </>
       )}
