@@ -35,7 +35,7 @@ import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
-import type { PaletteProvider, PaletteResult } from './types';
+import { GROUP_LIMIT, type PaletteProvider, type PaletteResult } from './types';
 import { usePaletteSearch } from './usePaletteSearch';
 
 const NO_CHARACTERS: readonly { characterId: number; name: string }[] = [];
@@ -302,46 +302,57 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                       {t('commandPalette.loadingGroup')}
                     </div>
                   ) : (
-                    group.results.map((result) => {
-                      const index = optionIndex++;
-                      const highlighted = index === highlightedIndex;
-                      return (
-                        <div
-                          key={result.id}
-                          id={optionDomId(index)}
-                          role="option"
-                          aria-selected={highlighted}
-                          // Keeps focus in the input, as every combobox here does.
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => activate(result)}
-                          className={cx(
-                            'flex min-h-11 cursor-pointer md:min-h-9 items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
-                            highlighted ? 'bg-panel-2 text-text' : 'text-text-dim hover:bg-panel-2'
-                          )}
-                        >
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate">{result.label}</span>
-                            {result.sublabel && (
-                              <span className="truncate text-xs text-text-faint">
-                                {result.sublabel}
+                    <>
+                      {group.results.map((result) => {
+                        const index = optionIndex++;
+                        const highlighted = index === highlightedIndex;
+                        return (
+                          <div
+                            key={result.id}
+                            id={optionDomId(index)}
+                            role="option"
+                            aria-selected={highlighted}
+                            // Keeps focus in the input, as every combobox here does.
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => activate(result)}
+                            className={cx(
+                              'flex min-h-11 cursor-pointer md:min-h-9 items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
+                              highlighted
+                                ? 'bg-panel-2 text-text'
+                                : 'text-text-dim hover:bg-panel-2'
+                            )}
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate">{result.label}</span>
+                              {result.sublabel && (
+                                <span className="truncate text-xs text-text-faint">
+                                  {result.sublabel}
+                                </span>
+                              )}
+                            </span>
+                            {result.hint && (
+                              <span className="shrink-0 text-xs text-text-faint">
+                                {result.hint}
                               </span>
                             )}
-                          </span>
-                          {result.hint && (
-                            <span className="shrink-0 text-xs text-text-faint">{result.hint}</span>
-                          )}
-                          {result.locked && (
-                            <>
-                              <span
-                                aria-hidden="true"
-                                className="size-1.5 shrink-0 rounded-full bg-warning"
-                              />
-                              <span className="sr-only">{`, ${t('reauth.navLocked')}`}</span>
-                            </>
-                          )}
+                            {result.locked && (
+                              <>
+                                <span
+                                  aria-hidden="true"
+                                  className="size-1.5 shrink-0 rounded-full bg-warning"
+                                />
+                                <span className="sr-only">{`, ${t('reauth.navLocked')}`}</span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {query.trim() !== '' && group.results.length >= GROUP_LIMIT && (
+                        <div className="px-2 py-1 text-xs text-text-faint">
+                          {t('commandPalette.groupCapped', { count: GROUP_LIMIT })}
                         </div>
-                      );
-                    })
+                      )}
+                    </>
                   )}
                 </div>
               );

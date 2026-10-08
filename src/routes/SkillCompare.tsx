@@ -416,12 +416,7 @@ export function SkillCompare() {
                 }}
               />
             )}
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={selectedIds.length === 0}
-              onClick={handleSave}
-            >
+            <Button variant="primary" disabled={selectedIds.length === 0} onClick={handleSave}>
               {t('skillCompare.saveComparison')}
             </Button>
           </>

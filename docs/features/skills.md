@@ -102,7 +102,8 @@ Sections (labelled, one panel on desktop, Disclosure on mobile):
    - What-if implants: Select (None / Current / Jump clone {label} / Custom), per-attribute implant bonus inputs, Market link to attribute enhancers. Per-plan, travels with Duplicate.
    - Booster list (`BoosterList.tsx`): ordered cerebral accelerators ("Accelerator N"), Bonus, Starts (or "Already running"), Expires, quick picks "+Nh"/"+Nd", Add/Remove, inline overlap rejection (EVE has one booster slot), "Expired" state, notice when ESI attributes already include an accelerator ("taken back out of your base sheet"), "does not report when an accelerator runs out" note. Market link to cerebral accelerators.
 3. Skill injectors (`InjectorFactsPanel.tsx`): "If injected now:" SP still to train, Unallocated SP, SP gap, Large Skill Injectors needed, SP left over, Price per injector (sell min at the selected Trade Hub via `useMarketHub`), Total cost, "No sell orders at {hub}", "Unknown until your total SP loads", "already covered by unallocated SP", Alpha caveat.
-4. Import / Export - not in pane; rendered in the page header (portal).
+4. Skills to buy (`SkillsToBuyPanel.tsx`): distinct untrained plan skills ("Unknown until your skills load" before ESI answers), each with its lowest sell at the selected hub (region fallback; "No sell orders at {hub}"), Total cost, unpriced count, Copy multibuy list.
+5. Import / Export - not in pane; rendered in the page header (portal).
 
 ### 2d. Import / Export (page header)
 
@@ -197,7 +198,7 @@ No tool says "finish ship A fully, then B, using the best order inside each". Cl
 
 ## Buying skills (skill books)
 
-Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). No plan-level shopping list exists.
+Modern EVE has no separate skill book item: the skill's own typeID is the market item (`SkillPriceSection.tsx:1-14`). The plan editor's "Skills to buy" tools-pane section (`SkillsToBuyPanel.tsx`) lists the plan's untrained skills, priced at the selected Trade Hub (hub station, else its region), with a total and a multibuy copy.
 
 | Need                         | Where                                                                                                 | Behavior                                                                                                                                                                                                         |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +207,7 @@ Modern EVE has no separate skill book item: the skill's own typeID is the market
 | Cost of reaching the SP      | Plan tools > Skill injectors                                                                          | Large Skill Injectors needed and price at hub; covers SP gap, not which skills to buy                                                                                                                            |
 | Buy several skills           | none                                                                                                  | Open each skill's modal, or search each in Market Browser                                                                                                                                                        |
 
-Gaps: no total book cost for a plan; no "skills in this plan I do not own" list; Trained inspector does not show price (modal does).
+Gaps: Trained inspector does not show price (modal does).
 
 ## Shared bits
 

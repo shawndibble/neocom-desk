@@ -35,6 +35,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
+import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
@@ -439,6 +440,7 @@ export const Layout = memo(function Layout() {
       */}
       <CorpGrantPrompt />
       <ForegroundNotificationPoller />
+      <NetWorthSnapshotRecorder />
 
       <RecentNavRecorder />
 

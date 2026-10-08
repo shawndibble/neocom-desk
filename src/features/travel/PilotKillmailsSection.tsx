@@ -22,6 +22,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import {
   characterZkillUrl,
   fetchPilotKillmails,
+  PILOT_KILLMAIL_LIMIT,
   type KillmailDetail,
   type KillmailParty,
   type PilotKillmail,
@@ -162,6 +163,11 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           ))}
         </ul>
       )}
+      {result?.ok && entries.length >= PILOT_KILLMAIL_LIMIT ? (
+        <p className="text-xs text-text-dim">
+          {t('travel.pilot.recent.capped', { count: PILOT_KILLMAIL_LIMIT })}
+        </p>
+      ) : null}
     </section>
   );
 }
