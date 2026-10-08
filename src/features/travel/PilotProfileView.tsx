@@ -16,6 +16,7 @@ import { CharacterAvatar } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
+import { PilotKillActivity, PilotStandingLine } from './PilotKillActivity';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillStatsSection } from './ZkillStatsSection';
 import { pilotAge, type PilotProfile } from './pilotLookup';
@@ -56,6 +57,12 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   return (
     <div className="space-y-4">
       <PilotIdentity {...props} />
+      <PilotStandingLine
+        characterId={characterId}
+        corporationId={props.profile.corporationId}
+        allianceId={props.profile.allianceId}
+      />
+      <PilotKillActivity characterId={characterId} />
       <ZkillStatsSection stats={stats} onRetry={retryStats} />
       <PilotKillmailsSection characterId={characterId} />
     </div>

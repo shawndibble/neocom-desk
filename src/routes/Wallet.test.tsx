@@ -285,7 +285,7 @@ describe('Wallet', () => {
   it('links the personal Journal header to Market › History › Transactions (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    const link = await screen.findByRole('link', { name: 'Transactions →' });
+    const link = await screen.findByRole('link', { name: 'Transactions' });
     expect(link).toHaveAttribute('href', '/market/history/transactions');
     // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');
