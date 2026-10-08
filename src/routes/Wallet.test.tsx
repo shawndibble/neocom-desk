@@ -13,6 +13,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
+import { REQUIRED_SCOPES } from '@/features/netWorth/recordSnapshots';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -707,6 +708,15 @@ describe('Wallet', () => {
       );
     }
 
+    /** Wallet, assets and orders: what a net worth snapshot needs. */
+    async function grantSnapshotScopes(...ids: number[]) {
+      for (const id of ids) {
+        await db.tokens.update(id, {
+          scopes: [...REQUIRED_SCOPES, 'esi-characters.read_loyalty.v1'],
+        });
+      }
+    }
+
     it('renders no character filter for an account with one Character — nothing for it to change', async () => {
       // Deliberately no `seedSecondCharacter()`: the outer beforeEach leaves
       // exactly one pilot in Dexie.
@@ -730,9 +740,9 @@ describe('Wallet', () => {
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
-      const wideHeader = (
-        await screen.findByRole('heading', { name: 'Balance by character' })
-      ).closest('header');
+      const wideHeader = (await screen.findByRole('heading', { name: 'Net worth' })).closest(
+        'header'
+      );
       expect(
         within(wideHeader!).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
@@ -750,6 +760,7 @@ describe('Wallet', () => {
     it('switching to "All characters" shows every character\'s balance and a total', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
       render(<App />);
 
       await screen.findByText(/4,500\.00/);
@@ -759,8 +770,31 @@ describe('Wallet', () => {
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
-      // 4,500.00 + 1,500.00 = 6,000.00 — the Total line, distinct from either row.
+      // 4,500.00 + 1,500.00 = 6,000.00 — the Net worth line, distinct from either row.
       expect(await screen.findByText(/6,000\.00/)).toBeInTheDocument();
+    });
+
+    it('drills into a Character from its row as route state, and Back returns to all', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+
+      expect(await screen.findByRole('table', { name: 'Net worth by layer' })).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).toContain('drill=92'));
+      expect(screen.queryByRole('table', { name: 'Balance by character' })).toBeNull();
+      expect(screen.getByRole('table', { name: 'Net worth by layer' })).toBeInTheDocument();
+
+      // The browser Back button undoes the drill.
+      window.history.back();
+      expect(
+        await screen.findByRole('table', { name: 'Balance by character' })
+      ).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).not.toContain('drill='));
     });
 
     it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {
@@ -777,6 +811,7 @@ describe('Wallet', () => {
     it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
       const CHAR_C = 93;
       await db.characters.put({
         characterId: CHAR_C,
@@ -791,10 +826,10 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // All three selected: Pilot Three's skipped notice shows.
-      expect(
-        await screen.findByText(/Pilot Three.*hasn't granted wallet access/)
-      ).toBeInTheDocument();
+      // All three selected: Pilot Three is left out, named by the scope readout
+      // and flagged on its own row.
+      expect(await screen.findByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
+      expect(await screen.findByText(/hasn't granted wallet access/)).toBeInTheDocument();
 
       // Narrow the filter back to "This character" — the notice list must
       // follow the same filter the balance rows do (issue #607 CodeRabbit
@@ -802,10 +837,8 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
-      expect(
-        screen.queryByText(/Pilot Three.*hasn't granted wallet access/)
-      ).not.toBeInTheDocument();
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(screen.queryByText(/hasn't granted wallet access/)).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Balance by character' })).not.toBeInTheDocument();
     });
   });
