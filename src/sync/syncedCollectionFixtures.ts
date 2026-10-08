@@ -18,6 +18,7 @@ import type {
   MiningTaxAssignmentRecord,
   PayeeRecord,
   PlanetRichnessRecord,
+  ProductionLossRecord,
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   ProductionSaleLinkRecord,
@@ -148,6 +149,19 @@ export const FULL_PRODUCTION_ORDER_WATCH: Required<ProductionOrderWatchRecord> =
   updatedAt: UPDATED_AT,
 };
 
+export const FULL_PRODUCTION_LOSS: Required<ProductionLossRecord> = {
+  id: '1:loss:555',
+  characterId: 1,
+  runId: 'run1',
+  quantity: 5,
+  lostAt: UPDATED_AT - 4000,
+  insurancePayout: 1_500_000,
+  journalEntryId: 555,
+  note: 'Gank at Uedama',
+  createdAt: UPDATED_AT - 3000,
+  updatedAt: UPDATED_AT,
+};
+
 export const FULL_PAYEE: Required<PayeeRecord> = {
   id: 'payee1',
   characterId: 1,
@@ -220,6 +234,7 @@ export const FULL_RECORDS = {
   productionRuns: FULL_PRODUCTION_RUN,
   productionSaleLinks: FULL_PRODUCTION_SALE_LINK,
   productionOrderWatches: FULL_PRODUCTION_ORDER_WATCH,
+  productionLosses: FULL_PRODUCTION_LOSS,
   netWorthSnapshots: FULL_NET_WORTH_SNAPSHOT,
   payees: FULL_PAYEE,
   fittings: FULL_FITTING,

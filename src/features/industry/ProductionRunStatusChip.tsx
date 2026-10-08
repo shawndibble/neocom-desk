@@ -14,6 +14,16 @@ const LABEL_KEY: Record<ProductionRunStatus, string> = {
   closed: 'industry.productionRunStatusClosed',
 };
 
+/** "N lost" beside the status chip when a run carries Run Loss records (issue #2851). */
+export function ProductionRunLostBadge({ count }: { count: number }) {
+  const { t } = useTranslation();
+  return (
+    <span className="inline-flex items-center rounded-xs bg-danger/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-danger uppercase">
+      {t('industry.lostBadge', { count })}
+    </span>
+  );
+}
+
 /**
  * A Production Run's sale status (issue #525): "New" (nothing sold yet),
  * "Open" (partially sold), "Closed" (fully sold). Shared between

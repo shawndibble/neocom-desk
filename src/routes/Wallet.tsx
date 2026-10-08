@@ -457,7 +457,10 @@ export function Wallet() {
     }
     return map;
   }, [walletBalancesSnapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
-  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalRowsFilter);
+  const { filteredJournal, breakdownJournal, refTypeOptions } = useJournalFilterResult(
+    journal,
+    journalRowsFilter
+  );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 
   // Each table's title-bar export button and its row menus export the same rows, in
@@ -775,6 +778,7 @@ export function Wallet() {
                 onFilterChange={setJournalFilter}
                 refTypeOptions={refTypeOptions}
                 filteredJournal={filteredJournal}
+                breakdownJournal={breakdownJournal}
                 journalColumns={journalColumns}
                 label={t('wallet.journalTab')}
                 sort={journalSortProps.sort}

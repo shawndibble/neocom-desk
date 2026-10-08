@@ -4,22 +4,22 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Summary
 
-| Feature                                  | Where                                 | Notes                                                                          |
-| ---------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
-| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | ISK balance, EverMarks, balance-history chart, LP-per-corp table               |
-| Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                  |
-| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                         |
-| Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                 |
-| Net worth chart                          | `features/netWorth/NetWorthPanel.tsx` | lazy Recharts stack (one Character) or lines (several), layer legend, drill    |
-| Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                           |
-| LP Store picker                          | `features/loyalty/LpStorePicker.tsx`  | select-box over every NPC corp with an LP Store                                |
-| Journal filters                          | `WalletJournalTable.tsx`              | ref type, date range, free text; filtered count + net total                    |
-| Journal column picker                    | `walletJournalColumns.ts`             | date/description/amount/balance toggle; device-local                           |
-| Journal row enrichments                  | `JournalDescriptionCell.tsx`          | bounty factions, daily-goal names, contract link, mining-tax link, market item |
-| Wallet-alert deep link                   | `Wallet.tsx:185`                      | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row       |
-| Exports                                  | `useTableExport` + `TableActionsMenu` | 3 surfaces: `wallet-journal`, `wallet-balances`, `loyalty-points`              |
-| Refresh                                  | `Wallet.tsx:530`                      | PageHeader icon button                                                         |
-| Corp wallet                              | pointer only                          | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                         |
+| Feature                                  | Where                                 | Notes                                                                                                           |
+| ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | ISK balance, EverMarks, balance-history chart, LP-per-corp table                                                |
+| Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                                                   |
+| `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                                                          |
+| Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                                                  |
+| Net worth chart                          | `features/netWorth/NetWorthPanel.tsx` | lazy Recharts stack (one Character) or lines (several), layer legend, drill                                     |
+| Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                                                            |
+| LP Store picker                          | `features/loyalty/LpStorePicker.tsx`  | select-box over every NPC corp with an LP Store                                                                 |
+| Journal filters                          | `WalletJournalTable.tsx`              | ref type, date range, free text; filtered count + net total; ref-type breakdown (in/out/net, row click filters) |
+| Journal column picker                    | `walletJournalColumns.ts`             | date/description/amount/balance toggle; device-local                                                            |
+| Journal row enrichments                  | `JournalDescriptionCell.tsx`          | bounty factions, daily-goal names, contract link, mining-tax link, market item                                  |
+| Wallet-alert deep link                   | `Wallet.tsx:185`                      | `walletBalanceChanged` → `/wallet/journal?highlight=<id>` pulses the row                                        |
+| Exports                                  | `useTableExport` + `TableActionsMenu` | 3 surfaces: `wallet-journal`, `wallet-balances`, `loyalty-points`                                               |
+| Refresh                                  | `Wallet.tsx:530`                      | PageHeader icon button                                                                                          |
+| Corp wallet                              | pointer only                          | `/corp/wallet` (`routes/CorpWallet.tsx`), see Pointers                                                          |
 
 ## Route, nav, redirects
 

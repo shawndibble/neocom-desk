@@ -1,7 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
-import { unitMargin } from './opportunityMetrics';
+import { stockCoverage, unitMargin } from './opportunityMetrics';
 
 /*
  * Export columns for the two opportunity rankings, in each table's order.
@@ -25,6 +25,14 @@ export function opportunitiesCsvColumns(t: CsvTranslate): CsvColumn<OpportunityR
     },
     { header: t('industry.opportunitiesUnitMargin'), value: (row) => unitMargin(row) },
     { header: t('industry.csvMarginPct'), value: (row) => row.result.marginPct },
+    {
+      header: t('industry.opportunitiesStockCovers'),
+      value: (row) => stockCoverage(row)?.coveredPct ?? null,
+    },
+    {
+      header: t('industry.opportunitiesStillToBuy'),
+      value: (row) => stockCoverage(row)?.stillToBuyIsk ?? null,
+    },
     { header: t('industry.csvTimeSeconds'), value: (row) => row.result.seconds },
     { header: t('industry.iskPerHour'), value: (row) => row.result.iskPerHour },
     {

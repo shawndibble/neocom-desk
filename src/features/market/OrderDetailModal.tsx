@@ -56,6 +56,7 @@ import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { StructureFeeLine } from './StructureFeeLine';
 import { scopeOrdersCsvColumns, type ScopeOrderCsvRow } from './scopeOrdersCsv';
 
 export interface OrderDetailModalProps {
@@ -463,6 +464,7 @@ export function OrderDetailContent({
   stationNameFor,
   structureMarket,
   relistFees,
+  accountingLevel,
   onCheckDeeper,
   onClose,
 }: OrderDetailContentProps) {
@@ -776,6 +778,13 @@ export function OrderDetailContent({
                   )}
                 </p>
               </div>
+            )}
+            {location === 'structure' && !row.isBuyOrder && (
+              <StructureFeeLine
+                structureId={row.locationId}
+                gross={row.price * row.volumeRemain}
+                accountingLevel={accountingLevel}
+              />
             )}
             <p className="mt-2">
               <OrderRowSummaryText row={row} />

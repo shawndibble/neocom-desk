@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   db,
   type BuildPlanRecord,
+  type ProductionLossRecord,
   type ProductionOrderWatchRecord,
   type ProductionRunRecord,
   type ProductionSaleLinkRecord,
@@ -49,6 +50,8 @@ import {
   totalCostColumn,
 } from './productionRunColumns';
 import { SaleLinkingModals } from './SaleLinkingControls';
+import { RunLossModals } from './RunLossModals';
+import { useRunLoss } from './useRunLoss';
 import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -107,6 +110,7 @@ function knownSort(sort: UrlSort | null, columns: readonly { id: string }[]): Ur
   return sort !== null && columns.some((column) => column.id === sort.columnId) ? sort : null;
 }
 const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
+const NO_LOSSES: ProductionLossRecord[] = [];
 const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
 
 /** Every row this run's own id backs, grouped once instead of `.filter()`-ed once per run. */
@@ -203,6 +207,7 @@ function buildRollup(
   runs: readonly ProductionRunRecord[],
   saleLinks: readonly ProductionSaleLinkRecord[],
   orderWatches: readonly ProductionOrderWatchRecord[],
+  losses: readonly ProductionLossRecord[],
   filter: ProductionLogFilter,
   skills: SkillLevels,
   catalog: BlueprintCatalog,
@@ -213,13 +218,15 @@ function buildRollup(
   const filteredRuns = filterProductionRunsByDate(runs, filter);
   const saleLinksByRun = groupByRunId(saleLinks);
   const orderWatchesByRun = groupByRunId(orderWatches);
+  const lossesByRun = groupByRunId(losses);
   const summaries = filteredRuns.map((run) =>
     summarizeProductionRun(
       run,
       saleLinksByRun.get(run.id) ?? [],
       orderWatchesByRun.get(run.id) ?? [],
       skills,
-      standingByPlanId.get(run.buildPlanId)
+      standingByPlanId.get(run.buildPlanId),
+      lossesByRun.get(run.id) ?? []
     )
   );
 
@@ -232,6 +239,7 @@ function buildRollup(
       quantity: s.run.quantity,
       quantitySold: s.quantitySold,
       netRevenue: s.profit.netRevenue,
+      quantityLost: s.quantityLost,
     });
     if (existing) {
       existing.runsLogged += 1;
@@ -337,8 +345,14 @@ export function ProductionLogPanel({
       () => db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
       [characterId]
     ) ?? NO_ORDER_WATCHES;
+  const losses =
+    useLiveQuery(
+      () => db.productionLosses.where('characterId').equals(characterId).toArray(),
+      [characterId]
+    ) ?? NO_LOSSES;
 
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
+  const runLoss = useRunLoss(characterId, losses);
 
   const planIds = useMemo(() => new Set(plans.map((p) => p.id)), [plans]);
 
@@ -365,13 +379,14 @@ export function ProductionLogPanel({
         runs,
         saleLinks,
         orderWatches,
+        losses,
         filter,
         skills,
         catalog,
         planIds,
         standingByPlanId
       ),
-    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds, standingByPlanId]
+    [runs, saleLinks, orderWatches, losses, filter, skills, catalog, planIds, standingByPlanId]
   );
 
   const profitHistoryPoints = useMemo(
@@ -525,7 +540,7 @@ export function ProductionLogPanel({
     avgMarginPct,
   } = rollup;
 
-  const runColumns = [...baseRunColumns, soldActionsColumn(sale)];
+  const runColumns = [...baseRunColumns, soldActionsColumn(sale, runLoss)];
 
   return (
     <Panel
@@ -663,6 +678,7 @@ export function ProductionLogPanel({
       </div>
 
       <SaleLinkingModals sale={sale} />
+      <RunLossModals loss={runLoss} />
     </Panel>
   );
 }
