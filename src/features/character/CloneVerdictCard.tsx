@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Button } from '@/components/ui';
 import type { AttributeName } from '@/engine/types';
 import type { VerdictSegment } from '@/engine/cloneVerdict';
@@ -12,6 +13,7 @@ export type CloneVerdictCardState =
   | {
       kind: 'stay';
       stay: VerdictSegment[];
+      cooldownReadyAt: Date | null;
       closest: { label: string; extraSeconds: number } | null;
     }
   | {
@@ -27,6 +29,10 @@ export type CloneVerdictCardState =
 
 const SEGMENT_TONES = ['bg-accent', 'bg-accent/65', 'bg-accent/40', 'bg-accent/25'];
 
+function skillName(t: TFunction, names: ReadonlyMap<number, string>, id: number): string {
+  return names.get(id) ?? t('clones.verdict.unknownSkill', { id });
+}
+
 function QueueBar({
   label,
   segments,
@@ -39,6 +45,7 @@ function QueueBar({
   scale: number;
   names: ReadonlyMap<number, string>;
 }) {
+  const { t } = useTranslation();
   const total = segments.reduce((sum, s) => sum + s.seconds, 0);
   return (
     <div className="space-y-1">
@@ -48,13 +55,16 @@ function QueueBar({
       </p>
       <div
         role="img"
-        aria-label={`${label}: ${formatDuration(total)}`}
+        aria-label={t('clones.verdict.barLabel', { label, duration: formatDuration(total) })}
         className="flex h-3 overflow-hidden rounded-xs bg-line"
       >
         {segments.map((s, i) => (
           <div
             key={`${s.skillTypeID}-${i}`}
-            title={`${names.get(s.skillTypeID) ?? `Type #${s.skillTypeID}`}: ${formatDuration(s.seconds)}`}
+            title={t('clones.verdict.segment', {
+              skill: skillName(t, names, s.skillTypeID),
+              duration: formatDuration(s.seconds),
+            })}
             className={`${SEGMENT_TONES[i % SEGMENT_TONES.length]} border-r border-panel last:border-r-0`}
             style={{ width: `${scale > 0 ? (s.seconds / scale) * 100 : 0}%` }}
           />
@@ -115,7 +125,7 @@ export function CloneVerdictCard({
   const best = state.kind === 'jump' ? state.best : null;
   const sum = (xs: readonly VerdictSegment[]) => xs.reduce((a, s) => a + s.seconds, 0);
   const scale = Math.max(sum(stay), best ? sum(best) : 0);
-  const legend = stay.map((s) => names.get(s.skillTypeID) ?? `Type #${s.skillTypeID}`);
+  const legend = stay.map((s) => skillName(t, names, s.skillTypeID));
 
   return (
     <section
@@ -167,6 +177,13 @@ export function CloneVerdictCard({
                     })
                   : t('clones.verdict.stayAlone')}
               </p>
+              {state.cooldownReadyAt && (
+                <p className="text-warning">
+                  {t('clones.verdict.jumpCooldown', {
+                    date: formatTimestamp(state.cooldownReadyAt, timeZone),
+                  })}
+                </p>
+              )}
             </>
           )}
         </div>

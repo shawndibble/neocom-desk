@@ -86,6 +86,8 @@ describe('cloneVerdict', () => {
 
   it('stays put when the cooldown outlasts the queue', () => {
     const readyAt = new Date(now.getTime() + 365 * 24 * 3600 * 1000);
-    expect(cloneVerdict(input({ cooldownReadyAt: readyAt })).verdict.kind).toBe('stay');
+    const r = cloneVerdict(input({ cooldownReadyAt: readyAt }));
+    expect(r.verdict.kind).toBe('stay');
+    if (r.verdict.kind === 'stay') expect(r.verdict.cooldownReadyAt).toEqual(readyAt);
   });
 });

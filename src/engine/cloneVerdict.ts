@@ -34,6 +34,8 @@ export type CloneVerdict =
   | {
       kind: 'stay';
       stay: VerdictSegment[];
+      /** Set while the cooldown runs: every clone is locked for it after a jump. */
+      cooldownReadyAt: Date | null;
       /** The nearest rival and how much longer it would take; null when there is none. */
       closest: { cloneId: string | number; extraSeconds: number } | null;
     }
@@ -69,11 +71,17 @@ const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 export function cloneVerdict(input: CloneTrainingInput): CloneVerdictResult {
   const { queue, clones, wornCloneId, baseAttributes, now, cooldownReadyAt } = input;
   const cloneState = input.cloneState ?? 'omega';
-  const rows: CloneRow[] = cloneTrainingTimes(input).map((t) => ({
-    cloneId: t.cloneId,
-    totalSeconds: t.totalSeconds,
-    deltaSeconds: (t.stayThenSwitch ?? t).deltaSeconds,
-  }));
+  // Time and delta share one frame: jump-when-allowed under a cooldown, else wearing it throughout.
+  const rows: CloneRow[] = cloneTrainingTimes(input).map((t) => {
+    const delta = (t.stayThenSwitch ?? t).deltaSeconds;
+    const wornTotal =
+      t.totalSeconds !== null && t.deltaSeconds !== null ? t.totalSeconds - t.deltaSeconds : null;
+    return {
+      cloneId: t.cloneId,
+      totalSeconds: wornTotal !== null && delta !== null ? wornTotal + delta : null,
+      deltaSeconds: delta,
+    };
+  });
   if (input.paused) {
     return { verdict: { kind: 'none', reason: 'paused' }, rows, bestCloneId: null };
   }
@@ -137,6 +145,7 @@ export function cloneVerdict(input: CloneTrainingInput): CloneVerdictResult {
     verdict: {
       kind: 'stay',
       stay,
+      cooldownReadyAt: readyAt,
       closest: top ? { cloneId: top.clone.id, extraSeconds: top.total - stayTotal } : null,
     },
     rows,

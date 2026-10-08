@@ -68,6 +68,7 @@ import {
 } from '@/features/character/clonesSort';
 import { cloneVerdict, MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/cloneVerdict';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
+import { isQueuePaused } from '@/features/skills/queueStatus';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -515,6 +516,9 @@ export function Clones() {
     const note = (message: string): CloneVerdictCardState => ({ kind: 'note', message });
     if (data.wornImplants === null) return note(t('clones.verdict.noteImplants'));
     if (data.queueResult === null) return note(t('clones.verdict.noteQueue'));
+    // The queue's own state outranks an unreadable sheet: an empty queue needs no attributes.
+    if (isQueuePaused(data.queueResult.data)) return note(t('clones.verdict.notePaused'));
+    if (data.queueResult.data.length === 0) return note(t('clones.verdict.noteEmpty'));
     if (training === null) return note(t('clones.verdict.noteAttributes'));
     if (training.paused) return note(t('clones.verdict.notePaused'));
     if (!verdictResult) return null;
@@ -525,6 +529,7 @@ export function Clones() {
       return {
         kind: 'stay',
         stay: verdict.stay,
+        cooldownReadyAt: readyAt,
         closest:
           verdict.closest && rival
             ? { label: cloneLabel(rival), extraSeconds: verdict.closest.extraSeconds }
