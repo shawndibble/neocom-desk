@@ -44,7 +44,7 @@ for (const size of [
     const table = page.getByRole('table');
     await expect(table.getByRole('cell', { name: `Alpha · ${PLACE}` })).toBeVisible();
     await expect(table.getByRole('cell', { name: `Beta · ${PLACE}` })).toBeVisible();
-    await expect(table.getByRole('cell', { name: `${PLACE}`, exact: true })).toBeVisible();
+    await expect(table.getByRole('cell', { name: `Unnamed · ${PLACE}` })).toBeVisible();
     await expect(table).not.toContainText('#');
 
     const long = table.getByText(LONG_NAME);
