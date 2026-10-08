@@ -41,7 +41,7 @@ async function mockHubPrices(page: Page): Promise<void> {
   });
 }
 
-for (const width of [1024, 1280, 1440]) {
+for (const width of [1024, 1100, 1280, 1440]) {
   test(`result header keeps long figures inside their groups at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await signInAndGoto(page);
@@ -82,7 +82,13 @@ for (const width of [1024, 1280, 1440]) {
       const clipRight = scroller ? scroller.getBoundingClientRect().right : window.innerWidth;
       const tableScrolls =
         scroller !== null && scroller !== document.body && scroller !== document.documentElement;
+      const paste = document.getElementById('market-appraisal-text')!.getBoundingClientRect();
+      const tableBox = table.getBoundingClientRect();
       return {
+        pasteRight: paste.right,
+        pasteTop: paste.top,
+        tableLeft: tableBox.left,
+        tableBottom: tableBox.bottom,
         boxes,
         kebabRight: kebab.right,
         clipRight,
@@ -90,6 +96,14 @@ for (const width of [1024, 1280, 1440]) {
         viewport: window.innerWidth,
       };
     });
+
+    // Side by side from `lg` up: the paste box and the results share a row.
+    expect(geometry.pasteRight, 'results sit to the right of the paste box').toBeLessThanOrEqual(
+      geometry.tableLeft + 1
+    );
+    expect(geometry.pasteTop, 'paste box and results start on the same row').toBeLessThan(
+      geometry.tableBottom
+    );
 
     expect(geometry.boxes.map((b) => b.name)).toEqual(
       expect.arrayContaining(["It's worth", 'Cargo'])
