@@ -1,6 +1,6 @@
 # Mockup screenshots
 
-PNG exports of the chosen mockups for ready tickets. The originals are private Claude artifacts that other accounts cannot read. Read the PNGs from the repo.
+PNG exports of the chosen mockups for ready tickets. Delete a folder (and its row) when its issue closes; git history keeps it. The originals are private Claude artifacts that other accounts cannot read. Read the PNGs from the repo.
 
 | Folder | Issue | Chosen |
 |---|---|---|
