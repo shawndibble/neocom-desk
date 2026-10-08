@@ -70,6 +70,9 @@ import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
+import { useLpBasis, type LpBasis } from '@/features/loyalty/lpBasis';
+import { concordRate, iskPerConcordLp, type ConcordRate } from '@/engine/loyalty/concordExchange';
+import { loadLpCorporations } from '@/sde/loadMarketSde';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -120,6 +123,8 @@ interface OfferDetailProps {
   hubId: string;
   hubName: string;
   priceBasis: PriceBasis;
+  lpBasis: LpBasis;
+  concord: ConcordRate | null;
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
@@ -134,6 +139,8 @@ function OfferDetail({
   hubId,
   hubName,
   priceBasis,
+  lpBasis,
+  concord,
   playerLp,
   useOwnMaterials,
   onToggleUseOwnMaterials,
@@ -142,6 +149,12 @@ function OfferDetail({
   const { t } = useTranslation();
   const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
   const { profit } = row;
+  const shownIskPerLp =
+    lpBasis === 'concord'
+      ? concord
+        ? iskPerConcordLp(profit.iskPerLp, concord.rate)
+        : null
+      : profit.iskPerLp;
 
   const materialColumns = useMemo<DataTableColumn<ResolvedMaterial>[]>(
     () => [
@@ -231,10 +244,16 @@ function OfferDetail({
       <div className="flex flex-wrap gap-6">
         <div>
           <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('loyaltyStore.colIskPerLp')}
+            {t(
+              lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
+            )}
           </div>
-          <div className={`text-3xl font-semibold tabular-nums ${iskPerLpTone(profit.iskPerLp)}`}>
-            {profit.iskPerLp === null ? '—' : profit.iskPerLp.toFixed(1)}
+          <div className={`text-3xl font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp)}`}>
+            {lpBasis === 'concord' && !concord
+              ? t('loyaltyStore.noConcordExchange')
+              : shownIskPerLp === null
+                ? '—'
+                : shownIskPerLp.toFixed(1)}
           </div>
         </div>
         <div>
@@ -452,6 +471,29 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     void hydratePriceBasis();
   }, [hydratePriceBasis]);
 
+  const hydrateLpBasis = useLpBasis((s) => s.hydrate);
+  const lpBasis = useLpBasis((s) => s.value);
+  const setLpBasis = useLpBasis((s) => s.setValue);
+  useEffect(() => {
+    void hydrateLpBasis();
+  }, [hydrateLpBasis]);
+
+  // The exchange rate is a faction rule keyed off the corporation's faction,
+  // which the offers feed does not carry: it comes from the bundled LP corporation list.
+  const [concord, setConcord] = useState<ConcordRate | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadLpCorporations()
+      .then((corps) => {
+        const corp = corps.find((c) => c.id === corporationId);
+        if (live) setConcord(corp ? concordRate(corp) : null);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [corporationId]);
+
   const {
     corpName,
     offersFetchedAt,
@@ -553,6 +595,15 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
   // Memoized so the `sortValue`s `DataTable` keys its sort on keep their
   // identity across renders (a keystroke in the search box re-renders this).
+  const shownIskPerLp = useCallback(
+    (row: LoyaltyOfferRow): number | null =>
+      lpBasis === 'concord'
+        ? concord
+          ? iskPerConcordLp(row.profit.iskPerLp, concord.rate)
+          : null
+        : row.profit.iskPerLp,
+    [lpBasis, concord]
+  );
   const optionalOfferColumns = useMemo<
     Record<LoyaltyStoreOffersColumnId, DataTableColumn<LoyaltyOfferRow>>
   >(
@@ -568,15 +619,21 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       },
       iskPerLp: {
         id: 'iskPerLp',
-        header: t('loyaltyStore.colIskPerLp'),
+        header: t(
+          lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
+        ),
         align: 'right',
         headerClassName: 'whitespace-nowrap',
-        sortValue: (row) => row.profit.iskPerLp ?? undefined,
-        cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
-        render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
+        sortValue: (row) => shownIskPerLp(row) ?? undefined,
+        cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,
+        render: (row) => {
+          if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
+          const value = shownIskPerLp(row);
+          return value === null ? '—' : value.toFixed(1);
+        },
       },
     }),
-    [t]
+    [t, lpBasis, concord, shownIskPerLp]
   );
   const itemColumn = useMemo<DataTableColumn<LoyaltyOfferRow>>(
     () => ({
@@ -678,6 +735,19 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         />
       ) : (
         <>
+          {lpBasis === 'concord' && (
+            <p className="border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
+              {concord
+                ? t(
+                    concord.basis === 'assumed'
+                      ? 'loyaltyStore.concordRateAssumed'
+                      : 'loyaltyStore.concordRateVerified',
+                    { rate: concord.rate }
+                  )
+                : t('loyaltyStore.noConcordExchangeNote')}{' '}
+              {t('loyaltyStore.concordExchangeHelp')}
+            </p>
+          )}
           {priceBasis === 'sell' && (
             <AssumesBaseStandingsNote
               className="border-b border-line px-3"
@@ -713,6 +783,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       hubId={hub.id}
       hubName={hub.name}
       priceBasis={priceBasis}
+      lpBasis={lpBasis}
+      concord={concord}
       playerLp={playerLp}
       useOwnMaterials={useOwnMaterialsFor.has(selectedRow.offer.offer_id)}
       onToggleUseOwnMaterials={() => toggleUseOwnMaterials(selectedRow.offer.offer_id)}
@@ -750,13 +822,14 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
         />
 
         <FilterBar
-          value={{ hubId, priceBasis, affordableOnly, blueprintsOnly }}
+          value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
           onChange={(next) => {
             // Persisted preferences (hub, price basis) are written here and only
             // here, so a Cancel in the mobile sheet never has a store write to
             // roll back — the draft was local until this point.
             if (next.hubId !== hubId) void setHubId(next.hubId);
             if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
+            if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
             setFilterParams({
               affordableOnly: next.affordableOnly,
               blueprintsOnly: next.blueprintsOnly,
@@ -841,6 +914,26 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                   <SelectContent>
                     <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
                     <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label={t('loyaltyStore.lpBasisLabel')}>
+                <Select
+                  value={draft.lpBasis}
+                  onValueChange={(value) => setDraft({ ...draft, lpBasis: value as LpBasis })}
+                >
+                  <SelectTrigger aria-label={t('loyaltyStore.lpBasisLabel')}>
+                    <SelectValue>
+                      {t(
+                        draft.lpBasis === 'concord'
+                          ? 'loyaltyStore.lpBasisConcord'
+                          : 'loyaltyStore.lpBasisLp'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lp">{t('loyaltyStore.lpBasisLp')}</SelectItem>
+                    <SelectItem value="concord">{t('loyaltyStore.lpBasisConcord')}</SelectItem>
                   </SelectContent>
                 </Select>
               </FilterField>
