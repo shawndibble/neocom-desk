@@ -2,7 +2,7 @@
  * Build Group detail's buy-materials table at 390px (issue #2215, reworked by
  * DESIGN.md §6c restraint): the figures are read across columns, so on a phone
  * it stays a plain table (`responsive="table"`) with the material name pinned
- * (`stickyStart`) and the low-value Volume and Owned columns dropped
+ * (`stickyStart`) and the low-value Volume column dropped
  * (`phoneHidden`); the table scrolls inside its own wrapper, never the page.
  *
  * A Rifter Blueprint (typeID 691) member at 20 runs supplies both edge cases:
@@ -119,7 +119,7 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
     await seedGroupWithPlan(page);
   });
 
-  test('stays a table at 390px: Qty and Still to buy shown, Volume and Owned dropped', async ({
+  test('stays a table at 390px: Qty, Owned and Still to buy shown, Volume dropped', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
@@ -128,7 +128,7 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('table-row');
     const visible = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
-    expect(visible).toEqual(['Material', 'Qty', 'Still to buy']);
+    expect(visible).toEqual(['Material', 'Qty', 'Owned', 'Still to buy']);
 
     // The six-digit case: Qty still holds its own figure without clipping it.
     const qty = cellFor(cells, 'Qty');
