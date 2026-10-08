@@ -1265,6 +1265,21 @@ describe('Quickbar (issue #7)', () => {
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
   });
 
+  it('keeps the finder a bounded flex column: tree scrolls, Quickbar stays rendered', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await pinRifterFromHeaderBell(user);
+
+    const quickbar = await screen.findByTestId('quickbar');
+    await within(quickbar).findByText('Rifter');
+    // Structure only (jsdom has no layout): the tree wrapper is the flexible,
+    // scrolling part; the Quickbar never shrinks and its list scrolls itself.
+    const tree = quickbar.parentElement!.querySelector('.overflow-y-auto');
+    expect(tree).toHaveClass('overflow-y-auto', 'lg:flex-1', 'lg:min-h-0');
+    expect(quickbar).toHaveClass('shrink-0');
+    expect(within(quickbar).getByRole('list')).toHaveClass('overflow-y-auto');
+  });
+
   it('pins an item from the header price alert bell, and a re-save does not duplicate it', async () => {
     const user = userEvent.setup();
     render(<App />);
