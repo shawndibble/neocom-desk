@@ -815,44 +815,71 @@ describe('AppraisalPanel', () => {
   });
 });
 
-describe('AppraisalPanel — Copy sell list', () => {
-  // Rows are Price-Percent-scaled (90%); the sell list reads `items`, unscaled.
-  const SELL_LIST_OUTCOME = outcome({
+describe('AppraisalPanel — Copy lists', () => {
+  // Rows are Price-Percent-scaled (90%); the lists read `items`, unscaled.
+  const LISTS_OUTCOME = outcome({
     appraisal: {
       ...APPRAISAL,
       items: [
         { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
         { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
+        // The undercut (150) is no better than the buy order, so it sells now.
+        { typeId: 555, name: 'Cheap Widget', quantity: 7, buy: 200, sell: 151 },
       ],
     },
   });
 
-  function copyButton() {
-    return screen.getByRole('button', { name: 'Copy' });
+  function menuButton() {
+    return screen.getByRole('button', { name: /Appraisal/ });
   }
 
-  async function copySellList() {
-    await userEvent.click(copyButton());
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy sell list' }));
+  async function copy(name: RegExp | string) {
+    await userEvent.click(menuButton());
+    await userEvent.click(await screen.findByRole('menuitem', { name }));
   }
 
-  it('disables the button with nobody to undercut', () => {
-    renderPanel({
-      controller: controller({
-        result: outcome({ appraisal: { ...APPRAISAL, items: [] } }),
-      }),
-    });
-    expect(copyButton()).toBeDisabled();
+  it('offers the copy lists and Export in one menu, with no separate Copy button', async () => {
+    renderPanel({ controller: controller({ result: LISTS_OUTCOME }) });
+    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
+    await userEvent.click(menuButton());
+    expect(await screen.findByRole('menuitem', { name: /^List at undercut/ })).toBeEnabled();
+    expect(screen.getByRole('menuitem', { name: /^Sell now/ })).toBeEnabled();
+    expect(screen.getByRole('menuitem', { name: /Export table/ })).toBeInTheDocument();
   });
 
-  it('copies one name/price line per sellable item, no quantity, ignoring Price Percent', async () => {
+  it('disables a list with nothing in it', async () => {
+    renderPanel({
+      controller: controller({ result: outcome({ appraisal: { ...APPRAISAL, items: [] } }) }),
+    });
+    await userEvent.click(menuButton());
+    expect(await screen.findByRole('menuitem', { name: /^Refine/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+
+  it('copies one name/price line per listable item, no quantity, ignoring Price Percent', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
-    renderPanel({ controller: controller({ result: SELL_LIST_OUTCOME }) });
-    await copySellList();
+    renderPanel({ controller: controller({ result: LISTS_OUTCOME }) });
+    await copy(/^List at undercut/);
     expect(written).toEqual(['Damage Control II\t511900\nCivilian Gatling Railgun\t999.90']);
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'List at undercut copied · 2 items'
+    );
+    configureClipboard(null);
+  });
+
+  it('copies name and quantity for what sells into a buy order now', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    renderPanel({ controller: controller({ result: LISTS_OUTCOME }) });
+    await copy(/^Sell now/);
+    expect(written).toEqual(['Cheap Widget\t7']);
     configureClipboard(null);
   });
 });
@@ -1098,21 +1125,14 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(within(cargo).getByText('Items')).toBeInTheDocument();
   });
 
-  it('offers both copy actions in one menu', async () => {
-    renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(await screen.findByRole('menuitem', { name: 'Copy sell list' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy multibuy' })).toBeInTheDocument();
-  });
-
   it('copies the full multibuy when nothing is subtracted', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy multibuy' }));
+    await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));
     expect(written).toEqual(['Damage Control II\t3\nCivilian Gatling Railgun\t4']);
   });
 
@@ -1178,8 +1198,8 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
     expect(covered).toHaveClass('opacity-50');
     expect(within(covered).getByText('4 owned')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy multibuy' }));
+    await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));
     expect(written).toEqual(['Damage Control II\t2']);
   });
 
