@@ -17,6 +17,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import * as Icon from '@/components/ui/icons';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -116,8 +117,18 @@ function LayerPicker({
   return (
     <MultiSelect
       trigger={
-        <Button size="md">
-          {t('wallet.netWorth.seriesButton', { shown: selected.size, total: listed.length })}
+        <Button
+          size="md"
+          aria-label={t('wallet.netWorth.layersButton', {
+            shown: selected.size,
+            total: listed.length,
+          })}
+        >
+          <span aria-hidden="true">{t('wallet.netWorth.layersNoun')}</span>
+          <span aria-hidden="true" className="text-text-dim tabular-nums">
+            {selected.size} / {listed.length}
+          </span>
+          <Icon.Expanded aria-hidden="true" className="text-text-dim" />
         </Button>
       }
       options={options}

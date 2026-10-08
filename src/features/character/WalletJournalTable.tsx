@@ -71,6 +71,7 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
       value={filter}
       onChange={onChange}
       activeCount={activeWalletJournalFilterCount(filter)}
+      triggerLabel
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -250,6 +251,7 @@ export function JournalTable({
             available={WALLET_JOURNAL_COLUMN_IDS}
             visible={visible}
             columnsById={columnsById}
+            showLabel
             onToggle={toggle}
             onReset={reset}
             buttonLabel={t('common.columnsButton')}

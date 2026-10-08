@@ -109,8 +109,8 @@ export interface CharacterFilterControlProps {
  * — so only the phone-width half varies here.
  */
 const TRIGGER_BOX: Record<'sm' | 'md', string> = {
-  sm: 'h-9 w-9',
-  md: 'h-11 w-11',
+  sm: 'h-9 min-w-9',
+  md: 'h-11 min-w-11',
 };
 
 /**
@@ -123,9 +123,9 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
   `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
-  `md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
-  `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
-  `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
+  `md:h-7 max-w-44 bg-panel-2 px-2 text-[0.6875rem] text-text-dim hover:border-line-bright ` +
+  `hover:bg-panel-2 hover:text-text gap-1.5 md:max-w-none md:bg-transparent md:px-2.5 ` +
+  `md:text-text md:hover:bg-panel-2`;
 
 export function CharacterFilterControl({
   activeCharacterId,
@@ -145,6 +145,13 @@ export function CharacterFilterControl({
       ? t('character.filter.allCharacters')
       : t('character.scope.all', { count: characterCount });
   const label = isAll ? allLabel : t('character.filter.thisCharacter');
+  // Below `md` the trigger is portrait + this short form (Tier 1: a scope control
+  // always names its scope); `label` stays the accessible name and the md text.
+  const phoneLabel = !isAll
+    ? label
+    : characterCount === undefined
+      ? t('character.filter.allShortNoCount')
+      : t('character.filter.allShort', { count: characterCount });
   const options = (
     <DropdownMenuContent align="start" className={unreadByCharacter ? 'w-60' : 'w-48'}>
       <DropdownMenuRadioGroup
@@ -215,8 +222,9 @@ export function CharacterFilterControl({
               />
             )}
           </span>
+          <span className="min-w-0 truncate md:hidden">{phoneLabel}</span>
           <span className="hidden md:inline">{label}</span>
-          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
+          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
         </button>
       </DropdownMenuTrigger>
       {options}
