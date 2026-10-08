@@ -2721,6 +2721,12 @@
     "fitImportCharges": "Loaded ammo — not imported",
     "fitImportIncludeCharges": "Include loaded ammo, one run each",
     "fitImportHeaderFailed": "Couldn't read the fit header, so no ship was imported. An EFT fit starts with [Ship] or [Ship, Fit name].",
+    "blueprintPasteGroupName": "Pasted blueprints",
+    "blueprintPasteSkipped_one": "{{count}} pasted blueprint was skipped: it has nothing to manufacture or react.",
+    "blueprintPasteSkipped_other": "{{count}} pasted blueprints were skipped: they have nothing to manufacture or react.",
+    "blueprintPasteNone": "None of the pasted blueprints can be manufactured or reacted, so no group was made.",
+    "blueprintPasteReused": "You pasted these blueprints before, so this is the group they made.",
+    "blueprintPasteCreated": "Created from your pasted blueprints. Delete the group to remove its plans.",
     "fitImportGroupName": "{{fit}} — {{ship}}",
     "fitImportApply_one": "Create 1 plan",
     "fitImportApply_other": "Create {{count}} plans",
@@ -8335,6 +8341,7 @@
       "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
       "chatLink": { "label": "Chat link", "opens": "Opens the item or system page" },
       "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
+      "blueprintList": { "label": "Blueprint list", "opens": "Creates a Build Group of plans" },
       "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
       "pilotList": { "label": "Local list", "opens": "Opens in Pilot Lookup" }
     }

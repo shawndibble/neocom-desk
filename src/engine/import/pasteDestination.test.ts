@@ -153,11 +153,12 @@ describe('detectPasteDestination', () => {
     expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
   });
 
-  it('keeps the shipped order: fit, chat link, D-Scan, item list, then Local list', () => {
+  it('keeps the shipped order: fit, chat link, D-Scan, blueprint list, item list, then Local list', () => {
     expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
       'fitting',
       'chatLink',
       'dscan',
+      'blueprintList',
       'appraisal',
       'pilotList',
     ]);
@@ -169,6 +170,25 @@ describe('detectPasteDestination', () => {
       expect(help[id]?.label, id).toBeTruthy();
       expect(help[id]?.opens, id).toBeTruthy();
     }
+  });
+
+  it('sends a mostly-blueprint list to a Build Group, never the Appraisal', () => {
+    const blueprintNames = new Set(['rifter blueprint', 'rifter ii invention blueprint']);
+    const sources = { ...SOURCES, blueprintNames };
+    const catalogue = new Map([
+      ...CATALOGUE,
+      ['rifter blueprint', { typeId: 99, name: 'Rifter Blueprint' }],
+    ]);
+    const list = ['Rifter Blueprint\t1', 'Rifter II Invention Blueprint\t1', 'Tritanium\t5'].join(
+      '\n'
+    );
+    expect(pasteDestination(list, { ...sources, catalogue })).toBe('blueprintList');
+  });
+
+  it('keeps a mixed list that is mostly other items in the Appraisal', () => {
+    const sources = { ...SOURCES, blueprintNames: new Set(['rifter blueprint']) };
+    const list = 'Rifter Blueprint\nTritanium\nPyerite';
+    expect(pasteDestination(list, sources)).toBe('appraisal');
   });
 
   it('prefers the fit over the item list when a paste reads as both', () => {
