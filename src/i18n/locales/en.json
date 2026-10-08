@@ -6324,6 +6324,7 @@
       "title": "Turn on notifications?",
       "body": "Neocom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
       "installRequiredBody": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
+      "installRequiredLink": "Show install steps",
       "enable": "Enable",
       "dismiss": "Not now"
     },
@@ -7646,6 +7647,10 @@
     "piDefaultsTitle": "Planetary Industry",
     "bpcSourcingDefaultsTitle": "BPC Sourcing",
     "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
+    "installTitle": "Install this app",
+    "installHint": "Add Neocom Desk to your device for quicker access. On iPhone and iPad, notifications only work from the installed app.",
+    "installMenuSteps": "Open your browser's menu and choose Install app (or Add to Home Screen). If you don't see it, this browser may not support installing.",
+    "installInstalled": "Neocom Desk is installed on this device.",
     "updateTitle": "App updates",
     "updateHint": "Neocom Desk normally updates itself in the background. Update now checks for a new version right away and reloads the app.",
     "updateAction": "Update now",
@@ -7686,12 +7691,14 @@
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
         "update": "How do I force an update?",
+        "install": "How do I install Neocom Desk as an app?",
         "push": "What notifications arrive when the app is closed?",
         "crashes": "Do you collect crash reports?",
         "backups": "How do backups work?"
       },
       "a": {
         "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only.",
+        "install": "<link>Settings › Data & storage › Install this app</link> shows the steps for your browser, or an Install button where your browser offers one. On iPhone and iPad this is also what makes notifications work.",
         "update": "The app updates itself in the background. To get a new version now, open Settings › Data & storage and press Update now: it checks and reloads.",
         "pushKinds": "Only alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing, a courier delivery due, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Everything else needs the app open. Turn them on in Settings › Notifications."
       },

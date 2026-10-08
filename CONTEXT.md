@@ -426,7 +426,9 @@ here — they go one per file in `docs/context/decisions/`.
   where the event never fires, it's a static instructional banner worded
   for Safari's Share button or for other iOS browsers' Share menu. Shown
   once ever per device — accepting or dismissing either one permanently
-  suppresses it, no snooze or re-ask.
+  suppresses it, no snooze or re-ask. The later path is Settings › Data &
+  storage › Install this app (plus a FAQ entry and a link from the iOS push
+  notice), which ignores the "seen" flag.
 - **Item Detail**: The modal view of one item's own properties — fitting cost,
   volume, bonuses, description. Read live from ESI per item, not from the SDE
   snapshot, so it is the one Market Browser panel that needs the network.
