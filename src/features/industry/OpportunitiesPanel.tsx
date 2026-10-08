@@ -576,13 +576,22 @@ export function OpportunitiesPanel({
       onChange={setCharacterFilter}
     />
   );
+  // The segmented control on desktop gets one-word labels so the three fit on
+  // the title's line at 1280; the phone select has the room for the full ones.
   const stockOptions = [
     { value: 'any' as const, label: t('industry.opportunitiesStockAny') },
     {
       value: 'mostly' as const,
-      label: t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
+      label: isDesktop
+        ? t('industry.opportunitiesStockMostlyShort', { pct: MOSTLY_COVERED_PCT })
+        : t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
     },
-    { value: 'full' as const, label: t('industry.opportunitiesStockFull') },
+    {
+      value: 'full' as const,
+      label: isDesktop
+        ? t('industry.opportunitiesStockFullShort')
+        : t('industry.opportunitiesStockFull'),
+    },
   ];
   const stockFilterControl = isDesktop ? (
     <SegmentedControl

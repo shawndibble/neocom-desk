@@ -2942,6 +2942,8 @@
     "opportunitiesStockAny": "Any",
     "opportunitiesStockMostly": "{{pct}}%+ covered",
     "opportunitiesStockFull": "Fully covered",
+    "opportunitiesStockMostlyShort": "{{pct}}%+",
+    "opportunitiesStockFullShort": "Full",
     "opportunitiesStockEmptyTitle": "No builds match your stock",
     "opportunitiesStockEmptyHint": "None of these blueprints are covered enough by what you own, or they have no price yet.",
     "opportunitiesOrderDepthLabel": "Depth",

@@ -6,12 +6,14 @@
  * "Scan".
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  CollapsiblePanel,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -21,7 +23,8 @@ import {
   FilterField,
   InfoTooltip,
   IskAmount,
-  Panel,
+  MenuItem,
+  Modal,
   Select,
   SelectContent,
   SelectItem,
@@ -33,6 +36,9 @@ import {
   STAT_CHIP_TONE_TEXT_CLASS,
 } from '@/components/ui';
 import { db } from '@/db';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
+import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { iskToneClass } from '@/features/character/format';
 import { formatDuration } from '@/lib/duration';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -95,6 +101,68 @@ interface MarketWideOpportunitiesPanelProps {
   activeCharacterId: number | null;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  /**
+   * The pilot owns blueprints, so Ranked builds is the panel they came for and
+   * this one starts folded to its header. Their own choice wins once made.
+   */
+  startFolded?: boolean;
+}
+
+/**
+ * The optional columns, in table order. Product, ISK/hour, ISK/day and the
+ * PLAN button always show. Order depth starts unticked: at 1024px the table
+ * otherwise scrolls sideways and pushes PLAN, the row's main action, off-screen.
+ */
+const MARKET_WIDE_COLUMN_IDS = [
+  'blueprintSource',
+  'margin',
+  'duration',
+  'buildCost',
+  'orderDepth',
+] as const;
+type MarketWideColumnId = (typeof MARKET_WIDE_COLUMN_IDS)[number];
+const MARKET_WIDE_DEFAULT_COLUMNS: readonly MarketWideColumnId[] = [
+  'blueprintSource',
+  'margin',
+  'duration',
+  'buildCost',
+];
+const useVisibleMarketWideColumns = createColumnVisibilitySetting({
+  key: 'marketWideVisibleColumns',
+  ids: MARKET_WIDE_COLUMN_IDS,
+  defaultVisible: MARKET_WIDE_DEFAULT_COLUMNS,
+});
+
+/** Identifies a gate by the skills it lacks, so rows can be told apart from the page's common one. */
+function gateKey(verdict: SkillGateVerdict | undefined): string | null {
+  if (!verdict?.gated) return null;
+  return verdict.shortfall
+    .map((skill) => `${skill.typeID}:${skill.needLevel}`)
+    .sort()
+    .join(',');
+}
+
+/** A gate shared by at least this many rows, and most gated rows, is the page's rule rather than a row's news. */
+const COMMON_GATE_MIN_ROWS = 3;
+
+function commonGateKey(verdicts: ReadonlyMap<number, SkillGateVerdict>): string | null {
+  const counts = new Map<string, number>();
+  let gated = 0;
+  for (const verdict of verdicts.values()) {
+    const key = gateKey(verdict);
+    if (key === null) continue;
+    gated += 1;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [key, count] of counts) {
+    if (count > bestCount) {
+      best = key;
+      bestCount = count;
+    }
+  }
+  return bestCount >= COMMON_GATE_MIN_ROWS && bestCount * 2 > gated ? best : null;
 }
 
 /** "Max build cost" presets — a budget cap, applied to the ranked rows since cost is only known once priced. */
@@ -189,6 +257,7 @@ export function MarketWideOpportunitiesPanel({
   modifiers,
   activeCharacterId,
   onStartPlan,
+  startFolded = false,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
   const unknownName = t('common.unknown');
@@ -245,8 +314,13 @@ export function MarketWideOpportunitiesPanel({
   // A tier, category or source change re-scans (they apply before the top-N
   // cut); the build-cost cap only narrows the rows already ranked.
   const [shownLimit, setShownLimit] = useState(MARKET_WIDE_PAGE_SIZE);
+  // `null` until the pilot opens or folds it: then the default (folded once they own blueprints) holds.
+  const [expandedChoice, setExpandedChoice] = useState<boolean | null>(null);
+  const expanded = expandedChoice ?? !startFolded;
   const scan = (next: MarketWideFilterState) => {
     setShownLimit(MARKET_WIDE_PAGE_SIZE);
+    // A scan the pilot asked for shows its results.
+    setExpandedChoice(true);
     run(next);
   };
   const applyFilter = (next: MarketWideFilterState) => {
@@ -272,6 +346,11 @@ export function MarketWideOpportunitiesPanel({
     }
     return verdicts;
   }, [rows, catalog, accountSkills]);
+
+  const commonGate = useMemo(
+    () => commonGateKey(skillGateByProductTypeID),
+    [skillGateByProductTypeID]
+  );
 
   const hideSkillGated = filter.hideSkillGated;
   const gatedCount = useMemo(
@@ -330,6 +409,26 @@ export function MarketWideOpportunitiesPanel({
 
   const startPlanFromRow = useRowStartPlan(startPlanFor);
 
+  // Mounting `PriceHistoryPanel` is what fetches the item's market history, so
+  // it stays out of the tree until a pilot asks for one row's.
+  const [historyItem, setHistoryItem] = useState<{ typeId: number; itemName: string } | null>(null);
+  // The same item menu Ranked builds rows carry, Price history included.
+  const rowContextMenu = (row: MarketWideDayRow, tr: ReactElement) => (
+    <ItemContextMenu
+      typeId={row.productTypeID}
+      itemName={row.productName}
+      extraItems={
+        <MenuItem
+          onSelect={() => setHistoryItem({ typeId: row.productTypeID, itemName: row.productName })}
+        >
+          {t('industry.opportunitiesPriceHistory')}
+        </MenuItem>
+      }
+    >
+      {tr}
+    </ItemContextMenu>
+  );
+
   const columns: DataTableColumn<MarketWideDayRow>[] = [
     {
       id: 'product',
@@ -348,6 +447,7 @@ export function MarketWideOpportunitiesPanel({
             {verdict?.gated && catalog && (
               <SkillGateMarker
                 verdict={verdict}
+                quiet={commonGate !== null && gateKey(verdict) === commonGate}
                 nameForSkill={(typeID) => nameForType(catalog, typeID)}
                 nameForCharacter={(id) => characterNames.get(id) ?? t('common.unknown')}
               />
@@ -361,15 +461,17 @@ export function MarketWideOpportunitiesPanel({
       header: t('industry.marketOpportunitiesBlueprintSource'),
       sortValue: SORT_VALUE.blueprintSource,
       // The header already names the column, so the cell is just the toned value.
-      render: (row) => (
-        <span
-          className={
-            STAT_CHIP_TONE_TEXT_CLASS[row.blueprintSource === 'owned' ? 'success' : 'default']
-          }
-        >
-          {t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
-        </span>
-      ),
+      // The NPC market is nearly every row's source; only an exception is worth a word.
+      render: (row) =>
+        row.blueprintSource === 'market' ? null : (
+          <span
+            className={
+              STAT_CHIP_TONE_TEXT_CLASS[row.blueprintSource === 'owned' ? 'success' : 'default']
+            }
+          >
+            {t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
+          </span>
+        ),
     },
     {
       id: 'margin',
@@ -422,7 +524,14 @@ export function MarketWideOpportunitiesPanel({
       cellClassName: (row) => (row.iskPerDay !== null ? iskToneClass(row.iskPerDay) : undefined),
       render: (row) =>
         row.iskPerDay === null ? (
-          t('common.unknown')
+          // Still reading this product's sales: a blank dash would read as no sales at all.
+          dailySales.pending > 0 && !dailySales.sales.has(row.productTypeID) ? (
+            <span className="text-text-dim" role="status" aria-label={t('common.loading')}>
+              …
+            </span>
+          ) : (
+            t('common.unknown')
+          )
         ) : (
           <IskAmount value={row.iskPerDay} decimals={0} />
         ),
@@ -451,6 +560,19 @@ export function MarketWideOpportunitiesPanel({
       render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleMarketWideColumns,
+    MARKET_WIDE_DEFAULT_COLUMNS
+  );
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    MarketWideColumnId,
+    DataTableColumn<MarketWideDayRow>
+  >;
+  const shownColumns = columns.filter(
+    (column) =>
+      !(MARKET_WIDE_COLUMN_IDS as readonly string[]).includes(column.id) ||
+      isVisible(column.id as MarketWideColumnId)
+  );
   const { sort, onSortChange } = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
@@ -602,8 +724,11 @@ export function MarketWideOpportunitiesPanel({
     ) : null;
 
   return (
-    <Panel
+    <CollapsiblePanel
       title={t('industry.marketOpportunitiesTitle')}
+      expanded={expanded}
+      onToggle={() => setExpandedChoice(!expanded)}
+      labels={{ show: t('industry.showDetails'), hide: t('industry.hideDetails') }}
       meta={
         <InfoTooltip
           label={t('industry.marketOpportunitiesTitle')}
@@ -617,6 +742,18 @@ export function MarketWideOpportunitiesPanel({
             <TableActionsMenu
               name={t('industry.marketOpportunitiesTitle')}
               tableExport={marketWideExport}
+            />
+          )}
+          {isDesktop && hasRun && !loading && rows.length > 0 && (
+            <ColumnPickerMenu
+              available={MARKET_WIDE_COLUMN_IDS}
+              visible={visible}
+              columnsById={columnsById}
+              onToggle={toggle}
+              onReset={reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
             />
           )}
           {filterBar}
@@ -671,10 +808,12 @@ export function MarketWideOpportunitiesPanel({
             <div className="overflow-x-auto">
               <DataTable
                 {...marketWideExport.tableProps}
-                columns={columns}
+                columns={shownColumns}
                 rows={shownRows}
                 rowKey={(row) => row.productTypeID}
                 onRowClick={startPlanFromRow}
+                rowContextMenu={rowContextMenu}
+                rowMoreActions
                 rowClickable={(row) => Boolean(catalog?.byProductTypeID.has(row.productTypeID))}
                 label={t('industry.marketOpportunitiesTitle')}
                 {...sortProps}
@@ -718,7 +857,21 @@ export function MarketWideOpportunitiesPanel({
           )}
         </div>
       )}
-    </Panel>
+      {historyItem && (
+        <Modal
+          open
+          onClose={() => setHistoryItem(null)}
+          title={t('industry.opportunitiesPriceHistoryTitle', { name: historyItem.itemName })}
+          placement="wide"
+        >
+          <PriceHistoryPanel
+            regionId={hub.regionId}
+            typeId={historyItem.typeId}
+            itemName={historyItem.itemName}
+          />
+        </Modal>
+      )}
+    </CollapsiblePanel>
   );
 }
 
