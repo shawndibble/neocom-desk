@@ -110,11 +110,11 @@ function rememberThisPage(): void {
  * whose Retry fallback restarts the very login that landing belongs to, and
  * `/share`, whose "Log in" stashes the shared page before it starts (#3075).
  */
+const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/share'];
+
 function forgetStrayLanding(): void {
   const here = currentRouterPath();
-  if (!isOnRoute(here, '/login') && !isOnRoute(here, '/callback') && !isOnRoute(here, '/share')) {
-    clearLoginReturnTo();
-  }
+  if (!LANDING_KEEPING_ROUTES.some((route) => isOnRoute(here, route))) clearLoginReturnTo();
 }
 
 /**

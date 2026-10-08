@@ -56,20 +56,29 @@ const STRUCTURE_CATEGORIES = new Set([65, 23]); // Upwell structure, Starbase
 
 /** Carrier, Dreadnought, Supercarrier, Titan, Force Auxiliary, Lancer Dreadnought. */
 const CAPITAL_GROUPS = new Set([547, 485, 659, 30, 1538, 4594]);
-/** Exhumer, Mining Barge, Industrial Command Ship, Capital Industrial. */
-const INDUSTRIAL_GROUPS = new Set([543, 463, 941, 883]);
+/** Exhumer, Mining Barge, Industrial Command Ship, Capital Industrial, Expedition Frigate. */
+const INDUSTRIAL_GROUPS = new Set([543, 463, 941, 883, 1283]);
 /** Industrial, Deep Space Transport, Blockade Runner, Freighter, Jump Freighter. */
 const TRANSPORT_GROUPS = new Set([28, 380, 1202, 513, 902]);
 /**
  * Logistics Cruiser/Frigate, Command Ship/Destroyer, Force Recon, Combat Recon,
  * Interdictor, Heavy Interdiction Cruiser, Electronic Attack Ship, Black Ops,
- * Stealth Bomber, Covert Ops.
+ * Covert Ops. (Stealth Bombers deal damage, so they are DPS.)
  */
-const SUPPORT_GROUPS = new Set([832, 1527, 540, 1534, 833, 906, 541, 894, 893, 898, 834, 830]);
+const SUPPORT_GROUPS = new Set([832, 1527, 540, 1534, 833, 906, 541, 894, 893, 898, 830]);
 /** Customs Office (category 46, so not covered by the structure categories). */
 const STRUCTURE_GROUPS = new Set([1025]);
 /** Capsule, Shuttle: ships, but no part of a fleet. */
 const NOT_A_FLEET_GROUPS = new Set([29, 31]);
+
+/** Every group id pinned to a role above — each needs a sub-label string. */
+export const PINNED_GROUP_IDS: readonly number[] = [
+  ...CAPITAL_GROUPS,
+  ...INDUSTRIAL_GROUPS,
+  ...TRANSPORT_GROUPS,
+  ...SUPPORT_GROUPS,
+  ...STRUCTURE_GROUPS,
+];
 
 const ORDER: readonly DscanRole[] = [
   'capitals',

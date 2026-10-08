@@ -7794,7 +7794,7 @@
     "title": "Shared link",
     "openInApp": "Open Neocom Desk",
     "logIn": "Log in with EVE Online",
-    "choosePermissions": "Choose permissions",
+    "choosePermissions": "Choose permissions…",
     "expiresOn": "This link expires {{date}}.",
     "goneTitle": "This link has expired",
     "goneHint": "Shared links last 7 days. Ask whoever sent it to share it again.",

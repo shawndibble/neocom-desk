@@ -6,7 +6,6 @@ import { db } from '@/db';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { Button, buttonClassName, LogoMark } from '@/components/ui';
-import { focusRingClassName } from '@/components/ui/controlStyles';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 
 /** Where "Open Neocom Desk" lands: the page the share came from, with its content filled in. */
@@ -73,13 +72,9 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
           <Button variant="primary" loading={loggingIn} onClick={logIn} className="w-full">
             {t('share.logIn')}
           </Button>
-          <button
-            type="button"
-            onClick={choosePermissions}
-            className={`text-xs text-text-dim underline underline-offset-2 hover:text-text ${focusRingClassName}`}
-          >
+          <Button size="sm" onClick={choosePermissions}>
             {t('share.choosePermissions')}
-          </button>
+          </Button>
           <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
         </div>
       ) : (

@@ -106,7 +106,7 @@ describe('SharedLink', () => {
 
     await screen.findByText('Tritanium');
     expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Choose permissions' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Open Neocom Desk' })).toBeNull();
   });
 

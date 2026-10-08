@@ -149,11 +149,9 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
             ))}
           </span>
         </button>
-        {expanded && (
-          <div id={lanesId} className="mt-3 space-y-1 px-1">
-            <Lanes roles={board.roles} />
-          </div>
-        )}
+        <div id={lanesId} hidden={!expanded} className="mt-3 space-y-1 px-1">
+          {expanded && <Lanes roles={board.roles} />}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">

@@ -13,6 +13,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadGroupCategories: async () => ({ '543': 6, '941': 6, '100': 18 }),
 }));
 
+import { PINNED_GROUP_IDS } from '@/engine/pilotList/dscanRoles';
 import { FleetBoard } from './FleetBoard';
 
 const row = (typeId: number, distanceKm: number | null, name = ''): DscanRow => ({
@@ -59,5 +60,13 @@ describe('FleetBoard', () => {
 
     await user.click(bar);
     expect(screen.queryByText('Distance from you, by role (km)')).toBeNull();
+  });
+});
+
+describe('group sub-labels', () => {
+  it('has a string for every group id the roles pin', async () => {
+    const { default: en } = await import('@/i18n/locales/en.json');
+    const labels = en.travel.pilot.dscan.group as Record<string, string>;
+    expect(PINNED_GROUP_IDS.filter((id) => labels[String(id)] === undefined)).toEqual([]);
   });
 });
