@@ -11,8 +11,17 @@ import { fittingSharePayload } from '@/engine/fitting/fittingSharePayload';
 import { createShareLink, existingShareLink } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import type { EsiEndpointId } from '@/esi/registry';
+import { ownedAtStation } from '@/engine/market/appraisalOwned';
+import { loadAllCharactersAssets } from '@/features/character/assets';
+import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
+import { useMarketHub } from '@/features/market/hub';
+import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
+
+const ASSETS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterAssets'];
 
 /**
  * What Export does — copy a format, open Appraisal — and the brief notice
@@ -23,6 +32,8 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
   const { t } = useTranslation();
   const navigate = useNavigate();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
+  const canSubtractOwned = characterId !== null && !lacksAssets;
   const [notice, setNotice] = useState<string | null>(null);
 
   // This Fitting's Fitting Share Code, encoded as it changes rather than on
@@ -50,6 +61,40 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       }
       await writeToClipboard(text);
       setNotice(t(`fittings.export.copied.${kind}`));
+    } catch {
+      setNotice(t('fittings.export.copyFailed'));
+    }
+  }
+
+  /**
+   * The multibuy list less what every Character holds at the Appraisal's
+   * "Minus owned" station (its saved pick, else the Market's hub).
+   */
+  async function copyMultibuyMinusOwned() {
+    try {
+      const ownedPref = useAppraisalOwnedPref.getState();
+      const marketHub = useMarketHub.getState();
+      await Promise.all([ownedPref.hydrate(), marketHub.hydrate()]);
+      const marketHubStation = getTradeHub(useMarketHub.getState().value)?.stationId;
+      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? marketHubStation;
+      const station = TRADE_HUBS.find((h) => h.stationId === stationId);
+      if (stationId === undefined || !station) {
+        setNotice(t('fittings.export.copyFailed'));
+        return;
+      }
+      const { entries } = await loadAllCharactersAssets();
+      const owned = ownedAtStation(
+        entries.map((entry) => entry.assets),
+        stationId
+      );
+      const text = await exportFitting('multibuy', fitting, cloneImplants, owned);
+      if (text === null) return;
+      if (text === '') {
+        setNotice(t('fittings.export.allOwned'));
+        return;
+      }
+      await writeToClipboard(text);
+      setNotice(t('fittings.export.copied.multibuyMinusOwned', { station: station.systemName }));
     } catch {
       setNotice(t('fittings.export.copyFailed'));
     }
@@ -130,7 +175,16 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     });
   }
 
-  return { notice, copy, copyShareLink, downloadEveXml, openInAppraisal, openManufacturePlan };
+  return {
+    notice,
+    canSubtractOwned,
+    copy,
+    copyMultibuyMinusOwned,
+    copyShareLink,
+    downloadEveXml,
+    openInAppraisal,
+    openManufacturePlan,
+  };
 }
 
 export type FittingExport = ReturnType<typeof useFittingExport>;

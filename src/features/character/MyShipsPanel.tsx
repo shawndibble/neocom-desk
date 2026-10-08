@@ -12,6 +12,7 @@ import { loadCharacterSolarSystemId } from './location';
 import { loadStationName, loadStationSystemId } from './stations';
 import { loadStructureName, loadStructureSystemId } from './structures';
 import { loadSystemName, loadSystemSecurity } from './systemSecurity';
+import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
 import { jumpsBetween, type JumpBasis } from '@/features/route/jumpBasis';
 
@@ -21,6 +22,8 @@ const SHIP_CATEGORY_ID = 6;
 interface ShipData {
   rows: ShipRow[];
   typeNames: ReadonlyMap<number, string>;
+  /** SDE group (the ship class) by type id. */
+  groupIdByType: ReadonlyMap<number, number>;
   characterNames: ReadonlyMap<number, string>;
   /** Type names of the owned assets a ship sits in, by item id (for the trail). */
   holderNames: ReadonlyMap<number, string>;
@@ -45,9 +48,11 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   );
   const rows = findShips(owned, isShip);
   const typeNames = new Map<number, string>();
+  const groupIdByType = new Map<number, number>();
   for (const typeId of new Set(rows.map((r) => r.typeId))) {
-    const name = types[String(typeId)]?.name;
-    if (name) typeNames.set(typeId, name);
+    const type = types[String(typeId)];
+    if (type?.name) typeNames.set(typeId, type.name);
+    if (type) groupIdByType.set(typeId, type.groupID);
   }
   const trailIds = new Set(rows.flatMap((r) => r.trail));
   const holderNames = new Map<number, string>();
@@ -58,6 +63,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   return {
     rows,
     typeNames,
+    groupIdByType,
     characterNames: new Map(entries.map((e) => [e.characterId, e.name])),
     holderNames,
   };
@@ -105,8 +111,9 @@ function usePlaces(
   rows: readonly ShipRow[],
   activeCharacterId: number | null,
   route: JumpBasis
-): { places: Places; systemOf: ReadonlyMap<string, number | null> } {
+): { places: Places; systemOf: ReadonlyMap<string, number | null>; originName: string | null } {
   const [places, setPlaces] = useState<Places>(NO_PLACES);
+  const [originName, setOriginName] = useState<string | null>(null);
   const [systemOf, setSystemOf] = useState<ReadonlyMap<string, number | null>>(new Map());
   const routeKey = route.key;
   useEffect(() => {
@@ -116,6 +123,7 @@ function usePlaces(
     /* eslint-disable react-hooks/set-state-in-effect */
     setPlaces(NO_PLACES);
     setSystemOf(new Map());
+    setOriginName(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     const distinct = [...new Map(rows.map((r) => [placeKey(r), r])).values()];
     void (async () => {
@@ -123,6 +131,13 @@ function usePlaces(
         activeCharacterId === null
           ? null
           : await loadCharacterSolarSystemId(activeCharacterId).catch(() => null);
+      if (originSystemId !== null) {
+        void loadSystemName(originSystemId)
+          .then((name) => {
+            if (!cancelled) setOriginName(name);
+          })
+          .catch(() => {});
+      }
       await mapWithConcurrencyLimit(distinct, ESI_FANOUT_CONCURRENCY, async (row) => {
         const key = placeKey(row);
         let place: ResolvedPlace = { name: null, systemId: null };
@@ -157,7 +172,7 @@ function usePlaces(
     // `route` itself changes identity with its settings; `key` names the basis.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, activeCharacterId, routeKey, route.hydrated]);
-  return { places, systemOf };
+  return { places, systemOf, originName };
 }
 
 interface MyShipsPanelProps {
@@ -175,8 +190,28 @@ interface MyShipsPanelProps {
   route: JumpBasis;
 }
 
+/** Phone: a wrapping card (ship line, then character, place, Sec, Jumps). `sm` up: the table grid. */
 const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1.6fr)_2.5rem_4.5rem_1rem]';
+  'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_1rem] sm:gap-y-0.5';
+
+/** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
+function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
+  const [classes, setClasses] = useState<ReadonlyMap<number, string>>(new Map());
+  const idsKey = [...new Set(groupIds)].sort((a, b) => a - b).join(',');
+  useEffect(() => {
+    if (idsKey === '') return;
+    let cancelled = false;
+    void loadGroupNames(idsKey.split(',').map(Number))
+      .then((names) => {
+        if (!cancelled) setClasses(names);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [idsKey]);
+  return classes;
+}
 
 /**
  * My ships (issue #2853): every ship the chosen Characters own, nearest
@@ -214,7 +249,18 @@ export function MyShipsPanel({
   }, [open, idsKey]);
 
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
-  const { places, systemOf } = usePlaces(open ? rows : [], activeCharacterId, route);
+  const { places, systemOf, originName } = usePlaces(open ? rows : [], activeCharacterId, route);
+  const groupIds = useMemo(
+    () =>
+      state.status === 'ready'
+        ? rows.flatMap((r) => {
+            const groupId = state.data.groupIdByType.get(r.typeId);
+            return groupId === undefined ? [] : [groupId];
+          })
+        : [],
+    [state, rows]
+  );
+  const shipClasses = useShipClasses(open ? groupIds : []);
   const sorted = useMemo(
     () =>
       sortShipsByJumps(rows, (row) => {
@@ -230,7 +276,7 @@ export function MyShipsPanel({
       onClose={onClose}
       title={t('assets.myShips.title')}
       closeOnBack={false}
-      className="w-full max-w-4xl"
+      wide
     >
       <div className="flex flex-col gap-3 p-3">
         {filterControl && <div className="flex items-center gap-2">{filterControl}</div>}
@@ -255,6 +301,17 @@ export function MyShipsPanel({
         )}
         {state.status === 'ready' && sorted.length > 0 && (
           <div role="table" aria-label={t('assets.myShips.title')}>
+            <div className="flex flex-col gap-0.5 px-3 pb-2 text-xs text-text-dim">
+              <span>
+                {t('assets.myShips.summary', {
+                  ships: t('assets.myShips.shipCount', { count: sorted.length }),
+                  characters: t('assets.myShips.characterCount', {
+                    count: new Set(sorted.map((r) => r.characterId)).size,
+                  }),
+                })}
+              </span>
+              {originName && <span>{t('assets.myShips.jumpsFrom', { system: originName })}</span>}
+            </div>
             <div
               role="row"
               className={`${ROW_GRID} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
@@ -274,6 +331,8 @@ export function MyShipsPanel({
                 (row.locationType === 'station'
                   ? t('assets.stationLabel', { id: row.locationId })
                   : t('assets.structureLabel', { id: row.locationId }));
+              const jumps = places.jumps.get(key);
+              const shipClass = shipClasses.get(state.data.groupIdByType.get(row.typeId) ?? -1);
               const trail = row.trail
                 .map((itemId) => state.data.holderNames.get(itemId))
                 .filter(Boolean)
@@ -283,13 +342,23 @@ export function MyShipsPanel({
                   key={row.itemId}
                   role="row"
                   to={hrefFor(row.locationId)}
-                  className={`${ROW_GRID} group border-b border-line px-3 py-2 hover:bg-panel-2 ${tappableRowClassName}`}
+                  className={`${ROW_GRID} group relative border-b border-line px-3 py-2 hover:bg-panel-2 ${tappableRowClassName}`}
                 >
-                  <span role="cell" className="flex min-w-0 items-center gap-2">
+                  <span
+                    role="cell"
+                    className="flex min-w-0 items-center gap-2 max-sm:basis-full max-sm:pr-6"
+                  >
                     <TypeIcon typeId={row.typeId} size={32} width={24} height={24} />
-                    <span className="truncate font-semibold text-accent">
-                      {state.data.typeNames.get(row.typeId) ??
-                        t('assets.myShips.unknownType', { id: row.typeId })}
+                    <span className="min-w-0 break-words">
+                      <span className="font-semibold text-accent">
+                        {state.data.typeNames.get(row.typeId) ??
+                          t('assets.myShips.unknownType', { id: row.typeId })}
+                      </span>
+                      {shipClass && (
+                        <span className="text-xs text-text-dim max-sm:ml-2 sm:block">
+                          {shipClass}
+                        </span>
+                      )}
                     </span>
                     {row.inCargo && (
                       <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
@@ -297,10 +366,13 @@ export function MyShipsPanel({
                       </span>
                     )}
                   </span>
-                  <span role="cell" className="truncate text-xs text-text-dim">
+                  <span role="cell" className="min-w-0 text-xs break-words text-text-dim">
                     {state.data.characterNames.get(row.characterId)}
                   </span>
-                  <span role="cell" className="col-span-2 min-w-0 truncate text-xs sm:col-span-1">
+                  <span
+                    role="cell"
+                    className="min-w-0 text-xs break-words max-sm:grow max-sm:basis-40"
+                  >
                     {name}
                     {trail && <span className="text-text-dim"> · {trail}</span>}
                   </span>
@@ -309,10 +381,16 @@ export function MyShipsPanel({
                       security={typeof systemId === 'number' ? places.security.get(systemId) : null}
                     />
                   </span>
-                  <span role="cell" className="text-xs">
-                    <JumpsAwayText result={places.jumps.get(key)} t={t} />
+                  <span role="cell" className="text-xs whitespace-nowrap">
+                    {jumps?.kind === 'known' && jumps.jumps === 0 ? (
+                      <span>{t('assets.myShips.here')}</span>
+                    ) : (
+                      <JumpsAwayText result={jumps} t={t} />
+                    )}
                   </span>
-                  <RowCaret />
+                  <span className="flex max-sm:absolute max-sm:top-3 max-sm:right-3">
+                    <RowCaret />
+                  </span>
                 </Link>
               );
             })}

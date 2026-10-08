@@ -44,6 +44,7 @@ describe('recordNetWorthSnapshot', () => {
         assetValue: 10,
         plexValue: 0,
         escrow: 7,
+        sellStock: 0,
         hubId: 'jita',
         updatedAt: DAY1,
       },
