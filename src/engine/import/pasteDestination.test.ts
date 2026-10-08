@@ -74,6 +74,17 @@ describe('pasteDestination', () => {
     );
   });
 
+  it('still opens Pilot Lookup when a name list holds one item-like name', () => {
+    expect(pasteDestination('Alpha One\nTritanium\nBeta Two\nGamma Three', SOURCES)).toBe(
+      'pilotList'
+    );
+    expect(pasteDestination('Tritanium\nAlpha One', SOURCES)).toBe('pilotList');
+  });
+
+  it('keeps an item list with one unknown line in the Appraisal, not Pilot Lookup', () => {
+    expect(pasteDestination('Tritanium\nPyerite\nNocxium\nMystery Box', SOURCES)).toBe('appraisal');
+  });
+
   it('leaves a single name alone', () => {
     expect(pasteDestination('Alpha One', SOURCES)).toBeNull();
   });
