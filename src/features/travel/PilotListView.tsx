@@ -6,8 +6,9 @@
  * ships counted by class. A pilot's name opens Show Info, whose Character tab
  * has the six-month picture.
  *
- * Numbers, never verdicts (decision `20260912-172628`): a group says what a
- * pilot did ("Killed in highsec, last 30 days"), it never calls one hostile or safe.
+ * A group says what a pilot did ("Killed in highsec, last 30 days"), and each
+ * row carries a Threat badge beside the name (decision `20261008-181210`); the
+ * list never calls a pilot safe or hostile.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +50,8 @@ import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
+import { rowThreat } from './rowThreat';
+import { ThreatBadge } from './ThreatBadge';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
@@ -181,20 +184,26 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
       stickyStart: true,
-      render: (row) => (
-        <>
-          {row.characterId === null ? (
-            row.name
-          ) : (
-            <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
-          )}
-          {(row.corporationName || row.allianceName) && (
-            <span className="block truncate text-[0.6875rem] text-text-dim">
-              {[row.corporationName, row.allianceName].filter(Boolean).join(' · ')}
+      render: (row) => {
+        const threat = rowThreat(row, now);
+        return (
+          <>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+              {row.characterId === null ? (
+                row.name
+              ) : (
+                <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
+              )}
+              {threat !== null && <ThreatBadge level={threat} />}
             </span>
-          )}
-        </>
-      ),
+            {(row.corporationName || row.allianceName) && (
+              <span className="block truncate text-[0.6875rem] text-text-dim">
+                {[row.corporationName, row.allianceName].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </>
+        );
+      },
     },
     {
       id: 'standing',

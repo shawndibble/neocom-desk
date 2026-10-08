@@ -10,15 +10,20 @@
  * Neither links to the modal's Character tab, which would only repeat this view.
  */
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { AllianceLink, CorporationLink } from '@/features/entities';
+import { needsDangerRatio, threatVerdict } from '@/engine/pilotList/threatVerdict';
+import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
-import { PilotKillActivity, PilotStandingLine } from './PilotKillActivity';
+import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
+import { PilotThreatSummary } from './PilotThreatSummary';
+import { ThreatBadge } from './ThreatBadge';
+import { usePilotKillHistory } from './usePilotKillHistory';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
-import { ZkillStatsSection } from './ZkillStatsSection';
+import { ZkillRatioMeters, ZkillStatsSection } from './ZkillStatsSection';
 import { pilotAge, type PilotProfile } from './pilotLookup';
 
 export interface PilotProfileViewProps {
@@ -33,11 +38,32 @@ export interface PilotProfileViewProps {
   hideName?: boolean;
 }
 
+interface PilotIdentityProps extends PilotProfileViewProps {
+  /** The Threat badge, drawn beside the name (alone where the dialog already titles it). */
+  threat?: ReactNode;
+}
+
 /** Mount it keyed by the character id, so a new pilot never shows the last one's stats. */
 export function PilotProfileView(props: PilotProfileViewProps) {
   const { characterId } = props.profile;
   const [stats, setStats] = useState<PilotStatsResult | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const { history, retry: retryHistory } = usePilotKillHistory(characterId);
+  const now = useNow();
+  const pilotStats = stats?.kind === 'stats' ? stats.stats : null;
+
+  // The verdict reads the kills and, for a pilot busy enough to be dangerous,
+  // the danger ratio; until that ratio arrives the badge says it is checking
+  // rather than showing a level that could still change.
+  const threat = useMemo(() => {
+    if (history.kind !== 'ready') return null;
+    const verdict = threatVerdict({
+      kills: history.kills,
+      dangerRatio: pilotStats?.dangerRatio ?? null,
+      nowMs: now,
+    });
+    return { verdict, pending: stats === null && needsDangerRatio(history.kills, now) };
+  }, [history, pilotStats, stats, now]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,14 +82,25 @@ export function PilotProfileView(props: PilotProfileViewProps) {
 
   return (
     <div className="space-y-4">
-      <PilotIdentity {...props} />
+      <PilotIdentity
+        {...props}
+        threat={threat && <ThreatBadge level={threat.pending ? 'pending' : threat.verdict.level} />}
+      />
+      {threat && !threat.pending && (
+        <PilotThreatSummary
+          verdict={threat.verdict}
+          gangRatio={pilotStats?.gangRatio ?? null}
+          nowMs={now}
+        />
+      )}
       <PilotStandingLine
         characterId={characterId}
         corporationId={props.profile.corporationId}
         allianceId={props.profile.allianceId}
       />
-      <PilotKillActivity characterId={characterId} />
-      <ZkillStatsSection stats={stats} onRetry={retryStats} />
+      {pilotStats && <ZkillRatioMeters stats={pilotStats} />}
+      <PilotKillActivityView history={history} onRetry={retryHistory} />
+      <ZkillStatsSection stats={stats} onRetry={retryStats} metersAbove />
       <PilotKillmailsSection characterId={characterId} />
     </div>
   );
@@ -82,7 +119,8 @@ function PilotIdentity({
   onOpenCorporation,
   onOpenAlliance,
   hideName = false,
-}: PilotProfileViewProps) {
+  threat,
+}: PilotIdentityProps) {
   const { t } = useTranslation();
   // Rendered once per lookup; "now" for an age in years and days needs no ticking.
   const [now] = useState(() => new Date());
@@ -95,7 +133,12 @@ function PilotIdentity({
     <div className="flex flex-wrap items-start gap-4">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 space-y-1">
-        {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
+        {(!hideName || threat) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
+            {threat}
+          </div>
+        )}
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
           <dt className="text-text-dim">{t('travel.pilot.corporation')}</dt>
           <dd>
