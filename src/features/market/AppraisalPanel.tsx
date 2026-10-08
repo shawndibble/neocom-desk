@@ -68,9 +68,11 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
   APPRAISAL_COLUMN_IDS,
+  DEFAULT_VISIBLE_APPRAISAL_COLUMNS,
   useVisibleAppraisalColumns,
   type AppraisalColumnId,
 } from './appraisalColumns';
@@ -178,6 +180,10 @@ function comparisonCell(
   );
 }
 
+/** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
+const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
+const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
+
 export function AppraisalPanel({
   controller,
   pricePercent,
@@ -227,7 +233,16 @@ export function AppraisalPanel({
   const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
   const { owned } = useOwnedAtStation(minusOwned, ownedStationId);
 
-  const visibleColumns = useVisibleAppraisalColumns((state) => state.value);
+  const storedColumns = useVisibleAppraisalColumns((state) => state.value);
+  // Side by side below `xl` the results card is only ~500px wide, so with no
+  // stored selection the per-unit price and volume columns start unticked (the totals and the Cargo group say
+  // the same thing) rather than pushing the row menu out of reach. Only a
+  // default: ticking one shows it, and a stored selection is read as saved.
+  const compactResults = useMediaQuery(COMPACT_RESULTS_QUERY);
+  const visibleColumns =
+    compactResults && storedColumns === DEFAULT_VISIBLE_APPRAISAL_COLUMNS
+      ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
+      : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
   useEffect(() => {
@@ -553,7 +568,7 @@ export function AppraisalPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[18rem_minmax(0,1fr)] xl:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[18rem_minmax(0,1fr)]">
       <Panel
         title={t('market.appraisal.pasteTitle')}
         actions={
