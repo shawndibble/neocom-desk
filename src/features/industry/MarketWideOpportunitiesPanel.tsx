@@ -38,7 +38,7 @@ import {
 import { db } from '@/db';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { iskToneClass } from '@/features/character/format';
 import { formatDuration } from '@/lib/duration';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -57,6 +57,12 @@ import {
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
+import {
+  MARKET_WIDE_COLUMN_IDS,
+  MARKET_WIDE_DEFAULT_COLUMNS,
+  useVisibleMarketWideColumns,
+  type MarketWideColumnId,
+} from './marketWideColumns';
 import { useRowStartPlan } from './rowStartPlan';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
@@ -107,31 +113,6 @@ interface MarketWideOpportunitiesPanelProps {
    */
   startFolded?: boolean;
 }
-
-/**
- * The optional columns, in table order. Product, ISK/hour, ISK/day and the
- * PLAN button always show. Order depth starts unticked: at 1024px the table
- * otherwise scrolls sideways and pushes PLAN, the row's main action, off-screen.
- */
-const MARKET_WIDE_COLUMN_IDS = [
-  'blueprintSource',
-  'margin',
-  'duration',
-  'buildCost',
-  'orderDepth',
-] as const;
-type MarketWideColumnId = (typeof MARKET_WIDE_COLUMN_IDS)[number];
-const MARKET_WIDE_DEFAULT_COLUMNS: readonly MarketWideColumnId[] = [
-  'blueprintSource',
-  'margin',
-  'duration',
-  'buildCost',
-];
-const useVisibleMarketWideColumns = createColumnVisibilitySetting({
-  key: 'marketWideVisibleColumns',
-  ids: MARKET_WIDE_COLUMN_IDS,
-  defaultVisible: MARKET_WIDE_DEFAULT_COLUMNS,
-});
 
 /** Identifies a gate by the skills it lacks, so rows can be told apart from the page's common one. */
 function gateKey(verdict: SkillGateVerdict | undefined): string | null {
@@ -429,6 +410,11 @@ export function MarketWideOpportunitiesPanel({
     </ItemContextMenu>
   );
 
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleMarketWideColumns,
+    MARKET_WIDE_DEFAULT_COLUMNS
+  );
+
   const columns: DataTableColumn<MarketWideDayRow>[] = [
     {
       id: 'product',
@@ -443,6 +429,11 @@ export function MarketWideOpportunitiesPanel({
               <span className={entityLinkClassName()}>{row.productName}</span>
             ) : (
               row.productName
+            )}
+            {!isVisible('blueprintSource') && row.blueprintSource !== 'market' && (
+              <span className="text-[0.6875rem] text-text-dim">
+                {t(`industry.marketOpportunitiesBlueprintSources.${row.blueprintSource}`)}
+              </span>
             )}
             {verdict?.gated && catalog && (
               <SkillGateMarker
@@ -560,10 +551,6 @@ export function MarketWideOpportunitiesPanel({
       render: (row) => <StartPlanButton onStart={() => startPlanFor(row)} planKey={row} />,
     },
   ];
-  const { visible, isVisible, toggle, reset } = useColumnVisibility(
-    useVisibleMarketWideColumns,
-    MARKET_WIDE_DEFAULT_COLUMNS
-  );
   const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
     MarketWideColumnId,
     DataTableColumn<MarketWideDayRow>

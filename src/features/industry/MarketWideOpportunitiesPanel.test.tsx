@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,6 +9,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
+import { MARKET_WIDE_COLUMN_IDS, useVisibleMarketWideColumns } from './marketWideColumns';
 import { useSalesShare } from './salesSharePref';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
@@ -169,7 +170,8 @@ describe('MarketWideOpportunitiesPanel layout', () => {
 
   it('keeps Plan visible and starts with Order depth off the table', () => {
     renderPanel();
-    expect(screen.queryByRole('columnheader', { name: 'Depth' })).not.toBeInTheDocument();
+    for (const name of ['Depth', 'Time', 'Blueprint'])
+      expect(screen.queryByRole('columnheader', { name })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Plan' })).not.toHaveLength(0);
   });
 });
@@ -426,6 +428,7 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 });
 
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
+  beforeEach(() => useVisibleMarketWideColumns.setState({ value: MARKET_WIDE_COLUMN_IDS }));
   const productOrder = () =>
     screen
       .getAllByText(/^Widget/)
@@ -473,6 +476,7 @@ describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
 });
 
 describe('MarketWideOpportunitiesPanel ISK/day', () => {
+  beforeEach(() => useVisibleMarketWideColumns.setState({ value: MARKET_WIDE_COLUMN_IDS }));
   const productOrder = () =>
     screen
       .getAllByText(/^Widget/)
