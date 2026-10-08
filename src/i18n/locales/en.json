@@ -3751,7 +3751,16 @@
     "journalBountyKills_one": "{{count}} NPC killed",
     "journalBountyKills_other": "{{count}} NPCs killed",
     "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
-    "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>"
+    "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>",
+    "journalBreakdownTitle": "Where the ISK went",
+    "journalBreakdownIn": "In",
+    "journalBreakdownOut": "Out",
+    "journalBreakdownNet": "Net",
+    "journalBreakdownRefType": "Ref type",
+    "journalBreakdownIncome": "Income",
+    "journalBreakdownExpense": "Expense",
+    "journalBreakdownShow": "Show breakdown",
+    "journalBreakdownHide": "Hide breakdown"
   },
   "miningTax": {
     "title": "Mining",
