@@ -843,7 +843,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Plan Milestone**: A named goal ("Fly Loki") pinned to a Skill Plan entry's
   skill level, not to its position — anchored by (skillTypeID, level) so it
   survives a reorder or the plan's own "suggest full reorder" by construction
-  (`engine/skillPlanMilestones.ts`). Three states against the current **Skill
+  (`engine/skillPlanMilestones.ts`). Reorder treats it as a hard deadline: its skills finish first. Three states against the current **Skill
   Plan schedule**: _projected_ (its step is still scheduled — the date is when
   that step, and every prerequisite it needs, finishes training), _reached_
   (the step is gone because the level is already trained), and _orphaned_ (the
