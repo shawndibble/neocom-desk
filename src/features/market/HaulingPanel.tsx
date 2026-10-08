@@ -104,7 +104,12 @@ import {
   type HaulingHubChoice,
 } from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
-import { HAUL_MODES, type HaulMode } from './haulingData';
+import {
+  HAUL_MODES,
+  MAX_BOOK_CANDIDATES,
+  MAX_PRICED_CANDIDATES,
+  type HaulMode,
+} from './haulingData';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
@@ -1125,6 +1130,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                         slow: hidden.slow,
                         low: hidden.lowMargin,
                       })}
+                {state.scan.capped
+                  ? ` ${t('market.hauling.cappedLine', {
+                      priced: MAX_PRICED_CANDIDATES,
+                      books: MAX_BOOK_CANDIDATES,
+                    })}`
+                  : ''}
               </p>
             </>
           )}

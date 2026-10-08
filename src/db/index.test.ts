@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(21);
+    expect(db.verno).toBe(22);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -275,6 +275,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'mailDrafts',
         'miningLedgerHistory',
         'miningTaxAssignments',
+        'netWorthSnapshots',
         'notificationFeed',
         'orderProblemSamples',
         'payees',

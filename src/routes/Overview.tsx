@@ -59,6 +59,7 @@ import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
+import { useExtractionPrices } from '@/features/character/useExtractionPrices';
 import { CardPicker } from '@/features/overview/CardPicker';
 import {
   effectiveCardOrder,
@@ -260,6 +261,7 @@ export function Overview() {
   const setStoredOrder = useOverviewCardOrder((state) => state.setValue);
   const spMonitoring = useSpExtractionMonitoringEnabled((state) => state.value);
   const spThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const extractionPrices = useExtractionPrices();
   const hydrateSpMonitoring = useSpExtractionMonitoringEnabled((state) => state.hydrate);
   const hydrateSpThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
   useEffect(() => {
@@ -438,6 +440,7 @@ export function Overview() {
     totalSp: skillsQueueData?.totalSp ?? null,
     monitoring: spMonitoring,
     thresholdSp: spThreshold,
+    price: extractionPrices,
   };
   const structures = structuresSnapshot.data ? structuresView(structuresSnapshot.data, now) : null;
   const structureClock = structures?.items ? structuresDeadline(structures.items, now) : null;

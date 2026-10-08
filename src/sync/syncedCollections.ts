@@ -26,6 +26,7 @@ import type {
   db,
   FittingRecord,
   MiningTaxAssignmentRecord,
+  NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
   ProductionOrderWatchRecord,
@@ -45,6 +46,7 @@ import type {
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
+  RemoteNetWorthSnapshotDoc,
   RemoteProductionOrderWatchDoc,
   RemoteProductionRunDoc,
   RemoteProductionSaleLinkDoc,
@@ -68,6 +70,7 @@ export type SyncedFaqItemId =
   | 'piPicks'
   | 'miningTax'
   | 'fittings'
+  | 'netWorthSnapshots'
   | 'notificationFeed'
   | 'settings';
 
@@ -645,6 +648,43 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   }),
 });
 
+/** One Character's net worth on one UTC day (issue #2865) — numbers only, one document per day. */
+export const NET_WORTH_SNAPSHOTS = defineEditableCollection<
+  NetWorthSnapshotRecord,
+  RemoteNetWorthSnapshotDoc
+>({
+  kind: 'editable',
+  remoteName: 'netWorthSnapshots',
+  table: 'netWorthSnapshots',
+  tombstoneSegment: 'netWorthSnapshotTombstones',
+  onRemoval: 'delete',
+  faqItem: 'netWorthSnapshots',
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    day: r.day,
+    wallet: r.wallet,
+    assetValue: r.assetValue,
+    plexValue: r.plexValue,
+    escrow: r.escrow,
+    hubId: r.hubId,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    day: r.day,
+    wallet: r.wallet,
+    assetValue: r.assetValue,
+    plexValue: r.plexValue,
+    escrow: r.escrow,
+    hubId: r.hubId,
+    updatedAt: r.updatedAt,
+  }),
+});
+
 /**
  * Every editable collection, **in sync order**: syncCharacter walks this list
  * one collection at a time and a throw stops the pass, so the order is
@@ -659,6 +699,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   PRODUCTION_RUNS,
   PRODUCTION_SALE_LINKS,
   PRODUCTION_ORDER_WATCHES,
+  NET_WORTH_SNAPSHOTS,
   PAYEES,
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,

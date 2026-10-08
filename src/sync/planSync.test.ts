@@ -1,3 +1,4 @@
+import { REMOTE_COLLECTIONS } from './syncedCollections';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import {
@@ -357,6 +358,9 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
 
+/** One read per synced collection per Character pass — derived, so a new collection can't strand a hard-coded count. */
+const COLLECTION_COUNT = REMOTE_COLLECTIONS.length;
+
 describe('markers field mapping', () => {
   it('round-trips plan markers through push and pull', async () => {
     await db.skillPlans.add(plan({ markers: [1, 3] }));
@@ -676,7 +680,7 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     // productionRuns + productionSaleLinks + productionOrderWatches + payees +
     // fittings + miningTaxAssignments + notificationFeed + settings, each read through a
     // where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(13);
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -1955,7 +1959,7 @@ describe('sync orchestration', () => {
     await Promise.all([p1, p2]);
     // One getDocs per synced collection (see the collection-count comment in
     // the "debounces scheduleSync" test above).
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(13);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(COLLECTION_COUNT);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -2003,7 +2007,7 @@ describe('sync orchestration', () => {
 
     await triggerSync(1);
 
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(peak).toBeGreaterThan(1);
     expect(peak).toBeLessThanOrEqual(4);
   });
@@ -2035,7 +2039,9 @@ describe('sync orchestration', () => {
     await expect(p1).rejects.toThrow('plans offline');
     await p2;
     // The failure did not skip the collections after it.
-    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(13);
+    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(
+      COLLECTION_COUNT
+    );
   });
 
   it('runs a foreground sync ahead of queued background ones', async () => {
@@ -2070,7 +2076,9 @@ describe('sync orchestration', () => {
 
     expect(firstReadOf(order, 1)).toBeLessThan(firstReadOf(order, 3));
     // Coalesced: character 1 synced once, not once per trigger.
-    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(13);
+    expect(order.filter((path) => path.startsWith('characters/char:1/'))).toHaveLength(
+      COLLECTION_COUNT
+    );
   });
 
   it.each([
@@ -2138,9 +2146,9 @@ describe('sync orchestration', () => {
     // stationPins + planetRichness + productionRuns + productionSaleLinks +
     // productionOrderWatches + payees + miningTaxAssignments +
     // notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13));
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
   });
 });
@@ -2470,7 +2478,7 @@ describe('triggerSync: incremental pull', () => {
 
     // mergeSettings' tombstones never expire and its absence semantics differ;
     // the allow-list bounds the doc count anyway.
-    expect(filtersFor(SETTINGS_PATH, readsSoFar() - 13)).toEqual([OWNER_FILTER]);
+    expect(filtersFor(SETTINGS_PATH, readsSoFar() - COLLECTION_COUNT)).toEqual([OWNER_FILTER]);
     expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
   });
 });

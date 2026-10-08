@@ -5,11 +5,10 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices, type HubAggregate } from '@/market/prices';
+import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/spExtraction';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
 
-/** public/data/market/types.json: "Large Skill Injector". */
-const LARGE_SKILL_INJECTOR_TYPE_ID = 40520;
 const LARGE_SKILL_INJECTOR_NAME = 'Large Skill Injector';
 
 interface InjectorFactsPanelProps {

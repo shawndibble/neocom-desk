@@ -436,7 +436,7 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
   });
 }
 
-const AUTO_RECALCULATE_MAX = 10;
+export const AUTO_RECALCULATE_MAX = 10;
 
 export function autoRecalculates(candidateCount: number): boolean {
   return candidateCount <= AUTO_RECALCULATE_MAX;

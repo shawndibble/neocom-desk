@@ -123,6 +123,8 @@ export interface HaulingScan {
   rows: HaulingScanRow[];
   /** How many items were looked at in the first pass. */
   scanned: number;
+  /** True when the price or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
+  capped?: boolean;
   fetchedAt: number;
 }
 
@@ -220,7 +222,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
 
   const minGap = mode === 'instant' ? MIN_INSTANT_GAP : MIN_LISTED_GAP;
   // Each item keeps only its best lane: the plan and the table are keyed by item.
-  const priced = ids
+  const pricedAll = ids
     .flatMap((typeId) => {
       let best: { typeId: number; lane: HubLane; buy: number; gap: number } | null = null;
       for (const lane of lanes) {
@@ -233,8 +235,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       }
       return best === null ? [] : [best];
     })
-    .sort((a, b) => b.gap - a.gap)
-    .slice(0, MAX_PRICED_CANDIDATES);
+    .sort((a, b) => b.gap - a.gap);
+  const priced = pricedAll.slice(0, MAX_PRICED_CANDIDATES);
 
   // 2. History: drop what never sells or only sold below the origin price.
   // An instant sale skips it: the standing buy order is the demand.
@@ -334,7 +336,14 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     onProgress?.({ stage: 'books', done: booksDone, total: shortlist.length });
   });
 
-  const scan: HaulingScan = { rows, scanned: ids.length, fetchedAt: Date.now() };
+  const capped =
+    pricedAll.length > MAX_PRICED_CANDIDATES || withHistory.length > MAX_BOOK_CANDIDATES;
+  const scan: HaulingScan = {
+    rows,
+    scanned: ids.length,
+    ...(capped ? { capped } : {}),
+    fetchedAt: Date.now(),
+  };
   scanCache.set(key, { scan, expiresAt: Date.now() + SCAN_CACHE_TTL_MS });
   return scan;
 }

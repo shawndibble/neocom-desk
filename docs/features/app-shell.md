@@ -127,7 +127,7 @@ Phones and tablets only, once per device (key `installPrompt.seen`, `:8`; accept
 
 ### Install later (gap)
 
-Banner is one-shot; no Settings/Help/FAQ path to install afterwards (grep `install` in Settings, settings feature, faq, help: none). Ticket #2860.
+Banner is one-shot; the later path is Settings › Data & storage › Install this app (`InstallAppPanel`, `selectInstallAppVariant`, event held by `installApp.ts`), a FAQ entry and a link in the iOS push notice (#2860).
 
 ## ESI outage, rate limit, offline (what the player sees)
 
@@ -228,7 +228,7 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 - Help › Shortcuts "On a page" rows are hard-coded (`src/features/help/ShortcutsPanel.tsx`), not derived from a registry, so they can drift from the real handlers.
 - No single-key shortcut for Skills, Assets, Mail, Calendar, Contacts, Travel, Corporation (`src/lib/shortcuts.ts:152`); only ten keys, two of which (`,` `?`) are for settings/help.
 - The phone has no indicator for "syncing"/"offline" (see `sync-backup.md`).
-- Install Prompt never shows on Android Chromium unless `beforeinstallprompt` fires; no fallback instructions (`installPromptRules.ts:51`).
+- The Install Prompt banner never shows on Android Chromium unless `beforeinstallprompt` fires; Settings › Data & storage › Install this app gives a generic menu pointer instead.
 - Updates apply silently with no "update available" indicator; a visible idle tab can run an old build until the next navigation or hide (`src/app/ReloadPrompt.tsx`).
 - Analytics `page_location` carries the full query string (e.g. `?info=`, `?f=`, filters) (`src/app/analytics.ts:71`); the in-app FAQ does not mention analytics (the privacy page does).
 - FAQ "Support" is Discord only; there is no in-app diagnostics or log-copy for bug reports (the Activity Log exists in Settings but is not linked from Support).
