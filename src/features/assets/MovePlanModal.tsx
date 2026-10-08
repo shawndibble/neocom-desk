@@ -19,6 +19,7 @@ import {
   inlineLinkClassName,
   rowInteractiveClassName,
   tappableRowClassName,
+  touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
@@ -378,21 +379,20 @@ export function MovePlanModal({
                   );
                   return (
                     <div key={characterId} className="flex flex-col">
-                      <div
-                        className={`${tappableRowClassName} sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-panel-2 px-2 font-medium`}
+                      <GroupCheckbox
+                        className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-panel-2 px-2 font-medium"
+                        keys={characterKeys}
+                        selected={selected}
+                        onToggle={toggle}
+                        label={t('assets.movePlan.selectAllFor', { character: characterName })}
                       >
-                        <GroupCheckbox
-                          keys={characterKeys}
-                          selected={selected}
-                          onToggle={toggle}
-                          label={t('assets.movePlan.selectAllFor', { character: characterName })}
-                        />
                         {characterName}
-                      </div>
+                      </GroupCheckbox>
                       {[...byPlace].map(([locationId, stacks]) => {
                         const keys = stacks.map((s) => s.key);
                         const groupKey = `${characterId}:${locationId}`;
                         const isOpen = !collapsed.has(groupKey);
+                        const groupId = `move-plan-group-${groupKey}`;
                         const picked = keys.filter((k) => selected.has(k)).length;
                         return (
                           <div key={locationId} className="flex flex-col border-b border-line">
@@ -403,11 +403,19 @@ export function MovePlanModal({
                                 onToggle={toggle}
                                 label={t('assets.movePlan.selectAllAt', {
                                   place: placeLabel(locationId),
+                                  character: characterName,
                                 })}
                               />
                               <button
                                 type="button"
                                 aria-expanded={isOpen}
+                                aria-controls={groupId}
+                                aria-label={t('assets.movePlan.groupToggle', {
+                                  character: characterName,
+                                  place: placeLabel(locationId),
+                                  picked,
+                                  total: keys.length,
+                                })}
                                 onClick={() =>
                                   setCollapsed((prev) => {
                                     const next = new Set(prev);
@@ -425,27 +433,32 @@ export function MovePlanModal({
                                 <span className="shrink-0 text-xs tabular-nums">
                                   {t('assets.movePlan.groupCount', {
                                     picked,
-                                    count: keys.length,
+                                    total: keys.length,
                                   })}
                                 </span>
                               </button>
                             </div>
-                            {isOpen &&
-                              stacks.map((s) => (
-                                <label
-                                  key={s.key}
-                                  className={`${tappableRowClassName} flex items-center gap-2 pr-2 pl-8`}
-                                >
-                                  <Checkbox
-                                    checked={selected.has(s.key)}
-                                    onChange={(e) => toggle([s.key], e.target.checked)}
-                                  />
-                                  <span className="min-w-0 flex-1 truncate">{name(s.typeId)}</span>
-                                  <span className="text-text-dim tabular-nums">
-                                    × {s.quantity.toLocaleString()}
-                                  </span>
-                                </label>
-                              ))}
+                            {isOpen && (
+                              <div id={groupId} className="flex flex-col">
+                                {stacks.map((s) => (
+                                  <label
+                                    key={s.key}
+                                    className={`${tappableRowClassName} flex items-center gap-2 pr-2 pl-8`}
+                                  >
+                                    <Checkbox
+                                      checked={selected.has(s.key)}
+                                      onChange={(e) => toggle([s.key], e.target.checked)}
+                                    />
+                                    <span className="min-w-0 flex-1 truncate">
+                                      {name(s.typeId)}
+                                    </span>
+                                    <span className="text-text-dim tabular-nums">
+                                      × {s.quantity.toLocaleString()}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -486,7 +499,12 @@ function GroupCheckbox({
   selected,
   onToggle,
   label,
+  className,
+  children,
 }: {
+  /** Layout for a label that also holds `children`; without it the label is just the box's 44px target. */
+  className?: string;
+  children?: ReactNode;
   keys: readonly string[];
   selected: ReadonlySet<string>;
   onToggle: (keys: readonly string[], on: boolean) => void;
@@ -495,7 +513,13 @@ function GroupCheckbox({
   const count = keys.filter((k) => selected.has(k)).length;
   const all = keys.length > 0 && count === keys.length;
   return (
-    <label className={`${tappableRowClassName} flex items-center`}>
+    <label
+      className={
+        className
+          ? `${tappableRowClassName} ${className}`
+          : `${touchCheckboxLabelClassName} ${tappableRowClassName}`
+      }
+    >
       <Checkbox
         ref={(el) => {
           if (el) el.indeterminate = count > 0 && !all;
@@ -504,6 +528,7 @@ function GroupCheckbox({
         onChange={(e) => onToggle(keys, e.target.checked)}
         aria-label={label}
       />
+      {children}
     </label>
   );
 }
