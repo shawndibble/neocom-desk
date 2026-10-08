@@ -717,7 +717,11 @@ export const syncPublicContractOffers = onSchedule(
       .doc(PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC);
     const fingerprint = await fetchArchiveFingerprint();
     if (fingerprint !== null) {
-      const stored = (await fingerprintRef.get()).data()?.fingerprint;
+      // A failed read just means "cannot tell": sync rather than fail the run.
+      const stored = await fingerprintRef
+        .get()
+        .then((snap) => snap.data()?.fingerprint as unknown)
+        .catch(() => null);
       if (stored === fingerprint) {
         logInfo('public contract offers sync skipped: archive unchanged', { fingerprint });
         return;

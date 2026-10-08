@@ -428,7 +428,7 @@ export async function runWorkbenchSync(deps: WorkbenchSyncDeps): Promise<Workben
       if (!retryable || attempt >= MAX_ATTEMPTS) return response;
       const asked = parseRetryAfterMs(response.retryAfter, now(), Number.POSITIVE_INFINITY);
       // Asked to back off longer than a run should idle: stop here, checkpointed.
-      // The next scheduled run (30 minutes on) is the retry — one request, not a burst.
+      // The next scheduled run (12 hours on) is the retry — one request, not a burst.
       if (asked !== null && asked > MAX_RETRY_WAIT_MS) {
         throw new StopRun(`${url}: Retry-After ${Math.ceil(asked / 1000)}s`);
       }
