@@ -12,7 +12,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
+import { Button, EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { cx } from '@/lib/cx';
@@ -77,9 +77,12 @@ export function StatTiles({ items, className }: { items: StatTileItem[]; classNa
 export function ZkillStatsStatus({
   stats,
   subject,
+  onRetry,
 }: {
   stats: PilotStatsResult | null;
   subject: 'pilot' | 'corporation' | 'alliance';
+  /** Offered on a zKillboard failure; absent where the host has no way to reload. */
+  onRetry?: () => void;
 }): ReactNode {
   const { t } = useTranslation();
   if (stats === null) {
@@ -94,6 +97,13 @@ export function ZkillStatsStatus({
       <EmptyState
         title={t('travel.pilot.statsFailedTitle')}
         hint={t('travel.pilot.statsFailedHint')}
+        action={
+          onRetry && (
+            <Button size="sm" onClick={onRetry}>
+              {t('travel.pilot.retry')}
+            </Button>
+          )
+        }
       />
     );
   }
@@ -125,9 +135,15 @@ export function ZkillStatsNote({
 }
 
 /** The pilot's full block, as Pilot Lookup and the Character tab show it. */
-export function ZkillStatsSection({ stats }: { stats: PilotStatsResult | null }) {
+export function ZkillStatsSection({
+  stats,
+  onRetry,
+}: {
+  stats: PilotStatsResult | null;
+  onRetry?: () => void;
+}) {
   const { t } = useTranslation();
-  const status = <ZkillStatsStatus stats={stats} subject="pilot" />;
+  const status = <ZkillStatsStatus stats={stats} subject="pilot" onRetry={onRetry} />;
   if (stats === null || stats.kind !== 'stats') return status;
   const s = stats.stats;
   const figures = killFigures(t, s);

@@ -2,10 +2,11 @@ import type { DataTableColumn } from '@/components/ui';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { ProductionRunSummary } from './productionRunSummary';
-import { ProductionRunStatusChip } from './ProductionRunStatusChip';
+import { ProductionRunLostBadge, ProductionRunStatusChip } from './ProductionRunStatusChip';
 import { RealizedProfitCell } from './RealizedProfitCell';
 import { SoldSplitButton } from './SaleLinkingControls';
 import type { SaleLinking } from './useSaleLinking';
+import type { RunLoss } from './useRunLoss';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
@@ -116,13 +117,19 @@ export function statusColumn<Row extends ProductionRunSummary>(t: T): DataTableC
     header: t('industry.productionRunColumnStatus'),
     align: 'right',
     sortValue: (r) => r.status,
-    render: (r) => <ProductionRunStatusChip status={r.status} />,
+    render: (r) => (
+      <span className="inline-flex items-center justify-end gap-1.5">
+        {r.quantityLost > 0 && <ProductionRunLostBadge count={r.quantityLost} />}
+        <ProductionRunStatusChip status={r.status} />
+      </span>
+    ),
   };
 }
 
 /** The "Sold" split button wired to `useSaleLinking`, keyed off each row's own run/product — no plan context needed. Its "Delete production run" item deletes the row's run, so this column also carries the delete action for both tables. */
 export function soldActionsColumn<Row extends ProductionRunSummary>(
-  sale: SaleLinking
+  sale: SaleLinking,
+  runLoss: RunLoss
 ): DataTableColumn<Row> {
   return {
     id: 'actions',
@@ -133,6 +140,10 @@ export function soldActionsColumn<Row extends ProductionRunSummary>(
         onSold={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'sale')}
         onWatch={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'watch')}
         onManual={() => sale.openManualSale(r.run.id)}
+        onLost={() => void runLoss.openLoss(r)}
+        losses={r.losses}
+        onEditLoss={(loss) => void runLoss.openLoss(r, loss)}
+        onRemoveLoss={(loss) => runLoss.confirmRemoveLoss(loss.id)}
         onDelete={() => sale.confirmDeleteRun(r.run.id)}
         onRefresh={
           r.orderWatches.some((w) => !w.closed)

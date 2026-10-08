@@ -33,14 +33,28 @@ export function typeNameLookup(names: ReadonlyMap<number, string>): (typeId: num
 export function useJournalFilterResult(
   journal: readonly WalletJournalEntry[],
   filter: WalletJournalFilter
-): { filteredJournal: WalletJournalEntry[]; refTypeOptions: string[] } {
+): {
+  filteredJournal: WalletJournalEntry[];
+  /** Filtered by date range and text only: the ref-type breakdown ignores the ref-type filter. */
+  breakdownJournal: WalletJournalEntry[];
+  refTypeOptions: string[];
+} {
   const { t } = useTranslation();
   const filteredJournal = useMemo(
     () => filterWalletJournal(journal, filter, (entry) => journalDescriptionText(entry, t)),
     [journal, filter, t]
   );
+  const breakdownJournal = useMemo(
+    () =>
+      filter.refType === null
+        ? filteredJournal
+        : filterWalletJournal(journal, { ...filter, refType: null }, (entry) =>
+            journalDescriptionText(entry, t)
+          ),
+    [journal, filter, filteredJournal, t]
+  );
   const refTypeOptions = useMemo(() => journalRefTypes(journal), [journal]);
-  return { filteredJournal, refTypeOptions };
+  return { filteredJournal, breakdownJournal, refTypeOptions };
 }
 
 /**

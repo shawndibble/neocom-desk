@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { configureClipboard } from '@/lib/clipboard';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { RowDetailModal } from './RowDetailModal';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -305,6 +306,21 @@ describe('RowDetailModal owed entry', () => {
     expect(onUndo).toHaveBeenCalledTimes(1);
   });
 
+  it('marks an outstanding entry paid from the More menu, not the footer', async () => {
+    const onMarkPaid = vi.fn();
+    renderModal('outstanding', owed, undefined, undefined, { onMarkPaid });
+    expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as paid' }));
+    expect(onMarkPaid).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer Mark as paid for a paid entry', async () => {
+    renderModal('paid', { ...owed, status: 'paid' } as MiningTaxAssignmentRecord);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
+    expect(screen.queryByRole('menuitem', { name: 'Mark as paid' })).not.toBeInTheDocument();
+  });
+
   it('offers linking a wallet payment from the More menu', async () => {
     const onLinkWalletPayment = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
@@ -325,5 +341,37 @@ describe('RowDetailModal — a failed action', () => {
   it('shows no alert while nothing has failed', () => {
     renderModal('unassigned', null);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('RowDetailModal — price breakdown', () => {
+  const owed = {
+    id: 'a1',
+    characterId: 1,
+    date: '2026-09-08',
+    solarSystemId: 30000142,
+    payeeId: 'p1',
+    oreLines: [{ typeId: VELDSPAR, quantity: 250 }],
+    taxPct: 10,
+    estimatedValue: 2_500,
+    taxOwed: 250,
+    status: 'outstanding',
+    updatedAt: 1,
+  } as MiningTaxAssignmentRecord;
+
+  it('shows unit price, source and hub, and copies them as text', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(write);
+    renderModal('outstanding', owed, undefined, undefined, {
+      pricesFor: () => new Map([[VELDSPAR, 10]]),
+      priceSourcesFor: () => new Map([[VELDSPAR, 'saved' as const]]),
+    });
+    expect(screen.getByText('Saved snapshot')).toBeInTheDocument();
+    expect(screen.getByText(/buy · .* ore · 10% tax/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy as text' }));
+    const text = write.mock.calls[0][0] as string;
+    expect(text).toContain('Veldspar: 250 × 10 = 2,500 ISK (Saved snapshot)');
+    expect(text).toContain('10% tax');
+    configureClipboard(null);
   });
 });

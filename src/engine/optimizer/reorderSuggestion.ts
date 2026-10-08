@@ -22,6 +22,7 @@ import type {
   CloneState,
   EngineSkill,
   Implants,
+  PlanMilestone,
   PlanPriority,
   PlanStep,
 } from '@/engine/types';
@@ -89,15 +90,60 @@ export function isValidOrder(
 }
 
 /**
+ * Split `steps` into deadline segments: one per Plan Milestone whose anchor
+ * is still in the plan, in the anchor's current order, plus a final tail of
+ * everything no milestone needs. A segment holds its anchor step plus every
+ * not-yet-claimed plan step the anchor transitively needs (lower levels of
+ * its own skill and in-plan prereqs), so each segment is closed under
+ * in-plan prerequisites and the concatenation stays prereq-valid. Reached or
+ * orphaned milestones (anchor not in `steps`) are ignored. Each segment keeps
+ * the original relative order of its steps.
+ */
+function splitByMilestones(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  milestones: readonly PlanMilestone[] | undefined
+): PlanStep[][] {
+  if (!milestones?.length) return [[...steps]];
+  const key = (typeID: number, level: number): string => `${typeID}:${level}`;
+  const position = new Map(steps.map((s, i) => [key(s.skillTypeID, s.level), i]));
+  const anchors = milestones
+    .map((m) => position.get(key(m.skillTypeID, m.level)))
+    .filter((i): i is number => i !== undefined)
+    .sort((a, b) => a - b);
+  const claimed = new Set<number>();
+  const segments: PlanStep[][] = [];
+  for (const anchor of anchors) {
+    if (claimed.has(anchor)) continue;
+    const needed = new Set<number>();
+    const visit = (typeID: number, level: number): void => {
+      steps.forEach((s, i) => {
+        if (s.skillTypeID !== typeID || s.level > level || claimed.has(i) || needed.has(i)) return;
+        needed.add(i);
+        for (const p of skills.get(typeID)?.prereqs ?? []) visit(p.typeID, p.level);
+      });
+    };
+    visit(steps[anchor].skillTypeID, steps[anchor].level);
+    needed.forEach((i) => claimed.add(i));
+    segments.push(steps.filter((_, i) => needed.has(i)));
+  }
+  segments.push(steps.filter((_, i) => !claimed.has(i)));
+  return segments.filter((seg) => seg.length > 0);
+}
+
+/**
  * Reorder steps grouped by attribute pair; prereq-valid and stable.
  *
  * `priorities` (#27) maps a skill typeID to the user's (or an inherited,
  * see `effectivePriority`) urgency for it; a step's group is keyed by its
  * skill's priority too, and groups are emitted highest-priority first, tied
- * groups keeping their original first-occurrence order. Omit it (or pass an
+ * groups keeping their original first-occurrence order. `milestones` makes each Plan
+ * Milestone a hard deadline: its skills (and prerequisites) all come before
+ * later milestones' and the rest, whatever the priority; grouping and
+ * priority only interleave within a deadline segment. Omit `priorities` (or pass an
  * empty map) to fall back to pure attribute-pair grouping.
  */
-export function suggestReorder(
+function suggestReorderSegment(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   priorities?: ReadonlyMap<number, PlanPriority>
@@ -149,10 +195,23 @@ export function suggestReorder(
   return result;
 }
 
+export function suggestReorder(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  priorities?: ReadonlyMap<number, PlanPriority>,
+  milestones?: readonly PlanMilestone[]
+): PlanStep[] {
+  return splitByMilestones(steps, skills, milestones).flatMap((seg) =>
+    suggestReorderSegment(seg, skills, priorities)
+  );
+}
+
 export interface SortShortestFirstOptions {
   attributes: Attributes;
   implants?: Implants;
   cloneState?: CloneState;
+  /** Plan Milestones as hard deadlines; see `splitByMilestones`. */
+  milestones?: readonly PlanMilestone[];
 }
 
 /**
@@ -170,7 +229,7 @@ export interface SortShortestFirstOptions {
  * costing against it would be circular). A linear scan per pick is fine at
  * plan sizes (~200 steps); no heap is needed unless a test shows otherwise.
  */
-export function sortShortestFirst(
+function sortShortestSegment(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   options: SortShortestFirstOptions,
@@ -216,4 +275,16 @@ export function sortShortestFirst(
     result.push(steps[pickIndex]);
   }
   return result;
+}
+
+/** `sortShortestSegment` per milestone deadline segment (`options.milestones`). */
+export function sortShortestFirst(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  options: SortShortestFirstOptions,
+  priorities?: ReadonlyMap<number, PlanPriority>
+): PlanStep[] {
+  return splitByMilestones(steps, skills, options.milestones).flatMap((seg) =>
+    sortShortestSegment(seg, skills, options, priorities)
+  );
 }

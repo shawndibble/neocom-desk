@@ -23,7 +23,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getAveragePriceByType, getHubPrices } from '@/market/prices';
 import { scheduleSync } from '@/sync';
 
-const REQUIRED_SCOPES = [
+export const REQUIRED_SCOPES = [
   ESI_REGISTRY.getCharacterWallet.scope,
   ESI_REGISTRY.getCharacterAssets.scope,
   ESI_REGISTRY.getCharacterOrders.scope,

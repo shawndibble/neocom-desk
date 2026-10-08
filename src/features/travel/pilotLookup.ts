@@ -27,6 +27,21 @@ export interface PilotProfile {
 }
 
 /**
+ * What the search box should show for the pilot in the URL, or null to leave it
+ * alone. The URL can change without the box (reload, pasted link, Back), so a
+ * resolved pilot not yet shown is seeded; a user mid-keystroke is never overwritten.
+ */
+export function searchBoxSeed(state: {
+  resolved: PilotSummary | null;
+  /** The pilot whose name the box last showed, by seeding or by choosing. */
+  seededId: number | null;
+  typing: boolean;
+}): string | null {
+  if (state.resolved === null || state.typing) return null;
+  return state.resolved.characterId === state.seededId ? null : state.resolved.name;
+}
+
+/**
  * Whole years since the birthday (counted to its last anniversary, in UTC) and
  * the days since that anniversary. Null for an unreadable or future birthday.
  */

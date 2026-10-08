@@ -41,6 +41,8 @@ const hookState = vi.hoisted(() => ({
   hasRun: true,
   isPhone: false,
   rows: null as unknown,
+  error: false,
+  fetchedAt: null as Date | null,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
 // Below `md` (`useIsNarrow`) is where `FilterBar` turns into its sheet and
@@ -68,7 +70,8 @@ vi.mock('./useMarketWideOpportunities', () => ({
     ],
     loading: hookState.loading,
     hasRun: hookState.hasRun,
-    error: false,
+    error: hookState.error,
+    fetchedAt: hookState.fetchedAt,
     unavailableSources: hookState.unavailableSources,
     run: hookState.run,
   }),
@@ -463,5 +466,34 @@ describe('MarketWideOpportunitiesPanel ISK/day', () => {
     base.unmount();
     renderPanel(undefined, ['/?marketWide.share=5']);
     expect(screen.getByText('Widget Gamma').closest('tr')!.textContent).not.toBe(before);
+  });
+});
+
+describe('MarketWideOpportunitiesPanel data age and failure (#2845)', () => {
+  afterEach(() => {
+    hookState.error = false;
+    hookState.fetchedAt = null;
+    hookState.run.mockClear();
+  });
+
+  it('shows how old the last scan is', () => {
+    hookState.fetchedAt = new Date();
+    const { container } = renderPanel();
+    expect(container.querySelector('time')).not.toBeNull();
+  });
+
+  it('shows an error with Try again, not "no results", when the scan failed', async () => {
+    hookState.error = true;
+    hookState.rows = [];
+    try {
+      const user = userEvent.setup();
+      renderPanel();
+      expect(screen.getByText('The scan failed')).toBeInTheDocument();
+      expect(screen.queryByText(/cleared the liquidity floor/)).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(hookState.run).toHaveBeenCalledTimes(1);
+    } finally {
+      hookState.rows = null;
+    }
   });
 });
