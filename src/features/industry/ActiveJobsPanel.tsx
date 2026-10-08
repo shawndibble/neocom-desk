@@ -861,7 +861,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'logProduction',
         header: '',
         align: 'right',
-        cardActions: true,
+        // A text button, not the corner icon `cardActions` pins: its own
+        // full-width row on the phone card, 44px tall.
+        cellClassName: () => 'dt-action-row',
         render: (job) =>
           canLog(job) ? (
             <Button size="sm" onClick={() => void handleLogProduction(job)}>
@@ -949,7 +951,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'logProduction',
         header: '',
         align: 'right',
-        cardActions: true,
+        // A text button, not the corner icon `cardActions` pins: its own
+        // full-width row on the phone card, 44px tall.
+        cellClassName: () => 'dt-action-row',
         render: (job) => {
           if (!isLoggableHistoryJob(job)) return null;
           const state = historyStates.get(job.job_id);

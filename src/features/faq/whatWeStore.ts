@@ -86,6 +86,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
         noteKey: 'settings.faq.store.synced.miningTaxNote',
       },
       { id: 'fittings', labelKey: 'settings.faq.store.synced.fittings' },
+      { id: 'netWorthSnapshots', labelKey: 'settings.faq.store.synced.netWorthSnapshots' },
       {
         id: 'notificationFeed',
         labelKey: 'settings.faq.store.synced.notificationFeed',
