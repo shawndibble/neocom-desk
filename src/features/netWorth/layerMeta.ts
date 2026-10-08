@@ -27,14 +27,6 @@ export const LAYER_SWATCH: Record<LayerId, string> = {
   sellOrders: 'bg-kind-skill-plan',
 };
 
-/** Where each layer drill-down link lands (the "Opens" column). */
-export const LAYER_LINKS: Record<LayerId, string> = {
-  isk: '/wallet/journal',
-  assets: '/assets',
-  escrow: '/market/orders',
-  sellOrders: '/market/orders',
-};
-
 /** Character line hues, cycled; a repeat gets a dash pattern so hue is never the only cue. */
 export const CHARACTER_COLORS = [
   'var(--color-kind-contract-expiry)',

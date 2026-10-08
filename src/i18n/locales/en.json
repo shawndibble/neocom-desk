@@ -3719,11 +3719,6 @@
       "seriesButton": "Layers: {{shown}} of {{total}}",
       "seriesSearch": "Filter layers",
       "seriesNoResults": "No matching layers",
-      "layersTable": "Net worth by layer",
-      "layerColumn": "Layer",
-      "valueColumn": "Value",
-      "shareColumn": "Share",
-      "opensColumn": "Opens",
       "showColumn": "Show",
       "showCharacter": "Show {{name}} on the chart",
       "allCharacters": "All characters",
@@ -3741,12 +3736,6 @@
         "assets": "Assets",
         "escrow": "Order escrow",
         "sellOrders": "Sell orders"
-      },
-      "opens": {
-        "isk": "Journal",
-        "assets": "Assets",
-        "escrow": "Open orders",
-        "sellOrders": "Open orders"
       }
     },
     "balanceTab": "Balance",

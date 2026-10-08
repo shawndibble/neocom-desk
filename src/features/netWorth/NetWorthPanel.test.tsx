@@ -92,6 +92,15 @@ describe('NetWorthPanel, several Characters', () => {
     expect(within(table).getByText(/hasn't granted wallet access/)).toBeInTheDocument();
   });
 
+  it('pins the character column on the panel surface, not the page background', async () => {
+    await seed({ covered: [1, 2] });
+    renderPanel();
+    const table = await screen.findByRole('table', { name: 'Balance by character' });
+    const cell = (await within(table).findAllByText('Ava'))[0].closest('td')!;
+    expect(cell).toHaveClass('sticky', 'left-0', 'bg-panel');
+    expect(cell).not.toHaveClass('bg-bg');
+  });
+
   it('shows the layer columns and a net worth per row', async () => {
     await seed({ covered: [1, 2, 3] });
     renderPanel();
@@ -163,18 +172,13 @@ describe('NetWorthPanel, several Characters', () => {
 });
 
 describe('NetWorthPanel, one Character', () => {
-  it('lists each layer with the right drill link, and a crumb back when drilled', async () => {
+  it('shows a crumb back when drilled, and no per-layer table', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1] });
     const { onBack } = renderPanel({ mode: 'single', characters: [A], drilled: true });
 
-    const table = await screen.findByRole('table', { name: 'Net worth by layer' });
-    const href = (name: string, index = 0) =>
-      within(table).getAllByRole('link', { name })[index]!.getAttribute('href');
-    expect(href('Journal')).toBe('/wallet/journal');
-    expect(href('Assets')).toBe('/assets');
-    expect(href('Open orders', 0)).toBe('/market/orders');
-    expect(href('Open orders', 1)).toBe('/market/orders');
+    await screen.findByRole('heading', { name: 'Worth' });
+    expect(screen.queryByRole('table', { name: 'Net worth by layer' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /All characters/ }));
     expect(onBack).toHaveBeenCalled();
@@ -220,15 +224,7 @@ describe('NetWorthPanel, layers with no value', () => {
     await db.netWorthSnapshots.bulkPut([bare(1), { ...bare(2), escrow: 30 }]);
   }
 
-  it('pins the layer column on the panel surface, not the page background', async () => {
-    await seedBare();
-    renderPanel({ mode: 'single', characters: [A] });
-    const iskCell = (await screen.findAllByText('ISK'))[0].closest('td')!;
-    expect(iskCell).toHaveClass('sticky', 'left-0', 'bg-panel');
-    expect(iskCell).not.toHaveClass('bg-bg');
-  });
-
-  it('leaves out layers that are zero everywhere, from the picker and the table', async () => {
+  it('leaves out layers that are zero everywhere, from the picker', async () => {
     const user = userEvent.setup();
     await seedBare();
     renderPanel({ mode: 'single', characters: [A] });
@@ -239,8 +235,6 @@ describe('NetWorthPanel, layers with no value', () => {
     for (const name of ['PLEX', 'Order escrow', 'Sell orders']) {
       expect(screen.queryByRole('option', { name })).toBeNull();
     }
-    const table = screen.getByRole('table', { name: 'Net worth by layer' });
-    expect(within(table).queryByText('PLEX')).toBeNull();
   });
 
   it('lists a layer when another Character in view holds it', async () => {
