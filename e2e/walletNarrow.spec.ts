@@ -150,3 +150,28 @@ test.describe('Journal phone table', () => {
     await expect(page.getByRole('columnheader', { name: /Balance/ })).toBeVisible();
   });
 });
+
+for (const viewport of [PHONE, DESKTOP]) {
+  test(`Balance tab with no loyalty points shows one line, no panel, at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.route(
+      (url) => url.pathname === `/characters/${CHARACTER_ID}/loyalty/points`,
+      (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    );
+    await signInAndGoto(page, './wallet');
+
+    const line = page.getByText(/^Loyalty Points: none/);
+    await expect(line).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Loyalty Points' })).toHaveCount(0);
+
+    const picker = page.getByRole('button', { name: /LP Store/ });
+    const [a, b] = await Promise.all([line.boundingBox(), picker.boundingBox()]);
+    expect(a && b).toBeTruthy();
+    // Same row's worth of height, no overlap between the text and the picker.
+    expect(a!.x + a!.width).toBeLessThanOrEqual(b!.x + 1);
+    await expectNoPageOverflow(page);
+  });
+}
