@@ -23,8 +23,8 @@ export function useNearestLowsecSystem(
     let cancelled = false;
     void (async () => {
       const [graph, systems, current] = await Promise.all([
-        loadJumpGraph(),
-        loadSolarSystemsById(),
+        loadJumpGraph().catch(() => undefined),
+        loadSolarSystemsById().catch(() => null),
         loadCharacterSolarSystemId(characterId).catch(() => null),
       ]);
       if (cancelled || !systems) return;
