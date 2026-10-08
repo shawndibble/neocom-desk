@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Readable } from 'node:stream';
 import { pack as tarPack } from 'tar-stream';
-import { streamContractsCsvEntries } from './publicContractsArchive.js';
+import { archiveFingerprint, streamContractsCsvEntries } from './publicContractsArchive.js';
 import type { ContractRecord, ContractItemRecord } from './publicContracts.js';
 
 const CONTRACTS_HEADER =
@@ -140,5 +140,24 @@ describe('streamContractsCsvEntries', () => {
     await expect(
       streamContractsCsvEntries(tarStream([['contracts.csv', CONTRACTS_CSV]]), handlers)
     ).rejects.toThrow(/missing/i);
+  });
+});
+
+describe('archiveFingerprint', () => {
+  it('prefers the ETag, so a re-upload with the same bytes is not a change', () => {
+    const headers = new Headers({
+      ETag: '"abc"',
+      'Last-Modified': 'Wed, 07 Oct 2026 10:00:00 GMT',
+    });
+    expect(archiveFingerprint(headers)).toBe('etag:"abc"');
+  });
+
+  it('falls back to Last-Modified when there is no ETag', () => {
+    const headers = new Headers({ 'Last-Modified': 'Wed, 07 Oct 2026 10:00:00 GMT' });
+    expect(archiveFingerprint(headers)).toBe('modified:Wed, 07 Oct 2026 10:00:00 GMT');
+  });
+
+  it('is null when the server names no version, so the caller always syncs', () => {
+    expect(archiveFingerprint(new Headers())).toBeNull();
   });
 });

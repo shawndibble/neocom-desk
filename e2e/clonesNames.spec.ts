@@ -1,7 +1,7 @@
 /**
- * Jump clone names in the Clones table's Location cell (issue #2087): the
- * name shows beside the location, a blank one shows nothing, and a long one
- * wraps inside its cell instead of widening the table past its Panel.
+ * Jump clone names in the Clones list (issues #2087, #3002): the name shows
+ * beside the place, a blank one reads "Unnamed", and a long one wraps inside
+ * its card instead of widening the list past its Panel, down to a phone.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
@@ -24,8 +24,9 @@ function clone(id: number, name?: string) {
 for (const size of [
   { width: 1440, height: 900 },
   { width: 1024, height: 768 },
+  { width: 390, height: 844 },
 ]) {
-  test(`clone names show beside the location and long names stay in the panel at ${size.width}px`, async ({
+  test(`clone names show beside the location and long names stay in the panel without overflow at ${size.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(size);
@@ -41,18 +42,23 @@ for (const size of [
     );
     await signInAndGoto(page, './clones');
 
-    const table = page.getByRole('table');
-    await expect(table.getByRole('cell', { name: `Alpha · ${PLACE}` })).toBeVisible();
-    await expect(table.getByRole('cell', { name: `Beta · ${PLACE}` })).toBeVisible();
-    await expect(table.getByRole('cell', { name: `Unnamed · ${PLACE}` })).toBeVisible();
-    await expect(table).not.toContainText('#');
+    const list = page.getByRole('list', { name: 'Clones' });
+    const row = (name: string) => list.getByRole('listitem').filter({ hasText: name });
+    await expect(row('Alpha')).toContainText(PLACE);
+    await expect(row('Beta')).toContainText(PLACE);
+    await expect(row('Unnamed').first()).toContainText(PLACE);
+    await expect(row('Alpha')).not.toContainText('#');
 
-    const long = table.getByText(LONG_NAME);
+    const long = list.getByText(LONG_NAME);
     await expect(long).toBeVisible();
-    const tableBox = await table.boundingBox();
-    const panelBox = await table.locator('xpath=ancestor::section[1]').boundingBox();
+    const listBox = await list.boundingBox();
+    const panelBox = await list.locator('xpath=ancestor::section[1]').boundingBox();
     const longBox = await long.boundingBox();
-    expect(longBox!.x + longBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1);
-    expect(tableBox!.x + tableBox!.width).toBeLessThanOrEqual(panelBox!.x + panelBox!.width + 1);
+    expect(longBox!.x + longBox!.width).toBeLessThanOrEqual(listBox!.x + listBox!.width + 1);
+    expect(listBox!.x + listBox!.width).toBeLessThanOrEqual(panelBox!.x + panelBox!.width + 1);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 }

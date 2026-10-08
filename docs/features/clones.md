@@ -2,15 +2,16 @@
 
 Route `/clones` (`src/routes/Clones.tsx`). Second tab of the Character overview (`OverviewSubNav`). Sub-view of Overview in nav (`src/app/navDestinations.ts:117`), not a rail item.
 
-| Feature                                             | Where                                       |
-| --------------------------------------------------- | ------------------------------------------- |
-| Shared Character header + sub-nav                   | `CharacterHeader`, `OverviewSubNav`         |
-| Home Clone row (location, last moved)               | `Clones.tsx:317-330`                        |
-| Jump Cooldown chip                                  | `Clones.tsx:331`, `src/engine/cloneJump.ts` |
-| Jump clone table: Location (+ clone name), Implants | `Clones.tsx:195`                            |
-| Implant link (Show Info) + description tooltip      | `ImplantLink`                               |
-| Data age, Refresh, Export (CSV/XLSX/copy)           | `Panel actions`, `clonesCsv.ts`             |
-| Re-login banner when scope missing                  | `GrantBanner`                               |
+| Feature                                                     | Where                                   |
+| ----------------------------------------------------------- | --------------------------------------- |
+| Shared Character header + sub-nav                           | `CharacterHeader`, `OverviewSubNav`     |
+| Top strip: shared Jump Cooldown, You are in, Respawn        | `Clones.tsx`, `src/engine/cloneJump.ts` |
+| Clone list: Wearing now first, then one card per jump clone | `CloneCard`                             |
+| Implant link (Show Info) + description tooltip              | `ImplantLink`                           |
+| Implant count and ISK value (hub sell, region fallback)     | `CloneCard`, `engine/implantValue.ts`   |
+| Jumps away (route-planner link) per place                   | `JumpsAwayText`                         |
+| Data age, Refresh, Export (CSV/XLSX/copy)                   | `Panel actions`, `clonesCsv.ts`         |
+| Re-login banners (clones grant, implants grant)             | `GrantBanner`                           |
 
 ## Purpose / user goal
 
@@ -19,9 +20,11 @@ See where the active Character's home clone and jump clones are, what is fitted 
 ## Controls
 
 - Refresh icon (disabled while loading), data-age badge, table actions menu (Download CSV, Download Excel, Copy for Sheets/Excel).
-- Table (`DataTable`, `mobileSort`, row key `jump_clone_id`): Location column sorts by name then location; Implants column sorts by count. No row click, no search.
-- Implant names: entity link to Show Info; hover/focus tooltip with markup-stripped description when one exists.
-- Location column: "name . location" for a named clone (trimmed; blank name ignored); unresolved location = "Station #id" / "Structure #id".
+- Top strip (three blocks on desktop, stacked on a phone): the Jump Cooldown stated once and labelled as shared by every clone (countdown chip, progress bar, last jump, Infomorph Synchronizing reduction); You are in (current system, security, worn implant count and ISK "at risk if podded"); Respawn (home clone place, security, jumps link, last moved).
+- List: a "Wearing now" card first (when the implants read worked), then one card per jump clone in the Character's own order. Each card: name (dimmed "Unnamed" when blank) and place, security, jumps link, implants as links, implant count and ISK value. No row click, no menu: the links carry every action (DESIGN §6c restraint).
+- Implant names: entity link to Show Info (no new modal); hover/focus tooltip with markup-stripped description when one exists. Touch-sized below `md`.
+- Value: sum of lowest sell at the Market Hub, else lowest in its region; implants with no price are counted ("N unpriced"), never treated as free. Loaded after first paint.
+- Unresolved place = "Station #id" / "Structure #id". Security shows only where the clone's system resolved.
 - CSV columns: Name, Location, Implants (names joined `; `, `Type #id` fallback). Surface `clones`.
 
 ## Persistence / sync
@@ -30,7 +33,7 @@ ESI cache (Dexie) key `clones`; route snapshot `cacheKey: 'clones'`. No settings
 
 ## States
 
-Spinner (first load, until hydrated) -> no active Character: `Navigate('/characters')` -> reauth `GrantBanner` (table hidden, export empty) -> load error (`common.loadFailedTitle`) -> no data ("No jump clones cached / Reconnect...") -> data with zero clones (`CachedEmptyState`, "No jump clones" if fetched) -> table. Offline: warning "Offline" line when `fromCache`. Home row shows whenever clones data loaded, even with zero jump clones.
+Spinner (first load, until hydrated) -> no active Character: `Navigate('/characters')` -> reauth `GrantBanner` (list hidden, export empty) -> load error (`common.loadFailedTitle`) -> no data ("No jump clones cached / Reconnect...") -> data with zero clones (`CachedEmptyState`, "No jump clones" if fetched) -> list. Offline: warning "Offline" line when `fromCache`. The top strip and Wearing now show whenever clones data loaded, even with zero jump clones (the empty state sits below them).
 
 ## Scopes
 
@@ -49,8 +52,10 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 
 ## Tests (what they assert)
 
-- `Clones.test.tsx`: lists clones with resolved locations/implant names and cooldown; implant names link to Show Info; description tooltip on hover while still linking; home station + last-change date; implants stay "Type #id" when the names batch is rate-limited (no fan-out); inaccessible structure shows id fallback with no reauth banner; named clone shown beside trimmed location, blank name ignored; empty state; same header as Overview, data age/Refresh below tabs; Refresh offered when empty; re-login prompt when scope revoked.
+- `Clones.test.tsx`: cooldown stated once, labelled shared, one progress bar; Wearing now card first with implant link target, count, value and "unpriced"; lists clones with resolved locations/implant names; implant names link to Show Info; description tooltip on hover while still linking; home station + last-change date; implants stay "Type #id" when the names batch is rate-limited (no fan-out); inaccessible structure shows id fallback with no reauth banner; named clone shown beside trimmed location, blank name ignored; empty state; same header as Overview, data age/Refresh below tabs; Refresh offered when empty; re-login prompt when scope revoked.
 - `clones.test.ts`: fetch+cache, offline cache fallback, `needsReauth` on 403 with empty cache; `loadImplantDescriptions` strips markup and omits failures/empties.
+- `engine/implantValue.test.ts`: implant value sums priced ones and counts unpriced; cooldown progress clamps 0..1.
+- `e2e/clonesNames.spec.ts`: names beside place, long name wraps, no horizontal overflow at 1440/1024/390.
 - `clonesCsv.test.ts`: column order name/location/implants; name split from location (blank if unnamed); unresolved location labelled by type+id; implants by name with id fallback.
 - `engine/cloneJump.test.ts`: 24h base, -1h per level, floor 0; never jumped = ready; ready once `readyAt` passed; on cooldown while future; unparseable date = no history.
 
@@ -67,13 +72,12 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 
 ## Observed gaps
 
-- The page now also loads (#3001) the Character's current system, the worn clone's implants (`getCharacterImplants`, missing grant = a `GrantBanner` above the table, never replacing it) and the active skill queue (cached, nothing rendered from it yet). Only the jumps-away figures render so far: a Jumps away column and a figure on the home line, each a `PlaceJumpsLink` to the route planner on the saved route preference (no page picker). The worn clone's implants are still shown only on Skills › Trained; unnamed clones read dimmed "Unnamed".
-- No Show Info/map link for clone locations; no search/filter.
+- "You are in" shows the current solar system, not the station or structure: the cached location read keeps only the system id.
+- No search/filter, no sort control (nearest-first is a later ticket); Clone State (Alpha/Omega) not shown.
 - `clones.emptyHint` says "Reconnect" even when nothing is wrong beyond an empty cache.
-- Cooldown is only 24h minus Infomorph level; Clone State not shown.
 - SP header chips depend on `/skills`, so can read unknown while the clones grant exists.
+- Worn implants need `esi-clones.read_implants.v1`; without it the Wearing now card and "at risk" figure are absent and a banner offers login.
 
 ## Improvement ideas
 
-- Show current clone implants and totals; Alpha/Omega.
-- Link locations to Show Info/map; cooldown countdown in strip or alert link.
+- Verdict and nearest-first sort; show the station for "You are in".

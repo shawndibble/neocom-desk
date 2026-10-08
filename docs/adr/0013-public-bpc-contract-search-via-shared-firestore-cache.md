@@ -34,7 +34,7 @@ public-contracts endpoint only ever lists outstanding contracts, so every row
 is already one.
 
 This project already runs on Firebase Blaze (two existing `onSchedule`
-functions: `dispatchProjections` every 5 minutes, `purgeNotificationFeed`
+functions: `dispatchProjections` (every 5 minutes when this was written, 15 since), `purgeNotificationFeed`
 daily), so a third scheduled job costs at most one more Cloud Scheduler job
 (3 are free per billing account) plus whatever Firestore writes it makes.
 That second part is where this needs deliberate design: `docs/ARCHITECTURE.md`
