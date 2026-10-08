@@ -44,7 +44,7 @@ import {
   loadOtherCharactersAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
-import { ConsolidationPanel } from '@/features/assets/ConsolidationPanel';
+import { MovePlanModal } from '@/features/assets/MovePlanModal';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   fromStoredCharacterFilterValue,
@@ -693,7 +693,7 @@ export function Assets() {
     [defaultCharacterFilter]
   );
   const [view, setView] = useUrlParams(viewParams);
-  const [showConsolidate, setShowConsolidate] = useState(false);
+  const [movePlanOpen, setMovePlanOpen] = useState(false);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
@@ -1690,18 +1690,15 @@ export function Assets() {
                   >
                     {t('assets.allItemsToggle')}
                   </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={showConsolidate}
-                    onCheckedChange={setShowConsolidate}
-                  >
-                    {t('assets.consolidate.toggle')}
-                  </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
                     {t('assets.select.toggle')}
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
                     {t('assets.myShips.title')}
                     <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setMovePlanOpen(true)}>
+                    {t('assets.movePlan.menuItem')}
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={loading} onSelect={refresh}>
                     {t('assets.refresh')}
@@ -1716,7 +1713,23 @@ export function Assets() {
             </>
           }
         />
-        {showConsolidate && <ConsolidationPanel />}
+        <MovePlanModal
+          open={movePlanOpen}
+          onClose={() => setMovePlanOpen(false)}
+          characterIds={shipCharacterIds}
+          activeCharacterId={activeCharacterId}
+          filterControl={
+            crossCharacterCandidates.length > 1 ? (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={crossCharacterFilter}
+                onChange={(chars: CharacterFilterValue) => setView({ chars })}
+                characterCount={crossCharacterCandidates.length}
+                variant="field"
+              />
+            ) : undefined
+          }
+        />
 
         <MyShipsPanel
           open={myShipsOpen}

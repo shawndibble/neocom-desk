@@ -66,7 +66,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 `PageHeader` title "Assets":
 
 - Meta: `DataAgeBadge` (assets fetch), the Character filter control (`CharacterFilterControl`, size md; hidden for one-Character accounts), small spinner "Searching other characters…" while cross-character data loads.
-- Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Consolidate, Select, My ships (hint "nearest first"), **Refresh** (with the data's age) and Export table ▸.
+- Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Select, My ships (hint "nearest first"), **Plan a move…** (opens `MovePlanModal`: tick items per Character and pickup, pick any system or one of your stations, get totals, a suggested hauler and a Route Safety link per pickup), **Refresh** (with the data's age) and Export table ▸.
 - Below: `SearchInput` "Search items…" — only shown when assets are loaded and no re-login needed. Debounced 250 ms for matching; input stays instant.
 - Select-mode bar (when on) between search and list.
 - List panel fills the viewport height (`h-[calc(100dvh-…)]`); only the list scrolls (virtualized with TanStack Virtual, overscan 10, measured heights because rows wrap on phones).
