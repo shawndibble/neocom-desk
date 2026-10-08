@@ -43,7 +43,10 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   return (
-    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+    // Chips never wrap their own text, so a group must be at least as wide as
+    // its widest chip: auto-fit drops to 2+1 (or 1) columns instead of letting a
+    // value run into the next group or push the card past its column.
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(17rem,100%),1fr))] gap-2">
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip

@@ -338,6 +338,49 @@ test.describe('Market Appraisal — stacked result card', () => {
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
 
+  test('keeps the result header groups apart and inside the page at 1280px (#2949)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await appraise(page, SIX_COLUMN_PASTE);
+
+    const groups = await page
+      .locator(
+        'section[aria-label="You get"], section[aria-label="It\'s worth"], section[aria-label="Cargo"]'
+      )
+      .evaluateAll((sections) =>
+        sections.map((section) => {
+          const rect = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+          };
+          return {
+            box: rect(section),
+            chips: [...section.querySelectorAll('span.whitespace-nowrap')].map(rect),
+          };
+        })
+      );
+    expect(groups.length).toBeGreaterThanOrEqual(2);
+
+    for (const [i, a] of groups.entries()) {
+      // A chip is never wider than the group that holds it.
+      for (const chip of a.chips) {
+        expect(chip.right).toBeLessThanOrEqual(a.box.right + 1);
+        expect(chip.left).toBeGreaterThanOrEqual(a.box.left - 1);
+      }
+      // No two groups overlap.
+      for (const b of groups.slice(i + 1)) {
+        const apart =
+          a.box.right <= b.box.left + 1 ||
+          b.box.right <= a.box.left + 1 ||
+          a.box.bottom <= b.box.top + 1 ||
+          b.box.bottom <= a.box.top + 1;
+        expect(apart).toBe(true);
+      }
+    }
+    await expectNoPageOverflow(page);
+  });
+
   test('offers a phone sort bar that reorders the stacked cards at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await appraise(page, SIX_COLUMN_PASTE);
