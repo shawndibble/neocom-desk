@@ -57,7 +57,7 @@ test.describe('Active Jobs panel header', () => {
   });
 
   async function titleClip(page: import('@playwright/test').Page) {
-    const heading = page.getByRole('heading', { name: 'Active jobs', exact: true });
+    const heading = page.getByRole('heading', { name: 'Jobs', exact: true });
     await expect(heading).toBeVisible();
     return heading.evaluate((el) => ({
       scrollWidth: el.scrollWidth,
@@ -81,7 +81,7 @@ test.describe('Active Jobs panel header', () => {
     expect(box!.width).toBeGreaterThanOrEqual(36);
     await expect(
       page
-        .locator('section', { has: page.getByRole('heading', { name: 'Active jobs' }) })
+        .locator('section', { has: page.getByRole('heading', { name: 'Jobs' }) })
         .locator('header [tabindex="0"]')
     ).toBeVisible();
 
@@ -94,7 +94,7 @@ test.describe('Active Jobs panel header', () => {
   test('summary sits under the title on a phone and beside it from md up', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/jobs');
-    const heading = page.getByRole('heading', { name: 'Active jobs', exact: true });
+    const heading = page.getByRole('heading', { name: 'Jobs', exact: true });
     const summary = page.getByText(/1 running · 1 done/);
     await expect(summary).toBeVisible();
     const phoneTitle = (await heading.boundingBox())!;

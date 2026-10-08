@@ -658,7 +658,7 @@ describe('Industry: owned-blueprint reauth', () => {
     expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
     expect(await screen.findByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
-    expect(screen.getByText('Active jobs')).toBeInTheDocument();
+    expect(screen.getByText('Jobs')).toBeInTheDocument();
   });
 });
 
