@@ -899,6 +899,12 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
         .getAllByRole('button', { name: /one$/ })
         .map((b) => b.textContent);
     expect(names()).toEqual(['Evening one', 'Morning one']);
+    fireEvent.click(
+      within(table)
+        .getByRole('columnheader', { name: /Issued/ })
+        .querySelector('button')!
+    );
+    expect(names()).toEqual(['Morning one', 'Evening one']);
   });
 
   it('exposes a title in full through a tooltip on its opener', async () => {
