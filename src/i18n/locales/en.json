@@ -3716,9 +3716,9 @@
     "netWorth": {
       "title": "Worth",
       "total": "Net worth",
-      "seriesButton": "Series: {{shown}} of {{total}}",
-      "seriesSearch": "Filter series",
-      "seriesNoResults": "No matching series",
+      "seriesButton": "Layers: {{shown}} of {{total}}",
+      "seriesSearch": "Filter layers",
+      "seriesNoResults": "No matching layers",
       "layersTable": "Net worth by layer",
       "layerColumn": "Layer",
       "valueColumn": "Value",

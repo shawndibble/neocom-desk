@@ -164,6 +164,7 @@ function LayerTable({
         id: 'layer',
         header: t('wallet.netWorth.layerColumn'),
         stickyStart: true,
+        stickyStartOnPanel: true,
         render: (row) => (
           <span className="inline-flex items-center gap-2">
             <span aria-hidden="true" className={cx('size-2.5 rounded-xs', LAYER_SWATCH[row.id])} />
@@ -350,6 +351,7 @@ export function NetWorthPanel({
         id: 'character',
         header: t('wallet.balanceCharacterColumn'),
         stickyStart: true,
+        stickyStartOnPanel: true,
         render: (row) => (
           <span className={row.covered ? undefined : 'text-text-dim'}>
             {row.characterName}

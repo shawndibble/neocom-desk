@@ -67,7 +67,7 @@ Character filter (`CharacterFilterControl`) rides in the Worth panel's meta. Abs
 
 One panel, the `NetWorthPanel` in `single` mode with the page's `stats` and `notices`; there is no separate Balance panel.
 
-- Title bar: "Worth", the Character filter (when the account has several), and a **Series** `MultiSelect` (button "Series: N of 5", options ISK / Assets / PLEX / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
+- Title bar: "Worth", the Character filter (when the account has several), and a **Layers** `MultiSelect` (button "Layers: N of 5", options ISK / Assets / PLEX / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
 - Stat row: **Net worth** (small-caps label, large figure toned by sign, whole ISK, no decimals; "—" when the Character lacks the wallet, assets or orders permission) and **EverMarks** to its right (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with an `InfoTooltip`. EverMarks shows "unknown" when loyalty is missing or needs re-auth.
 - No character portrait or "<name> only" readout: the page header already names the Character.
 - The exact wallet balance is no longer a figure of its own (user decision). It can still be read in the layer table under the chart (ISK row, whole ISK, the live balance); cents are not shown anywhere on this tab.

@@ -580,7 +580,7 @@ describe('Wallet', () => {
     render(<App />);
     const header = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
-    expect(within(header!).getByRole('button', { name: /^Series:/ })).toBeInTheDocument();
+    expect(within(header!).getByRole('button', { name: /^Layers:/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Balance' })).toBeNull();
     expect(screen.queryByText(/ only$/)).toBeNull();
   });

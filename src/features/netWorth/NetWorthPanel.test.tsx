@@ -39,7 +39,7 @@ function netWorthFigure() {
 }
 
 async function openSeries(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /^Series:/ }));
+  await user.click(screen.getByRole('button', { name: /^Layers:/ }));
 }
 
 async function seed(opts: { covered: number[]; ids?: number[] }) {
@@ -126,7 +126,7 @@ describe('NetWorthPanel, several Characters', () => {
     }
     // ISK was the last one standing, so the click on it changed nothing.
     expect(screen.getByRole('option', { name: 'ISK' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('button', { name: 'Series: 1 of 5' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers: 1 of 5' })).toBeInTheDocument();
   });
 
   it('a Character checkbox hides its line and total, and the last one cannot be unchecked', async () => {
@@ -188,7 +188,7 @@ describe('NetWorthPanel, one Character', () => {
     expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
     await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,334$/));
     expect(screen.getByText('EverMarks')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Series: 5 of 5' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers: 5 of 5' })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText(/ only$/)).toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
@@ -222,12 +222,20 @@ describe('NetWorthPanel, layers with no value', () => {
     await db.netWorthSnapshots.bulkPut([bare(1), { ...bare(2), escrow: 30 }]);
   }
 
+  it('pins the layer column on the panel surface, not the page background', async () => {
+    await seedBare();
+    renderPanel({ mode: 'single', characters: [A] });
+    const iskCell = (await screen.findAllByText('ISK'))[0].closest('td')!;
+    expect(iskCell).toHaveClass('sticky', 'left-0', 'bg-panel');
+    expect(iskCell).not.toHaveClass('bg-bg');
+  });
+
   it('leaves out layers that are zero everywhere, from the picker and the table', async () => {
     const user = userEvent.setup();
     await seedBare();
     renderPanel({ mode: 'single', characters: [A] });
-    expect(await screen.findByRole('button', { name: 'Series: 2 of 2' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^Series:/ }));
+    expect(await screen.findByRole('button', { name: 'Layers: 2 of 2' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Layers:/ }));
     expect(await screen.findByRole('option', { name: 'ISK' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Assets' })).toBeInTheDocument();
     for (const name of ['PLEX', 'Order escrow', 'Sell orders']) {
@@ -240,7 +248,7 @@ describe('NetWorthPanel, layers with no value', () => {
   it('lists a layer when another Character in view holds it', async () => {
     await seedBare();
     renderPanel({ characters: [A, B] });
-    await userEvent.click(await screen.findByRole('button', { name: 'Series: 3 of 3' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Layers: 3 of 3' }));
     expect(await screen.findByRole('option', { name: 'Order escrow' })).toBeInTheDocument();
   });
 
@@ -258,7 +266,7 @@ describe('NetWorthPanel, layers with no value', () => {
         />
       </MemoryRouter>
     );
-    expect(await screen.findByRole('button', { name: 'Series: 2 of 2' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Layers: 2 of 2' })).toBeInTheDocument();
     expect(useNetWorthHiddenLayers.getState().value).toEqual(['escrow']);
     unmount();
   });
