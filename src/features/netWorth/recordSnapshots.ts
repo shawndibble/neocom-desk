@@ -2,7 +2,8 @@
  * Writes the daily Net Worth Snapshot (issue #2865) — the impure shell around
  * `engine/netWorth/snapshot.ts`. It reads the same cached wallet, assets and
  * orders fetches the pages use, so it adds no ESI calls of its own beyond a
- * cache refresh, and writes at most one row per Character per UTC day.
+ * cache refresh, and writes at most one row per Character per UTC day (a same-day row that
+ * predates a layer is rewritten once, in place).
  */
 import { captureException } from '@sentry/react';
 import { db } from '@/db';
@@ -10,6 +11,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import {
   buildSnapshotRow,
+  lacksLayer,
   snapshotId,
   utcDay,
   type SnapshotInputs,
@@ -86,23 +88,23 @@ export const liveSources: SnapshotSources = {
   },
 };
 
-export type SnapshotOutcome = 'written' | 'already-recorded' | 'skipped';
+export type SnapshotOutcome = 'written' | 'upgraded' | 'already-recorded' | 'skipped';
 
 async function recordOne(
   characterId: number,
   sources: SnapshotSources,
   now: number
 ): Promise<SnapshotOutcome> {
-  if (await db.netWorthSnapshots.get(snapshotId(characterId, utcDay(now)))) {
-    return 'already-recorded';
-  }
+  const held = await db.netWorthSnapshots.get(snapshotId(characterId, utcDay(now)));
+  // A row from before a layer existed is re-read once; a complete one is final for the day.
+  if (held && !lacksLayer(held)) return 'already-recorded';
   const fetched = await sources.fetch(characterId);
   if (!fetched) return 'skipped';
   const row = buildSnapshotRow({ ...fetched, characterId, now });
   if (!row) return 'skipped';
   await db.netWorthSnapshots.put(row);
   scheduleSync(characterId);
-  return 'written';
+  return held ? 'upgraded' : 'written';
 }
 
 /** Record today's snapshot for one Character unless it already has one. Never throws: history is a bonus on top of the pages. */
