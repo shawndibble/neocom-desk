@@ -39,7 +39,7 @@ import {
 } from '@/features/character/walletJournalFilter';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { clampIskZero, formatIsk } from '@/lib/isk';
+import { clampIskZero, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   useVisibleWalletJournalColumns,
@@ -169,28 +169,24 @@ export function JournalTable({
         sortValue: (row) => row.refType,
       },
       {
-        id: 'income',
-        header: t('wallet.journalBreakdownIncome'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (row) => formatIsk(row.income, 2),
-        sortValue: (row) => row.income,
-      },
-      {
-        id: 'expense',
-        header: t('wallet.journalBreakdownExpense'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (row) => formatIsk(row.expense, 2),
-        sortValue: (row) => row.expense,
-      },
-      {
         id: 'net',
         header: t('wallet.journalBreakdownNet'),
         align: 'right',
         className: 'tabular-nums',
-        cellClassName: (row) => (clampIskZero(row.net, 2) === 0 ? '' : iskToneClass(row.net)),
-        render: (row) => signedIsk(row.net, 2),
+        cellClassName: (row) => (clampIskZero(row.net, 0) === 0 ? '' : iskToneClass(row.net)),
+        render: (row) => (
+          <>
+            {formatIskCompactSigned(row.net)}
+            {row.income > 0 && row.expense > 0 && (
+              <span className="block text-xs font-normal text-text-dim">
+                {t('wallet.journalBreakdownBothSides', {
+                  in: formatIskCompact(row.income),
+                  out: formatIskCompact(row.expense),
+                })}
+              </span>
+            )}
+          </>
+        ),
         sortValue: (row) => row.net,
       },
     ],
@@ -200,16 +196,16 @@ export function JournalTable({
     <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
       <span>
         {t('wallet.journalBreakdownIn')}{' '}
-        <span className="text-isk-pos">{formatIsk(breakdown.totalIn, 2)}</span>
+        <span className="text-isk-pos">{formatIskCompact(breakdown.totalIn)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownOut')}{' '}
-        <span className="text-isk-neg">{formatIsk(breakdown.totalOut, 2)}</span>
+        <span className="text-isk-neg">{formatIskCompact(breakdown.totalOut)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownNet')}{' '}
-        <span className={clampIskZero(breakdown.net, 2) === 0 ? '' : iskToneClass(breakdown.net)}>
-          {signedIsk(breakdown.net, 2)}
+        <span className={clampIskZero(breakdown.net, 0) === 0 ? '' : iskToneClass(breakdown.net)}>
+          {formatIskCompactSigned(breakdown.net)}
         </span>
       </span>
     </span>
