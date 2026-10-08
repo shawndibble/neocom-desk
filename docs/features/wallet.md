@@ -10,7 +10,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 | Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                  |
 | `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                         |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                 |
-| Balance-history chart                    | `WalletBalanceChart.tsx`              | lazy Recharts line from journal `balance` field                                |
+| Net worth chart                          | `features/netWorth/NetWorthPanel.tsx` | lazy Recharts stack (one Character) or lines (several), layer legend, drill    |
 | Loyalty Points table                     | `Wallet.tsx:707-756`                  | per-corp LP, row → LP Store, export, LP Store picker                           |
 | LP Store picker                          | `features/loyalty/LpStorePicker.tsx`  | select-box over every NPC corp with an LP Store                                |
 | Journal filters                          | `WalletJournalTable.tsx`              | ref type, date range, free text; filtered count + net total                    |
@@ -81,13 +81,18 @@ Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent w
 - States: spinner while loading; `EmptyState` "No wallet data cached" when no rows.
 - Fetched lazily: nothing beyond the active Character loads until the filter asks for more (`Wallet.tsx:256-265`).
 
-### Balance-history chart (`features/character/WalletBalanceChart.tsx`)
+### Net worth chart (`features/netWorth/`, issue #2935)
 
-- Lazy-loaded (Recharts kept out of initial bundle). Line of each journal entry's own `balance` over time, oldest first (`engine/wallet/balanceHistory.ts`: sorts by date, drops entries missing `balance`).
-- Stroke colour by overall trend: up positive, down negative, flat accent (`walletBalanceTrend`: first vs last point).
-- X axis: max 5 ticks, `timeAxisTicks`; shows time-of-day ticks when span is short. Y axis compact ISK. Tooltip: date label + balance.
-- A11y: `role="img"` with label "Balance history" plus a sr-only `DataTable` (Date, Balance) as sibling.
-- Time zone from user setting (`useTimeZone`).
+Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` (`series.ts`, `chartRows.ts`), tested there.
+
+- **Layers** (checkboxes above the chart double as the legend; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), PLEX (hangar PLEX x global price), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). "Hangar PLEX only" footnote: no ESI endpoint for the PLEX Vault.
+- **One Character:** layers stacked, plus a layer table (Layer, Value, Share, Opens). Opens links: ISK to `/wallet/journal`, Assets to `/assets`, PLEX to `/assets?q=PLEX`, Order escrow and Sell orders to `/market/orders`, each carrying `state.from = 'wallet'` so the landing page shows a "‹ Wallet" crumb (`FromWalletCrumb`).
+- **Several Characters** (the existing `?char=` filter): one line per Character; "Balance by character" gains a leading Show checkbox column (the last Character cannot be unchecked), one column per layer and a net worth column. A row or a chart line drills into that Character's own layered view as route state `?drill=<id>` (pushed, so Back undoes it); a "‹ All characters" crumb returns. Not `?character=`: that is the alert deep link `AlertCharacterSwitch` strips.
+- **Permissions:** a Character without the wallet, assets and orders scopes is left out of totals; the scope readout reads "All characters · N of M" with a tooltip naming who is missing.
+- **History:** ISK is backfilled from the cached wallet journal (last balance per UTC day; ESI keeps about 30 days). The other layers start on the first snapshot day: before it the chart shows a dashed "Wallet only before <date>" divider. Days with no snapshot after that are hatched, the wallet continues and nothing is interpolated.
+- **Device-local toggles:** hidden layers and hidden Characters persist per device (`netWorthHiddenLayers`, `netWorthHiddenCharacters`, stored as what is hidden so a new Character shows by default).
+- **Export:** surface `wallet-balances`; columns Character, one per layer, Net worth of the shown layers; blank (not 0) for an excluded Character.
+- Sync status is the shell-wide `SyncStatusDot` / `SyncErrorNote`; the panel adds no control.
 
 ### Loyalty Points panel
 
@@ -170,7 +175,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 - No income/expense breakdown by ref type for a date range; only the filtered net total (`WalletJournalTable.tsx:151`) (#2858).
 - Journal tab and the balance chart are always the active Character's; the `?char=` filter only affects the Balance panel.
-- All-characters Balance has no history chart and no per-row actions; Character rows do not link anywhere.
+- All-characters Balance rows drill into that Character (`?drill=`); there are no per-row action menus.
 - Journal tab never shows a re-login banner: `loadWalletJournal` exposes no `needsReauth`; a revoked wallet scope shows the generic cached-empty state (Balance tab does show the grant banner).
 - Item names on journal lines come from at most 5 pages of transactions (`MAX_TRANSACTION_PAGES`); older journal lines stay unlinked (documented in `journalTransactionLink.ts`).
 - `CharacterFilterControl` offers only This/All (partial subsets removed); `Wallet.tsx` still handles an arbitrary id Set.
@@ -267,4 +272,4 @@ Interview Qs (LP, wallet side): **Why does Wallet show LP at all if the store mo
 
 ## Net Worth Snapshots (data layer, #2865)
 
-- One row per Character per UTC day in Dexie `netWorthSnapshots` (id `${characterId}:${day}`): `wallet`, `assetValue` (hub sell minimum, average price fallback, PLEX removed), `plexValue` (hangar PLEX x global PLEX price), `escrow` (buy orders), `hubId`, `updatedAt`. Pure builder/merge/gap helpers: `src/engine/netWorth/snapshot.ts`; writer: `features/netWorth/recordSnapshots.ts`; trigger: `NetWorthSnapshotRecorder` in `Layout` (Tab Leader only). A Character missing the wallet, assets or orders scope gets no row. Synced as an Editable Data collection (`netWorthSnapshots`, last write wins per id) and deleted with the Character. No UI yet: the chart is #2935, the drill-down pages #2936. Decision `20261007-184320`.
+- One row per Character per UTC day in Dexie `netWorthSnapshots` (id `${characterId}:${day}`): `wallet`, `assetValue` (hub sell minimum, average price fallback, PLEX removed), `plexValue` (hangar PLEX x global PLEX price), `escrow` (buy orders), `sellStock` (optional, remaining sell-order stock, #2935), `hubId`, `updatedAt`. Pure builder/merge/gap helpers: `src/engine/netWorth/snapshot.ts`; writer: `features/netWorth/recordSnapshots.ts`; trigger: `NetWorthSnapshotRecorder` in `Layout` (Tab Leader only). A Character missing the wallet, assets or orders scope gets no row. Synced as an Editable Data collection (`netWorthSnapshots`, last write wins per id) and deleted with the Character. The chart is the Balance tab's net worth chart (above); the drill-down landing pages are #2936. Decision `20261007-184320`.
