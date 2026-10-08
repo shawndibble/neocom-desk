@@ -20,7 +20,6 @@ import { loadCharacterAssets } from '@/features/character/assets';
 import { loadOrders } from '@/features/character/orders';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';
-import { loadPlexPrice } from '@/features/market/plexPrice';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getAveragePriceByType, getHubPrices } from '@/market/prices';
 import { scheduleSync } from '@/sync';
@@ -64,10 +63,9 @@ export const liveSources: SnapshotSources = {
     const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
       (id) => id !== PLEX_TYPE_ID
     );
-    const [hubPrices, averages, plexPrice] = await Promise.all([
+    const [hubPrices, averages] = await Promise.all([
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
       getAveragePriceByType(),
-      loadPlexPrice().catch(() => null),
     ]);
     // Hub sell price where the hub trades the item, the average otherwise.
     const priceByTypeId = new Map<number, number>();
@@ -83,7 +81,6 @@ export const liveSources: SnapshotSources = {
       assets: assetList,
       orders: orders.cached?.data ?? null,
       priceByTypeId,
-      plexPrice,
     };
   },
 };

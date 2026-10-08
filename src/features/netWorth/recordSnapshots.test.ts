@@ -20,7 +20,6 @@ function sourcesWith(wallet: number | null = 100) {
     assets: [{ item_id: 1, type_id: 34, quantity: 2 }],
     orders: [{ is_buy_order: true, escrow: 7 }],
     priceByTypeId: new Map([[34, 5]]),
-    plexPrice: null,
   }));
   return { sources: { fetch } satisfies SnapshotSources, fetch };
 }
@@ -42,7 +41,6 @@ describe('recordNetWorthSnapshot', () => {
         day: '2026-10-07',
         wallet: 100,
         assetValue: 10,
-        plexValue: 0,
         escrow: 7,
         sellStock: 0,
         hubId: 'jita',
@@ -58,7 +56,6 @@ describe('recordNetWorthSnapshot', () => {
       day: '2026-10-07',
       wallet: 90,
       assetValue: 10,
-      plexValue: 0,
       escrow: 7,
       hubId: 'jita',
       updatedAt: DAY1,
@@ -74,7 +71,6 @@ describe('recordNetWorthSnapshot', () => {
         { is_buy_order: false, is_corporation: true, price: 100, volume_remain: 100 },
       ],
       priceByTypeId: new Map([[34, 5]]),
-      plexPrice: null,
     }));
     const sources = { fetch } satisfies SnapshotSources;
     expect(await recordNetWorthSnapshot(1, sources, DAY1_LATER)).toBe('upgraded');
@@ -92,7 +88,6 @@ describe('recordNetWorthSnapshot', () => {
       day: '2026-10-07',
       wallet: 90,
       assetValue: 10,
-      plexValue: 0,
       escrow: 7,
       hubId: 'jita',
       updatedAt: DAY1,

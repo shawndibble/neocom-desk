@@ -3210,7 +3210,7 @@
       },
       "clones": {
         "name": "Clones",
-        "desc": "Your jump clones with where they are, how far, and what each wears, the one jump cooldown they all share, and what you are wearing now.",
+        "desc": "Your jump clones with where they are, how far, and what each wears, the one jump cooldown they all share, what you are wearing now, and which clone finishes your training queue soonest.",
         "tag": "Read-only"
       },
       "industry": {
@@ -3734,19 +3734,17 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Hangar PLEX only. Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
         "assets": "Assets",
-        "plex": "PLEX",
         "escrow": "Order escrow",
         "sellOrders": "Sell orders"
       },
       "opens": {
         "isk": "Journal",
         "assets": "Assets",
-        "plex": "PLEX in assets",
         "escrow": "Open orders",
         "sellOrders": "Open orders"
       }
@@ -4800,6 +4798,49 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "clones": {
+    "verdict": {
+      "title": "Training verdict",
+      "jumpTitle": "Worth a jump",
+      "stayTitle": "Stay put",
+      "jumpHeadline": "{{clone}} finishes your queue {{duration}} sooner",
+      "jumpReason": "Your queue trains on {{attributes}}, and that clone carries more of it.",
+      "jumpCooldown": "You can jump from {{date}}. Every clone is locked for the cooldown after, so this counts staying put until then.",
+      "route_one": "Route to {{place}} · {{count}} jump",
+      "route_other": "Route to {{place}} · {{count}} jumps",
+      "stayHeadline": "You are already in your fastest clone for this queue",
+      "stayClosest": "The closest alternative, {{clone}}, would take {{duration}} longer.",
+      "stayAlone": "You have no other clone to compare.",
+      "barStay": "Stay in this clone",
+      "barBest": "Best alternative",
+      "legend": "Queue: {{skills}}",
+      "segment": "{{skill}}: {{duration}}",
+      "barLabel": "{{label}}: {{duration}}",
+      "unknownSkill": "Skill #{{id}}",
+      "rowQueue": "Queue {{duration}}",
+      "rowSooner": "{{duration}} sooner",
+      "rowLonger": "{{duration}} longer",
+      "badge": "Best for training",
+      "noteEmpty": "Your training queue is empty, so there is no verdict.",
+      "notePaused": "Your training queue is paused, so there is no finish time to compare.",
+      "noteImplants": "No verdict: the worn implants could not be read. Log in again to allow it.",
+      "noteQueue": "No verdict: the training queue could not be read.",
+      "noteAttributes": "No verdict: the character's attributes could not be read.",
+      "noteRouting": "Working out the route to the best clone…",
+      "noteRoute": "No verdict: there is no known route to the best clone.",
+      "attribute": {
+        "intelligence": "Intelligence",
+        "memory": "Memory",
+        "perception": "Perception",
+        "willpower": "Willpower",
+        "charisma": "Charisma"
+      }
+    },
+    "sort": {
+      "label": "Sort clones",
+      "training": "Best for training",
+      "nearest": "Nearest",
+      "value": "Value"
+    },
     "csvName": "Name",
     "title": "Clones",
     "refresh": "Refresh",

@@ -9,7 +9,6 @@ const row = (day: string, characterId = 1, wallet = 100): NetWorthSnapshotRow =>
   day,
   wallet,
   assetValue: 50,
-  plexValue: 20,
   escrow: 10,
   sellStock: 5,
   hubId: 'jita',
@@ -23,9 +22,9 @@ describe('stackRows', () => {
   });
 
   it('stacks only the shown layers on snapshot days', () => {
-    const rows = stackRows(series, ['isk', 'plex']);
-    expect(rows[1]).toMatchObject({ day: '2026-10-02', total: 120 });
-    expect(rows[1]!.values).toEqual({ isk: 100, assets: 0, plex: 20, escrow: 0, sellOrders: 0 });
+    const rows = stackRows(series, ['isk', 'escrow']);
+    expect(rows[1]).toMatchObject({ day: '2026-10-02', total: 110 });
+    expect(rows[1]!.values).toEqual({ isk: 100, assets: 0, escrow: 10, sellOrders: 0 });
   });
 
   it('keeps only the wallet on wallet-only and gap days', () => {
