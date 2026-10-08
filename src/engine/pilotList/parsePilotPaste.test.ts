@@ -35,7 +35,11 @@ describe('classifyPilotPaste', () => {
 
   it('reads tab-separated lines starting with a type id as a D-Scan', () => {
     const text = '626\tMy Vexor\tVexor\t1,234 km\n11379\t\tHyperion\t-\n626\tOther\tVexor\t2 AU';
-    expect(classifyPilotPaste(text)).toEqual({ kind: 'dscan', typeIds: [626, 11379, 626] });
+    expect(classifyPilotPaste(text)).toEqual({
+      kind: 'dscan',
+      typeIds: [626, 11379, 626],
+      text,
+    });
   });
 
   it('needs two D-Scan lines too', () => {
