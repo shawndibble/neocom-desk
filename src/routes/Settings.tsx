@@ -1104,8 +1104,10 @@ export function Settings() {
             <>
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
-                <UpdatePanel />
-                <InstallAppPanel />
+                <div className="space-y-4">
+                  <UpdatePanel />
+                  <InstallAppPanel />
+                </div>
                 <ExportPanel />
                 <ImportPanel />
               </div>
