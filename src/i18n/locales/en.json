@@ -3325,6 +3325,8 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
+      "allShort": "All · {{count}}",
+      "allShortNoCount": "All",
       "unreadFor": "{{name}} · {{count}} unread"
     }
   },
@@ -3676,6 +3678,7 @@
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",
+      "exportVerb": "Export",
       "exportTable": "Export table",
       "csv": "Download CSV",
       "xlsx": "Download Excel (.xlsx)",
@@ -3723,7 +3726,8 @@
     "netWorth": {
       "title": "Worth",
       "total": "Net worth",
-      "seriesButton": "Layers: {{shown}} of {{total}}",
+      "layersButton": "Layers: {{shown}} of {{total}}",
+      "layersNoun": "Layers",
       "seriesSearch": "Filter layers",
       "seriesNoResults": "No matching layers",
       "showColumn": "Show",
@@ -4758,6 +4762,7 @@
     },
     "filter": {
       "title": "Event types",
+      "visibleLabel": "Filter",
       "open": "Filter event types",
       "openWithCount": "Filter event types ({{count}} hidden)",
       "notGranted": "Not granted",

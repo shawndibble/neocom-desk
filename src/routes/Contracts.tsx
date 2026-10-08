@@ -228,6 +228,7 @@ function ContractsFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeContractsFilterCount(filter)}
+      triggerLabel
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -604,7 +605,12 @@ export function Contracts() {
         actions={
           tab === 'history' ? (
             <>
-              <TableActionsMenu name={t('contracts.title')} tableExport={historyExport} size="md" />
+              <TableActionsMenu
+                name={t('contracts.title')}
+                tableExport={historyExport}
+                size="md"
+                showLabel
+              />
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}
@@ -676,6 +682,7 @@ export function Contracts() {
                 available={CONTRACTS_HISTORY_COLUMN_IDS}
                 visible={historyColumnVisibility.visible}
                 columnsById={optionalHistoryColumns}
+                showLabel
                 onToggle={historyColumnVisibility.toggle}
                 buttonLabel={t('common.columnsButton')}
                 menuTitle={t('common.columnsMenuTitle')}
