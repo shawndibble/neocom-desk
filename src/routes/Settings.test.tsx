@@ -698,6 +698,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     stubNotification('granted');
     usePushFailure.setState({ value: { reason: 'network', at: 1 }, hydrated: true });
+    vi.mocked(enableWebPush).mockClear();
     vi.mocked(enableWebPush).mockImplementationOnce(async () => {
       await clearPushFailure();
       return { support: 'supported', permission: 'granted' };
