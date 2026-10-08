@@ -1,0 +1,53 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import '@/i18n';
+import { db } from '@/db';
+import { StructureFeeLine } from './StructureFeeLine';
+import { SYNCED_STRUCTURE_FEES_KEY, useStructureFees } from './structureFees';
+import { StructureFeesList } from './StructureFeesList';
+
+beforeEach(async () => {
+  await db.settings.clear();
+  useStructureFees.setState({ value: {}, hydrated: false });
+});
+
+describe('StructureFeeLine', () => {
+  it('says the NPC fees are assumed until a fee is set, then shows the fee', async () => {
+    render(<StructureFeeLine structureId={1000000000001} gross={2_640_000} accountingLevel={5} />);
+    expect(await screen.findByText('Assuming NPC station fees')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set fee…' }));
+    fireEvent.change(await screen.findByLabelText("Owner's broker fee (%)"), {
+      target: { value: '2' },
+    });
+    expect(screen.getByText(/2\.5% total broker fee/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Broker fee 2.5% (you set this)')).toBeTruthy();
+    expect(screen.queryByText('Assuming NPC station fees')).toBeNull();
+    expect(useStructureFees.getState().value).toEqual({ 1000000000001: 2 });
+  });
+
+  it('keeps an explicit 0% owner fee as a set fee', async () => {
+    await db.settings.put({ key: SYNCED_STRUCTURE_FEES_KEY, value: { 1000000000001: 0 } });
+    render(<StructureFeeLine structureId={1000000000001} gross={1000} accountingLevel={5} />);
+    expect(await screen.findByText('Broker fee 0.5% (you set this)')).toBeTruthy();
+  });
+});
+
+describe('StructureFeesList', () => {
+  it('renders nothing while no fee is set', async () => {
+    const { container } = render(<StructureFeesList />);
+    await waitFor(() => expect(useStructureFees.getState().hydrated).toBe(true));
+    expect(container.textContent).toBe('');
+  });
+
+  it('lists a set fee and removes it', async () => {
+    await db.settings.put({ key: SYNCED_STRUCTURE_FEES_KEY, value: { 1000000000001: 2.5 } });
+    render(<StructureFeesList />);
+    expect(await screen.findByText(/2\.5% owner fee/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Remove fee for/ }));
+    await waitFor(() => expect(useStructureFees.getState().value).toEqual({}));
+    expect(screen.queryByText(/owner fee/)).toBeNull();
+  });
+});

@@ -21,7 +21,7 @@ const BROKER_FEE_BASE_PCT = 3;
 const BROKER_RELATIONS_PCT_PER_LEVEL = 0.3;
 const FACTION_STANDING_PCT_PER_POINT = 0.03;
 const CORP_STANDING_PCT_PER_POINT = 0.02;
-const MIN_BROKER_FEE_ISK = 100;
+export const MIN_BROKER_FEE_ISK = 100;
 const RELIST_DISCOUNT_BASE_PCT = 50;
 const RELIST_DISCOUNT_PCT_PER_LEVEL = 6;
 
@@ -194,4 +194,26 @@ export function relistBreakEvenPrice(
     corpStanding
   );
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
+}
+
+/**
+ * `relistBreakEvenPrice` for a broker rate the caller already knows (a player
+ * structure: the SCC surcharge plus the owner's percentage) rather than one
+ * derived from NPC skills and standings. The Relist Discount still applies to
+ * it. Returns `null` for a non-positive quantity.
+ */
+export function relistBreakEvenPriceAtBrokerPct(
+  totalCost: number,
+  quantity: number,
+  accountingLevel: number,
+  brokerPct: number,
+  advancedBrokerRelationsLevel: number
+): number | null {
+  const discountPct = relistDiscountPct(advancedBrokerRelationsLevel);
+  return breakEvenPriceAtRate(
+    totalCost,
+    quantity,
+    salesTaxPct(accountingLevel),
+    (brokerPct * (100 - discountPct)) / 100
+  );
 }

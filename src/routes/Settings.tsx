@@ -1,3 +1,4 @@
+import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -755,6 +756,7 @@ function MarketDefaultsPanel() {
 
             <LpValueField id="settings-lp-value" />
           </Fields>
+          <StructureFeesList />
         </div>
       ) : (
         <Spinner />
