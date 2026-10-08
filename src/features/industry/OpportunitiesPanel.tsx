@@ -702,6 +702,17 @@ export function OpportunitiesPanel({
           hint={t('industry.opportunitiesNeedsRefreshHint')}
           className="py-8"
         />
+      ) : stockFilter !== 'any' && rows.length === 0 && allRows.length > 0 ? (
+        <EmptyState
+          title={t('industry.opportunitiesStockEmptyTitle')}
+          hint={t('industry.opportunitiesStockEmptyHint')}
+          action={
+            <Button size="sm" onClick={() => setStockFilter('any')}>
+              {t('common.resetFilters')}
+            </Button>
+          }
+          className="py-8"
+        />
       ) : isDesktop ? (
         <div className="overflow-x-auto">
           <DataTable

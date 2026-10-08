@@ -72,6 +72,6 @@ export function matchesStockFilter(row: OpportunityRow, filter: StockFilter): bo
   const coverage = stockCoverage(row);
   if (!coverage) return false;
   return filter === 'full'
-    ? coverage.stillToBuyIsk === 0
+    ? coverage.stillToBuyIsk < 0.005
     : coverage.coveredPct >= MOSTLY_COVERED_PCT;
 }
