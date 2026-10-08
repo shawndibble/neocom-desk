@@ -31,7 +31,7 @@ import {
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
-import { streamPublicContractsCsvs } from './publicContractsArchive.js';
+import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
   INSURGENCY_URL,
   LAWLESS_SYSTEMS_DOC,
@@ -172,7 +172,7 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
  * and pushes each row only to the device that uploaded it (issue #2240) —
  * see projectionStore.ts.
  */
-export const dispatchProjections = onSchedule('every 5 minutes', async () => {
+export const dispatchProjections = onSchedule('every 15 minutes', async () => {
   await dispatchDueProjections(getFirestore(), getMessaging(), Date.now(), logError);
 });
 
@@ -701,9 +701,28 @@ export const syncLawlessSystems = onSchedule({ schedule: 'every 10 minutes' }, a
   logInfo('lawless systems sync', { count: systemIds.length });
 });
 
+/** Doc under `systemConditions` holding the archive version the last publish was built from. */
+const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
+
 export const syncPublicContractOffers = onSchedule(
   { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
   async () => {
+    // Skip the whole run when EVE Ref has not published a new archive since
+    // the last publish. The fingerprint is read before the download and stored
+    // only after the write, so a refresh landing in between is picked up next
+    // run rather than lost. An unreadable fingerprint always syncs.
+    const db = getFirestore();
+    const fingerprintRef = db
+      .collection(SYSTEM_CONDITIONS_COLLECTION)
+      .doc(PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC);
+    const fingerprint = await fetchArchiveFingerprint();
+    if (fingerprint !== null) {
+      const stored = (await fingerprintRef.get()).data()?.fingerprint;
+      if (stored === fingerprint) {
+        logInfo('public contract offers sync skipped: archive unchanged', { fingerprint });
+        return;
+      }
+    }
     const nowMs = Date.now();
     const eligibleContracts = new Map<string, EligibleContract>();
     const rows: PublicContractOfferRow[] = [];
@@ -764,9 +783,9 @@ export const syncPublicContractOffers = onSchedule(
     // The lookup is dead once the join is done, and it is ~50k objects the
     // write would otherwise be encoding rows alongside.
     eligibleContracts.clear();
-    const db = getFirestore();
     await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
     await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
+    if (fingerprint !== null) await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
   }
 );
 
@@ -777,10 +796,10 @@ export const syncPublicContractOffers = onSchedule(
  * copy — see workbenchFits.ts for the pass/checkpoint design, and the
  * decision doc it ships with.
  *
- * Every 30 minutes, each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
+ * Every 12 hours (cost: it was every 30 minutes), each run fetching for at most `WORKBENCH_FETCH_BUDGET_MS`
  * then flushing to Firestore. Requests are sequential with a 250ms gap (≤ 4/s
  * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
- * the first pass over ~38k fits takes ~40 runs, about a day, after which a run
+ * the first pass over ~38k fits takes ~40 runs, about 20 days at this cadence, after which a run
  * is one list page plus however many fits were published since.
  *
  * The 360s budget leaves 180s of the 540s timeout for the flush, which reads
@@ -798,7 +817,7 @@ const WORKBENCH_FETCH_BUDGET_MS = 360_000;
 const WORKBENCH_REQUEST_GAP_MS = 250;
 
 export const syncWorkbenchFits = onSchedule(
-  { schedule: 'every 30 minutes', memory: '1GiB', timeoutSeconds: 540 },
+  { schedule: 'every 12 hours', memory: '1GiB', timeoutSeconds: 540 },
   async () => {
     const result = await runWorkbenchSync({
       store: firestoreWorkbenchFitsStore(getFirestore()),

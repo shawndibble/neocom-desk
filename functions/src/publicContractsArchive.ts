@@ -100,6 +100,31 @@ export async function streamContractsCsvEntries(
   }
 }
 
+/**
+ * Names the archive's version from its response headers, or `null` when the
+ * server names none. The sync stores this after a publish and skips the next
+ * run when it is unchanged: EVE Ref refreshes twice an hour, so a 30-minute
+ * poll often finds the same file, and the download, decompress and rewrite
+ * of every chunk are the whole cost of a run.
+ */
+export function archiveFingerprint(headers: Headers): string | null {
+  const etag = headers.get('etag');
+  if (etag) return `etag:${etag}`;
+  const modified = headers.get('last-modified');
+  if (modified) return `modified:${modified}`;
+  return null;
+}
+
+/** The archive's current fingerprint from a HEAD request, `null` when it cannot be told (the caller then syncs). */
+export async function fetchArchiveFingerprint(): Promise<string | null> {
+  try {
+    const response = await fetch(PUBLIC_CONTRACTS_ARCHIVE_URL, { method: 'HEAD' });
+    return response.ok ? archiveFingerprint(response.headers) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Downloads the archive and streams its rows through `streamContractsCsvEntries`. */
 export async function streamPublicContractsCsvs(handlers: ContractsCsvHandlers): Promise<void> {
   const response = await fetch(PUBLIC_CONTRACTS_ARCHIVE_URL);
