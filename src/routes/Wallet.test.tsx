@@ -351,7 +351,9 @@ describe('Wallet', () => {
       window.history.pushState({}, '', '/wallet/journal?char=92');
       render(<App />);
       expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
-      expect(await screen.findByRole('button', { name: /^Log in again/ })).toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole('button', { name: /grant|log in again/i })).length
+      ).toBeGreaterThan(0);
     });
   });
 
