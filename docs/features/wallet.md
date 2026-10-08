@@ -6,7 +6,7 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 | Feature                                  | Where                                 | Notes                                                                                                           |
 | ---------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | ISK balance, EverMarks, balance-history chart, LP-per-corp table                                                |
+| Balance tab (`/wallet/balance`, default) | `Wallet.tsx:560-757`                  | Worth panel (net worth, EverMarks, chart), LP-per-corp table                                                    |
 | Journal tab (`/wallet/journal`)          | `Wallet.tsx:759-816`                  | filterable/sortable/virtualized ledger, column picker, export                                                   |
 | `transactions` alias tab                 | `pageTabs.ts:90-94`, `Wallet.tsx:522` | not a tab; redirects to `/market/history/transactions`                                                          |
 | Cross-character balance (`?char=`)       | `Wallet.tsx:570`                      | per-Character table + total, picker, CSV/XLSX/clipboard export                                                  |
@@ -61,16 +61,18 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Balance tab
 
-Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent when the account has one Character (`Wallet.tsx:237-244`). State in `?char=` (codec `characterFilterParam`, default = synced Settings "default character filter" `useDefaultCharacterFilter`; URL value never written back to the setting). Options: This character / All characters.
+Character filter (`CharacterFilterControl`) rides in the Worth panel's meta. Absent when the account has one Character (`Wallet.tsx:237-244`). State in `?char=` (codec `characterFilterParam`, default = synced Settings "default character filter" `useDefaultCharacterFilter`; URL value never written back to the setting). Options: This character / All characters.
 
-### Single-Character panel ("Balance")
+### Single-Character panel ("Worth", issue #3004)
 
-- ISK figure, toned by sign (`iskToneClass`, `formatIsk(…, 2)`).
-- EverMarks figure (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with `InfoTooltip` explaining EverMarks. Shows "unknown" when loyalty missing or needs re-auth.
-- States: `balanceNeedsReauth` → `GrantBanner` for `getCharacterWallet` ("Log in again with EVE Online"); no cache → `EmptyState` "No wallet data cached. Couldn't load it yet. Try again shortly."; any cached data → offline notice.
-- Balance-history chart below the figures, only when the journal has entries with a `balance` (see Chart).
-- Journal truncation warning (`common.incompleteTitle` + "Some pages failed to load. Refresh to try again.") above the chart.
-- Empty journal: `CachedEmptyState` (never fetched vs fetched empty texts differ).
+One panel, the `NetWorthPanel` in `single` mode with the page's `stats` and `notices`; there is no separate Balance panel.
+
+- Title bar: "Worth", the Character filter (when the account has several), and a **Series** `MultiSelect` (button "Series: N of 5", options ISK / Assets / PLEX / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
+- Stat row: **Net worth** (small-caps label, large figure toned by sign, whole ISK, no decimals; "—" when the Character lacks the wallet, assets or orders permission) and **EverMarks** to its right (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with an `InfoTooltip`. EverMarks shows "unknown" when loyalty is missing or needs re-auth.
+- No character portrait or "<name> only" readout: the page header already names the Character.
+- The exact wallet balance is no longer a figure of its own (user decision). It can still be read in the layer table under the chart (ISK row, whole ISK, the live balance); cents are not shown anywhere on this tab.
+- Notices between the stat row and the chart: `GrantBanner` for `getCharacterWallet` / `getCharacterWalletJournal` re-login, the offline notice when any read came from cache, the journal truncation warning.
+- Chart below, in the same panel (see Net worth chart).
 
 ### All-Characters panel ("Balance by character")
 
@@ -85,7 +87,7 @@ Character filter (`CharacterFilterControl`) rides in each panel's meta. Absent w
 
 Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` (`series.ts`, `chartRows.ts`), tested there.
 
-- **Layers** (checkboxes above the chart double as the legend; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), PLEX (hangar PLEX x global price), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). "Hangar PLEX only" footnote: no ESI endpoint for the PLEX Vault.
+- **Layers** (the title-bar Series dropdown; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), PLEX (hangar PLEX x global price), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). "Hangar PLEX only" footnote: no ESI endpoint for the PLEX Vault.
 - **One Character:** layers stacked, plus a layer table (Layer, Value, Share, Opens). Opens links: ISK to `/wallet/journal`, Assets to `/assets`, PLEX to `/assets?q=PLEX`, Order escrow and Sell orders to `/market/orders`, each carrying `state.from = 'wallet'` so the landing page shows a "‹ Wallet" crumb (`FromWalletCrumb`).
 - **Several Characters** (the existing `?char=` filter): one line per Character; "Balance by character" gains a leading Show checkbox column (the last Character cannot be unchecked), one column per layer and a net worth column. A row or a chart line drills into that Character's own layered view as route state `?drill=<id>` (pushed, so Back undoes it); a "‹ All characters" crumb returns. Not `?character=`: that is the alert deep link `AlertCharacterSwitch` strips.
 - **Permissions:** a Character without the wallet, assets and orders scopes is left out of totals; the scope readout reads "All characters · N of M" with a tooltip naming who is missing.

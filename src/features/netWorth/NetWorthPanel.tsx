@@ -16,7 +16,9 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -68,6 +70,10 @@ export interface NetWorthPanelProps {
   actions?: ReactNode;
   /** Replaces the title when the page already says what this is. */
   title?: string;
+  /** Stats shown beside Net worth in the stat row (the Wallet page's EverMarks). */
+  stats?: ReactNode;
+  /** Banners and warnings shown between the stat row and the chart. */
+  notices?: ReactNode;
 }
 
 const NO_SERIES: CharacterSeries = { points: [], firstSnapshotDay: null, gapDays: [] };
@@ -87,7 +93,7 @@ function useHidden() {
   return { hiddenLayers, setHiddenLayers, hiddenCharacters, setHiddenCharacters };
 }
 
-function LayerLegend({
+function LayerPicker({
   hidden,
   onToggle,
 }: {
@@ -95,30 +101,30 @@ function LayerLegend({
   onToggle: (id: LayerId) => void;
 }) {
   const { t } = useTranslation();
-  const visibleCount = LAYER_IDS.length - hidden.length;
+  const options = useMemo(
+    () =>
+      LAYER_IDS.map((id) => ({
+        id,
+        label: t(LAYER_LABEL_KEYS[id]),
+        swatch: <span aria-hidden="true" className={cx('size-2.5 rounded-xs', LAYER_SWATCH[id])} />,
+      })),
+    [t]
+  );
+  const selected = useMemo(() => new Set(LAYER_IDS.filter((id) => !hidden.includes(id))), [hidden]);
   return (
-    <ul
-      aria-label={t('wallet.netWorth.layersLabel')}
-      className="flex flex-wrap gap-x-4 gap-y-1 text-xs"
-    >
-      {LAYER_IDS.map((id) => {
-        const checked = !hidden.includes(id);
-        return (
-          <li key={id}>
-            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 md:min-h-0">
-              <Checkbox
-                checked={checked}
-                // The last layer cannot be switched off: an empty chart says nothing.
-                disabled={checked && visibleCount === 1}
-                onChange={() => onToggle(id)}
-              />
-              <span aria-hidden="true" className={cx('size-2.5 rounded-xs', LAYER_SWATCH[id])} />
-              {t(LAYER_LABEL_KEYS[id])}
-            </label>
-          </li>
-        );
-      })}
-    </ul>
+    <MultiSelect
+      trigger={
+        <Button size="sm">
+          {t('wallet.netWorth.seriesButton', { shown: selected.size, total: LAYER_IDS.length })}
+        </Button>
+      }
+      options={options}
+      selected={selected}
+      // The last series cannot be switched off (`toggleHidden`): an empty chart says nothing.
+      onToggle={onToggle}
+      searchPlaceholder={t('wallet.netWorth.seriesSearch')}
+      noResultsLabel={t('wallet.netWorth.seriesNoResults')}
+    />
   );
 }
 
@@ -203,6 +209,8 @@ export function NetWorthPanel({
   onBack,
   actions,
   title,
+  stats,
+  notices,
 }: NetWorthPanelProps) {
   const { t } = useTranslation();
   const { hiddenLayers, setHiddenLayers, hiddenCharacters, setHiddenCharacters } = useHidden();
@@ -286,14 +294,9 @@ export function NetWorthPanel({
     t(LAYER_LABEL_KEYS[id])
   );
 
+  // One Character's panel says nothing about scope: the page header already names them.
   const readout =
-    mode === 'single' && single ? (
-      <CharacterScopeReadout
-        scope="one"
-        characterId={single.characterId}
-        characterName={single.name}
-      />
-    ) : (
+    mode === 'single' ? null : (
       <CharacterScopeReadout scope="all" total={characters.length} missing={missingNames} />
     );
 
@@ -422,7 +425,12 @@ export function NetWorthPanel({
           {readout}
         </span>
       }
-      actions={actions}
+      actions={
+        <span className="flex items-center gap-2">
+          <LayerPicker hidden={hiddenLayers} onToggle={toggleLayer} />
+          {actions}
+        </span>
+      }
     >
       {drilled && (
         <button
@@ -437,18 +445,23 @@ export function NetWorthPanel({
           {t('wallet.netWorth.allCharacters')}
         </button>
       )}
-      <p className="text-xl font-medium tabular-nums">
-        {t('wallet.netWorth.total')}:{' '}
-        <span className={iskToneClass(total)}>{formatIsk(total, 2)}</span>
-      </p>
+      <div className="flex flex-wrap gap-x-8 gap-y-4">
+        <div>
+          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('wallet.netWorth.total')}
+          </p>
+          <p className={cx('text-xl font-medium tabular-nums', iskToneClass(total))}>
+            {mode === 'single' && !singleLatest ? '—' : formatIsk(total)}
+          </p>
+        </div>
+        {stats}
+      </div>
       {excluded.length > 0 && (
         <p className="text-[0.6875rem] text-text-dim">
           {t('wallet.netWorth.excludes', { layers: excluded.join(', ') })}
         </p>
       )}
-      <div className="mt-3">
-        <LayerLegend hidden={hiddenLayers} onToggle={toggleLayer} />
-      </div>
+      {notices}
       <div className="mt-3">{data.ready ? chart : <Spinner label={t('common.loading')} />}</div>
       {mode === 'single' && snapshotDays > 0 && snapshotDays <= 2 && firstSnapshot && (
         <p className="mt-2 text-xs text-text-dim">

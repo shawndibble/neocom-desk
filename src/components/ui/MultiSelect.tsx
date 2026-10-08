@@ -155,6 +155,7 @@ export function MultiSelect<Id>({
                     <span aria-hidden="true" className="inline-block w-3 text-center">
                       {checked ? '✓' : ''}
                     </span>
+                    {option.swatch}
                     {option.label}
                   </div>
                 );
