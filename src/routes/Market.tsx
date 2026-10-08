@@ -242,12 +242,10 @@ function MarketGroupTree({
 
   const roots = childrenByParent.get(null) ?? [];
   return (
-    // Flat cap, not viewport-relative: `QuickbarList` renders below this
-    // tree in the same column, so sizing the tree to all remaining viewport
-    // height would push the quickbar off-screen.
-    // On a desktop the finder column is sticky, so the tree takes what the
-    // viewport has left after the search and the Quickbar beneath it.
-    <div className="max-h-[32rem] overflow-y-auto lg:max-h-[calc(100dvh-18rem)]">
+    // Below `lg` a flat cap. From `lg` the finder panel is a viewport-bounded
+    // flex column and the tree is its flexible part: it takes whatever the
+    // search and the Quickbar leave, so neither is pushed off-screen.
+    <div className="max-h-[32rem] overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
       {filterResult?.bestMatch && (
         <div className="mb-2 border-b border-line pb-2">
           <p className="pb-1 text-[0.6875rem] text-text-dim uppercase">{t('market.bestMatch')}</p>
@@ -910,7 +908,12 @@ export function Market() {
               ref={finderPanelRef}
               // Sticky beside a long order book, so the search stays in reach
               // while the book scrolls.
-              className={isDesktop || selectedTypeId === null ? 'lg:sticky lg:top-4' : 'hidden'}
+              fill
+              className={
+                isDesktop || selectedTypeId === null
+                  ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col'
+                  : 'hidden'
+              }
             >
               <BrowserFilterBar
                 {...browserFilterBarProps}
@@ -927,19 +930,19 @@ export function Market() {
               />
 
               {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
-                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
                   {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
                 </p>
               )}
 
               {filterResult?.fuzzy && (
-                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
                   {t('market.searchFuzzy')}
                 </p>
               )}
 
               {filterResult?.capped && (
-                <p className="pt-2 text-[0.6875rem] text-warning uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('market.searchCapped', {
                     limit: MARKET_TREE_MATCH_LIMIT,
                     total: filterResult.totalMatches,
@@ -962,7 +965,7 @@ export function Market() {
                 !filterResult.bestMatch ? (
                 <EmptyState title={t('market.noResults')} className="py-8" />
               ) : (
-                <div className="mt-3 border-t border-line pt-2">
+                <div className="mt-3 flex min-h-0 flex-col border-t border-line pt-2 lg:flex-1">
                   <MarketGroupTree
                     groups={groups ?? []}
                     childrenByParent={childrenByParent}
