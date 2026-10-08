@@ -369,7 +369,10 @@ export function MyShipsPanel({
                   <span role="cell" className="min-w-0 text-xs break-words text-text-dim">
                     {state.data.characterNames.get(row.characterId)}
                   </span>
-                  <span role="cell" className="min-w-0 text-xs break-words max-sm:flex-1">
+                  <span
+                    role="cell"
+                    className="min-w-0 text-xs break-words max-sm:grow max-sm:basis-40"
+                  >
                     {name}
                     {trail && <span className="text-text-dim"> · {trail}</span>}
                   </span>
