@@ -1,6 +1,9 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button, Tooltip } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { Button, Panel, Tooltip } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { AttributeName } from '@/engine/types';
 import type { VerdictSegment } from '@/engine/cloneVerdict';
 import { useViewRoute } from '@/features/travel/useViewRoute';
@@ -38,12 +41,15 @@ function QueueBar({
   segments,
   scale,
   names,
+  action,
 }: {
   label: string;
   segments: readonly VerdictSegment[];
   /** Seconds the full bar width stands for: shared, so two bars compare by eye. */
   scale: number;
   names: ReadonlyMap<number, string>;
+  /** Sits on the line above the bar, beside the duration. */
+  action?: ReactNode;
 }) {
   const { t } = useTranslation();
   const total = segments.reduce((sum, s) => sum + s.seconds, 0);
@@ -51,7 +57,10 @@ function QueueBar({
     <div className="space-y-1">
       <p className="flex flex-wrap justify-between gap-x-2 text-xs text-text-dim">
         <span>{label}</span>
-        <span className="tabular-nums">{formatDuration(total)}</span>
+        <span className="flex items-center gap-x-3">
+          <span className="tabular-nums">{formatDuration(total)}</span>
+          {action}
+        </span>
       </p>
       <div
         role="img"
@@ -116,11 +125,10 @@ export function CloneVerdictCard({
   const { t } = useTranslation();
   if (state.kind === 'note') {
     return (
-      <section
-        aria-label={t('clones.verdict.title')}
-        className="border-b border-line px-3 py-2 text-sm text-text-dim"
-      >
-        {state.message}
+      <section aria-label={t('clones.verdict.title')}>
+        <Panel>
+          <p className="text-sm text-text-dim">{state.message}</p>
+        </Panel>
       </section>
     );
   }
@@ -129,84 +137,97 @@ export function CloneVerdictCard({
   const best = state.kind === 'jump' ? state.best : null;
   const sum = (xs: readonly VerdictSegment[]) => xs.reduce((a, s) => a + s.seconds, 0);
   const scale = Math.max(sum(stay), best ? sum(best) : 0);
-  const legend = stay.map((s) => skillName(t, names, s.skillTypeID));
+  const queueLink = (
+    <Link
+      to="/overview"
+      className={`${inlineLinkClassName} inline-flex min-h-11 items-center md:min-h-0`}
+    >
+      {t('clones.verdict.viewQueue')}
+    </Link>
+  );
 
   return (
-    <section
-      aria-label={t('clones.verdict.title')}
-      className="space-y-3 border-b border-line px-3 py-3 text-sm"
-    >
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="space-y-1">
-          <h3
-            className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${
-              state.kind === 'jump' ? 'text-accent' : 'text-success'
-            }`}
-          >
-            {state.kind === 'jump' ? t('clones.verdict.jumpTitle') : t('clones.verdict.stayTitle')}
-          </h3>
-          {state.kind === 'jump' ? (
-            <>
-              <p className="font-semibold [overflow-wrap:anywhere]">
-                {t('clones.verdict.jumpHeadline', {
-                  clone: state.label,
-                  duration: formatDuration(state.savedSeconds),
-                })}
-              </p>
-              {state.attributes.length > 0 && (
-                <p className="text-text-dim">
-                  {t('clones.verdict.jumpReason', {
-                    attributes: state.attributes
-                      .map((a) => t(`clones.verdict.attribute.${a}`))
-                      .join(', '),
-                  })}
-                </p>
+    <section aria-label={t('clones.verdict.title')}>
+      <Panel>
+        <div className="space-y-3 text-sm">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            <div className="space-y-1">
+              <h3
+                className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${
+                  state.kind === 'jump' ? 'text-accent' : 'text-success'
+                }`}
+              >
+                {state.kind === 'jump'
+                  ? t('clones.verdict.jumpTitle')
+                  : t('clones.verdict.stayTitle')}
+              </h3>
+              {state.kind === 'jump' ? (
+                <>
+                  <p className="font-semibold [overflow-wrap:anywhere]">
+                    {t('clones.verdict.jumpHeadline', {
+                      clone: state.label,
+                      duration: formatDuration(state.savedSeconds),
+                    })}
+                  </p>
+                  {state.attributes.length > 0 && (
+                    <p className="text-text-dim">
+                      {t('clones.verdict.jumpReason', {
+                        attributes: state.attributes
+                          .map((a) => t(`clones.verdict.attribute.${a}`))
+                          .join(', '),
+                      })}
+                    </p>
+                  )}
+                  {state.cooldownReadyAt && (
+                    <p className="text-warning">
+                      {t('clones.verdict.jumpCooldown', {
+                        date: formatTimestamp(state.cooldownReadyAt, timeZone),
+                      })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">{t('clones.verdict.stayHeadline')}</p>
+                  <p className="text-text-dim [overflow-wrap:anywhere]">
+                    {state.closest
+                      ? t('clones.verdict.stayClosest', {
+                          clone: state.closest.label,
+                          duration: formatDuration(state.closest.extraSeconds),
+                        })
+                      : t('clones.verdict.stayAlone')}
+                  </p>
+                  {state.cooldownReadyAt && (
+                    <p className="text-warning">
+                      {t('clones.verdict.jumpCooldown', {
+                        date: formatTimestamp(state.cooldownReadyAt, timeZone),
+                      })}
+                    </p>
+                  )}
+                </>
               )}
-              {state.cooldownReadyAt && (
-                <p className="text-warning">
-                  {t('clones.verdict.jumpCooldown', {
-                    date: formatTimestamp(state.cooldownReadyAt, timeZone),
-                  })}
-                </p>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="font-semibold">{t('clones.verdict.stayHeadline')}</p>
-              <p className="text-text-dim [overflow-wrap:anywhere]">
-                {state.closest
-                  ? t('clones.verdict.stayClosest', {
-                      clone: state.closest.label,
-                      duration: formatDuration(state.closest.extraSeconds),
-                    })
-                  : t('clones.verdict.stayAlone')}
-              </p>
-              {state.cooldownReadyAt && (
-                <p className="text-warning">
-                  {t('clones.verdict.jumpCooldown', {
-                    date: formatTimestamp(state.cooldownReadyAt, timeZone),
-                  })}
-                </p>
-              )}
-            </>
-          )}
+            </div>
+            {state.kind === 'jump' && <RouteButton {...state.route} />}
+          </div>
+          <div className="space-y-2">
+            <QueueBar
+              label={t('clones.verdict.barStay')}
+              segments={stay}
+              scale={scale}
+              names={names}
+              action={queueLink}
+            />
+            {best && (
+              <QueueBar
+                label={t('clones.verdict.barBest')}
+                segments={best}
+                scale={scale}
+                names={names}
+              />
+            )}
+          </div>
         </div>
-        {state.kind === 'jump' && <RouteButton {...state.route} />}
-      </div>
-      <div className="space-y-2">
-        <QueueBar label={t('clones.verdict.barStay')} segments={stay} scale={scale} names={names} />
-        {best && (
-          <QueueBar
-            label={t('clones.verdict.barBest')}
-            segments={best}
-            scale={scale}
-            names={names}
-          />
-        )}
-        <p className="text-xs text-text-dim [overflow-wrap:anywhere]">
-          {t('clones.verdict.legend', { skills: legend.join(' · ') })}
-        </p>
-      </div>
+      </Panel>
     </section>
   );
 }
