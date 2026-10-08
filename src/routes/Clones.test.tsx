@@ -409,6 +409,23 @@ describe('Clones', () => {
     expect(screen.getByText(/Infomorph Synchronizing: -3 h/)).toBeInTheDocument();
   });
 
+  it('renders no cooldown footnote when there is no last jump and no reduction', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({ ...clonesPayload, last_clone_jump_date: undefined })
+      ),
+      http.get(`${ESI}/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
+    expect(screen.queryByText(/Last jump/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Infomorph Synchronizing/)).not.toBeInTheDocument();
+    const section = screen.getByRole('region', { name: 'Jump Cooldown' });
+    expect(section.querySelector('p.text-xs')).toBeNull();
+  });
+
   it('lists the clone being worn first, its implants linking to Show info, with count and value', async () => {
     render(<App />);
     const worn = await screen.findByRole('link', { name: 'Worn Implant' });

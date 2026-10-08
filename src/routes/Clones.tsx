@@ -77,12 +77,8 @@ const NO_SYSTEMS: ReadonlyMap<number, number | null> = new Map();
 const NO_SECURITIES: ReadonlyMap<number, number> = new Map();
 const NO_IDS: readonly number[] = [];
 /** Touch-sized on a phone, compact beside a pointer. */
-/**
- * The same 44px target for links that share a wrapped line with others: the
- * negative margin lets neighbouring lines sit close while each link keeps its
- * tap box, instead of every line growing to 44px.
- */
-const TOUCH_LINK_TIGHT = 'inline-flex min-h-11 items-center max-md:-my-2 md:min-h-0';
+/** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
+const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
 
 interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
@@ -340,7 +336,7 @@ function CloneCard({
                   typeId={id}
                   name={implantNames.get(id) ?? `Type #${id}`}
                   description={implantDescriptions.get(id)}
-                  className={TOUCH_LINK_TIGHT}
+                  className={TOUCH_LINK}
                 />
               </li>
             ))}
@@ -468,6 +464,16 @@ export function Clones() {
   const cooldownHours = cloneJumpCooldownHours(infomorphLevel);
   const cooldownFraction = cooldownProgress(lastCloneJumpDate, cooldownHours, new Date(loadedAt));
 
+  // Empty (no element at all) when there is no last jump and no reduction to state.
+  const cooldownNote = [
+    lastCloneJumpDate &&
+      t('clones.lastJump', {
+        date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
+      }),
+    infomorphLevel > 0 && t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
 
   const homeJumps =
@@ -655,18 +661,7 @@ export function Clones() {
                     style={{ width: `${cooldownFraction * 100}%` }}
                   />
                 </div>
-                <p className="text-xs text-text-dim">
-                  {[
-                    lastCloneJumpDate &&
-                      t('clones.lastJump', {
-                        date: formatTimestamp(new Date(lastCloneJumpDate), timeZone),
-                      }),
-                    infomorphLevel > 0 &&
-                      t('clones.infomorphReduction', { hours: Math.min(infomorphLevel, 24) }),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
+                {cooldownNote && <p className="text-xs text-text-dim">{cooldownNote}</p>}
               </section>
             </Panel>
             <Panel className="h-full">
@@ -708,7 +703,7 @@ export function Clones() {
                       result={homeJumps}
                       t={t}
                       locationId={homeLocation?.location_id}
-                      linkClassName={TOUCH_LINK_TIGHT}
+                      linkClassName={TOUCH_LINK}
                     />
                   </p>
                   {lastStationChangeDate && (
@@ -845,7 +840,7 @@ export function Clones() {
                           result={jumpsByLocation?.get(clone.location_id)}
                           t={t}
                           locationId={clone.location_id}
-                          linkClassName={TOUCH_LINK_TIGHT}
+                          linkClassName={TOUCH_LINK}
                         />
                       }
                       implantIds={clone.implants}
