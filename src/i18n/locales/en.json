@@ -300,6 +300,9 @@
       "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
+      "alsoSaveLabel": "Also save to My Fittings",
+      "myFittingsFailedTitle": "Saved to EVE, but not to My Fittings",
+      "myFittingsFailed": "It's in your in-game list, but we couldn't save it to My Fittings. Use Save to keep it there.",
       "close": "Close"
     },
     "missingSkills": {
@@ -782,6 +785,8 @@
       "shareLink": "Copy Share Link",
       "eft": "Copy Fitting",
       "multibuy": "Copy multibuy list",
+      "multibuyMinusOwned": "Copy multibuy list, minus owned",
+      "allOwned": "You already own everything on this list.",
       "eveXml": "Download EVE XML",
       "manufacturePlan": "Manufacture Plan",
       "appraise": "Appraise in Market",
@@ -793,7 +798,8 @@
         "shareLink": "Share Link copied — it works for 7 days",
         "permanentLink": "Permanent link copied",
         "eft": "Fitting copied",
-        "multibuy": "Multibuy list copied"
+        "multibuy": "Multibuy list copied",
+        "multibuyMinusOwned": "Multibuy list copied, minus what you hold in {{station}}"
       },
       "downloaded": {
         "eveXml": "Fitting XML downloaded"
@@ -1856,7 +1862,7 @@
     "cancel": "Cancel",
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
-    "emptyHint": "Create a plan to start training toward a goal.",
+    "emptyHint": "Create a plan to start training toward a goal. Import your in-game queue, start from a Certified Plan, or pick a ship in the Ship Tree.",
     "backToList": "Back to plans",
     "yourEntries": "Your entries",
     "yourEntriesEmpty": "No entries yet. Add a skill to get started.",
@@ -2903,6 +2909,9 @@
     "marketOpportunitiesShowLast_one": "Show the last one",
     "marketOpportunitiesShowLast_other": "Show the last {{count}}",
     "marketOpportunitiesNoResultsHint": "No product whose blueprint you own or can buy cleared the liquidity floor at this hub with these filters — try a busier Trade Hub or loosen the filters.",
+    "marketOpportunitiesErrorTitle": "The scan failed",
+    "marketOpportunitiesErrorHint": "Something went wrong while pricing products. This is not an empty result — try the scan again.",
+    "marketOpportunitiesRetry": "Try again",
     "marketOpportunitiesBlueprintSource": "Blueprint",
     "marketOpportunitiesBlueprintSources": {
       "owned": "Owned",
@@ -4234,6 +4243,28 @@
       "moreLabel": "More actions for this entry",
       "unassignAction": "Unassign…",
       "valueLine": "Est. value {{value}} ISK on the day mined",
+      "breakdown": {
+        "title": "How this was priced",
+        "summary": "{{hub}} buy · {{form}} ore · {{tax}}% tax",
+        "compressed": "Compressed",
+        "raw": "Raw",
+        "edited": "Edited by hand",
+        "copy": "Copy as text",
+        "copied": "Copied",
+        "caveat": "Hub, ore form and unit prices are your current settings, re-read for the day mined. The bill itself is frozen.",
+        "drift": "Unit prices are re-read for the day mined and now differ from the figures this bill was frozen at ({{value}} ISK). Hub and ore form are your current settings.",
+        "driftText": "Note: unit prices were re-read when copied and may not multiply out to the frozen total above.",
+        "source": {
+          "saved": "Saved snapshot",
+          "historical": "Historical buy",
+          "live": "Live buy price",
+          "live-sell": "Live sell price (no buy orders)",
+          "none": "No price"
+        },
+        "headerText": "Mining tax estimate, {{date}} in {{system}} — {{hub}} buy prices, {{form}} ore, {{tax}}% tax",
+        "lineText": "{{name}}: {{quantity}} × {{unit}} = {{value}} ISK ({{source}})",
+        "totalText": "Estimated value {{value}} ISK, tax owed {{tax}} ISK"
+      },
       "editAction": "Edit…",
       "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed."
     },
@@ -6256,8 +6287,11 @@
     "colItem": "Item",
     "colProfit": "Profit",
     "colIskPerLp": "ISK / LP",
-    "emptyTitle": "No offers cached",
-    "emptyHint": "Couldn't load this corporation's LP store yet. Try again shortly.",
+    "emptyTitle": "No offers",
+    "emptyHint": "This corporation's LP store has no offers right now.",
+    "errorTitle": "Couldn't load this LP store",
+    "errorHint": "EVE's servers didn't answer, and nothing was saved from an earlier visit. This is not an empty store.",
+    "retry": "Try again",
     "noMatchTitle": "No offers match these filters",
     "noMatchHint": "Try clearing the search or the Affordable/Blueprints filters.",
     "selectPrompt": "Select an offer to see its profit breakdown.",
@@ -7786,6 +7820,14 @@
       "thanksTitle": "Say thanks",
       "thanksBody": "In game: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations welcome, never expected. The app stays free.",
+      "skillsTitle": "Finding skills to train",
+      "skillsIntro": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
+      "skillsQueue": "Copy your in-game queue: Skills > Plans > a plan > Import > From skill queue.",
+      "skillsCertified": "Follow a CCP career path: Skills > Plans > From a Certified Plan.",
+      "skillsShip": "Fly a hull: Ship Tree > a ship > Skills & Mastery.",
+      "skillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
+      "skillsSearch": "Know the name: search in the plan editor, or browse Skills > Trained and add the next level.",
+      "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",
       "tabShortcuts": "Shortcuts"
     },
     "displayTitle": "Display",
@@ -7799,6 +7841,13 @@
     "notifications": {
       "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. Device pop-up choices stay on this device. Alerts choices and thresholds sync with your account's other devices.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
+      "pushFailed": {
+        "browser-refused": "Your browser refused to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "network": "Couldn't reach the server to set up background alerts, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "server-rejected": "The server turned down this device's background alert setup, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
+        "unknown": "Background alert setup failed, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work."
+      },
+      "pushRetryButton": "Retry",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
@@ -8609,6 +8658,7 @@
       "topShips": "Ships used most on kills",
       "shipKills_one": "{{formatted}} kill",
       "shipKills_other": "{{formatted}} kills",
+      "retry": "Try again",
       "recent": {
         "title": "Recent kills and losses",
         "more": "More on zKillboard",

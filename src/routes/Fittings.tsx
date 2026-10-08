@@ -812,6 +812,7 @@ function FittingsPage() {
               fitting={fitting}
               description={savedRecord?.notes ?? ''}
               onSaved={() => setInGameFittingsKey((key) => key + 1)}
+              onSaveToMyFittings={workspace.savedId === null ? workspace.save : undefined}
             />
           )}
           <Modal

@@ -180,6 +180,19 @@ describe('fittingToMultibuy', () => {
     expect(lines).toHaveLength(8);
   });
 
+  it('subtracts owned stock and drops fully covered lines', () => {
+    const owned = new Map([
+      [1, 1],
+      [587, 1],
+      [7, 500],
+    ]);
+    const lines = fittingToMultibuy(FITTING, nameFor, [], owned).split('\n');
+    expect(lines).toContain('200mm AutoCannon II\t1');
+    expect(lines.some((l) => l.startsWith('Rifter'))).toBe(false);
+    expect(lines.some((l) => l.startsWith('Nanite Repair Paste'))).toBe(false);
+    expect(lines).toHaveLength(6);
+  });
+
   it("includes the Fitting's own implants and boosters", () => {
     const names: Record<number, string> = {
       8: "Zor's Custom Navigation Hyper-Link",
