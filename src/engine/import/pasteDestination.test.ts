@@ -153,7 +153,7 @@ describe('pasteDestination', () => {
     });
 
     it('ignores a plan with a line that is not a skill at all', () => {
-      expect(pasteDestination('Gunnery V\nsee you in local', WITH_BOOKS)).toBeNull();
+      expect(pasteDestination('Gunnery V\nsee you in local, o7?', WITH_BOOKS)).toBeNull();
     });
 
     it('still reads a bracketed fit as a fit', () => {
