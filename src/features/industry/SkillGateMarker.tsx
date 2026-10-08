@@ -36,6 +36,12 @@ export interface SkillGateMarkerProps {
   nameForCharacter: (characterId: number) => string;
   /** Names the Skill Plan "Add" creates when the character has none yet. */
   newPlanName?: string;
+  /**
+   * Icon only, no warning chip: for a gate most rows of the page share, which
+   * the panel's footer rule already states. The click still opens the
+   * popover, so a quiet row is no less actionable than a loud one.
+   */
+  quiet?: boolean;
 }
 
 export function SkillGateMarker({
@@ -43,6 +49,7 @@ export function SkillGateMarker({
   nameForSkill,
   nameForCharacter,
   newPlanName,
+  quiet = false,
 }: SkillGateMarkerProps) {
   const { t } = useTranslation();
   const { shortfall } = verdict;
@@ -63,14 +70,16 @@ export function SkillGateMarker({
           // A row click or a card link behind the chip must not also fire.
           onClick={(event) => event.stopPropagation()}
           className={cx(
-            'inline-flex max-w-full shrink-0 items-center gap-1 rounded-xs border border-warning/60 px-1.5 py-0.5 text-left text-warning',
-            'enabled:hover:border-warning enabled:hover:bg-warning/10 enabled:active:bg-warning/20',
+            'inline-flex max-w-full shrink-0 items-center gap-1 rounded-xs text-left',
+            quiet
+              ? 'p-0.5 text-text-dim enabled:hover:text-warning'
+              : 'border border-warning/60 px-1.5 py-0.5 text-warning enabled:hover:border-warning enabled:hover:bg-warning/10 enabled:active:bg-warning/20',
             interactiveClassName,
             focusRingClassName
           )}
         >
           <Icon.SkillLocked size={Icon.ICON_SIZE.sm} />
-          <span className="min-w-0 text-[0.6875rem] leading-tight">{label}</span>
+          {!quiet && <span className="min-w-0 text-[0.6875rem] leading-tight">{label}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent

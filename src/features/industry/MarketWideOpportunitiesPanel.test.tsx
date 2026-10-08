@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,6 +9,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
+import { MARKET_WIDE_COLUMN_IDS, useVisibleMarketWideColumns } from './marketWideColumns';
 import { useSalesShare } from './salesSharePref';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
@@ -43,6 +44,7 @@ const hookState = vi.hoisted(() => ({
   rows: null as unknown,
   error: false,
   fetchedAt: null as Date | null,
+  skills: new Map() as ReadonlyMap<number, Record<number, number>>,
 }));
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => hookState.isPhone }));
 // Below `md` (`useIsNarrow`) is where `FilterBar` turns into its sheet and
@@ -83,7 +85,7 @@ vi.mock('./marketWidePage', async (importOriginal) => ({
   MARKET_WIDE_PAGE_SIZE: 5,
 }));
 vi.mock('@/features/skills/useAccountSkillLevels', () => ({
-  useAccountSkillLevels: () => new Map(),
+  useAccountSkillLevels: () => hookState.skills,
 }));
 vi.mock('@/features/market/useTradeHubStandings', () => ({
   useTradeHubStandings: () => ({}),
@@ -100,7 +102,8 @@ const catalog = {
 function renderPanel(
   actions = fakeItemActions(),
   initialEntries = ['/'],
-  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false)
+  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false),
+  extra: { catalog?: BlueprintCatalog; startFolded?: boolean } = {}
 ) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
@@ -108,10 +111,11 @@ function renderPanel(
         <MarketWideOpportunitiesPanel
           hub={{ id: 'jita' } as unknown as TradeHub}
           trees={{}}
-          catalog={catalog}
+          catalog={extra.catalog ?? catalog}
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
           onStartPlan={onStartPlan}
+          startFolded={extra.startFolded}
         />,
         actions
       )}
@@ -131,7 +135,6 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     renderPanel(fakeItemActions(), ['/'], onStartPlan);
     const beta = screen.getByText('Widget Beta').closest('tr')!;
     const gamma = screen.getByText('Widget Gamma').closest('tr')!;
-    expect(gamma).not.toHaveAttribute('tabindex');
     fireEvent.click(gamma);
     expect(onStartPlan).not.toHaveBeenCalled();
     expect(beta).toHaveAttribute('tabindex', '0');
@@ -139,13 +142,73 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     expect(onStartPlan).toHaveBeenCalledTimes(1);
   });
 
-  it('has no row menu: Start plan is the row’s one control', () => {
+  it('carries the same row menu as Ranked builds, Price history included', async () => {
+    const user = userEvent.setup();
     renderPanel();
     const row = screen.getByText('Widget Beta').closest('tr')!;
-    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     expect(within(row).getByRole('button', { name: 'Plan' })).toBeInTheDocument();
-    fireEvent.contextMenu(row);
-    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).toBeNull();
+    await user.click(within(row).getByRole('button', { name: /More actions for Widget Beta/ }));
+    expect(await screen.findByRole('menuitem', { name: /Quickbar/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Price history' })).toBeInTheDocument();
+  });
+});
+
+describe('MarketWideOpportunitiesPanel layout', () => {
+  it('folds to its header when the pilot owns blueprints, and opens on request', async () => {
+    const user = userEvent.setup();
+    renderPanel(fakeItemActions(), ['/'], undefined, { startFolded: true });
+    expect(screen.queryByText('Widget Beta')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show details' }));
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
+  });
+
+  it('is open when the pilot owns none', () => {
+    renderPanel();
+    expect(screen.getByText('Widget Beta')).toBeInTheDocument();
+  });
+
+  it('keeps Plan visible and starts with Order depth off the table', () => {
+    renderPanel();
+    for (const name of ['Depth', 'Time', 'Blueprint'])
+      expect(screen.queryByRole('columnheader', { name })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Plan' })).not.toHaveLength(0);
+  });
+});
+
+describe('MarketWideOpportunitiesPanel skill gate chips', () => {
+  const gatedCatalog = {
+    entries: [],
+    byBlueprintTypeID: new Map(
+      [400, 401, 402, 403].map((id) => [
+        id + 1000,
+        {
+          blueprint: {
+            skills: [
+              { typeID: 1, level: 5 },
+              { typeID: 2, level: 5 },
+              ...(id === 403 ? [{ typeID: 3, level: 4 }] : []),
+            ],
+          },
+        },
+      ])
+    ),
+    byProductTypeID: new Map(),
+  } as unknown as BlueprintCatalog;
+
+  it('quiets the chip on rows sharing the page’s gate; a differing row keeps it', () => {
+    hookState.skills = new Map([[1, {}]]);
+    hookState.rows = [400, 401, 402, 403].map((id) => row(id, `Gated ${id}`));
+    try {
+      renderPanel(fakeItemActions(), ['/'], undefined, { catalog: gatedCatalog });
+      expect(screen.queryByText('2 skills short')).not.toBeInTheDocument();
+      expect(screen.getByText('3 skills short')).toBeInTheDocument();
+      // Quiet is still a control: the popover is one click away.
+      expect(screen.getAllByRole('button', { name: /2 skills short/ })).toHaveLength(3);
+    } finally {
+      hookState.skills = new Map();
+      hookState.rows = null;
+    }
   });
 });
 
@@ -156,6 +219,16 @@ describe('MarketWideOpportunitiesPanel blueprint sources', () => {
     const gamma = screen.getByText('Widget Gamma').closest('tr')!;
     expect(within(beta).getByText('Owned')).toBeInTheDocument();
     expect(within(gamma).getByText('Contract')).toBeInTheDocument();
+  });
+
+  it('leaves the default NPC market source unsaid', () => {
+    hookState.rows = [row(200, 'Widget Beta', { blueprintSource: 'market' })];
+    try {
+      renderPanel();
+      expect(screen.queryByText('NPC market')).not.toBeInTheDocument();
+    } finally {
+      hookState.rows = null;
+    }
   });
 
   it('says which sources it could not check, since their rows may be missing', () => {
@@ -355,6 +428,7 @@ describe('MarketWideOpportunitiesPanel sales and price sanity', () => {
 });
 
 describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
+  beforeEach(() => useVisibleMarketWideColumns.setState({ value: MARKET_WIDE_COLUMN_IDS }));
   const productOrder = () =>
     screen
       .getAllByText(/^Widget/)
@@ -402,6 +476,7 @@ describe('MarketWideOpportunitiesPanel margin and time (issue #2297)', () => {
 });
 
 describe('MarketWideOpportunitiesPanel ISK/day', () => {
+  beforeEach(() => useVisibleMarketWideColumns.setState({ value: MARKET_WIDE_COLUMN_IDS }));
   const productOrder = () =>
     screen
       .getAllByText(/^Widget/)
