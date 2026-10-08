@@ -33,8 +33,60 @@ const BAR_CELLS = 20;
 export const MAX_LINE_WIDTH = 50;
 const SEPARATOR = ' · ';
 
-/** Words that start a two-word ore name without being a quality prefix. */
-const NAME_LEADERS = new Set(['Dark']);
+/**
+ * Quality prefixes that can come off an ore name. A first word not listed
+ * here is part of the name ("Dark Ochre", "Clear Icicle", "Glacial Mass"), so
+ * an unknown prefix only costs width, never a wrong name.
+ */
+const QUALITY_PREFIXES = new Set([
+  'Concentrated',
+  'Dense',
+  'Condensed',
+  'Massive',
+  'Solid',
+  'Viscous',
+  'Azure',
+  'Rich',
+  'Silvery',
+  'Golden',
+  'Luminous',
+  'Fiery',
+  'Pure',
+  'Pristine',
+  'Vivid',
+  'Radiant',
+  'Vitric',
+  'Glazed',
+  'Bright',
+  'Gleaming',
+  'Sharp',
+  'Crystalline',
+  'Onyx',
+  'Obsidian',
+  'Iridescent',
+  'Prismatic',
+  'Triclinic',
+  'Monoclinic',
+  'Crimson',
+  'Prime',
+  'Magma',
+  'Vitreous',
+  'Brimful',
+  'Glistening',
+  'Copious',
+  'Twinkling',
+  'Lavish',
+  'Shimmering',
+  'Bountiful',
+  'Shiny',
+  'Replete',
+  'Glowing',
+  'Sparkling',
+  'Brilliant',
+  'Enriched',
+  'Thick',
+  'Smooth',
+]);
 
 /** Newer ore names carry the grade last: "Scordite II-Grade". */
 const GRADED = /\s(?:I|II|III|IV|V)-Grade$/;
@@ -49,7 +101,7 @@ export function shortOreNames(names: readonly string[]): Record<string, string> 
     // "Pyroxeres II-Grade": the grade is a suffix and part of what the ore is.
     if (GRADED.test(name)) return name.replace(/-Grade$/, '');
     const words = name.split(' ');
-    return words.length > 1 && !NAME_LEADERS.has(words[0]) ? words.slice(1).join(' ') : name;
+    return words.length > 1 && QUALITY_PREFIXES.has(words[0]) ? words.slice(1).join(' ') : name;
   };
   const unique = [...new Set(names)];
   const counts = new Map<string, number>();

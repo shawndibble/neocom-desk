@@ -53,6 +53,17 @@ describe('parseSurveyScan', () => {
     expect(parseSurveyScan('Scordite\nVeldspar')).toBeNull();
   });
 
+  it('reads an ice scan, where a unit is 1,000 m3', () => {
+    const ice = [
+      'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km',
+      'Clear Icicle\t29\t29,000 m3\t5,940,000.00 ISK\t7,222 m',
+    ].join('\n');
+    expect(parseSurveyScan(ice)).toEqual([
+      { ore: 'Clear Icicle', units: 25, volume: 25_000, distanceM: 28_000 },
+      { ore: 'Clear Icicle', units: 29, volume: 29_000, distanceM: 7222 },
+    ]);
+  });
+
   it('returns null for text that is not a survey scan', () => {
     expect(parseSurveyScan('')).toBeNull();
     expect(parseSurveyScan('Tritanium\t1000\nPyerite\t500')).toBeNull();

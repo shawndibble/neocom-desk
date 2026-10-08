@@ -42,8 +42,9 @@ describe('shortOreNames', () => {
     expect(m.Scordite).toBe('Scordite');
   });
 
-  it('treats Dark Ochre as one name', () => {
-    expect(shortOreNames(['Dark Ochre'])['Dark Ochre']).toBe('Dark Ochre');
+  it('leaves names alone when the first word is not a quality prefix', () => {
+    const names = ['Dark Ochre', 'Clear Icicle', 'Blue Ice', 'Glacial Mass'];
+    expect(shortOreNames(names)).toEqual(Object.fromEntries(names.map((n) => [n, n])));
   });
 });
 

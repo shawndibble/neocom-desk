@@ -279,7 +279,7 @@ service cloud.firestore {
         && shareId.matches('^[0-9A-Za-z]{9}$')
         && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.keys().hasAll(['type', 'payload', 'createdAt', 'expiresAt'])
-        && request.resource.data.type in ['appraisal', 'fitting', 'dscan']
+        && request.resource.data.type in ['appraisal', 'fitting', 'dscan', 'survey']
         && request.resource.data.payload is map
         && request.resource.data.createdAt == request.time
         && request.resource.data.expiresAt is timestamp
@@ -295,6 +295,30 @@ service cloud.firestore {
           || (request.resource.data.payload.text is string
             && request.resource.data.payload.text.size() <= 50000));
       allow update, delete: if false;
+
+      // A Survey's scans (src/features/survey/surveyStore.ts): one create-only
+      // doc per pasted Survey Scan, under a `survey` share. Anyone holding the
+      // link may read them and add one, signed in or not: whoever keeps a
+      // Survey going after the pilot who started it left may have no account,
+      // and the 9-character id is what keeps it private, as for any share.
+      // The doc carries no uid. `createdAt` is the server's clock, so a scan
+      // can't be backdated; `expiresAt` must equal the survey's own, so the TTL
+      // policy on `surveyScans` removes it with the survey. A scan is only
+      // accepted while the survey exists and has not expired. The text cap
+      // mirrors MAX_SCAN_TEXT.
+      match /surveyScans/{scanId} {
+        allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
+        allow create: if get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(['text', 'createdAt', 'expiresAt'])
+          && request.resource.data.keys().hasAll(['text', 'createdAt', 'expiresAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 40000
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt
+            == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
+        allow update, delete: if false;
+      }
     }
     // Everything else: implicit deny.
   }
