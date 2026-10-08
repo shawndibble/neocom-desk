@@ -456,6 +456,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     corpName,
     offersFetchedAt,
     offersFromCache,
+    offersError,
+    reloadOffers,
     rows,
     catalog,
     playerLp,
@@ -643,7 +645,17 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       padded={false}
       className={isDesktop ? 'w-80 shrink-0' : undefined}
     >
-      {!ready ? (
+      {offersError ? (
+        <EmptyState
+          title={t('loyaltyStore.errorTitle')}
+          hint={t('loyaltyStore.errorHint')}
+          action={
+            <Button size="sm" onClick={reloadOffers}>
+              {t('loyaltyStore.retry')}
+            </Button>
+          }
+        />
+      ) : !ready ? (
         <div className="flex justify-center p-6">
           <Spinner />
         </div>
