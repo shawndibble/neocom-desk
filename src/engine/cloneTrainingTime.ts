@@ -62,6 +62,18 @@ function entryRate(
   );
 }
 
+/** Seconds each queue entry takes wearing `implants` the whole way. */
+export function queueEntrySeconds(
+  queue: readonly QueueEntryInput[],
+  base: Attributes,
+  implants: Implants,
+  cloneState: CloneState
+): number[] {
+  return queue.map((e) => timeToTrain(e.remainingSp, entryRate(e, base, implants, cloneState)));
+}
+
+const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+
 /** Seconds to finish `queue` wearing `implants` the whole way. */
 function queueSeconds(
   queue: readonly QueueEntryInput[],
@@ -69,36 +81,32 @@ function queueSeconds(
   implants: Implants,
   cloneState: CloneState
 ): number {
-  return queue.reduce(
-    (sum, e) => sum + timeToTrain(e.remainingSp, entryRate(e, base, implants, cloneState)),
-    0
-  );
+  return sum(queueEntrySeconds(queue, base, implants, cloneState));
 }
 
-/** Seconds to finish `queue` wearing `stay` for `stayBudget` seconds, then `target`. */
-function stayThenSwitchSeconds(
+/** Seconds each entry takes wearing `stay` for `stayBudget` seconds, then `target`. */
+export function stayThenSwitchEntrySeconds(
   queue: readonly QueueEntryInput[],
   base: Attributes,
   stay: Implants,
   target: Implants,
   cloneState: CloneState,
   stayBudget: number
-): number {
+): number[] {
   let budget = stayBudget;
-  let total = 0;
-  for (const e of queue) {
+  return queue.map((e) => {
     const stayRate = entryRate(e, base, stay, cloneState);
     const staySeconds = timeToTrain(e.remainingSp, stayRate);
     if (budget >= staySeconds) {
       budget -= staySeconds;
-      total += staySeconds;
-      continue;
+      return staySeconds;
     }
     const doneSp = (budget / 60) * stayRate;
-    total += budget + timeToTrain(e.remainingSp - doneSp, entryRate(e, base, target, cloneState));
+    const seconds =
+      budget + timeToTrain(e.remainingSp - doneSp, entryRate(e, base, target, cloneState));
     budget = 0;
-  }
-  return total;
+    return seconds;
+  });
 }
 
 export function cloneTrainingTimes(input: CloneTrainingInput): CloneTrainingResult[] {
@@ -133,13 +141,15 @@ export function cloneTrainingTimes(input: CloneTrainingInput): CloneTrainingResu
       deltaSeconds: total - wornSeconds,
     };
     if (cooldownSeconds !== null) {
-      const switched = stayThenSwitchSeconds(
-        queue,
-        baseAttributes,
-        wornImplants,
-        c.implants,
-        cloneState,
-        cooldownSeconds
+      const switched = sum(
+        stayThenSwitchEntrySeconds(
+          queue,
+          baseAttributes,
+          wornImplants,
+          c.implants,
+          cloneState,
+          cooldownSeconds
+        )
       );
       result.stayThenSwitch = { finish: at(switched), deltaSeconds: switched - wornSeconds };
     }
