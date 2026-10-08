@@ -112,7 +112,8 @@ describe('MovePlanModal', () => {
     await user.click(screen.getByRole('checkbox', { name: /select everything for alice/i }));
     expect(screen.getByText('3 stacks picked')).toBeTruthy();
 
-    const amarr = screen.getByRole('button', { name: /amarr viii/i });
+    const amarr = screen.getByRole('button', { name: 'Alice, Amarr VIII, 2 of 2 stacks' });
+    expect(amarr.getAttribute('aria-controls')).toBeTruthy();
     expect(amarr.getAttribute('aria-expanded')).toBe('true');
     await user.click(amarr);
     expect(amarr.getAttribute('aria-expanded')).toBe('false');
