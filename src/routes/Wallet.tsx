@@ -33,6 +33,8 @@ import {
 } from '@/features/character/wallet';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
+import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   useResolvedCharacterFilter,
@@ -171,8 +173,9 @@ export function Wallet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
-    useRouteSnapshot(loadWalletSnapshot, undefined, { cacheKey: 'wallet' });
+    useRouteSnapshot(loadWalletSnapshot, viewedCharacterId, { cacheKey: 'wallet' });
 
   // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
   // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
@@ -211,7 +214,12 @@ export function Wallet() {
     characterFilterCodec
   );
 
-  const resolvedWalletFilter = useResolvedCharacterFilter(walletCharacterFilter, activeCharacterId);
+  // A Character named in the URL is the one page subject: the balance panel
+  // follows it rather than a stored "all" default.
+  const resolvedWalletFilter = useResolvedCharacterFilter(
+    viewedCharacterId === undefined ? walletCharacterFilter : 'current',
+    activeCharacterId
+  );
   const showingAllWalletBalances =
     resolvedWalletFilter === 'all' ||
     resolvedWalletFilter.size !== 1 ||
@@ -710,13 +718,16 @@ export function Wallet() {
           title={t('wallet.journalTab')}
           meta={
             // Journal stays one Character (#2846): say so beside the title.
-            activeCharacter && (
-              <CharacterScopeReadout
-                scope="one"
-                characterId={activeCharacter.characterId}
-                characterName={activeCharacter.name}
-              />
-            )
+            <>
+              <WalletOriginCrumb />
+              {activeCharacter && (
+                <CharacterScopeReadout
+                  scope="one"
+                  characterId={activeCharacter.characterId}
+                  characterName={activeCharacter.name}
+                />
+              )}
+            </>
           }
           actions={
             <span className="flex items-center gap-2">

@@ -3289,6 +3289,9 @@
       "corp": "Corp · {{division}}",
       "missing": "Not included: {{names}}"
     },
+    "crumb": {
+      "wallet": "Wallet"
+    },
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",

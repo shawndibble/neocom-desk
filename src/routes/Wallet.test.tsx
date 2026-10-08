@@ -289,6 +289,75 @@ describe('Wallet', () => {
     expect(link).toHaveClass('text-accent');
   });
 
+  describe('opened for a chosen Character (issue #2936)', () => {
+    async function seedSecond() {
+      await db.characters.put({ characterId: 92, name: 'Bex Roan', ownerHash: 'oh2', addedAt: 2 });
+      await db.tokens.put({
+        characterId: 92,
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'],
+      });
+      server.use(
+        http.get('https://esi.evetech.net/characters/92/wallet', () => HttpResponse.json(777)),
+        http.get('https://esi.evetech.net/characters/92/wallet/journal', () =>
+          HttpResponse.json(journalPage1, { headers: { 'X-Pages': '1' } })
+        ),
+        http.get('https://esi.evetech.net/characters/92/loyalty/points', () =>
+          HttpResponse.json([])
+        ),
+        http.get('https://esi.evetech.net/characters/92/wallet/transactions', () =>
+          HttpResponse.json([])
+        )
+      );
+    }
+
+    it.each(['char', 'chars'])(
+      'shows that Character via ?%s= without switching the active one',
+      async (key) => {
+        await seedSecond();
+        window.history.pushState({}, '', `/wallet/journal?${key}=92`);
+        render(<App />);
+        expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+        expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+      }
+    );
+
+    it('shows the ‹ Wallet crumb only when arriving from the Wallet chart', async () => {
+      await seedSecond();
+      window.history.pushState({}, '', '/wallet/journal?char=92');
+      const plain = render(<App />);
+      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('main')).queryByRole('link', { name: 'Wallet' })
+      ).not.toBeInTheDocument();
+      plain.unmount();
+
+      window.history.pushState(
+        { usr: { origin: 'wallet' }, key: 'k1', idx: 1 },
+        '',
+        '/wallet/journal?char=92'
+      );
+      render(<App />);
+      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('main')).getByRole('link', { name: /Wallet/ })
+      ).toHaveAttribute('href', '/wallet');
+    });
+
+    it('shows the grant note for a Character without the wallet scope', async () => {
+      await seedSecond();
+      await db.tokens.update(92, { scopes: [] });
+      window.history.pushState({}, '', '/wallet/journal?char=92');
+      render(<App />);
+      expect(await screen.findByText('Bex Roan only')).toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole('button', { name: /grant|log in again/i })).length
+      ).toBeGreaterThan(0);
+    });
+  });
+
   it('says the Journal reads one Character (issue #2846)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
