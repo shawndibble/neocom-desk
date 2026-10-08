@@ -638,6 +638,11 @@ export interface OwnedStockLocation {
   locationType: EngineAsset['location_type'];
 }
 
+/** One corp hangar division (1-7) at an owned-stock location (issue #2941). */
+export interface OwnedStockHangar extends OwnedStockLocation {
+  division: number;
+}
+
 /**
  * How a Build Plan's "use detected" owned-stock total is scoped: every
  * placement (`everywhere`, the default and today's only behavior), or only
@@ -655,6 +660,14 @@ export type OwnedStockScope =
        * selected locations counts, as before.
        */
       excludedContainers?: readonly number[];
+      /**
+       * Corp hangar divisions chosen on their own (issue #2941), for a station
+       * that is not in `locations`: only stock inside them counts. A station
+       * in `locations` counts everything under it regardless.
+       */
+      hangars?: readonly OwnedStockHangar[];
+      /** Containers (`item_id`) chosen on their own, same rule as `hangars`. */
+      containers?: readonly number[];
     };
 
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
