@@ -51,7 +51,7 @@ import {
 } from './boardSeverity';
 import { contractsDeadlineNote, mailSummary } from './boardSummary';
 import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
-import { extractableSp, extractionTotalIsk, extractorCount } from '@/engine/spExtraction';
+import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import type { CorpBoardItem } from '@/engine/corp/board';
@@ -587,7 +587,7 @@ export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
                 ? '…'
                 : price.net === null
                   ? '—'
-                  : formatIskCompact(extractionTotalIsk(data.totalSp, price.net) ?? 0)
+                  : formatIskCompact(price.net)
             }
             severity="clear"
           />

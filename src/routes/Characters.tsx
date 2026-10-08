@@ -1414,10 +1414,13 @@ export function Characters() {
    * carries membership per row instead, and `GroupSectionHeader`'s
    * rename/reorder/delete stay card-view only.
    */
-  const extractionTotals = tableRows.map((row) =>
-    row.totalSp === undefined ? 0 : extractorCount(row.totalSp)
+  const extractorsReady = tableRows.reduce(
+    (sum, row) =>
+      row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThreshold)
+        ? sum + extractorCount(row.totalSp)
+        : sum,
+    0
   );
-  const extractorsReady = extractionTotals.reduce((sum, n) => sum + n, 0);
   const extractionSummary =
     !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
       ? null
@@ -1425,6 +1428,7 @@ export function Characters() {
         ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
         : t('characters.extractionTotal', {
             isk: formatIskCompact(extractionPrices.net * extractorsReady),
+            each: formatIskCompact(extractionPrices.net),
             hub: extractionPrices.hubName,
           });
 

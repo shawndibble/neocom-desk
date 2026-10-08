@@ -3317,7 +3317,7 @@
     },
     "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready",
-    "extractionTotal": "Extraction net across characters: {{isk}} ISK ({{hub}}, sell injector − buy extractor, before fees)",
+    "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
     "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}"
   },
   "overview": {
@@ -3396,7 +3396,7 @@
       "spExtractionReady_other": "{{count}} extractors ready",
       "spExtractionThreshold": "Flags at {{sp}} spare SP",
       "spExtractionOff": "Monitoring is off — turn it on in Settings",
-      "extractionNet": "Net ISK",
+      "extractionNet": "Net / extraction",
       "extractionBasis": "Sell Large Skill Injector − buy Skill Extractor at {{hub}}, before fees",
       "mail": "Mail",
       "mailUnread_one": "{{count}} unread",
