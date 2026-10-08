@@ -818,6 +818,28 @@ export interface ProductionRunRecord {
 }
 
 /**
+ * One Character's net worth on one UTC day (issue #2865): numbers only, never
+ * tokens. Synced as Editable Data; last write wins per id.
+ */
+export interface NetWorthSnapshotRecord {
+  /** `${characterId}:${day}` */
+  id: string;
+  characterId: number;
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: string;
+  wallet: number;
+  /** Assets priced at `hubId` that day, PLEX stacks removed. */
+  assetValue: number;
+  /** Hangar PLEX × the global PLEX price. */
+  plexValue: number;
+  /** Escrow held by open buy orders. */
+  escrow: number;
+  hubId: string;
+  /** Epoch ms of the write. */
+  updatedAt: number;
+}
+
+/**
  * One past wallet sale linked to a Production Run's output ("Link Past
  * Sale", issue #525) — a picker over the character's already-cached
  * `WalletTransaction[]` (`features/character/wallet.ts`), never a new ESI
@@ -1030,6 +1052,7 @@ export const db = new Dexie('neocom') as Dexie & {
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
+  netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
@@ -1491,4 +1514,34 @@ db.version(21).stores({
   hullFitCache: 'key, savedAt',
   ansiblexGates: 'id',
   industryJobHistory: 'characterId',
+});
+
+// Adds `netWorthSnapshots`, the daily per-Character net worth history (issue #2865).
+db.version(22).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  esiCacheMeta: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
+  ansiblexGates: 'id',
+  industryJobHistory: 'characterId',
+  netWorthSnapshots: 'id, characterId',
 });
