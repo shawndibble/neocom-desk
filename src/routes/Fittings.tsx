@@ -681,7 +681,7 @@ function FittingsPage() {
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
-              {t('fittings.load.tooLargeToShare')}
+              {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
             </p>
           )}
           {/* Only a Load that opened a Fitting describes this one; a failed Load's
