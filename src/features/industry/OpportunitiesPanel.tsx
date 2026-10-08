@@ -552,14 +552,14 @@ export function OpportunitiesPanel({
         </span>
       )}
       {manualRefreshOnly && (
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          {t('industry.opportunitiesRefresh')}
-        </Button>
-      )}
-      {manualRefreshOnly && (
-        <span className="text-xs text-text-dim">
-          {t('industry.opportunitiesManualOnly', { count: AUTO_RECALCULATE_MAX })}
-        </span>
+        <>
+          <Button size="sm" onClick={refresh} disabled={loading}>
+            {t('industry.opportunitiesRefresh')}
+          </Button>
+          <span className="text-xs text-text-dim">
+            {t('industry.opportunitiesManualOnly', { count: AUTO_RECALCULATE_MAX })}
+          </span>
+        </>
       )}
     </>
   );
