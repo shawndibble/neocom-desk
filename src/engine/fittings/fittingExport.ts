@@ -199,7 +199,7 @@ export function fittingToMultibuy(
   owned?: ReadonlyMap<number, number>
 ): string {
   return [...fittingItemCounts(fitting, cloneImplants)]
-    .map(([typeId, quantity]) => [typeId, quantity - Math.min(owned?.get(typeId) ?? 0, quantity)])
+    .map(([typeId, quantity]) => [typeId, Math.max(quantity - (owned?.get(typeId) ?? 0), 0)])
     .filter(([, need]) => need > 0)
     .map(([typeId, need]) => `${nameFor(typeId)}\t${need}`)
     .join('\n');

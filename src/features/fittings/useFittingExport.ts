@@ -17,7 +17,7 @@ import { ownedAtStation } from '@/engine/market/appraisalOwned';
 import { loadAllCharactersAssets } from '@/features/character/assets';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
-import { getTradeHub } from '@/market/hubs';
+import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { exportFitting, fittingShareCode, type FittingExportKind } from './fittingExportText';
 import { useTimedToast, NOTICE_MS } from '@/components/ui/useTimedToast';
 
@@ -75,9 +75,13 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       const ownedPref = useAppraisalOwnedPref.getState();
       const marketHub = useMarketHub.getState();
       await Promise.all([ownedPref.hydrate(), marketHub.hydrate()]);
-      const hub = getTradeHub(useMarketHub.getState().value);
-      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? hub?.stationId;
-      if (stationId === undefined) throw new Error('no station');
+      const marketHubStation = getTradeHub(useMarketHub.getState().value)?.stationId;
+      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? marketHubStation;
+      const station = TRADE_HUBS.find((h) => h.stationId === stationId);
+      if (stationId === undefined || !station) {
+        setNotice(t('fittings.export.copyFailed'));
+        return;
+      }
       const { entries } = await loadAllCharactersAssets();
       const owned = ownedAtStation(
         entries.map((entry) => entry.assets),
@@ -90,7 +94,7 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
         return;
       }
       await writeToClipboard(text);
-      setNotice(t('fittings.export.copied.multibuyMinusOwned', { station: hub?.systemName ?? '' }));
+      setNotice(t('fittings.export.copied.multibuyMinusOwned', { station: station.systemName }));
     } catch {
       setNotice(t('fittings.export.copyFailed'));
     }
