@@ -36,6 +36,7 @@ export function FullIskTotal({ value, compact = false }: { value: number; compac
   );
 
   const full = formatIsk(value, 0);
+  const short = formatIskCompact(value);
 
   async function copy() {
     try {
@@ -52,15 +53,17 @@ export function FullIskTotal({ value, compact = false }: { value: number; compac
     <button
       type="button"
       onClick={() => void copy()}
-      aria-label={t('market.appraisal.copyTotal', {
-        amount: t('common.iskExact', { amount: full }),
-      })}
+      aria-label={
+        compact
+          ? t('market.appraisal.copyTotalCompact', { short, full })
+          : t('market.appraisal.copyTotal', { amount: t('common.iskExact', { amount: full }) })
+      }
       className={`cursor-copy rounded-xs hover:underline ${interactiveClassName} ${focusRingClassName}`}
     >
       {compact
-        ? formatIskCompact(value)
+        ? short
         : /* Exception: the exact figure is printed beside the shorthand, so IskAmount's tooltip would repeat it. */
-          t('market.appraisal.totalFull', { full, short: formatIskCompact(value) })}
+          t('market.appraisal.totalFull', { full, short })}
     </button>
   );
 
@@ -78,7 +81,9 @@ export function FullIskTotal({ value, compact = false }: { value: number; compac
           role="status"
           className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md"
         >
-          {t('market.appraisal.copiedToClipboard')}
+          {compact
+            ? t('market.appraisal.copiedAmount', { amount: t('common.iskExact', { amount: full }) })
+            : t('market.appraisal.copiedToClipboard')}
         </span>
       )}
     </span>

@@ -51,7 +51,9 @@ for (const width of [1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Appraise', exact: true }).click();
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
-    const sell = page.getByRole('button', { name: /^Copy 6\d,\d{3},\d{3},\d{3} ISK$/ }).first();
+    const sell = page
+      .getByRole('button', { name: /^Copy 6\d\.\dB ISK \(6\d,\d{3},\d{3},\d{3}\)$/ })
+      .first();
     await expect(sell).toBeVisible();
     // The shorthand alone is printed; the full digits live in the hover and the copy.
     await expect(sell).toHaveText(/^6\d\.\dB$/);

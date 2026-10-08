@@ -250,6 +250,8 @@
 
   @supports (animation-timeline: scroll()) {
     .tab-scroller {
+      /* A tab scrolled into view stops clear of the fade, not under it. */
+      scroll-padding-inline: 1.5rem;
       animation:
         tab-fade-left linear both,
         tab-fade-right linear both;
