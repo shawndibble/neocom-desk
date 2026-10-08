@@ -3714,9 +3714,11 @@
   "wallet": {
     "title": "Wallet",
     "netWorth": {
-      "title": "Net worth",
+      "title": "Worth",
       "total": "Net worth",
-      "layersLabel": "Layers",
+      "seriesButton": "Series: {{shown}} of {{total}}",
+      "seriesSearch": "Filter series",
+      "seriesNoResults": "No matching series",
       "layersTable": "Net worth by layer",
       "layerColumn": "Layer",
       "valueColumn": "Value",

@@ -97,7 +97,7 @@ beforeAll(async () => {
   const { unmount } = render(<App />);
   // Wait for real content, not just the shell: the first data load (Dexie, MSW,
   // the ESI cache) is part of the cold cost too.
-  await screen.findByText(/4,500\.00/, {}, { timeout: 25_000 });
+  await screen.findByText('EverMarks', {}, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
 }, 30_000);
@@ -129,12 +129,12 @@ beforeEach(seed);
 describe('Wallet', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
   });
 
   it('shows EverMarks (Paragon LP) alongside ISK, and other loyalty points in a table below', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.getByText('250')).toBeInTheDocument();
     expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
     expect(screen.getByText('5,000')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('Wallet', () => {
 
   it("links each loyalty row's corporation name to the LP Store, with a trailing caret and no store column", async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // A real link, not just a row click: a keyboard or screen-reader user
     // reaches the LP Store without the row. Not a Show Info link any more.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
@@ -162,13 +162,13 @@ describe('Wallet', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /LP Store corporation/ })).toBeInTheDocument();
   });
 
   it('has no row menu or More actions button on a loyalty row: the name and row open the store', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
     expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(row);
@@ -209,7 +209,7 @@ describe('Wallet', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.getByText('Log in again to see your loyalty points')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
   });
@@ -409,8 +409,7 @@ describe('Wallet', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     render(<App />);
-    expect(await screen.findByText(/999\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
   });
 
   it('warns that the journal is incomplete when a page fails mid-pagination (D4)', async () => {
@@ -566,12 +565,24 @@ describe('Wallet', () => {
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there is no data at all', async () => {
+  it('still shows the Worth panel, with a dash for net worth, when the wallet read fails and nothing is cached', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     render(<App />);
-    expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
+    expect(screen.getByText('Net worth', { selector: 'p' }).nextElementSibling).toHaveTextContent(
+      '—'
+    );
+  });
+
+  it('puts net worth, EverMarks and the series picker in one Worth panel, with no scope readout', async () => {
+    render(<App />);
+    const header = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
+    expect(within(header!).getByRole('button', { name: /^Series:/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Balance' })).toBeNull();
+    expect(screen.queryByText(/ only$/)).toBeNull();
   });
 
   it('distinguishes a failed manual Refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
@@ -585,7 +596,7 @@ describe('Wallet', () => {
     render(<App />);
 
     // Initial load succeeds live — no banner at all yet.
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).not.toBeInTheDocument();
 
     server.use(
@@ -742,27 +753,25 @@ describe('Wallet', () => {
       // exactly one pilot in Dexie.
       render(<App />);
 
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
     });
 
-    it('puts the character filter in the balance panel header, and keeps it there across the panel swap', async () => {
+    it('puts the character filter in the Worth panel header, and keeps it there across the panel swap', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
       render(<App />);
 
       // In the panel's own title bar, not a bare row floating above it.
-      await screen.findByText(/4,500\.00/);
-      const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
+      await screen.findByText('EverMarks');
+      const balanceHeader = screen.getByRole('heading', { name: 'Worth' }).closest('header');
       expect(balanceHeader).not.toBeNull();
       await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
-      const wideHeader = (await screen.findByRole('heading', { name: 'Net worth' })).closest(
-        'header'
-      );
+      const wideHeader = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
       expect(
         within(wideHeader!).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
@@ -772,7 +781,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       render(<App />);
 
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
       expect(screen.queryByText(/1,500\.00/)).not.toBeInTheDocument();
     });
@@ -783,15 +792,15 @@ describe('Wallet', () => {
       await grantSnapshotScopes(CHAR_ID, 92);
       render(<App />);
 
-      await screen.findByText(/4,500\.00/);
+      await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
-      // 4,500.00 + 1,500.00 = 6,000.00 — the Net worth line, distinct from either row.
-      expect(await screen.findByText(/6,000\.00/)).toBeInTheDocument();
+      // 4,500 + 1,500 = 6,000 — the Net worth figure, distinct from either row's own.
+      expect(await screen.findByText('6,000')).toBeInTheDocument();
     });
 
     it('drills into a Character from its row as route state, and Back returns to all', async () => {
@@ -842,7 +851,7 @@ describe('Wallet', () => {
       // CHAR_C deliberately gets no token at all — never granted the scope.
       render(<App />);
 
-      await screen.findByText(/4,500\.00/);
+      await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
@@ -858,7 +867,7 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
       expect(screen.queryByText(/hasn't granted wallet access/)).not.toBeInTheDocument();
-      expect(await screen.findByRole('heading', { name: 'Balance' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Balance by character' })).not.toBeInTheDocument();
     });
   });

@@ -33,6 +33,15 @@ const snap = (characterId: number, wallet: number): NetWorthSnapshotRow => ({
   updatedAt: 1,
 });
 
+/** The Net worth figure in the stat row (the table's column header is a `th`, not a `p`). */
+function netWorthFigure() {
+  return screen.getByText('Net worth', { selector: 'p' }).nextElementSibling as HTMLElement;
+}
+
+async function openSeries(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Series:/ }));
+}
+
 async function seed(opts: { covered: number[]; ids?: number[] }) {
   for (const id of opts.ids ?? [1, 2, 3]) {
     await db.tokens.put({
@@ -77,7 +86,7 @@ describe('NetWorthPanel, several Characters', () => {
     renderPanel();
 
     // (100 + 1000 + 200 + 30 + 4) + (500 + 1000 + 200 + 30 + 4) = 3068
-    expect(await screen.findByText(/3,068\.00/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,068$/));
     expect(screen.getByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Not included: Cy/)).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Balance by character' });
@@ -99,9 +108,10 @@ describe('NetWorthPanel, several Characters', () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await screen.findByText(/4,309\.00/);
-    await user.click(screen.getByRole('checkbox', { name: 'PLEX' }));
-    expect(await screen.findByText(/3,709\.00/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
+    await openSeries(user);
+    await user.click(await screen.findByRole('option', { name: 'PLEX' }));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,709$/));
     expect(screen.getByText('Excludes PLEX')).toBeInTheDocument();
   });
 
@@ -109,20 +119,23 @@ describe('NetWorthPanel, several Characters', () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await screen.findByText(/4,309\.00/);
-    for (const name of ['Assets', 'PLEX', 'Order escrow', 'Sell orders']) {
-      await user.click(screen.getByRole('checkbox', { name }));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
+    await openSeries(user);
+    for (const name of ['Assets', 'PLEX', 'Order escrow', 'Sell orders', 'ISK']) {
+      await user.click(await screen.findByRole('option', { name }));
     }
-    expect(screen.getByRole('checkbox', { name: 'ISK' })).toBeDisabled();
+    // ISK was the last one standing, so the click on it changed nothing.
+    expect(screen.getByRole('option', { name: 'ISK' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: 'Series: 1 of 5' })).toBeInTheDocument();
   });
 
   it('a Character checkbox hides its line and total, and the last one cannot be unchecked', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2] });
     const { onDrill } = renderPanel();
-    await screen.findByText(/3,068\.00/);
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^3,068$/));
     await user.click(screen.getByRole('checkbox', { name: 'Show Bo on the chart' }));
-    expect(await screen.findByText(/1,334\.00/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,334$/));
     expect(screen.getByRole('checkbox', { name: 'Show Ava on the chart' })).toBeDisabled();
     // The checkbox is not a drill.
     expect(onDrill).not.toHaveBeenCalled();
@@ -141,8 +154,9 @@ describe('NetWorthPanel, several Characters', () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });
     renderPanel();
-    await screen.findByText(/4,309\.00/);
-    await user.click(screen.getByRole('checkbox', { name: 'Assets' }));
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^4,309$/));
+    await openSeries(user);
+    await user.click(await screen.findByRole('option', { name: 'Assets' }));
     await vi.waitFor(async () =>
       expect((await db.settings.get('netWorthHiddenLayers'))?.value).toEqual(['assets'])
     );
@@ -166,6 +180,24 @@ describe('NetWorthPanel, one Character', () => {
 
     await user.click(screen.getByRole('button', { name: /All characters/ }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  it('shows one Worth panel: whole-number net worth, the series picker, no portrait or scope text', async () => {
+    await seed({ covered: [1] });
+    renderPanel({ mode: 'single', characters: [A], stats: <p>EverMarks</p> });
+    expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^1,334$/));
+    expect(screen.getByText('EverMarks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Series: 5 of 5' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByText(/ only$/)).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('shows a dash, not 0, for a Character short of permissions', async () => {
+    await seed({ covered: [] });
+    renderPanel({ mode: 'single', characters: [A] });
+    await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent('—'));
   });
 
   it('says the layers start on the first snapshot day while history is short', async () => {

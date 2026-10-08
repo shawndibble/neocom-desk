@@ -43,7 +43,6 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { resolveNames } from '@/features/character/names';
 import type { CachedResult } from '@/esi/cache';
-import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
@@ -52,7 +51,6 @@ import { WALLET_TABS } from '@/app/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { formatIsk } from '@/lib/isk';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
@@ -588,30 +586,14 @@ export function Wallet() {
             />
           ) : (
             <>
-              <Panel title={t('wallet.balanceTab')} meta={walletCharacterFilterMeta}>
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                  <div>
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('wallet.isk')}
-                    </p>
-                    {balanceNeedsReauth ? (
-                      <GrantBanner
-                        characterId={activeCharacterId}
-                        endpoints={['getCharacterWallet']}
-                        title={t('wallet.reauthTitle')}
-                        hint={t('wallet.reauthHint')}
-                        actionLabel={t('wallet.reauthAction')}
-                      />
-                    ) : balanceResult ? (
-                      <p
-                        className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
-                      >
-                        {formatIsk(balanceResult.data, 2)}
-                      </p>
-                    ) : (
-                      <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
-                    )}
-                  </div>
+              <NetWorthPanel
+                mode="single"
+                characters={activeCharacters}
+                liveWallet={liveWallet}
+                filterMeta={walletCharacterFilterMeta}
+                onDrill={drillInto}
+                onBack={leaveDrill}
+                stats={
                   <div>
                     <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                       {t('wallet.everMarks')}
@@ -626,36 +608,44 @@ export function Wallet() {
                         : t('common.unknown')}
                     </p>
                   </div>
-                </div>
-                {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                  <p className="mt-3 text-[0.6875rem] text-warning uppercase">
-                    {t(offlineTitleKey)}
-                  </p>
-                )}
-                {journalNeedsReauth ? (
-                  <div className="mt-4">
-                    <GrantBanner
-                      characterId={activeCharacterId}
-                      endpoints={['getCharacterWalletJournal']}
-                      title={t('wallet.reauthTitle')}
-                      hint={t('wallet.reauthHint')}
-                      actionLabel={t('wallet.reauthAction')}
-                    />
-                  </div>
-                ) : (
-                  journalTruncated && (
-                    <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
-                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                    </p>
-                  )
-                )}
-              </Panel>
-              <NetWorthPanel
-                mode="single"
-                characters={activeCharacters}
-                liveWallet={liveWallet}
-                onDrill={drillInto}
-                onBack={leaveDrill}
+                }
+                notices={
+                  <>
+                    {balanceNeedsReauth && (
+                      <div className="mt-3">
+                        <GrantBanner
+                          characterId={activeCharacterId}
+                          endpoints={['getCharacterWallet']}
+                          title={t('wallet.reauthTitle')}
+                          hint={t('wallet.reauthHint')}
+                          actionLabel={t('wallet.reauthAction')}
+                        />
+                      </div>
+                    )}
+                    {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+                      <p className="mt-3 text-[0.6875rem] text-warning uppercase">
+                        {t(offlineTitleKey)}
+                      </p>
+                    )}
+                    {journalNeedsReauth ? (
+                      <div className="mt-4">
+                        <GrantBanner
+                          characterId={activeCharacterId}
+                          endpoints={['getCharacterWalletJournal']}
+                          title={t('wallet.reauthTitle')}
+                          hint={t('wallet.reauthHint')}
+                          actionLabel={t('wallet.reauthAction')}
+                        />
+                      </div>
+                    ) : (
+                      journalTruncated && (
+                        <p className="mt-4 px-1 text-[0.6875rem] text-warning uppercase">
+                          {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                        </p>
+                      )
+                    )}
+                  </>
+                }
               />
             </>
           )}
