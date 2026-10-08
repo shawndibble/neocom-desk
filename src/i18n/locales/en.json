@@ -4380,6 +4380,7 @@
       "save_other": "Save all {{count}} days"
     },
     "valueAffix": "value",
+    "noPriceLabel": "No price",
     "moreActions": "More actions",
     "sections": {
       "open": "Open · {{count}}",
