@@ -2098,6 +2098,18 @@
       "none": "Your plan is already covered by unallocated SP — no injectors needed.",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
     },
+    "skillsToBuy": {
+      "title": "Skills to buy",
+      "unknown": "Unknown until your skills load.",
+      "none": "You already have every skill in this plan.",
+      "noSellOrders": "No sell orders at {{hub}}",
+      "total": "Total cost",
+      "unpriced_one": "{{count}} skill without a price is left out of the total.",
+      "unpriced_other": "{{count}} skills without a price are left out of the total.",
+      "copy": "Copy multibuy list",
+      "copied": "Multibuy list copied",
+      "copyFailed": "Couldn't copy to the clipboard."
+    },
     "milestone": {
       "add": "Add milestone…",
       "addTitle": "Name this milestone",
