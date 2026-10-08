@@ -82,6 +82,20 @@ export function loadCharacterImplants(characterId: number): Promise<CachedResult
 }
 
 /**
+ * Same data as loadCharacterImplants, with the auth-failure state exposed for
+ * views (Clones) that show a re-login prompt for a missing read-implants grant
+ * instead of silently reading it as "no implants".
+ */
+export function loadCharacterImplantsWithStatus(
+  characterId: number
+): Promise<StatusResult<number[]>> {
+  const { fetchLive, conditional } = conditionalFetch((options) =>
+    getCharacterImplants(characterId, options)
+  );
+  return loadWithCacheStatus(characterId, KEYS.implants, fetchLive, { conditional });
+}
+
+/**
  * Fetches the skill queue by ETag. The capture also carries that response's
  * own `Expires` header, so the shared cache sizes a freshness window from it
  * (issue #41) — read on four routes (Overview, Skills, Plans, Industry), so a

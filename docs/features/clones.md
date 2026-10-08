@@ -67,7 +67,7 @@ Spinner (first load, until hydrated) -> no active Character: `Navigate('/charact
 
 ## Observed gaps
 
-- Only jump clones and home clone on this page (`jump_clones` only, `Clones.tsx:172`; `getCharacterImplants` not loaded here). The active clone's implants are on Skills › Trained (`ImplantChip` per fitted implant, "N of 5 slots empty", `Skills.tsx`; needs `esi-clones.read_implants.v1`). Player question "what am I wearing right now?" -> Skills › Trained, not Clones.
+- The page now also loads (#3001) the Character's current system, the worn clone's implants (`getCharacterImplants`, missing grant = a `GrantBanner` above the table, never replacing it) and the active skill queue (cached, nothing rendered from it yet). Only the jumps-away figures render so far: a Jumps away column and a figure on the home line, each a `PlaceJumpsLink` to the route planner on the saved route preference (no page picker). The worn clone's implants are still shown only on Skills › Trained; unnamed clones read dimmed "Unnamed".
 - No Show Info/map link for clone locations; no search/filter.
 - `clones.emptyHint` says "Reconnect" even when nothing is wrong beyond an empty cache.
 - Cooldown is only 24h minus Infomorph level; Clone State not shown.

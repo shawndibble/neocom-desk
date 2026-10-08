@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -64,6 +64,11 @@ const skillsPayload = {
 const server = setupServer(
   http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json(clonesPayload)),
   http.get(`${ESI}/characters/${CHAR_ID}/skills`, () => HttpResponse.json(skillsPayload)),
+  http.get(`${ESI}/characters/${CHAR_ID}/location`, () =>
+    HttpResponse.json({ solar_system_id: 30000142 })
+  ),
+  http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.json([19540])),
+  http.get(`${ESI}/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
   http.get(`${ESI}/universe/stations/60003760`, () =>
     HttpResponse.json({
       station_id: 60003760,
@@ -230,7 +235,7 @@ describe('Clones', () => {
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
   });
 
-  it('shows a jump clone name beside its location, trimmed, and nothing for a blank name', async () => {
+  it('shows a jump clone name beside its location, trimmed, and "Unnamed" for a blank name', async () => {
     const station = { location_id: 60003760, location_type: 'station' as const, implants: [] };
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
@@ -257,7 +262,7 @@ describe('Clones', () => {
     const unnamed = cells.filter((td) => !/Alpha|Beta/.test(td.textContent ?? ''));
     expect(unnamed).toHaveLength(2);
     for (const td of unnamed) {
-      expect(td).toHaveTextContent(/^Jita IV - Moon 4 - Caldari Navy Assembly Plant$/);
+      expect(td).toHaveTextContent(/^Unnamed · Jita IV - Moon 4 - Caldari Navy Assembly Plant/);
     }
   });
 
@@ -311,5 +316,77 @@ describe('Clones', () => {
     );
     render(<App />);
     expect(await screen.findByText('Log in again to see your clones')).toBeInTheDocument();
+  });
+
+  it('shows jumps away on the home clone and each clone, the count opening the route to that station', async () => {
+    render(<App />);
+    // The Character is in Jita's system, the home and first clone's station: 0 jumps.
+    const counts = await screen.findAllByRole('button', { name: '0 jumps' });
+    expect(counts).toHaveLength(2);
+    // The structure is outside the ACL: no system, so the existing unknown text.
+    expect(screen.getByText('-')).toBeInTheDocument();
+    fireEvent.click(counts[1]);
+    await waitFor(() => expect(window.location.pathname).not.toBe('/clones'));
+    expect(window.location.search).toContain('30000142');
+  });
+
+  it('shows the unknown text when the Character location is unavailable', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/location`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    await waitFor(() => expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(3));
+    expect(screen.queryByRole('button', { name: /jump/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+  });
+
+  it('reads an unnamed clone as a dimmed "Unnamed"', async () => {
+    render(<App />);
+    const unnamed = await screen.findAllByText('Unnamed');
+    expect(unnamed).toHaveLength(2);
+    expect(unnamed[0]).toHaveClass('text-text-dim');
+  });
+
+  it('loads and caches the worn clone implants and the training queue', async () => {
+    await db.tokens.update(CHAR_ID, {
+      scopes: [
+        'esi-clones.read_clones.v1',
+        'esi-skills.read_skills.v1',
+        'esi-skills.read_skillqueue.v1',
+      ],
+    });
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    await waitFor(async () => {
+      expect((await db.esiCache.get([CHAR_ID, 'implants']))?.value).toEqual([19540]);
+      expect(await db.esiCache.get([CHAR_ID, 'skillqueue'])).toBeDefined();
+    });
+  });
+
+  it('falls back to the cached worn implants offline, with no re-login prompt', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'implants', value: [19540], fetchedAt: 1 });
+    server.use(http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.error()));
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    expect(
+      screen.queryByText('Log in again to see the implants you are wearing')
+    ).not.toBeInTheDocument();
+  });
+
+  it('prompts a re-login for a missing read-implants grant without hiding the clones table', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(
+      await screen.findByText('Log in again to see the implants you are wearing')
+    ).toBeInTheDocument();
+    expect(screen.getByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
   });
 });
