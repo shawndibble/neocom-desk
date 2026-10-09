@@ -92,37 +92,37 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       <SelectTrigger size="sm" aria-label={t('survey.historyLabel')} className="w-56 max-w-full">
         <SelectValue placeholder={t('survey.historyPlaceholder')}>
           {/* The item's remove button lives in its children, which Radix would copy up here. */}
-          {currentId !== null ? labels[currentId] : undefined}
+          {currentId !== null ? (labels[currentId] ?? t('common.loading')) : undefined}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {history.map((entry) => (
-          <SelectItem key={entry.id} value={entry.id} className="pr-1">
-            <span className="flex items-center justify-between gap-2">
-              <span className="min-w-0 flex-1 truncate">
-                {labels[entry.id] ?? t('common.loading')}
+        {history.map((entry) => {
+          const label = labels[entry.id] ?? t('common.loading');
+          return (
+            <SelectItem key={entry.id} value={entry.id}>
+              <span className="flex items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
+                <span
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <IconButton
+                    icon={<Icon.Close />}
+                    label={t('survey.historyRemove', {
+                      name: label,
+                    })}
+                    tooltip={t('survey.historyRemoveShort')}
+                    variant="plain"
+                    size="row"
+                    onClick={() => void forgetSurvey(entry.id)}
+                  />
+                </span>
               </span>
-              {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
-              <span
-                onPointerDown={(e) => e.stopPropagation()}
-                onPointerUp={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-              >
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('survey.historyRemove', {
-                    name: labels[entry.id] ?? t('common.loading'),
-                  })}
-                  tooltip={t('survey.historyRemoveShort')}
-                  variant="plain"
-                  size="row"
-                  onClick={() => void forgetSurvey(entry.id)}
-                />
-              </span>
-            </span>
-          </SelectItem>
-        ))}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );
