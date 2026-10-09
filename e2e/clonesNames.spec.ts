@@ -110,6 +110,13 @@ test('Settings > Data age stays inside a 390px page', async ({ page }) => {
     dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByRole('heading', { name: /^Data age$/i })).toBeVisible();
+  // Folded by default: the log's rows are absent, only the header shows.
+  await expect(page.getByRole('table', { name: /data age/i })).toHaveCount(0);
+  const caret = page.getByRole('button', { name: /show data age/i });
+  await expect(caret).toBeVisible();
+  const box = await caret.boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(40);
+  expect(box!.height).toBeGreaterThanOrEqual(40);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );

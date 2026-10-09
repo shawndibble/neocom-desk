@@ -8484,6 +8484,10 @@
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",
     "columnUpdated": "Last updated",
+    "summary_one": "{{count}} source · last update {{age}}",
+    "summary_other": "{{count}} sources · last update {{age}}",
+    "show": "Show data age",
+    "hide": "Hide data age",
     "emptyTitle": "Nothing fetched yet",
     "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
