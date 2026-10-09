@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import { moveHighlight, COMBOBOX_NAV_KEYS, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
@@ -113,7 +114,8 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
               role="option"
               aria-selected={index === highlight}
               className={cx(
-                'flex min-h-11 cursor-pointer items-center border-l-2 px-3 text-sm md:min-h-7 touch:min-h-11',
+                tappableRowClassName,
+                'flex cursor-pointer items-center border-l-2 px-3 text-sm',
                 index === highlight
                   ? 'border-accent bg-panel-2 font-semibold'
                   : 'border-transparent hover:bg-panel-2'
