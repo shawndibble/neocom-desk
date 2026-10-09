@@ -1,7 +1,7 @@
 /**
  * What the chart's colours and lines mean: a swatch per ore layer (the same
- * tones the layers are drawn in), the mining-rate bars, and the dashed run to
- * the finish. The chart itself carries no labels for these.
+ * tones the layers are drawn in) and the mining-rate bars. The chart itself
+ * carries no labels for these.
  */
 import { useTranslation } from 'react-i18next';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -24,10 +24,6 @@ export function SurveyLegend({ summary }: { summary: SurveySummary }) {
       <li className="flex items-center gap-1.5">
         <span aria-hidden="true" className="size-2.5 rounded-xs bg-accent-dim" />
         {t('survey.legendRate')}
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span aria-hidden="true" className="w-4 border-t border-dashed border-text" />
-        {t('survey.legendProjection')}
       </li>
     </ul>
   );

@@ -160,10 +160,9 @@ describe('SurveyBoard', () => {
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
     });
 
-    it('explains the chart: a swatch per ore, the rate and the projection', () => {
+    it('explains the chart: a swatch per ore, and the rate', () => {
       render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getByText('Mining rate')).toBeTruthy();
-      expect(screen.getByText('Dashed: finish at the current pace')).toBeTruthy();
       expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);
     });
   });
