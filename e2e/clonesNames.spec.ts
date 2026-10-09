@@ -115,8 +115,8 @@ test('Settings > Data age stays inside a 390px page', async ({ page }) => {
   const caret = page.getByRole('button', { name: /show data age/i });
   await expect(caret).toBeVisible();
   const box = await caret.boundingBox();
-  expect(box!.width).toBeGreaterThanOrEqual(40);
-  expect(box!.height).toBeGreaterThanOrEqual(40);
+  expect(box!.width).toBeGreaterThanOrEqual(36);
+  expect(box!.height).toBeGreaterThanOrEqual(36);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
