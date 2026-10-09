@@ -785,6 +785,34 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     );
   });
 
+  it('keeps the offer count off the header and on the list panel, following the search', async () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows: [ITEM_ROW, UNRESOLVED_BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore('?affordableOnly=0');
+
+    expect(screen.queryByText('Offers shown')).not.toBeInTheDocument();
+    expect(screen.getByText('Your LP')).toBeInTheDocument();
+    expect(screen.getByText('12,000')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2 offers')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
+    expect(await screen.findByText('1 / 2 offers')).toBeInTheDocument();
+  });
+
   it('opens the picked store from the URL', () => {
     renderAt('/loyalty/1000168');
     fireEvent.click(screen.getByRole('button', { name: /^picker:/ }));
