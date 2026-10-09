@@ -265,6 +265,7 @@ export function FittingCompare() {
     index,
     statsIndex: statsPosition(index),
     header: headerFor(index),
+    name: slots[index]?.fitting?.name,
   }));
 
   const differencesToggle = (
@@ -379,6 +380,7 @@ export function FittingCompare() {
                     rows={table!.rows}
                     columns={columns}
                     differencesOnly={showDifferencesOnly}
+                    pinNames={!isPhone}
                   />
                 </TableExportProvider>
                 {!pricesReady && (
