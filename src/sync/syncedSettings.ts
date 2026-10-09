@@ -235,6 +235,14 @@
 // last hour). All "set to another value, never unset", so the tombstone-expiry
 // edge does not bite them either.
 //
+// sync.surveyHistory: the Mining Survey short links the pilot created or opened
+// in the app, as {id, addedAt} entries — just the link ids, so a second device
+// can list and reopen them; the surveys themselves stay in their Share Links.
+// See features/survey/surveyHistory.ts, whose parse drops malformed entries and
+// ones past the 7-day link life. Never deleted via deleteSyncedSetting: a
+// pruned list is written back, so the tombstone-expiry edge does not bite. No
+// `legacyKey`: new.
+//
 // Route Safety's own wormhole defaults (features/route/routeHoleSettings.ts),
 // beside but deliberately not part of the Travel Settings: sync.routeHoles
 // (route through the open Thera / Turnur holes), sync.routeHoleShipSize,
@@ -285,6 +293,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
   'sync.structureBrokerFees',
+  'sync.surveyHistory',
   'sync.targetSkillPlan',
 ];
 

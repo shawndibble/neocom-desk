@@ -7,37 +7,53 @@
  * `GlobalPasteRouter` lives in the signed-in shell, which this page sits
  * outside, so the page listens for a paste itself.
  */
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { classifyScan } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
+import { stashPendingScan } from './pendingScan';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
-import { addSurveyScan } from './surveyStore';
+import { addSurveyScan, loadSurvey } from './surveyStore';
 import { useSurvey } from './useSurvey';
 
 export function SurveyShareScreen({ shareId }: { shareId: string }) {
   const { t } = useTranslation();
   const { state, refresh } = useSurvey(shareId);
-  const expiresAt = state.status === 'ready' ? state.expiresAt : null;
+  // A pasted scan of a different field waits for the pilot to log in (or open
+  // the app), where it starts their own survey: starting one needs a session.
+  const [diverted, setDiverted] = useState(false);
 
   const add = useCallback(
     async (text: string): Promise<AddScanResult> => {
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
-      if (expiresAt === null) return 'failed';
       try {
-        await addSurveyScan({ id: shareId, text, expiresAt });
+        // Read fresh: the comparison is against the latest scan, which another
+        // pilot may have just added.
+        const found = await loadSurvey(shareId);
+        if (!found.ok) return 'failed';
+        const latest = found.scans[found.scans.length - 1];
+        if (
+          latest !== undefined &&
+          classifyScan(latest.rocks, parseSurveyScan(text) ?? []) === 'different'
+        ) {
+          stashPendingScan(text);
+          setDiverted(true);
+          return 'ok';
+        }
+        await addSurveyScan({ id: shareId, text, expiresAt: found.expiresAt });
         await refresh();
         return 'ok';
       } catch (error) {
         return scanFailure(error);
       }
     },
-    [expiresAt, refresh, shareId]
+    [refresh, shareId]
   );
 
   useEffect(() => {
@@ -55,7 +71,9 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
     <ShareShell
       title={t('survey.shareTitle')}
       openInApp={
-        state.status === 'ready' ? { path: `/mining/survey?survey=${shareId}` } : undefined
+        state.status === 'ready'
+          ? { path: diverted ? '/mining/survey' : `/mining/survey?survey=${shareId}` }
+          : undefined
       }
     >
       {state.status === 'loading' && (
@@ -72,6 +90,11 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
       {state.status === 'ready' && (
         <>
           <p className="text-xs text-text-dim">{t('survey.shareHint')}</p>
+          {diverted && (
+            <p role="status" className="text-sm text-warning">
+              {t('survey.differentOnShare')}
+            </p>
+          )}
           <SurveyBoard
             scans={state.scans}
             url={shareUrl(shareId)}

@@ -3925,6 +3925,14 @@
     "pasteLabel": "Survey scan",
     "pastePlaceholder": "Paste a Survey Scanner copy here",
     "adding": "Adding…",
+    "differentField": "That scan is a different field than the survey you have open.",
+    "createNew": "Create new survey",
+    "addToExisting": "Add to existing survey",
+    "differentOnShare": "That scan is a different field than this survey, so it wasn't added. Continue in Neocom Desk to start a new survey with it.",
+    "historyLabel": "Your surveys",
+    "historyPlaceholder": "Switch survey",
+    "historyEntry": "{{ore}} · {{percent}}% mined · {{time}}",
+    "historyEmpty": "No scans yet · {{time}}",
     "notAScan": "That isn't a Survey Scanner copy. Select the rows in the scanner window and copy them.",
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
@@ -8272,7 +8280,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Mining Survey: the survey links you created or opened.",
             "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }

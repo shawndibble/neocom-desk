@@ -24,12 +24,14 @@ export const SURVEY_SCANS_COLLECTION = 'surveyScans';
 
 export async function startSurvey(input: {
   characterId: number;
+  /** The starting pilot's Character name, kept on the survey so they can be recognised as its owner. */
+  ownerName: string;
 }): Promise<{ id: string; url: string; expiresAt: number }> {
   const id = generateShareId();
   const expiresAt = await saveShare({
     id,
     type: 'survey',
-    payload: { v: 1 },
+    payload: { v: 1, owner: input.ownerName },
     characterId: input.characterId,
   });
   return { id, url: shareUrl(id), expiresAt };
@@ -51,8 +53,15 @@ export async function addSurveyScan(input: {
 }
 
 export type LoadSurveyResult =
-  | { ok: true; scans: SurveyScan[]; expiresAt: number }
+  | { ok: true; scans: SurveyScan[]; expiresAt: number; owner: string | null }
   | { ok: false; reason: 'not-found' | 'failed' };
+
+/** The Character name a survey was started under; null for one stored before owners existed. */
+function ownerOf(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const { owner } = payload as { owner?: unknown };
+  return typeof owner === 'string' && owner !== '' ? owner : null;
+}
 
 export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
   const found = await loadShare(id);
@@ -71,7 +80,12 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
       scans.push({ at: data.createdAt.toMillis(), rocks });
     }
     scans.sort((a, b) => a.at - b.at);
-    return { ok: true, scans, expiresAt: found.share.expiresAt };
+    return {
+      ok: true,
+      scans,
+      expiresAt: found.share.expiresAt,
+      owner: ownerOf(found.share.payload),
+    };
   } catch {
     return { ok: false, reason: 'failed' };
   }
