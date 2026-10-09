@@ -14,6 +14,7 @@
  * should override this route" (the `/roles` fixture answering `{}` puts
  * every corp capability off).
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import {
   CHARACTER_NAME,
@@ -58,71 +59,76 @@ function makeAccessTokenWithCorpScopes(): string {
   return `${header}.${payload}.fakesig`;
 }
 
+/** Signs in as a Station_Manager and opens `/corp` with `structureCount` fuel clocks. */
+async function openCorpBoard(page: Page, structureCount: number) {
+  // Registered after `installSsoMock` (the `page` fixture's own setup), so
+  // Playwright tries this one first: same endpoint, a token carrying the
+  // corp scope group too.
+  await page.route('https://login.eveonline.com/v2/oauth/token', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        access_token: makeAccessTokenWithCorpScopes(),
+        token_type: 'Bearer',
+        expires_in: 1199,
+        refresh_token: 'fake-refresh',
+      }),
+    });
+  });
+
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    // Station_Manager opens both `canReadStructures` and
+    // `canReadMoonExtractions` (engine/corpRoles.ts) — the extractions
+    // read fires right alongside structures, and an unmocked route here
+    // would trip testBase's network guard, not just leave a panel empty.
+    if (path === `/characters/${CHARACTER_ID}/roles`) {
+      return json({ roles: ['Station_Manager'] });
+    }
+    if (path === `/corporations/${CORPORATION_ID}/structures`) {
+      return json(
+        Array.from({ length: structureCount }, (_, index) => ({
+          structure_id: index + 1,
+          corporation_id: CORPORATION_ID,
+          system_id: 1,
+          type_id: 1,
+          profile_id: 1,
+          // Deliberately long and unbroken: the regression this guards is
+          // a flex child rendering without `min-w-0`, which overflows
+          // instead of truncating — a short name would never surface it.
+          name: `Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha ${index + 1}`,
+          fuel_expires: new Date(Date.now() + (index + 2) * 86_400_000).toISOString(),
+        }))
+      );
+    }
+    if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) return json([]);
+
+    await route.fallback();
+  });
+
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
+  await expect(page).toHaveURL(/\/overview$/);
+
+  await page.goto('./corp');
+  await expect(
+    page.getByText('Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha 1')
+  ).toBeVisible();
+}
+
 test.describe('corp ops board — 320px width', () => {
   test.use({ viewport: NARROW });
 
   test('the board holds without a horizontal scroll', async ({ page }) => {
-    // Registered after `installSsoMock` (the `page` fixture's own setup), so
-    // Playwright tries this one first: same endpoint, a token carrying the
-    // corp scope group too.
-    await page.route('https://login.eveonline.com/v2/oauth/token', async (route) => {
-      if (route.request().method() !== 'POST') {
-        await route.fallback();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          access_token: makeAccessTokenWithCorpScopes(),
-          token_type: 'Bearer',
-          expires_in: 1199,
-          refresh_token: 'fake-refresh',
-        }),
-      });
-    });
-
-    await page.route('https://esi.evetech.net/**', async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      const json = (body: unknown) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
-
-      // Station_Manager opens both `canReadStructures` and
-      // `canReadMoonExtractions` (engine/corpRoles.ts) — the extractions
-      // read fires right alongside structures, and an unmocked route here
-      // would trip testBase's network guard, not just leave a panel empty.
-      if (path === `/characters/${CHARACTER_ID}/roles`) {
-        return json({ roles: ['Station_Manager'] });
-      }
-      if (path === `/corporations/${CORPORATION_ID}/structures`) {
-        return json([
-          {
-            structure_id: 1,
-            corporation_id: CORPORATION_ID,
-            system_id: 1,
-            type_id: 1,
-            profile_id: 1,
-            // Deliberately long and unbroken: the regression this guards is
-            // a flex child rendering without `min-w-0`, which overflows
-            // instead of truncating — a short name would never surface it.
-            name: 'Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha',
-            fuel_expires: new Date(Date.now() + 2 * 86_400_000).toISOString(),
-          },
-        ]);
-      }
-      if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) return json([]);
-
-      await route.fallback();
-    });
-
-    await page.goto('./');
-    await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
-    await expect(page).toHaveURL(/\/overview$/);
-
-    await page.goto('./corp');
-    await expect(
-      page.getByText('Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha')
-    ).toBeVisible();
+    await openCorpBoard(page, 1);
 
     // `scrollWidth` is never below `clientWidth`, so "not wider" is the whole
     // assertion — the same technique `productionCss.built.spec.ts` uses.
@@ -146,3 +152,36 @@ test.describe('corp ops board — 320px width', () => {
     ).toBeLessThanOrEqual(clientWidth);
   });
 });
+
+for (const width of [390, 1024, 1280]) {
+  test.describe(`corp kind card footer — ${width}px width`, () => {
+    test.use({ viewport: { width, height: 800 } });
+
+    test('the Show more button fits inside its card and the page does not overflow', async ({
+      page,
+    }) => {
+      await openCorpBoard(page, 5);
+
+      const toggle = page.getByRole('button', { name: 'Show 2 more' });
+      await expect(toggle).toBeVisible();
+      const box = await toggle.boundingBox();
+      // `min-h-11` is the touch tier below `md` only.
+      if (width < 768) expect(box!.height).toBeGreaterThanOrEqual(44);
+
+      const card = await toggle.evaluate((el) => {
+        const panel = el.closest('section') ?? el.parentElement!.parentElement!;
+        const r = panel.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      });
+      expect(box!.x).toBeGreaterThanOrEqual(card.left - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(card.right + 1);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(card.bottom + 1);
+
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
+  });
+}

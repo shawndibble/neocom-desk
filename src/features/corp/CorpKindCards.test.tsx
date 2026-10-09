@@ -39,7 +39,9 @@ describe('CorpKindCards', () => {
       )
     );
     expect(screen.queryByText('Structure 4')).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: 'Show all 5' });
+    // The header carries the total because the card is over the cap.
+    expect(screen.getByText('5')).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Show 2 more' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
     await userEvent.click(toggle);
@@ -51,5 +53,24 @@ describe('CorpKindCards', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
     expect(screen.queryByText('Structure 4')).not.toBeInTheDocument();
+  });
+
+  it('shows no total and no toggle when the card is within the cap', () => {
+    const grouped = new Map<CorpBoardItemKind, CorpBoardItem[]>([
+      ['structureFuel', [1, 2, 3].map(fuel)],
+    ]);
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={grouped}
+            capabilities={{ canReadStructures: true } as CorpCapabilities}
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.queryByText('3')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show/ })).not.toBeInTheDocument();
   });
 });
