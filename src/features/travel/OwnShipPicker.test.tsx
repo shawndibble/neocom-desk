@@ -48,6 +48,8 @@ describe('OwnShipPicker', () => {
     expect(onChange).toHaveBeenCalledWith(33153);
     expect(screen.queryByRole('option')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
+    // Focus returns to the name, so a keyboard pilot keeps their place.
+    expect(screen.getByRole('button', { name: /^Your ship:/ })).toHaveFocus();
   });
 
   it('picks a suggestion with a click', async () => {
@@ -69,6 +71,7 @@ describe('OwnShipPicker', () => {
     expect(screen.queryByRole('option')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /^Your ship:/ })).toHaveFocus();
   });
 
   it('shows the manual pick as text and Clear removes it', async () => {

@@ -176,9 +176,7 @@ export function DangerAnswer({
           <StatusMark tone={age?.stale ? 'warn' : 'ok'}>{ageLine}</StatusMark>
         </p>
       )}
-      {notes !== undefined && notes !== null && notes !== false && (
-        <div className="mt-3 max-w-md">{notes}</div>
-      )}
+      {notes ? <div className="mt-3 max-w-md">{notes}</div> : null}
     </section>
   );
 }

@@ -30,6 +30,9 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
   const { t } = useTranslation();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  // Escape and a pick hand focus back to the name; a blur must not steal it.
+  const refocusButton = useRef(false);
   const [ships, setShips] = useState<ShipType[]>([]);
   // null = showing the name; a string = the field is open with that text.
   const [query, setQuery] = useState<string | null>(null);
@@ -48,6 +51,10 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
   const editing = query !== null;
   useEffect(() => {
     if (editing) inputRef.current?.focus();
+    else if (refocusButton.current) {
+      refocusButton.current = false;
+      editButtonRef.current?.focus();
+    }
   }, [editing]);
 
   const nameOf = (id: number | null) =>
@@ -66,6 +73,7 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
 
   function choose(ship: ShipType) {
     onChange(ship.typeId);
+    refocusButton.current = true;
     close();
   }
 
@@ -79,6 +87,7 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
     } else if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
+      refocusButton.current = true;
       close();
     }
   }
@@ -141,6 +150,7 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
       ) : (
         <>
           <button
+            ref={editButtonRef}
             type="button"
             aria-label={t('travel.pilot.dscan.ownShip.editLabel', {
               name: shownName ?? t('travel.pilot.dscan.ownShip.notSet'),

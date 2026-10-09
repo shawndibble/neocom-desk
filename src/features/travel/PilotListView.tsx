@@ -551,7 +551,7 @@ export function DscanShareControl({
     <>
       {tooltip === undefined ? button : <Tooltip content={tooltip}>{button}</Tooltip>}
       {share.status === 'manual' && (
-        <div className="flex w-full items-center gap-2">
+        <div className="flex w-full min-w-72 max-w-full items-center gap-2">
           <label
             htmlFor="pilot-dscan-share-url"
             className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
