@@ -4,7 +4,7 @@
  * - A Recent kills and losses row cut the other pilot's name to ~9
  *   characters ("Victim: Aurelianu…"), with nowhere else on the page to read
  *   it: below `sm` the name now takes the row's last line of its own.
- * - The identity block's Corporation and Alliance links, the only way into
+ * - The identity header's Corporation and Alliance links, the only way into
  *   those orgs from this page, were 20px targets 2px apart: 44px on a phone.
  *
  * The looked-up pilot is the signed-in fixture character, whose public info,
@@ -123,7 +123,11 @@ test.describe('Pilot Lookup at 390px', () => {
     if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
     expect(corpBox.height).toBeGreaterThanOrEqual(44);
     expect(allianceBox.height).toBeGreaterThanOrEqual(44);
-    expect(corpBox.y + corpBox.height).toBeLessThanOrEqual(allianceBox.y);
+    // The two sit on one line when they fit and wrap onto two when they do not;
+    // either way neither covers the other.
+    const apart =
+      corpBox.y + corpBox.height <= allianceBox.y || corpBox.x + corpBox.width <= allianceBox.x;
+    expect(apart).toBe(true);
 
     await expectNoPageOverflow(page);
   });

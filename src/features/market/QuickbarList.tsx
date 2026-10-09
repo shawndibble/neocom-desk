@@ -161,7 +161,7 @@ export function QuickbarList({
   }
 
   return (
-    <div className="mt-3 border-t border-line pt-2" data-testid="quickbar">
+    <div className="mt-3 shrink-0 border-t border-line pt-2" data-testid="quickbar">
       <div className="flex items-center justify-between pb-1">
         <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('market.quickbar.title')}
@@ -182,7 +182,7 @@ export function QuickbarList({
             items={items.map((i) => i.typeId)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="rounded-xs border border-line">
+            <ul className="max-h-80 overflow-y-auto rounded-xs border border-line">
               {items.map((item) => (
                 <QuickbarRow
                   key={item.typeId}

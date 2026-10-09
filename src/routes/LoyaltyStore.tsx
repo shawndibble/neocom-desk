@@ -700,6 +700,27 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const list = (
     <Panel
       title={t('loyaltyStore.title')}
+      wrapMeta
+      meta={
+        ready && (
+          <span className="flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim max-md:basis-full">
+            <span className="hidden text-xs tabular-nums md:inline">
+              {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
+            </span>
+            <span data-testid="lp-basis-readout" className="min-w-0 truncate">
+              {[
+                (getTradeHub(hubId) ?? DEFAULT_TRADE_HUB).systemName,
+                t(
+                  priceBasis === 'buy'
+                    ? 'loyaltyStore.priceBasisBuyShort'
+                    : 'loyaltyStore.priceBasisSellShort'
+                ),
+                ...(lpBasis === 'concord' ? [t('loyaltyStore.lpBasisConcord')] : []),
+              ].join(' · ')}
+            </span>
+          </span>
+        )
+      }
       actions={
         ready &&
         filteredRows.length > 0 && (
@@ -810,7 +831,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-              <CorporationLink id={corporationId}>
+              <CorporationLink id={corporationId} className="text-xs">
                 {t('loyaltyStore.corporationInfo')}
               </CorporationLink>
               <StatChips>
@@ -818,10 +839,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                   label={t('loyaltyStore.yourLp')}
                   value={playerLp.toLocaleString()}
                   tone="accent"
-                />
-                <StatChip
-                  label={t('loyaltyStore.offersShown')}
-                  value={`${filteredRows.length} / ${rows.length}`}
+                  emphasis
                 />
               </StatChips>
             </div>

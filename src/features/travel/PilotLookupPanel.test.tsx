@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   fetchPilotStats: vi.fn(),
   loadTypeNames: vi.fn(),
   fetchPilotKillmails: vi.fn(),
+  fetchPilotKillHistory: vi.fn(),
   loadKillmailFit: vi.fn(),
   resolveNames: vi.fn(),
   loadTypes: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@/lib/zkillboard', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/zkillboard')>()),
   fetchPilotStats: mocks.fetchPilotStats,
   fetchPilotKillmails: mocks.fetchPilotKillmails,
+  fetchPilotKillHistory: mocks.fetchPilotKillHistory,
 }));
 vi.mock('./pilotKillmailFit', () => ({ loadKillmailFit: mocks.loadKillmailFit }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
@@ -48,7 +50,17 @@ vi.mock('./pilotLookup', async (importOriginal) => ({
 }));
 
 // A pasted Local list's zKillboard lookups stay pending: these tests are about the strip and the box.
-vi.mock('./pilotListData', () => ({ loadPilotList: () => new Promise(() => undefined) }));
+vi.mock('./pilotListData', () => ({
+  loadPilotList: () => new Promise(() => undefined),
+  loadViewerContext: () =>
+    Promise.resolve({ contacts: new Map(), corporationId: null, allianceId: null }),
+}));
+vi.mock('./useHereSpace', () => ({
+  useHereSpace: () => ({
+    current: { systemId: null, source: null, pick: () => undefined, clearPick: () => undefined },
+    space: null,
+  }),
+}));
 
 import { PilotLookupPanel } from './PilotLookupPanel';
 
@@ -105,6 +117,7 @@ describe('PilotLookupPanel', () => {
     mocks.loadPilotProfile.mockResolvedValue(PROFILE);
     mocks.fetchPilotStats.mockResolvedValue(STATS);
     mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+    mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [] });
     mocks.resolveNames.mockResolvedValue(
       new Map([
         [900, 'Victim Pilot'],
@@ -132,11 +145,54 @@ describe('PilotLookupPanel', () => {
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
     expect(probe.search).toBe('?pilot=42');
-    expect(await screen.findByText('1,043')).toBeTruthy();
-    expect(screen.getByText('99.2%')).toBeTruthy();
+    expect(await screen.findByText('1,043 kills')).toBeTruthy();
+    expect(screen.queryByText('99.2%')).toBeNull();
     expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
     expect(await screen.findByText('Kronos')).toBeTruthy();
-    expect(screen.getByText('317 kills')).toBeTruthy();
+    expect(screen.getByText('317')).toBeTruthy();
+  });
+
+  it('shows a Threat badge beside the name once the kills and the danger ratio are in', async () => {
+    const day = 86_400_000;
+    mocks.fetchPilotKillHistory.mockResolvedValue({
+      ok: true,
+      kills: Array.from({ length: 12 }, (_, i) => ({
+        timeMs: Date.now() - (i + 1) * day,
+        space: 'nullsec',
+        systemId: 1,
+        victimShipTypeId: i < 4 ? 670 : 587,
+        ownShipTypeId: 20,
+      })),
+    });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
+    // "Dangerous" is also the danger meter's high end: the badge is the one in the name row.
+    expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
+    expect(screen.getByText(/12 kills in the last 90 days/)).toBeTruthy();
+    expect(screen.getByText('Nullsec hunter')).toBeTruthy();
+    expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
+  });
+
+  it('shows no verdict band when the kill history could not be read', async () => {
+    mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    expect(await screen.findByText('1,043 kills')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
+    // The meters and the ships they fly come from the stats, so they still show.
+    expect(screen.getByRole('meter', { name: 'Kills vs losses' })).toBeTruthy();
+    expect(screen.getByText('Kronos')).toBeTruthy();
   });
 
   it('suggests matches with the search scope and selects one', async () => {
@@ -176,6 +232,71 @@ describe('PilotLookupPanel', () => {
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(screen.queryByText('3 names, Local list')).toBeNull();
     expect(probe.search).toBe('?pilot=42');
+  });
+
+  describe('a name box with one name per line', () => {
+    const NL = String.fromCharCode(10);
+
+    it('looks one name up on Enter, as it always did', async () => {
+      mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' });
+      fireEvent.change(box, { target: { value: 'some pilot' } });
+      fireEvent.keyDown(box, { key: 'Enter' });
+      expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    });
+
+    it('keeps Enter for a new line once there is a list, and Ctrl+Enter looks it up', async () => {
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' });
+      fireEvent.change(box, { target: { value: 'Alpha One' + NL + 'Beta Two' } });
+
+      expect(fireEvent.keyDown(box, { key: 'Enter' })).toBe(true);
+      expect(screen.queryByText('2 names, Local list')).toBeNull();
+      expect(mocks.resolvePilotByName).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+      expect(await screen.findByText('2 names, Local list')).toBeTruthy();
+    });
+
+    it('looks a typed list up with the Look up button too', async () => {
+      renderTab();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+        target: { value: 'Alpha One' + NL + 'Beta Two' + NL + 'Gamma Three' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      expect(await screen.findByText('3 names, Local list')).toBeTruthy();
+    });
+
+    it('says so when a line does not look like a pilot name', async () => {
+      renderTab();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+        target: { value: 'Alpha One' + NL + 'not <a> name!' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      expect(
+        await screen.findByText(/One of the lines doesn't look like a pilot name/)
+      ).toBeTruthy();
+      expect(screen.queryByText('2 names, Local list')).toBeNull();
+    });
+
+    it('suggests for the line being typed and fills only that line', async () => {
+      mocks.granted = true;
+      mocks.searchMailRecipients.mockResolvedValue([{ characterId: 7, name: 'Nimjia' }]);
+      renderTab();
+      const box = screen.getByRole('combobox', { name: 'Pilot' }) as HTMLTextAreaElement;
+      fireEvent.focus(box);
+      const text = 'Zakof' + NL + 'Nim';
+      box.setSelectionRange(text.length, text.length);
+      fireEvent.change(box, { target: { value: text, selectionStart: text.length } });
+
+      const option = await screen.findByRole('option', { name: 'Nimjia' }, { timeout: 2000 });
+      expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'Nim', expect.any(AbortSignal));
+      fireEvent.mouseDown(option);
+      expect(box.value).toBe('Zakof' + NL + 'Nimjia');
+      // Picking one name of a list does not open that pilot.
+      expect(probe.search).toBe('');
+    });
   });
 
   it('puts Copy Share Link beside Clear for a D-Scan, and nothing of the kind for a Local list', async () => {
@@ -272,13 +393,16 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByText('No kills or losses on zKillboard')).toBeNull();
   });
 
-  // zKillboard's own Snuggly/Dangerous scale is quoted, ends and all (decision
-  // 20261002-145207); the app adds no verdict of its own.
-  it('states numbers, never a verdict, in its copy (decision 20260912-172628)', () => {
-    const copy = JSON.stringify(en.travel.pilot).toLowerCase();
-    for (const word of ['safe', 'hostile', 'threat', 'avoid']) {
+  // The Threat verdict (decision 20261008-181210) says how threatening a pilot
+  // looks and nothing more: no copy calls a pilot safe, hostile or one to avoid.
+  // The one place "safe" appears is the help text's "never means safe".
+  it('never calls a pilot safe, hostile or to be avoided (decision 20261008-181210)', () => {
+    const { help, ...rest } = en.travel.pilot.threat;
+    const copy = JSON.stringify({ ...en.travel.pilot, threat: rest }).toLowerCase();
+    for (const word of ['safe', 'hostile', 'avoid']) {
       expect(copy).not.toContain(word);
     }
+    expect(help).toContain('never means safe');
   });
 
   describe('recent kills and losses', () => {

@@ -106,7 +106,7 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('overrides nothing outside the remotely-owned collections and shares', () => {
-    const groups = new Set([...REMOTE_COLLECTION_NAMES, SHARES_COLLECTION]);
+    const groups = new Set([...REMOTE_COLLECTION_NAMES, SHARES_COLLECTION, 'surveyScans']);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
 
@@ -118,6 +118,15 @@ describe('firestore.indexes.json field overrides', () => {
     expect(overridesFor(SHARES_COLLECTION)).toEqual([
       { collectionGroup: SHARES_COLLECTION, fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: SHARES_COLLECTION, fieldPath: 'expiresAt', ttl: true, indexes: [] },
+    ]);
+  });
+
+  it('expires a Survey Scan with its survey, and indexes none of its fields', () => {
+    // Scans sit under `shares/{id}` but a TTL delete of the parent leaves its
+    // subcollection behind, so each scan carries the survey's `expiresAt`.
+    expect(overridesFor('surveyScans')).toEqual([
+      { collectionGroup: 'surveyScans', fieldPath: '*', ttl: false, indexes: [] },
+      { collectionGroup: 'surveyScans', fieldPath: 'expiresAt', ttl: true, indexes: [] },
     ]);
   });
 
