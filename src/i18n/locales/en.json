@@ -8950,6 +8950,8 @@
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name.",
       "searchHintExact": "Type the pilot's full name and press Enter. Suggestions need this character's search permission.",
+      "searchHintSuggest_touch": "Type at least 3 characters for suggestions, then tap Look up.",
+      "searchHintExact_touch": "Type the pilot's full name, then tap Look up. Suggestions need this character's search permission.",
       "resolving": "Looking up…",
       "notFound": "No pilot is named “{{name}}”. Check the spelling — the name must match exactly.",
       "resolveFailed": "Couldn't reach EVE to look up that name. Check your connection and try again.",

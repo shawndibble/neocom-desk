@@ -28,6 +28,7 @@ import {
 import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { useTouchContext } from '@/lib/useMediaQuery';
 import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -118,6 +119,7 @@ function PilotSearch({
   onSelect: (pilot: PilotSummary) => void;
 }) {
   const { t } = useTranslation();
+  const touchCtx = useTouchContext();
   const listboxId = useId();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const canSuggest = useEndpointsGranted(SEARCH_ENDPOINTS) === true && activeCharacterId !== null;
@@ -327,7 +329,9 @@ function PilotSearch({
           </Button>
         </div>
         <p className="text-xs text-text-dim">
-          {canSuggest ? t('travel.pilot.searchHintSuggest') : t('travel.pilot.searchHintExact')}
+          {t(canSuggest ? 'travel.pilot.searchHintSuggest' : 'travel.pilot.searchHintExact', {
+            context: touchCtx,
+          })}
         </p>
         <p role="status" aria-live="polite" className="text-xs">
           {resolve.kind === 'resolving' && t('travel.pilot.resolving')}
