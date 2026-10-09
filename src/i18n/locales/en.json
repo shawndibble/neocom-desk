@@ -1277,6 +1277,7 @@
       "delete": "Delete {{name}}",
       "nameLabel": "Name",
       "signatureLabel": "Signature radius (m)",
+      "summary": "{{signature}} m sig · {{velocity}} m/s",
       "velocityLabel": "Speed (m/s)",
       "save": "Save",
       "cancel": "Cancel",
