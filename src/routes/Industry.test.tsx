@@ -805,7 +805,7 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
 });
 
 describe('Industry: Opportunities page order with owned blueprints (#3071)', () => {
-  it('leads with Build Opportunities and folds the market-wide scan under it', async () => {
+  it("leads with What's profitable, open, ahead of Build Opportunities", async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
         HttpResponse.json([
@@ -828,11 +828,9 @@ describe('Industry: Opportunities page order with owned blueprints (#3071)', () 
     const ranked = await screen.findByRole('heading', { name: 'Build Opportunities' });
     const profitable = await screen.findByRole('heading', { name: "What's profitable" });
     expect(
-      ranked.compareDocumentPosition(profitable) & Node.DOCUMENT_POSITION_FOLLOWING
+      profitable.compareDocumentPosition(ranked) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     const section = profitable.closest('section')!;
-    expect(
-      await within(section).findByRole('button', { name: 'Show details' })
-    ).toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Show details' })).not.toBeInTheDocument();
   });
 });
