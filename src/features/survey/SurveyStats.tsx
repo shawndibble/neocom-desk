@@ -49,7 +49,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
         {summary.finished
           ? t('survey.finished')
           : summary.etaAt === null
-            ? t('survey.needSecondScan')
+            ? '–'
             : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
       </Tile>
       <Tile label={t('survey.statTimeLeft')}>

@@ -70,6 +70,13 @@ describe('SurveyBoard', () => {
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
+  it('with one scan shows a dash for done at, and asks for another scan where the chart goes', () => {
+    render(<SurveyBoard scans={SCANS.slice(0, 1)} url={URL} expiresAt={null} />);
+    expect(screen.getByText('Add another scan to see the chart')).toBeTruthy();
+    expect(screen.queryByTestId('charts')).toBeNull();
+    expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
+  });
+
   it('copies a four-line chat message ending in the link, each line within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {

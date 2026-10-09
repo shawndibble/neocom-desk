@@ -3949,7 +3949,7 @@
     "unitVolume": "{{value}} m³",
     "unitPace": "{{value}} m³/s",
     "eveTime": "{{time}} EVE",
-    "needSecondScan": "Needs a second scan",
+    "addSecondScan": "Add another scan to see the chart",
     "finished": "Field cleared",
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
