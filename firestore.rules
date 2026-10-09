@@ -282,7 +282,8 @@ service cloud.firestore {
       allow get: if resource.data.expiresAt > request.time;
       allow list: if false;
       allow create: if request.auth != null
-        && shareId.matches('^([0-9A-Za-z]{9}|[2-9a-km-np-z]{6})$')
+        && // New keys: engine/share/shareId.ts's alphabet; the 9-char form is legacy.
+        shareId.matches('^([0-9A-Za-z]{9}|[2-9a-hj-kmnp-z]{6})$')
         && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.keys().hasAll(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.type in ['appraisal', 'fitting', 'dscan', 'survey']

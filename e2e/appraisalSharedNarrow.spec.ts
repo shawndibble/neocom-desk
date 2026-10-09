@@ -105,7 +105,7 @@ async function mockShare(page: Page): Promise<void> {
 }
 
 async function openShare(page: Page): Promise<void> {
-  await page.goto(`./share/${SHARE_ID}`);
+  await page.goto(`./s/${SHARE_ID}`);
   await expect(page.getByRole('table', { name: TABLE })).toBeVisible({ timeout: 15_000 });
 }
 

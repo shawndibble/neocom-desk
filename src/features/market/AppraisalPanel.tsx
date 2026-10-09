@@ -292,7 +292,7 @@ export function AppraisalPanel({
 
   /**
    * Stores the appraisal as it stands — prices included — and copies its short
-   * `/share/<id>` link. The same appraisal shared again gets the same link, and
+   * `/s/<id>` link. The same appraisal shared again gets the same link, and
    * a failed save copies nothing.
    */
   async function handleShare() {

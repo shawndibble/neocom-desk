@@ -14,7 +14,7 @@ describe('generateShareId', () => {
   it('is SHARE_ID_LENGTH easy-to-read lowercase characters', () => {
     const id = generateShareId();
     expect(id).toHaveLength(SHARE_ID_LENGTH);
-    expect(id).toMatch(/^[2-9a-km-np-z]+$/);
+    expect(id).toMatch(/^[2-9a-hj-kmnp-z]+$/);
     expect(id).not.toMatch(/[01ilo]/);
   });
 
@@ -53,6 +53,7 @@ describe('isShareId', () => {
     expect(isShareId('abcdefg!')).toBe(false);
     expect(isShareId('abcdefgh')).toBe(false);
     expect(isShareId('abcdef0')).toBe(false);
+    expect(isShareId('abcdei')).toBe(false);
     expect(isShareId('')).toBe(false);
   });
 });

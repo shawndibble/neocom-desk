@@ -36,6 +36,7 @@ function renderAt(path: string) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/s/:shareId" element={<SharedLink />} />
         <Route path="/share/:shareId" element={<SharedLink />} />
         <Route path="*" element={<Landed />} />
       </Routes>
@@ -58,16 +59,27 @@ describe('SharedLink', () => {
       ok: true,
       share: { type: 'appraisal', payload: SNAPSHOT, expiresAt },
     });
-    renderAt('/share/abc123XYZ');
+    renderAt('/s/k7m2xq');
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(loadShare).toHaveBeenCalledWith('abc123XYZ');
+    expect(loadShare).toHaveBeenCalledWith('k7m2xq');
     expect(screen.getByText('Amarr')).toBeInTheDocument();
     // 1e9 × 6 × 90%: the full figure, its shorthand right after.
     expect(screen.getByText('5,400,000,000 ISK (5.4B)')).toBeInTheDocument();
     expect(screen.getByText('4,500,000,000 ISK (4.5B)')).toBeInTheDocument();
     expect(screen.queryByText(/Unverified/)).not.toBeInTheDocument();
     expect(screen.getByText(new Date(expiresAt).toLocaleString())).toBeInTheDocument();
+  });
+
+  it('still opens a link in the old /share/<id> spelling', async () => {
+    vi.mocked(loadShare).mockResolvedValue({
+      ok: true,
+      share: { type: 'appraisal', payload: SNAPSHOT, expiresAt: Date.UTC(2026, 9, 9, 14, 2) },
+    });
+    renderAt('/share/abc123XYZ');
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(loadShare).toHaveBeenCalledWith('abc123XYZ');
   });
 
   it('never redirects a signed-in visitor away from a Shared Appraisal', async () => {

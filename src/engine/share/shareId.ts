@@ -2,8 +2,8 @@
  * The key a stored Share Link lives under — the `k7m2xq` in `/s/k7m2xq`.
  * Six characters from a 31-letter alphabet with nothing easily misread
  * (no `0/o`, `1/l/i`) and no capitals, so it can be read aloud in fleet comms
- * or typed from a screenshot. 31^6 is ~30 bits (about 887 million keys): enough that a week-long link
- * can't be stumbled on, since `shares` can only be read by id, never listed.
+ * or typed from a screenshot. 31^6 is ~30 bits (about 887 million keys): enough that a week-long
+ * link can't be stumbled on, since `shares` can only be read by id, never listed.
  *
  * Minted on the client, before the doc is written, so the URL is known up
  * front (the Share button copies it inside the click, before any await).

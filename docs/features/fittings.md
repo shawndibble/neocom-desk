@@ -129,7 +129,7 @@ Collapsible sections with stable ids: assumptions ("Implants & skills"), whatToT
 
 ### Export menu (`FittingExportMenu.tsx`, `useFittingExport.ts`, `fittingExportText.ts`)
 
-- Copy Share Link: short `/share/<id>` link via `features/share/shareStore` (same code gives same link, expires; Firestore backed); too-large and failure notices.
+- Copy Share Link: short `/s/<id>` link via `features/share/shareStore` (same code gives same link, expires; Firestore backed); too-large and failure notices.
 - Copy Fitting (EFT), Copy multibuy list, Download EVE XML (`fittingXmlDocument.ts`), Manufacture Plan (router state to `/industry`, `@/lib/shortcuts`), Appraise in Market (router state to Market). Price preview Jita sell/buy in menu.
 
 ## Fixing an over-CPU / over-PG fit
