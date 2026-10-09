@@ -40,4 +40,17 @@ describe('CorpDeadlineStrip day labels', () => {
     expect(months[3]).toBe('Nov');
     expect(months.filter(Boolean)).toHaveLength(2);
   });
+
+  it('skips the first month label when the next column opens a new month', () => {
+    const days = Array.from({ length: 14 }, (_, i) => ({
+      startMs: new Date(2026, 9, 31 + i).getTime(),
+      count: 0,
+      severity: null,
+    }));
+    render(<CorpDeadlineStrip days={days} />);
+    const columns = screen.getByRole('img').querySelectorAll(':scope > div');
+    const months = Array.from(columns, (c) => c.lastElementChild?.textContent ?? '');
+    expect(months[0]).toBe('');
+    expect(months[1]).toBe('Nov');
+  });
 });

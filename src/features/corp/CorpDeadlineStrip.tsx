@@ -132,9 +132,12 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
         {days.map((day, index) => {
           const isToday = index === 0;
           // The first column names its month, and so does every column that opens a new one.
-          const startsMonth =
-            index === 0 ||
-            new Date(day.startMs).getMonth() !== new Date(days[index - 1].startMs).getMonth();
+          // A label is skipped when the next column opens a month: two would collide.
+          const opensMonth = (i: number) =>
+            i === 0 ||
+            new Date(days[i].startMs).getMonth() !== new Date(days[i - 1].startMs).getMonth();
+          const isLast = index === days.length - 1;
+          const showMonth = opensMonth(index) && (isLast || !opensMonth(index + 1));
           const percent =
             day.count === 0 ? 0 : Math.max(MIN_BAR_PERCENT, (day.count / busiest) * 100);
           return (
@@ -173,8 +176,12 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                 {dayOfMonth.format(day.startMs)}
               </span>
               {/* Reserved on every column so baselines match; it may spill into the empty cells beside it. */}
-              <span className="h-3.5 w-full text-left text-[0.6875rem] leading-3.5 whitespace-nowrap text-text-dim">
-                {startsMonth ? month.format(day.startMs) : ''}
+              <span
+                className={`h-3.5 w-full text-[0.6875rem] leading-3.5 whitespace-nowrap text-text-dim ${
+                  isLast ? 'text-right' : 'text-left'
+                }`}
+              >
+                {showMonth ? month.format(day.startMs) : ''}
               </span>
             </div>
           );
