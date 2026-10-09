@@ -14,11 +14,12 @@ import {
   type SurveyMessageLabels,
 } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
+import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { AddScanResult } from './scanResult';
+import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { oreTone } from './surveyTones';
 
 const LazySurveyCharts = lazy(() =>
@@ -34,27 +35,24 @@ interface SurveyBoardProps {
   onAdd: (text: string) => Promise<AddScanResult>;
   /** Extra header controls, e.g. "New survey". */
   actions?: ReactNode;
+  /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
+  viewerLine?: (summary: SurveySummary) => ReactNode;
 }
 
-type Flash = 'idle' | 'copied' | 'failed';
-
-function useFlash(): [Flash, (next: Flash) => void] {
-  const [flash, setFlash] = useState<Flash>('idle');
+/** What the copy button last copied, shown on it for two seconds. */
+function useCopyOutcome(): [CopyOutcome, (next: CopyOutcome) => void] {
+  const [outcome, setOutcome] = useState<CopyOutcome>(null);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   return [
-    flash,
+    outcome,
     (next) => {
       window.clearTimeout(timer.current);
-      setFlash(next);
-      if (next !== 'idle') timer.current = window.setTimeout(() => setFlash('idle'), 2000);
+      setOutcome(next);
+      if (next !== null) timer.current = window.setTimeout(() => setOutcome(null), 2000);
     },
   ];
 }
-
-/** The label a copy button shows while it flashes the outcome of a copy. */
-const flashLabel = (flash: Flash, copied: string, failed: string, idle: string): string =>
-  flash === 'copied' ? copied : flash === 'failed' ? failed : idle;
 
 function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
   const { t } = useTranslation();
@@ -113,11 +111,17 @@ function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
   );
 }
 
-export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoardProps) {
+export function SurveyBoard({
+  scans,
+  url,
+  expiresAt,
+  onAdd,
+  actions,
+  viewerLine,
+}: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
   const summary = useMemo(() => summarizeSurvey(scans), [scans]);
-  const [chatFlash, setChatFlash] = useFlash();
-  const [linkFlash, setLinkFlash] = useFlash();
+  const [outcome, setOutcome] = useCopyOutcome();
 
   const labels: SurveyMessageLabels = {
     cracking: t('survey.message.cracking'),
@@ -131,11 +135,11 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
     cleared: t('survey.message.cleared'),
   };
 
-  function copy(text: string, setFlash: (next: Flash) => void) {
+  function copy(what: 'chat' | 'link', text: string) {
     // Started inside the click so the browser still counts it as the user's gesture.
     writeToClipboard(text).then(
-      () => setFlash('copied'),
-      () => setFlash('failed')
+      () => setOutcome({ what, result: 'copied' }),
+      () => setOutcome({ what, result: 'failed' })
     );
   }
 
@@ -165,27 +169,11 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
         actions={
           <>
             {url !== null && (
-              <Button
-                variant="primary"
-                onClick={() => copy(surveyChatMessage(summary, url, labels), setChatFlash)}
-              >
-                {flashLabel(
-                  chatFlash,
-                  t('survey.copiedChat'),
-                  t('survey.copyFailed'),
-                  t('survey.copyChat')
-                )}
-              </Button>
-            )}
-            {url !== null && (
-              <Button onClick={() => copy(url, setLinkFlash)}>
-                {flashLabel(
-                  linkFlash,
-                  t('survey.copiedLink'),
-                  t('survey.copyFailed'),
-                  t('survey.copyLink')
-                )}
-              </Button>
+              <SurveyCopyButton
+                outcome={outcome}
+                onCopyChat={() => copy('chat', surveyChatMessage(summary, url, labels))}
+                onCopyLink={() => copy('link', url)}
+              />
             )}
             {actions}
           </>
@@ -240,6 +228,8 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
               <StatChip label={t('survey.statIsk')} value={formatIskCompact(summary.iskLeft)} />
             )}
           </StatChips>
+
+          {viewerLine?.(summary)}
 
           {scans.length > 1 && (
             <Suspense

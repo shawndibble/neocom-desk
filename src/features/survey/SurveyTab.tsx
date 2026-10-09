@@ -7,7 +7,7 @@
  * Like the other mining tabs, this one owns its `PageHeader`; the shared tab
  * bar is handed down from `routes/MoonMiningTax.tsx`.
  */
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, PageHeader } from '@/components/ui';
@@ -16,6 +16,7 @@ import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
+import { YourShareRow } from './YourShareRow';
 import { scanFailure, type AddScanResult } from './scanResult';
 import { useCurrentSurveyId } from './surveyPref';
 import { addSurveyScan, loadSurvey, startSurvey } from './surveyStore';
@@ -94,7 +95,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
     });
   }, [hydrated, routed, navigate, location.pathname, location.search]);
 
-  const scans = state.status === 'ready' ? state.scans : [];
+  const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
   return (
@@ -113,6 +114,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           )}
           <SurveyBoard
             scans={scans}
+            viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
             url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
             expiresAt={expiresAt}
             onAdd={add}
