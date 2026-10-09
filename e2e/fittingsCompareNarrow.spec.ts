@@ -127,6 +127,13 @@ test.describe('Fitting Compare long names at 390px', () => {
 test.describe('Fitting Compare control toolbar', () => {
   const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
 
+  test('at 390 the Target profile summary reads as text, not a raw i18n key', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page, './ships/fittings/compare');
+    await expect(page.getByText(/\d+ m sig · \d+ m\/s/).first()).toBeVisible();
+    expect(await page.locator('body').innerText()).not.toMatch(/bfittings\.\w+\./);
+  });
+
   test('at 1440 the three selects share one row', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await signInAndGoto(page, './ships/fittings/compare');
