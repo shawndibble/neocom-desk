@@ -113,19 +113,19 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 
 ## Proving a payment to someone else (e.g. a corp)
 
-| Step               | Where                                                         | Notes                                                                                                                       |
-| ------------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Find the line      | Wallet > Journal                                              | Filter Ref type (`player_donation`, `contract_price` ...), date range, search description/reason. Active Character only     |
-| Copy the facts     | Journal CSV / Excel / copy-for-Sheets                         | Filtered rows; includes Date (ISO), Type, Amount, Reason, Context ID, First/Second party ID. No per-row "copy proof" action |
-| Contract payment   | Contracts page; contract id in Mining Settle up record        | Contract id is the reference the receiver can search in game                                                                |
-| See the app's link | Mining > Tax row > payment links card; Journal "Mining tax →" | Shows which Assignment a journal line or contract is linked to                                                              |
-| Corp side          | `/corp/wallet` journal (needs `canReadWallet`)                | Same table; only for members with the wallet role                                                                           |
+| Step               | Where                                                       | Notes                                                                                                                       |
+| ------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Find the line      | Wallet > Journal                                            | Filter Ref type (`player_donation`, `contract_price` ...), date range, search description/reason. Active Character only     |
+| Copy the facts     | Journal CSV / Excel / copy-for-Sheets                       | Filtered rows; includes Date (ISO), Type, Amount, Reason, Context ID, First/Second party ID. No per-row "copy proof" action |
+| Contract payment   | Contracts page; contract id in Mining Settle up record      | Contract id is the reference the receiver can search in game                                                                |
+| See the app's link | Mining > Tax row > payment links card; Journal "Mining tax" | Shows which Assignment a journal line or contract is linked to                                                              |
+| Corp side          | `/corp/wallet` journal (needs `canReadWallet`)              | Same table; only for members with the wallet role                                                                           |
 
 Gaps: no share link or screenshot-friendly view of one journal row; journal lags ESI; a donation carries only the reason text the sender typed.
 
 ## Journal tab (`/wallet/journal`)
 
-Panel "Journal". Panel actions: link "Transactions →" (to `/market/history/transactions`), `TableActionsMenu` (surface `wallet-journal`), `DataAgeBadge` of the journal fetch.
+Panel "Journal". Panel actions: link "Transactions" (to `/market/history/transactions`), `TableActionsMenu` (surface `wallet-journal`), `DataAgeBadge` of the journal fetch.
 
 Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
@@ -150,8 +150,8 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Daily-goal lines (`dailyGoalMessageIdOf`): goal name from `wallet.dailyGoalNames` map; unnamed goal shows "Daily goal" with hover "Goal id N".
 - Bounty lines: reason replaced with kills summed per pirate faction (`BountyFactionSummary`).
 - Other `reason` (e.g. corp memo): dim second line.
-- Contract context (`context_id_type === contract_id`): "Contract →" link to `/contracts/history?highlight=<id>`.
-- Mining-tax link: "Mining tax →" to `/mining/tax?tax.payment=journal:<id>` or `contract:<id>` when a Moon Mining Tax Assignment links that payment (`miningTaxHrefFor`, reads every Character's Assignments).
+- Contract context (`context_id_type === contract_id`): "Contract" link to `/contracts/history?highlight=<id>`.
+- Mining-tax link: "Mining tax" to `/mining/tax?tax.payment=journal:<id>` or `contract:<id>` when a Moon Mining Tax Assignment links that payment (`miningTaxHrefFor`, reads every Character's Assignments).
 - Market line: when the journal line's fill is loaded (by `journal_ref_id` or `market_transaction_id` context; `journalTransactionLinks`), shows item icon + name ×qty as `ItemInfoLink` (Show info). Tooltip: "Bought/Sold N × unit = total". Escrow and broker-fee lines carry no key so stay unlinked.
 
 ### Journal export (CSV / XLSX / copy)
@@ -162,7 +162,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 
 - Journal: `responsive="table"`, Balance off by default on phones (Columns menu shows them), filters collapse into a sheet; date range kept on one row inside the sheet (test `Wallet.test.tsx:522`).
 - Character filter trigger is icon-only below `md` (avatar or all-characters glyph).
-- "Transactions →" link has 44px min hit area below `md`.
+- "Transactions" link has 44px min hit area below `md`.
 - LP table and balance table: `responsive="table"`.
 
 ## Pointers (not documented here)
@@ -226,7 +226,7 @@ Default Balance; EverMarks + other LP table; LP row link + caret, no row menu; p
 
 ## Interview Q&A
 
-1. **Where did Transactions go and why?** Personal fills are Market › History › Transactions; Wallet keeps a "Transactions →" link and redirects `/wallet/transactions`. `src/app/pageTabs.ts:83-94`, `src/routes/Wallet.tsx:521-522`.
+1. **Where did Transactions go and why?** Personal fills are Market › History › Transactions; Wallet keeps a "Transactions" link and redirects `/wallet/transactions`. `src/app/pageTabs.ts:83-94`, `src/routes/Wallet.tsx:521-522`.
 2. **How does the app avoid raising a re-auth banner for an alt in All-characters view?** Scope is checked from `db.tokens` before any call; no-scope Characters go to `skipped` with a notice. `src/features/character/wallet.ts:75-106`.
 3. **What happens to the total if an alt needs re-login?** Its row shows "Log in again to see your wallet" and it is excluded from the sum (not zero). `wallet.ts:109-114`, `Wallet.tsx:379`.
 4. **Why does the journal name items sometimes and not others?** Lines link to a fill by `journal_ref_id` or `market_transaction_id` context; only 5 transaction pages are loaded; escrow/broker fees have no key. `journalTransactionLink.ts`, `esi/endpoints.ts:502`.

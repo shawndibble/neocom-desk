@@ -165,3 +165,12 @@ export function valueMiningYield(
     implantBonusPct: modifiers.refiningImplantPct,
   };
 }
+
+/**
+ * True when an entry has nothing priced at all: not fully priced and both
+ * sides valued at zero. The Overview table and Yield Detail modal show an em
+ * dash for these rather than "0 ISK", which would read as worthless.
+ */
+export function nothingPriced(valuation: EntryValuation): boolean {
+  return !valuation.pricedAll && valuation.rawValue === 0 && valuation.refineValue === 0;
+}
