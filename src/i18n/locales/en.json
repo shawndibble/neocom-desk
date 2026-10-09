@@ -3987,6 +3987,7 @@
       "label": "Moon tax",
       "to": "to",
       "set": "Set who gets the tax",
+      "noRate": "Set rate",
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",

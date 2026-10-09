@@ -16,15 +16,22 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Panel, textActionClassName, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
 import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 import { useSurveyTax } from './surveyTaxPref';
 
+// Accent text is clickable and the faint pencil after it says "edit in place" (DESIGN.md §6c);
+// `touch:min-h-11` keeps the phone target at 44px.
 const editClassName =
-  'cursor-text rounded-xs border-b border-dashed border-transparent text-left hover:border-current focus-visible:border-current focus-visible:outline-none';
+  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11';
+
+function Pencil() {
+  return <Icon.Rename aria-hidden className="size-[0.6em] shrink-0 text-text-dim" />;
+}
 
 /** The stored survey this row publishes its tax to, and what is already stored there. */
 export interface TaxSurvey {
@@ -124,11 +131,12 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
           ) : (
             <button
               type="button"
-              className={`${editClassName} text-warning tabular-nums`}
+              className={`${editClassName} tabular-nums`}
               aria-label={`${t('survey.moonTax.rate')}: ${saved.pct}%`}
               onClick={() => setEditing('pct')}
             >
-              {saved.pct === '' ? '—' : saved.pct}%
+              {saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`}
+              <Pencil />
             </button>
           )}
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
@@ -154,23 +162,24 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
           ) : (
             <button
               type="button"
-              className={`${editClassName} min-w-0 text-accent [overflow-wrap:anywhere]`}
+              className={`${editClassName} min-w-0 [overflow-wrap:anywhere]`}
               aria-label={`${t('survey.moonTax.payee')}: ${saved.name}`}
               onClick={() => setEditing('name')}
             >
               {name === '' ? t('survey.moonTax.set') : saved.name}
+              <Pencil />
             </button>
           )}
         </div>
-        <button
-          type="button"
-          className={textActionClassName('sm:ml-auto')}
-          disabled={!ready || busy}
-          aria-busy={busy}
+        <Button
+          size="sm"
+          className="sm:ml-auto"
+          disabled={!ready}
+          loading={busy}
           onClick={() => void openTax()}
         >
           {t('survey.moonTax.open')}
-        </button>
+        </Button>
         {failed && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
@@ -187,7 +196,7 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
   return (
     <Panel title={t('survey.moonTax.label')}>
       <p className="flex flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-        <span className="text-warning tabular-nums">{tax.pct}%</span>
+        <span className="tabular-nums">{tax.pct}%</span>
         <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
         <span className="min-w-0 text-accent [overflow-wrap:anywhere]">{tax.name}</span>
       </p>
