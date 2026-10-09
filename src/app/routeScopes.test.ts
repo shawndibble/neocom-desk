@@ -135,6 +135,7 @@ describe('every route must declare its scope requirement', () => {
       '/callback',
       '/error',
       '/login',
+      '/s/:shareId',
       '/share/:shareId',
       '/share/fitting',
       '/styleguide',

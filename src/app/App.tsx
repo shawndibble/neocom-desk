@@ -375,8 +375,11 @@ export function App() {
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}
             <Route path="/share/fitting" element={<FittingShared />} />
-            {/* A Share Link (`/share/<id>`), for any share type — same
-              exemption. The literal path above outranks this pattern. */}
+            {/* A Share Link (`/s/<id>`), for any share type — same
+              exemption. `/share/<id>` is the old spelling of the same link
+              (ids minted before the short key), kept so links already sent
+              still open; the literal `/share/fitting` above outranks it. */}
+            <Route path="/s/:shareId" element={<SharedLink />} />
             <Route path="/share/:shareId" element={<SharedLink />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />

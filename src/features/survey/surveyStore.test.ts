@@ -31,7 +31,7 @@ vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/features/share/shareStore', () => ({
   loadShare,
   saveShare,
-  shareUrl: (id: string) => `https://neocomdesk.test/share/${id}`,
+  shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
 }));
 
 const ROW = (units: number, volume: number) => `Veldspar\t${units}\t${volume} m3\t1.00 ISK\t20 km`;
@@ -55,8 +55,8 @@ describe('startSurvey', () => {
         characterId: 7,
       })
     );
-    expect(started.id).toMatch(/^[0-9A-Za-z]{9}$/);
-    expect(started.url).toBe(`https://neocomdesk.test/share/${started.id}`);
+    expect(started.id).toMatch(/^[2-9a-hj-kmnp-z]{6}$/);
+    expect(started.url).toBe(`https://neocomdesk.test/s/${started.id}`);
     expect(started.expiresAt).toBe(EXPIRES);
   });
 });

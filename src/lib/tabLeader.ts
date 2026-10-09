@@ -5,7 +5,7 @@
  *
  * One election per job (`neocom:leader:<job>`), each joined only by the tabs
  * whose component for that job is mounted: the sweep lives in `App` (every
- * route) but the poller only in `Layout`, so a tab on `/share/*` or `/login`
+ * route) but the poller only in `Layout`, so a tab on `/s/*` or `/share/*` or `/login`
  * must never win the poller's lock and then not poll.
  *
  * Leadership is a held Web Lock, and only a *visible* tab holds it: both jobs

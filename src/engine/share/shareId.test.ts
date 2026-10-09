@@ -11,25 +11,26 @@ function bytes(...values: number[]) {
 }
 
 describe('generateShareId', () => {
-  it('is SHARE_ID_LENGTH characters of the base-62 alphabet', () => {
+  it('is SHARE_ID_LENGTH easy-to-read lowercase characters', () => {
     const id = generateShareId();
     expect(id).toHaveLength(SHARE_ID_LENGTH);
-    expect(id).toMatch(/^[0-9A-Za-z]+$/);
+    expect(id).toMatch(/^[2-9a-hj-kmnp-z]+$/);
+    expect(id).not.toMatch(/[01ilo]/);
   });
 
   it('maps bytes onto the alphabet in order', () => {
-    expect(generateShareId(bytes(0, 1, 10, 36, 61))).toBe('01aAZ01aA');
+    expect(generateShareId(bytes(0, 1, 6, 7, 30))).toBe('2389z2');
   });
 
   it('rejects bytes that would bias the alphabet rather than wrapping them', () => {
-    // 248..255 sit past the last whole multiple of 62 (4 × 62 = 248); taking
-    // them mod 62 would make 0–7 likelier than the rest.
+    // 248..255 sit past the last whole multiple of 31 (8 × 31 = 248); taking
+    // them mod 31 would make 0–7 likelier than the rest.
     let call = 0;
     const source = (length: number) => {
       call++;
       return new Uint8Array(length).fill(call === 1 ? 255 : 5);
     };
-    expect(generateShareId(source)).toBe('5'.repeat(SHARE_ID_LENGTH));
+    expect(generateShareId(source)).toBe('7'.repeat(SHARE_ID_LENGTH));
   });
 
   it('does not repeat across many draws', () => {
@@ -43,9 +44,16 @@ describe('isShareId', () => {
     expect(isShareId(generateShareId())).toBe(true);
   });
 
+  it('still accepts a nine-character id minted before the short key', () => {
+    expect(isShareId('abc123XYZ')).toBe(true);
+  });
+
   it('rejects the wrong length and characters outside the alphabet', () => {
     expect(isShareId('abc')).toBe(false);
-    expect(isShareId('abcdefgh!')).toBe(false);
+    expect(isShareId('abcdefg!')).toBe(false);
+    expect(isShareId('abcdefgh')).toBe(false);
+    expect(isShareId('abcdef0')).toBe(false);
+    expect(isShareId('abcdei')).toBe(false);
     expect(isShareId('')).toBe(false);
   });
 });

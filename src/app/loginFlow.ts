@@ -108,9 +108,10 @@ function rememberThisPage(): void {
  * keep the stash: `/login`, where a Fitting Share Code's "Open in Neocom Desk"
  * (#1544) sent the visitor with its landing already stashed, `/callback`,
  * whose Retry fallback restarts the very login that landing belongs to, and
- * `/share`, whose "Log in" stashes the shared page before it starts (#3075).
+ * `/s` and `/share` (the old spelling), whose "Log in" stashes the shared page
+ * before it starts (#3075).
  */
-const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/share'];
+const LANDING_KEEPING_ROUTES = ['/login', '/callback', '/s', '/share'];
 
 function forgetStrayLanding(): void {
   const here = currentRouterPath();

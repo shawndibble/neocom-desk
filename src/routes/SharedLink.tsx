@@ -33,7 +33,7 @@ function dscanState(share: StoredShare): DscanShareState {
 }
 
 /**
- * A stored **Share Link**, `/share/<id>`: reads the share from Firestore and
+ * A stored **Share Link**, `/s/<id>`: reads the share from Firestore and
  * opens the page its `type` names, showing what was shared at the time it was
  * shared. One route for every share type, so a page that becomes shareable
  * adds a case here rather than a route. Outside `RequireCharacter` and
