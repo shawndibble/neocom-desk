@@ -9653,7 +9653,6 @@
         "jump": "Jump drive"
       },
       "inUse": "In use",
-      "use": "Use for this leg",
       "useLabel": "Use {{way}} for leg {{number}}",
       "noRoute": "doesn't reach {{to}}",
       "lowsec": "{{count}} lowsec",

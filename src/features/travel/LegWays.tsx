@@ -1,7 +1,8 @@
 /**
  * "Ways to fly this leg" (issue #2477): beside a leg's rows, each way to fly
  * it as a small box — its name and jumps, then dim facts (lowest security,
- * lowsec and nullsec counts, Gank Chokepoints passed) and Use for this leg.
+ * lowsec and nullsec counts, Gank Chokepoints passed). A way not in use is
+ * itself the button that pins it to the leg.
  * Through a hole, each hole jump follows: where it joins, the size it fits
  * and the life it has left. The way in use has an accent edge and an In use
  * badge.
@@ -95,81 +96,83 @@ function WayBox({
   return (
     <li
       className={cx(
-        'rounded-xs border border-line px-2 py-1.5',
+        'relative rounded-xs border border-line px-2 py-1.5',
         way.inUse && 'border-l-2 border-l-accent bg-panel-2'
       )}
     >
-      <div className="flex items-baseline gap-2">
-        <span className="font-semibold">{label}</span>
-        {way.inUse && <span className={badgeClassName}>{t('travel.ways.inUse')}</span>}
-        <span className="ml-auto tabular-nums">
-          {summary
-            ? t('travel.legs.jumps', { count: summary.jumps })
-            : t('travel.ways.noRoute', { to })}
-        </span>
-      </div>
-      {(facts.length > 0 || canUse) && (
-        <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim">
-          {facts.map((fact, index) => (
-            <span key={fact} className="inline-flex gap-1.5">
-              {index > 0 && <Dot />}
-              {fact}
-            </span>
-          ))}
-          {canUse && (
-            <>
-              {facts.length > 0 && <Dot />}
-              <button
-                type="button"
-                className={textActionClassName()}
-                aria-label={t('travel.ways.useLabel', { way: label, number })}
-                onClick={() => onUse(way.pin)}
-              >
-                {t('travel.ways.use')}
-              </button>
-            </>
+      {/* The whole box is the control: a button under the text, so its fill never hides it. */}
+      {canUse && (
+        <button
+          type="button"
+          className={cx(
+            'absolute inset-0 cursor-pointer rounded-xs',
+            rowInteractiveClassName,
+            focusRingInsetClassName
           )}
-        </p>
+          aria-label={t('travel.ways.useLabel', { way: label, number })}
+          onClick={() => onUse(way.pin)}
+        />
       )}
-      {jump && <p className="text-sm text-text-dim">{t('travel.jumpDrive.caveat', { to })}</p>}
-      {way.bridges.map(({ from, to: bridgeTo, gate }) => (
-        <p
-          key={`bridge-${from}-${bridgeTo}`}
-          className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
-        >
-          <span aria-hidden="true">⇉</span>
-          <span>{t('travel.ways.bridge', { from: nameOf(from), to: nameOf(bridgeTo) })}</span>
-          {gate.name !== '' && (
-            <>
-              <Dot />
-              <span className="min-w-0 truncate">{gate.name}</span>
-            </>
-          )}
-        </p>
-      ))}
-      {way.holes.map(({ from, to: holeTo, hole }) => (
-        <p
-          key={`${from}-${holeTo}`}
-          className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
-        >
-          <span aria-hidden="true">⤳</span>
-          <span>{t('travel.ways.hole', { from: nameOf(from), to: nameOf(holeTo) })}</span>
-          {hole.maxShipSize && (
-            <>
-              <Dot />
-              <span>
-                {t('travel.holes.fits', { size: t(`travel.thera.size.${hole.maxShipSize}`) })}
-              </span>
-            </>
-          )}
-          <Dot />
-          <span className="tabular-nums">
-            {t('travel.thera.lifeLeft', {
-              time: formatCountdown(Math.max(0, hole.expiresAt - now) / 1000),
-            })}
+      <div className="pointer-events-none relative">
+        <div className="flex items-baseline gap-2">
+          <span className="font-semibold">{label}</span>
+          {way.inUse && <span className={badgeClassName}>{t('travel.ways.inUse')}</span>}
+          <span className="ml-auto tabular-nums">
+            {summary
+              ? t('travel.legs.jumps', { count: summary.jumps })
+              : t('travel.ways.noRoute', { to })}
           </span>
-        </p>
-      ))}
+        </div>
+        {facts.length > 0 && (
+          <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim">
+            {facts.map((fact, index) => (
+              <span key={fact} className="inline-flex gap-1.5">
+                {index > 0 && <Dot />}
+                {fact}
+              </span>
+            ))}
+          </p>
+        )}
+        {jump && <p className="text-sm text-text-dim">{t('travel.jumpDrive.caveat', { to })}</p>}
+        {way.bridges.map(({ from, to: bridgeTo, gate }) => (
+          <p
+            key={`bridge-${from}-${bridgeTo}`}
+            className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
+          >
+            <span aria-hidden="true">⇉</span>
+            <span>{t('travel.ways.bridge', { from: nameOf(from), to: nameOf(bridgeTo) })}</span>
+            {gate.name !== '' && (
+              <>
+                <Dot />
+                <span className="min-w-0 truncate">{gate.name}</span>
+              </>
+            )}
+          </p>
+        ))}
+        {way.holes.map(({ from, to: holeTo, hole }) => (
+          <p
+            key={`${from}-${holeTo}`}
+            className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-dim"
+          >
+            <span aria-hidden="true">⤳</span>
+            <span>{t('travel.ways.hole', { from: nameOf(from), to: nameOf(holeTo) })}</span>
+            {hole.maxShipSize && (
+              <>
+                <Dot />
+                <span>
+                  {t('travel.holes.fits', { size: t(`travel.thera.size.${hole.maxShipSize}`) })}
+                </span>
+              </>
+            )}
+            <Dot />
+            <span className="tabular-nums">
+              {t('travel.thera.lifeLeft', {
+                time: formatCountdown(Math.max(0, hole.expiresAt - now) / 1000),
+              })}
+            </span>
+          </p>
+        ))}
+      </div>
     </li>
   );
 }
