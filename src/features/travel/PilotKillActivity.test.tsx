@@ -76,6 +76,8 @@ describe('PilotKillActivity', () => {
     await screen.findByRole('region', { name: 'Where they kill' });
     expect(screen.queryByText('Flew on their kills')).toBeNull();
     expect(screen.queryByText('Latest kills')).toBeNull();
-    expect(await screen.findByText('Ships they killed')).toBeTruthy();
+    // The hulls they kill moved to the ships row, beside the ones they fly.
+    expect(screen.queryByText('Ships they killed')).toBeNull();
+    expect(screen.queryByText('Kills most')).toBeNull();
   });
 });

@@ -145,11 +145,11 @@ describe('PilotLookupPanel', () => {
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
     expect(probe.search).toBe('?pilot=42');
-    expect(await screen.findByText('1,043')).toBeTruthy();
+    expect(await screen.findByText('1,043 kills')).toBeTruthy();
     expect(screen.queryByText('99.2%')).toBeNull();
     expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
     expect(await screen.findByText('Kronos')).toBeTruthy();
-    expect(screen.getByText('317 kills')).toBeTruthy();
+    expect(screen.getByText('317')).toBeTruthy();
   });
 
   it('shows a Threat badge beside the name once the kills and the danger ratio are in', async () => {
@@ -174,7 +174,8 @@ describe('PilotLookupPanel', () => {
     const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
     // "Dangerous" is also the danger meter's high end: the badge is the one in the name row.
     expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
-    expect(screen.getByText(/12 kills in the last 90 days, mostly in nullsec/)).toBeTruthy();
+    expect(screen.getByText(/12 kills in the last 90 days/)).toBeTruthy();
+    expect(screen.getByText('Nullsec hunter')).toBeTruthy();
     expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
   });
 

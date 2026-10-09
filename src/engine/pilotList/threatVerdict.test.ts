@@ -129,6 +129,40 @@ describe('threatVerdict', () => {
   });
 });
 
+describe('threatVerdict alsoSpaces', () => {
+  it('names another kind of space that holds a fifth or more of the recent kills', () => {
+    const list = [...kills(8, 1, 'nullsec'), ...kills(2, 10, 'lowsec')];
+    const verdict = threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW });
+    expect(verdict.mainSpace).toBe('nullsec');
+    expect(verdict.alsoSpaces).toEqual(['lowsec']);
+  });
+
+  it('leaves out a space below a fifth of the recent kills', () => {
+    const list = [...kills(9, 1, 'nullsec'), ...kills(1, 12, 'lowsec')];
+    expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).alsoSpaces).toEqual([]);
+  });
+
+  it('lists the worse space first and counts only recent kills that say where', () => {
+    const list = [
+      ...kills(6, 1, 'nullsec'),
+      ...kills(2, 10, 'highsec'),
+      ...kills(2, 20, 'lowsec'),
+      kill(30 * DAY, null),
+      kill(100 * DAY, 'wormhole'),
+    ];
+    expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).alsoSpaces).toEqual([
+      'lowsec',
+      'highsec',
+    ]);
+  });
+
+  it('has none when nothing says where', () => {
+    expect(
+      threatVerdict({ kills: [kill(DAY, null)], dangerRatio: null, nowMs: NOW }).alsoSpaces
+    ).toEqual([]);
+  });
+});
+
 describe('needsDangerRatio', () => {
   it('is true only when the recent kill count could reach dangerous', () => {
     expect(needsDangerRatio(kills(9), NOW)).toBe(false);

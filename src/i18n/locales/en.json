@@ -8962,14 +8962,17 @@
         },
         "help": "Read from their kills in the last {{days}} days and zKillboard's all-time danger ratio. Dangerous: {{dangerousKills}} or more recent kills and a danger ratio of {{dangerRatio}} or more. Active: {{activeKills}} or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
         "inactive": "No kills in the last {{days}} days.",
-        "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}} ago.",
-        "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}} ago.",
-        "summary_other": "{{count}} kills in the last {{days}} days. Last kill {{age}} ago.",
-        "summaryIn_one": "{{count}} kill in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
-        "summaryIn_other": "{{count}} kills in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
+        "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
+        "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}}.",
+        "summary_other": "{{count}} kills in the last {{days}} days. Last kill {{age}}.",
         "gangs": "{{value}}% in gangs",
         "pods": "{{value}}% of kills are pods",
         "pending": "Checking",
+        "chip": {
+          "space": "{{space}} hunter",
+          "also": "Also {{space}}",
+          "solo": "Mostly solo"
+        },
         "dangerUnknown": "zKillboard's danger ratio could not be read, so this may understate the threat."
       },
       "activity": {
@@ -8981,7 +8984,6 @@
         "window": "Kills in the last 30 days, and how long ago the latest one in that space was.",
         "chart": "Kills per month, by kind of space, last 6 months",
         "chartLabel": "Kills per month by space: {{summary}}",
-        "killed": "Ships they killed",
         "basis": "From their latest {{count}} kills on zKillboard."
       },
       "linesInvalid": "One of the lines doesn't look like a pilot name. Names use letters, numbers, spaces and ' . -",
@@ -9239,7 +9241,24 @@
       "snuggly": "Snuggly",
       "dangerous": "Dangerous",
       "dangerousShare": "{{value}}% dangerous",
-      "snugglyShare": "{{value}}% snuggly",
+      "killerMeter": "Kills vs losses",
+      "killerMeterHelp": "Kills as a share of kills and losses, by ship count: 100% is all kills, 0% is all losses. Above 50% they kill more ships than they lose. Unlike the danger ratio, every ship counts the same, whatever its size.",
+      "victim": "Victim",
+      "killer": "Killer",
+      "killerShare": "{{value}}% killer",
+      "victimShare": "{{value}}% victim",
+      "allTime": {
+        "kills": "{{value}} kills",
+        "losses": "{{value}} losses",
+        "destroyed": "destroyed",
+        "lost": "lost",
+        "solo": "{{value}} solo kills"
+      },
+      "ships": {
+        "flies": "Flies on kills",
+        "killed": "Kills most",
+        "fliesBasis": "All-time, as zKillboard states them."
+      },
       "gangMeter": "Fleet size",
       "gangMeterHelp": "zKillboard's gang ratio, 0–100%, as zKillboard states it: solo at 0, gang at 100.",
       "solo": "Solo",

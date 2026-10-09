@@ -21,6 +21,8 @@ export const DANGEROUS_MIN_DANGER_RATIO = 50;
 const DAY_MS = 86_400_000;
 /** Capsule and its Genolution variant: the two pod hulls. */
 const POD_TYPE_IDS: ReadonlySet<number> = new Set([670, 33328]);
+/** A space other than the main one is worth a mention from this share of the recent kills that say where. */
+const ALSO_SPACE_MIN_SHARE = 0.2;
 /** When two kinds of space tie, the one that is worse to meet a pilot in wins. */
 const SPACE_PRIORITY: readonly KillSpace[] = ['nullsec', 'wormhole', 'lowsec', 'highsec'];
 
@@ -32,6 +34,8 @@ export interface ThreatVerdict {
   lastKillMs: number | null;
   /** The kind of space most recent kills were in; null when none of them say. */
   mainSpace: KillSpace | null;
+  /** Other kinds of space with a fifth or more of the recent kills that say where, worst first. */
+  alsoSpaces: KillSpace[];
   /** Capsules as a 0-1 share of recent kills; null when there are none. */
   podShare: number | null;
   /** False when no danger ratio was given, so "dangerous" was out of reach. */
@@ -92,6 +96,12 @@ export function threatVerdict({
     }
   }
 
+  const placed = [...counts.values()].reduce((sum, n) => sum + n, 0);
+  const alsoSpaces = SPACE_PRIORITY.filter(
+    (space) =>
+      space !== mainSpace && placed > 0 && (counts.get(space) ?? 0) / placed >= ALSO_SPACE_MIN_SHARE
+  );
+
   const pods = recent.filter(
     (kill) => kill.victimShipTypeId !== null && POD_TYPE_IDS.has(kill.victimShipTypeId)
   ).length;
@@ -101,6 +111,7 @@ export function threatVerdict({
     recentKills: recent.length,
     lastKillMs,
     mainSpace,
+    alsoSpaces,
     podShare: recent.length === 0 ? null : pods / recent.length,
     dangerKnown: dangerRatio !== null,
   };
