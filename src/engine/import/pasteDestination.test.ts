@@ -30,6 +30,19 @@ const SCAN = [
 ].join('\n');
 
 describe('pasteDestination', () => {
+  it('sends a scan with empty ore groups to the Survey tab, not the Appraisal', () => {
+    // The scanner prints a header for every grade, and some have no rocks.
+    const scan = [
+      'Scordite II-Grade',
+      'Scordite II-Grade\t7,396\t1,109 m3\t128,000.00 ISK\t19 km',
+      'Scordite III-Grade',
+      'Veldspar',
+      'Veldspar\t23,799\t2,379 m3\t223,000.00 ISK\t20 km',
+      'Veldspar IV-Grade',
+    ].join('\n');
+    expect(pasteDestination(scan, SOURCES)).toBe('survey');
+  });
+
   it('sends a Survey Scanner copy to the Survey tab, never the Appraisal', () => {
     expect(pasteDestination(SCAN, SOURCES)).toBe('survey');
     expect(pasteDestination('Tritanium\t1000\nPyerite\t500', SOURCES)).toBe('appraisal');
