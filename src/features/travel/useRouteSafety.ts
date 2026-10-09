@@ -46,6 +46,7 @@ import type { AnsiblexGate } from '@/engine/route/ansiblex';
 import type { TripOptions } from '@/engine/route/tripPlan';
 import { planLocalTrip, type LocalTripResult } from '@/features/route/localRoute';
 import type { RouteQuery, RouteRules } from '@/features/route/routeRules';
+import type { RouteJumpSetup } from '@/features/route/routeJumpSettings';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { useLawlessSystems } from './useLawlessSystems';
 import { loadRouteRegionNames, loadSystemActivity, type SystemActivity } from './routeSafetyData';
@@ -99,6 +100,8 @@ export interface RouteSafetyRequest {
   listed?: readonly TheraConnection[] | null;
   /** The known Ansiblex the route may cross, or `null` while Use jump bridges is off. */
   bridges?: readonly AnsiblexGate[] | null;
+  /** The hull's jump drive and the map around it, or `null` while jump legs are off (issue #3147). */
+  jump?: RouteJumpSetup | null;
 }
 
 interface ResolvedTrip {
@@ -123,6 +126,7 @@ async function planRouteSafetyTrip(request: {
   network: HoleNetwork;
   networkEnds: { holes: readonly HoleEnds[]; bridges: readonly AnsiblexGate[] };
   pins: Parameters<typeof planLegAlternatives>[2];
+  jump: RouteJumpSetup | null;
 }): Promise<{
   result: LocalTripResult;
   alternatives: LegAlternatives[];
@@ -142,7 +146,12 @@ async function planRouteSafetyTrip(request: {
   if (result.kind !== 'trip') {
     return { result, alternatives: [], systemIds: [], systems: systems ?? NO_SYSTEMS };
   }
-  const { legs, systemIds } = planLegAlternatives(result, request.networkEnds, request.pins);
+  const { legs, systemIds } = planLegAlternatives(
+    result,
+    request.networkEnds,
+    request.pins,
+    request.jump && { systems: request.jump.systems, drive: request.jump.drive }
+  );
   return { result, alternatives: legs, systemIds, systems: systems ?? NO_SYSTEMS };
 }
 
@@ -155,6 +164,7 @@ export function useRouteSafety({
   pins = NO_PINS,
   listed = null,
   bridges = null,
+  jump = null,
 }: RouteSafetyRequest): RouteSafetyState {
   const [activity, setActivity] = useState<SystemActivity | null>(null);
   const lawless = useLawlessSystems();
@@ -175,7 +185,7 @@ export function useRouteSafety({
     [listed]
   );
   const pinRequestKey = pinsKey(pins, listedById);
-  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}:${pinRequestKey}`;
+  const requestKey = `${fromId}:${stopsKey}:${optimize}:${returnToStart}:${keepLastStopLast}:${routeKey}:${networkKey}:${pinRequestKey}:${jump?.key ?? ''}`;
   const wantsRoute =
     fromId !== null && stops.length > 0 && !(stops.length === 1 && stops[0] === fromId);
 
@@ -208,6 +218,7 @@ export function useRouteSafety({
         network,
         networkEnds,
         pins: pinsFromKey(pinRequestKey),
+        jump,
       });
       const regionIds = new Set(systemIds.flatMap((id) => systems.get(id)?.regionId ?? []));
       const regionNames = await loadRouteRegionNames([...regionIds]);
@@ -231,6 +242,7 @@ export function useRouteSafety({
     networkEnds,
     pinRequestKey,
     requestKey,
+    jump,
   ]);
 
   // The same request with the avoid list swapped. No region names or
@@ -248,6 +260,7 @@ export function useRouteSafety({
         network,
         networkEnds,
         pins: pinsFromKey(pinRequestKey),
+        jump,
       });
       if (planned.result.kind === 'unknown') return planned.result;
       return assembleRouteSafety({
@@ -261,6 +274,7 @@ export function useRouteSafety({
         systems: planned.systems,
         regionNames: NO_REGION_NAMES,
         activity: null,
+        jump,
       });
     },
     [
@@ -277,6 +291,7 @@ export function useRouteSafety({
       holes,
       listed,
       bridges,
+      jump,
     ]
   );
 
@@ -298,6 +313,7 @@ export function useRouteSafety({
       regionNames: resolved.regionNames,
       activity,
       lawless,
+      jump,
     });
     return assembled.kind === 'route' ? { ...assembled, requestKey, planWithAvoid } : assembled;
   }, [
@@ -312,5 +328,6 @@ export function useRouteSafety({
     planWithAvoid,
     pins,
     listed,
+    jump,
   ]);
 }

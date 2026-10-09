@@ -809,6 +809,7 @@ async function main() {
         !piPinTypeIds.has(typeID) &&
         typeID !== PI_LINK_TYPE_ID &&
         !refinableTypeIds.has(typeID) &&
+        !shipTypeIds.has(typeID) &&
         types.get(typeID)?.groupID !== WORMHOLE_GROUP_ID
       )
         continue;
@@ -2130,7 +2131,8 @@ async function main() {
   const wormholeMass = bakeWormholeMass(typeRows, attrsByType);
   const shipMass = bakeShipMass(
     typeRows,
-    new Set([...groups].filter(([, g]) => g.categoryID === SHIP_CATEGORY_ID).map(([id]) => id))
+    new Set([...groups].filter(([, g]) => g.categoryID === SHIP_CATEGORY_ID).map(([id]) => id)),
+    attrsByType
   );
   if (Object.keys(wormholeMass).length < 80 || wormholeMass.M267?.[0] !== 375_000_000) {
     throw new Error(

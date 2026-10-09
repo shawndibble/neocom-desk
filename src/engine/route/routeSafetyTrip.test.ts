@@ -475,7 +475,15 @@ describe('assembleRouteSafety', () => {
     expect(systemsOf(state.legs[0].rows)).toEqual(BY_GATE);
     expect(state.legs[1]).toMatchObject({ rows: null, summary: null });
     expect(state.legs[1].ways).toEqual([
-      { kind: 'gates', pin: 'gates', summary: null, holes: [], bridges: [], inUse: false },
+      {
+        kind: 'gates',
+        pin: 'gates',
+        summary: null,
+        holes: [],
+        bridges: [],
+        jump: null,
+        inUse: false,
+      },
     ]);
   });
 

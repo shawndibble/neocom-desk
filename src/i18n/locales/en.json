@@ -9499,7 +9499,8 @@
         "thera": "Via Thera",
         "turnur": "Via Turnur",
         "hole": "Pinned hole via {{hub}}",
-        "ansiblex": "Via Ansiblex"
+        "ansiblex": "Via Ansiblex",
+        "jump": "Jump drive"
       },
       "inUse": "In use",
       "use": "Use for this leg",
@@ -9642,6 +9643,9 @@
       "massValue_one": "{{count}} hop may not pass",
       "massValue_other": "{{count}} hops may not pass",
       "bridgesLabel": "Ansiblex",
+      "driveLabel": "Jump drive",
+      "fuelLabel": "Fuel",
+      "arriveLabel": "Arrive",
       "highsecLabel": "High",
       "lowsecLabel": "Low",
       "nullsecLabel": "Null",
@@ -9650,6 +9654,25 @@
       "killsValue": "{{ships}} ship · {{pods}} pod",
       "chokepointsLabel": "Chokepoints",
       "chokepointsNone": "None"
+    },
+    "jumpDrive": {
+      "enabled": "Allow jump drive legs",
+      "hint": "Uses the hull's range and fuel with Jump Drive Calibration and Jump Fuel Conservation at V.",
+      "range": "Longest single jump",
+      "short": "Short, {{ly}} ly",
+      "max": "Max {{ly}} ly",
+      "fuelValue_one": "{{fuel}} isotope",
+      "fuelValue_other": "{{fuel}} isotopes",
+      "arriveValue": "~{{time}}",
+      "stripCell": "Jump drive, {{from}} → {{to}}, {{distance}} ly",
+      "stripDistance": "{{distance}} ly",
+      "stripLabel_one": "{{count}} jump by jump drive.",
+      "stripLabel_other": "{{count}} jumps by jump drive.",
+      "wayJumps_one": "{{count}} jump",
+      "wayJumps_other": "{{count}} jumps",
+      "wayLy": "{{ly}} ly",
+      "wayFatigue": "fatigue ends in {{time}}",
+      "caveat": "Cannot say whether a cyno or beacon is lit at {{to}}, or whether you may use it."
     },
     "bridges": {
       "enabled": "Use jump bridges",
@@ -9718,10 +9741,12 @@
       "grantAction": "Log in again",
       "done": "Waypoints set. Your client plans the path between them with its own settings.",
       "cutOff": {
+        "jump": "Waypoints set to {{entrance}}. Jump from there to {{exit}}, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
         "hole": "Waypoints set to {{entrance}}. Take the wormhole there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
         "bridge": "Waypoints set to {{entrance}}. Take the bridge there, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings."
       },
       "nothing": {
+        "jump": "No waypoints set: the trip leaves {{entrance}} by jump drive. Jump to {{exit}}, then set the rest from there.",
         "hole": "No waypoints set: the trip leaves {{entrance}} by wormhole. Take it, then set the rest from {{exit}}.",
         "bridge": "No waypoints set: the trip leaves {{entrance}} by bridge. Take it, then set the rest from {{exit}}."
       },
