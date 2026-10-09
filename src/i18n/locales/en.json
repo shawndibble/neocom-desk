@@ -4003,6 +4003,7 @@
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
       "open": "Open in Mining Tax",
+      "manage": "Manage moon taxes",
       "failed": "Couldn't save that Payee. Try again."
     },
     "formCompressed": "compressed",

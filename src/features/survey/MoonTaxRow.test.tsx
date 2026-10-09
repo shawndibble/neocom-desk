@@ -153,10 +153,17 @@ describe('MoonTaxRow blank start', () => {
 });
 
 describe('MoonTaxReadout', () => {
-  it('shows the rate and who gets it, with nothing to edit', () => {
-    render(<MoonTaxReadout tax={{ name: 'Moon Corp', pct: 8 }} />);
+  it('shows the rate and who gets it, with a link to the Tax tab and nothing to edit', () => {
+    render(
+      <MemoryRouter>
+        <MoonTaxReadout tax={{ name: 'Moon Corp', pct: 8 }} />
+      </MemoryRouter>
+    );
     expect(screen.getByText('8%')).toBeTruthy();
-    expect(screen.getByText('Moon Corp')).toBeTruthy();
+    expect(screen.getByText('Moon Corp').className).not.toContain('text-accent');
     expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Manage moon taxes' }).getAttribute('href')).toBe(
+      '/mining/tax'
+    );
   });
 });
