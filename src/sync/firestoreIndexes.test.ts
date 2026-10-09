@@ -106,7 +106,12 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('overrides nothing outside the remotely-owned collections and shares', () => {
-    const groups = new Set([...REMOTE_COLLECTION_NAMES, SHARES_COLLECTION, 'surveyScans']);
+    const groups = new Set([
+      ...REMOTE_COLLECTION_NAMES,
+      SHARES_COLLECTION,
+      'surveyScans',
+      'surveyTax',
+    ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
 
@@ -127,6 +132,13 @@ describe('firestore.indexes.json field overrides', () => {
     expect(overridesFor('surveyScans')).toEqual([
       { collectionGroup: 'surveyScans', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyScans', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+    ]);
+  });
+
+  it('expires a Survey moon tax with its survey, and indexes none of its fields', () => {
+    expect(overridesFor('surveyTax')).toEqual([
+      { collectionGroup: 'surveyTax', fieldPath: '*', ttl: false, indexes: [] },
+      { collectionGroup: 'surveyTax', fieldPath: 'expiresAt', ttl: true, indexes: [] },
     ]);
   });
 
