@@ -8,6 +8,14 @@ function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
   return { at: T0 + minutes * MIN, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
+/** A scan whose rocks carry the scanner's ISK value: [ore, volume, isk]. */
+function iskScan(minutes: number, ...rocks: [string, number, number][]): SurveyScan {
+  return {
+    at: T0 + minutes * MIN,
+    rocks: rocks.map(([ore, volume, isk]) => ({ ore, volume, isk })),
+  };
+}
+
 describe('summarizeSurvey', () => {
   it('is null with no scans', () => {
     expect(summarizeSurvey([])).toBeNull();
@@ -87,11 +95,30 @@ describe('summarizeSurvey', () => {
     expect(s.oreNames).toEqual(['A', 'B']);
   });
 
+  it('puts the biggest ISK first when the scan carries it, with the value of each ore', () => {
+    // Veldspar 20 rocks worth 10M, Scordite 5 rocks worth 25M, Pyroxeres 15 rocks worth 12M.
+    const rocks = (ore: string, count: number, each: number): [string, number, number][] =>
+      Array.from({ length: count }, () => [ore, 100, each]);
+    const s = summarizeSurvey([
+      iskScan(
+        0,
+        ...rocks('Veldspar', 20, 500_000),
+        ...rocks('Scordite', 5, 5_000_000),
+        ...rocks('Pyroxeres', 15, 800_000)
+      ),
+    ])!;
+    expect(s.ores.map((o) => [o.ore, o.rocks, o.isk])).toEqual([
+      ['Scordite', 5, 25_000_000],
+      ['Pyroxeres', 15, 12_000_000],
+      ['Veldspar', 20, 10_000_000],
+    ]);
+  });
+
   it('lists ores by volume left with rock counts', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500], ['Sylvite', 300])])!;
     expect(s.ores).toEqual([
-      { ore: 'Sylvite', rocks: 2, volume: 800, startVolume: 800 },
-      { ore: 'Bitumens', rocks: 1, volume: 50, startVolume: 50 },
+      { ore: 'Sylvite', rocks: 2, volume: 800, isk: 0, startVolume: 800 },
+      { ore: 'Bitumens', rocks: 1, volume: 50, isk: 0, startVolume: 50 },
     ]);
     expect(s.rocksLeft).toBe(3);
   });
@@ -102,10 +129,10 @@ describe('summarizeSurvey', () => {
       scan(5, ['A', 250], ['B', 300], ['D', 100]),
     ])!;
     expect(s.ores).toEqual([
-      { ore: 'B', rocks: 1, volume: 300, startVolume: 300 },
-      { ore: 'A', rocks: 1, volume: 250, startVolume: 500 },
-      { ore: 'D', rocks: 1, volume: 100, startVolume: 100 },
-      { ore: 'C', rocks: 0, volume: 0, startVolume: 200 },
+      { ore: 'B', rocks: 1, volume: 300, isk: 0, startVolume: 300 },
+      { ore: 'A', rocks: 1, volume: 250, isk: 0, startVolume: 500 },
+      { ore: 'D', rocks: 1, volume: 100, isk: 0, startVolume: 100 },
+      { ore: 'C', rocks: 0, volume: 0, isk: 0, startVolume: 200 },
     ]);
   });
 

@@ -5,9 +5,11 @@ import '@/i18n';
 import { MAX_LINE_WIDTH } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { configureClipboard } from '@/lib/clipboard';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { SurveyBoard } from './SurveyBoard';
 
 // Recharts needs a real layout; the chart has its own concerns.
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: vi.fn(() => false) }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
 const FIRST = [
@@ -31,6 +33,7 @@ const URL = 'https://neocomdesk.test/share/abc123XYZ';
 
 afterEach(() => {
   cleanup();
+  vi.mocked(useIsPhone).mockReturnValue(false);
   configureClipboard(null);
 });
 
@@ -56,8 +59,8 @@ describe('SurveyBoard', () => {
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
     // The scanner's own ISK column, summed.
-    expect(screen.getByText('ISK left')).toBeTruthy();
-    expect(screen.getByText(/^34\.\d+M$/)).toBeTruthy();
+    // The figure is an `IskAmount`: shorthand on screen, the exact value one hover away.
+    expect(screen.getByText('ISK left').parentElement?.textContent).toMatch(/34\.\d+M/);
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
@@ -124,5 +127,60 @@ describe('SurveyBoard', () => {
     fireEvent.change(box, { target: { value: 'typed' } });
     expect(box.value).toBe('');
     expect(onAdd).not.toHaveBeenCalled();
+  });
+  describe('value colours and layout', () => {
+    const row = (ore: string, volume: number, isk: number) => ({ ore, volume, isk });
+    // ISK per m3: Scordite 108, Veldspar 93, Pyroxeres 77, so orange, yellow and blue against the richest.
+    const richScans = [
+      {
+        at: T0,
+        rocks: [
+          row('Scordite', 5274, 570_000),
+          row('Veldspar', 8260, 772_000),
+          row('Pyroxeres', 1842, 141_000),
+        ],
+      },
+    ];
+
+    it('colours each ore bar by its ISK per m3 left, and says what the colours mean', () => {
+      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      const tierOf = (ore: string) =>
+        screen
+          .getByText(ore, { selector: 'span' })
+          .closest('li')
+          ?.querySelector('[data-value-tier]')
+          ?.getAttribute('data-value-tier');
+      expect(tierOf('Scordite')).toBe('orange');
+      expect(tierOf('Veldspar')).toBe('yellow');
+      expect(tierOf('Pyroxeres')).toBe('blue');
+      expect(screen.getByText('Bar colour is ISK per m³ left')).toBeTruthy();
+      // Colour is never the only signal: each row also says its tier in words for a screen reader.
+      expect(screen.getByText(/highest value per m³/)).toBeTruthy();
+      expect(screen.getByText(/low value per m³/)).toBeTruthy();
+    });
+
+    it('shows each ore with its rocks and the ISK left in it', () => {
+      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      const row = screen.getByText('Scordite', { selector: 'span' }).closest('li');
+      expect(row?.textContent).toMatch(/1 rock · 5\.3K m³ · .*570K.* ISK · 100% left/);
+    });
+
+    it('has one Copy chat message button, in the header on a desktop and under the chart on a phone', () => {
+      const { unmount } = render(
+        <SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />
+      );
+      expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
+      unmount();
+      vi.mocked(useIsPhone).mockReturnValue(true);
+      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
+    });
+
+    it('explains the chart: a swatch per ore, the rate and the projection', () => {
+      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      expect(screen.getByText('Mining rate')).toBeTruthy();
+      expect(screen.getByText('Dashed: finish at the current pace')).toBeTruthy();
+      expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);
+    });
   });
 });

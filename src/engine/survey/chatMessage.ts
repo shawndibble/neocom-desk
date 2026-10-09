@@ -18,7 +18,7 @@ export interface SurveyMessageLabels {
   waiting: string;
   /** `{ores}` is the joined ore list. */
   left: string;
-  /** `{count}` ores not listed. */
+  /** `{count}` rocks of the ores not named. */
   more: string;
   /** `{duration}` is the whole mining time. */
   cleared: string;
@@ -27,10 +27,12 @@ export interface SurveyMessageLabels {
 const BAR_CELLS = 20;
 /**
  * Widest a line of the message may run, in visible characters (`<b>` tags
- * don't show). RockRadar's own message is the benchmark: its widest line is
- * about 50 characters and it never wraps in the chat window.
+ * don't show). RockRadar's own message is the benchmark: its widest lines are
+ * about 52 characters, and they never wrap. Most of those are box-drawing
+ * characters, which run wider than letters in the chat window's proportional
+ * font, so a line of plain text can be a little longer than that and still fit.
  */
-export const MAX_LINE_WIDTH = 50;
+export const MAX_LINE_WIDTH = 56;
 const SEPARATOR = ' · ';
 
 /**
@@ -139,24 +141,35 @@ function bar(percent: number, finished: boolean): string {
   return `▕${'█'.repeat(filled)}${'░'.repeat(BAR_CELLS - filled)}▏ ${percent}%`;
 }
 
-/** "Left: 19 Pyroxeres · 13 Pyroxeres II · +4 more", as many ores as fit one line. */
+/** How many ores the "Left:" line names before grouping the rest. */
+const MAX_NAMED_ORES = 3;
+
+/**
+ * "Left: 5 Scordite · 15 Pyroxeres · 20 Veldspar · 12 other": the ores with
+ * the most ISK left, each with its rock count, and the rocks of every other
+ * ore grouped into one count. `ores` arrives most valuable first, and fewer
+ * than three are named if a longer line would wrap.
+ */
 function oreLine(
   ores: SurveySummary['ores'],
   short: Record<string, string>,
   labels: SurveyMessageLabels
 ): string {
-  const entries = ores.filter((o) => o.rocks > 0).map((o) => `${o.rocks} ${short[o.ore]}`);
+  const rocksIn = (list: SurveySummary['ores']): number => list.reduce((n, o) => n + o.rocks, 0);
   const prefixWidth = fill(labels.left, { ores: '' }).length;
   const listed: string[] = [];
-  for (let i = 0; i < entries.length; i++) {
-    const rest = entries.length - (i + 1);
-    const more = rest > 0 ? [fill(labels.more, { count: rest })] : [];
-    const width = prefixWidth + [...listed, entries[i], ...more].join(SEPARATOR).length;
+  let named = 0;
+  for (const ore of ores.slice(0, MAX_NAMED_ORES)) {
+    const entry = `${ore.rocks} ${short[ore.ore]}`;
+    const rest = rocksIn(ores.slice(named + 1));
+    const other = rest > 0 ? [fill(labels.more, { count: rest })] : [];
+    const width = prefixWidth + [...listed, entry, ...other].join(SEPARATOR).length;
     if (listed.length > 0 && width > MAX_LINE_WIDTH) break;
-    listed.push(entries[i]);
+    listed.push(entry);
+    named++;
   }
-  const hidden = entries.length - listed.length;
-  if (hidden > 0) listed.push(fill(labels.more, { count: hidden }));
+  const other = rocksIn(ores.slice(named));
+  if (other > 0) listed.push(fill(labels.more, { count: other }));
   return fill(labels.left, { ores: listed.join(SEPARATOR) });
 }
 
