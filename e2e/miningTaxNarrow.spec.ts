@@ -48,7 +48,7 @@ interface SeedOptions {
   withUnassignedEntry?: boolean;
   /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
   withMadePayment?: boolean;
-  /** Skip the Payee and its Assignment, so every entry is Unassigned and nothing is owed. */
+  /** Skip the Assignment (the Payee stays, so the tab isn't the first-Payee empty state): every entry is Unassigned and nothing is owed. */
   nothingOwed?: boolean;
   /** Seed the Assignment with a zero value and zero tax, so its row has nothing to show in the value and tax columns. */
   withZeroValue?: boolean;
@@ -148,11 +148,6 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           value: { system_id: solarSystemId, name: 'Jita', security_status: 0.9 },
           fetchedAt: now,
         });
-        if (nothingOwed) {
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-          return;
-        }
         tx.objectStore('payees').put({
           id: payeeId,
           characterId,
@@ -163,19 +158,20 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
         // Outstanding Assignment covering the whole entry, so `computePayeeBalances`
         // counts its `taxOwed` toward this Payee's balance (`owed > 0`), which is
         // what makes the card show by default without toggling "show settled".
-        tx.objectStore('miningTaxAssignments').put({
-          id: assignmentId,
-          characterId,
-          date: entryDate,
-          solarSystemId,
-          payeeId,
-          oreLines: [{ typeId: oreTypeId, quantity: oreQuantity }],
-          taxPct: 10,
-          estimatedValue: zeroValue ? 0 : 1_000_000,
-          taxOwed: zeroValue ? 0 : taxOwed,
-          status: 'outstanding',
-          updatedAt: now,
-        });
+        if (!nothingOwed)
+          tx.objectStore('miningTaxAssignments').put({
+            id: assignmentId,
+            characterId,
+            date: entryDate,
+            solarSystemId,
+            payeeId,
+            oreLines: [{ typeId: oreTypeId, quantity: oreQuantity }],
+            taxPct: 10,
+            estimatedValue: zeroValue ? 0 : 1_000_000,
+            taxOwed: zeroValue ? 0 : taxOwed,
+            status: 'outstanding',
+            updatedAt: now,
+          });
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
