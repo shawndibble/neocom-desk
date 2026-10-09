@@ -6,6 +6,7 @@ import { usePageTab } from '@/lib/usePageTab';
 import { MINING_TABS } from '@/app/pageTabs';
 import { TaxTab } from '@/features/miningTax/TaxTab';
 import { OverviewTab } from '@/features/miningTax/OverviewTab';
+import { SurveyTab } from '@/features/survey/SurveyTab';
 
 /**
  * Mining (issue #671): renamed from "Moon Mining" — every internal
@@ -62,7 +63,9 @@ export function MoonMiningTax() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'overview' ? <OverviewTab tabBar={tabBar} /> : <TaxTab tabBar={tabBar} />}
+      {tab === 'overview' && <OverviewTab tabBar={tabBar} />}
+      {tab === 'tax' && <TaxTab tabBar={tabBar} />}
+      {tab === 'survey' && <SurveyTab tabBar={tabBar} />}
     </div>
   );
 }

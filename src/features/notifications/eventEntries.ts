@@ -467,7 +467,7 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     source: SNAPSHOT_SOURCES.corpIndustryJobs,
     diff: diffCorpIndustryJobReady,
     copy: corpIndustryJobCopy,
-    projection: null,
+    projection: { push: corpIndustryJobCopy.push, everyOccurrence: true },
     thresholds: null,
     rowHintKey: null,
   }),

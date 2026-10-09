@@ -25,7 +25,7 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { formatCountdown } from '@/lib/duration';
+import { formatCountdown, formatDuration } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { RouteHolesState } from './useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
@@ -69,6 +69,17 @@ function WayBox({
   const label = useWayLabel()(way);
   const { summary } = way;
   const facts: string[] = [];
+  const { jump } = way;
+  if (jump) {
+    facts.push(
+      t('travel.jumpDrive.wayJumps', { count: jump.jumps }),
+      t('travel.jumpDrive.wayLy', { ly: jump.totalLy.toFixed(1) }),
+      t('travel.jumpDrive.fuelValue', { count: jump.fuel, fuel: jump.fuel.toLocaleString() }),
+      t('travel.jumpDrive.wayFatigue', {
+        time: formatDuration(Math.round(jump.fatigueMinutes) * 60),
+      })
+    );
+  }
   if (summary) {
     if (summary.lowestSecurity !== null) {
       facts.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
@@ -120,6 +131,7 @@ function WayBox({
           )}
         </p>
       )}
+      {jump && <p className="text-sm text-text-dim">{t('travel.jumpDrive.caveat', { to })}</p>}
       {way.bridges.map(({ from, to: bridgeTo, gate }) => (
         <p
           key={`bridge-${from}-${bridgeTo}`}

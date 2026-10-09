@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { HoleMassTable } from '@/engine/route/jumpMass';
+import type { HullJumpDrive } from '@/engine/route/jumpLegs';
 import { loadShipMass, loadWormholeMass } from '@/sde/loadSde';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
@@ -20,7 +21,10 @@ export const useRouteShipTypeId = createLocalSetting<number | null>({
 export interface RouteShipOption {
   typeId: number;
   name: string;
+  groupId: number;
   massKg: number;
+  /** The hull's base jump drive, or `null` for a hull without one. */
+  drive: HullJumpDrive | null;
 }
 
 export interface RouteShipMass {
@@ -46,7 +50,13 @@ function loadMassTables(): Promise<MassTables> {
   tables ??= Promise.all([loadShipMass(), loadWormholeMass()])
     .then(([ships, holeTable]) => ({
       hulls: Object.entries(ships)
-        .map(([id, [name, , massKg]]) => ({ typeId: Number(id), name, massKg }))
+        .map(([id, [name, groupId, massKg, drive]]) => ({
+          typeId: Number(id),
+          name,
+          groupId,
+          massKg,
+          drive: drive ?? null,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       holeTable,
     }))

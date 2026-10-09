@@ -336,6 +336,12 @@ export function ContainerRow({
  * cells by construction rather than by two hand-matched sets of widths.
  * Below `md` none of these apply and the figures wrap as before.
  */
+/**
+ * The name cell: capped at 24rem so the figures sit beside it instead of a
+ * screen away at the panel's far edge, but free to shrink when the panel is
+ * narrower. The rest of the row stays blank to the right of the menu slot.
+ */
+const ITEM_NAME_CELL = 'md:flex-[0_1_24rem]';
 const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
 const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
@@ -360,7 +366,7 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
       data-testid="item-column-labels"
       className="sticky top-0 z-10 hidden shrink-0 items-center gap-2.5 border-b border-line bg-panel-2 py-1 pr-3 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:flex"
     >
-      <span className="min-w-0 flex-1 truncate">{t('assets.sort.name')}</span>
+      <span className={cx('min-w-0 truncate', ITEM_NAME_CELL)}>{t('assets.sort.name')}</span>
       <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>
       <span className={ITEM_VOLUME_CELL}>{t('assets.columns.volume')}</span>
       <span className={ITEM_VALUE_CELL}>{t('assets.sort.value')}</span>
@@ -385,6 +391,21 @@ interface ItemRowProps {
   selectionState: SelectionState;
   onToggleSelection: () => void;
   t: Translate;
+}
+
+/**
+ * An item's estimated value. Exactly 0 means "no estimate" (an unpriced type or
+ * a blueprint copy without a valuation), so it reads as a dim dash with a
+ * screen-reader "No estimate" rather than a green "0".
+ */
+function ValueFigure({ value, t }: { value: number; t: Translate }) {
+  if (value !== 0) return <IskAmount value={value} decimals={0} />;
+  return (
+    <>
+      <span aria-hidden="true">{t('assets.unknownValue')}</span>
+      <span className="sr-only">{t('assets.noEstimate')}</span>
+    </>
+  );
 }
 
 /**
@@ -434,9 +455,11 @@ export function ItemRow({
               two layouts (a stacked name + wrapping line below, a table row
               above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
-            <span className="flex min-w-0 items-center md:flex-1">
+            <span className={cx('flex min-w-0 items-center', ITEM_NAME_CELL)}>
               {typeId === undefined ? (
-                <span className="truncate text-sm">{name}</span>
+                <Tooltip content={name}>
+                  <span className="truncate text-sm">{name}</span>
+                </Tooltip>
               ) : (
                 <ItemInfoLink
                   typeId={typeId}
@@ -446,7 +469,9 @@ export function ItemRow({
                     if (guard.swallowClick(e)) e.preventDefault();
                   }}
                 >
-                  <span className="truncate">{name}</span>
+                  <Tooltip content={name}>
+                    <span className="truncate">{name}</span>
+                  </Tooltip>
                 </ItemInfoLink>
               )}
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
@@ -461,8 +486,13 @@ export function ItemRow({
               <span aria-hidden="true" className="md:hidden">
                 ·
               </span>
-              <span className={cx('text-isk-pos', ITEM_VALUE_CELL)}>
-                <IskAmount value={estimatedValue} decimals={0} />
+              <span
+                className={cx(
+                  estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos',
+                  ITEM_VALUE_CELL
+                )}
+              >
+                <ValueFigure value={estimatedValue} t={t} />
               </span>
             </span>
           </span>
@@ -533,8 +563,13 @@ export function SearchResultRow({
               <SecurityValue security={security} />
               <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
             </span>
-            <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
-              <IskAmount value={estimatedValue} decimals={0} />
+            <span
+              className={cx(
+                'shrink-0 text-[0.6875rem] tabular-nums',
+                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+              )}
+            >
+              <ValueFigure value={estimatedValue} t={t} />
             </span>
           </span>
         </span>

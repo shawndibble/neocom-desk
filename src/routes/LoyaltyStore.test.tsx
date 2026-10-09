@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -14,6 +14,19 @@ import type { BuildResult } from '@/engine/industry/types';
 const useLoyaltyStoreOffers = vi.fn();
 vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
   useLoyaltyStoreOffers: (corporationId: number) => useLoyaltyStoreOffers(corporationId),
+}));
+
+// The landing's cross-store search has its own tests (`LpStoreSearch.test.tsx`).
+vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
+  useLpStoreSearch: () => ({
+    status: 'ready',
+    syncedAt: null,
+    result: { groups: [], corporations: [], totalItemMatches: 0 },
+    rowFor: () => null,
+    systemName: () => null,
+    jumpsStatus: 'ready',
+    pricing: false,
+  }),
 }));
 
 // The picker loads the LP-corp snapshot and the Character's balances itself
@@ -36,6 +49,7 @@ vi.mock('@/features/loyalty/LpStorePicker', async () => {
 const { LoyaltyStore } = await import('./LoyaltyStore');
 const { useMarketHub } = await import('@/features/market/hub');
 const { usePriceBasis } = await import('@/features/loyalty/priceBasis');
+const { useLpBasis } = await import('@/features/loyalty/lpBasis');
 
 /**
  * Narrow, so the filters render inside the sheet. jsdom's stub never matches
@@ -100,6 +114,7 @@ beforeEach(() => {
   });
   useMarketHub.setState({ value: 'jita' });
   usePriceBasis.setState({ value: 'sell' });
+  useLpBasis.setState({ value: 'lp' });
 });
 
 afterEach(() => {
@@ -216,6 +231,25 @@ describe('LoyaltyStore LP Value cog', () => {
       'href',
       '/settings/market'
     );
+  });
+});
+
+describe('LoyaltyStore basis readout', () => {
+  it('names the hub and price basis, and CONCORD only on the CONCORD basis', () => {
+    renderStore();
+    const readout = screen.getByTestId('lp-basis-readout');
+    expect(readout).toHaveTextContent('Jita · Sell');
+    expect(readout).not.toHaveTextContent('CONCORD');
+
+    act(() => {
+      useMarketHub.setState({ value: OTHER_HUB.id });
+      usePriceBasis.setState({ value: 'buy' });
+    });
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy`);
+    expect(readout).not.toHaveTextContent('CONCORD');
+
+    act(() => useLpBasis.setState({ value: 'concord' }));
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy · CONCORD LP`);
   });
 });
 
@@ -766,9 +800,38 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
   it('lands on a pick-a-corporation state with no store chosen, loading no offers', () => {
     renderAt('/loyalty');
     expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
-    expect(screen.getByText('Pick a corporation')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
+    expect(screen.getByText('Search every LP Store')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'picker: none' })).toBeInTheDocument();
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
+  });
+
+  it('is a Market tab: the bar shows LP Store selected beside the other tabs', () => {
+    renderAt('/loyalty');
+    expect(screen.getByRole('tab', { name: 'LP Store', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Market' })).toBeInTheDocument();
+  });
+
+  it('offers a crumb back to the search only when a result opened the store', () => {
+    const { unmount } = renderAt('/loyalty/1000168');
+    expect(screen.queryByRole('link', { name: /LP Store search/ })).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: '/loyalty/1000168', state: { from: 'lp-search', q: 'tritanium' } },
+        ]}
+      >
+        <Routes>
+          <Route path="/loyalty/:corporationId" element={<LoyaltyStore />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /LP Store search/ })).toHaveAttribute(
+      'href',
+      '/market/lp-store?q=tritanium'
+    );
   });
 
   it('puts the picker in the header, naming the open store', () => {
@@ -783,6 +846,34 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
       'info=corporation-1000168'
     );
+  });
+
+  it('keeps the offer count off the header and on the list panel, following the search', async () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows: [ITEM_ROW, UNRESOLVED_BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore('?affordableOnly=0');
+
+    expect(screen.queryByText('Offers shown')).not.toBeInTheDocument();
+    expect(screen.getByText('Your LP')).toBeInTheDocument();
+    expect(screen.getByText('12,000')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2 offers')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
+    expect(await screen.findByText('1 / 2 offers')).toBeInTheDocument();
   });
 
   it('opens the picked store from the URL', () => {

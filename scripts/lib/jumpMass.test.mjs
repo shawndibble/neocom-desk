@@ -45,6 +45,28 @@ describe('bakeWormholeMass', () => {
 });
 
 describe('bakeShipMass', () => {
+  it('adds a hull base jump drive [rangeLy, fuelTypeId, fuelPerLy] when it has one', () => {
+    const types = [
+      { typeID: 20, name: 'Archon', groupID: 547, mass: 1e9, published: true },
+      { typeID: 21, name: 'Rifter', groupID: 25, mass: 1e6, published: true },
+    ];
+    const attrs = new Map([
+      [
+        20,
+        new Map([
+          [867, 5],
+          [866, 16273],
+          [868, 1000],
+        ]),
+      ],
+      [21, new Map([[867, 0]])],
+    ]);
+    expect(bakeShipMass(types, new Set([547, 25]), attrs)).toEqual({
+      20: ['Archon', 547, 1e9, [5, 16273, 1000]],
+      21: ['Rifter', 25, 1e6],
+    });
+  });
+
   it('keeps published ship hulls as typeId -> [name, groupID, massKg]', () => {
     const types = [
       { typeID: 10, name: 'Megathron', groupID: 27, mass: 98.4e6, published: true },

@@ -20,6 +20,10 @@ import { PilotListView } from './PilotListView';
 const SCAN =
   '626\tA\tVexor\t1 km\n626\tB\tVexor\t2 km\n23773\tC\tRagnarok\t3 AU\n1\tD\tDrone\t1 km';
 
+// Worth and Since-last-scan are market and device state, not the scan itself.
+const ROLE_SECTIONS =
+  'section[aria-label]:not([aria-label^="Worth on the scan"]):not([aria-label^="Since your last scan"])';
+
 afterEach(cleanup);
 
 describe('Shared D-Scan', () => {
@@ -33,11 +37,11 @@ describe('Shared D-Scan', () => {
 
     const live = render(
       <MemoryRouter>
-        <PilotListView paste={sender} onOpen={() => undefined} />
+        <PilotListView paste={sender} />
       </MemoryRouter>
     );
     await screen.findByText('Ragnarok');
-    const senderSections = [...live.container.querySelectorAll('section[aria-label]')].map(
+    const senderSections = [...live.container.querySelectorAll(ROLE_SECTIONS)].map(
       (el) => el.textContent
     );
     cleanup();
@@ -51,7 +55,7 @@ describe('Shared D-Scan', () => {
       </MemoryRouter>
     );
     await screen.findByText('Ragnarok');
-    const recipientSections = [...shared.container.querySelectorAll('section[aria-label]')].map(
+    const recipientSections = [...shared.container.querySelectorAll(ROLE_SECTIONS)].map(
       (el) => el.textContent
     );
     expect(recipientSections).toEqual(senderSections);

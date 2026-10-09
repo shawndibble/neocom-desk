@@ -7,7 +7,15 @@
  *
  * The selected pilot lives in the URL (`?pilot=<id>`) so a lookup can be shared.
  */
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import {
@@ -18,13 +26,14 @@ import {
   PageHeader,
   Panel,
   Spinner,
-  TextInput,
+  TextArea,
 } from '@/components/ui';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
   MIN_RECIPIENT_SEARCH_LENGTH,
   searchMailRecipients,
 } from '@/features/character/mailRecipientSearch';
+import { isMultiLine, lineAt, namesOf, replaceLine } from '@/engine/pilotList/nameLines';
 import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { moveHighlight } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
@@ -86,10 +95,7 @@ export function PilotLookupPanel() {
         />
       </Panel>
       {params.pilot === null && list !== null ? (
-        <PilotListView
-          paste={list}
-          onOpen={(characterId) => setParams({ pilot: characterId }, { push: true })}
-        />
+        <PilotListView paste={list} />
       ) : params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
       ) : (
@@ -103,7 +109,14 @@ type ResolveState =
   | { kind: 'idle' }
   | { kind: 'resolving' }
   | { kind: 'not-found'; name: string }
+  /** A line of a several-line list doesn't look like a pilot name. */
+  | { kind: 'bad-lines' }
   | { kind: 'failed' };
+
+/** A phone keyboard has no Shift+Enter, so there Enter always adds a line. */
+function hasCoarsePointer(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+}
 
 function PilotSearch({
   resolved,
@@ -133,6 +146,10 @@ function PilotSearch({
   // The pilot whose name the box last showed, and whether the user is editing it.
   const seededId = useRef<number | null>(null);
   const typing = useRef(false);
+  // The box takes one name per line; suggestions are for the line the caret is on.
+  const [caret, setCaret] = useState(0);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingCaret = useRef<number | null>(null);
 
   useEffect(() => {
     // The pilot left the URL: coming back to it must seed again, even over edited text.
@@ -149,7 +166,10 @@ function PilotSearch({
     setOpen(false);
   }, [resolved]);
 
-  const trimmed = query.trim();
+  const multi = isMultiLine(query);
+  const exact = query.trim();
+  // The name being typed is the caret's line: it alone gets suggestions.
+  const trimmed = lineAt(query, caret).text.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
 
   useEffect(() => {
@@ -177,7 +197,26 @@ function PilotSearch({
     };
   }, [canSuggest, activeCharacterId, trimmed]);
 
+  // After a pick fills a line of a list, the caret goes to the end of that line.
+  useLayoutEffect(() => {
+    if (pendingCaret.current === null) return;
+    areaRef.current?.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    setCaret(pendingCaret.current);
+    pendingCaret.current = null;
+  }, [query]);
+
   function choose(pilot: PilotSummary) {
+    if (multi) {
+      // Part of a list: fill the line being typed, and look the list up when asked.
+      const next = replaceLine(query, caret, pilot.name);
+      pendingCaret.current = next.caret;
+      typing.current = true;
+      setQuery(next.text);
+      setSuggestions([]);
+      setOpen(false);
+      setHighlight(null);
+      return;
+    }
     setQuery(pilot.name);
     seededId.current = pilot.characterId;
     typing.current = false;
@@ -188,31 +227,62 @@ function PilotSearch({
   }
 
   async function lookUpExactName() {
-    if (trimmed === '') return;
+    if (exact === '') return;
     const ticket = ++latestLookup.current;
     setOpen(false);
     setResolve({ kind: 'resolving' });
     try {
-      const pilot = await resolvePilotByName(trimmed);
+      const pilot = await resolvePilotByName(exact);
       if (ticket !== latestLookup.current) return;
-      if (pilot === null) setResolve({ kind: 'not-found', name: trimmed });
+      if (pilot === null) setResolve({ kind: 'not-found', name: exact });
       else choose(pilot);
     } catch {
       if (ticket === latestLookup.current) setResolve({ kind: 'failed' });
     }
   }
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  /** One name looks that pilot up; several lines look the whole list up. */
+  function submit() {
+    const names = namesOf(query);
+    if (names.length >= 2) {
+      const pasted = classifyPilotPaste(names.join('\n'));
+      setOpen(false);
+      if (pasted === null) {
+        setResolve({ kind: 'bad-lines' });
+        return;
+      }
+      setResolve({ kind: 'idle' });
+      onList(pasted);
+      return;
+    }
     const picked = highlight === null ? undefined : shown[highlight];
     if (open && picked) choose(picked);
     else void lookUpExactName();
   }
 
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    submit();
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Escape') {
       setOpen(false);
       setHighlight(null);
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const picked = highlight === null ? undefined : shown[highlight];
+      if (open && picked) {
+        e.preventDefault();
+        choose(picked);
+      } else if (!multi && !hasCoarsePointer()) {
+        // One name: Enter looks it up. Shift+Enter starts a list; once there is
+        // one, Enter adds a line and Ctrl+Enter looks the list up. A phone's
+        // Enter always adds a line, so its Look up button is the way.
+        e.preventDefault();
+        submit();
+      }
       return;
     }
     const key = e.key;
@@ -250,7 +320,9 @@ function PilotSearch({
         <div className="flex flex-wrap items-end gap-3">
           <FilterField label={label} stretch={false}>
             <div className="relative w-72 max-w-full">
-              <TextInput
+              <TextArea
+                ref={areaRef}
+                rows={Math.min(6, Math.max(1, query.split('\n').length))}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={listOpen}
@@ -267,11 +339,14 @@ function PilotSearch({
                   latestLookup.current++;
                   typing.current = true;
                   setQuery(e.target.value);
+                  setCaret(e.target.selectionStart);
                   setSuggestions([]);
                   setOpen(true);
                   setHighlight(null);
                   setResolve({ kind: 'idle' });
                 }}
+                onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+                onSubmitChord={submit}
                 onFocus={() => setOpen(true)}
                 onBlur={() => {
                   typing.current = false;
@@ -321,7 +396,7 @@ function PilotSearch({
           <Button
             type="submit"
             variant="primary"
-            disabled={trimmed === '' || resolve.kind === 'resolving'}
+            disabled={exact === '' || resolve.kind === 'resolving'}
           >
             {t('travel.pilot.lookUp')}
           </Button>
@@ -332,6 +407,7 @@ function PilotSearch({
         <p role="status" aria-live="polite" className="text-xs">
           {resolve.kind === 'resolving' && t('travel.pilot.resolving')}
           {resolve.kind === 'not-found' && t('travel.pilot.notFound', { name: resolve.name })}
+          {resolve.kind === 'bad-lines' && t('travel.pilot.linesInvalid')}
           {resolve.kind === 'failed' && t('travel.pilot.resolveFailed')}
         </p>
       </form>

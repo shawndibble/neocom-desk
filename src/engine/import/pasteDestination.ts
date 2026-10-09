@@ -2,6 +2,7 @@
  * Where a page-level paste belongs (the app-wide paste router,
  * `app/GlobalPasteRouter.tsx`): an EFT fit opens in Fittings, an item list —
  * an inventory copy, a multibuy, a contract's contents — in the Appraisal,
+ * a Survey Scanner copy in the Mining Survey tab,
  * a blueprint list in a new Build Group, a Local list or D-Scan in Pilot Lookup,
  * a skill plan (in-game or EVEMon text) in the Skills planner, an in-game chat
  * link on the item or
@@ -19,6 +20,7 @@
  * a sentence that happens to start with "Tritanium" stays a no-op.
  */
 import { parseChatLink } from '@/engine/import/chatLink';
+import { isSurveyScanText } from '@/engine/survey/parseScan';
 import { looksLikeBlueprintList } from '@/engine/import/blueprintList';
 import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import { parseSkillPlanPaste, type SkillCatalog } from '@/engine/import/skillPlanPaste';
@@ -27,7 +29,14 @@ import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
 export type PasteDestination =
-  'fitting' | 'chatLink' | 'dscan' | 'blueprintList' | 'skillPlan' | 'appraisal' | 'pilotList';
+  | 'survey'
+  | 'fitting'
+  | 'chatLink'
+  | 'dscan'
+  | 'blueprintList'
+  | 'skillPlan'
+  | 'appraisal'
+  | 'pilotList';
 
 export interface PasteSources {
   /** The market catalogue, keyed by lower-case item name. */
@@ -60,6 +69,12 @@ export interface PasteDetector<Id extends string = PasteDestination> {
  * order, with its strings under `shortcuts.pasteDestinations.<id>`.
  */
 export const PASTE_DETECTORS: readonly PasteDetector[] = [
+  {
+    // First, and strict: every line must be a Survey Scanner row (units, m3,
+    // distance), which no item list, fit or Local list ever is.
+    id: 'survey',
+    detect: (text) => (isSurveyScanText(text) ? 'match' : 'pass'),
+  },
   {
     id: 'fitting',
     detect: (text, { hullNames }) => {

@@ -146,7 +146,7 @@ export function CorpBoardRow({ item }: { item: CorpBoardItem }) {
       <Countdown item={item} />
       <div className="min-w-0 flex-1">
         <Tooltip content={item.subject}>
-          <p className="truncate text-sm">
+          <p className="line-clamp-2 text-sm break-words">
             {/* Item rows go to Market (§6c); structures and the rest are plain names. */}
             {item.typeId === null ? (
               item.subject

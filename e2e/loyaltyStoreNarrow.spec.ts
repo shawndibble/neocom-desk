@@ -112,3 +112,129 @@ test('the header corporation picker fits a 390px phone without horizontal scroll
   await page.goto(`./market/lp-store/${CORPORATION_ID}`);
   await expectPickerFits();
 });
+
+for (const width of [390, 1024, 1280]) {
+  test(`the header and list panel meta do not overlap or overflow at ${width}px (issue #3117)`, async ({
+    page,
+  }) => {
+    await mockLoyaltyOffers(page);
+    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
+
+    const header = page.getByRole('heading', { level: 1 }).locator('xpath=ancestor::header[1]');
+    await expect(header.getByText('Offers shown')).toHaveCount(0);
+
+    // Direct children of the header's meta row never sit on top of each other.
+    const meta = page.getByRole('link', { name: 'Corporation info' }).locator('xpath=..');
+    const boxes = await meta.locator('> *').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const r = node.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      })
+    );
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!;
+        const b = boxes[j]!;
+        const overlaps =
+          a.left < b.right - 1 &&
+          b.left < a.right - 1 &&
+          a.top < b.bottom - 1 &&
+          b.top < a.bottom - 1;
+        expect(overlaps).toBe(false);
+      }
+    }
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    // From md up the count rides the list panel's title line, clear of the export button.
+    if (width >= 768) {
+      const count = page.getByText(/^2 \/ 2 offers$/);
+      await expect(count).toBeVisible();
+      const panelHeader = count.locator('xpath=ancestor::header[1]');
+      const title = panelHeader.getByRole('heading', { level: 2 });
+      const [c, t, actions] = await Promise.all([
+        count.boundingBox(),
+        title.boundingBox(),
+        panelHeader.getByRole('button').last().boundingBox(),
+      ]);
+      expect(Math.abs(c!.y + c!.height / 2 - (t!.y + t!.height / 2))).toBeLessThan(t!.height);
+      if (actions) expect(c!.x + c!.width).toBeLessThanOrEqual(actions.x + 1);
+    } else {
+      await expect(page.getByText(/^2 \/ 2 offers$/)).toBeHidden();
+    }
+  });
+}
+
+for (const width of [390, 1024, 1280]) {
+  test(`the list panel names the hub and price basis inside its header at ${width}px (issue #3118)`, async ({
+    page,
+  }) => {
+    await mockLoyaltyOffers(page);
+    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
+
+    const readout = page.getByTestId('lp-basis-readout');
+    await expect(readout).toHaveText('Jita · Sell');
+    const panelHeader = readout.locator('xpath=ancestor::header[1]');
+    const title = panelHeader.getByRole('heading', { level: 2 });
+    const [r, t, h, actions] = await Promise.all([
+      readout.boundingBox(),
+      title.boundingBox(),
+      panelHeader.boundingBox(),
+      panelHeader.getByRole('button').last().boundingBox(),
+    ]);
+    // Inside the header, clear of the title and the export button.
+    expect(r!.x).toBeGreaterThanOrEqual(h!.x - 1);
+    expect(r!.x + r!.width).toBeLessThanOrEqual(h!.x + h!.width + 1);
+    expect(r!.y).toBeGreaterThanOrEqual(h!.y - 1);
+    expect(r!.y + r!.height).toBeLessThanOrEqual(h!.y + h!.height + 1);
+    const apart = (a: { x: number; y: number; width: number; height: number }) =>
+      r!.x + r!.width <= a.x + 1 ||
+      a.x + a.width <= r!.x + 1 ||
+      r!.y + r!.height <= a.y + 1 ||
+      a.y + a.height <= r!.y + 1;
+    expect(apart(t!)).toBe(true);
+    if (actions) expect(apart(actions)).toBe(true);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
+
+for (const width of [1024, 1280, 1440]) {
+  test(`the offers list is wide beside the detail panel, which does not overflow, at ${width}px (issue #3140)`, async ({
+    page,
+  }) => {
+    await mockLoyaltyOffers(page);
+    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await page.setViewportSize({ width, height: 900 });
+    const cells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
+    await expect(cells).toHaveCount(2);
+    await cells.first().click();
+
+    const list = page.getByRole('table').first().locator('xpath=ancestor::section[1]');
+    const detail = page.getByText('Select an offer to see its profit breakdown.');
+    await expect(detail).toBeHidden();
+    const box = await list.boundingBox();
+    if (width >= 1280) expect(box!.width).toBeGreaterThanOrEqual(26 * 16);
+
+    // The detail panel is the list's right-hand sibling: no overlap, no clipping.
+    const sibling = list.locator('xpath=following-sibling::*[contains(@class,"min-w-0")][1]');
+    const d = await sibling.boundingBox();
+    expect(d!.x).toBeGreaterThanOrEqual(box!.x + box!.width - 1);
+    const clipped = await sibling.evaluate((n) => n.scrollWidth - n.clientWidth);
+    expect(clipped).toBeLessThanOrEqual(0);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
