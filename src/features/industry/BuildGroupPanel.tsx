@@ -592,6 +592,7 @@ export function BuildGroupPanel({
           mean. */}
       {!loading && (
         <div
+          data-testid="group-verdict-band"
           className={cx(
             'flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xs border p-3',
             groupProfit === null
@@ -628,6 +629,9 @@ export function BuildGroupPanel({
                   : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
           </p>
           <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
+          {rollup.unpriceable && (
+            <p className="basis-full text-xs text-warning">{t('industry.groupUnpriceable')}</p>
+          )}
           {plans.length > 0 && (
             <div className="basis-full">
               <GroupSlotLine characterId={plans[0].characterId} counts={groupJobCounts} />
@@ -725,9 +729,6 @@ export function BuildGroupPanel({
             ))}
           </div>
         </div>
-      )}
-      {rollup.unpriceable && (
-        <p className="text-xs text-warning">{t('industry.groupUnpriceable')}</p>
       )}
       {failed.length > 0 && (
         <ul className="text-xs text-danger">

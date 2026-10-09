@@ -559,3 +559,25 @@ describe('BuildGroupPanel — verdict band wording when the verdict is unknown',
     expect(screen.queryByText(/-\d+(\.\d+)?% more than buying/)).toBeNull();
   });
 });
+
+describe('BuildGroupPanel — one unpriced-materials warning (issue #3128)', () => {
+  const WARNING = /At least one plan has a material with no price/;
+
+  it('renders the warning once, inside the verdict band, when the rollup is unpriceable', () => {
+    const unpriced = row('a', [material(34, 100)]);
+    (unpriced.groupResult as { unpriceable: boolean }).unpriceable = true;
+    mockedUseComparedBuildResults.mockReturnValue([unpriced]);
+    renderPanel([plan('a', 'jita')]);
+
+    const warnings = screen.getAllByText(WARNING);
+    expect(warnings).toHaveLength(1);
+    expect(screen.getByTestId('group-verdict-band').contains(warnings[0])).toBe(true);
+  });
+
+  it('does not render the warning when every material is priced', () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    expect(screen.queryByText(WARNING)).toBeNull();
+  });
+});
