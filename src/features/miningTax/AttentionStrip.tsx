@@ -26,7 +26,12 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
-  const warning = items.some((item) => item.tone === 'warning');
+  // Warnings first (stable), so the collapsed preview names the most important item.
+  const ordered = [...items].sort(
+    (a, b) => Number(b.tone === 'warning') - Number(a.tone === 'warning')
+  );
+  const warning = ordered[0].tone === 'warning';
+  const first = ordered[0];
   return (
     <section
       role={warning ? 'alert' : 'status'}
@@ -39,8 +44,22 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
         expanded={expanded}
         onToggle={() => setExpanded(!expanded)}
         label={
-          <span className={warning ? 'text-warning' : 'text-text'}>
-            {t('miningTax.attention.title', { count: items.length })}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={cx('shrink-0', warning ? 'text-warning' : 'text-text')}>
+              {t('miningTax.attention.title', { count: items.length })}
+            </span>
+            {!expanded && (
+              <>
+                <span className="min-w-0 truncate font-normal tracking-normal text-text-dim normal-case">
+                  {first.title}
+                </span>
+                {items.length > 1 && (
+                  <span className="shrink-0 font-normal tracking-normal text-text-dim normal-case">
+                    {t('miningTax.attention.more', { count: items.length - 1 })}
+                  </span>
+                )}
+              </>
+            )}
           </span>
         }
         trailing={
@@ -49,7 +68,7 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
           </span>
         }
       >
-        {items.map((item) => (
+        {ordered.map((item) => (
           <div key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-2.5 py-2">
             <div className="min-w-0 flex-1 space-y-1">
               <p

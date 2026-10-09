@@ -3,7 +3,12 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PilotStats } from '@/lib/zkillboard';
-import { ZkillStatsSection, ZkillStatsStatus, ZkillTopShips } from './ZkillStatsSection';
+import {
+  ZkillRatioMeters,
+  ZkillStatsSection,
+  ZkillStatsStatus,
+  ZkillTopShips,
+} from './ZkillStatsSection';
 
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: () =>
@@ -28,46 +33,84 @@ const base: PilotStats = {
   memberCount: null,
 };
 
-describe('ZkillStatsSection', () => {
-  it('shows both ratios as meters that name the side they lean to', () => {
-    render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} />);
+describe('ZkillRatioMeters', () => {
+  it('shows danger, fleet size and kills against losses as meters that name the side they lean to', () => {
+    render(<ZkillRatioMeters stats={base} />);
     const danger = screen.getByRole('meter', { name: 'Danger' });
     expect(danger).toHaveAttribute('aria-valuenow', '78');
     expect(danger).toHaveAttribute('aria-valuetext', '78% dangerous');
     const gang = screen.getByRole('meter', { name: 'Fleet size' });
     expect(gang).toHaveAttribute('aria-valuenow', '36');
     expect(gang).toHaveAttribute('aria-valuetext', '64% solo');
+    const killer = screen.getByRole('meter', { name: 'Kills vs losses' });
+    expect(killer).toHaveAttribute('aria-valuenow', '80');
+    expect(killer).toHaveAttribute('aria-valuetext', '80% killer');
   });
 
   it('colours each meter by the end it leans to: red to the high end, green to the low', () => {
-    render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} />);
+    render(<ZkillRatioMeters stats={base} />);
     expect(screen.getByText('78% dangerous')).toHaveClass('text-danger');
     expect(screen.getByText('64% solo')).toHaveClass('text-success');
+    expect(screen.getByText('80% killer')).toHaveClass('text-danger');
   });
 
-  it('reads exactly 50 as even, in words and in colour', () => {
-    render(<ZkillStatsSection stats={{ kind: 'stats', stats: { ...base, dangerRatio: 50 } }} />);
-    const danger = screen.getByRole('meter', { name: 'Danger' });
-    expect(danger).toHaveAttribute('aria-valuetext', 'Even, 50/50');
+  it('reads the danger ratio as a share of danger at either end of its scale', () => {
+    render(<ZkillRatioMeters stats={{ ...base, dangerRatio: 42 }} />);
+    expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute(
+      'aria-valuetext',
+      '42% dangerous'
+    );
+  });
+
+  it('reads a record with more losses than kills as a victim, and 50 as even', () => {
+    const { rerender } = render(<ZkillRatioMeters stats={{ ...base, kills: 10, losses: 30 }} />);
+    expect(screen.getByRole('meter', { name: 'Kills vs losses' })).toHaveAttribute(
+      'aria-valuetext',
+      '75% victim'
+    );
+    rerender(<ZkillRatioMeters stats={{ ...base, kills: 30, losses: 30 }} />);
+    const killer = screen.getByRole('meter', { name: 'Kills vs losses' });
+    expect(killer).toHaveAttribute('aria-valuetext', 'Even, 50/50');
     expect(screen.getByText('Even, 50/50')).toHaveClass('text-text');
   });
 
+  it('labels the ends of the kills meter Victim and Killer', () => {
+    render(<ZkillRatioMeters stats={base} />);
+    expect(screen.getByText('Victim')).toBeInTheDocument();
+    expect(screen.getByText('Killer')).toBeInTheDocument();
+  });
+
   it('leaves out a meter zKillboard sent no ratio for', () => {
-    render(<ZkillStatsSection stats={{ kind: 'stats', stats: { ...base, dangerRatio: null } }} />);
+    render(<ZkillRatioMeters stats={{ ...base, dangerRatio: null }} />);
     expect(screen.queryByRole('meter', { name: 'Danger' })).toBeNull();
     expect(screen.getByRole('meter', { name: 'Fleet size' })).toBeInTheDocument();
   });
 
-  it('reads kills green and losses red', () => {
+  it('draws nothing with no ratio and no record', () => {
+    const { container } = render(
+      <ZkillRatioMeters
+        stats={{ ...base, dangerRatio: null, gangRatio: null, kills: 0, losses: 0 }}
+      />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+});
+
+describe('ZkillStatsSection', () => {
+  it('states the all-time figures as one line, kills green and losses red', () => {
     render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} />);
-    expect(screen.getByText('120')).toHaveClass('text-isk-pos');
-    expect(screen.getByText('30')).toHaveClass('text-isk-neg');
+    expect(screen.getByText('120 kills')).toHaveClass('text-isk-pos');
+    expect(screen.getByText('30 losses')).toHaveClass('text-isk-neg');
+    expect(screen.getByText('40 solo kills')).toBeInTheDocument();
+    expect(screen.getByText(/destroyed/)).toBeInTheDocument();
+    expect(screen.getByText(/lost/)).toBeInTheDocument();
   });
 
-  it('explains ISK efficiency behind a help button', () => {
+  it('draws no tiles, no meters and no ISK efficiency of its own', () => {
     render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} />);
-    expect(screen.getByRole('button', { name: 'About ISK efficiency' })).toBeInTheDocument();
-    expect(screen.getByText('90.0%')).toBeInTheDocument();
+    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.queryByRole('term')).toBeNull();
+    expect(screen.queryByText('ISK efficiency')).toBeNull();
   });
 });
 
