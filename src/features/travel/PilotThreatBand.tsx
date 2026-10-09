@@ -24,7 +24,6 @@ import {
   THREAT_LEVEL_TONE,
   THREAT_PILL_CLASS,
   THREAT_TEXT_CLASS,
-  type ThreatTone,
 } from './threatTone';
 
 /** A gang share from here up is worth a chip. */
@@ -34,20 +33,16 @@ const SOLO_CHIP_MAX = 30;
 /** A pod share from here up is worth a chip. */
 const POD_CHIP_MIN = 0.25;
 
-/** Where a kill happened, as a tone: nullsec and wormhole space and lowsec are the ones to watch. */
-const SPACE_TONE: Record<KillSpace, ThreatTone> = {
-  nullsec: 'danger',
-  wormhole: 'danger',
-  lowsec: 'warning',
-  highsec: 'neutral',
-};
-
-function Chip({ tone, children }: { tone: ThreatTone; children: string }) {
+/**
+ * Every chip is neutral: the level word is the one loud colour on the band, and each chip
+ * says in words what it is (a hot space or a gang share is not a second alarm).
+ */
+function Chip({ children }: { children: string }) {
   return (
     <li
       className={cx(
         'rounded-xs border px-1.5 py-px text-xs leading-4 whitespace-nowrap',
-        THREAT_PILL_CLASS[tone]
+        THREAT_PILL_CLASS.neutral
       )}
     >
       {children}
@@ -85,18 +80,16 @@ export function PilotThreatBand({
     sentence = t('travel.pilot.threat.summary', { count: verdict.recentKills, days, age });
   }
   const space = (kind: KillSpace) => t(`common.spaceOption.${kind}`);
-  const chips: { key: string; tone: ThreatTone; text: string }[] = [];
+  const chips: { key: string; text: string }[] = [];
   if (verdict.mainSpace !== null) {
     chips.push({
       key: 'space',
-      tone: SPACE_TONE[verdict.mainSpace],
       text: t('travel.pilot.threat.chip.space', { space: space(verdict.mainSpace) }),
     });
   }
   for (const also of verdict.alsoSpaces) {
     chips.push({
       key: `also-${also}`,
-      tone: SPACE_TONE[also],
       text: t('travel.pilot.threat.chip.also', { space: space(also) }),
     });
   }
@@ -105,16 +98,14 @@ export function PilotThreatBand({
   if (gangKnown && gangRatio >= GANG_CHIP_MIN) {
     chips.push({
       key: 'gangs',
-      tone: 'danger',
       text: t('travel.pilot.threat.gangs', { value: Math.round(gangRatio) }),
     });
   } else if (gangKnown && gangRatio <= SOLO_CHIP_MAX) {
-    chips.push({ key: 'solo', tone: 'neutral', text: t('travel.pilot.threat.chip.solo') });
+    chips.push({ key: 'solo', text: t('travel.pilot.threat.chip.solo') });
   }
   if (verdict.podShare !== null && verdict.podShare >= POD_CHIP_MIN) {
     chips.push({
       key: 'pods',
-      tone: 'neutral',
       text: t('travel.pilot.threat.pods', { value: Math.round(verdict.podShare * 100) }),
     });
   }
@@ -153,9 +144,7 @@ export function PilotThreatBand({
         {chips.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {chips.map((chip) => (
-              <Chip key={chip.key} tone={chip.tone}>
-                {chip.text}
-              </Chip>
+              <Chip key={chip.key}>{chip.text}</Chip>
             ))}
           </ul>
         )}

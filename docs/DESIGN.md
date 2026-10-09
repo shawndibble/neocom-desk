@@ -159,6 +159,28 @@ Safety's last-hour ship-kill count: default text at none, blending to
 Computed like `securityStatusColor`; the count is always printed beside the
 color (§7).
 
+### Kind of space
+
+| Token            | Value     | Use       |
+| ---------------- | --------- | --------- |
+| `success`        | `#5fd584` | Highsec.  |
+| `warning`        | `#f5b94a` | Lowsec.   |
+| `space-nullsec`  | `#7e9cfd` | Nullsec.  |
+| `space-wormhole` | `#d8beff` | Wormhole. |
+
+Nominal identity for where a kill happened (a pilot's kill chart and counts, the Local list). Red is not
+one of them: `danger` stays on the Threat verdict, so nullsec cannot be mistaken for it. The space name
+is always written beside the colour. `space-nullsec` and `space-wormhole` share their hex with
+`kind-calendar-event` and `kind-skill-training`, so those rows' contrast ratios apply.
+
+### Ratio meters
+
+`ratioMeterColor(pct)` (`src/engine/pilotList/meterColor.ts`) fills the Danger, Fleet size and Kills vs
+losses meters: gray at 0, muted blue at 22, sage green at 42, soft yellow at 60, muted orange at 80 and
+a dusty red at 100, blended between. Every stop is desaturated so the Threat verdict stays the loudest
+red on the profile, and nothing warm shows until a value passes about half. The readout beside the
+fill is plain `text`, and the figure is always printed, so colour is never the only signal.
+
 ### Damage types
 
 | Token           | Value     | Use                          |

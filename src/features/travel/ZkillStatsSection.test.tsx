@@ -47,11 +47,24 @@ describe('ZkillRatioMeters', () => {
     expect(killer).toHaveAttribute('aria-valuetext', '80% killer');
   });
 
-  it('colours each meter by the end it leans to: red to the high end, green to the low', () => {
+  it('fills each meter along the gray-to-red ramp and keeps the readout plain text', () => {
     render(<ZkillRatioMeters stats={base} />);
-    expect(screen.getByText('78% dangerous')).toHaveClass('text-danger');
-    expect(screen.getByText('64% solo')).toHaveClass('text-success');
-    expect(screen.getByText('80% killer')).toHaveClass('text-danger');
+    for (const [text, name, pct] of [
+      ['78% dangerous', 'Danger', 78],
+      ['64% solo', 'Fleet size', 36],
+      ['80% killer', 'Kills vs losses', 80],
+    ] as const) {
+      expect(screen.getByText(text)).toHaveClass('text-text');
+      const fill = screen.getByRole('meter', { name }).firstElementChild as HTMLElement;
+      expect(fill.style.width).toBe(`${pct}%`);
+      expect(fill.style.backgroundColor).not.toBe('');
+    }
+  });
+
+  it('puts the three meters in one "How they fight" card', () => {
+    render(<ZkillRatioMeters stats={base} />);
+    const card = screen.getByRole('region', { name: 'How they fight' });
+    expect(within(card).getAllByRole('meter')).toHaveLength(3);
   });
 
   it('reads the danger ratio as a share of danger at either end of its scale', () => {

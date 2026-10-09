@@ -1,7 +1,8 @@
 /**
  * "Where they kill" on a pilot's profile (Pilot Lookup and Show Info's
  * Character tab): kills in the last 30 days by kind of space and how long ago
- * the latest was, and six months of kills by space behind a disclosure. The
+ * the latest was, under six months of kills by space. The chart is always open
+ * (it is the point of the section), and its card carries the counts. The
  * hulls they fly and kill (`PilotShips`) and their latest kills are the
  * sections below it. Kills only: a loss says little about how dangerous a
  * pilot is. The profile's Threat verdict (`PilotThreatBand`) is read from the
@@ -9,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, Spinner } from '@/components/ui';
+import { Button, Spinner } from '@/components/ui';
 import {
   ageTone,
   KILL_SPACES,
@@ -23,7 +24,7 @@ import { useNow } from '@/lib/useNow';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadViewerContext, type ViewerContext } from './pilotListData';
 import { PilotStandingTag } from './PilotStandingTag';
-import { SPACE_BAR, SPACE_TEXT } from './pilotListStyles';
+import { SPACE_BAR, SPACE_RULE, SPACE_TEXT } from './pilotListStyles';
 import { usePilotKillHistory, type PilotKillHistoryState } from './usePilotKillHistory';
 
 /** `2026-05` -> "May", read in UTC like the buckets. */
@@ -53,7 +54,6 @@ export function PilotKillActivityView({
   onRetry: () => void;
 }) {
   const { t } = useTranslation();
-  const [chartOpen, setChartOpen] = useState(false);
 
   const kills = history.kind === 'ready' ? history.kills : null;
   const now = useNow();
@@ -105,92 +105,95 @@ export function PilotKillActivityView({
   const spaces = KILL_SPACES.filter(
     (space) => space !== 'wormhole' || summary.bySpace.wormhole.lastMs !== null
   );
-  const tallest = Math.max(1, ...months.map((m) => KILL_SPACES.reduce((n, s) => n + m[s], 0)));
   const monthTotal = (m: (typeof months)[number]) => KILL_SPACES.reduce((n, sp) => n + m[sp], 0);
-  const chartSpaces = KILL_SPACES.filter((space) => months.some((m) => m[space] > 0));
+  const tallest = Math.max(1, ...months.map(monthTotal));
+  const recentTotal = spaces.reduce((n, space) => n + summary.bySpace[space].count, 0);
 
   return (
-    <section className="space-y-3" aria-label={t('travel.pilot.activity.title')}>
-      {heading}
-      <Disclosure
-        label={t('travel.pilot.activity.chart')}
-        expanded={chartOpen}
-        onToggle={() => setChartOpen((open) => !open)}
-        className="rounded-xs border border-line"
+    <section
+      aria-label={t('travel.pilot.activity.title')}
+      className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3"
+    >
+      <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <h3>{t('travel.pilot.activity.chart')}</h3>
+        <span className="text-right">{t('travel.pilot.activity.chartPeriod')}</span>
+      </div>
+      <div
+        role="img"
+        aria-label={t('travel.pilot.activity.chartLabel', {
+          summary: months.map((m) => `${monthName(m.key)}: ${monthTotal(m)}`).join(', '),
+        })}
+        className="space-y-1"
       >
-        <div className="p-3">
-          <div
-            role="img"
-            aria-label={t('travel.pilot.activity.chartLabel', {
-              summary: months.map((m) => `${monthName(m.key)}: ${monthTotal(m)}`).join(', '),
-            })}
-            className="space-y-1"
-          >
-            <div
-              aria-hidden
-              className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim tabular-nums"
-            >
-              {months.map((m) => (
-                <span key={m.key} className={monthTotal(m) > 0 ? 'text-text' : undefined}>
-                  {monthTotal(m)}
-                </span>
-              ))}
-            </div>
-            <div
-              aria-hidden
-              className="grid h-20 grid-cols-6 items-end gap-1.5 border-b border-line"
-            >
-              {months.map((m) => (
-                <div key={m.key} className="flex h-full min-w-0 flex-col-reverse">
-                  {KILL_SPACES.map((space) =>
-                    m[space] > 0 ? (
-                      <span
-                        key={space}
-                        className={SPACE_BAR[space]}
-                        style={{ height: `${(m[space] / tallest) * 100}%` }}
-                      />
-                    ) : null
-                  )}
-                </div>
-              ))}
-            </div>
-            <div
-              aria-hidden
-              className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim"
-            >
-              {months.map((m) => (
-                <span key={m.key}>{monthName(m.key)}</span>
-              ))}
-            </div>
-          </div>
-          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-dim">
-            {chartSpaces.map((space) => (
-              <li key={space} className="flex items-center gap-1.5">
-                <span aria-hidden className={cx('size-2.5', SPACE_BAR[space])} />
-                {t(`common.spaceOption.${space}`)}
-              </li>
-            ))}
-          </ul>
+        <div
+          aria-hidden
+          className="grid grid-cols-6 gap-2 text-center text-xs text-text-dim tabular-nums"
+        >
+          {months.map((m) => (
+            <span key={m.key} className={monthTotal(m) > 0 ? 'font-semibold text-text' : undefined}>
+              {monthTotal(m)}
+            </span>
+          ))}
         </div>
-      </Disclosure>
+        <div
+          aria-hidden
+          className="grid h-30 grid-cols-6 items-end gap-2 border-b border-line-bright @md/kills:h-38"
+        >
+          {months.map((m) => (
+            <div
+              key={m.key}
+              className="mx-auto flex h-full w-full max-w-9 min-w-0 flex-col-reverse @md/kills:max-w-14"
+            >
+              {monthTotal(m) === 0 && <span className="h-0.5 bg-line" />}
+              {KILL_SPACES.map((space) =>
+                m[space] > 0 ? (
+                  <span
+                    key={space}
+                    className={SPACE_BAR[space]}
+                    style={{ height: `${(m[space] / tallest) * 100}%` }}
+                  />
+                ) : null
+              )}
+            </div>
+          ))}
+        </div>
+        <div aria-hidden className="grid grid-cols-6 gap-2 text-center text-xs text-text-dim">
+          {months.map((m) => (
+            <span key={m.key}>{monthName(m.key)}</span>
+          ))}
+        </div>
+      </div>
 
-      <ul
-        className={cx(
-          'grid gap-2',
-          spaces.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
-        )}
-      >
+      <h4 className="mt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {t('travel.pilot.activity.last30')}
+      </h4>
+      <div aria-hidden className="hidden h-2 bg-panel-2 @md/kills:flex">
+        {spaces.map((space) => (
+          <span
+            key={space}
+            className={SPACE_BAR[space]}
+            style={{ width: `${(summary.bySpace[space].count / Math.max(1, recentTotal)) * 100}%` }}
+          />
+        ))}
+      </div>
+      <ul className={cx('grid gap-2', spaces.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
         {spaces.map((space) => {
           const { count, lastMs } = summary.bySpace[space];
           const tone = ageTone(lastMs, now);
           return (
-            <li key={space} className="rounded-xs border border-line bg-panel-2 px-3 py-2">
-              <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <li
+              key={space}
+              className={cx(
+                'min-w-0 border-t-2 pt-1.5',
+                count > 0 ? SPACE_RULE[space] : 'border-t-line'
+              )}
+            >
+              <span className="block text-[0.625rem] font-semibold tracking-wider text-text-dim uppercase @md/kills:text-[0.6875rem] @md/kills:tracking-widest">
                 {t(`common.spaceOption.${space}`)}
               </span>
               <span
                 className={cx(
-                  'block text-lg font-semibold tabular-nums',
+                  'block text-xl leading-tight font-semibold tabular-nums @md/kills:text-2xl',
                   count > 0 ? SPACE_TEXT[space] : 'text-text-dim'
                 )}
               >
@@ -198,7 +201,7 @@ export function PilotKillActivityView({
               </span>
               <span
                 className={cx(
-                  'block text-xs',
+                  'block text-[0.6875rem] @md/kills:text-xs',
                   tone === 'fresh' ? 'font-semibold text-text' : 'text-text-dim',
                   (tone === 'old' || tone === 'none') && 'opacity-60'
                 )}
@@ -211,7 +214,6 @@ export function PilotKillActivityView({
           );
         })}
       </ul>
-      <p className="text-[0.6875rem] text-text-dim">{t('travel.pilot.activity.window')}</p>
     </section>
   );
 }

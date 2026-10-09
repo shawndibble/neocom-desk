@@ -5,7 +5,8 @@
  * Info Character tab (`PilotProfileView`); the Corporation and Alliance tabs
  * lay the same parts out around their own facts. The meters quote
  * zKillboard's own scales, ends and all (decision `20261002-145207`), and are
- * coloured by the end they lean to (`20261002-163430`).
+ * filled along a gray-to-red ramp by how far they reach (`20261009-092214`, which replaces
+ * `20261002-163430`'s green-or-red-by-side).
  *
  * zKillboard sends the same body for either kind of id (`parsePilotStats`);
  * only the no-history wording names which one it is.
@@ -15,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { ratioMeterColor } from '@/engine/pilotList/meterColor';
 import { cx } from '@/lib/cx';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killerRatio, type StatTileItem } from './zkillFigures';
@@ -179,19 +181,23 @@ export function ZkillStatsSection({
 }
 
 /**
- * The meters side by side (stacked on a phone): danger, fleet size, and kills
- * against losses. Nothing when zKillboard sent no ratio and there is no record.
+ * "How they fight": danger, fleet size, and kills against losses in one card.
+ * Three narrow columns by default (a phone, the Corporation and Alliance
+ * tabs), stacked as full-width rows when the pilot profile has room to put the
+ * card beside the kill chart (`@3xl/profile`). Nothing when zKillboard sent no
+ * ratio and there is no record.
  */
 export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   const { t } = useTranslation();
   const killer = killerRatio(stats);
   if (stats.dangerRatio === null && stats.gangRatio === null && killer === null) return null;
   return (
-    // The meters' own container decides: three across once it is about 32rem wide,
-    // one column below that, so a tablet and the Show Info modal both fit and no
-    // meter is left alone on a second row.
-    <div className="@container">
-      <div className="grid gap-3 @lg:grid-cols-3">
+    <section
+      aria-label={t('travel.pilot.fightTitle')}
+      className="flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3 py-2.5"
+    >
+      <h3 className={termClassName}>{t('travel.pilot.fightTitle')}</h3>
+      <div className="grid flex-1 auto-cols-fr grid-flow-col gap-2.5 @3xl/profile:grid-flow-row @3xl/profile:content-around">
         {stats.dangerRatio !== null && (
           <RatioMeter
             label={t('travel.pilot.dangerMeter')}
@@ -235,16 +241,16 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
           />
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
 /**
- * One of zKillboard's 0-100 ratios as a two-ended meter. The fill and the
- * readout take the colour of the end the value leans to — green towards the
- * low end (snuggly, solo), red towards the high end (dangerous, gang),
- * neutral dead centre — and the readout also names that end in words, so
- * nothing rests on telling red from green.
+ * One of zKillboard's 0-100 ratios as a two-ended meter. The fill takes its
+ * colour from how far along the scale it reaches (`ratioMeterColor`: gray,
+ * blue, green, then warm only past half, never the verdict's red); the readout
+ * stays plain text and names the end the value leans to in words, so nothing
+ * rests on the colour.
  */
 function RatioMeter({
   label,
@@ -266,10 +272,9 @@ function RatioMeter({
   const clamped = Math.min(100, Math.max(0, value));
   const rounded = Math.round(clamped);
   const text = valueText(rounded);
-  const lean = rounded > 50 ? 'high' : rounded < 50 ? 'low' : 'even';
   return (
-    <div className="space-y-1.5 rounded-xs border border-line bg-panel-2 px-3 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex flex-col gap-0.5 @3xl/profile:flex-row @3xl/profile:items-baseline @3xl/profile:justify-between @3xl/profile:gap-x-2">
         <span className={termClassName}>
           {label}
           <InfoTooltip
@@ -278,12 +283,7 @@ function RatioMeter({
             className="normal-case"
           />
         </span>
-        <span
-          className={cx(
-            'text-sm font-semibold tabular-nums',
-            lean === 'high' ? 'text-danger' : lean === 'low' ? 'text-success' : 'text-text'
-          )}
-        >
+        <span className="text-base font-semibold text-text tabular-nums @3xl/profile:text-sm">
           {text}
         </span>
       </div>
@@ -294,18 +294,18 @@ function RatioMeter({
         aria-valuemax={100}
         aria-valuenow={rounded}
         aria-valuetext={text}
-        className="relative h-2 overflow-hidden rounded-full border border-line bg-bg"
+        className="relative h-1.5 bg-panel-2"
       >
         <div
-          className={cx(
-            'h-full rounded-full',
-            lean === 'high' ? 'bg-danger' : lean === 'low' ? 'bg-success' : 'bg-text-dim'
-          )}
-          style={{ width: `${clamped}%` }}
+          className="h-full"
+          style={{ width: `${clamped}%`, backgroundColor: ratioMeterColor(clamped) }}
         />
-        <span aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-line-bright" />
+        <span aria-hidden className="absolute -inset-y-0.5 left-1/2 w-px bg-line-bright" />
       </div>
-      <div aria-hidden className="flex justify-between text-xs text-text-dim">
+      <div
+        aria-hidden
+        className="flex flex-wrap justify-between gap-x-1 text-[0.6875rem] text-text-dim"
+      >
         <span>{low}</span>
         <span>{high}</span>
       </div>
