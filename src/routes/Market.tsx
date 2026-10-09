@@ -866,6 +866,7 @@ export function Market() {
             { id: 'history', label: t('market.sections.history') },
             { id: 'appraisal', label: t('market.sections.appraisal') },
             { id: 'hauling', label: t('market.sections.hauling') },
+            { id: 'lp-store', label: t('loyaltyStore.title') },
           ]}
         />
 

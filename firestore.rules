@@ -190,6 +190,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // LP Store offers of every NPC corporation plus their station systems
+    // (#2873), written daily by syncLpStoreOffers; read by any signed-in client.
+    match /lpStoreOffers/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     // Public contract search (issues #608, #906, ADR 0013): one of the two
     // top-level collections that aren't per-Character sync data — the other is
     // publicCourierContracts just below, fed by the same job. Written only

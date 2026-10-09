@@ -16,6 +16,19 @@ vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
   useLoyaltyStoreOffers: (corporationId: number) => useLoyaltyStoreOffers(corporationId),
 }));
 
+// The landing's cross-store search has its own tests (`LpStoreSearch.test.tsx`).
+vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
+  useLpStoreSearch: () => ({
+    status: 'ready',
+    syncedAt: null,
+    result: { groups: [], corporations: [], totalItemMatches: 0 },
+    rowFor: () => null,
+    systemName: () => null,
+    jumpsStatus: 'ready',
+    pricing: false,
+  }),
+}));
+
 // The picker loads the LP-corp snapshot and the Character's balances itself
 // (its own tests cover that); here it only has to show which store is open
 // and let a test switch stores.
@@ -787,9 +800,38 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
   it('lands on a pick-a-corporation state with no store chosen, loading no offers', () => {
     renderAt('/loyalty');
     expect(screen.getByRole('heading', { level: 1, name: 'LP Store' })).toBeInTheDocument();
-    expect(screen.getByText('Pick a corporation')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
+    expect(screen.getByText('Search every LP Store')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'picker: none' })).toBeInTheDocument();
     expect(useLoyaltyStoreOffers).not.toHaveBeenCalled();
+  });
+
+  it('is a Market tab: the bar shows LP Store selected beside the other tabs', () => {
+    renderAt('/loyalty');
+    expect(screen.getByRole('tab', { name: 'LP Store', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Market' })).toBeInTheDocument();
+  });
+
+  it('offers a crumb back to the search only when a result opened the store', () => {
+    const { unmount } = renderAt('/loyalty/1000168');
+    expect(screen.queryByRole('link', { name: /LP Store search/ })).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: '/loyalty/1000168', state: { from: 'lp-search', q: 'tritanium' } },
+        ]}
+      >
+        <Routes>
+          <Route path="/loyalty/:corporationId" element={<LoyaltyStore />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('link', { name: /LP Store search/ })).toHaveAttribute(
+      'href',
+      '/market/lp-store?q=tritanium'
+    );
   });
 
   it('puts the picker in the header, naming the open store', () => {
