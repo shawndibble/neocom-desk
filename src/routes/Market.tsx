@@ -34,6 +34,7 @@ import {
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
   type MarketTreeFilterResult,
+  type SearchCategorySummary,
 } from '@/features/market/marketTree';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -150,6 +151,7 @@ interface MarketGroupTreeProps {
   filterResult: MarketTreeFilterResult | null;
   expandedIds: ReadonlySet<number>;
   searchCollapsedIds: ReadonlySet<number>;
+  searchCategories: SearchCategorySummary | null;
   onToggle: (id: number) => void;
   onSelect: (typeId: number) => void;
   selectedTypeId: number | null;
@@ -161,6 +163,7 @@ function MarketGroupTree({
   filterResult,
   expandedIds,
   searchCollapsedIds,
+  searchCategories,
   onToggle,
   onSelect,
   selectedTypeId,
@@ -206,7 +209,17 @@ function MarketGroupTree({
     // a starting point: `onToggle` below lets the user collapse/re-expand any
     // group while search is active, independent of which items still match.
     // Search only ever prunes *items*, never forces expand state.
-    const expanded = filtering ? !searchCollapsedIds.has(group.id) : expandedIds.has(group.id);
+    // The one exception is a top-level category: those start collapsed when
+    // the matches are too many to fit (`searchCategories.openByDefault`), so
+    // the set holds flips from that default rather than only collapses.
+    const categoryCount =
+      filtering && depth === 0 ? searchCategories?.countsByRoot.get(group.id) : undefined;
+    const flipped = searchCollapsedIds.has(group.id);
+    const expanded = !filtering
+      ? expandedIds.has(group.id)
+      : categoryCount !== undefined && !searchCategories?.openByDefault
+        ? flipped
+        : !flipped;
     const expandable = children.length > 0 || items.length > 0;
 
     // `min-h-11 md:min-h-0` gives a thumb the 44px floor on the leaf row and
@@ -228,7 +241,11 @@ function MarketGroupTree({
           }`}
         >
           {expandable && <Caret expanded={expanded} />}
-          <span className={expandable ? '' : 'pl-3'}>{group.name}</span>
+          <span className={expandable ? '' : 'pl-3'}>
+            {categoryCount === undefined
+              ? group.name
+              : t('market.categoryHeader', { name: group.name, count: categoryCount })}
+          </span>
         </button>
         {expanded && (children.length > 0 || items.length > 0) && (
           <ul>
@@ -428,6 +445,7 @@ export function Market() {
     setQuery,
     expandedIds,
     searchCollapsedIds,
+    searchCategories,
     filterResult,
     handleToggle,
     itemTab,
@@ -974,6 +992,7 @@ export function Market() {
                     filterResult={filterResult}
                     expandedIds={expandedIds}
                     searchCollapsedIds={searchCollapsedIds}
+                    searchCategories={searchCategories}
                     onToggle={handleToggle}
                     onSelect={handleSelectItem}
                     selectedTypeId={selectedTypeId}
