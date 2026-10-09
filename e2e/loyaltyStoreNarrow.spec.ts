@@ -126,9 +126,7 @@ for (const width of [390, 1024, 1280]) {
     await expect(header.getByText('Offers shown')).toHaveCount(0);
 
     // Direct children of the header's meta row never sit on top of each other.
-    const meta = page
-      .getByText('Your LP')
-      .locator('xpath=ancestor::div[contains(@class,"flex-wrap")][1]');
+    const meta = page.getByRole('link', { name: 'Corporation info' }).locator('xpath=..');
     const boxes = await meta.locator('> *').evaluateAll((nodes) =>
       nodes.map((node) => {
         const r = node.getBoundingClientRect();

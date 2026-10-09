@@ -817,7 +817,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-              <CorporationLink id={corporationId}>
+              <CorporationLink id={corporationId} className="text-xs">
                 {t('loyaltyStore.corporationInfo')}
               </CorporationLink>
               <StatChips>
