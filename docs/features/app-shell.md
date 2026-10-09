@@ -142,7 +142,7 @@ Foreground requests for the active Character get permits before background work 
 
 ## Update flow (`src/app/ReloadPrompt.tsx`; `docs/adr/0007-hand-written-service-worker-for-background-sync.md`)
 
-No UI. Service worker `registerType: 'prompt'`. Polls `registration.update()` every 30 min (`:6`; skipped offline or while installing). A waiting update applies: immediately if found within 15 s of page start (`BOOT_APPLY_WINDOW_MS`, `:18`; a reload finding a fresh build), never on `/callback` (a reload would replay the spent OAuth code, `:117`); when the tab has been hidden >= 30 s (`:10`, re-checked on `visibilitychange` and every 15 s, `:13`); or on the next in-app route change of a visible tab (never mid-page on idle); a manual reload counts as consent (`beforeunload` fires skip-waiting best effort). Reloads go through a fade-to-background cover (150 ms, instant with reduced motion) instead of the library's flicker. Manual: Settings › Data & storage › **Update now** (`sync-backup.md`).
+No UI. Service worker `registerType: 'prompt'`. Polls `registration.update()` every 5 min and when a tab returns to the foreground (at most once a minute; skipped offline or while installing). A waiting update applies: immediately if found within 15 s of page start (`BOOT_APPLY_WINDOW_MS`, `:18`; a reload finding a fresh build), never on `/callback` (a reload would replay the spent OAuth code, `:117`); or on the next in-app route change (never mid-page, and never because a tab was idle, hidden, or switched away from and back); a manual reload counts as consent (`beforeunload` fires skip-waiting best effort). Reloads go through a fade-to-background cover (150 ms, instant with reduced motion) instead of the library's flicker. Manual: Settings › Data & storage › **Update now** (`sync-backup.md`).
 
 ## Boot, errors, not found
 
@@ -207,7 +207,7 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 4. **Why exactly four phone tabs?** Equal-width split of a possibly 320 px viewport; fewer looks unfinished, more truncates labels; stored arrays of another length are discarded (`src/lib/mobileTabs.ts` header comment, `:43`, `:101`).
 5. **Does hiding a page remove it?** No: it stays in Go to and More; the page you are on is always shown; footer pages and Corporation can't be hidden (`src/app/navRail.ts:88,94`; string `nav.editHint`).
 6. **Does nav hiding sync?** Yes (`sync.navHidden`), Recent does not (`src/app/navPreferences.ts:14,20`).
-7. **What triggers an app update and why not a banner?** Silent; applies at boot window, after 30 s hidden, or on next route change; never on `/callback` (`src/app/ReloadPrompt.tsx:6-18,117`), to avoid wiping in-progress input.
+7. **What triggers an app update and why not a banner?** Silent; applies at boot window or on next route change; never on `/callback` (`src/app/ReloadPrompt.tsx:6-18,117`), to avoid wiping in-progress input.
 8. **What if boot hangs?** After 10 s a Reload button appears; recovery promotes a waiting service worker, bounded 2 s per step (`src/app/BootScreen.tsx:12`, `bootRecovery.ts:26`).
 9. **Do shortcuts fire in text boxes or dialogs?** No: typing targets and open overlays suppress them; Ctrl/Cmd+K is the exception for typing targets but refuses to open over an open dialog (`src/app/useKeyboardShortcuts.ts:20`, `src/lib/shortcuts.ts:53`).
 10. **What does pasting do?** An EFT fit opens in Fittings, an item list in Appraisal, no confirmation; Back undoes (`src/app/GlobalPasteRouter.tsx`).
@@ -229,7 +229,7 @@ Footer page (not a setting: FAQ and Support left Settings, decision `20261002-14
 - No single-key shortcut for Skills, Assets, Mail, Calendar, Contacts, Travel, Corporation (`src/lib/shortcuts.ts:152`); only ten keys, two of which (`,` `?`) are for settings/help.
 - The phone has no indicator for "syncing"/"offline" (see `sync-backup.md`).
 - The Install Prompt banner never shows on Android Chromium unless `beforeinstallprompt` fires; Settings › Data & storage › Install this app gives a generic menu pointer instead.
-- Updates apply silently with no "update available" indicator; a visible idle tab can run an old build until the next navigation or hide (`src/app/ReloadPrompt.tsx`).
+- Updates apply silently with no "update available" indicator; a visible idle tab can run an old build until the next navigation (`src/app/ReloadPrompt.tsx`).
 - Analytics `page_location` carries the full query string (e.g. `?info=`, `?f=`, filters) (`src/app/analytics.ts:71`); the in-app FAQ does not mention analytics (the privacy page does).
 - FAQ "Support" is Discord only; there is no in-app diagnostics or log-copy for bug reports (the Activity Log exists in Settings but is not linked from Support).
 - The More sheet cannot show a page's views; reaching a deep view on a phone depends on Recent, search, or the page's own tabs (documented design: `MobileMoreSheet.tsx` header).

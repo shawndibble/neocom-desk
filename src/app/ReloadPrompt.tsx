@@ -3,15 +3,14 @@ import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { currentRouterPathname, isOnRoute } from './routerPath';
 
-const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
-// A tab must stay hidden this long before a waiting update applies — a
-// short grace period so a quick tab-peek mid-edit doesn't get its unsaved
-// state wiped the instant the tab is switched away from.
-const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
-// Coarse cadence for re-checking the hidden threshold above — not itself a
-// threshold.
-const APPLY_CHECK_POLL_MS = 15 * 1000;
-
+// Checking is cheap and applying is not, so check often — a build is already
+// waiting by the time the user next changes page — and apply only on that page
+// change (see the route effect below).
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+// A tab coming back to the foreground checks at once (timers freeze while a
+// mobile PWA is backgrounded), but not more often than this, so going back and
+// forth between apps doesn't fire a request each time.
+const RESUME_CHECK_MIN_GAP_MS = 60 * 1000;
 // sw.js is checked on every load, so an update found this soon after load is
 // a reload or cold start finding a fresh build: apply it at once. Kept short
 // so a slow check never wipes input the user has already started typing.
@@ -85,20 +84,18 @@ async function checkForUpdate(registration: ServiceWorkerRegistration) {
 /**
  * No UI. Applies an update found right after load (see BOOT_APPLY_WINDOW_MS)
  * at once. Also polls the registration for updates, then applies a waiting
- * update silently instead of prompting: once the tab has been hidden for a short
- * grace period, or — for a tab that stays visible — the next time the user
- * navigates to a different in-app route. A tab that's visible and on the
- * same route is never reloaded mid-use, however long it sits idle; the
- * reload rides along with a transition the user already expects, rather
- * than firing at an arbitrary idle timeout while they're reading the
- * current page. Whenever a reload does fire, it goes through
+ * update silently instead of prompting: the next time the user navigates to a
+ * different in-app route, and only then. A tab is never reloaded while it sits
+ * on one page — idle, hidden, or switched away to another app and back — so a
+ * page that polls for data (the Survey) stays put; the reload rides along with
+ * a transition the user already expects. Whenever a reload does fire, it goes through
  * coverViewportAndReload rather than the library's default instant reload,
  * so it reads as a solid-color swap instead of a flicker. A manual reload
  * by the user is also treated as consent to apply immediately (see the
  * beforeunload handler below).
  */
 export function ReloadPrompt() {
-  const hiddenSinceRef = useRef(0);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const isFirstRouteRef = useRef(true);
   const { pathname } = useLocation();
   const {
@@ -106,7 +103,9 @@ export function ReloadPrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
-      if (!registration || pollingRegistrations.has(registration)) return;
+      if (!registration) return;
+      registrationRef.current = registration;
+      if (pollingRegistrations.has(registration)) return;
       pollingRegistrations.add(registration);
       setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);
     },
@@ -119,10 +118,7 @@ export function ReloadPrompt() {
     },
   });
 
-  // Mobile OSes freeze a backgrounded PWA's timers entirely, so the polling
-  // tick below never runs while the tab is hidden — it only resumes once the
-  // tab is visible again. Mirrored in refs so the resume check (mount-once
-  // effect, below) always reads the latest values.
+  // The latest values for the mount-once effects below.
   const needRefreshRef = useRef(needRefresh);
   const updateServiceWorkerRef = useRef(updateServiceWorker);
   useEffect(() => {
@@ -144,60 +140,24 @@ export function ReloadPrompt() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Tracks tab visibility — independent of whether an update is waiting, so
-  // the hidden clock is already running by the time one shows up.
+  // Coming back to the tab looks for an update (it only looks — applying waits
+  // for a page change), since a frozen mobile PWA's interval never ran.
   useEffect(() => {
-    const trackVisibility = () => {
-      if (document.hidden) {
-        hiddenSinceRef.current = Date.now();
-        return;
-      }
-      // Coming back visible: judge the grace period by wall-clock time right
-      // here, rather than waiting for the polling tick to notice — on a
-      // frozen-while-backgrounded tab that tick may not run again until well
-      // after resume, and by then trackVisibility will already have cleared
-      // hiddenSinceRef below, silently skipping the hidden-apply path.
-      const hiddenSince = hiddenSinceRef.current;
-      hiddenSinceRef.current = 0;
-      if (
-        hiddenSince &&
-        needRefreshRef.current &&
-        Date.now() - hiddenSince >= HIDDEN_APPLY_GRACE_MS
-      ) {
-        void updateServiceWorkerRef.current();
-      }
+    let lastCheck = Date.now();
+    const onVisibilityChange = () => {
+      const registration = registrationRef.current;
+      if (document.hidden || !registration) return;
+      if (Date.now() - lastCheck < RESUME_CHECK_MIN_GAP_MS) return;
+      lastCheck = Date.now();
+      void checkForUpdate(registration);
     };
-    trackVisibility();
-    document.addEventListener('visibilitychange', trackVisibility);
-    return () => document.removeEventListener('visibilitychange', trackVisibility);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, []);
 
-  useEffect(() => {
-    if (!needRefresh) return;
-
-    // Re-checked every tick rather than latched — if a prior call didn't
-    // actually trigger a reload (SKIP_WAITING lost, controllerchange never
-    // fired), the next tick just tries again. Hidden-tab apply only: a
-    // visible tab instead waits for the route-change effect below, so it's
-    // never reloaded out from under someone mid-page.
-    const tick = () => {
-      const hiddenSince = hiddenSinceRef.current;
-      if (hiddenSince && Date.now() - hiddenSince >= HIDDEN_APPLY_GRACE_MS) {
-        void updateServiceWorker();
-      }
-    };
-
-    const id = window.setInterval(tick, APPLY_CHECK_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [needRefresh, updateServiceWorker]);
-
-  // A visible tab only ever reloads here: on the next in-app route change,
-  // never at an arbitrary idle timeout while the current page is still
-  // being read. Skips the first render (mounting isn't "navigating to
-  // another page") and, technically, could double-fire with the hidden-tab
-  // path if a route change lands right as the grace period elapses — a
-  // second, no-op updateServiceWorker call in that case, not a second
-  // reload.
+  // The only place a running tab reloads for an update: the next in-app route
+  // change, never an idle or hidden timeout while the page is still in use.
+  // Skips the first render (mounting isn't "navigating to another page").
   useEffect(() => {
     if (isFirstRouteRef.current) {
       isFirstRouteRef.current = false;
