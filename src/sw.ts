@@ -38,7 +38,7 @@ import { isEvePortraitImage, isEveTypeImage, isVersionedSdeData } from '@/lib/sw
 declare let self: ServiceWorkerGlobalScope;
 
 // registerType: 'prompt' (vite.config.ts) — the worker must stay in
-// `waiting` until ReloadPrompt triggers it (auto, once idle/hidden) via
+// `waiting` until ReloadPrompt triggers it (auto, on the next route change) via
 // workbox-window's `messageSkipWaiting()`, which sends exactly this message.
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();

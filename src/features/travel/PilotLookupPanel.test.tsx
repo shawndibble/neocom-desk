@@ -361,6 +361,18 @@ describe('PilotLookupPanel', () => {
       expect(await screen.findByText('2 names, Local list')).toBeTruthy();
     });
 
+    it('swaps one open pilot for the list when a second name is added', async () => {
+      renderTab('/pilot-lookup?pilot=42');
+      expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+      const box = screen.getByRole('combobox', { name: 'Pilot' });
+      fireEvent.change(box, { target: { value: 'Some Pilot' + NL + 'Beta Two' } });
+      fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true });
+
+      expect(await screen.findByText('2 names, Local list')).toBeTruthy();
+      expect(screen.queryByRole('heading', { name: 'Some Pilot' })).toBeNull();
+      expect(probe.search).toBe('');
+    });
+
     it('looks a typed list up with the Look up button too', async () => {
       renderTab();
       fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {

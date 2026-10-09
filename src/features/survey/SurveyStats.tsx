@@ -8,7 +8,9 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
-import { IskAmount } from '@/components/ui';
+import { IskAmount, Tooltip } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { useDoneAtLocal } from './surveyPref';
 
 function Tile({
   label,
@@ -25,7 +27,8 @@ function Tile({
         {label}
       </div>
       <div
-        className={`truncate text-lg font-semibold tabular-nums ${emphasis ? 'text-accent' : ''}`}
+        data-survey-stat
+        className={`text-lg font-semibold break-words tabular-nums ${emphasis ? 'text-accent' : ''}`}
       >
         {children}
       </div>
@@ -44,20 +47,40 @@ function shortVolume(value: number, locale: string): string {
 
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const { t, i18n } = useTranslation();
+  const local = useDoneAtLocal((state) => state.value);
+  const setLocal = useDoneAtLocal((state) => state.setValue);
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-x-4 gap-y-3">
       <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
       <Tile label={t('survey.statPace')}>
         {summary.pace === null ? '–' : t('survey.unitPace', { value: n(summary.pace, 1) })}
       </Tile>
       <Tile label={t('survey.statDone')} emphasis>
-        {summary.finished
-          ? t('survey.finished')
-          : summary.etaAt === null
-            ? '–'
-            : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
+        {summary.finished ? (
+          t('survey.finished')
+        ) : summary.etaAt === null ? (
+          '–'
+        ) : (
+          <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
+            <button
+              type="button"
+              className={inlineLinkClassName}
+              onClick={() => void setLocal(!local)}
+            >
+              {local
+                ? t('survey.localTime', {
+                    time: new Date(summary.etaAt).toLocaleTimeString(i18n.language, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    }),
+                  })
+                : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
+            </button>
+          </Tooltip>
+        )}
       </Tile>
       <Tile label={t('survey.statTimeLeft')}>
         {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}

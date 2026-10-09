@@ -84,18 +84,23 @@ export function PilotLookupPanel() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('nav.pilotLookup')} />
-      <Panel>
+      {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}
+      <Panel className="relative z-20">
         <PilotSearch
           resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
           list={list}
-          onList={setList}
+          onList={(paste) => {
+            setList(paste);
+            // A list replaces the one pilot on screen, so the pilot leaves the URL.
+            if (paste !== null && params.pilot !== null) setParams({ pilot: null }, { push: true });
+          }}
           onSelect={(pilot) => {
             setList(null);
             setParams({ pilot: pilot.characterId }, { push: true });
           }}
         />
       </Panel>
-      {params.pilot === null && list !== null ? (
+      {list !== null ? (
         <PilotListView paste={list} />
       ) : params.pilot === null ? (
         <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />

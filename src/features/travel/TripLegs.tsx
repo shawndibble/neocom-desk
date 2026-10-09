@@ -9,7 +9,7 @@
  * still draw.
  *
  * Each open leg lists its ways to fly beside its rows (`LegBody`, issue
- * #2477), and Clicking a way pins it to the leg.
+ * #2477), and clicking a way pins it to the leg.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
