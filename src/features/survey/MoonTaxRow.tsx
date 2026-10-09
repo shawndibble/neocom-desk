@@ -20,8 +20,8 @@ import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Panel, TextInput } from '@/components/ui';
-import { buttonClassName } from '@/components/ui/buttonClassName';
+import { Button, buttonClassName, Panel, TextInput } from '@/components/ui';
+import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
@@ -217,7 +217,9 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
         {/* The Tax tab sits behind the login gate, so a logged-out visitor is sent to log in first. */}
         <Link
           to={MINING_TAX_HREF}
-          className={buttonClassName({ size: 'sm', className: 'sm:ml-auto' })}
+          // Stashed so a logged-out visitor, sent to log in by the gate, lands back on the Tax tab.
+          onClick={() => setLoginReturnTo(MINING_TAX_HREF)}
+          className={buttonClassName({ size: 'sm', className: 'touch:min-h-11 sm:ml-auto' })}
         >
           {t('survey.moonTax.manage')}
         </Link>
