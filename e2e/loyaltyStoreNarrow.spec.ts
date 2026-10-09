@@ -208,3 +208,33 @@ for (const width of [390, 1024, 1280]) {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 }
+
+for (const width of [1024, 1280, 1440]) {
+  test(`the offers list is wide beside the detail panel, which does not overflow, at ${width}px (issue #3140)`, async ({
+    page,
+  }) => {
+    await mockLoyaltyOffers(page);
+    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await page.setViewportSize({ width, height: 900 });
+    const cells = page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ });
+    await expect(cells).toHaveCount(2);
+    await cells.first().click();
+
+    const list = page.getByRole('table').first().locator('xpath=ancestor::section[1]');
+    const detail = page.getByText('Select an offer to see its profit breakdown.');
+    await expect(detail).toBeHidden();
+    const box = await list.boundingBox();
+    if (width >= 1280) expect(box!.width).toBeGreaterThanOrEqual(26 * 16);
+
+    // The detail panel is the list's right-hand sibling: no overlap, no clipping.
+    const sibling = list.locator('xpath=following-sibling::*[contains(@class,"min-w-0")][1]');
+    const d = await sibling.boundingBox();
+    expect(d!.x).toBeGreaterThanOrEqual(box!.x + box!.width - 1);
+    const clipped = await sibling.evaluate((n) => n.scrollWidth - n.clientWidth);
+    expect(clipped).toBeLessThanOrEqual(0);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
