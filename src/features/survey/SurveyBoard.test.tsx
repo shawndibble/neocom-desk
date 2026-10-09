@@ -77,7 +77,7 @@ describe('SurveyBoard', () => {
     expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
   });
 
-  it('copies a four-line chat message ending in the link, each line within the width', async () => {
+  it('copies a four-line chat message with the link on the bottom rail, each line within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
@@ -88,11 +88,11 @@ describe('SurveyBoard', () => {
 
     const lines = written[0].split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^Rocks cracking · done <b>\d\d:\d\d EVE<\/b> \(~/);
-    expect(lines[1]).toBe('▕██░░░░░░░░░░░░░░░░░░▏ 13%');
-    expect(lines[2]).toBe('Left: 5 Clear Icicle');
-    expect(lines[3]).toBe(URL);
-    for (const line of lines.slice(0, 3)) {
+    expect(lines[0]).toMatch(/^╔═+\[ ETA: <b>\d\d:\d\d EVE<\/b> \(~.*\]═+╗$/);
+    expect(lines[1]).toMatch(/^║ █+░+ 13% ║$/);
+    expect(lines[2]).toMatch(/^║ Left: 5 Clear Icicle\s+ ║$/);
+    expect(lines[3]).toContain(`[ ${URL} ]`);
+    for (const line of lines) {
       expect(line.replace(/<\/?b>/g, '').length).toBeLessThanOrEqual(MAX_LINE_WIDTH);
     }
     await screen.findByText('Copied');

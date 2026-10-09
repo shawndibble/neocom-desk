@@ -172,6 +172,9 @@ function RouteJumpFields({
 
 const NO_SHIP = 'none';
 
+/** Settings → Travel (`bare`): fill the column on a phone, natural width from `md` up (issue #3252). */
+const bareFillClassName = 'md:inline-flex md:w-auto md:*:flex-none';
+
 /**
  * Route Safety's own group: whether, and through which holes and bridges,
  * routes may go. Shared with Settings → Travel (`bare`: the panel there
@@ -237,6 +240,7 @@ export function RouteHoleFields({
           }}
           size="sm"
           fill
+          className={bare ? bareFillClassName : undefined}
           uppercase={false}
         />
       </div>
@@ -303,6 +307,7 @@ export function RouteHoleFields({
           onChange={(value) => onChange({ field: 'hubs', value })}
           size="sm"
           fill
+          className={bare ? bareFillClassName : undefined}
           uppercase={false}
         />
       </div>

@@ -18,6 +18,8 @@ export interface OpenInApp {
 
 interface ShareShellProps {
   title: string;
+  /** Keep the title for screen readers only, when the page body already says what it is. */
+  hideTitle?: boolean;
   /** Header-right controls, e.g. a table's export menu. */
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
@@ -33,7 +35,7 @@ interface ShareShellProps {
  * on to the same page after, and a small "Choose permissions" link under it
  * that opens the Customize permissions dialog first (#3075).
  */
-export function ShareShell({ title, actions, openInApp, children }: ShareShellProps) {
+export function ShareShell({ title, hideTitle, actions, openInApp, children }: ShareShellProps) {
   const { t } = useTranslation();
   const characterCount = useLiveQuery(() => db.characters.count());
   const signedOut = characterCount === 0;
@@ -88,7 +90,9 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
 
       <main className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold tracking-widest uppercase">{title}</h1>
+          <h1 className={hideTitle ? 'sr-only' : 'text-sm font-semibold tracking-widest uppercase'}>
+            {title}
+          </h1>
           {actions && <span className="ml-auto">{actions}</span>}
         </div>
 
