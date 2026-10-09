@@ -201,14 +201,25 @@ export function AppraisalPanel({
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
-  // Phone only: the pilot opened the folded paste card to edit the list. A new
-  // result folds it again, adjusted during render like the idioms below.
+  // Phone only: the pilot opened the folded paste card to edit the list. The
+  // result of an Appraise (or a Recent pick) from the open form folds it
+  // again, adjusted during render like the idioms below. A re-price from a
+  // changed Price % or hub also lands a new result, but must not pull the form
+  // out from under someone mid-typing, hence the explicit request flag.
   const isDesktop = useIsDesktop();
   const [editingList, setEditingList] = useState(false);
+  const [foldOnResult, setFoldOnResult] = useState(false);
   const [foldedFor, setFoldedFor] = useState(result);
   if (result !== foldedFor) {
     setFoldedFor(result);
-    setEditingList(false);
+    if (foldOnResult) {
+      setFoldOnResult(false);
+      setEditingList(false);
+    }
+  }
+  function appraiseFromForm(run: () => void) {
+    setFoldOnResult(true);
+    run();
   }
   const focusListOnOpen = useRef(false);
   useEffect(() => {
@@ -639,7 +650,7 @@ export function AppraisalPanel({
               <Select
                 value=""
                 onValueChange={(value) =>
-                  controller.appraiseText(recent[Number(value)]?.text ?? '')
+                  appraiseFromForm(() => controller.appraiseText(recent[Number(value)]?.text ?? ''))
                 }
               >
                 <SelectTrigger
@@ -695,7 +706,7 @@ export function AppraisalPanel({
               value={text}
               onChange={(event) => setText(event.target.value)}
               onSubmitChord={() => {
-                if (controller.canAppraise && !loading) controller.appraise();
+                if (controller.canAppraise && !loading) appraiseFromForm(controller.appraise);
               }}
               rows={pasteBoxRows(text)}
               spellCheck={false}
@@ -772,7 +783,7 @@ export function AppraisalPanel({
                 size="md"
                 variant="primary"
                 className="max-sm:w-full"
-                onClick={controller.appraise}
+                onClick={() => appraiseFromForm(controller.appraise)}
                 disabled={!controller.canAppraise || loading}
               >
                 {t('market.appraisal.appraise')}

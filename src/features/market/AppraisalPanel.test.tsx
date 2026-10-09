@@ -193,10 +193,9 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
     expect(screen.getByText(/Nope/)).toBeInTheDocument();
   });
 
-  it('folds again when a new result lands', async () => {
+  it('folds again when an Appraise from the open form lands, not on a re-price', async () => {
     const user = userEvent.setup();
-    const first = controller({ text: 'Tritanium 5', result: outcome() });
-    const second = { ...first, result: outcome() };
+    const first = controller({ text: 'Tritanium 5', result: outcome(), canAppraise: true });
     const ui = (c: AppraisalController) => (
       <MemoryRouter initialEntries={['/market/appraisal?hub=jita']}>
         <FakeItemActions actions={fakeItemActions()}>
@@ -213,8 +212,11 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
     );
     const { rerender } = render(ui(first));
     await user.click(screen.getByRole('button', { name: /Edit list/ }));
+    // A re-price (new result, no Appraise) leaves the form where the pilot is typing.
+    rerender(ui({ ...first, result: outcome() }));
     expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
-    rerender(ui(second));
+    await user.click(screen.getByRole('button', { name: 'Appraise' }));
+    rerender(ui({ ...first, result: outcome() }));
     expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
   });
 
