@@ -52,24 +52,32 @@ function WorthCard({
   const { t } = useTranslation();
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-  const [prices, setPrices] = useState<ReadonlyMap<number, number | null>>();
+  // Tagged with the scan and hub they were fetched for, so a new scan never reads old prices.
+  const [fetched, setFetched] = useState<{
+    key: string;
+    prices: ReadonlyMap<number, number | null>;
+  }>();
+  const key = `${hub.stationId}|${hullsKey(hulls)}`;
 
   useEffect(() => {
     let cancelled = false;
     void getHubPrices(
       hub,
       hulls.map((h) => h.typeId)
-    ).then((found) => {
-      if (cancelled) return;
-      setPrices(new Map([...found].map(([typeId, agg]) => [typeId, agg.sellMin])));
-    });
+    )
+      .then((found) => new Map([...found].map(([typeId, agg]) => [typeId, agg.sellMin])))
+      // A failed fetch reads as no price, the same as an unlisted hull.
+      .catch(() => new Map<number, number | null>())
+      .then((found) => {
+        if (!cancelled) setFetched({ key, prices: found });
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hub.stationId, hullsKey(hulls)]);
 
-  const worth = prices === undefined ? null : buildWorth(hulls, prices);
+  const worth = fetched?.key === key ? buildWorth(hulls, fetched.prices) : null;
   return (
     <section aria-label={t('travel.pilot.dscan.worth.title')} className={cardClassName}>
       <h3 className={captionClassName}>{t('travel.pilot.dscan.worth.title')}</h3>
