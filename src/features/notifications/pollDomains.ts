@@ -136,6 +136,7 @@ import {
 import {
   projectSkillQueue,
   projectIndustryJobs,
+  projectCorpIndustryJobs,
   projectCloneJump,
   projectColonies,
   projectCalendar,
@@ -1448,6 +1449,24 @@ export const corpIndustryJobDomain = defineDomain<
     return result.cached.data;
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toCorpIndustryJobEntrySnapshot), nowMs }),
+  // Re-checks the role: the baseline outlives a lost Factory Manager role, and
+  // a Projection nothing re-verifies must not keep pushing for a corp the
+  // pilot can no longer read.
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    if ((await corpContextFor(characterId, 'canReadIndustry')) === null) return [];
+    const itemNames = await resolveProjectionNames(
+      snapshot.entries.map((entry) => entry.productTypeId ?? entry.blueprintTypeId),
+      universeTypeName
+    );
+    return projectCorpIndustryJobs(
+      characterId,
+      characterName,
+      snapshot.entries,
+      itemNames,
+      NOTIFICATION_EVENT_ENTRIES.corpIndustryJobReady.projection.push,
+      nowMs
+    );
+  },
   names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 

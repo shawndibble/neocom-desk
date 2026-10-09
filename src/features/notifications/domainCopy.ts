@@ -445,12 +445,24 @@ export const structureFuelCopy: DomainCopy<StructureFuelLowFire, NoNames> & {
 
 /* Corp industry jobs ------------------------------------------------------ */
 
-export const corpIndustryJobCopy: DomainCopy<CorpIndustryJobNotificationFire, ItemNames> = {
+export const corpIndustryJobCopy: DomainCopy<CorpIndustryJobNotificationFire, ItemNames> & {
+  readonly push: PushCopy<CorpIndustryJobNotificationFire, ItemNames>;
+} = {
   poll: (fire, character, names) =>
     simple('corpIndustryJobReady', {
       character,
       item: names.item ?? `#${industryItemTypeId(fire)}`,
     }),
+  // A started job's end_date is fixed, so the push asserts like the personal
+  // job's. Written inline, not shared wording: the live and push text are the
+  // same sentence, but this event's lives only in `notifications.fired.*`.
+  push: (fire, character, names) => {
+    assertProjectionWording('corpIndustryJobReady', 'assert');
+    return {
+      title: 'Corp industry job ready for delivery',
+      body: `${character}: the corporation's ${names.item ?? `#${industryItemTypeId(fire)}`} job is ready for delivery.`,
+    };
+  },
   // Industry's Active Jobs lists corp jobs by installer (issue #2302), and
   // keeps the one an alert names whoever installed it.
   subjectOf: (fire) => fire.jobId,
