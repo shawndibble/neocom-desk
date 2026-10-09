@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
+  adoptGameBaseline,
   effectiveCurrentSystem,
   jumpRangeSystems,
   type CurrentSystem,
@@ -77,6 +78,14 @@ export function useCurrentSystem(): CurrentSystemState {
   const gameSystemId = game?.characterId === characterId ? game.systemId : null;
   const picked = characterId === null ? null : (picks[String(characterId)] ?? null);
   const current = effectiveCurrentSystem(gameSystemId, picked);
+
+  // A pick made before ESI answered learns what the game said first, so a
+  // later, different answer (the pilot really moved) still ends it.
+  useEffect(() => {
+    if (characterId === null) return;
+    const adopted = adoptGameBaseline(picked, gameSystemId);
+    if (adopted !== null) void setPicks({ ...picks, [String(characterId)]: adopted });
+  }, [characterId, picked, gameSystemId, picks, setPicks]);
 
   return {
     ...current,

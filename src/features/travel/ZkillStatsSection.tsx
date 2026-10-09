@@ -17,12 +17,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { cx } from '@/lib/cx';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
-import { killFigures, type StatTileItem } from './zkillFigures';
-
-/** A 0-1 share as a percentage. */
-function percent(value: number | null, digits = 0): string {
-  return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
-}
+import { killerRatio, type StatTileItem } from './zkillFigures';
 
 const NO_HISTORY_HINT = {
   pilot: 'travel.pilot.noHistoryHint',
@@ -134,7 +129,12 @@ export function ZkillStatsNote({
   return <ZkillStatsStatus stats={stats} subject={subject} />;
 }
 
-/** The pilot's full block, as Pilot Lookup and the Character tab show it. */
+/**
+ * The pilot's all-time figures as one line (kills, losses, ISK destroyed and
+ * lost, solo kills) and where zKillboard states them from, or the reason there
+ * are none yet. The meters and the hulls they fly are drawn by the profile
+ * around it; the Corporation and Alliance tabs keep their tiles.
+ */
 export function ZkillStatsSection({
   stats,
   onRetry,
@@ -146,47 +146,48 @@ export function ZkillStatsSection({
   const status = <ZkillStatsStatus stats={stats} subject="pilot" onRetry={onRetry} />;
   if (stats === null || stats.kind !== 'stats') return status;
   const s = stats.stats;
-  const figures = killFigures(t, s);
   return (
-    // DOM order is the phone's reading order: figures, note, then meters. From `md`
-    // up the meters lead, as they always did (`md:order-first` on a flex column).
-    <section aria-label={t('travel.pilot.statsLabel')} className="flex flex-col gap-3">
-      <StatTiles
-        className="md:grid-cols-6"
-        items={[
-          figures.kills,
-          figures.losses,
-          figures.iskDestroyed,
-          figures.iskLost,
-          {
-            label: t('travel.pilot.iskEfficiency'),
-            value: percent(s.iskEfficiency, 1),
-            help: t('travel.pilot.iskEfficiencyHelp'),
-          },
-          { label: t('travel.pilot.soloKills'), value: s.soloKills.toLocaleString() },
-        ]}
-      />
+    <section aria-label={t('travel.pilot.statsLabel')} className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-text-dim tabular-nums">
+        <span>
+          <b className="font-semibold text-isk-pos">
+            {t('travel.pilot.allTime.kills', { value: s.kills.toLocaleString() })}
+          </b>
+        </span>
+        <span>
+          <b className="font-semibold text-isk-neg">
+            {t('travel.pilot.allTime.losses', { value: s.losses.toLocaleString() })}
+          </b>
+        </span>
+        <span>
+          <b className="font-semibold text-text">
+            <IskAmount value={s.iskDestroyed} />
+          </b>{' '}
+          {t('travel.pilot.allTime.destroyed')}
+        </span>
+        <span>
+          <b className="font-semibold text-text">
+            <IskAmount value={s.iskLost} />
+          </b>{' '}
+          {t('travel.pilot.allTime.lost')}
+        </span>
+        <span>{t('travel.pilot.allTime.solo', { value: s.soloKills.toLocaleString() })}</span>
+      </p>
       <ZkillStatsNote stats={stats} subject="pilot" />
-      <div className="empty:hidden md:order-first">
-        <ZkillRatioMeters stats={s} />
-      </div>
-      {/* Half the modal's width on desktop: bars stretched across all of it
-          make the spread between hulls harder to compare, not easier. */}
-      {s.topShips.length > 0 && (
-        <div className="md:w-1/2">
-          <ZkillTopShips ships={s.topShips} />
-        </div>
-      )}
     </section>
   );
 }
 
-/** Both meters side by side (stacked on a phone); nothing when zKillboard sent neither ratio. */
+/**
+ * The meters side by side (stacked on a phone): danger, fleet size, and kills
+ * against losses. Nothing when zKillboard sent no ratio and there is no record.
+ */
 export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   const { t } = useTranslation();
-  if (stats.dangerRatio === null && stats.gangRatio === null) return null;
+  const killer = killerRatio(stats);
+  if (stats.dangerRatio === null && stats.gangRatio === null && killer === null) return null;
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {stats.dangerRatio !== null && (
         <RatioMeter
           label={t('travel.pilot.dangerMeter')}
@@ -194,13 +195,7 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
           low={t('travel.pilot.snuggly')}
           high={t('travel.pilot.dangerous')}
           value={stats.dangerRatio}
-          valueText={(v) =>
-            v > 50
-              ? t('travel.pilot.dangerousShare', { value: v })
-              : v < 50
-                ? t('travel.pilot.snugglyShare', { value: 100 - v })
-                : t('travel.pilot.evenShare')
-          }
+          valueText={(v) => t('travel.pilot.dangerousShare', { value: v })}
         />
       )}
       {stats.gangRatio !== null && (
@@ -215,6 +210,22 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
               ? t('travel.pilot.gangShare', { value: v })
               : v < 50
                 ? t('travel.pilot.soloShare', { value: 100 - v })
+                : t('travel.pilot.evenShare')
+          }
+        />
+      )}
+      {killer !== null && (
+        <RatioMeter
+          label={t('travel.pilot.killerMeter')}
+          help={t('travel.pilot.killerMeterHelp')}
+          low={t('travel.pilot.victim')}
+          high={t('travel.pilot.killer')}
+          value={killer}
+          valueText={(v) =>
+            v > 50
+              ? t('travel.pilot.killerShare', { value: v })
+              : v < 50
+                ? t('travel.pilot.victimShare', { value: 100 - v })
                 : t('travel.pilot.evenShare')
           }
         />
