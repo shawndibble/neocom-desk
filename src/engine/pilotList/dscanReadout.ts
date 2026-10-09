@@ -1,8 +1,7 @@
 /**
- * The **Read-out** above a Fleet board (issue #3076): what is this scan, and
- * can it hurt me? A reading (first matching rule wins) says what the fleet
- * looks like; four independent questions (find, catch, kill, bring more) set
- * the threat, so it never depends on the label guessing right.
+ * The **Read-out** of a D-Scan (issue #3076): which pattern the scan reads as
+ * (drop, scouts, mining fleet, roaming gang or mixed; first matching rule
+ * wins) and the evidence lines that back it up.
  *
  * Wording stays a condition, never a verdict (decision 20260912-172628): this
  * module returns i18n keys and params, not sentences. Thresholds are starting
@@ -15,9 +14,7 @@ import { formatDistanceKm } from './formatDistanceKm';
 import type { DscanRow } from './parsePilotPaste';
 
 export type ReadingId = 'drop' | 'scout' | 'mining' | 'gang' | 'mixed';
-export type Threat = 'clear' | 'watch' | 'dangerous';
-export type Confidence = 'strong' | 'likely' | 'weak';
-/** How loudly a question's answer reads: `none` is green, `warn` amber, `bad` red. */
+/** How loudly a danger reads: `none` is green, `warn` amber, `bad` red. */
 export type Tone = 'none' | 'warn' | 'bad';
 
 /** An i18n key under `travel.pilot.dscan.readout` plus its interpolation params. */
@@ -26,27 +23,9 @@ export interface ReadoutLine {
   params: Record<string, string | number>;
 }
 
-export interface ReadoutAnswer {
-  tone: Tone;
-  /** `yes`/`no`, or for "kill": `few` (1-2 damage ships) and `gang` (3+). */
-  answer: 'yes' | 'no' | 'few' | 'gang';
-  detail: ReadoutLine;
-}
-
-export interface ReadoutSignal extends ReadoutLine {
-  tone: 'hot' | 'mid' | 'plain';
-}
-
 export interface Readout {
   reading: ReadingId;
-  confidence: Confidence;
   evidence: ReadoutLine[];
-  threat: Threat;
-  find: ReadoutAnswer;
-  catch: ReadoutAnswer;
-  kill: ReadoutAnswer;
-  reinforce: ReadoutAnswer;
-  signals: ReadoutSignal[];
 }
 
 /** "Scouts": at most this many ships, each fast, covert or recon. */
@@ -63,8 +42,6 @@ export const GANG_DOCTRINE_SHARE = 0.5;
 export const GANG_MAX_SPREAD_KM = 25;
 /** This many cruiser-size-or-larger damage ships read as "a gang" for "kill". */
 export const KILL_GANG_MIN = 3;
-/** Confidence: this many evidence lines is Strong, one fewer is Likely. */
-export const STRONG_EVIDENCE = 3;
 
 /** Interdictor, Heavy Interdiction Cruiser, Interceptor. */
 const TACKLE_SHIP_GROUPS = new Set([541, 894, 831]);
@@ -79,8 +56,6 @@ const FAST_GROUPS = new Set([25, 237, 324, 831, COVERT_OPS_GROUP, 834]);
 const LOGISTICS_GROUPS = new Set([832, 1527]);
 /** Industrial Command Ship, Capital Industrial: the hulls that boost miners. */
 const BOOSTER_GROUPS = new Set([941, 883]);
-/** Cruiser, HAC, Strategic Cruiser, Flag Cruiser, battlecruisers, Battleship, Marauder. */
-const HEAVY_DAMAGE_GROUPS = new Set([26, 358, 963, 1972, 419, 1201, 27, 900]);
 /** Mobile Cynosural Beacon: a deployable that lets ships jump to it. */
 const CYNO_BEACON_GROUP = 4093;
 
@@ -102,19 +77,6 @@ const line = (key: string, params: Record<string, string | number> = {}): Readou
 
 function count<T>(items: readonly T[], test: (item: T) => boolean): number {
   return items.reduce((n, item) => n + (test(item) ? 1 : 0), 0);
-}
-
-function sharedName(rows: readonly DscanRow[]): { name: string; count: number } | null {
-  const counts = new Map<string, number>();
-  for (const { name, typeName } of rows) {
-    if (name === '' || name === typeName) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-  let best: { name: string; count: number } | null = null;
-  for (const [name, n] of counts) {
-    if (n >= 2 && (best === null || n > best.count)) best = { name, count: n };
-  }
-  return best;
 }
 
 /** The Read-out for a scan, or null when it holds no ship to read. */
@@ -142,7 +104,6 @@ export function buildReadout(
   const inGroups = (groups: ReadonlySet<number>) => count(ships, (s) => groups.has(s.groupId));
   const blackOps = count(ships, (s) => s.groupId === BLACK_OPS_GROUP);
   const capitals = count(ships, (s) => s.role === 'capitals');
-  const recon = inGroups(RECON_GROUPS);
   const logistics = inGroups(LOGISTICS_GROUPS);
   const boosters = inGroups(BOOSTER_GROUPS);
   const tackle = inGroups(TACKLE_SHIP_GROUPS) + disruptors;
@@ -151,13 +112,6 @@ export function buildReadout(
   const damage = ships.filter((s) => s.role === 'dps');
   const combat = ships.filter(
     (s) => (s.role === 'dps' || s.role === 'support') && s.groupId !== BLACK_OPS_GROUP
-  );
-  const heavy = count(
-    ships,
-    (s) =>
-      (s.role === 'dps' && HEAVY_DAMAGE_GROUPS.has(s.groupId)) ||
-      s.role === 'capitals' ||
-      s.groupId === BLACK_OPS_GROUP
   );
 
   const hullCounts = new Map<number, number>();
@@ -222,79 +176,5 @@ export function buildReadout(
       );
     }
   }
-  const confidence: Confidence =
-    evidence.length >= STRONG_EVIDENCE ? 'strong' : evidence.length === 2 ? 'likely' : 'weak';
-
-  const found = probes + recon;
-  const find: ReadoutAnswer = {
-    tone: found > 0 ? 'warn' : 'none',
-    answer: found > 0 ? 'yes' : 'no',
-    detail:
-      probes > 0
-        ? line('q.find.probes', { count: probes })
-        : recon > 0
-          ? line('q.find.recon', { count: recon })
-          : line('q.find.no'),
-  };
-  const catchAnswer: ReadoutAnswer = {
-    tone: tackle > 0 ? 'bad' : 'none',
-    answer: tackle > 0 ? 'yes' : 'no',
-    detail: tackle > 0 ? line('q.catch.yes', { count: tackle }) : line('q.catch.no'),
-  };
-  const killTone: Tone = heavy >= KILL_GANG_MIN ? 'bad' : heavy > 0 ? 'warn' : 'none';
-  const kill: ReadoutAnswer = {
-    tone: killTone,
-    answer: killTone === 'bad' ? 'gang' : killTone === 'warn' ? 'few' : 'no',
-    detail: heavy > 0 ? line('q.kill.yes', { count: heavy }) : line('q.kill.no'),
-  };
-  const bringMore = cynos > 0 || capitals > 0 || blackOps > 0;
-  const reinforce: ReadoutAnswer = {
-    tone: bringMore ? 'bad' : 'none',
-    answer: bringMore ? 'yes' : 'no',
-    detail:
-      cynos > 0
-        ? line('q.reinforce.cyno')
-        : bringMore
-          ? line('q.reinforce.ships', { count: capitals + blackOps })
-          : line('q.reinforce.no'),
-  };
-
-  let threat: Threat = 'clear';
-  if (
-    reading === 'drop' ||
-    reading === 'gang' ||
-    killTone === 'bad' ||
-    (killTone !== 'none' && (tackle > 0 || bringMore))
-  ) {
-    threat = 'dangerous';
-  } else if (found > 0 || tackle > 0 || reading === 'scout') {
-    threat = 'watch';
-  }
-
-  const signals: ReadoutSignal[] = [];
-  if (probes > 0) signals.push({ tone: 'mid', ...line('sig.probes', { count: probes }) });
-  if (cynos > 0) signals.push({ tone: 'hot', ...line('sig.cyno') });
-  if (tackle > 0 && killTone !== 'none') {
-    signals.push({ tone: 'hot', ...line('sig.tackleDamage', { tackle, damage: heavy }) });
-  }
-  if (logistics > 0) signals.push({ tone: 'mid', ...line('sig.logistics', { count: logistics }) });
-  if (boosters > 0) signals.push({ tone: 'plain', ...line('sig.boosters', { count: boosters }) });
-  const shared = sharedName(rows);
-  if (reading === 'mining' && shared !== null) {
-    signals.push({ tone: 'plain', ...line('sig.sharedName', shared) });
-  }
-  if (reading === 'scout') signals.push({ tone: 'mid', ...line('sig.scouts') });
-  if (cynos === 0 && reading !== 'drop') signals.push({ tone: 'plain', ...line('sig.noCyno') });
-
-  return {
-    reading,
-    confidence,
-    evidence,
-    threat,
-    find,
-    catch: catchAnswer,
-    kill,
-    reinforce,
-    signals,
-  };
+  return { reading, evidence };
 }

@@ -20,7 +20,11 @@ const mocks = vi.hoisted(() => ({
   encodeFittingShare: vi.fn(),
 }));
 
-vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => mocks.granted }));
+vi.mock('@/app/useGrantedScopes', () => ({
+  useEndpointsGranted: () => mocks.granted,
+  // The D-Scan danger read asks which scopes are held, to read the current ship.
+  useGrantedScopes: () => undefined,
+}));
 vi.mock('@/stores/activeCharacter', () => ({
   useActiveCharacter: (select: (state: { activeCharacterId: number }) => unknown) =>
     select({ activeCharacterId: 1 }),
@@ -397,16 +401,21 @@ describe('PilotLookupPanel', () => {
     });
   });
 
-  it('puts Copy Share Link beside Clear for a D-Scan, and nothing of the kind for a Local list', async () => {
+  it('puts Copy Share Link in the top right and Clear after Look up for a D-Scan, and no share for a Local list', async () => {
     renderTab();
     const box = screen.getByRole('combobox', { name: 'Pilot' });
     const lines = ['626', '587', '626', '587'].map((id) => id + String.fromCharCode(9) + 'X');
     fireEvent.paste(box, {
       clipboardData: { getData: () => lines.join(String.fromCharCode(10)) },
     });
-    expect(await screen.findByText('4 lines, D-Scan')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Clear' })).toBeTruthy();
+    const share = await screen.findByRole('button', { name: 'Copy Share Link' });
+    // No "N lines, D-Scan" line of its own: the scan's size is on the page.
+    expect(screen.queryByText(/lines, D-Scan/)).toBeNull();
+    const lookUp = screen.getByRole('button', { name: 'Look up' });
+    const clear = screen.getByRole('button', { name: 'Clear' });
+    // Document order: the box, Look up, Clear, then Share at the far end.
+    expect(lookUp.compareDocumentPosition(clear) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(clear.compareDocumentPosition(share) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     fireEvent.paste(screen.getByRole('combobox', { name: 'Pilot' }), {

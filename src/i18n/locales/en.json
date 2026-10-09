@@ -3151,7 +3151,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
+    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
     "writeExceptions": "It also asks for five permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client; and setting a route's waypoints in game replaces your autopilot waypoints in the EVE client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
@@ -3925,6 +3925,14 @@
     "pasteLabel": "Survey scan",
     "pastePlaceholder": "Paste a Survey Scanner copy here",
     "adding": "Adding…",
+    "differentField": "That scan is a different field than the survey you have open.",
+    "createNew": "Create new survey",
+    "addToExisting": "Add to existing survey",
+    "differentOnShare": "That scan is a different field than this survey, so it wasn't added. Continue in Neocom Desk to start a new survey with it.",
+    "historyLabel": "Your surveys",
+    "historyPlaceholder": "Switch survey",
+    "historyEntry": "{{ore}} · {{percent}}% mined · {{time}}",
+    "historyEmpty": "No scans yet · {{time}}",
     "notAScan": "That isn't a Survey Scanner copy. Select the rows in the scanner window and copy them.",
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
@@ -8069,6 +8077,10 @@
       "label": "Fittings",
       "caption": "Your in-game Fittings, and saving Fittings to EVE."
     },
+    "currentShip": {
+      "label": "Current ship",
+      "caption": "The ship you are flying, so the D-Scan danger read can start from it."
+    },
     "corp": {
       "label": "Corporation",
       "caption": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions."
@@ -8267,7 +8279,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Mining Survey: the survey links you created or opened.",
             "layout": "Layout: hidden and reordered Overview cards, and pages hidden from the navigation.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs."
           }
@@ -8604,14 +8616,38 @@
     "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
     "paste": "Paste",
     "pasteDestinations": {
-      "survey": { "label": "Survey scan", "opens": "Adds to your Mining Survey" },
-      "fitting": { "label": "EFT fitting", "opens": "Opens in Fittings" },
-      "chatLink": { "label": "Chat link", "opens": "Opens the item or system page" },
-      "dscan": { "label": "D-Scan", "opens": "Opens in Pilot Lookup" },
-      "blueprintList": { "label": "Blueprint list", "opens": "Creates a Build Group of plans" },
-      "skillPlan": { "label": "Skill plan", "opens": "Opens in the Skills planner" },
-      "appraisal": { "label": "Item list", "opens": "Opens in Appraisal" },
-      "pilotList": { "label": "Local list", "opens": "Opens in Pilot Lookup" }
+      "survey": {
+        "label": "Survey scan",
+        "opens": "Adds to your Mining Survey"
+      },
+      "fitting": {
+        "label": "EFT fitting",
+        "opens": "Opens in Fittings"
+      },
+      "chatLink": {
+        "label": "Chat link",
+        "opens": "Opens the item or system page"
+      },
+      "dscan": {
+        "label": "D-Scan",
+        "opens": "Opens in Pilot Lookup"
+      },
+      "blueprintList": {
+        "label": "Blueprint list",
+        "opens": "Creates a Build Group of plans"
+      },
+      "skillPlan": {
+        "label": "Skill plan",
+        "opens": "Opens in the Skills planner"
+      },
+      "appraisal": {
+        "label": "Item list",
+        "opens": "Opens in Appraisal"
+      },
+      "pilotList": {
+        "label": "Local list",
+        "opens": "Opens in Pilot Lookup"
+      }
     }
   },
   "activityLog": {
@@ -9105,7 +9141,7 @@
       "pickTitle": "Look up a pilot by name",
       "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once.",
       "searchLabel": "Pilot",
-      "searchPlaceholder": "Pilot name",
+      "searchPlaceholder": "Pilot name, Local, or D-Scan",
       "suggestionsLabel": "Matching pilots",
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name. Shift+Enter adds another name; Ctrl+Enter looks up the whole list.",
@@ -9158,8 +9194,6 @@
       "list": {
         "tokenLocal_one": "{{count}} name, Local list",
         "tokenLocal_other": "{{count}} names, Local list",
-        "tokenDscan_one": "{{count}} line, D-Scan",
-        "tokenDscan_other": "{{count}} lines, D-Scan",
         "clear": "Clear",
         "pilot": "Pilot",
         "standing": "Your standing",
@@ -9205,6 +9239,16 @@
         "failedHint": "The list couldn't be looked up right now. Check your connection and paste it again."
       },
       "dscan": {
+        "ownShip": {
+          "label": "Your ship",
+          "placeholder": "Type your ship, e.g. Hurricane",
+          "fromCharacter": "from your character",
+          "useCurrent": "Use my current ship",
+          "clear": "Clear",
+          "editLabel": "Your ship: {{name}}, change",
+          "notSet": "Not set",
+          "unsetNote": "Counting cruiser-size and larger damage ships."
+        },
         "role": {
           "capitals": "Capitals",
           "industrial": "Industrial",
@@ -9274,7 +9318,6 @@
           "4594": "Lancer Dreadnought"
         },
         "readout": {
-          "readsAs": "Reads as",
           "reading": {
             "drop": "Capital drop staging",
             "scout": "Scouts, or a hunter looking for a target",
@@ -9282,15 +9325,6 @@
             "gang": "A roaming PvP gang",
             "mixed": "Mixed traffic, no fleet pattern"
           },
-          "confidence": { "strong": "Strong reading", "likely": "Likely", "weak": "Weak reading" },
-          "threat": { "clear": "Clear on scan", "watch": "Watch", "dangerous": "Dangerous" },
-          "questions": {
-            "find": "Can it find you",
-            "catch": "Can it catch you",
-            "kill": "Can it kill you",
-            "reinforce": "Can it bring more"
-          },
-          "answer": { "yes": "Yes", "no": "No", "few": "A few", "gang": "A gang" },
           "ev": {
             "cyno": "A cyno field is lit on the scan",
             "blackOps_one": "{{count}} Black Ops on scan",
@@ -9313,44 +9347,6 @@
             "tackle": "{{count}} tackle",
             "hulls": "{{count}} ships across {{hulls}} hulls, no shared doctrine",
             "spread": "Spread over {{distance}}"
-          },
-          "q": {
-            "find": {
-              "probes_one": "{{count}} combat probe out",
-              "probes_other": "{{count}} combat probes out",
-              "recon_one": "{{count}} recon ship",
-              "recon_other": "{{count}} recon ships",
-              "no": "No probes or recon ships"
-            },
-            "catch": {
-              "yes_one": "{{count}} tackle ship or disruptor",
-              "yes_other": "{{count}} tackle ships or disruptors",
-              "no": "No interdictor, HIC, interceptor or disruptor"
-            },
-            "kill": {
-              "yes_one": "{{count}} cruiser-size or larger damage ship",
-              "yes_other": "{{count}} cruiser-size or larger damage ships",
-              "no": "No damage ships above destroyer size"
-            },
-            "reinforce": {
-              "cyno": "A cyno field is lit",
-              "ships_one": "{{count}} capital or Black Ops",
-              "ships_other": "{{count}} capitals or Black Ops",
-              "no": "No cyno, capital or Black Ops"
-            }
-          },
-          "sig": {
-            "probes_one": "{{count}} combat scanner probe out. Someone in the system is scanning for ships.",
-            "probes_other": "{{count}} combat scanner probes out. Someone in the system is scanning for ships.",
-            "cyno": "A cyno field is lit. Ships can arrive in seconds.",
-            "tackleDamage": "Tackle and damage together: {{tackle}} tackle with {{damage}} damage ships. Anything caught could be held and killed.",
-            "logistics_one": "{{count}} logistics ship. A fleet that expects to take damage.",
-            "logistics_other": "{{count}} logistics ships. A fleet that expects to take damage.",
-            "boosters_one": "{{count}} booster hull: Industrial Command Ships usually boost miners.",
-            "boosters_other": "{{count}} booster hulls: Industrial Command Ships usually boost miners.",
-            "sharedName": "{{count}} ships share the name {{name}}, a hint of one owner.",
-            "scouts": "Scouts often sit one jump ahead of a gang. The neighbouring systems may show more.",
-            "noCyno": "No cyno field on scan."
           },
           "caveat": "A clean scan is not an empty system. Cloaked ships and anything past 14.3 AU do not show."
         },
@@ -9387,7 +9383,118 @@
         "shareFailed": "Couldn't create the Share Link. Try again.",
         "shareReady": "Share Link — works for 7 days",
         "shareCopy": "Copy",
-        "shareTooLarge": "Too large to share as a link (over {{max}} characters)."
+        "shareTooLarge": "Too large to share as a link (over {{max}} characters).",
+        "danger": {
+          "level": {
+            "clear": "Clear on scan",
+            "watch": "Watch",
+            "danger": "Danger",
+            "busy": "Busy"
+          },
+          "headline": {
+            "first": {
+              "kill_one": "One ship can hurt you",
+              "kill_other": "{{count}} ships can hurt you",
+              "catch_one": "One ship can pin you down",
+              "catch_other": "{{count}} ships can pin you down",
+              "more_one": "One ship can bring more",
+              "more_other": "{{count}} ships can bring more",
+              "find_one": "One ship can find you",
+              "find_other": "{{count}} ships can find you"
+            },
+            "next": {
+              "kill_one": "one can hurt you",
+              "kill_other": "{{count}} can hurt you",
+              "catch_one": "one can pin you down",
+              "catch_other": "{{count}} can pin you down",
+              "more_one": "one can bring more",
+              "more_other": "{{count}} can bring more",
+              "find_one": "one can find you",
+              "find_other": "{{count}} can find you"
+            },
+            "joinMiddle": "{{head}}, {{tail}}",
+            "joinLast": "{{head}}, and {{tail}}",
+            "sentence": "{{text}}.",
+            "clear": "Nothing here can hurt you.",
+            "busy": "{{ships}} ships. {{kill}} can hurt you, {{catch}} can pin you down, {{find}} can find you."
+          },
+          "sub": {
+            "pattern": "Reads as: {{reading}}. {{evidence}}.",
+            "newThreats_one": "{{names}} is new since your last scan.",
+            "newThreats_other": "{{names}} are new since your last scan.",
+            "nothingNew": "Nothing here is new since your last scan.",
+            "namesAnd": "{{first}} and {{second}}",
+            "namesMore": "{{first}}, {{second}} and {{count}} more",
+            "clearShips_one": "{{count}} ship, none a threat to you.",
+            "clearShips_other": "{{count}} ships, none a threat to you.",
+            "cloak": "Cloaked ships do not show on scan.",
+            "busy": "Combat ships in a trade hub are often neutral, and a scan cannot tell whose ships these are. Read the counts, not the ships.",
+            "and": "and"
+          },
+          "age": {
+            "fresh_one": "Scanned {{count}} second ago",
+            "fresh_other": "Scanned {{count}} seconds ago",
+            "stale_one": "Scanned {{count}} minute ago. This may be out of date. Scan again.",
+            "stale_other": "Scanned {{count}} minutes ago. This may be out of date. Scan again."
+          },
+          "watch": {
+            "title": "Watch these, most dangerous first",
+            "titleBusy": "Biggest threat groups",
+            "none": "Nothing to watch.",
+            "noneHint": "No ship here can hurt, pin or find you.",
+            "notThreat": "Not a threat: {{names}}.",
+            "tag": {
+              "catch": "Can pin you down",
+              "more": "Can bring more",
+              "kill": "Can hurt you",
+              "find": "Can find you"
+            },
+            "why": {
+              "catch": "Can hold you in place.",
+              "more": "Can bring reinforcements.",
+              "kill": "Damage ships big enough to hurt a {{ship}}.",
+              "killUnknown": "Cruiser-size or larger damage ships.",
+              "find": "Recon ships and probes are built to track targets down."
+            },
+            "new": "New",
+            "newSome": "{{count}} new",
+            "moreGroups_one": "+{{count}} more group",
+            "moreGroups_other": "+{{count}} more groups",
+            "notThreatCount": "Not a threat: {{groups}} other groups, {{ships}} ships."
+          },
+          "tripwire": {
+            "title": "Leave or re-check if",
+            "hint": "Watch for these to appear or grow.",
+            "catch": {
+              "title": "Pinning ships: interdictor, HIC, interceptor, disruptor",
+              "sub": "They can hold you in place."
+            },
+            "more": {
+              "title": "Reinforcements: cyno, capital, Black Ops",
+              "sub": "They can bring a fleet."
+            },
+            "kill": {
+              "title": "More damage ships",
+              "sub": "On scan now: {{count}} that can hurt you."
+            },
+            "find": {
+              "title": "Recon ships and probes",
+              "sub": "Check again after your next paste."
+            },
+            "none": "None now",
+            "now": "{{count}} now",
+            "paste": "Scan again in the game, then paste here with Ctrl+V. This page compares it with this scan.",
+            "firstScan": "First scan on this device.",
+            "firstScanHint": "New and gone tags appear after your next paste."
+          },
+          "fullScan_one": "Full scan: {{count}} ship, value, changes",
+          "fullScan_other": "Full scan: {{count}} ships, value, changes",
+          "grant": {
+            "title": "Your current ship is not shared yet",
+            "hint": "Allow Current ship and this page reads for the ship you are flying. Until then, pick your ship above.",
+            "action": "Allow current ship"
+          }
+        }
       },
       "unknownTitle": "This pilot couldn't be found",
       "unknownHint": "EVE has no pilot with this id. Check the link, or search by name.",

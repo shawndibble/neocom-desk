@@ -9,8 +9,22 @@ vi.mock('@/sde/loadSde', () => ({
     '22548': { name: 'Mackinaw', groupID: 543 },
     '28606': { name: 'Orca', groupID: 941 },
     '2175': { name: 'Infiltrator II', groupID: 100 },
+    '1': { name: 'Cenotaph', groupID: 419 },
+    '2': { name: 'Bustard', groupID: 380 },
+    '3': { name: 'Rapier', groupID: 833 },
+    '4': { name: 'Catalyst', groupID: 420 },
+    '5': { name: 'Iteron V', groupID: 28 },
   }),
-  loadGroupCategories: async () => ({ '543': 6, '941': 6, '100': 18 }),
+  loadGroupCategories: async () => ({
+    '543': 6,
+    '941': 6,
+    '100': 18,
+    '419': 6,
+    '380': 6,
+    '833': 6,
+    '420': 6,
+    '28': 6,
+  }),
 }));
 
 vi.mock('@/market/prices', () => ({
@@ -44,9 +58,16 @@ beforeEach(async () => {
 });
 afterEach(cleanup);
 
+const openFullScan = async (user: ReturnType<typeof userEvent.setup>) => {
+  const toggle = await screen.findByRole('button', { name: /^Full scan/ });
+  if (toggle.getAttribute('aria-expanded') === 'false') await user.click(toggle);
+};
+
 describe('FleetBoard', () => {
   it('groups hulls by role with counts, group, name hint and distance range', async () => {
+    const user = userEvent.setup();
     render(<FleetBoard rows={ROWS} />);
+    await openFullScan(user);
     const industrial = await screen.findByRole('region', { name: 'Industrial' });
     expect(industrial.textContent).toContain('Mackinaw');
     expect(industrial.textContent).toContain('Exhumer');
@@ -56,19 +77,75 @@ describe('FleetBoard', () => {
     expect(screen.getByRole('region', { name: 'Drones and deployables' })).toBeTruthy();
   });
 
-  it('opens with a Read-out: the reading, the threat and the cloaked-ships caveat', async () => {
+  it('opens with the answer: Clear, the pattern, nothing to watch, and the Full scan collapsed', async () => {
     render(<FleetBoard rows={ROWS} />);
-    const readout = await screen.findByTestId('dscan-readout');
-    expect(readout.textContent).toContain('A mining fleet');
-    expect(readout.textContent).toContain('Clear on scan');
-    expect(readout.textContent).toContain('Can it catch you');
-    expect(readout.textContent).toContain('Cloaked ships and anything past 14.3 AU do not show.');
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(answer.getAttribute('data-level')).toBe('clear');
+    expect(answer.textContent).toContain('Nothing here can hurt you.');
+    expect(answer.textContent).toContain('Reads as: A mining fleet.');
+    expect(answer.textContent).toContain('Cloaked ships do not show on scan.');
+    expect(screen.getByText('Nothing to watch.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Leave or re-check if' })).toBeTruthy();
+    const toggle = screen.getByRole('button', { name: /^Full scan: 4 ships/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('region', { name: 'Industrial' })).toBeNull();
+  });
+
+  it('names what can hurt and find you, ranked, with the reason in text', async () => {
+    render(<FleetBoard rows={[row(1, 12), row(3, 30), row(2, 8)]} />);
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(answer.getAttribute('data-level')).toBe('watch');
+    expect(answer.textContent).toContain('One ship can hurt you, and one can find you.');
+    expect(answer.textContent).toContain('Counting cruiser-size and larger damage ships.');
+    const watch = screen.getByRole('region', { name: /Watch these/ });
+    const items = within(watch).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toContain('Cenotaph');
+    expect(items[0].textContent).toContain('Can hurt you');
+    expect(items[1].textContent).toContain('Rapier');
+    expect(items[1].textContent).toContain('Can find you');
+    expect(watch.textContent).toContain('Not a threat');
+  });
+
+  it('reads the same scan wider for a fragile ship the pilot picked', async () => {
+    await db.settings.put({ key: 'dscan.ownShip', value: 5 });
+    render(<FleetBoard rows={[row(1, 12), row(4, 14)]} />);
+    const answer = await screen.findByTestId('dscan-answer');
+    await within(answer).findByRole('button', { name: 'Your ship: Iteron V, change' });
+    expect(answer.textContent).toContain('2 ships can hurt you.');
+  });
+
+  it('on the live view: says when the scan was taken, and a first scan has nothing to compare', async () => {
+    render(<FleetBoard rows={[row(1, 12), row(3, 30)]} trackHistory />);
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(answer.textContent).toContain('Scanned 5 seconds ago');
+    expect(screen.getByText('First scan on this device.')).toBeTruthy();
+  });
+
+  it('tags a group that is new since the last scan', async () => {
+    await db.settings.put({ key: 'dscan.lastScan', value: [{ typeId: 3, count: 1 }] });
+    render(<FleetBoard rows={[row(1, 12), row(3, 30)]} trackHistory />);
+    const watch = await screen.findByRole('region', { name: /Watch these/ });
+    expect(within(watch).getByText('New')).toBeTruthy();
+    expect(screen.getByTestId('dscan-answer').textContent).toContain(
+      'Cenotaph is new since your last scan.'
+    );
+    expect(screen.queryByText('First scan on this device.')).toBeNull();
+  });
+
+  it('a Shared D-Scan shows no scan age and no first-scan note', async () => {
+    render(<FleetBoard rows={[row(1, 12), row(3, 30)]} />);
+    const answer = await screen.findByTestId('dscan-answer');
+    expect(answer.textContent).not.toContain('Scanned');
+    expect(screen.queryByText('First scan on this device.')).toBeNull();
   });
 
   it('is one button, collapsed until pressed, that reveals the distance lanes', async () => {
     const user = userEvent.setup();
     render(<FleetBoard rows={ROWS} />);
-    const bar = await screen.findByRole('button', { expanded: false });
+    await openFullScan(user);
+    const bar = await screen.findByRole('button', { name: /Fleet by role/ });
+    expect(bar.getAttribute('aria-expanded')).toBe('false');
     expect(bar.textContent).toContain('Industrial');
     expect(bar.textContent).toContain('Drones and deployables');
     expect(screen.queryByText('Distance from you, by role (km)')).toBeNull();
@@ -89,9 +166,13 @@ describe('group sub-labels', () => {
     const labels = en.travel.pilot.dscan.group as Record<string, string>;
     expect(PINNED_GROUP_IDS.filter((id) => labels[String(id)] === undefined)).toEqual([]);
   });
+});
 
+describe('the Full scan', () => {
   it('prices hulls and never shows 0 for a hull with no price', async () => {
+    const user = userEvent.setup();
     render(<FleetBoard rows={ROWS} />);
+    await openFullScan(user);
     const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
     expect(await within(worth).findAllByText('300M')).toHaveLength(2);
     expect(worth.textContent).toContain('1 × Orca');
@@ -101,6 +182,7 @@ describe('group sub-labels', () => {
   });
 
   it('diffs against the last stored scan and keeps only that one', async () => {
+    const user = userEvent.setup();
     await db.settings.put({
       key: 'dscan.lastScan',
       value: [
@@ -109,6 +191,7 @@ describe('group sub-labels', () => {
       ],
     });
     render(<FleetBoard rows={ROWS} trackHistory />);
+    await openFullScan(user);
     const since = await screen.findByRole('region', { name: /Since your last scan/ });
     expect(await within(since).findByText('+2')).toBeTruthy();
     expect(since.textContent).toContain('Mackinaw');
@@ -120,10 +203,13 @@ describe('group sub-labels', () => {
   });
 
   it('says so when there is no earlier scan, and a Shared D-Scan shows no diff', async () => {
+    const user = userEvent.setup();
     const first = render(<FleetBoard rows={ROWS} trackHistory />);
+    await openFullScan(user);
     expect(await screen.findByText(/No earlier scan stored/)).toBeTruthy();
     first.unmount();
     render(<FleetBoard rows={ROWS} />);
+    await openFullScan(user);
     await screen.findByRole('region', { name: /Worth on the scan/ });
     expect(screen.queryByRole('region', { name: /Since your last scan/ })).toBeNull();
   });

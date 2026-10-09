@@ -61,9 +61,7 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} />
   ) : (
-    <Panel className="space-y-4">
-      <FleetBoard rows={paste.rows} trackHistory />
-    </Panel>
+    <FleetBoard rows={paste.rows} trackHistory />
   );
 }
 
@@ -553,7 +551,7 @@ export function DscanShareControl({
     <>
       {tooltip === undefined ? button : <Tooltip content={tooltip}>{button}</Tooltip>}
       {share.status === 'manual' && (
-        <div className="flex w-full items-center gap-2">
+        <div className="flex w-full min-w-72 max-w-full items-center gap-2">
           <label
             htmlFor="pilot-dscan-share-url"
             className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"

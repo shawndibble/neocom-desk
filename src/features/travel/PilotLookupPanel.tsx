@@ -301,23 +301,6 @@ function PilotSearch({
 
   return (
     <div className="space-y-3">
-      {list !== null && (
-        // The paste collapsed to a token, not a wall of text. The search box stays
-        // below it, so one pilot can be looked up without clearing the list first.
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-text">
-            {list.kind === 'local'
-              ? t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })
-              : t('travel.pilot.list.tokenDscan', { count: list.typeIds.length })}
-          </span>
-          {list.kind === 'dscan' && (
-            <DscanShareControl paste={list} characterId={activeCharacterId} />
-          )}
-          <Button type="button" size="sm" onClick={() => onList(null)}>
-            {t('travel.pilot.list.clear')}
-          </Button>
-        </div>
-      )}
       <form onSubmit={handleSubmit} className="space-y-2">
         <div className="flex flex-wrap items-end gap-3">
           <FilterField label={label} stretch={false}>
@@ -402,6 +385,24 @@ function PilotSearch({
           >
             {t('travel.pilot.lookUp')}
           </Button>
+          {list !== null && (
+            // A pasted list collapses out of the box; the box stays, so one pilot can be
+            // looked up without clearing the list first. Clear drops the list.
+            <Button type="button" onClick={() => onList(null)}>
+              {t('travel.pilot.list.clear')}
+            </Button>
+          )}
+          {list?.kind === 'local' && (
+            <span className="self-center text-sm text-text-dim">
+              {t('travel.pilot.list.tokenLocal', { count: list.names.length + list.overflow })}
+            </span>
+          )}
+          {list?.kind === 'dscan' && (
+            // The scan's size is on the page below; Share sits in the top right corner.
+            <div className="ml-auto flex max-w-full flex-wrap justify-end gap-2 self-start">
+              <DscanShareControl paste={list} characterId={activeCharacterId} />
+            </div>
+          )}
         </div>
         <p className="text-xs text-text-dim">
           {t(canSuggest ? 'travel.pilot.searchHintSuggest' : 'travel.pilot.searchHintExact', {

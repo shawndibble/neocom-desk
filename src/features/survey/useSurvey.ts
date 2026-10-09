@@ -12,7 +12,7 @@ export const SURVEY_POLL_MS = 60_000;
 export type SurveyLoadState =
   | { status: 'none' }
   | { status: 'loading' }
-  | { status: 'ready'; scans: SurveyScan[]; expiresAt: number }
+  | { status: 'ready'; scans: SurveyScan[]; expiresAt: number; owner: string | null }
   | { status: 'gone' }
   | { status: 'failed' };
 
@@ -75,7 +75,14 @@ export function useSurvey(id: string | null): {
     // A result for another id (the pilot switched surveys) is stale.
     const result = loaded?.id === id ? loaded.result : null;
     if (result === null) return { status: 'loading' };
-    if (result.ok) return { status: 'ready', scans: result.scans, expiresAt: result.expiresAt };
+    if (result.ok) {
+      return {
+        status: 'ready',
+        scans: result.scans,
+        expiresAt: result.expiresAt,
+        owner: result.owner,
+      };
+    }
     return { status: result.reason === 'not-found' ? 'gone' : 'failed' };
   }, [id, loaded]);
   return { state, refresh };

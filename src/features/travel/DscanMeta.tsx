@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
-import { db } from '@/db';
-import { buildWorth, diffHulls, sameHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
+import { buildWorth, diffHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-
-/** Device-local (no `sync.` prefix), so the previous scan never reaches Firestore. */
-const LAST_SCAN_KEY = 'dscan.lastScan';
+import { hullsKey } from './lastScan';
 
 const SHOWN_LINES = 4;
 
@@ -26,21 +23,21 @@ export function DscanMeta({
   hulls,
   names,
   trackHistory,
+  previous,
 }: {
   hulls: readonly HullCount[];
   names: ReadonlyMap<number, string>;
   trackHistory: boolean;
+  /** The earlier scan from `useLastScan`; only read when `trackHistory` is set. */
+  previous: HullCount[] | null | undefined;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <WorthCard hulls={hulls} names={names} />
-      {trackHistory && <SinceLastScanCard hulls={hulls} names={names} />}
+      {trackHistory && <SinceLastScanCard hulls={hulls} previous={previous} names={names} />}
     </div>
   );
 }
-
-const hullsKey = (hulls: readonly HullCount[]) =>
-  hulls.map((h) => `${h.typeId}x${h.count}`).join(',');
 
 function WorthCard({
   hulls,
@@ -127,33 +124,15 @@ function WorthCard({
 
 function SinceLastScanCard({
   hulls,
+  previous,
   names,
 }: {
   hulls: readonly HullCount[];
+  /** undefined = still reading Dexie; null = no earlier scan stored. */
+  previous: HullCount[] | null | undefined;
   names: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
-  // undefined = still reading Dexie; null = no earlier scan stored.
-  const [previous, setPrevious] = useState<HullCount[] | null>();
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const stored = await db.settings.get(LAST_SCAN_KEY);
-      const last = Array.isArray(stored?.value) ? (stored.value as HullCount[]) : null;
-      if (cancelled) return;
-      setPrevious(last);
-      // The same scan seen again must not wipe the scan it is compared with.
-      if (last === null || !sameHulls(last, hulls)) {
-        await db.settings.put({ key: LAST_SCAN_KEY, value: hulls.map((h) => ({ ...h })) });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hullsKey(hulls)]);
-
   const diff = previous ? diffHulls(hulls, previous) : null;
   return (
     <section aria-label={t('travel.pilot.dscan.since.title')} className={cardClassName}>

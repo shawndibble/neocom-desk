@@ -1,25 +1,34 @@
 /**
  * Mining › Survey: paste a Survey Scanner copy (here, or Ctrl+V anywhere in
  * the app, which `GlobalPasteRouter` sends here) and it tracks the field from
- * then on. The first scan stores a `survey` Share Link; every later paste adds
- * a scan to it, and the short link is what other pilots open or paste into.
+ * then on. The first scan stores a `survey` Share Link; a later paste that only
+ * shrinks the field adds a scan to it, and the short link is what other pilots
+ * open or paste into. A paste that is a different field starts a new survey, or
+ * asks first when the pilot owns the one in view.
  *
  * Like the other mining tabs, this one owns its `PageHeader`; the shared tab
  * bar is handed down from `routes/MoonMiningTax.tsx`.
  */
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, PageHeader, textActionClassName } from '@/components/ui';
+import { db } from '@/db';
+import { Button, EmptyState, PageHeader, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
+import { ownsSurvey } from '@/engine/survey/owner';
+import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { classifyScan } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
 import { MoonTaxRow } from './MoonTaxRow';
+import { SurveyPicker } from './SurveyPicker';
 import { YourShareRow } from './YourShareRow';
+import { stashPendingScan, takePendingScan } from './pendingScan';
 import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
+import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 import { addSurveyScan, loadSurvey, startSurvey } from './surveyStore';
 import { useSurvey } from './useSurvey';
@@ -28,6 +37,9 @@ interface SurveyTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
 }
+
+/** Where a scan goes when the pilot has chosen: a new survey, or the one in view. */
+type ScanTarget = 'new' | 'existing';
 
 export function SurveyTab({ tabBar }: SurveyTabProps) {
   const { t } = useTranslation();
@@ -52,45 +64,78 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
 
   const { state, refresh } = useSurvey(hydrated ? currentId : null);
 
-  const add = useCallback(
+  // A survey in view is one the pilot has now created or opened.
+  useEffect(() => {
+    if (currentId !== null && state.status === 'ready') void noteSurvey(currentId);
+  }, [currentId, state.status]);
+
+  // A different field the survey's owner pasted, waiting for their choice. It
+  // belongs to the survey that was in view, so switching survey drops it.
+  const [asking, setAsking] = useState<{ text: string; forId: string | null } | null>(null);
+
+  const startWith = useCallback(
     async (text: string): Promise<AddScanResult> => {
+      if (characterId === null) return 'failed';
+      const ownerName = (await db.characters.get(characterId))?.name;
+      if (ownerName === undefined) return 'failed';
+      const started = await startSurvey({ characterId, ownerName });
+      // Scan first, so the new survey's first load already has it.
+      await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt });
+      await setCurrentId(started.id);
+      return 'ok';
+    },
+    [characterId, setCurrentId]
+  );
+
+  const add = useCallback(
+    async (text: string, choice?: ScanTarget): Promise<AddScanResult> => {
       // Before anything is sent, so a wrong paste never starts a survey.
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
       try {
-        let target: { id: string; expiresAt: number } | null = null;
-        if (currentId !== null) {
-          if (state.status === 'ready') {
-            target = { id: currentId, expiresAt: state.expiresAt };
-          } else {
-            const found = await loadSurvey(currentId);
-            if (found.ok) target = { id: currentId, expiresAt: found.expiresAt };
-            else if (found.reason === 'failed') return 'failed';
+        if (choice === 'new') return await startWith(text);
+        // Read fresh, not from the polled state: another pilot may have added a
+        // scan since, and a paste is compared against the latest one.
+        const found = currentId === null ? null : await loadSurvey(currentId);
+        if (found?.ok) {
+          const latest = found.scans[found.scans.length - 1];
+          const sameField =
+            choice === 'existing' ||
+            latest === undefined ||
+            classifyScan(latest.rocks, parseSurveyScan(text) ?? []) === 'update';
+          if (!sameField) {
+            const names = (await db.characters.toArray()).map((c) => c.name);
+            if (!ownsSurvey(found.owner, names)) return await startWith(text);
+            setAsking({ text, forId: currentId });
+            return 'ok';
           }
+          await addSurveyScan({ id: currentId!, text, expiresAt: found.expiresAt });
+          await refresh();
+          return 'ok';
         }
-        if (target === null) {
-          // First scan, or the old survey has expired: start a new one.
-          if (characterId === null) return 'failed';
-          const started = await startSurvey({ characterId });
-          await setCurrentId(started.id);
-          target = { id: started.id, expiresAt: started.expiresAt };
-        }
-        await addSurveyScan({ id: target.id, text, expiresAt: target.expiresAt });
-        await refresh();
-        return 'ok';
+        if (found !== null && found.reason === 'failed') return 'failed';
+        // First scan, or the old survey has expired: start a new one.
+        return await startWith(text);
       } catch (error) {
         return scanFailure(error);
       }
     },
-    [characterId, currentId, refresh, setCurrentId, state]
+    [currentId, refresh, startWith]
   );
 
-  // A scan the app-wide paste router carried here.
-  const routed = (location.state as Partial<SurveyScanState> | null)?.surveyScanText;
+  async function answer(choice: ScanTarget) {
+    const text = asking?.text;
+    setAsking(null);
+    if (text !== undefined) await add(text, choice);
+  }
+
   const addRef = useRef(add);
   useEffect(() => {
     addRef.current = add;
   });
+
+  // A scan the app-wide paste router carried here.
+  const routed = (location.state as Partial<SurveyScanState> | null)?.surveyScanText;
   const handled = useRef<string | null>(null);
   useEffect(() => {
     if (!hydrated || routed === undefined || handled.current === routed) return;
@@ -99,6 +144,20 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
       void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     });
   }, [hydrated, routed, navigate, location.pathname, location.search]);
+
+  // A scan pasted on a shared page that was a different field, waiting here
+  // since the pilot logged in: it starts their own survey. Taken before the
+  // await, so a re-render cannot add it twice.
+  useEffect(() => {
+    if (!hydrated || characterId === null) return;
+    const pending = takePendingScan();
+    if (pending === null) return;
+    // Put back if it didn't land (no session yet right after login, offline):
+    // the pilot's next visit tries again instead of losing the paste.
+    void addRef.current(pending, 'new').then((result) => {
+      if (result !== 'ok') stashPendingScan(pending);
+    });
+  }, [hydrated, characterId]);
 
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
@@ -116,6 +175,22 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           )}
           {state.status === 'gone' && (
             <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-6" />
+          )}
+          <SurveyPicker currentId={currentId} onPick={(id) => void setCurrentId(id)} />
+          {asking !== null && asking.forId === currentId && (
+            <div
+              role="group"
+              aria-label={t('survey.differentField')}
+              className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel/85 p-3"
+            >
+              <p className="mr-auto text-sm">{t('survey.differentField')}</p>
+              <Button variant="primary" size="sm" onClick={() => void answer('new')}>
+                {t('survey.createNew')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => void answer('existing')}>
+                {t('survey.addToExisting')}
+              </Button>
+            </div>
           )}
           <SurveyBoard
             scans={scans}

@@ -55,7 +55,7 @@ const DRONE_CATEGORIES = new Set([18, 87, 22]); // Drone, Fighter, Deployable
 const STRUCTURE_CATEGORIES = new Set([65, 23]); // Upwell structure, Starbase
 
 /** Carrier, Dreadnought, Supercarrier, Titan, Force Auxiliary, Lancer Dreadnought. */
-const CAPITAL_GROUPS = new Set([547, 485, 659, 30, 1538, 4594]);
+export const CAPITAL_GROUPS: ReadonlySet<number> = new Set([547, 485, 659, 30, 1538, 4594]);
 /** Exhumer, Mining Barge, Industrial Command Ship, Capital Industrial, Expedition Frigate. */
 const INDUSTRIAL_GROUPS = new Set([543, 463, 941, 883, 1283]);
 /** Industrial, Deep Space Transport, Blockade Runner, Freighter, Jump Freighter. */

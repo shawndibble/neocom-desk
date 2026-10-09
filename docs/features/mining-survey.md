@@ -24,6 +24,8 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - Ctrl+V anywhere in the app with a scan on the clipboard goes to this tab (`survey` is the first paste detector, strict enough that no item list or fit matches). The first scan starts a Survey (a `survey` Share Link); later ones add to it. The paste box has no button: anything pasted into it is processed at once, and text that is not a scan says so. The text is checked before anything is sent, so a wrong paste never starts a survey. A write the server refuses (permission-denied, for example while the rules are not deployed) says "The server refused this scan" instead of the generic save error.
 - Progress is volume mined of everything the scans have shown. Rocks are matched between scans by ore, biggest first, each taking the smallest earlier rock at least as big. A rock that shrank or vanished was mined; a rock never seen before extends the field. The scanner's range is far, so a rock drifting out of range is not handled.
 - Each ore is shown against what the scans first showed of it (plus any that came into range), as a percent left; an ore mined out stays on the list at 0%. A scan whose rocks match any earlier scan is ignored, even with a newer scan in between: mining only removes ore, so the same rocks can't be a later state. ISK left is the scanner's own ISK column summed over the latest scan.
+- A pasted scan is an update when every ore in it was in the latest scan and none has more m³ than before (1% allowed for rounding; `classifyScan`). Belts don't spawn rocks while mined, so an update only shrinks the field. An update always joins the survey in view, for anyone with the link. Any other scan is a different field: on the Survey tab the owner is asked ("Create new survey", primary, or "Add to existing survey"), anyone else gets a new survey at once, and on the public page the scan is held until the visitor logs in (or opens the app), where it starts their own survey.
+- A survey names its owner (`payload.owner`, a Character name). The account owns it when it holds a Character of that name (case-insensitive). It is a hint for the prompt above, not security; a survey made before owners has none and is nobody's.
 - Pace is volume mined over the last three intervals divided by their time; ETA is the volume left over that pace from the latest scan. One scan gives neither.
 - Copy chat message is a split button: the button copies the message, and its caret menu has Copy link for the URL alone. The message is four lines, none wider than 56 visible characters (see the 20261009 decision), bold only. A cleared field is three lines with the total mining time.
 - The chat message's "Left:" line names the three ores with the most ISK left (the scanner's own ISK column), each with its rock count, and groups the rocks of every other ore as "N other". The page's ore list follows the same order; each bar is coloured gray, blue, yellow or orange by ISK per m³ left against the richest ore (`valueTier.ts`; DESIGN.md "Ore value ramp"), with the ISK and percent printed beside it.
@@ -35,17 +37,20 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 
 - Firestore `shares/{id}` (type `survey`, standard 7-day expiry) and create-only `shares/{id}/surveyScans/{auto}` with `text`, server `createdAt` and the survey's `expiresAt`. A TTL policy on `surveyScans.expiresAt` deletes them, because deleting the parent leaves subcollections behind.
 - The tracked Survey id is a device-local setting (`miningSurveyCurrent`).
+- Past surveys are a synced list of `{id, addedAt}` (`sync.surveyHistory`): ids only, added when the pilot creates or opens a Survey in the app, 7 days at most, dropped when the picker finds the link gone. The picker (Survey tab, two or more entries) loads each label (main ore, percent mined, latest scan time) from the share link when it opens. Firebase gains no copy of a survey.
+- A scan pasted on a share page that starts a new survey waits in local storage (`miningSurveyPendingScan`, 30 minutes, taken once) across the login; the Survey tab consumes it.
 - The rules must be deployed by hand: CI ships Pages only.
 
 ## Decisions
 
-`docs/context/decisions/20261008-175716-survey-scans-append-to-a-survey-share-link.md`, `docs/context/decisions/20261008-221334-survey-your-share-reads-the-mining-ledger-for.md`.
+`docs/context/decisions/20261008-175716-survey-scans-append-to-a-survey-share-link.md`, `docs/context/decisions/20261008-221334-survey-your-share-reads-the-mining-ledger-for.md`, `docs/context/decisions/20261009-114933-survey-names-its-owner-and-tracks-same-field.md`.
 
 ## Observed gaps
 
 - Your share is a running total: ore mined in that system before the first scan counts, and it lags the game by a few minutes.
 - A "Field cleared" state needs a scan with every rock at 0 m³. The scanner prints no rows for an empty field, so the finish message may never show; a "Mark cleared" control or clearing at the finish time are the fallbacks.
 - A genuinely older scan that was never pasted before is read as the newest, because a scan's time is when it was pasted.
+- A rock pulled into scanner range by flying closer reads as growth, so a paste after moving can be a "different field" when it isn't.
 - A survey has no "stop sharing": a create-only share can only expire.
 - A junk-paste flood is bounded only by the per-scan size cap and the 7-day expiry.
 

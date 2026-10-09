@@ -1021,8 +1021,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   mined, how fast, and when it will be gone. Stored as a `survey` **Share
   Link**, so it has a short `/share/<id>` URL and the standard 7-day life, from
   creation. Anyone holding the link can add a scan with no sign-in, which is
-  how a Survey carries on after the pilot who started it has left. Shown on the
-  Mining › Survey tab and on the public page of its link.
+  how a Survey carries on after the pilot who started it has left. It names its
+  owner, the starting Character, so the app can tell the owner from someone who
+  opened the link. A pasted scan that only shrinks the latest one (no new ore,
+  none with more m³) is an update of the Survey; any other scan is a different
+  field. Shown on the Mining › Survey tab and on the public page of its link.
 - **Survey Scan**: One copy of the in-game Survey Scanner results: a row per
   rock (ore, units, volume in m³, ISK value, distance), pasted as text. Stored
   as that text, timed by the server's clock. Between two scans, rocks are
@@ -1037,7 +1040,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
   **Shared Appraisal**, a **Shared D-Scan**, a **Fitting**, or a **Survey**. It opens with or without a session,
-  and says when it expires. It never names who shared it. A Fitting's Share
+  and says when it expires. It never names who shared it, except a Survey,
+  which names its owner. A Fitting's Share
   Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
   in, it shows the Fitting at every skill level V; a logged-in visitor goes
   straight to the Fitting in the editor. Distinct from a **Fitting Share
@@ -1059,6 +1063,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   wrecks). One share bar shows each role's count and percent and expands to
   the distance of every ship from the scanner, by role. Counts and distances
   only: D-Scan gives no bearing and never names a pilot.
+- **Danger read**: The answer a D-Scan view opens with: "am I in danger, and
+  what should I watch?" A level (Clear on scan, Watch, Danger, Busy), one
+  sentence of counts, then **Watch these** (ranked groups of identical hulls that
+  can pin, reinforce, hurt or find the pilot, each with its reason) and **Leave
+  or re-check if** (those four things with live counts). It is read for the
+  pilot's own ship, so what can "hurt you" differs for a hauler and a
+  battlecruiser. The Fleet board, worth and changes sit beneath, collapsed, as
+  the **Full scan**. States a condition, never a verdict.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**

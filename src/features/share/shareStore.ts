@@ -9,7 +9,8 @@
  * button only exists inside the app); reading does not, since whoever was
  * sent the link may have no account at all. `firestore.rules` grants a public
  * `get` by id, never `list`, and refuses an expired doc; the doc carries no
- * uid or Character id, because anyone holding the link can read all of it.
+ * uid or Character id, because anyone holding the link can read all of it (a
+ * Survey alone names its owner by Character name, in its payload).
  * Expired docs are deleted by a Firestore TTL policy on `expiresAt`
  * (`firestore.indexes.json`), which can lag a day — so the read checks expiry
  * itself as well.
