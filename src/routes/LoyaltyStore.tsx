@@ -23,7 +23,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CorporationLink } from '@/features/entities/EntityLink';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +50,7 @@ import {
   Spinner,
   StatChip,
   StatChips,
+  Tabs,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -78,6 +79,10 @@ import { nameForType } from '@/features/industry/blueprintCatalog';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
 import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
+import { LpStoreSearch } from '@/features/loyalty/LpStoreSearch';
+import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
+import { MARKET_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
@@ -423,19 +428,60 @@ function LpStoreActions({ corporationName }: { corporationName: string | null })
   );
 }
 
-/** `/market/lp-store` with no corporation chosen yet: just the picker. */
+/**
+ * LP Store is a Market tab, but its own route outranks Market's, so the page
+ * draws Market's tab bar itself. Every other tab is a path under `/market`.
+ */
+function MarketTabBar() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  return (
+    <Tabs
+      label={t('market.title')}
+      value="lp-store"
+      onChange={(id) =>
+        navigate(tabPath(MARKET_TABS, id as (typeof MARKET_TABS.tabs)[number]['id']))
+      }
+      tabs={MARKET_TABS.tabs
+        .filter((tab) => tab.id !== 'history/transactions')
+        .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
+    />
+  );
+}
+
+/** `/market/lp-store` with no corporation chosen yet: the item-first search. */
 function LoyaltyStoreLanding() {
   const { t } = useTranslation();
+  const [params, setParams] = useUrlParams(LANDING_PARAMS);
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3">
       <PageHeader
         title={t('loyaltyStore.title')}
         actions={<LpStoreActions corporationName={null} />}
       />
-      <Panel>
-        <EmptyState title={t('loyaltyStore.landingTitle')} hint={t('loyaltyStore.landingHint')} />
-      </Panel>
+      <MarketTabBar />
+      <LpStoreSearch query={params.q} onQueryChange={(q) => setParams({ q })} />
     </div>
+  );
+}
+
+/** The search box's text, in the URL (ADR 0015) so a search can be linked and Back returns to it. */
+const LANDING_PARAMS = { q: textParam() };
+
+/** The crumb back to the search a store was opened from (a result row carries the query in the location state). */
+function SearchCrumb() {
+  const { t } = useTranslation();
+  const state = useLocation().state as Partial<LpSearchCrumbState> | null;
+  if (state?.from !== 'lp-search') return null;
+  const q = state.q ?? '';
+  return (
+    <Link
+      to={q === '' ? '/market/lp-store' : `/market/lp-store?q=${encodeURIComponent(q)}`}
+      className="inline-flex min-h-11 items-center gap-1 self-start rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0"
+    >
+      <span aria-hidden="true">‹</span>
+      {t('loyaltyStore.search.crumb')}
+    </Link>
   );
 }
 
@@ -826,6 +872,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
+        <SearchCrumb />
         <PageHeader
           title={corpName ?? t('loyaltyStore.title')}
           meta={
@@ -846,6 +893,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           }
           actions={<LpStoreActions corporationName={corpName} />}
         />
+        <MarketTabBar />
 
         <FilterBar
           value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
