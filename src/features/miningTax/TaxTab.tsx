@@ -4,6 +4,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { useSurveyPayeeId } from './surveyPayeePref';
 import { useSearchParams } from 'react-router-dom';
 import {
   findRowForPaymentRef,
@@ -466,6 +467,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // reopen the modal after the pilot closed it. Searches every row, not the
   // filtered ones: a Character or Payee filter must not hide the target.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Read by the Assign dialog when it opens, long after this has hydrated.
+  const hydrateSurveyPayee = useSurveyPayeeId((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateSurveyPayee();
+  }, [hydrateSurveyPayee]);
   const [initialPaymentRef] = useState(() =>
     parsePaymentRefParam(searchParams.get(PAYMENT_REF_PARAM))
   );

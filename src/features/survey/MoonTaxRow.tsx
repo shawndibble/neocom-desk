@@ -6,13 +6,14 @@
  * owed once the ore is in it. Shown on the creator's Survey tab only; the
  * public page has no pilot to tax.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { TextInput, textActionClassName } from '@/components/ui';
+import { Button, TextInput } from '@/components/ui';
+import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
-import { ensurePayee, findPayeeByName, miningTaxPayeeHref, parseTaxPct } from './moonTaxPayee';
+import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
 import { useSurveyTax } from './surveyTaxPref';
 
 export function MoonTaxRow({ characterId }: { characterId: number }) {
@@ -27,23 +28,33 @@ export function MoonTaxRow({ characterId }: { characterId: number }) {
   }, [hydrate]);
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const inFlight = useRef(false);
 
   const pct = parseTaxPct(saved.pct);
   const ready = saved.name.trim() !== '' && pct !== null;
 
   function changeName(name: string) {
     // Picking a known Payee brings its rate along; typing a new name keeps the rate.
+    // Only when the name has just become a known Payee, so a rate typed after is kept.
     const known = findPayeeByName(payees, name);
-    void setSaved({ name, pct: known ? String(known.defaultTaxPct) : saved.pct });
+    const fill = known !== undefined && known !== findPayeeByName(payees, saved.name);
+    void setSaved({ name, pct: fill ? String(known.defaultTaxPct) : saved.pct });
   }
 
   async function openTax() {
-    if (!ready || busy) return;
+    if (!ready || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
+    setFailed(false);
     try {
       const payee = await ensurePayee(characterId, saved.name, pct);
-      navigate(miningTaxPayeeHref(payee.id));
+      await useSurveyPayeeId.getState().setValue(payee.id);
+      navigate(MINING_TAX_HREF);
+    } catch {
+      setFailed(true);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
@@ -84,14 +95,14 @@ export function MoonTaxRow({ characterId }: { characterId: number }) {
         />
         <span className="text-text-dim">%</span>
       </span>
-      <button
-        type="button"
-        className={textActionClassName()}
-        disabled={!ready || busy}
-        onClick={() => void openTax()}
-      >
+      <Button size="sm" disabled={!ready} loading={busy} onClick={() => void openTax()}>
         {t('survey.moonTax.open')}
-      </button>
+      </Button>
+      {failed && (
+        <span role="alert" className="text-xs text-danger">
+          {t('survey.moonTax.failed')}
+        </span>
+      )}
     </div>
   );
 }

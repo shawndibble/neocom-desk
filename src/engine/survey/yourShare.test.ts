@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { utcDate, yourShare, type LedgerLine, type OreType } from './yourShare';
+import { miningSystems, utcDate, yourShare, type LedgerLine, type OreType } from './yourShare';
 
 const TYPES = new Map<number, OreType>([
   [1, { name: 'Veldspar', volume: 0.1 }],
@@ -83,5 +83,38 @@ describe('yourShare', () => {
 
   it('is zero with an empty ledger', () => {
     expect(yourShare({ ...base, rows: [] })).toEqual({ minedM3: 0, percentOfMined: 0 });
+  });
+});
+
+describe('miningSystems', () => {
+  const row = (date: string, solar_system_id: number, quantity = 10): LedgerLine => ({
+    date,
+    solar_system_id,
+    quantity,
+    type_id: 1,
+  });
+
+  it('lists the systems mined in on the survey days, the latest day first', () => {
+    const rows = [
+      row('2026-10-07', 3),
+      row('2026-10-08', 1),
+      row('2026-10-09', 2),
+      row('2026-10-01', 9),
+    ];
+    expect(miningSystems(rows, '2026-10-07', '2026-10-09')).toEqual([2, 1, 3]);
+  });
+
+  it('puts the system with more ore first within a day, and lists each system once', () => {
+    const rows = [
+      row('2026-10-09', 1, 5),
+      row('2026-10-09', 2, 50),
+      row('2026-10-09', 1, 5),
+      row('2026-10-08', 2),
+    ];
+    expect(miningSystems(rows, '2026-10-08', '2026-10-09')).toEqual([2, 1]);
+  });
+
+  it('is empty when nothing was mined on those days', () => {
+    expect(miningSystems([row('2026-09-01', 1)], '2026-10-08', '2026-10-09')).toEqual([]);
   });
 });

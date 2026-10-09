@@ -18,8 +18,10 @@ export function findPayeeByName(
 
 /** A tax percent as typed, or null when it isn't a number from 0 to 100. */
 export function parseTaxPct(text: string): number | null {
-  const value = Number(text.trim().replace(',', '.'));
-  return text.trim() !== '' && Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
+  const trimmed = text.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return value <= 100 ? value : null;
 }
 
 export async function ensurePayee(
@@ -38,6 +40,5 @@ export async function ensurePayee(
   });
 }
 
-export function miningTaxPayeeHref(payeeId: string): string {
-  return `/mining/tax?${new URLSearchParams({ 'tax.payee': payeeId }).toString()}`;
-}
+/** The Tax tab, unfiltered: a filter would hide every row until the Payee has an Assignment. */
+export const MINING_TAX_HREF = '/mining/tax';

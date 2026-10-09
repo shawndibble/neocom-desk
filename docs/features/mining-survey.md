@@ -50,4 +50,6 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 
 **Value.** Rocks are valued at market, not at the scanner's ISK column (`priceScans`, `useOrePrices`): units times the highest buy price of the ore's Compressed form at the pilot's default Trade Hub (Jita for a visitor with no session). An ore with no price has no value and reads gray.
 
-**Moon tax.** On the Survey tab, a Survey with a moon ore shows a Payee and rate row (`MoonTaxRow`); "Open in Mining Tax" finds or creates the Payee and opens the Tax tab filtered to it. Not on the public page.
+**Moon tax.** On the Survey tab, a Survey with a moon ore shows a Payee and rate row (`MoonTaxRow`); "Open in Mining Tax" finds or creates the Payee and opens the Tax tab, whose Assign dialog then preselects that Payee. Not on the public page.
+
+**Your share refresh.** The ledger is re-read when a newer scan arrives and every 60 seconds (ESI's own cache decides what is new). The system editor offers the systems the ledger shows you mined in on the survey's days, latest first, above the typed name.

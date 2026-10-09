@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { ensurePayee, findPayeeByName, miningTaxPayeeHref, parseTaxPct } from './moonTaxPayee';
+import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
 
 beforeEach(async () => {
   await db.payees.clear();
@@ -15,6 +15,8 @@ describe('parseTaxPct', () => {
     expect(parseTaxPct('abc')).toBeNull();
     expect(parseTaxPct('101')).toBeNull();
     expect(parseTaxPct('-1')).toBeNull();
+    expect(parseTaxPct('1e1')).toBeNull();
+    expect(parseTaxPct('0x10')).toBeNull();
   });
 });
 
@@ -48,7 +50,7 @@ describe('helpers', () => {
     expect(findPayeeByName(payees, 'Other')).toBeUndefined();
   });
 
-  it("links to the Tax tab's Payee filter", () => {
-    expect(miningTaxPayeeHref('abc')).toBe('/mining/tax?tax.payee=abc');
+  it('links to the Tax tab', () => {
+    expect(MINING_TAX_HREF).toBe('/mining/tax');
   });
 });

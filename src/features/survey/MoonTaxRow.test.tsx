@@ -38,7 +38,7 @@ afterEach(cleanup);
 
 describe('MoonTaxRow', () => {
   it('fills in a known Payee’s rate from its name and offers the Payees to complete', async () => {
-    const payee = await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
+    await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
     const { container } = renderRow();
     await waitFor(() => expect(container.querySelectorAll('datalist option')).toHaveLength(1));
     fireEvent.change(screen.getByLabelText('Who gets the tax'), { target: { value: 'moon corp' } });
@@ -46,9 +46,7 @@ describe('MoonTaxRow', () => {
       expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8')
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open in Mining Tax' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('where').textContent).toBe(`/mining/tax?tax.payee=${payee.id}`)
-    );
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
   });
 
   it('stays disabled until there is a name and a rate from 0 to 100, then creates the Payee', async () => {

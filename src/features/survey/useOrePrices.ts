@@ -64,7 +64,7 @@ export function useOrePrices(oreNames: readonly string[]): OrePrices {
         }
         if (!cancelled) setLoaded({ key, hubId: hub.id, prices, compressed });
       } catch {
-        if (!cancelled) setLoaded({ key, hubId: hub.id, prices: new Map(), compressed: true });
+        // Keep what was shown: a transient failure shouldn't blank the ISK figures.
       }
     })();
     return () => {
@@ -73,7 +73,11 @@ export function useOrePrices(oreNames: readonly string[]): OrePrices {
   }, [hydrated, key, hub]);
 
   return useMemo(() => {
-    const current = loaded?.key === key && loaded.hubId === hub.id ? loaded : null;
-    return { prices: current?.prices ?? new Map(), hub, compressed: current?.compressed ?? true };
-  }, [loaded, key, hub]);
+    // The last result stays up while a new ore or hub is fetched, so the ISK figures don't flicker.
+    return {
+      prices: loaded?.prices ?? new Map(),
+      hub: (loaded && getTradeHub(loaded.hubId as TradeHub['id'])) || hub,
+      compressed: loaded?.compressed ?? true,
+    };
+  }, [loaded, hub]);
 }
