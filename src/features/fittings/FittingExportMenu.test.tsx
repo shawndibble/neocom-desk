@@ -14,7 +14,7 @@ import { exportFitting } from './fittingExportText';
 
 vi.mock('@/features/share/shareStore', () => ({
   existingShareLink: vi.fn(() => null),
-  createShareLink: vi.fn(async () => 'https://neocomdesk.com/share/abc123XYZ'),
+  createShareLink: vi.fn(async () => 'https://neocomdesk.com/s/k7m2xq'),
 }));
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/syncStatus')>()),
@@ -120,7 +120,7 @@ describe('FittingExportMenu', () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
     const copied = setup();
     await choose('Copy Share Link');
-    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/share/abc123XYZ']));
+    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/s/k7m2xq']));
     const call = vi.mocked(createShareLink).mock.calls[0][0];
     expect(call).toMatchObject({ type: 'fitting', characterId: 7 });
     expect(call.payload).toEqual({ v: 1, code: call.reuseKey });
@@ -133,10 +133,10 @@ describe('FittingExportMenu', () => {
 
   it('copies a link already made for this fit without storing another', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
-    vi.mocked(existingShareLink).mockReturnValue('https://neocomdesk.com/share/made1Earl');
+    vi.mocked(existingShareLink).mockReturnValue('https://neocomdesk.com/s/made2e');
     const copied = setup();
     await choose('Copy Share Link');
-    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/share/made1Earl']));
+    await waitFor(() => expect(copied).toEqual(['https://neocomdesk.com/s/made2e']));
     expect(createShareLink).not.toHaveBeenCalled();
     vi.mocked(existingShareLink).mockReturnValue(null);
   });

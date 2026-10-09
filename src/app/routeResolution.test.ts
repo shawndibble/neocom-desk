@@ -21,7 +21,15 @@ import {
 } from '@/features/notifications/notificationOptions';
 
 // The routes App.tsx mounts outside FEATURE_ROUTES/RequireCharacter.
-const STATIC_ROUTES = ['/', '/login', '/callback', '/styleguide', '/s/:shareId', '/share/:shareId', '/error'];
+const STATIC_ROUTES = [
+  '/',
+  '/login',
+  '/callback',
+  '/styleguide',
+  '/s/:shareId',
+  '/share/:shareId',
+  '/error',
+];
 
 const FEATURE_PATTERNS = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).map(routePatternFor);
 
