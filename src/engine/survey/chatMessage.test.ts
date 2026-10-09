@@ -52,11 +52,12 @@ describe('surveyChatMessage', () => {
       scan(15, ['Glistening Sylvite', 40], ['Glistening Sylvite', 20], ['Glistening Bitumens', 10]),
     ])!;
     const lines = surveyChatMessage(s, URL, labels).split('\n');
-    expect(lines).toHaveLength(4);
-    expect(lines[0]).toBe('93% · ETA: <b>16:56 EVE</b> (~1m)');
-    expect(lines[1]).toBe('█'.repeat(44) + '░'.repeat(4));
-    expect(lines[2]).toBe('Left: 2 Sylvite · 1 Bitumens');
-    expect(lines[3]).toBe(URL);
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toBe('╔═[ 93% · ETA: <b>16:56 EVE</b> (~1m) ]══');
+    expect(lines[1]).toBe('║ ' + '█'.repeat(44) + '░'.repeat(4));
+    expect(lines[2]).toBe('║ Left: 2 Sylvite · 1 Bitumens');
+    expect(lines[3]).toBe('╚' + '═'.repeat(11));
+    expect(lines[4]).toBe(URL);
   });
 
   it('shows hours and minutes when long', () => {
@@ -67,13 +68,15 @@ describe('surveyChatMessage', () => {
 
   it('with one scan says it is waiting for a second', () => {
     const s = summarizeSurvey([scan(0, ['A', 10_000])])!;
-    expect(surveyChatMessage(s, URL, labels).split('\n')[0]).toBe('0% · waiting for a second scan');
+    expect(surveyChatMessage(s, URL, labels).split('\n')[0]).toBe(
+      '╔═[ 0% · waiting for a second scan ]══'
+    );
   });
 
   it('draws the bar flush left, with no end caps, as the widest line', () => {
     const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 750])])!;
     const lines = surveyChatMessage(s, URL, labels).split('\n');
-    expect(lines[1]).toBe('█'.repeat(12) + '░'.repeat(36));
+    expect(lines[1]).toBe('║ ' + '█'.repeat(12) + '░'.repeat(36));
     for (const i of [0, 2]) {
       expect(lines[i].replace(/<\/?b>/g, '').length).toBeLessThan(lines[1].length);
     }
@@ -83,7 +86,7 @@ describe('surveyChatMessage', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1], ['E', 1]),
     ])!;
-    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe('Left: 1 A · 1 B · 4 other');
+    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe('║ Left: 1 A · 1 B · 4 other');
   });
 
   it('calls out the two ores richest per m³, with how many rocks each has', () => {
@@ -102,14 +105,16 @@ describe('surveyChatMessage', () => {
       },
     ])!;
     expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
-      'Left: 5 Scordite · 4 Kernite · 35 other'
+      '║ Left: 5 Scordite · 4 Kernite · 35 other'
     );
   });
 
-  it('a cleared field is three lines with the full bar and elapsed time', () => {
+  it('a cleared field is four lines with the full bar and elapsed time', () => {
     const s = summarizeSurvey([scan(0, ['A', 1000]), scan(176)])!;
     expect(surveyChatMessage(s, URL, labels)).toBe(
-      ['Field cleared in 2h 56m', '█'.repeat(48), URL].join('\n')
+      ['╔═[ Field cleared in 2h 56m ]══', '║ ' + '█'.repeat(48), '╚' + '═'.repeat(11), URL].join(
+        '\n'
+      )
     );
   });
 });
@@ -124,7 +129,7 @@ describe('chat message width', () => {
     });
   });
 
-  it('stays at four lines and fits the ore line to the width, listing the rest as a count', () => {
+  it('stays at five lines and fits the ore line to the width, listing the rest as a count', () => {
     const s = summarizeSurvey([
       scan(
         0,
@@ -148,9 +153,9 @@ describe('chat message width', () => {
       ),
     ])!;
     const lines = surveyChatMessage(s, URL, labels).split('\n');
-    expect(lines).toHaveLength(4);
-    for (const line of lines.slice(0, 3)) expect(visible(line)).toBeLessThanOrEqual(MAX_LINE_WIDTH);
-    expect(lines[2]).toMatch(/^Left: .* · \d+ other$/);
+    expect(lines).toHaveLength(5);
+    for (const line of lines.slice(0, 4)) expect(visible(line)).toBeLessThanOrEqual(MAX_LINE_WIDTH);
+    expect(lines[2]).toMatch(/^║ Left: .* · \d+ other$/);
   });
 
   it('never drops the biggest ore, even when its name alone is long', () => {

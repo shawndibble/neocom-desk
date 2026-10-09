@@ -25,6 +25,15 @@ export interface SurveyMessageLabels {
 /** Longer than the usual text line, so the bar is the message's widest line; a long ore name can still pass it, up to MAX_LINE_WIDTH. */
 const BAR_CELLS = 48;
 /**
+ * The frame: a top rail with the headline set into it, a left rail down the bar
+ * and the ore line, and a bottom rail. The right side stays open because the
+ * chat window's proportional font would never line a right edge up. Both rails
+ * stay short, so the bar remains the one long line.
+ */
+const RAIL_LEFT = '║ ';
+const BOTTOM_RAIL = '╚' + '═'.repeat(11);
+const topRail = (headline: string): string => `╔═[ ${headline} ]══`;
+/**
  * Widest a line of the message may run, in visible characters (`<b>` tags
  * don't show). RockRadar's own message is the benchmark: its widest lines are
  * about 52 characters, and they never wrap. Most of those are box-drawing
@@ -149,7 +158,7 @@ function oreLine(
   labels: SurveyMessageLabels
 ): string {
   const rocksIn = (list: SurveySummary['ores']): number => list.reduce((n, o) => n + o.rocks, 0);
-  const prefixWidth = fill(labels.left, { ores: '' }).length;
+  const prefixWidth = RAIL_LEFT.length + fill(labels.left, { ores: '' }).length;
   const listed: string[] = [];
   let named = 0;
   for (const ore of ores.slice(0, MAX_NAMED_ORES)) {
@@ -173,8 +182,9 @@ export function surveyChatMessage(
 ): string {
   if (summary.finished) {
     return [
-      fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) }),
-      bar(100, true),
+      topRail(fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) })),
+      RAIL_LEFT + bar(100, true),
+      BOTTOM_RAIL,
       url,
     ].join('\n');
   }
@@ -192,5 +202,11 @@ export function surveyChatMessage(
   const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
   const left = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
 
-  return [timing, bar(summary.percent, false), left, url].join('\n');
+  return [
+    topRail(timing),
+    RAIL_LEFT + bar(summary.percent, false),
+    RAIL_LEFT + left,
+    BOTTOM_RAIL,
+    url,
+  ].join('\n');
 }

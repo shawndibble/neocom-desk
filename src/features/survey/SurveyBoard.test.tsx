@@ -70,7 +70,7 @@ describe('SurveyBoard', () => {
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
-  it('copies a four-line chat message ending in the link, each line within the width', async () => {
+  it('copies a five-line chat message ending in the link, each line within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
@@ -80,12 +80,13 @@ describe('SurveyBoard', () => {
     await waitFor(() => expect(written).toHaveLength(1));
 
     const lines = written[0].split('\n');
-    expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^13% · ETA: <b>\d\d:\d\d EVE<\/b> \(~/);
-    expect(lines[1]).toBe('█'.repeat(6) + '░'.repeat(42));
-    expect(lines[2]).toBe('Left: 5 Clear Icicle');
-    expect(lines[3]).toBe(URL);
-    for (const line of lines.slice(0, 3)) {
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toMatch(/^╔═\[ 13% · ETA: <b>\d\d:\d\d EVE<\/b> \(~/);
+    expect(lines[1]).toBe('║ ' + '█'.repeat(6) + '░'.repeat(42));
+    expect(lines[2]).toBe('║ Left: 5 Clear Icicle');
+    expect(lines[3]).toBe('╚' + '═'.repeat(11));
+    expect(lines[4]).toBe(URL);
+    for (const line of lines.slice(0, 4)) {
       expect(line.replace(/<\/?b>/g, '').length).toBeLessThanOrEqual(MAX_LINE_WIDTH);
     }
     await screen.findByText('Copied');
