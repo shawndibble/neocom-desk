@@ -5,7 +5,6 @@ import '@/i18n';
 import { db } from '@/db';
 import { createPayee } from '@/features/miningTax/payees';
 import { MoonTaxReadout, MoonTaxRow } from './MoonTaxRow';
-import { useSurveyTax } from './surveyTaxPref';
 
 const { setSurveyTax } = vi.hoisted(() => ({ setSurveyTax: vi.fn() }));
 vi.mock('./surveyStore', () => ({ setSurveyTax }));
@@ -48,7 +47,6 @@ function type(label: string, value: string) {
 
 beforeEach(async () => {
   await db.payees.clear();
-  await useSurveyTax.getState().setValue({ name: '', pct: '' });
   setSurveyTax.mockReset();
   setSurveyTax.mockResolvedValue(undefined);
 });
@@ -56,8 +54,7 @@ afterEach(cleanup);
 
 describe('MoonTaxRow', () => {
   it('reads as text until the name or rate is clicked, then edits both together', async () => {
-    await useSurveyTax.getState().setValue({ name: 'Moon Corp', pct: '8' });
-    renderRow();
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.getByRole('button', { name: /who gets the tax/i }).textContent).toBe('Moon Corp');
     edit(/tax rate/i);
@@ -71,8 +68,7 @@ describe('MoonTaxRow', () => {
   });
 
   it('keeps editing while focus moves between the two fields, and stops when it leaves them', async () => {
-    await useSurveyTax.getState().setValue({ name: 'Moon Corp', pct: '8' });
-    renderRow();
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
     edit(/who gets the tax/i);
     const name = screen.getByLabelText('Who gets the tax');
     const rate = screen.getByLabelText('Tax rate, percent');
@@ -137,10 +133,22 @@ describe('MoonTaxRow', () => {
   });
 
   it('does not store what the survey already has', async () => {
-    await useSurveyTax.getState().setValue({ name: 'Moon Corp', pct: '8' });
     renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
     await screen.findByRole('button', { name: /tax rate/i });
     expect(setSurveyTax).not.toHaveBeenCalled();
+  });
+});
+
+describe('MoonTaxRow blank start', () => {
+  it('starts blank on a survey with no stored tax, whatever was set on another', async () => {
+    const first = renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
+    expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('8%');
+    first.unmount();
+    renderRow(SURVEY);
+    expect(screen.getByRole('button', { name: /tax rate/i }).textContent).not.toContain('8');
+    expect(screen.getByRole('button', { name: /who gets the tax/i }).textContent).not.toContain(
+      'Moon Corp'
+    );
   });
 });
 
