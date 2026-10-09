@@ -22,6 +22,8 @@ export interface SurveyScan {
   /** When the scan was taken, epoch ms. */
   at: number;
   rocks: SurveyRock[];
+  /** The Character name that submitted the scan; absent when anonymous or stored before names. */
+  by?: string;
 }
 
 export interface SurveyInterval {
@@ -53,6 +55,7 @@ export interface SurveyPoint {
   total: number;
   /** Volume left per ore, m³. */
   byOre: Record<string, number>;
+  by?: string;
 }
 
 export interface SurveySummary {
@@ -173,7 +176,12 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
   const points: SurveyPoint[] = scans.map((scan) => {
     const byOre: Record<string, number> = {};
     for (const rock of scan.rocks) byOre[rock.ore] = (byOre[rock.ore] ?? 0) + rock.volume;
-    return { at: scan.at, total: total(scan), byOre };
+    return {
+      at: scan.at,
+      total: total(scan),
+      byOre,
+      ...(scan.by === undefined ? {} : { by: scan.by }),
+    };
   });
   const recent = intervals.slice(-PACE_INTERVALS);
   const minedRecent = recent.reduce((sum, i) => sum + i.mined, 0);

@@ -155,6 +155,11 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
             <span>{t('survey.chartTotal')}</span>
             <span>{formatCompactNumber(row.total)} m³</span>
           </div>
+          <div className="border-t border-line pt-1">
+            {t('survey.scannedBy', {
+              name: summary.points.find((p) => p.at === row.at)?.by ?? t('survey.anonymous'),
+            })}
+          </div>
         </div>
       </ChartTooltipShell>
     );

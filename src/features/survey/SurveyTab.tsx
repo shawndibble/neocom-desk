@@ -18,10 +18,11 @@ import { Button, EmptyState, PageHeader, textActionClassName } from '@/component
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { classifyScan, lastSeenField } from '@/engine/survey/scanUpdate';
+import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
+import { ExpandedCheck } from './ExpandedCheck';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyBoard } from './SurveyBoard';
@@ -29,6 +30,8 @@ import { SurveyPicker } from './SurveyPicker';
 import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
 import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
+import { hasSubmittedScan, noteSubmittedScan } from './submitted';
+import { submitterName } from './submitterName';
 import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
@@ -75,6 +78,14 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
   // A different field the survey's owner pasted, waiting for their choice. It
   // belongs to the survey that was in view, so switching survey drops it.
   const [asking, setAsking] = useState<{ text: string; forId: string | null } | null>(null);
+  // A first scan that lacks an ore the survey shows, waiting for the pilot to
+  // confirm every section was expanded.
+  const [checking, setChecking] = useState<{
+    text: string;
+    ores: string[];
+    forId: string | null;
+    choice?: ScanTarget;
+  } | null>(null);
 
   const startWith = useCallback(
     async (text: string): Promise<AddScanResult> => {
@@ -83,7 +94,8 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
       if (ownerName === undefined) return 'failed';
       const started = await startSurvey({ characterId, ownerName });
       // Scan first, so the new survey's first load already has it.
-      await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt });
+      await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
+      noteSubmittedScan();
       await setCurrentId(started.id);
       return 'ok';
     },
@@ -91,7 +103,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
   );
 
   const add = useCallback(
-    async (text: string, choice?: ScanTarget): Promise<AddScanResult> => {
+    async (text: string, choice?: ScanTarget, confirmed = false): Promise<AddScanResult> => {
       // Before anything is sent, so a wrong paste never starts a survey.
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
@@ -115,7 +127,23 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
             setAsking({ text, forId: currentId });
             return 'ok';
           }
-          await addSurveyScan({ id: currentId!, text, expiresAt: found.expiresAt });
+          if (!confirmed && choice === undefined && !hasSubmittedScan()) {
+            const ores = missingOres(
+              lastSeenField(found.scans.map((scan) => scan.rocks)),
+              parseSurveyScan(text) ?? []
+            );
+            if (ores.length > 0) {
+              setChecking({ text, ores, forId: currentId, choice });
+              return 'ok';
+            }
+          }
+          await addSurveyScan({
+            id: currentId!,
+            text,
+            expiresAt: found.expiresAt,
+            by: await submitterName(characterId),
+          });
+          noteSubmittedScan();
           await refresh();
           return 'ok';
         }
@@ -126,7 +154,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
         return scanFailure(error);
       }
     },
-    [currentId, refresh, startWith]
+    [characterId, currentId, refresh, startWith]
   );
 
   const { trackedAdd, busy, error } = useScanFeedback(add);
@@ -135,6 +163,12 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
     const text = asking?.text;
     setAsking(null);
     if (text !== undefined) await trackedAdd(text, choice);
+  }
+
+  function confirmExpanded() {
+    const pending = checking;
+    setChecking(null);
+    if (pending !== null) void trackedAdd(pending.text, pending.choice, true);
   }
 
   const addRef = useRef(trackedAdd);
@@ -204,6 +238,13 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
                 {t('survey.addToExisting')}
               </Button>
             </div>
+          )}
+          {checking !== null && checking.forId === currentId && (
+            <ExpandedCheck
+              ores={checking.ores}
+              onConfirm={confirmExpanded}
+              onCancel={() => setChecking(null)}
+            />
           )}
           <ScanFeedback busy={busy} error={error} />
           <SurveyBoard

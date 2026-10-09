@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addSurveyScan, loadSurvey, MAX_SCAN_TEXT, setSurveyTax, startSurvey } from './surveyStore';
+import {
+  addSurveyScan,
+  loadSurvey,
+  MAX_SCAN_BY,
+  MAX_SCAN_TEXT,
+  setSurveyTax,
+  startSurvey,
+} from './surveyStore';
 
 const { addDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() => {
   class FakeTimestamp {
@@ -70,6 +77,24 @@ describe('addSurveyScan', () => {
     );
   });
 
+  it('stores who submitted the scan when a name is given, trimmed to the cap', async () => {
+    await addSurveyScan({
+      id: 'abc123XYZ',
+      text: ROW(10, 5),
+      expiresAt: EXPIRES,
+      by: `  ${'N'.repeat(MAX_SCAN_BY + 20)}  `,
+    });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyScans' },
+      expect.objectContaining({ by: 'N'.repeat(MAX_SCAN_BY) })
+    );
+  });
+
+  it('leaves the name off for an anonymous scan', async () => {
+    await addSurveyScan({ id: 'abc123XYZ', text: ROW(10, 5), expiresAt: EXPIRES, by: '  ' });
+    expect(addDoc.mock.calls[0][1]).not.toHaveProperty('by');
+  });
+
   it('refuses text that is not a survey scan without writing', async () => {
     await expect(
       addSurveyScan({ id: 'abc123XYZ', text: 'Tritanium\t5', expiresAt: EXPIRES })
@@ -111,6 +136,23 @@ describe('loadSurvey', () => {
         { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
       ],
     });
+  });
+
+  it('returns who submitted each scan, and none for an anonymous or older one', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockResolvedValue({
+      docs: [
+        {
+          data: () => ({ text: ROW(10, 5), createdAt: FakeTimestamp.fromMillis(1000), by: 'Ann' }),
+        },
+        { data: () => ({ text: ROW(10, 4), createdAt: FakeTimestamp.fromMillis(2000), by: 7 }) },
+      ],
+    });
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans.map((s) => s.by)).toEqual(['Ann', undefined]);
   });
 
   it('returns the owner the survey was started under', async () => {

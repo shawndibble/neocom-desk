@@ -50,3 +50,17 @@ export function lastSeenField(scans: readonly (readonly SurveyRock[])[]): Survey
   }
   return [...seen].map(([ore, volume]) => ({ ore, volume }));
 }
+
+/**
+ * Ores the field has shown that `pasted` has no rock for. A pilot who left an
+ * ore group collapsed in the scanner window pastes a scan without it; the
+ * board would read that ore as mined out. Order follows the field.
+ */
+export function missingOres(
+  field: readonly SurveyRock[] | null,
+  pasted: readonly SurveyRock[]
+): string[] {
+  if (field === null) return [];
+  const present = new Set(pasted.map((rock) => rock.ore));
+  return [...new Set(field.map((rock) => rock.ore))].filter((ore) => !present.has(ore));
+}
