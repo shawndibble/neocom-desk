@@ -3987,7 +3987,7 @@
       "done": "done <b>{time} EVE</b> (~{left})",
       "waiting": "waiting for a second scan",
       "left": "Left: {ores}",
-      "more": "+{count} more",
+      "more": "{count} other",
       "cleared": "Field cleared in {duration}"
     }
   },
