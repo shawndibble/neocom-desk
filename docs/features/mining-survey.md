@@ -47,3 +47,7 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - A genuinely older scan that was never pasted before is read as the newest, because a scan's time is when it was pasted.
 - A survey has no "stop sharing": a create-only share can only expire.
 - A junk-paste flood is bounded only by the per-scan size cap and the 7-day expiry.
+
+**Value.** Rocks are valued at market, not at the scanner's ISK column (`priceScans`, `useOrePrices`): units times the highest buy price of the ore's Compressed form at the pilot's default Trade Hub (Jita for a visitor with no session). An ore with no price has no value and reads gray.
+
+**Moon tax.** On the Survey tab, a Survey with a moon ore shows a Payee and rate row (`MoonTaxRow`); "Open in Mining Tax" finds or creates the Payee and opens the Tax tab filtered to it. Not on the public page.

@@ -3976,6 +3976,13 @@
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
     "oreRowIsk": "{{rocks}} · {{volume}} m³ · <isk/> ISK · {{percent}}% left",
     "valueRamp": "Bar colour is ISK per m³ left · {{hub}} buy, {{form}}",
+    "moonTax": {
+      "label": "Moon tax",
+      "payee": "Who gets the tax",
+      "payeePlaceholder": "Corporation or pilot",
+      "rate": "Tax rate, percent",
+      "open": "Open in Mining Tax"
+    },
     "formCompressed": "compressed",
     "formRaw": "raw",
     "tier": {
