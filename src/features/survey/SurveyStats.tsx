@@ -33,15 +33,22 @@ function Tile({
   );
 }
 
+/** "11.0M": one fixed decimal, like the ISK tile beside it, so a big field's volume isn't cropped. */
+function shortVolume(value: number, locale: string): string {
+  return value.toLocaleString(locale, {
+    notation: 'compact',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const { t, i18n } = useTranslation();
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
-      <Tile label={t('survey.statLeft')}>
-        {t('survey.unitVolume', { value: n(summary.leftVolume) })}
-      </Tile>
+      <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
       <Tile label={t('survey.statPace')}>
         {summary.pace === null ? '–' : t('survey.unitPace', { value: n(summary.pace, 1) })}
       </Tile>

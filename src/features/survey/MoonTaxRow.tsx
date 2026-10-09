@@ -8,6 +8,9 @@
  * fills in that Payee's rate), and the link opens the Tax tab, where the ledger
  * shows what is owed once the ore is in it.
  *
+ * The fields start blank for each survey (only what the survey itself stored
+ * comes back), so a tax is shown only when the pilot sets it.
+ *
  * Shown on the creator's Survey tab only; the public page shows the same line
  * read-only (`MoonTaxReadout`). Once the pilot is done editing, a complete
  * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
@@ -23,7 +26,6 @@ import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
 import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
-import { useSurveyTax } from './surveyTaxPref';
 
 // Accent text is clickable and the faint pencil after it says "edit in place" (DESIGN.md §6c);
 // `touch:min-h-11` keeps the phone target at 44px.
@@ -45,12 +47,12 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
-  const saved = useSurveyTax((s) => s.value);
-  const setSaved = useSurveyTax((s) => s.setValue);
-  const hydrate = useSurveyTax((s) => s.hydrate);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+  // Starts blank unless this survey already stored a tax: nothing carries over
+  // from the last survey, so the pilot sets it for each field they want it on.
+  const [saved, setSaved] = useState(() => ({
+    name: survey?.published?.name ?? '',
+    pct: survey?.published ? String(survey.published.pct) : '',
+  }));
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -83,7 +85,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
     // Only when the name has just become a known Payee, so a rate typed after is kept.
     const known = findPayeeByName(payees, next);
     const fill = known !== undefined && known !== findPayeeByName(payees, saved.name);
-    void setSaved({ name: next, pct: fill ? String(known.defaultTaxPct) : saved.pct });
+    setSaved({ name: next, pct: fill ? String(known.defaultTaxPct) : saved.pct });
   }
 
   async function openTax() {
@@ -133,7 +135,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
                 value={saved.pct}
                 placeholder="0"
                 aria-invalid={saved.pct !== '' && pct === null}
-                onChange={(event) => void setSaved({ ...saved, pct: event.target.value })}
+                onChange={(event) => setSaved({ ...saved, pct: event.target.value })}
                 {...stopEditing}
               />
               <span className="text-text-dim">%</span>
