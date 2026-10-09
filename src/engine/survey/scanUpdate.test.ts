@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SurveyRock } from './series';
-import { classifyScan, SCAN_UPDATE_TOLERANCE } from './scanUpdate';
+import { classifyScan, lastSeenField, SCAN_UPDATE_TOLERANCE } from './scanUpdate';
 
 const rocks = (...rows: [string, number][]): SurveyRock[] =>
   rows.map(([ore, volume]) => ({ ore, volume }));
@@ -48,5 +48,26 @@ describe('classifyScan', () => {
 
   it('has nothing to be an update of before the first scan', () => {
     expect(classifyScan(null, rocks(['Veldspar', 100]))).toBe('different');
+  });
+});
+
+describe('lastSeenField', () => {
+  it('is null before the first scan', () => {
+    expect(lastSeenField([])).toBeNull();
+  });
+
+  it('keeps an ore that dropped out of later scans at its last seen m3', () => {
+    const field = lastSeenField([
+      rocks(['Veldspar', 1000], ['Sylvite', 500], ['Sylvite', 100]),
+      rocks(['Veldspar', 900]),
+    ]);
+    expect(classifyScan(field, rocks(['Sylvite', 550]))).toBe('update');
+    expect(classifyScan(field, rocks(['Sylvite', 700]))).toBe('different');
+    expect(classifyScan(field, rocks(['Veldspar', 950]))).toBe('different');
+  });
+
+  it('uses the newest scan that showed an ore, not its largest reading', () => {
+    const field = lastSeenField([rocks(['Veldspar', 1000]), rocks(['Veldspar', 400])]);
+    expect(classifyScan(field, rocks(['Veldspar', 800]))).toBe('different');
   });
 });

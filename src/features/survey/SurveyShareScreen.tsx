@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { classifyScan } from '@/engine/survey/scanUpdate';
+import { classifyScan, lastSeenField } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
@@ -45,7 +45,10 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
         const latest = found.scans[found.scans.length - 1];
         if (
           latest !== undefined &&
-          classifyScan(latest.rocks, parseSurveyScan(text) ?? []) === 'different'
+          classifyScan(
+            lastSeenField(found.scans.map((scan) => scan.rocks)),
+            parseSurveyScan(text) ?? []
+          ) === 'different'
         ) {
           stashPendingScan(text);
           setDiverted(true);
