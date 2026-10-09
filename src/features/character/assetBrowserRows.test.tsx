@@ -118,6 +118,19 @@ describe('ItemRow name', () => {
     );
   });
 
+  it('caps the name cell at md+ and truncates a long name, leaving phone layout alone', () => {
+    const long = 'A very long item name that cannot possibly fit inside the capped name cell';
+    renderItemRow({ name: long });
+    const text = screen.getByText(long);
+    expect(text).toHaveClass('truncate');
+    const cell = text.parentElement;
+    expect(cell).toHaveClass('md:flex-[0_1_24rem]');
+    expect(cell).not.toBeNull();
+    expect(cell).toHaveClass('min-w-0');
+    // The cap is md-only: no unprefixed width/flex class on the cell.
+    expect(cell).not.toHaveClass('flex-1');
+  });
+
   it('keeps the name plain text without a type id', () => {
     renderItemRow();
     expect(screen.queryByRole('link', { name: 'Rifter Blueprint' })).toBeNull();
