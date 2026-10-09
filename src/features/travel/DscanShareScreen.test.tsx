@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { buildDscanSnapshot, parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
@@ -75,6 +75,10 @@ describe('Shared D-Scan', () => {
     );
     expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByRole('link', { name: 'Neocom Desk' })).toHaveAttribute('href', '/');
+    expect(within(banner).getByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
+    expect(within(banner).getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Open Neocom Desk' })).toBeNull();
   });
 

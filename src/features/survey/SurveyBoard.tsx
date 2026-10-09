@@ -36,6 +36,8 @@ interface SurveyBoardProps {
   actions?: ReactNode;
   /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
   viewerLine?: (summary: SurveySummary) => ReactNode;
+  /** The panel's title; the public page sets one that doesn't repeat its page heading. */
+  panelTitle?: string;
 }
 
 /** What the copy button last copied, shown on it for two seconds. */
@@ -116,6 +118,7 @@ export function SurveyBoard({
   onAdd,
   actions,
   viewerLine,
+  panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
   const summary = useMemo(() => summarizeSurvey(scans), [scans]);
@@ -144,7 +147,7 @@ export function SurveyBoard({
   if (summary === null) {
     return (
       <div className="space-y-4">
-        <Panel title={t('survey.title')} actions={actions}>
+        <Panel title={panelTitle ?? t('survey.title')} actions={actions}>
           <ScanPasteBox onAdd={onAdd} />
         </Panel>
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
@@ -158,7 +161,7 @@ export function SurveyBoard({
   return (
     <div className="space-y-4">
       <Panel
-        title={t('survey.title')}
+        title={panelTitle ?? t('survey.title')}
         meta={
           <span className="text-xs text-text-dim">
             {t('survey.scanCount', { count: scans.length })}
