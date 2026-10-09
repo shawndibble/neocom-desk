@@ -51,7 +51,7 @@ export function Disclosure({
   className = '',
 }: DisclosureProps) {
   const labelContent = (
-    <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
       <Caret expanded={expanded} />
       {label}
     </span>
