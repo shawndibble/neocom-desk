@@ -106,11 +106,23 @@ describe('SurveyBoard', () => {
     expect(onAdd).toHaveBeenCalledWith(FIRST);
   });
 
-  it('says so when text typed into the box is not a scan', async () => {
+  it('processes anything pasted into the box at once, and says so when it is not a scan', async () => {
     const onAdd = vi.fn(async () => 'not-a-scan' as const);
     render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={onAdd} />);
-    fireEvent.change(screen.getByLabelText('Survey scan'), { target: { value: 'hello' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add scan' }));
+    fireEvent.paste(screen.getByLabelText('Survey scan'), {
+      clipboardData: { getData: () => 'hello' },
+    });
+    expect(onAdd).toHaveBeenCalledWith('hello');
     expect((await screen.findByRole('alert')).textContent).toContain("isn't a Survey Scanner copy");
+  });
+
+  it('has no Add scan button, and typing into the box does nothing', () => {
+    const onAdd = vi.fn(async () => 'ok' as const);
+    render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={onAdd} />);
+    expect(screen.queryByRole('button', { name: 'Add scan' })).toBeNull();
+    const box = screen.getByLabelText('Survey scan') as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: 'typed' } });
+    expect(box.value).toBe('');
+    expect(onAdd).not.toHaveBeenCalled();
   });
 });

@@ -15,7 +15,7 @@ import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
-import { scanFailure, type AddScanResult } from './scanResult';
+import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { addSurveyScan } from './surveyStore';
 import { useSurvey } from './useSurvey';
 
@@ -26,6 +26,8 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
 
   const add = useCallback(
     async (text: string): Promise<AddScanResult> => {
+      const rejected = rejectScanText(text);
+      if (rejected !== null) return rejected;
       if (expiresAt === null) return 'failed';
       try {
         await addSurveyScan({ id: shareId, text, expiresAt });
