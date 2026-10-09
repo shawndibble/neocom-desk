@@ -111,10 +111,6 @@ const contractPage2 = [
 ];
 
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
-function openFilters() {
-  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
-}
-
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
     const page = new URL(request.url).searchParams.get('page');
@@ -323,7 +319,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Courier')).toBeInTheDocument();
 
-    openFilters();
+    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
 
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
@@ -348,7 +344,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
 
-    openFilters();
+    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
     await user.type(
       screen.getByPlaceholderText('Search issuer, receiver or title…'),
