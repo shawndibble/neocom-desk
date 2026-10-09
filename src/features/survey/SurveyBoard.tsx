@@ -38,6 +38,8 @@ interface SurveyBoardProps {
   footerActions?: ReactNode;
   /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
   viewerLine?: (summary: SurveySummary) => ReactNode;
+  /** The panel's title; the public page sets one that doesn't repeat its page heading. */
+  panelTitle?: string;
 }
 
 /** What the copy button last copied, shown on it for two seconds. */
@@ -115,6 +117,7 @@ export function SurveyBoard({
   onAdd,
   footerActions,
   viewerLine,
+  panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
   const oreNames = useMemo(() => scans.flatMap((s) => s.rocks.map((r) => r.ore)), [scans]);
@@ -172,7 +175,7 @@ export function SurveyBoard({
       <ScanPasteBox onAdd={onAdd} />
 
       <Panel
-        title={t('survey.title')}
+        title={panelTitle ?? t('survey.title')}
         meta={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <DataAgeBadge date={new Date(summary.lastAt)} />

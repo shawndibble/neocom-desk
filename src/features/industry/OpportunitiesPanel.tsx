@@ -29,6 +29,7 @@ import {
   StatChip,
   type DataTableColumn,
   Checkbox,
+  ColumnPickerMenu,
   SegmentedControl,
   Select,
   SelectContent,
@@ -80,9 +81,16 @@ import { opportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
+import {
+  OPPORTUNITIES_COLUMN_IDS,
+  OPPORTUNITIES_DEFAULT_COLUMNS,
+  useVisibleOpportunitiesColumns,
+  type OpportunitiesColumnId,
+} from './opportunitiesColumns';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -390,6 +398,11 @@ export function OpportunitiesPanel({
   // A row click is the Start plan button's action, so the product name needs no link of its own.
   const startPlanFromRow = useRowStartPlan(onStartPlan);
 
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleOpportunitiesColumns,
+    OPPORTUNITIES_DEFAULT_COLUMNS
+  );
+
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
       // Desktop-only column now (`isDesktop` gates this whole `DataTable`
@@ -563,6 +576,15 @@ export function OpportunitiesPanel({
       ),
     },
   ];
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    OpportunitiesColumnId,
+    DataTableColumn<OpportunityRow>
+  >;
+  const shownColumns = columns.filter(
+    (column) =>
+      !(OPPORTUNITIES_COLUMN_IDS as readonly string[]).includes(column.id) ||
+      isVisible(column.id as OpportunitiesColumnId)
+  );
   const sortProps = useUrlSort(
     OPPORTUNITIES_SORT_KEY,
     OPPORTUNITIES_DEFAULT_SORT,
@@ -723,6 +745,18 @@ export function OpportunitiesPanel({
               {t('industry.opportunitiesAddToCompare', { count: selectedRows.length })}
             </Button>
           )}
+          {isDesktop && rows.length > 0 && (
+            <ColumnPickerMenu
+              available={OPPORTUNITIES_COLUMN_IDS}
+              visible={visible}
+              columnsById={columnsById}
+              onToggle={toggle}
+              onReset={reset}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              resetLabel={t('common.resetColumns')}
+            />
+          )}
           {rows.length > 0 && (
             <TableActionsMenu
               name={t('industry.opportunitiesTitle')}
@@ -763,7 +797,7 @@ export function OpportunitiesPanel({
         <div className="overflow-x-auto">
           <DataTable
             {...opportunitiesExport.tableProps}
-            columns={columns}
+            columns={shownColumns}
             rows={rows}
             rowKey={opportunityRowKey}
             virtualize="auto"

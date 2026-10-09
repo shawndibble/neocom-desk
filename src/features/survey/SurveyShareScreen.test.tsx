@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
@@ -45,6 +45,18 @@ describe('SurveyShareScreen', () => {
     await screen.findByText('0% mined');
     expect(loadSurvey).toHaveBeenCalledWith(ID);
     expect(screen.getByText(/Anyone with this link can add a scan/)).toBeTruthy();
+  });
+
+  it('names the page once, and puts the way in in the header', async () => {
+    renderScreen();
+    await screen.findByText('0% mined');
+    expect(screen.getAllByText('Mining Survey')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Mining Survey' })).toBeTruthy();
+    const banner = screen.getAllByRole('banner')[0];
+    expect(within(banner).getByRole('link', { name: 'Neocom Desk' })).toHaveAttribute('href', '/');
+    expect(
+      await within(banner).findByRole('button', { name: 'Log in with EVE Online' })
+    ).toBeTruthy();
   });
 
   it('adds a scan pasted anywhere on the page, to this survey, with no sign-in', async () => {

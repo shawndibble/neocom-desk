@@ -3997,6 +3997,7 @@
     "valueHigh": "higher",
     "legendRate": "Mining rate",
     "legendProjection": "Dashed: finish at the current pace",
+    "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",
     "shareHint": "Anyone with this link can add a scan. The page updates every 20 seconds.",
     "gone": "This survey has expired",
@@ -7983,6 +7984,7 @@
   },
   "share": {
     "title": "Shared link",
+    "brand": "Neocom Desk",
     "openInApp": "Open Neocom Desk",
     "logIn": "Log in with EVE Online",
     "choosePermissions": "Choose permissions…",
