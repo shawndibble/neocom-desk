@@ -54,7 +54,7 @@ import {
   refineBeatsSellAsIs,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { countPasteLines } from '@/engine/market/appraisalPaste';
+import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
 import {
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -632,7 +632,7 @@ export function AppraisalPanel({
             onSubmitChord={() => {
               if (controller.canAppraise && !loading) controller.appraise();
             }}
-            rows={14}
+            rows={pasteBoxRows(text)}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
             mono
