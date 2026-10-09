@@ -80,6 +80,7 @@ beforeEach(async () => {
     ok: true,
     expiresAt: EXPIRES,
     owner: 'Shawn Dibble',
+    tax: null,
     scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
   });
   localStorage.clear();
@@ -174,6 +175,7 @@ describe('SurveyTab', () => {
       ok: true,
       expiresAt: EXPIRES,
       owner: 'Someone Else',
+      tax: null,
       scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
     });
     await useCurrentSurveyId.getState().setValue('other1234');
