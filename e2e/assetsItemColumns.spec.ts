@@ -59,7 +59,7 @@ async function seedAssets(page: Page): Promise<void> {
   );
 }
 
-for (const width of [1440, 1024]) {
+for (const width of [1440, 1280, 1024]) {
   test.describe(`Assets item columns at ${width}px`, () => {
     test.beforeEach(async ({ page }) => {
       await seedAssets(page);
@@ -103,6 +103,33 @@ for (const width of [1440, 1024]) {
         expect(new Set(edges).size).toBe(1);
         expect(edges[0]).toBe(labelEdges[labelIndex]);
       }
+    });
+
+    test('the figures sit beside the capped name, not at the panel edge', async ({ page }) => {
+      const rows = page.locator('[data-virtual-scroll-root] [data-index]');
+      const gaps = await rows.evaluateAll((els) =>
+        els.map((row) => {
+          const cells = row.querySelectorAll<HTMLElement>('.tabular-nums > span');
+          const value = cells[4].getBoundingClientRect();
+          return {
+            left: value.left - row.getBoundingClientRect().left,
+            right: value.right,
+            rowRight: row.getBoundingClientRect().right,
+          };
+        })
+      );
+      const rem = await page.evaluate(() =>
+        parseFloat(getComputedStyle(document.documentElement).fontSize)
+      );
+      for (const g of gaps) {
+        // 24rem name cell + Qty + m3 + gaps: the Value cell starts well inside the row.
+        expect(g.left).toBeLessThanOrEqual(40 * rem);
+        expect(g.right).toBeLessThanOrEqual(g.rowRight);
+      }
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
     });
 
     test('a long name and an oversized value keep every row one line tall', async ({ page }) => {
