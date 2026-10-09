@@ -25,6 +25,14 @@ export const THREAT_TEXT_CLASS: Record<ThreatTone, string> = {
   dim: 'text-text-dim',
 };
 
+/** The band's faint tint behind the level word; levels without one stay on the panel. */
+export const THREAT_FILL_CLASS: Record<ThreatTone, string> = {
+  danger: 'bg-danger/10',
+  warning: 'bg-warning/10',
+  neutral: '',
+  dim: '',
+};
+
 export const THREAT_LEVEL_TONE: Record<ThreatLevel | 'pending', ThreatTone> = {
   dangerous: 'danger',
   active: 'warning',

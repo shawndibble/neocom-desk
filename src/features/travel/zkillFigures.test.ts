@@ -14,6 +14,11 @@ describe('killerRatio', () => {
     expect(killerRatio({ ...base, kills: 0, losses: 5 })).toBe(0);
   });
 
+  it('never reads 100 or 0 while the record has both a kill and a loss', () => {
+    expect(killerRatio({ ...base, kills: 300, losses: 1 })).toBe(99);
+    expect(killerRatio({ ...base, kills: 1, losses: 300 })).toBe(1);
+  });
+
   it('is null with neither a kill nor a loss', () => {
     expect(killerRatio({ ...base, kills: 0, losses: 0 })).toBeNull();
   });

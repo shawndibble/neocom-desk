@@ -19,6 +19,7 @@ import {
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import {
+  THREAT_FILL_CLASS,
   THREAT_LEVEL_TONE,
   THREAT_PILL_CLASS,
   THREAT_TEXT_CLASS,
@@ -92,13 +93,15 @@ export function PilotThreatBand({
       text: t('travel.pilot.threat.chip.also', { space: space(also) }),
     });
   }
-  if (gangRatio !== null && gangRatio >= GANG_CHIP_MIN) {
+  // The gang ratio is all-time, so it says nothing about a pilot with no recent kills.
+  const gangKnown = gangRatio !== null && verdict.level !== 'inactive';
+  if (gangKnown && gangRatio >= GANG_CHIP_MIN) {
     chips.push({
       key: 'gangs',
       tone: 'danger',
       text: t('travel.pilot.threat.gangs', { value: Math.round(gangRatio) }),
     });
-  } else if (gangRatio !== null && gangRatio <= SOLO_CHIP_MAX) {
+  } else if (gangKnown && gangRatio <= SOLO_CHIP_MAX) {
     chips.push({ key: 'solo', tone: 'neutral', text: t('travel.pilot.threat.chip.solo') });
   }
   if (verdict.podShare !== null && verdict.podShare >= POD_CHIP_MIN) {
@@ -116,8 +119,7 @@ export function PilotThreatBand({
       <div
         className={cx(
           'flex min-w-32 flex-col justify-center gap-0.5 border-b border-line px-4 py-3 sm:border-r sm:border-b-0',
-          tone === 'danger' && 'bg-danger/10',
-          tone === 'warning' && 'bg-warning/10'
+          THREAT_FILL_CLASS[tone]
         )}
       >
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

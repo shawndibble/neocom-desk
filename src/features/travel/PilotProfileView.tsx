@@ -148,6 +148,7 @@ function PilotIdentity({
           </div>
         )}
         <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+          <span className="sr-only">{t('travel.pilot.corporation')}: </span>
           {onOpenCorporation ? (
             <button
               type="button"
@@ -164,6 +165,7 @@ function PilotIdentity({
           <span aria-hidden className="text-text-dim">
             ·
           </span>
+          <span className="sr-only">{t('travel.pilot.alliance')}: </span>
           {allianceId === null ? (
             <span className="text-text-dim">{t('travel.pilot.noAlliance')}</span>
           ) : onOpenAlliance ? (
@@ -200,7 +202,10 @@ function PilotIdentity({
                   })}
             </b>
           </span>
-          <ExternalLink href={characterZkillUrl(profile.characterId)}>
+          <ExternalLink
+            href={characterZkillUrl(profile.characterId)}
+            className="inline-flex min-h-11 items-center md:min-h-0"
+          >
             {t('travel.pilot.zkillboard')}
           </ExternalLink>
         </p>

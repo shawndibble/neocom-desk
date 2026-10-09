@@ -64,6 +64,17 @@ describe('PilotThreatBand', () => {
     expect(texts.some((text) => text?.includes('gangs'))).toBe(false);
   });
 
+  it('leaves the all-time gang chip off an inactive pilot', () => {
+    render(
+      <PilotThreatBand
+        verdict={verdict({ level: 'inactive', recentKills: 0, mainSpace: null, podShare: null })}
+        gangRatio={99}
+        nowMs={NOW}
+      />
+    );
+    expect(screen.queryByText('99% in gangs')).toBeNull();
+  });
+
   it('adds a pod chip from a quarter of the kills', () => {
     const { rerender } = render(
       <PilotThreatBand verdict={verdict({ podShare: 0.4 })} gangRatio={null} nowMs={NOW} />

@@ -179,6 +179,22 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
   });
 
+  it('shows no verdict band when the kill history could not be read', async () => {
+    mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    expect(await screen.findByText('1,043 kills')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
+    // The meters and the ships they fly come from the stats, so they still show.
+    expect(screen.getByRole('meter', { name: 'Kills vs losses' })).toBeTruthy();
+    expect(screen.getByText('Kronos')).toBeTruthy();
+  });
+
   it('suggests matches with the search scope and selects one', async () => {
     mocks.granted = true;
     mocks.searchMailRecipients.mockResolvedValue([{ characterId: 42, name: 'Some Pilot' }]);
