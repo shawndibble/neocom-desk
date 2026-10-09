@@ -107,7 +107,6 @@ export function PilotKillActivityView({
   );
   const monthTotal = (m: (typeof months)[number]) => KILL_SPACES.reduce((n, sp) => n + m[sp], 0);
   const tallest = Math.max(1, ...months.map(monthTotal));
-  const recentTotal = spaces.reduce((n, space) => n + summary.bySpace[space].count, 0);
 
   return (
     <section
@@ -142,7 +141,7 @@ export function PilotKillActivityView({
         </div>
         <div
           aria-hidden
-          className="grid h-30 grid-cols-6 items-end gap-2 border-b border-line-bright @sm/kills:h-38"
+          className="grid h-[5.625rem] grid-cols-6 items-end gap-2 border-b border-line-bright @sm/kills:h-28.5"
         >
           {months.map((m) => (
             <div
@@ -169,18 +168,9 @@ export function PilotKillActivityView({
         </div>
       </div>
 
-      <h4 className="mt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <h4 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {t('travel.pilot.activity.last30')}
       </h4>
-      <div aria-hidden className="hidden h-2 bg-panel-2 @sm/kills:flex">
-        {spaces.map((space) => (
-          <span
-            key={space}
-            className={SPACE_BAR[space]}
-            style={{ width: `${(summary.bySpace[space].count / Math.max(1, recentTotal)) * 100}%` }}
-          />
-        ))}
-      </div>
       <ul className={cx('grid gap-2', spaces.length === 4 ? 'grid-cols-4' : 'grid-cols-3')}>
         {spaces.map((space) => {
           const { count, lastMs } = summary.bySpace[space];
