@@ -8,6 +8,7 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
+import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { resetShareLinksForTests } from '@/features/share/shareStore';
@@ -133,6 +134,99 @@ function renderPanel(
   );
   return { onPricePercentChange, actions };
 }
+
+/**
+ * jsdom's `matchMedia` stub never matches, which `useIsDesktop` reads as a
+ * phone — where a result folds the paste card away (#3135). Every test here
+ * but the phone block below is about the desktop two-column layout.
+ */
+const realMatchMedia = window.matchMedia;
+function setViewport(desktop: boolean) {
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: desktop && media === DESKTOP_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+beforeEach(() => setViewport(true));
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+});
+
+describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => {
+  beforeEach(() => setViewport(false));
+
+  it('folds to a summary once a result exists, and opens on the textarea', async () => {
+    const user = userEvent.setup();
+    renderPanel({ controller: controller({ text: 'Tritanium 5\nPyerite 2', result: outcome() }) });
+    expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
+    const summary = screen.getByRole('button', { name: /2 lines · Edit list/ });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    expect(summary).toHaveTextContent('Jita · 90%');
+    await user.click(summary);
+    const box = screen.getByLabelText(/Items from inventory/);
+    expect(box).toHaveValue('Tritanium 5\nPyerite 2');
+    expect(box).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Appraise' })).toBeInTheDocument();
+  });
+
+  it('stays open with no result', () => {
+    renderPanel({ controller: controller({ text: 'Tritanium 5' }) });
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the unmatched-lines warning while folded', () => {
+    renderPanel({
+      controller: controller({
+        text: 'Tritanium 5\nNope 1',
+        result: outcome({ unmatched: [{ name: 'Nope', lines: [2] }] }),
+      }),
+    });
+    expect(screen.getByRole('button', { name: /Edit list/ })).toBeInTheDocument();
+    expect(screen.getByText(/Nope/)).toBeInTheDocument();
+  });
+
+  it('folds again when an Appraise from the open form lands, not on a re-price', async () => {
+    const user = userEvent.setup();
+    const first = controller({ text: 'Tritanium 5', result: outcome(), canAppraise: true });
+    const ui = (c: AppraisalController) => (
+      <MemoryRouter initialEntries={['/market/appraisal?hub=jita']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <AppraisalPanel
+            controller={c}
+            pricePercent={90}
+            onPricePercentChange={vi.fn()}
+            hub={TRADE_HUBS[0]}
+            standing={ZERO_STANDINGS}
+            characterId={1}
+          />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const { rerender } = render(ui(first));
+    await user.click(screen.getByRole('button', { name: /Edit list/ }));
+    // A re-price (new result, no Appraise) leaves the form where the pilot is typing.
+    rerender(ui({ ...first, result: outcome() }));
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Appraise' }));
+    rerender(ui({ ...first, result: outcome() }));
+    expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
+  });
+
+  it('never folds at desktop width', () => {
+    setViewport(true);
+    renderPanel({ controller: controller({ text: 'Tritanium 5', result: outcome() }) });
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();
+  });
+});
 
 describe('AppraisalPanel', () => {
   it('prompts for a paste before anything has been appraised', () => {

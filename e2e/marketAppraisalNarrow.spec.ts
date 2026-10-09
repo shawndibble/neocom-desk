@@ -415,6 +415,34 @@ test.describe('Market Appraisal — stacked result card', () => {
     ]);
   });
 
+  test('folds the paste form so the first result group is on screen at 390px (#3135)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await appraise(page, SIX_COLUMN_PASTE);
+
+    await expect(page.getByLabel(/items from inventory/i)).toHaveCount(0);
+    const summary = page.getByRole('button', { name: /Edit list/ });
+    await expect(summary).toHaveAttribute('aria-expanded', 'false');
+
+    const group = page.locator('section[aria-label="You get"]');
+    await expect(group).toBeVisible();
+    const box = (await group.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeLessThan(PHONE.height);
+    await expectNoPageOverflow(page);
+
+    await summary.click();
+    await expect(page.getByLabel(/items from inventory/i)).toHaveValue(SIX_COLUMN_PASTE);
+  });
+
+  test('keeps the paste form open beside the result at 1280px (#3135)', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await appraise(page, SIX_COLUMN_PASTE);
+    await expect(page.getByLabel(/items from inventory/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Edit list/ })).toHaveCount(0);
+  });
+
   test('has no phone sort bar at 640px or 1280px', async ({ page }) => {
     for (const width of [640, DESKTOP.width]) {
       await page.setViewportSize({ width, height: DESKTOP.height });
@@ -439,6 +467,9 @@ test.describe('Market Appraisal — stacked result card', () => {
         Array.from({ length: n }, (_, i) => (i % 2 ? 'Pyerite\t100' : 'Tritanium\t100')).join('\n');
       const measure = async (lineCount: number) => {
         await appraise(page, paste(lineCount));
+        // Below lg the form folds away once a result exists (#3135); open it to measure the box.
+        if (size.viewport.width < 1024)
+          await page.getByRole('button', { name: /Edit list/ }).click();
         const box = await page.getByLabel(/items from inventory/i).boundingBox();
         const table = await page.getByRole('table', { name: 'Appraisal' }).boundingBox();
         return {
