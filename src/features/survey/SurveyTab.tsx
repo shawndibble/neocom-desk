@@ -15,7 +15,6 @@ import { isShareId } from '@/engine/share/shareId';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
-import { summarizeSurvey } from '@/engine/survey/series';
 import { SurveyBoard } from './SurveyBoard';
 import { YourShareRow } from './YourShareRow';
 import { scanFailure, type AddScanResult } from './scanResult';
@@ -97,7 +96,6 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
   }, [hydrated, routed, navigate, location.pathname, location.search]);
 
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
-  const summary = useMemo(() => summarizeSurvey(scans), [scans]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
   return (
@@ -116,7 +114,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           )}
           <SurveyBoard
             scans={scans}
-            viewerLine={<YourShareRow characterId={characterId} summary={summary} />}
+            viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
             url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
             expiresAt={expiresAt}
             onAdd={add}

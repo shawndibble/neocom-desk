@@ -35,7 +35,6 @@ export interface YourShareInput {
 
 export interface YourShare {
   minedM3: number;
-  byOre: Record<string, number>;
   /** Whole percent of what the survey shows mined, capped at 100; null when it shows none. */
   percentOfMined: number | null;
 }
@@ -45,7 +44,6 @@ export function utcDate(epochMs: number): string {
 }
 
 export function yourShare(input: YourShareInput): YourShare {
-  const byOre: Record<string, number> = {};
   let minedM3 = 0;
   for (const row of input.rows) {
     if (row.solar_system_id !== input.systemId) continue;
@@ -53,11 +51,9 @@ export function yourShare(input: YourShareInput): YourShare {
     if (row.date < input.fromDate || row.date > input.toDate) continue;
     const type = input.types.get(row.type_id);
     if (type === undefined || !input.oreNames.has(type.name)) continue;
-    const m3 = row.quantity * type.volume;
-    byOre[type.name] = (byOre[type.name] ?? 0) + m3;
-    minedM3 += m3;
+    minedM3 += row.quantity * type.volume;
   }
   const percentOfMined =
     input.surveyMined > 0 ? Math.min(100, Math.round((minedM3 / input.surveyMined) * 100)) : null;
-  return { minedM3, byOre, percentOfMined };
+  return { minedM3, percentOfMined };
 }

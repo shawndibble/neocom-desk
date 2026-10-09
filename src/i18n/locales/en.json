@@ -3955,7 +3955,7 @@
     "copyLink": "Copy link",
     "moreCopy": "More copy options",
     "yourShare": "You mined {{volume}} m³ of these ores in {{system}}",
-    "yourSharePercent": " · {{percent}}% of what's been mined",
+    "yourShareWithPercent": "You mined {{volume}} m³ of these ores in {{system}} · {{percent}}% of what's been mined",
     "yourShareTooltipLabel": "About your share",
     "yourShareTooltip": "From your mining ledger, which counts whole days (EVE time) in one system and runs a few minutes behind the game. Ore you mined there before the first scan counts too.",
     "changeSystem": "Change system",

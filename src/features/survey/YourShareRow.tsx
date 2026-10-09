@@ -21,6 +21,8 @@ function SystemField({ onDone }: { onDone: () => void }) {
   const [status, setStatus] = useState<'idle' | 'resolving' | 'notFound'>('idle');
 
   async function commit() {
+    // Enter and the blur it causes both land here; only the first resolves.
+    if (status === 'resolving') return;
     if (text.trim() === '') return onDone();
     setStatus('resolving');
     const system = await resolveSolarSystem(text);
@@ -51,6 +53,7 @@ function SystemField({ onDone }: { onDone: () => void }) {
             event.preventDefault();
             void commit();
           }
+          if (event.key === 'Escape') onDone();
         }}
       />
       {status === 'notFound' && (
@@ -92,12 +95,11 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <span className="tabular-nums">
-        {t('survey.yourShare', {
+        {t(share.percentOfMined === null ? 'survey.yourShare' : 'survey.yourShareWithPercent', {
           volume: formatCompactNumber(share.minedM3),
           system: system.name,
+          percent: share.percentOfMined,
         })}
-        {share.percentOfMined !== null &&
-          t('survey.yourSharePercent', { percent: share.percentOfMined })}
       </span>
       {tooltip}
       {changing ? (

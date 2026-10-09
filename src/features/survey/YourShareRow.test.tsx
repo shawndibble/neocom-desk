@@ -86,4 +86,36 @@ describe('YourShareRow', () => {
     await waitFor(() => expect(loadMiningLedger).toHaveBeenCalled());
     expect(container.textContent).toBe('');
   });
+  it('does not ask for a system when there is no mining ledger to read', async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(null);
+    loadMiningLedger.mockResolvedValue({ cached: null, needsReauth: true });
+    const { container } = render(<YourShareRow characterId={7} summary={summary} />);
+    await waitFor(() => expect(loadMiningLedger).toHaveBeenCalled());
+    await waitFor(() => expect(loadCharacterSolarSystemId).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Solar system')).toBeNull();
+    expect(container.textContent).toBe('');
+  });
+
+  it('closes the system field on Escape without changing the system', async () => {
+    render(<YourShareRow characterId={7} summary={summary} />);
+    await screen.findByText(/in Jita/);
+    fireEvent.click(screen.getByRole('button', { name: 'Change system' }));
+    const input = screen.getByLabelText('Solar system');
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByLabelText('Solar system')).toBeNull();
+    expect(screen.getByText(/in Jita/)).toBeTruthy();
+    expect(resolveSolarSystem).not.toHaveBeenCalled();
+  });
+
+  it('resolves a typed system once even though Enter is followed by a blur', async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(null);
+    resolveSolarSystem.mockResolvedValue({ id: JITA, name: 'Jita', security: null });
+    render(<YourShareRow characterId={7} summary={summary} />);
+    const input = await screen.findByLabelText('Solar system');
+    fireEvent.change(input, { target: { value: 'jita' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    await screen.findByText(/in Jita/);
+    expect(resolveSolarSystem).toHaveBeenCalledTimes(1);
+  });
 });

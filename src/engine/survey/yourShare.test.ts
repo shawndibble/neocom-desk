@@ -43,7 +43,6 @@ describe('yourShare', () => {
       ],
     });
     expect(result.minedM3).toBe(400);
-    expect(result.byOre).toEqual({ Veldspar: 250, Scordite: 150 });
     expect(result.percentOfMined).toBe(40);
   });
 
@@ -83,10 +82,6 @@ describe('yourShare', () => {
   });
 
   it('is zero with an empty ledger', () => {
-    expect(yourShare({ ...base, rows: [] })).toEqual({
-      minedM3: 0,
-      byOre: {},
-      percentOfMined: 0,
-    });
+    expect(yourShare({ ...base, rows: [] })).toEqual({ minedM3: 0, percentOfMined: 0 });
   });
 });

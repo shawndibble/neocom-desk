@@ -14,7 +14,7 @@ import {
   type SurveyMessageLabels,
 } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
+import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -36,7 +36,7 @@ interface SurveyBoardProps {
   /** Extra header controls, e.g. "New survey". */
   actions?: ReactNode;
   /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
-  viewerLine?: ReactNode;
+  viewerLine?: (summary: SurveySummary) => ReactNode;
 }
 
 /** What the copy button last copied, shown on it for two seconds. */
@@ -229,7 +229,7 @@ export function SurveyBoard({
             )}
           </StatChips>
 
-          {viewerLine}
+          {viewerLine?.(summary)}
 
           {scans.length > 1 && (
             <Suspense
