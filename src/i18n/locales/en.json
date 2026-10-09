@@ -3943,7 +3943,7 @@
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
     "minedPercent": "{{percent}}% mined",
     "seenOf": "of {{volume}} m³ seen",
-    "statLeft": "Left",
+    "statLeft": "m³ left",
     "statPace": "Pace",
     "statDone": "Done at",
     "statTimeLeft": "Time left",
