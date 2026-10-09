@@ -40,6 +40,15 @@ interface PanelProps {
    * the row is exactly as before.
    */
   wrapMeta?: boolean;
+  /**
+   * With `wrapMeta`, on a phone gives `meta` the header's full width as a
+   * second row beneath the title and `actions`, instead of a second line
+   * inside the title's cell (which the `actions` cluster squeezes to a
+   * sliver). For a `meta` carrying figures that must not wrap or clip —
+   * Production Runs' realized profit. The caller's `meta` carries
+   * `max-md:order-last max-md:basis-full`. From `md` up the row is as before.
+   */
+  metaOwnRow?: boolean;
   children: ReactNode;
   /**
    * Lets `actions` take the header's free width instead of hugging the right
@@ -90,6 +99,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
     leading,
     meta,
     wrapMeta = false,
+    metaOwnRow = false,
     children,
     padded = true,
     fill = false,
@@ -112,12 +122,12 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         // own left inset would read as a double gap — drop it and let the
         // control sit against the edge, the way `Assets`' breadcrumb bar does.
         <header
-          className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${leading ? 'pl-1' : 'pl-3'}`}
+          className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
           {/* An empty left group would still cost the header's gap before filling actions. */}
           {(!actionsFill || leading || title || meta) && (
             <div
-              className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''}`}
+              className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
             >
               {leading}
               {title && (
@@ -140,7 +150,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
           )}
           {actions && (
             <div
-              className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : 'shrink-0'}`}
+              className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : 'shrink-0'} ${metaOwnRow ? 'max-md:ml-auto' : ''}`}
             >
               {actions}
             </div>
