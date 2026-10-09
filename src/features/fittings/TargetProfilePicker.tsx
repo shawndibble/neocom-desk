@@ -373,7 +373,7 @@ export function TargetProfilePicker({
       </StatField>
     );
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs">
       <span className="text-text-dim">{label}</span>
       {select}
       <span className="text-text-dim">{summary}</span>
