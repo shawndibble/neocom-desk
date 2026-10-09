@@ -64,4 +64,28 @@ describe('FittingCompareTable', () => {
     render(<FittingCompareTable rows={tied} columns={COLUMNS} differencesOnly={true} />);
     expect(screen.getByText('Nothing differs between the compared Fittings.')).toBeInTheDocument();
   });
+
+  describe('pinned names row', () => {
+    const named = COLUMNS.map((c) => ({ ...c, name: c.header }));
+
+    it('adds a names row only when asked, with two or more named columns', () => {
+      const { rerender } = render(
+        <FittingCompareTable rows={ROWS} columns={named} differencesOnly={false} />
+      );
+      expect(screen.queryByTestId('compare-pinned-names')).not.toBeInTheDocument();
+      rerender(
+        <FittingCompareTable rows={ROWS} columns={named} differencesOnly={false} pinNames />
+      );
+      expect(screen.getByTestId('compare-pinned-names')).toHaveTextContent('Fit AFit B');
+      rerender(
+        <FittingCompareTable
+          rows={ROWS}
+          columns={named.slice(0, 1)}
+          differencesOnly={false}
+          pinNames
+        />
+      );
+      expect(screen.queryByTestId('compare-pinned-names')).not.toBeInTheDocument();
+    });
+  });
 });
