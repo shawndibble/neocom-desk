@@ -61,7 +61,9 @@ function makeAccessTokenWithCorpScopes(): string {
 test.describe('corp ops board — 320px width', () => {
   test.use({ viewport: NARROW });
 
-  test('the board holds without a horizontal scroll', async ({ page }) => {
+  test('the board holds without a horizontal scroll, and empty cards stay compact', async ({
+    page,
+  }) => {
     // Registered after `installSsoMock` (the `page` fixture's own setup), so
     // Playwright tries this one first: same endpoint, a token carrying the
     // corp scope group too.
