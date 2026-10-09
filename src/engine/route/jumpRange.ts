@@ -71,14 +71,31 @@ export interface CurrentSystem {
  * reports a *different* system than it did when the pick was made: once the
  * pilot has really moved, the fresh game location is better than a
  * hand-typed one they have probably forgotten.
+ *
+ * A pick made before ESI had answered has no game location to compare with.
+ * ESI's first answer may then be where the pilot was, not where they are now,
+ * so the pick holds; `adoptGameBaseline` records that first answer as the
+ * baseline, and a later, different one ends the pick as usual.
  */
 export function effectiveCurrentSystem(
   gameSystemId: number | null,
   picked: PickedSystem | null
 ): CurrentSystem {
-  if (picked && (gameSystemId === null || gameSystemId === picked.gameSystemId)) {
+  if (
+    picked &&
+    (gameSystemId === null || picked.gameSystemId === null || gameSystemId === picked.gameSystemId)
+  ) {
     return { systemId: picked.systemId, source: 'picked' };
   }
   if (gameSystemId !== null) return { systemId: gameSystemId, source: 'game' };
   return { systemId: null, source: null };
+}
+
+/** The pick with its missing baseline filled in from ESI's first answer; null when nothing needs recording. */
+export function adoptGameBaseline(
+  picked: PickedSystem | null,
+  gameSystemId: number | null
+): PickedSystem | null {
+  if (picked === null || picked.gameSystemId !== null || gameSystemId === null) return null;
+  return { ...picked, gameSystemId };
 }

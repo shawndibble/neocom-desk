@@ -33,6 +33,15 @@ export interface SkillPlanImportState {
 
 /**
  * Router `location.state` shape the app-wide paste router navigates
+ * `/mining/survey` with: a pasted Survey Scan, added to the current Survey on
+ * arrival.
+ */
+export interface SurveyScanState {
+  readonly surveyScanText: string;
+}
+
+/**
+ * Router `location.state` shape the app-wide paste router navigates
  * `/pilot-lookup` with: a pasted Local list or D-Scan, checked on arrival.
  */
 export interface PilotListState {

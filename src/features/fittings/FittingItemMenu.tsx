@@ -11,7 +11,7 @@
  * in context; a surface without it (the Start screen's read-only preview)
  * simply shows no menu.
  */
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MenuItem,
@@ -184,10 +184,6 @@ export function ModuleMenuItems({
 }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
-  const variants = useMemo(
-    () => actions?.variantsOf(module.typeId) ?? [],
-    [actions, module.typeId]
-  );
   if (actions === null) return null;
   const { slot: rack, slotIndex: index, typeId } = module;
   const name = actions.typeName(typeId);
@@ -234,21 +230,11 @@ export function ModuleMenuItems({
       <MenuItem onSelect={() => actions.copyToAllOfType(rack, index)}>
         {t('fittings.item.copyToAllOfType')}
       </MenuItem>
-      <MenuSub>
-        <MenuSubTrigger disabled={variants.length === 0}>
-          {t('fittings.item.swapVariant')}
-        </MenuSubTrigger>
-        <MenuSubContent className="max-h-80 overflow-y-auto">
-          {variants.map((variant) => (
-            <MenuItem
-              key={variant.typeId}
-              onSelect={() => actions.swapType(rack, index, variant.typeId)}
-            >
-              {variant.name}
-            </MenuItem>
-          ))}
-        </MenuSubContent>
-      </MenuSub>
+      {actions.hasVariants(typeId) && (
+        <MenuItem onSelect={() => actions.openVariations(rack, index)}>
+          {t('fittings.item.variations')}
+        </MenuItem>
+      )}
       <MenuItem onSelect={() => actions.copyModule(module)}>
         {t('fittings.item.copyModule')}
       </MenuItem>

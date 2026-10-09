@@ -760,8 +760,8 @@ export function BuildGroupPanel({
                       onClick={onPlanLinkClick(() => onOpenPlan(plan.id))}
                       className={`${tappableRowClassName} group flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left ${rowInteractiveClassName} ${focusRingInsetClassName}`}
                     >
-                      <span className="truncate text-accent">{plan.name}</span>
-                      <span className="shrink-0 tabular-nums text-text-dim">
+                      <span className="min-w-0 flex-1 truncate text-accent">{plan.name}</span>
+                      <span className="shrink-0 text-right tabular-nums text-text-dim">
                         {row?.result ? (
                           <IskAmount value={row.result.totalCost} decimals={0} />
                         ) : (

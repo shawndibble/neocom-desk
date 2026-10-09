@@ -47,6 +47,7 @@ function setup(stats: FittingStats | null, currentStats: FittingStats | null) {
       dragEnabled: false,
       selectTarget: () => {},
       openCargoQuantity: () => {},
+      openVariations: () => {},
     })
   );
   return { result, edit };

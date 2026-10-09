@@ -30,6 +30,7 @@ import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
   Button,
+  CollapsiblePanel,
   DataTable,
   EmptyState,
   FilterChip,
@@ -289,8 +290,17 @@ function RelativeAge({ timestamp }: { timestamp: number }) {
   return formatAge(now - timestamp, t);
 }
 
+/** The folded Data Age panel's one-line read: how many sources, and how fresh the newest is. */
+function DataAgeSummary({ rows }: { rows: ActivityLogEntry[] }) {
+  const { t } = useTranslation();
+  const now = useTicker(RELATIVE_AGE_TICK_MS);
+  const newest = Math.max(...rows.map((entry) => entry.timestamp));
+  return t('dataAge.summary', { count: rows.length, age: formatAge(now - newest, t) });
+}
+
 function DataAgePanel() {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
   const timeZone = useTimeZone();
   const entries = useActivityLog((state) => state.entries);
   const characterNames = useCharacterNames();
@@ -336,8 +346,14 @@ function DataAgePanel() {
   const tableExport = useTableExport({ surface: 'data-age', rows, columns: csvColumns });
 
   return (
-    <Panel
+    <CollapsiblePanel
       title={t('dataAge.title')}
+      meta={rows.length > 0 && <DataAgeSummary rows={rows} />}
+      wrapMeta
+      expanded={expanded}
+      onToggle={() => setExpanded((open) => !open)}
+      labels={{ show: t('dataAge.show'), hide: t('dataAge.hide') }}
+      collapsible={rows.length > 0}
       actions={
         rows.length > 0 && <TableActionsMenu name={t('dataAge.title')} tableExport={tableExport} />
       }
@@ -361,7 +377,7 @@ function DataAgePanel() {
           />
         )}
       </div>
-    </Panel>
+    </CollapsiblePanel>
   );
 }
 

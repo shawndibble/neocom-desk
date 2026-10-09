@@ -35,7 +35,6 @@ import {
   setModuleCharge,
   setModuleState,
   setModulesState,
-  swapModuleType,
   takeCargo,
   unloadCharges,
   type DroneBay,
@@ -76,6 +75,8 @@ interface EditorItemActionsInput {
   selectTarget: (target: AddTarget) => void;
   /** Opens the quantity dialog for a cargo item. */
   openCargoQuantity: (typeId: number) => void;
+  /** Opens a fitted module's dialog with its Variations unfolded. Stable. */
+  openVariations: (rack: FittingSlotKind, index: number) => void;
 }
 
 export interface EditorItemActions {
@@ -116,6 +117,7 @@ export function useEditorItemActions({
   dragEnabled,
   selectTarget,
   openCargoQuantity,
+  openVariations,
 }: EditorItemActionsInput): EditorItemActions {
   // The types last fitted to each rack, newest first — an empty slot's
   // "Add module" and "Fill rack with last used".
@@ -308,16 +310,12 @@ export function useEditorItemActions({
               shipTypeId === null ? [] : defaultCharges(shipTypeId, module.slot, module.typeId),
             chargePickerInput: () => chargePickerRef.current,
             copyToAllOfType: (rack, index) => edit((f) => copyToAllOfType(f, rack, index)),
-            variantsOf: (typeId) =>
-              variationIndex === null
-                ? []
-                : getVariations(variationIndex, typeId)
-                    .members.filter((member) => member.typeId !== typeId)
-                    .map((member) => ({
-                      typeId: member.typeId,
-                      name: catalogueTypeName(catalogue, member.typeId),
-                    })),
-            swapType: (rack, index, typeId) => edit((f) => swapModuleType(f, rack, index, typeId)),
+            hasVariants: (typeId) =>
+              variationIndex !== null &&
+              getVariations(variationIndex, typeId).members.some(
+                (member) => member.typeId !== typeId
+              ),
+            openVariations,
             removeAllOfType: (typeId) => edit((f) => removeAllOfType(f, typeId)),
             remove: (rack, index) => edit((f) => removeModule(f, rack, index)),
             move: (rack, from, to) => edit((f) => moveModule(f, rack, from, to)),
@@ -388,6 +386,7 @@ export function useEditorItemActions({
       cargoCapacity,
       cargoUsed,
       openCargoQuantity,
+      openVariations,
       canPlace,
       droneBay,
       dragEnabled,
