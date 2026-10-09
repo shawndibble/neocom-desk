@@ -156,6 +156,24 @@ function ContractStatusCell({ contract }: { contract: Contract }) {
   );
 }
 
+/**
+ * Yesterday's calendar day in `timeZone`, formatted like `formatDateOnly`.
+ * Walks the calendar rather than subtracting 24h, which lands on the wrong day
+ * across a DST change (a 23- or 25-hour day).
+ */
+function formatYesterday(nowMs: number, timeZone: string | undefined): string {
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(new Date(nowMs))
+    .split('-')
+    .map(Number);
+  return formatDateOnly(new Date(Date.UTC(year, month - 1, day - 1, 12)), 'UTC');
+}
+
 /** A phone day section's header: the date, and how many contracts were issued that day. */
 function ContractDayHeader({
   date,
@@ -172,7 +190,7 @@ function ContractDayHeader({
   const label =
     date === formatDateOnly(new Date(now), timeZone)
       ? t('contracts.today')
-      : date === formatDateOnly(new Date(now - 24 * 60 * 60 * 1000), timeZone)
+      : date === formatYesterday(now, timeZone)
         ? t('contracts.yesterday')
         : date;
   return (

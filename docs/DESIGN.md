@@ -584,6 +584,17 @@ header (Assets' per-location sort) — they already wrap sensibly and have no
 search box to sit inline with. And a lone chip (Mail's "hide read") is not
 worth a trigger: the trigger costs the same room the chip does.
 
+One sanctioned repeat: a phone list a reader scans by outcome may show its
+status `FilterChip`s as a horizontally scrolling row (`sm:hidden`) under the
+`FilterBar`, writing the same committed filter the sheet does, so a tap is one
+step instead of three. Contracts History is the case (All plus one chip per
+status present). Desktop keeps only the funnel; the sheet's chips stay.
+
+A **status dot** (`size-2 rounded-full bg-current`, `aria-hidden`, phone only)
+may lead a dense card's title in the row's status tone, so a scan down the list
+reads outcome at a glance. It is never the only cue: the status word stays on
+the card's meta line.
+
 ## 5. Icons
 
 Pack: [Phosphor](https://phosphoricons.com) (`@phosphor-icons/react`), weight
