@@ -48,6 +48,8 @@ interface SeedOptions {
   withUnassignedEntry?: boolean;
   /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
   withMadePayment?: boolean;
+  /** Skip the Payee and its Assignment, so every entry is Unassigned and nothing is owed. */
+  nothingOwed?: boolean;
 }
 
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
@@ -71,6 +73,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       journalRefId,
       withUnassignedEntry,
       withMadePayment,
+      nothingOwed,
     }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
@@ -142,6 +145,11 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           value: { system_id: solarSystemId, name: 'Jita', security_status: 0.9 },
           fetchedAt: now,
         });
+        if (nothingOwed) {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          return;
+        }
         tx.objectStore('payees').put({
           id: payeeId,
           characterId,
@@ -186,6 +194,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       journalRefId: JOURNAL_REF_ID,
       withUnassignedEntry: options.withUnassignedEntry ?? false,
       withMadePayment: options.withMadePayment ?? false,
+      nothingOwed: options.nothingOwed ?? false,
     }
   );
 }
@@ -651,4 +660,40 @@ test.describe('Mining Tax ledger — long Payee name overflow', () => {
 
     await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
   });
+});
+
+/**
+ * Nothing owed, entries Unassigned (#3120): the prompt is a slim row, not a
+ * half-width tile, so the Assign button stays on screen and the ledger starts
+ * above the fold. Invariants only — no pixel thresholds.
+ */
+test.describe('Tax tab Unassigned prompt — nothing owed (#3120)', () => {
+  for (const viewport of [PHONE, { width: 1024, height: 800 }, DESKTOP]) {
+    test(`slim row, no overflow at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { nothingOwed: true });
+      await page.goto('./mining/tax');
+
+      const assign = page.getByRole('button', { name: /Assign next/ });
+      await expect(assign).toBeVisible();
+      const box = await assign.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      if (viewport.width === PHONE.width) expect(box!.height).toBeGreaterThanOrEqual(44);
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+
+      if (viewport.width === DESKTOP.width) {
+        const row = page.getByRole('table').locator('tbody tr').first();
+        await expect(row).toBeVisible();
+        const rowBox = await row.boundingBox();
+        expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(viewport.height);
+      }
+    });
+  }
 });

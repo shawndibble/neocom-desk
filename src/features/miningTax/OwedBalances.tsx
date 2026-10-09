@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -59,6 +60,12 @@ export function OwedBalances({
     owed.length + (unassigned.entryCount > 0 ? 1 : 0) + (unlinkedPaymentCount > 0 ? 1 : 0);
   const wide = cardCount === 1 && owed.length === 1;
 
+  // Nothing owed: the prompts are the page's next action, so they read as slim
+  // full-width rows rather than tiles stranded in one column of a grid. With
+  // owed cards present they stay tiles that share those cards' height — a
+  // deliberate split (issue #3120).
+  const slimPrompts = owed.length === 0;
+
   const nameButton = (balance: PayeeBalance) => (
     <button
       type="button"
@@ -86,6 +93,27 @@ export function OwedBalances({
     </span>
   );
 
+  const promptRow = (
+    key: string,
+    title: ReactNode,
+    value: ReactNode,
+    hint: string,
+    action: ReactNode
+  ) => (
+    <Panel key={key} padded={false} className="border-dashed">
+      <div className="flex items-center gap-3 px-3 py-2">
+        <div className="min-w-0 flex-1 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-3">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            {title}
+            {value}
+          </div>
+          <p className="text-xs text-text-dim">{hint}</p>
+        </div>
+        {action}
+      </div>
+    </Panel>
+  );
+
   return (
     <section aria-label={t('miningTax.balancesLabel')} className="space-y-2">
       {/* One owed Payee: the single card already carries the name and the
@@ -110,7 +138,42 @@ export function OwedBalances({
         </p>
       )}
 
-      {cardCount > 0 && (
+      {slimPrompts &&
+        unassigned.entryCount > 0 &&
+        promptRow(
+          'unassigned',
+          <span className="text-base font-semibold text-warning">
+            {t('miningTax.unassignedCardTitle')}
+          </span>,
+          // An unpriced day reads as "0 ISK", which looks like nothing to do.
+          unassigned.estimatedValue > 0 && (
+            <span className="text-sm font-semibold tabular-nums">
+              {formatIsk(unassigned.estimatedValue, 0)}
+              <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
+            </span>
+          ),
+          t('miningTax.owed.unassignedHint', { count: unassigned.entryCount }),
+          <Button className="shrink-0" onClick={onAssignNext}>
+            {t('miningTax.assignNextAction')}
+          </Button>
+        )}
+      {slimPrompts &&
+        unlinkedPaymentCount > 0 &&
+        promptRow(
+          'unlinked',
+          <span className="text-base font-semibold">
+            {t('miningTax.unlinkedPaymentsCardTitle')}
+          </span>,
+          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
+          </span>,
+          t('miningTax.unlinkedPaymentsHint'),
+          <Button className="shrink-0" onClick={onReviewPayments}>
+            {t('miningTax.linkPaymentAction')}
+          </Button>
+        )}
+
+      {cardCount > 0 && !slimPrompts && (
         <div className={cx('grid grid-cols-1 gap-2', !wide && 'sm:grid-cols-2 xl:grid-cols-3')}>
           {owed.map((balance) => {
             const days = owedForDays(balance);
