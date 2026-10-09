@@ -869,6 +869,8 @@ export const syncWorkbenchFits = onSchedule(
  * Another Cloud Scheduler job past the free three, the same trade as
  * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
  */
+const LP_STORE_MAX_FAILED_SHARE = 0.1;
+
 export const syncLpStoreOffers = onSchedule(
   { schedule: 'every 24 hours', memory: '512MiB', timeoutSeconds: 540 },
   async () => {
@@ -890,7 +892,7 @@ export const syncLpStoreOffers = onSchedule(
       requestGapMs: LP_STORE_REQUEST_GAP_MS,
     });
     logInfo('LP store offers sync', { corporations: rows.length, failed: failed.length });
-    if (rows.length === 0 || failed.length > Math.max(1, rows.length * 0.1)) {
+    if (rows.length === 0 || failed.length > Math.max(1, rows.length * LP_STORE_MAX_FAILED_SHARE)) {
       logError('LP store offers sync skipped publishing', { failed });
       return;
     }

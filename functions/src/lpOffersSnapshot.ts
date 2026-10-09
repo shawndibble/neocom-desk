@@ -152,6 +152,11 @@ export async function fetchLpStoreRows(
       failed.push(id);
       continue;
     }
+    // A 2xx that is not an offer list is ESI changing shape, not a store with no offers.
+    if (!Array.isArray(result.body)) {
+      failed.push(id);
+      continue;
+    }
     const row = buildLpStoreRow(id, deps.corporations[id], result.body);
     if (row !== null) rows.push(row);
   }

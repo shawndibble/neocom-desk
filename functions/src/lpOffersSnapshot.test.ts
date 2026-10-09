@@ -114,6 +114,17 @@ describe('fetchLpStoreRows', () => {
     expect(result.failed).toEqual([1000130]);
   });
 
+  it('counts a 2xx that is not an offer list as a failure', async () => {
+    const result = await fetchLpStoreRows({
+      corporations,
+      fetchJson: async () => ({ status: 200, retryAfter: null, body: { error: 'x' } }),
+      sleep: async () => {},
+      requestGapMs: 0,
+    });
+    expect(result.rows).toEqual([]);
+    expect(result.failed).toEqual([1000120, 1000130]);
+  });
+
   it('treats a 404 as a store that no longer exists, not a failure', async () => {
     const result = await fetchLpStoreRows({
       corporations,
