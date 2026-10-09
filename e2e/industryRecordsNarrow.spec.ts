@@ -171,3 +171,31 @@ test.describe('By item card — margin on units sold (issue #1785)', () => {
     await expect(row.locator('td[data-label="Unsold cost"]')).toContainText('550,000');
   });
 });
+
+test.describe('Realized-profit hero — captions folded into a tooltip (issue #3127)', () => {
+  for (const width of [390, 1024, 1280]) {
+    test(`hero is shorter than the stat rows and the page does not overflow at ${width}px`, async ({
+      page,
+    }) => {
+      await signInAndGoto(page);
+      await seedFixtures(page);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('./industry/records');
+
+      const hero = page
+        .getByText('Total realized profit', { exact: true })
+        .first()
+        .locator('xpath=ancestor::div[contains(@class,"bg-panel-2")][1]');
+      await expect(hero).toBeVisible();
+      const heroHeight = (await hero.boundingBox())!.height;
+      const rowsHeight = (await hero.locator('xpath=following-sibling::div[last()]').boundingBox())!
+        .height;
+      expect(heroHeight).toBeLessThan(rowsHeight);
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
+});
