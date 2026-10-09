@@ -85,7 +85,20 @@ export function routeWithJumps(
     return { kind: 'no-route' };
   }
   const byId = new Map(systems.map((system) => [system.id, system]));
-  const landings = systems.filter((system) => graph.has(system.id) && !isUntargetable(system));
+  // Sorted by x, so an origin only measures the landings inside its x window.
+  const landings = systems
+    .filter((system) => graph.has(system.id) && !isUntargetable(system))
+    .sort((a, b) => a.x - b.x);
+  const firstLandingAtOrAfter = (x: number) => {
+    let low = 0;
+    let high = landings.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (landings[mid].x < x) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  };
   const stepCost = stepCostFor({ ...options, extraConnections: undefined, freeSystems: undefined });
 
   const best = new Map<number, number>([[from, 0]]);
@@ -111,7 +124,9 @@ export function routeWithJumps(
     }
     const origin = byId.get(systemId);
     if (!origin) continue;
-    for (const landing of landings) {
+    for (let at = firstLandingAtOrAfter(origin.x - drive.rangeLy); at < landings.length; at += 1) {
+      const landing = landings[at];
+      if (landing.x > origin.x + drive.rangeLy) break;
       if (landing.id === systemId || settled.has(landing.id)) continue;
       const distanceLy = lightYearDistance(origin, landing);
       if (distanceLy > drive.rangeLy) continue;
@@ -171,16 +186,18 @@ export function jumpWayFacts(
   let fatigue = 0;
   let wait = 0;
   let minutes = 0;
+  let gateMinutes = 0;
   for (const hop of hops) {
     if (hop.kind === 'gate') {
-      minutes += GATE_HOP_MINUTES;
+      gateMinutes += GATE_HOP_MINUTES;
       continue;
     }
     jumps += 1;
     totalLy += hop.distanceLy;
     fuel += jumpFuel(hop.distanceLy, drive.fuelPerLy);
-    // The previous jump's timer runs before this one can start.
-    minutes += wait;
+    // The previous jump's timer runs while the gates in between are flown.
+    minutes += Math.max(wait, gateMinutes);
+    gateMinutes = 0;
     fatigue = decayFatigue(fatigue, wait);
     const result = jumpFatigue({
       fatigueMinutes: fatigue,
@@ -190,5 +207,5 @@ export function jumpWayFacts(
     fatigue = result.fatigueMinutes;
     wait = result.cooldownMinutes;
   }
-  return { jumps, totalLy, fuel, fatigueMinutes: fatigue, arriveMinutes: minutes };
+  return { jumps, totalLy, fuel, fatigueMinutes: fatigue, arriveMinutes: minutes + gateMinutes };
 }
