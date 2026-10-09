@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { pickupHueVar } from './movePlanView';
 
@@ -28,7 +29,9 @@ export function RailHeading({
   children?: ReactNode;
 }) {
   return (
-    <li className="relative flex min-h-11 items-center gap-2 pt-1 pl-[34px] font-medium md:min-h-8">
+    <li
+      className={`${tappableRowClassName} relative flex items-center gap-2 pt-1 pl-[34px] font-medium`}
+    >
       <span
         aria-hidden="true"
         className="absolute top-1 left-[-5px] grid size-[30px] place-items-center rounded-full border-[3px] border-panel bg-accent/15 text-xs font-bold text-accent"
