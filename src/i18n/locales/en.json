@@ -3974,7 +3974,7 @@
     "oreRocks_one": "{{count}} rock",
     "oreRocks_other": "{{count}} rocks",
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
-    "oreRowIsk": "{{rocks}} · {{volume}} m³ · {{isk}} ISK · {{percent}}% left",
+    "oreRowIsk": "{{rocks}} · {{volume}} m³ · <isk/> ISK · {{percent}}% left",
     "valueRamp": "Bar colour is ISK per m³ left",
     "tier": {
       "gray": "lowest value per m³",
@@ -9343,7 +9343,7 @@
         "worth": {
           "title": "Worth on the scan, hulls only",
           "total": "Total",
-          "isk": "{{amount}} ISK",
+          "isk": "<isk/> ISK",
           "noPrice": "price unavailable",
           "unpriced_one": "1 ship has no price and is left out.",
           "unpriced_other": "{{count}} ships have no price and are left out.",

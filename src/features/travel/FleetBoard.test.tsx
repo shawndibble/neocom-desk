@@ -93,7 +93,7 @@ describe('group sub-labels', () => {
   it('prices hulls and never shows 0 for a hull with no price', async () => {
     render(<FleetBoard rows={ROWS} />);
     const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
-    expect(await within(worth).findAllByText('300M ISK')).toHaveLength(2);
+    expect(await within(worth).findAllByText('300M')).toHaveLength(2);
     expect(worth.textContent).toContain('1 × Orca');
     expect(worth.textContent).toContain('price unavailable');
     expect(worth.textContent).toContain('Total');

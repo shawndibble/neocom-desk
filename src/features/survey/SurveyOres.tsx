@@ -4,12 +4,11 @@
  * on a gray, blue, yellow, orange ramp (`engine/survey/valueTier.ts`), so a
  * pilot sees which rocks are worth the trip without reading the numbers.
  */
-import { useTranslation } from 'react-i18next';
-import { Panel } from '@/components/ui';
+import { Trans, useTranslation } from 'react-i18next';
+import { IskAmount, Panel } from '@/components/ui';
 import type { SurveySummary } from '@/engine/survey/series';
 import { oreValueTiers } from '@/engine/survey/valueTier';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatIskCompact } from '@/lib/isk';
 import { VALUE_TIER_COLORS, VALUE_TIER_ORDER } from './surveyTones';
 
 export function SurveyOres({ summary }: { summary: SurveySummary }) {
@@ -28,12 +27,23 @@ export function SurveyOres({ summary }: { summary: SurveySummary }) {
                 <div className="flex flex-col gap-0.5 text-sm sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-3">
                   <span>{ore.ore}</span>
                   <span className="text-text-dim tabular-nums">
-                    {t(hasIsk ? 'survey.oreRowIsk' : 'survey.oreRow', {
-                      rocks: t('survey.oreRocks', { count: ore.rocks }),
-                      volume: formatCompactNumber(ore.volume),
-                      isk: formatIskCompact(ore.isk),
-                      percent: leftPercent,
-                    })}
+                    {hasIsk ? (
+                      <Trans
+                        i18nKey="survey.oreRowIsk"
+                        values={{
+                          rocks: t('survey.oreRocks', { count: ore.rocks }),
+                          volume: formatCompactNumber(ore.volume),
+                          percent: leftPercent,
+                        }}
+                        components={{ isk: <IskAmount value={ore.isk} decimals={0} /> }}
+                      />
+                    ) : (
+                      t('survey.oreRow', {
+                        rocks: t('survey.oreRocks', { count: ore.rocks }),
+                        volume: formatCompactNumber(ore.volume),
+                        percent: leftPercent,
+                      })
+                    )}
                     {hasIsk && (
                       <span className="sr-only">
                         {' · '}

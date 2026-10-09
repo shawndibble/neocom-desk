@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
-import { formatIskCompact } from '@/lib/isk';
+import { IskAmount } from '@/components/ui';
 
 function Tile({
   label,
@@ -57,7 +57,9 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
       </Tile>
       <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
       {summary.iskLeft !== null && (
-        <Tile label={t('survey.statIsk')}>{formatIskCompact(summary.iskLeft)}</Tile>
+        <Tile label={t('survey.statIsk')}>
+          <IskAmount value={summary.iskLeft} decimals={0} />
+        </Tile>
       )}
     </div>
   );

@@ -59,8 +59,8 @@ describe('SurveyBoard', () => {
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
     // The scanner's own ISK column, summed.
-    expect(screen.getByText('ISK left')).toBeTruthy();
-    expect(screen.getByText(/^34\.\d+M$/)).toBeTruthy();
+    // The figure is an `IskAmount`: shorthand on screen, the exact value one hover away.
+    expect(screen.getByText('ISK left').parentElement?.textContent).toMatch(/34\.\d+M/);
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
@@ -161,7 +161,8 @@ describe('SurveyBoard', () => {
 
     it('shows each ore with its rocks and the ISK left in it', () => {
       render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
-      expect(screen.getByText(/1 rock · 5\.3K m³ · 570K ISK · 100% left/)).toBeTruthy();
+      const row = screen.getByText('Scordite', { selector: 'span' }).closest('li');
+      expect(row?.textContent).toMatch(/1 rock · 5\.3K m³ · .*570K.* ISK · 100% left/);
     });
 
     it('has one Copy chat message button, in the header on a desktop and under the chart on a phone', () => {
