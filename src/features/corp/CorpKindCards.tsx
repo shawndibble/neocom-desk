@@ -19,7 +19,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel } from '@/components/ui';
+import { Panel } from '@/components/ui';
 import {
   disabledClassName,
   focusRingClassName,
@@ -129,7 +129,7 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
       }
     >
       {items.length === 0 ? (
-        <EmptyState title={t(EMPTY_FOR_KIND[kind])} />
+        <p className="px-3 py-2.5 text-xs text-text-dim">{t(EMPTY_FOR_KIND[kind])}</p>
       ) : (
         <>
           <ul className="divide-y divide-line">
@@ -171,16 +171,16 @@ export function CorpKindCards({ grouped, capabilities }: CorpKindCardsProps) {
   if (readable.length === 0) return null;
 
   return (
-    // One column on a phone, two on a tablet, all four across from `xl`. Four
-    // cards in the 1776px content width of a 2000px viewport is ~432px each,
-    // which is where the row's `truncate` stops being reached by the structure
-    // names this corp actually has.
+    // One column on a phone, two from `sm`, all four across only from `2xl`.
+    // The sidebar leaves ~1030px of content at 1280, so four columns there are
+    // ~246px each and a Fuel row has ~100px for its name; two columns give ~500px,
+    // enough for a whole structure name. Four cards read at ~370px from 1536px.
     //
     // `items-start` so each card is its own height. Stretched to match its
     // tallest neighbour, a card holding one job would carry ~180px of air —
     // which is the thing this rework exists to remove (DESIGN.md: density over
     // whitespace).
-    <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 2xl:grid-cols-4">
       {readable.map((kind) => (
         <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
       ))}

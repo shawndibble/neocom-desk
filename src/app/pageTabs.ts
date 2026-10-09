@@ -79,6 +79,7 @@ export const PI_TABS = definePageTabs('/planetary-industry', [
 export const MINING_TABS = definePageTabs('/mining', [
   { id: 'overview', labelKey: 'miningTax.overviewTab' },
   { id: 'tax', labelKey: 'miningTax.taxTab' },
+  { id: 'survey', labelKey: 'miningTax.surveyTab' },
 ]);
 
 /**

@@ -45,6 +45,15 @@ describe('FleetBoard', () => {
     expect(screen.getByRole('region', { name: 'Drones and deployables' })).toBeTruthy();
   });
 
+  it('opens with a Read-out: the reading, the threat and the cloaked-ships caveat', async () => {
+    render(<FleetBoard rows={ROWS} />);
+    const readout = await screen.findByTestId('dscan-readout');
+    expect(readout.textContent).toContain('A mining fleet');
+    expect(readout.textContent).toContain('Clear on scan');
+    expect(readout.textContent).toContain('Can it catch you');
+    expect(readout.textContent).toContain('Cloaked ships and anything past 14.3 AU do not show.');
+  });
+
   it('is one button, collapsed until pressed, that reveals the distance lanes', async () => {
     const user = userEvent.setup();
     render(<FleetBoard rows={ROWS} />);

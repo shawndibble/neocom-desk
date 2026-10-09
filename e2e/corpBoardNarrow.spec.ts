@@ -59,8 +59,10 @@ function makeAccessTokenWithCorpScopes(): string {
   return `${header}.${payload}.fakesig`;
 }
 
-/** Signs in as a Station_Manager and opens `/corp` with `structureCount` fuel clocks. */
-async function openCorpBoard(page: Page, structureCount: number) {
+const LONG_NAME = 'Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha';
+
+/** Logs in with the corp scopes granted, mocks one structure called `name`, and opens `/corp`. */
+async function openCorpBoard(page: Page, name: string, structureCount = 1): Promise<void> {
   // Registered after `installSsoMock` (the `page` fixture's own setup), so
   // Playwright tries this one first: same endpoint, a token carrying the
   // corp scope group too.
@@ -104,7 +106,7 @@ async function openCorpBoard(page: Page, structureCount: number) {
           // Deliberately long and unbroken: the regression this guards is
           // a flex child rendering without `min-w-0`, which overflows
           // instead of truncating — a short name would never surface it.
-          name: `Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha ${index + 1}`,
+          name: index === 0 ? name : `${name} ${index + 1}`,
           fuel_expires: new Date(Date.now() + (index + 2) * 86_400_000).toISOString(),
         }))
       );
@@ -119,16 +121,16 @@ async function openCorpBoard(page: Page, structureCount: number) {
   await expect(page).toHaveURL(/\/overview$/);
 
   await page.goto('./corp');
-  await expect(
-    page.getByText('Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha 1')
-  ).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 }
 
 test.describe('corp ops board — 320px width', () => {
   test.use({ viewport: NARROW });
 
-  test('the board holds without a horizontal scroll', async ({ page }) => {
-    await openCorpBoard(page, 1);
+  test('the board holds without a horizontal scroll, and empty cards stay compact', async ({
+    page,
+  }) => {
+    await openCorpBoard(page, LONG_NAME);
 
     // `scrollWidth` is never below `clientWidth`, so "not wider" is the whole
     // assertion — the same technique `productionCss.built.spec.ts` uses.
@@ -150,7 +152,49 @@ test.describe('corp ops board — 320px width', () => {
       scrollWidth,
       `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest: ${offenders.join(', ')}`
     ).toBeLessThanOrEqual(clientWidth);
+
+    // Empty cards stay (so "nothing due" differs from "cannot read") but are
+    // one quiet line: shorter than the fuel card holding a single row.
+    for (const width of [390, 1024, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      const height = (title: string) =>
+        page
+          .getByRole('heading', { name: title })
+          .locator('xpath=ancestor::section[1]')
+          .evaluate((el) => el.getBoundingClientRect().height);
+      const withRow = await height('Fuel');
+      expect(await height('Moon chunks'), `moons at ${width}`).toBeLessThan(withRow);
+      expect(await height('Structure timers'), `timers at ${width}`).toBeLessThan(withRow);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${width}`
+      ).toBe(true);
+    }
   });
+});
+
+test.describe('corp Kind Cards — whole structure names (#3124)', () => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+  ]) {
+    test(`the name wraps instead of truncating to one line at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await openCorpBoard(page, LONG_NAME);
+
+      const fits = await page
+        .getByText(LONG_NAME)
+        .evaluate((element) => element.scrollWidth <= element.clientWidth);
+      expect(fits, 'the name is cut off on one line instead of wrapping').toBe(true);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${viewport.width}`
+      ).toBe(true);
+    });
+  }
 });
 
 for (const width of [390, 1024, 1280]) {
@@ -160,7 +204,7 @@ for (const width of [390, 1024, 1280]) {
     test('the Show more button fits inside its card and the page does not overflow', async ({
       page,
     }) => {
-      await openCorpBoard(page, 5);
+      await openCorpBoard(page, LONG_NAME, 5);
 
       const toggle = page.getByRole('button', { name: 'Show 2 more' });
       await expect(toggle).toBeVisible();
@@ -169,9 +213,8 @@ for (const width of [390, 1024, 1280]) {
       if (width < 768) expect(box!.height).toBeGreaterThanOrEqual(44);
 
       const card = await toggle.evaluate((el) => {
-        const panel = el.closest('section')!;
-        const r = panel.getBoundingClientRect();
-        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        const r = el.closest('section')!.getBoundingClientRect();
+        return { left: r.left, right: r.right, bottom: r.bottom };
       });
       expect(box!.x).toBeGreaterThanOrEqual(card.left - 1);
       expect(box!.x + box!.width).toBeLessThanOrEqual(card.right + 1);

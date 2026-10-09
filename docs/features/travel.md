@@ -112,7 +112,7 @@ Two groups; waits for settings hydration (spinner) so a click cannot overwrite s
    - Security penalty 0-100 (disabled under Prefer shorter, with note).
    - Avoid EDENCOM systems / Triglavian minor-victory systems / systems with >= N pod kills in last hour (threshold 1-100, default 3; warning when pod-kill feed unavailable).
    - Avoided Systems switch + add picker + list with remove (per-row security).
-2. Route Safety only (`RouteHoleFields`): Route through Thera / Turnur switch; My ship fits (Small..Capital); Skip holes with under N h left (0-24, default 1); Hubs (all / Thera / Turnur); Use jump bridges switch (device-local) + "Manage Ansiblex (N)" button opening the dialog. Changing one saves default and drops link override.
+2. Route Safety only (`RouteHoleFields`): Route through Thera / Turnur switch; My ship fits (Small..Capital; picking a hull in Ship I am moving sets it from the hull's SDE group via `engine/route/hullWormholeSize.ts` and shows "Set from <hull>" until the size is edited; industrials, barges, Orca and Rorqual leave it alone); Skip holes with under N h left (0-24, default 1); Hubs (all / Thera / Turnur); Use jump bridges switch (device-local) + "Manage Ansiblex (N)" button opening the dialog. Changing one saves default and drops link override.
 
 Phone: panel folds with `ActiveRuleChips` summarising rules on (preference, penalty if not shortest, avoid chips, avoided count, hole hub, bridge count).
 

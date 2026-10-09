@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -36,6 +36,7 @@ vi.mock('@/features/loyalty/LpStorePicker', async () => {
 const { LoyaltyStore } = await import('./LoyaltyStore');
 const { useMarketHub } = await import('@/features/market/hub');
 const { usePriceBasis } = await import('@/features/loyalty/priceBasis');
+const { useLpBasis } = await import('@/features/loyalty/lpBasis');
 
 /**
  * Narrow, so the filters render inside the sheet. jsdom's stub never matches
@@ -100,6 +101,7 @@ beforeEach(() => {
   });
   useMarketHub.setState({ value: 'jita' });
   usePriceBasis.setState({ value: 'sell' });
+  useLpBasis.setState({ value: 'lp' });
 });
 
 afterEach(() => {
@@ -216,6 +218,25 @@ describe('LoyaltyStore LP Value cog', () => {
       'href',
       '/settings/market'
     );
+  });
+});
+
+describe('LoyaltyStore basis readout', () => {
+  it('names the hub and price basis, and CONCORD only on the CONCORD basis', () => {
+    renderStore();
+    const readout = screen.getByTestId('lp-basis-readout');
+    expect(readout).toHaveTextContent('Jita · Sell');
+    expect(readout).not.toHaveTextContent('CONCORD');
+
+    act(() => {
+      useMarketHub.setState({ value: OTHER_HUB.id });
+      usePriceBasis.setState({ value: 'buy' });
+    });
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy`);
+    expect(readout).not.toHaveTextContent('CONCORD');
+
+    act(() => useLpBasis.setState({ value: 'concord' }));
+    expect(readout).toHaveTextContent(`${OTHER_HUB.systemName} · Buy · CONCORD LP`);
   });
 });
 
@@ -783,6 +804,34 @@ describe('LoyaltyStore corporation picker (issue #2321)', () => {
     expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
       'info=corporation-1000168'
     );
+  });
+
+  it('keeps the offer count off the header and on the list panel, following the search', async () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows: [ITEM_ROW, UNRESOLVED_BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore('?affordableOnly=0');
+
+    expect(screen.queryByText('Offers shown')).not.toBeInTheDocument();
+    expect(screen.getByText('Your LP')).toBeInTheDocument();
+    expect(screen.getByText('12,000')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2 offers')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
+    expect(await screen.findByText('1 / 2 offers')).toBeInTheDocument();
   });
 
   it('opens the picked store from the URL', () => {
