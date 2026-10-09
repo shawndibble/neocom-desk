@@ -37,6 +37,8 @@ export interface FittingCompareColumn {
   /** Position in each row's `values`; null when this Fitting's stats couldn't be calculated. */
   statsIndex: number | null;
   header: ReactNode;
+  /** The Fitting's plain name, for the slim row pinned over the stat rows at `md` and up. */
+  name?: string;
 }
 
 /**
@@ -61,15 +63,25 @@ export interface FittingCompareTableProps {
   /** Which columns to render, and what heads them — the phone pager's window, or every column on desktop. */
   columns: readonly FittingCompareColumn[];
   differencesOnly: boolean;
+  /** Pin a slim row of Fitting names under the top edge while the stat rows scroll (not on the phone, whose pager header stays put). */
+  pinNames?: boolean;
 }
 
-export function FittingCompareTable({ rows, columns, differencesOnly }: FittingCompareTableProps) {
+export function FittingCompareTable({
+  rows,
+  columns,
+  differencesOnly,
+  pinNames = false,
+}: FittingCompareTableProps) {
   const { t } = useTranslation();
   const shown = differencesOnly ? rows.filter((row) => row.differs) : rows;
 
   if (shown.length === 0) {
     return <p className="text-xs text-text-dim">{t('fittings.compare.noDifferences')}</p>;
   }
+
+  // Only worth a second header line once there is a second column to tell apart.
+  const pinned = pinNames && columns.length >= 2 && columns.every((column) => column.name);
 
   return (
     <table className={COMPARE_TABLE_CLASS}>
@@ -83,6 +95,25 @@ export function FittingCompareTable({ rows, columns, differencesOnly }: FittingC
             </th>
           ))}
         </tr>
+        {pinned && (
+          // The tall header above scrolls away; this one-line strip stays under the top edge so a
+          // column of bare numbers never loses its Fitting. Its own cells carry the sticky (a
+          // sticky `tr` is unreliable) and an opaque background so rows don't show through.
+          <tr data-testid="compare-pinned-names" aria-hidden="true">
+            <th className="sticky top-0 z-10 border-b border-line bg-panel p-2 text-left font-normal text-text-dim">
+              {t('fittings.compare.statColumn')}
+            </th>
+            {columns.map((column) => (
+              <th
+                key={column.index}
+                title={column.name}
+                className="sticky top-0 z-10 truncate border-b border-line bg-panel p-2 text-right font-medium text-text"
+              >
+                {column.name}
+              </th>
+            ))}
+          </tr>
+        )}
       </thead>
       <tbody>
         {shown.map((row) => (
