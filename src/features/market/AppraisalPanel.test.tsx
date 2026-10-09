@@ -140,6 +140,18 @@ describe('AppraisalPanel', () => {
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
   });
 
+  it('sizes the paste box to its content', () => {
+    const rowsFor = (text: string) => {
+      cleanup();
+      renderPanel({ controller: controller({ text }) });
+      return screen.getByLabelText(/Items from inventory/).getAttribute('rows');
+    };
+    expect(rowsFor('')).toBe('6');
+    expect(rowsFor('a\nb\nc')).toBe('4');
+    expect(rowsFor('a\nb\nc\nd\ne\nf')).toBe('7');
+    expect(rowsFor(Array.from({ length: 40 }, (_, i) => `Item ${i}`).join('\n'))).toBe('14');
+  });
+
   it('renders a priced row with both sides', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Damage Control II/ });

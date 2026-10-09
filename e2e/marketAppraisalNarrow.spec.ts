@@ -425,4 +425,34 @@ test.describe('Market Appraisal — stacked result card', () => {
       ).toBeVisible();
     }
   });
+
+  // #3114: the paste box follows its content, so a short list does not leave a
+  // mostly empty box pushing the result down. Compared in-test, no pixel values.
+  for (const size of [
+    { name: '390px', viewport: PHONE },
+    { name: '1024px', viewport: { width: 1024, height: 800 } },
+    { name: '1280px', viewport: DESKTOP },
+  ]) {
+    test(`sizes the paste box to its content at ${size.name}`, async ({ page }) => {
+      await page.setViewportSize(size.viewport);
+      const paste = (n: number) =>
+        Array.from({ length: n }, (_, i) => (i % 2 ? 'Pyerite\t100' : 'Tritanium\t100')).join('\n');
+      const measure = async (lineCount: number) => {
+        await appraise(page, paste(lineCount));
+        const box = await page.getByLabel(/items from inventory/i).boundingBox();
+        const table = await page.getByRole('table', { name: 'Appraisal' }).boundingBox();
+        return {
+          textareaHeight: box!.height,
+          resultTop: table!.y + (await page.evaluate(() => window.scrollY)),
+        };
+      };
+      const short = await measure(3);
+      await expectNoPageOverflow(page);
+      const long = await measure(14);
+      await expectNoPageOverflow(page);
+
+      expect(short.textareaHeight).toBeLessThan(long.textareaHeight);
+      if (size.viewport.width < 1024) expect(short.resultTop).toBeLessThan(long.resultTop);
+    });
+  }
 });
