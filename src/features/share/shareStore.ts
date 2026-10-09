@@ -1,5 +1,5 @@
 /**
- * Stored **Share Links**: a short `/share/<id>` URL whose content lives in the
+ * Stored **Share Links**: a short `/s/<id>` URL whose content lives in the
  * top-level Firestore `shares` collection for a week, instead of being packed
  * into the URL. One collection for every share type — the doc's `type` says
  * which page opens it (`routes/SharedLink.tsx`), so a new shareable page adds
@@ -40,7 +40,7 @@ export type LoadShareResult =
 
 export function shareUrl(id: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${window.location.origin}${base}/share/${id}`;
+  return `${window.location.origin}${base}/s/${id}`;
 }
 
 export async function saveShare(input: {

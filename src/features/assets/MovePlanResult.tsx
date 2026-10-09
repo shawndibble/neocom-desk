@@ -196,8 +196,8 @@ export function PlanResult({
               <RailStop key={p.locationId} hue={hueOf(p.locationId)}>
                 <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
-                    <h3 className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-                      <span className="min-w-0 flex-1 font-bold [overflow-wrap:anywhere]">
+                    <h3 className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm">
+                      <span className="min-w-0 flex-1 font-bold max-sm:basis-full [overflow-wrap:anywhere]">
                         {placeLabel(p.locationId)}
                       </span>
                       <span className="font-bold tabular-nums">

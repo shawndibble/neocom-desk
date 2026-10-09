@@ -1,6 +1,6 @@
 # Mining Survey
 
-Route `/mining/survey` (the third Mining tab) and, for anyone with the link, `/share/<id>`.
+Route `/mining/survey` (the third Mining tab) and, for anyone with the link, `/s/<id>`.
 
 User goal: paste the in-game Survey Scanner results and see how much of the field is mined, how fast, and when it will be gone; post that to fleet chat in one tap; let other pilots watch and keep it updated, with no login.
 

@@ -1142,7 +1142,7 @@ describe('AppraisalPanel — the row as an item', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
 
       await waitFor(() => expect(written).toHaveLength(1));
-      expect(written[0]).toMatch(/\/share\/[0-9A-Za-z]{9}$/);
+      expect(written[0]).toMatch(/\/s\/[2-9a-hj-kmnp-z]{6}$/);
       expect(storedPaths()).toEqual([`shares/${written[0].split('/').pop()}`]);
       expect((setDoc.mock.calls[0] as unknown[])[1]).toMatchObject({
         type: 'appraisal',
@@ -1189,7 +1189,7 @@ describe('AppraisalPanel — the row as an item', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
 
       const field = await screen.findByLabelText('Share Link — works for 7 days');
-      expect((field as HTMLInputElement).value).toMatch(/\/share\/[0-9A-Za-z]{9}$/);
+      expect((field as HTMLInputElement).value).toMatch(/\/s\/[2-9a-hj-kmnp-z]{6}$/);
     });
 
     it('copies nothing when the share could not be stored', async () => {

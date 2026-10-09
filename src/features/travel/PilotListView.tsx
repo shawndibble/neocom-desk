@@ -487,7 +487,7 @@ export function DscanShareControl({
   const snapshot = buildDscanSnapshot(paste.text);
   const tooLarge = !snapshot.ok && snapshot.reason === 'too-large';
 
-  /** Stores the scan's raw text and copies its short `/share/<id>` link; the same scan shared again gets the same link. */
+  /** Stores the scan's raw text and copies its short `/s/<id>` link; the same scan shared again gets the same link. */
   async function handleShare() {
     if (!snapshot.ok || characterId === null || share.status === 'saving') return;
     const reuseKey = dscanSnapshotReuseKey(snapshot.value);

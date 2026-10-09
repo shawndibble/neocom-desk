@@ -17,7 +17,7 @@ const { startSurvey, addSurveyScan, loadSurvey } = vi.hoisted(() => ({
 }));
 vi.mock('./surveyStore', () => ({ startSurvey, addSurveyScan, loadSurvey }));
 vi.mock('@/features/share/shareStore', () => ({
-  shareUrl: (id: string) => `https://neocomdesk.test/share/${id}`,
+  shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
 }));
 // The moon tax has its own test; here only who sees it editable matters.
 vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
@@ -72,7 +72,7 @@ beforeEach(async () => {
   loadSurvey.mockReset();
   startSurvey.mockResolvedValue({
     id: ID,
-    url: `https://neocomdesk.test/share/${ID}`,
+    url: `https://neocomdesk.test/s/${ID}`,
     expiresAt: EXPIRES,
   });
   addSurveyScan.mockResolvedValue(undefined);

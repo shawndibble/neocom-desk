@@ -4,7 +4,7 @@ User goal: send someone a short URL to an appraisal or a fitting; the recipient 
 
 | Route / piece                                                     | What                                                   | Where                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
-| `/share/:shareId`                                                 | Stored Share Link, 9-char id, 7 days                   | `src/routes/SharedLink.tsx`                               |
+| `/s/:shareId` (+ legacy `/share/:shareId`)                        | Stored Share Link, 6-char key, 7 days                  | `src/routes/SharedLink.tsx`                               |
 | `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
 | Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
 | Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
@@ -15,7 +15,7 @@ User goal: send someone a short URL to an appraisal or a fitting; the recipient 
 
 Both routes sit outside `RequireCharacter`/`ScopeGate` (`src/app/App.tsx:360-370`; `routeScopes.test.ts` asserts the exemption). The literal `/share/fitting` outranks `:shareId`.
 
-See also: `entities-share.md` (another author; id format, 7-day TTL and in-memory reuse agree).
+See also: `entities-share.md` (another author; key format, 7-day TTL and in-memory reuse agree).
 
 ## Controls and behavior
 
@@ -24,7 +24,7 @@ See also: `entities-share.md` (another author; id format, 7-day TTL and in-memor
 - Appraisal icon button "Copy Share Link": snapshot = hub id, price percent, `generatedAt` (epoch s), items with per-unit prices at 100% (`buildAppraisalSnapshot`, max `MAX_SNAPSHOT_ITEMS` = 1000). Disabled with no Character, sync not configured, no rows, too many items, or while saving. Tooltips only for too-large, saving, failed, copied ("works for 7 days"). Clipboard refusal shows a "Share Link - works for 7 days" row with Copy (`manual`). Icon becomes a tick when copied.
 - Fitting: encodes `fittingShareCode`; too large -> "Too large to share as a link."; no Character or sync not configured -> "Couldn't create the Share Link. Try again."; clipboard refusal after save -> "Share Link ready - choose Copy Share Link again to copy it." A reused link copies with no await so it stays inside the click gesture.
 
-**Opening `/share/:shareId`** (`loadShare`)
+**Opening `/s/:shareId`** (`loadShare`)
 
 - Bad id shape -> `not-found` with no Firestore read; `permission-denied` -> `not-found`; other error -> `failed`; missing or expired -> `not-found`; unknown type -> `unsupported`.
 - A result for a previous id is ignored if the visitor follows another link.
@@ -49,8 +49,8 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 
 ## Rules and thresholds
 
-- `SHARE_TYPES = ['appraisal','fitting']`, `SHARE_TTL_MS` 7 d. Rules: `get` iff `expiresAt > request.time`; `list` denied; `create` needs auth, id `^[0-9A-Za-z]{9}$`, exact keys, type in list, `payload` map, `createdAt == request.time`, `expiresAt` future and < 8 d; appraisal `items` list <= 1000; fitting `code` <= 20100 chars; update/delete denied. A Firestore TTL deletes docs (can lag ~1 day), so `loadShare` also checks expiry.
-- Id: 9 base-62 chars, unbiased rejection sampling, ~53 bits, minted client-side (`engine/share/shareId.ts`); a collision is refused by the create-only rule.
+- `SHARE_TYPES = ['appraisal','fitting']`, `SHARE_TTL_MS` 7 d. Rules: `get` iff `expiresAt > request.time`; `list` denied; `create` needs auth, id `^([0-9A-Za-z]{9}|[2-9a-hj-kmnp-z]{6})$` (legacy or new), exact keys, type in list, `payload` map, `createdAt == request.time`, `expiresAt` future and < 8 d; appraisal `items` list <= 1000; fitting `code` <= 20100 chars; update/delete denied. A Firestore TTL deletes docs (can lag ~1 day), so `loadShare` also checks expiry.
+- Id: 6 chars of a 31-letter unambiguous lowercase alphabet (no 0/o/1/l/i), unbiased rejection sampling, ~30 bits; legacy 9-char base-62 ids from `/share/<id>` still open until they expire, minted client-side (`engine/share/shareId.ts`); a collision is refused by the create-only rule.
 - Reuse: same content returns the session's link unless < 24 h from expiry (`REUSE_MARGIN_MS`).
 
 ## Decisions
@@ -60,13 +60,13 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 ## Tests assert
 
 - `SharedLink.test.tsx`: appraisal shows at its shared prices plus expiry; a signed-in visitor is never redirected from an appraisal; "Open" goes to the live Appraisal tab at the share's hub and percent, re-reading by id; a signed-out visitor goes through login first; expired or unknown reads as expired; a malformed stored appraisal is an invalid link, not a crash; a fitting redirects a signed-in visitor to the editor on its code; a malformed fitting payload is invalid for a signed-out visitor.
-- `shareStore.test.ts`: `shareUrl` is `/share/<id>` on this origin; `saveShare` signs in, then creates with server `createdAt` and a week expiry; `loadShare` returns type and payload; an expired doc is gone; missing or rule-refused is gone; an impossible id never touches Firestore; unknown type = unsupported, network failure = failed; `createShareLink` stores under a fresh id and returns the short URL, same content gives the same link without a second doc, different content or type makes a new link, no reuse within a day of expiry, nothing remembered after a failed save.
+- `shareStore.test.ts`: `shareUrl` is `/s/<id>` on this origin; `saveShare` signs in, then creates with server `createdAt` and a week expiry; `loadShare` returns type and payload; an expired doc is gone; missing or rule-refused is gone; an impossible id never touches Firestore; unknown type = unsupported, network failure = failed; `createShareLink` stores under a fresh id and returns the short URL, same content gives the same link without a second doc, different content or type makes a new link, no reuse within a day of expiry, nothing remembered after a failed save.
 - `FittingShared.test.tsx`: invalid message with no code or an undecodable one; read-only All V view with no session, and Copy Fitting writes EFT text (`[Rifter, Rifter]`); a signed-in visitor is redirected without computing stats; load-failed message when resolving throws; hull named above the Ring and cargo in the module list.
 
 ## Interview Q&A
 
 1. Why stored short links? Big appraisals and fits exceed sane URLs (decision `20261002-125432`).
-2. Who can read one? Anyone with the 9-char id; `get` only, no list, no uid (`firestore.rules:243-263`).
+2. Who can read one? Anyone with the 6-char key; `get` only, no list, no uid (`firestore.rules:243-263`).
 3. How is expiry enforced? Rules, client re-check, TTL policy (lags ~1 day).
 4. How are duplicates avoided? In-session reuse by content unless < 24 h left (`shareStore.ts`).
 5. Why copy inside the click? The client-minted id lets a reused link copy with no await; failures fall to a manual-copy row.

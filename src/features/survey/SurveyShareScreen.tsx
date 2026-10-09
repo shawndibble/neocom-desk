@@ -1,5 +1,5 @@
 /**
- * The public page of a shared Survey, opened from `/share/<id>`: the same
+ * The public page of a shared Survey, opened from `/s/<id>`: the same
  * board the Survey tab shows, with no login. Anyone holding the link can add a
  * scan (paste into the box, or press Ctrl+V anywhere on the page), so the
  * Survey carries on after the pilot who started it has left.

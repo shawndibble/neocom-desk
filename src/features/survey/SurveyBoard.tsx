@@ -1,7 +1,7 @@
 /**
  * The Survey board: one panel with progress, the chart and the headline
  * numbers, what the caller puts under it (the moon tax), then what's left by ore. Shared by the Mining › Survey
- * tab and the public `/share/<id>` page, so both read and behave the same; the
+ * tab and the public `/s/<id>` page, so both read and behave the same; the
  * caller supplies the scans and what "add a scan" does.
  *
  * Laid out as the chart-led mockup: the percent leads, the legend and charts come next, and the big stat tiles sit

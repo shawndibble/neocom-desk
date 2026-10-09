@@ -37,7 +37,7 @@ type TypeName = (typeId: number) => string;
  * The read-only view a Fitting Share Code (#1544) opens with no session:
  * every skill at level V, stated in a banner, the Fitting's own implant set
  * if it carries one (`resolveFittingShareView`). Outside `RequireCharacter`
- * and `ScopeGate` deliberately, the same exemption `/share/:shareId` has
+ * and `ScopeGate` deliberately, the same exemption `/s/:shareId` has
  * (`routeScopes.test.ts` asserts it) — this is the second unauthenticated
  * content route, not the first.
  *
