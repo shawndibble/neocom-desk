@@ -154,6 +154,9 @@ describe('SurveyBoard', () => {
       expect(tierOf('Veldspar')).toBe('yellow');
       expect(tierOf('Pyroxeres')).toBe('blue');
       expect(screen.getByText('Bar colour is ISK per m³ left')).toBeTruthy();
+      // Colour is never the only signal: each row also says its tier in words for a screen reader.
+      expect(screen.getByText(/highest value per m³/)).toBeTruthy();
+      expect(screen.getByText(/low value per m³/)).toBeTruthy();
     });
 
     it('shows each ore with its rocks and the ISK left in it', () => {

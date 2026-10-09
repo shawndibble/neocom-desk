@@ -205,8 +205,8 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     entry.isk += rock.isk ?? 0;
   }
   // Biggest value left first when the scan carries ISK, else biggest volume.
-  const rank = (o: SurveyOre): number =>
-    last.rocks.some((r) => r.isk !== undefined) ? o.isk : o.volume;
+  const hasIsk = last.rocks.some((r) => r.isk !== undefined);
+  const rank = (o: SurveyOre): number => (hasIsk ? o.isk : o.volume);
   const ores = [...byOre.values()].sort(
     (a, b) => rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume
   );

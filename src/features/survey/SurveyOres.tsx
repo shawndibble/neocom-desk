@@ -34,6 +34,12 @@ export function SurveyOres({ summary }: { summary: SurveySummary }) {
                       isk: formatIskCompact(ore.isk),
                       percent: leftPercent,
                     })}
+                    {hasIsk && (
+                      <span className="sr-only">
+                        {' · '}
+                        {t(`survey.tier.${tiers.get(ore.ore) ?? 'gray'}`)}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="h-2 rounded-xs bg-line" aria-hidden="true">

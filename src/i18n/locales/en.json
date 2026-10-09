@@ -3976,6 +3976,12 @@
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
     "oreRowIsk": "{{rocks}} · {{volume}} m³ · {{isk}} ISK · {{percent}}% left",
     "valueRamp": "Bar colour is ISK per m³ left",
+    "tier": {
+      "gray": "lowest value per m³",
+      "blue": "low value per m³",
+      "yellow": "high value per m³",
+      "orange": "highest value per m³"
+    },
     "valueLow": "lower",
     "valueHigh": "higher",
     "legendRate": "Mining rate",
