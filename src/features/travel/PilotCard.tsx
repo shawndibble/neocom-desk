@@ -64,9 +64,9 @@ export function PilotCard({
     <li
       className={cx(
         'space-y-1.5 border border-l-2 border-line border-l-transparent p-2.5',
-        tone !== null && THREAT_ROW_CLASS[tone] !== '' ? THREAT_ROW_CLASS[tone] : 'bg-panel',
-        threat === 'dangerous' &&
-          'border-danger bg-linear-to-r from-danger/20 to-danger/5 shadow-[0_0_18px_-4px] shadow-danger/50'
+        tone !== 'warning' && 'bg-panel',
+        tone !== null && THREAT_ROW_CLASS[tone],
+        threat === 'dangerous' && 'border-danger shadow-[0_0_18px_-4px] shadow-danger/50'
       )}
     >
       <div className="flex items-center gap-2.5">
