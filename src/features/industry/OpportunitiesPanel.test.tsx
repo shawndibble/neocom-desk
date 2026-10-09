@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@/i18n';
 import { db } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
+import {
+  OPPORTUNITIES_DEFAULT_COLUMNS,
+  useVisibleOpportunitiesColumns,
+} from './opportunitiesColumns';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const loadCharacterBlueprints = vi.hoisted(() => vi.fn());
@@ -191,6 +195,18 @@ describe('OpportunitiesPanel', () => {
       const { row } = await renderWithRow(1000);
       expect(within(row).queryByRole('link', { name: 'Widget Alpha' })).not.toBeInTheDocument();
       expect(within(row).getByText('Widget Alpha')).toBeInTheDocument();
+    });
+
+    it('starts with Blueprint, Time and Depth hidden; a ticked column shows', async () => {
+      const { row } = await renderWithRow(1000);
+      const table = row.closest('table')!;
+      expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+      for (const name of ['Blueprint', 'Time', 'Depth']) {
+        expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument();
+      }
+      act(() => useVisibleOpportunitiesColumns.setState({ value: ['duration'] }));
+      expect(await within(table).findByRole('columnheader', { name: /Time/ })).toBeInTheDocument();
+      act(() => useVisibleOpportunitiesColumns.setState({ value: OPPORTUNITIES_DEFAULT_COLUMNS }));
     });
 
     it('clicking the product name starts the plan, like the Plan button', async () => {
