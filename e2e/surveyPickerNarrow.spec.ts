@@ -15,7 +15,7 @@ import { signInAndGoto } from './support/authSeed';
 const PHONE = { width: 390, height: 844 };
 
 const IDS = ['abc123XYZ', 'def456UVW'];
-const ORE = 'Dark Ochre Of Extraordinary Len';
+const ORE = 'Dark Ochre Of Extraordinary Lengt';
 const SCAN = `${ORE}\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\n${ORE}\t55\t55,000 m3\t11,300,000.00 ISK\t10 km`;
 
 async function mockSurveys(page: Page): Promise<void> {
