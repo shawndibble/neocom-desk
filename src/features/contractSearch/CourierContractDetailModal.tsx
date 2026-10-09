@@ -23,6 +23,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Modal, Tooltip } from '@/components/ui';
+import { CopyContractIdButton } from '@/features/contracts/CopyContractIdButton';
 import { Caret } from '@/components/ui/Disclosure';
 import { SystemLink } from '@/features/entities';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -616,7 +617,15 @@ export function CourierContractDetailModal({
             label={t('contractSearch.listingExpiresLabel')}
             value={formatTimestamp(new Date(row.dateExpired), timeZone)}
           />
-          <Figure label={t('contractDetail.contractIdLabel')} value={String(row.contractId)} />
+          <Figure
+            label={t('contractDetail.contractIdLabel')}
+            value={
+              <span className="flex items-center gap-1">
+                {String(row.contractId)}
+                <CopyContractIdButton contractId={row.contractId} />
+              </span>
+            }
+          />
         </div>
       </div>
     </Modal>
