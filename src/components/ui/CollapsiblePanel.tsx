@@ -9,6 +9,8 @@ interface CollapsiblePanelProps {
   meta?: ReactNode;
   /** Passed to `Panel`: on a phone `meta` drops to its own line under the title. */
   wrapMeta?: boolean;
+  /** Passed to `Panel`: with `wrapMeta`, `meta` takes a full-width second row on a phone. */
+  metaOwnRow?: boolean;
   /** Header controls other than the caret; always visible. */
   actions?: ReactNode;
   expanded: boolean;
@@ -54,6 +56,7 @@ export function CollapsiblePanel({
   title,
   meta,
   wrapMeta,
+  metaOwnRow,
   actions,
   expanded,
   onToggle,
@@ -70,6 +73,7 @@ export function CollapsiblePanel({
       title={title}
       meta={meta}
       wrapMeta={wrapMeta}
+      metaOwnRow={metaOwnRow}
       className={className}
       padded={padded}
       actions={

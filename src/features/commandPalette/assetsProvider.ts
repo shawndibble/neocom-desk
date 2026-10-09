@@ -82,7 +82,7 @@ export function assetsHref(
 ): string {
   const params = new URLSearchParams({ q: name });
   if (holderIds.some((id) => id !== activeCharacterId)) params.set('chars', 'all');
-  return `/assets?${params.toString()}`;
+  return `/assets/items?${params.toString()}`;
 }
 
 const ASSETS_SCOPES = requiredScopesForEndpoints(['getCharacterAssets']);

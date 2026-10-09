@@ -34,7 +34,6 @@ const CONCRETE_PATH: Partial<Record<AppRoutePath, string>> = {
   '/industry/plans/:planId': '/industry/plans/e2e-missing-plan',
   '/industry/groups/:groupId': '/industry/groups/e2e-missing-group',
   '/market/lp-store/:corporationId': `/market/lp-store/${CORPORATION_ID}`,
-  '/assets/*': '/assets/e2e-missing-location',
   '/corp/assets/*': '/corp/assets/e2e-missing-location',
 };
 

@@ -159,9 +159,8 @@ export const ROUTE_REQUIREMENTS = {
    * grant.
    */
   '/corp/assets': UNGATED,
-  // The drill-down's deeper levels (issue #779), same reasoning as
-  // `/assets/*` below: every level renders the same component off the same
-  // gate, so it gates identically.
+  // The drill-down's deeper levels (issue #779): every level renders the same
+  // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,
 
   // One scope each, so a missing grant leaves the page with literally nothing
@@ -176,21 +175,6 @@ export const ROUTE_REQUIREMENTS = {
   // #1590; Assets.tsx / features/character/location.ts) instead of
   // gating the whole tab on a grant most existing users don't have yet.
   '/assets': {
-    endpoints: [
-      'getCharacterAssets',
-      'getUniverseStation',
-      'getUniverseSystem',
-      'postUniverseNames',
-      'getUniverseType',
-      'getUniverseGroup',
-    ],
-    strings: 'assets',
-  },
-  // The drill-down's deeper levels (issue #148 follow-up). "Where am I" lives
-  // in the URL so the back button steps up a level instead of leaving the
-  // page, which makes every level a real route — and every level renders the
-  // same component off the same endpoints, so it gates identically.
-  '/assets/*': {
     endpoints: [
       'getCharacterAssets',
       'getUniverseStation',

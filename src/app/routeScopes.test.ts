@@ -80,7 +80,6 @@ describe('gated routes', () => {
   it('are exactly the single-scope D3 views', () => {
     expect(paths.filter(isGatedRoute).sort()).toEqual([
       '/assets',
-      '/assets/*',
       '/clones',
       '/contacts',
       '/mail',

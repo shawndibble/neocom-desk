@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { MovePlanModal } from './MovePlanModal';
+import { MovePlanTab } from './MovePlanTab';
 
 const asset = (item_id: number, type_id: number, location_id: number, quantity = 1000) => ({
   item_id,
@@ -73,14 +73,14 @@ async function open() {
   const user = userEvent.setup();
   render(
     <MemoryRouter>
-      <MovePlanModal open onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
     </MemoryRouter>
   );
   await screen.findByText('Alice');
   return user;
 }
 
-describe('MovePlanModal', () => {
+describe('MovePlanTab', () => {
   it('plans a move from the picker to the destination system with a Route Safety link per pickup', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, Modal, Spinner } from '@/components/ui';
+import { Button, FilterChip, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import { planMove, type MoveHull } from '@/engine/assets/movePlan';
@@ -16,7 +16,6 @@ import {
 import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
@@ -102,30 +101,23 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues };
 }
 
-interface MovePlanModalProps {
-  open: boolean;
+interface MovePlanTabProps {
+  /** Leaves the plan: Cancel, and Done on the result. The page returns to its Items tab. */
   onClose: () => void;
   /** The Characters the page's filter names. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
-  filterControl?: ReactNode;
 }
 
 /**
  * Plan a move: tick what to carry, say where to, see the work list per
- * Character and pickup with a suggested hauler. Modal state only — no route.
+ * Character and pickup with a suggested hauler. The Assets page's Move tab
+ * mounts it, so its state lasts while the tab is open and starts fresh on re-entry.
  * Volumes and trips are an estimate from hull class; the Route Safety link
  * answers the safety question.
  */
-export function MovePlanModal({
-  open,
-  onClose,
-  characterIds,
-  activeCharacterId,
-  filterControl,
-}: MovePlanModalProps) {
+export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePlanTabProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -144,9 +136,8 @@ export function MovePlanModal({
   const idsKey = characterIds.join(',');
 
   useEffect(() => {
-    if (!open) return;
     let live = true;
-    /* eslint-disable react-hooks/set-state-in-effect -- reset for a new open or Character set */
+    /* eslint-disable react-hooks/set-state-in-effect -- reset for a new Character set */
     setLoaded(null);
     setFailed(false);
     setSelected(new Set());
@@ -176,7 +167,7 @@ export function MovePlanModal({
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- idsKey stands for characterIds
-  }, [open, idsKey]);
+  }, [idsKey]);
 
   const grouped = useMemo(() => {
     const out = new Map<number, Map<number, PickerStack[]>>();
@@ -314,15 +305,12 @@ export function MovePlanModal({
     .join(' + ');
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('assets.movePlan.title')}
-      placement={isPhone ? 'sheet-full' : 'wide'}
+    <section
+      aria-label={t('assets.movePlan.title')}
+      className="min-h-0 flex-1 overflow-y-auto rounded-xs border border-line bg-panel p-3"
     >
       <div className="flex min-h-full flex-col gap-3 text-sm">
-        {open && <HullSource characterId={activeCharacterId} intoRef={hullSource} />}
-        {filterControl}
+        <HullSource characterId={activeCharacterId} intoRef={hullSource} />
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
         ) : !loaded ? (
@@ -431,9 +419,8 @@ export function MovePlanModal({
               />
             </section>
             {planFailed && <p className="text-text-dim">{t('assets.movePlan.planFailed')}</p>}
-            {/* Sticky rather than a Modal footer prop: the sheet body is the
-                scroller (same bar FilterBar sheet uses). */}
-            <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+            {/* Sticky to the tab body's own scroller, so the totals stay in reach. */}
+            <div className="sticky bottom-0 mt-auto -mx-3 -mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-2">
               <div className="flex min-w-0 basis-full flex-col gap-1.5 sm:flex-1 sm:basis-0">
                 <div className="flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
                   {segments.map((s) => (
@@ -474,7 +461,7 @@ export function MovePlanModal({
           </>
         )}
       </div>
-    </Modal>
+    </section>
   );
 }
 
@@ -496,7 +483,7 @@ interface HullSourceData {
 }
 
 /**
- * Loads the fitting catalogue and pilot profile only while the modal is open,
+ * Loads the fitting catalogue and pilot profile only while the Move tab is open,
  * so the Assets page does not pull the fitting data on every visit.
  */
 function HullSource({

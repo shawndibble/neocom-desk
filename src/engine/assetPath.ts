@@ -1,7 +1,7 @@
 /**
  * The Assets page browses one level at a time (issue #148 follow-up): a
  * location list, then a station's contents, then a container's, and so on.
- * "Where am I" lives in the URL (`/assets/:stationId/*`) rather than in
+ * "Where am I" lives in the URL (`/assets/items/:stationId/*`) rather than in
  * component state, so the phone's back button steps *up* a level instead of
  * leaving the page, and a refresh or a shared link lands in the same place.
  *
@@ -106,10 +106,16 @@ export interface ParsedAssetPath {
 
 const ROOT_PARSE: ParsedAssetPath = { stationId: null, segments: [] };
 
+/** The Items tab: the drill-down lives below this one path segment. */
+const ITEMS_TAB = 'items';
+
 /**
  * Reads the `/assets/*` wildcard back into a station id plus node segments.
- * A path whose first segment isn't a station id resolves to the root rather
- * than to `NaN` — hand-edited and truncated URLs are expected input here.
+ * The drill-down sits under the Items tab, so the wildcard's leading `items`
+ * segment is skipped; on any other tab the wildcard names no station and
+ * resolves to the root. A path whose first segment isn't a station id also
+ * resolves to the root rather than to `NaN` — hand-edited and truncated URLs
+ * are expected input here.
  */
 export function parseAssetPath(wildcard: string): ParsedAssetPath {
   const parts = wildcard
@@ -124,7 +130,7 @@ export function parseAssetPath(wildcard: string): ParsedAssetPath {
         return part;
       }
     });
-  if (parts.length === 0) return ROOT_PARSE;
+  if (parts.shift() !== ITEMS_TAB || parts.length === 0) return ROOT_PARSE;
 
   const [head, ...segments] = parts;
   if (!/^\d+$/.test(head)) return ROOT_PARSE;
@@ -133,6 +139,29 @@ export function parseAssetPath(wildcard: string): ParsedAssetPath {
 
 /** Builds the href for a location and a depth beneath it. */
 export function assetPathHref(stationId: number | null, segments: readonly string[]): string {
-  if (stationId === null) return '/assets';
-  return ['/assets', String(stationId), ...segments].join('/');
+  if (stationId === null) return `/assets/${ITEMS_TAB}`;
+  return ['/assets', ITEMS_TAB, String(stationId), ...segments].join('/');
+}
+
+/**
+ * Where a pre-tabs Assets URL now lives, or `null` when it needs no move (the
+ * default-tab redirect handles the rest). `/assets/<location>/...` was the
+ * drill-down before it went under the Items tab; `/assets?view=ships` opened
+ * My ships before that was the Ships tab. The query rides along, less the
+ * retired `view` param.
+ */
+export function legacyAssetsLocation(
+  pathname: string,
+  search: string
+): { pathname: string; search: string } | null {
+  const rest = pathname.replace(/^\/assets\/?/, '').replace(/\/$/, '');
+  if (/^\d+(\/|$)/.test(rest)) return { pathname: `/assets/${ITEMS_TAB}/${rest}`, search };
+  if (rest === '') {
+    const params = new URLSearchParams(search);
+    if (params.get('view') !== 'ships') return null;
+    params.delete('view');
+    const kept = params.toString();
+    return { pathname: '/assets/ships', search: kept ? `?${kept}` : '' };
+  }
+  return null;
 }

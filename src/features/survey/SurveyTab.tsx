@@ -22,9 +22,11 @@ import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
+import { MoonTaxRow } from './MoonTaxRow';
 import { SurveyPicker } from './SurveyPicker';
 import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
+import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
@@ -192,7 +194,14 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           )}
           <SurveyBoard
             scans={scans}
-            viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
+            viewerLine={(summary) => (
+              <>
+                <YourShareRow characterId={characterId} summary={summary} />
+                {characterId !== null && (
+                  <MoonTaxLine characterId={characterId} oreNames={summary.oreNames} />
+                )}
+              </>
+            )}
             url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
             expiresAt={expiresAt}
             onAdd={add}
@@ -212,4 +221,9 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
       )}
     </div>
   );
+}
+
+/** The moon tax row, only once the Survey shows a moon ore. */
+function MoonTaxLine({ characterId, oreNames }: { characterId: number; oreNames: string[] }) {
+  return useHasMoonOre(oreNames) ? <MoonTaxRow characterId={characterId} /> : null;
 }

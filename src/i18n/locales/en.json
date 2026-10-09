@@ -3964,6 +3964,7 @@
     "yourShareWithPercent": "You mined {{volume}} m³ of these ores in {{system}} · {{percent}}% of what's been mined",
     "yourShareTooltipLabel": "About your share",
     "yourShareTooltip": "From your mining ledger, which counts whole days (EVE time) in one system and runs a few minutes behind the game. Ore you mined there before the first scan counts too.",
+    "minedIn": "Systems you mined in",
     "changeSystem": "Change system",
     "systemLabel": "Solar system",
     "systemPlaceholder": "System name",
@@ -3983,7 +3984,17 @@
     "oreRocks_other": "{{count}} rocks",
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
     "oreRowIsk": "{{rocks}} · {{volume}} m³ · <isk/> ISK · {{percent}}% left",
-    "valueRamp": "Bar colour is ISK per m³ left",
+    "valueRamp": "Bar colour is ISK per m³ left · {{hub}} buy, {{form}}",
+    "moonTax": {
+      "label": "Moon tax",
+      "payee": "Who gets the tax",
+      "payeePlaceholder": "Corporation or pilot",
+      "rate": "Tax rate, percent",
+      "open": "Open in Mining Tax",
+      "failed": "Couldn't save that Payee. Try again."
+    },
+    "formCompressed": "compressed",
+    "formRaw": "raw",
     "tier": {
       "gray": "lowest value per m³",
       "blue": "low value per m³",
@@ -3994,6 +4005,7 @@
     "valueHigh": "higher",
     "legendRate": "Mining rate",
     "legendProjection": "Dashed: finish at the current pace",
+    "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",
     "shareHint": "Anyone with this link can add a scan. The page updates every 20 seconds.",
     "gone": "This survey has expired",
@@ -4526,8 +4538,12 @@
     "saveFailed": "Couldn’t save — nothing was changed. Try again."
   },
   "assets": {
+    "tabs": {
+      "items": "Items",
+      "ships": "Ships",
+      "move": "Move"
+    },
     "movePlan": {
-      "menuItem": "Plan a move…",
       "title": "Plan a move",
       "loading": "Reading the assets…",
       "failed": "Could not read assets.",
@@ -4705,7 +4721,6 @@
     },
     "myShips": {
       "title": "My ships",
-      "hint": "nearest first",
       "loading": "Loading ships…",
       "error": "Could not read your ships.",
       "emptyTitle": "No ships found",
@@ -4713,7 +4728,6 @@
       "showAllCharacters": "Show all characters",
       "inCargo": "In cargo",
       "here": "Here",
-      "summary": "{{ships}} across {{characters}} · nearest first",
       "unknownType": "Type #{{id}}",
       "searchLabel": "Search ships",
       "searchPlaceholder": "Ship, hull or location",
@@ -7980,6 +7994,7 @@
   },
   "share": {
     "title": "Shared link",
+    "brand": "Neocom Desk",
     "openInApp": "Open Neocom Desk",
     "logIn": "Log in with EVE Online",
     "choosePermissions": "Choose permissions…",

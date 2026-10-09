@@ -53,7 +53,6 @@ const ROUTE_TITLE_KEYS = {
   '/corp/assets': ['corp.title', 'corp.assets.title'],
   '/corp/assets/*': ['corp.title', 'corp.assets.title'],
   '/assets': ['assets.title'],
-  '/assets/*': ['assets.title'],
   '/mail': ['mail.title'],
   '/calendar': ['calendar.title'],
   '/contracts': ['contracts.title'],

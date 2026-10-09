@@ -27,6 +27,12 @@ export interface PageTab<Id extends string = string> {
    * `tabBarTabs` leaves it out of the bar.
    */
   readonly standalone?: boolean;
+  /**
+   * The tab owns every path below it, not just its own segment: Assets' Items
+   * tab is `/assets/items` and also each drill-down level under it
+   * (`/assets/items/<location>/...`), which the page parses itself.
+   */
+  readonly deep?: boolean;
 }
 
 export interface PageTabs<Id extends string = string> {
@@ -85,7 +91,7 @@ export function isWithinPage(page: PageTabs, pathname: string): boolean {
 
 /**
  * The tab `pathname` names, or `null` when it names none: the bare base path,
- * an unknown segment, or anything deeper than one segment below the base. A
+ * an unknown segment, or anything deeper than one segment below the base (bar a `deep` tab's own subtree). A
  * trailing slash is tolerated, as React Router itself tolerates it.
  */
 export function tabFromPathname<Id extends string>(
@@ -94,7 +100,9 @@ export function tabFromPathname<Id extends string>(
 ): Id | null {
   if (!pathname.startsWith(`${page.base}/`)) return null;
   const segment = pathname.slice(page.base.length + 1).replace(/\/$/, '');
-  return page.tabs.find((tab) => tab.id === segment)?.id ?? null;
+  const exact = page.tabs.find((tab) => tab.id === segment);
+  if (exact) return exact.id;
+  return page.tabs.find((tab) => tab.deep && segment.startsWith(`${tab.id}/`))?.id ?? null;
 }
 
 /**

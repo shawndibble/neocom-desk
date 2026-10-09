@@ -27,8 +27,8 @@ interface ShareShellProps {
 
 /**
  * The frame every Share Link page renders in: no navigation chrome (it sits
- * outside `RequireCharacter` and `ScopeGate`), the brand, a title, and one way
- * back into the live app. A visitor with no Character gets "Log in" instead,
+ * outside `RequireCharacter` and `ScopeGate`), the brand and one way
+ * into the live app in a header, then the page's title. A visitor with no Character gets "Log in" instead,
  * which starts the EVE login right here with `setLoginReturnTo` carrying them
  * on to the same page after, and a small "Choose permissions" link under it
  * that opens the Customize permissions dialog first (#3075).
@@ -58,35 +58,42 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
-      <div className="flex items-center gap-2">
-        <LogoMark className="size-6" />
-        <h1 className="text-sm font-semibold tracking-widest uppercase">{title}</h1>
-        {actions && <span className="ml-auto">{actions}</span>}
-      </div>
-
-      {children}
-
-      {signedOut ? (
-        <div className="flex flex-col items-center gap-2">
-          <Button variant="primary" loading={loggingIn} onClick={logIn} className="w-full">
-            {t('share.logIn')}
-          </Button>
-          <Button size="sm" onClick={choosePermissions}>
-            {t('share.choosePermissions')}
-          </Button>
-          <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
-        </div>
-      ) : (
-        <Link
-          to={target.path}
-          state={target.state}
-          onClick={loading ? () => setLoginReturnTo(target.path) : undefined}
-          className={buttonClassName({ size: 'sm' })}
-        >
-          {t('share.openInApp')}
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Link to="/" className="flex items-center gap-2 text-sm font-semibold tracking-wide">
+          <LogoMark className="size-6" />
+          {t('share.brand')}
         </Link>
-      )}
-    </main>
+        {signedOut ? (
+          <div className="flex flex-col items-end gap-1 max-sm:w-full max-sm:items-stretch">
+            <Button variant="accent" loading={loggingIn} onClick={logIn}>
+              {t('share.logIn')}
+            </Button>
+            <Button size="sm" onClick={choosePermissions}>
+              {t('share.choosePermissions')}
+            </Button>
+            <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
+          </div>
+        ) : (
+          <Link
+            to={target.path}
+            state={target.state}
+            onClick={loading ? () => setLoginReturnTo(target.path) : undefined}
+            className={buttonClassName({ variant: 'accent' })}
+          >
+            {t('share.openInApp')}
+          </Link>
+        )}
+      </header>
+
+      <main className="flex flex-1 flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-semibold tracking-widest uppercase">{title}</h1>
+          {actions && <span className="ml-auto">{actions}</span>}
+        </div>
+
+        {children}
+      </main>
+    </div>
   );
 }

@@ -7,14 +7,20 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, TextInput, textActionClassName } from '@/components/ui';
+import { Button, InfoTooltip, TextInput, textActionClassName } from '@/components/ui';
 import type { SurveySummary } from '@/engine/survey/series';
 import { resolveSolarSystem } from '@/features/character/systemLookup';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { useSurveySystem } from './surveySystemPref';
+import { useSurveySystem, type SurveySystem } from './surveySystemPref';
 import { useYourShare } from './useYourShare';
 
-function SystemField({ onDone }: { onDone: () => void }) {
+function SystemField({
+  suggestions,
+  onDone,
+}: {
+  suggestions: readonly SurveySystem[];
+  onDone: () => void;
+}) {
   const { t } = useTranslation();
   const setSystem = useSurveySystem((s) => s.setValue);
   const [text, setText] = useState('');
@@ -32,8 +38,31 @@ function SystemField({ onDone }: { onDone: () => void }) {
     onDone();
   }
 
+  async function pick(system: SurveySystem) {
+    await setSystem(system);
+    onDone();
+  }
+
   return (
     <span className="flex flex-wrap items-center gap-2">
+      {suggestions.length > 0 && (
+        <span
+          className="flex flex-wrap items-center gap-1"
+          aria-label={t('survey.minedIn')}
+          role="group"
+        >
+          {suggestions.map((system) => (
+            <Button
+              key={system.id}
+              size="sm"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => void pick(system)}
+            >
+              {system.name}
+            </Button>
+          ))}
+        </span>
+      )}
       <label htmlFor="survey-system" className="sr-only">
         {t('survey.systemLabel')}
       </label>
@@ -85,13 +114,13 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
         <span>{t('survey.systemPrompt')}</span>
-        <SystemField onDone={() => undefined} />
+        <SystemField suggestions={state.suggestions} onDone={() => undefined} />
         {tooltip}
       </div>
     );
   }
 
-  const { system, share } = state;
+  const { system, share, suggestions } = state;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <span className="tabular-nums">
@@ -103,7 +132,7 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
       </span>
       {tooltip}
       {changing ? (
-        <SystemField onDone={() => setChanging(false)} />
+        <SystemField suggestions={suggestions} onDone={() => setChanging(false)} />
       ) : (
         <button type="button" className={textActionClassName()} onClick={() => setChanging(true)}>
           {t('survey.changeSystem')}
