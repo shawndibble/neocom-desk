@@ -13,6 +13,7 @@ import type { ThreatLevel } from '@/engine/pilotList/threatVerdict';
 import { CharacterLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
 import type { PilotListRow } from './pilotListData';
+import { PilotAffiliation } from './PilotAffiliation';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_TEXT } from './pilotListStyles';
 import { ThreatBadge } from './ThreatBadge';
@@ -58,7 +59,6 @@ export function PilotCard({
         : null;
   const own = row.ownOrganization;
   const mainSpace = ready === null ? null : mainSpaceOf(ready.bySpace);
-  const affiliation = [row.corporationName, row.allianceName].filter(Boolean).join(' · ');
 
   return (
     <li
@@ -83,9 +83,7 @@ export function PilotCard({
               <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
             )}
           </div>
-          {affiliation !== '' && (
-            <div className="truncate text-xs text-text-dim">{affiliation}</div>
-          )}
+          <PilotAffiliation row={row} className="text-xs text-text-dim" />
         </div>
         <div className="shrink-0 text-right">
           <b
