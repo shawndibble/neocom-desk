@@ -35,6 +35,7 @@ const TYPES: Record<number, [string, number, number]> = {
   16: ['Drake', 419, SHIP],
   17: ['Atron', 25, SHIP],
   18: ['Capsule', 29, SHIP],
+  19: ['Unmapped hull', 9999, SHIP], // a damage hull no size is pinned for
 };
 const infoOf = (typeId: number): DscanTypeInfo | undefined => {
   const t = TYPES[typeId];
@@ -129,6 +130,10 @@ describe('buildDangerRead: level and counts', () => {
     expect(r.level).toBe('clear');
     expect(r.watch).toEqual([]);
     expect(r.headline).toEqual([]);
+  });
+
+  it('counts a damage hull with no pinned size as a threat, not as harmless', () => {
+    expect(read([rows(19, 2)]).counts.kill).toBe(2);
   });
 
   it('a pinning ship together with damage is Danger', () => {

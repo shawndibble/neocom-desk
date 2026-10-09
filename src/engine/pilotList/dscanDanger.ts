@@ -124,7 +124,7 @@ export interface DangerRead {
   /** The sentence's clauses, most pressing first; empty when nothing here is a threat. */
   headline: HeadlineClause[];
   /** The Read-out's reading when it found a pattern (not "mixed"), else null. */
-  pattern: Pick<Readout, 'reading' | 'confidence' | 'evidence'> | null;
+  pattern: Pick<Readout, 'reading' | 'evidence'> | null;
   watch: WatchGroup[];
   /** Threat groups beyond the cap. */
   moreGroups: number;
@@ -174,14 +174,15 @@ export function buildDangerRead(
       known.count += 1;
       continue;
     }
-    const rank = hullRankOf(info.groupId) ?? 0;
+    // A damage hull the SDE groups are not pinned for counts as a threat, never as harmless.
+    const rank = hullRankOf(info.groupId);
     const capital = role === 'capitals';
     const blackOps = info.groupId === BLACK_OPS_GROUP;
     hulls.set(row.typeId, {
       typeId: row.typeId,
       groupId: info.groupId,
       count: 1,
-      kill: capital || blackOps || (role === 'dps' && rank >= threshold),
+      kill: capital || blackOps || (role === 'dps' && (rank === null || rank >= threshold)),
       catch: TACKLE_GROUPS.has(info.groupId),
       more: capital || blackOps,
       find: RECON_GROUPS.has(info.groupId),
@@ -260,7 +261,7 @@ export function buildDangerRead(
     pattern:
       readout === null || readout.reading === 'mixed'
         ? null
-        : { reading: readout.reading, confidence: readout.confidence, evidence: readout.evidence },
+        : { reading: readout.reading, evidence: readout.evidence },
     watch: threats.slice(0, WATCH_MAX_GROUPS),
     moreGroups: Math.max(0, threats.length - WATCH_MAX_GROUPS),
     notThreat: {

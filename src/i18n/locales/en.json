@@ -9283,18 +9283,12 @@
           "4594": "Lancer Dreadnought"
         },
         "readout": {
-          "readsAs": "Reads as",
           "reading": {
             "drop": "Capital drop staging",
             "scout": "Scouts, or a hunter looking for a target",
             "mining": "A mining fleet",
             "gang": "A roaming PvP gang",
             "mixed": "Mixed traffic, no fleet pattern"
-          },
-          "confidence": {
-            "strong": "Strong reading",
-            "likely": "Likely",
-            "weak": "Weak reading"
           },
           "ev": {
             "cyno": "A cyno field is lit on the scan",
@@ -9392,7 +9386,7 @@
             "busy": "{{ships}} ships. {{kill}} can hurt you, {{catch}} can pin you down, {{find}} can find you."
           },
           "sub": {
-            "pattern": "Reads as: {{reading}}.",
+            "pattern": "Reads as: {{reading}}. {{evidence}}.",
             "newThreats_one": "{{names}} is new since your last scan.",
             "newThreats_other": "{{names}} are new since your last scan.",
             "nothingNew": "Nothing here is new since your last scan.",
@@ -9461,7 +9455,12 @@
             "firstScanHint": "New and gone tags appear after your next paste."
           },
           "fullScan_one": "Full scan: {{count}} ship, value, changes",
-          "fullScan_other": "Full scan: {{count}} ships, value, changes"
+          "fullScan_other": "Full scan: {{count}} ships, value, changes",
+          "grant": {
+            "title": "Your current ship is not shared yet",
+            "hint": "Allow Current ship and this page reads for the ship you are flying. Until then, pick your ship above.",
+            "action": "Allow current ship"
+          }
         }
       },
       "unknownTitle": "This pilot couldn't be found",

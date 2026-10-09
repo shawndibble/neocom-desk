@@ -18,7 +18,9 @@ export function useLastScan(
   hulls: readonly HullCount[],
   enabled: boolean
 ): HullCount[] | null | undefined {
-  const [previous, setPrevious] = useState<HullCount[] | null>();
+  // Tagged with the scan it was read for, so a new paste never reads the last one's answer.
+  const [read, setRead] = useState<{ key: string; previous: HullCount[] | null }>();
+  const key = hullsKey(hulls);
 
   useEffect(() => {
     if (!enabled) return;
@@ -27,7 +29,7 @@ export function useLastScan(
       const stored = await db.settings.get(LAST_SCAN_KEY);
       const last = Array.isArray(stored?.value) ? (stored.value as HullCount[]) : null;
       if (cancelled) return;
-      setPrevious(last);
+      setRead({ key, previous: last });
       // The same scan seen again must not wipe the scan it is compared with.
       if (last === null || !sameHulls(last, hulls)) {
         await db.settings.put({ key: LAST_SCAN_KEY, value: hulls.map((h) => ({ ...h })) });
@@ -39,5 +41,6 @@ export function useLastScan(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, hullsKey(hulls)]);
 
-  return enabled ? previous : null;
+  if (!enabled) return null;
+  return read?.key === key ? read.previous : undefined;
 }

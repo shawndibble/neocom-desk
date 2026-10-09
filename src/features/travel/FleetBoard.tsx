@@ -17,6 +17,7 @@ import {
 import { formatDistanceKm as formatKm } from '@/engine/pilotList/formatDistanceKm';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import type { HullCount } from '@/engine/pilotList/dscanWorth';
+import { GrantNote } from '@/app/GrantNote';
 import { useCharacterShipTypeId } from '@/features/character/ship';
 import { cx } from '@/lib/cx';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
@@ -115,9 +116,10 @@ export function FleetBoard({
   // The age of a live paste, re-read on a slow tick. A Shared D-Scan has none to show.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!trackHistory) return;
     const id = setInterval(() => setNow(Date.now()), AGE_TICK_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [trackHistory]);
 
   const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
   const previous = useLastScan(hulls, trackHistory && loaded !== undefined);
@@ -127,10 +129,6 @@ export function FleetBoard({
   const ownTypeId = manual.typeId ?? current.typeId;
   const ownShipGroupId =
     loaded === undefined || ownTypeId === null ? null : (loaded.infoOf(ownTypeId)?.groupId ?? null);
-  const shipName =
-    loaded === undefined || ownTypeId === null || ownShipGroupId === null
-      ? null
-      : loaded.nameOf(ownTypeId);
 
   const read = useMemo(
     () =>
@@ -140,9 +138,15 @@ export function FleetBoard({
             ownShipGroupId,
             previous: previous ?? null,
           }),
+    // `rows` is keyed by `rowsKey`: a caller re-parsing the same scan hands a new array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [loaded, previous, ownShipGroupId, rowsKey, trackHistory]
   );
+  // The ship's name is only stated when its size is known: otherwise the read says it is not set.
+  const shipName =
+    loaded !== undefined && ownTypeId !== null && read?.ownShipKnown === true
+      ? loaded.nameOf(ownTypeId)
+      : null;
 
   if (loaded === undefined || (trackHistory && previous === undefined)) {
     return (
@@ -152,6 +156,7 @@ export function FleetBoard({
     );
   }
   const { board, names } = loaded;
+  const answer = read ?? null;
   if (board.roles.length === 0) {
     return (
       <EmptyState
@@ -171,7 +176,7 @@ export function FleetBoard({
   );
   const fullScan = (
     <>
-      {(read === null || read === undefined || !read.promoteRoles) && roleShare}
+      {(answer === null || !answer.promoteRoles) && roleShare}
       <div className="grid gap-3 md:grid-cols-2">
         {board.roles.map((r) => (
           <RoleCard key={r.role} role={r} names={names} />
@@ -189,26 +194,34 @@ export function FleetBoard({
 
   return (
     <div className="space-y-4">
-      {read !== null && read !== undefined && (
+      {answer !== null && (
         <>
           <DangerAnswer
-            read={read}
+            read={answer}
             names={names}
             age={trackHistory ? scanAge(Math.max(0, now - loaded.at)) : null}
             shipName={shipName}
           >
-            <div className="max-w-md">
+            <div className="max-w-md space-y-3">
               <OwnShipPicker
                 typeId={manual.typeId}
                 autoTypeId={current.typeId}
                 onChange={manual.setTypeId}
               />
+              {manual.typeId === null && (
+                <GrantNote
+                  endpoints={['getCharacterShip']}
+                  title={t('travel.pilot.dscan.danger.grant.title')}
+                  hint={t('travel.pilot.dscan.danger.grant.hint')}
+                  actionLabel={t('travel.pilot.dscan.danger.grant.action')}
+                />
+              )}
             </div>
           </DangerAnswer>
-          {read.promoteRoles && roleShare}
+          {answer.promoteRoles && roleShare}
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <WatchCard
-              read={read}
+              read={answer}
               names={names}
               shipName={shipName}
               groupLabel={(groupId) =>
@@ -216,17 +229,17 @@ export function FleetBoard({
               }
             />
             <TripwireCard
-              tripwires={read.tripwires}
+              tripwires={answer.tripwires}
               firstScan={trackHistory && previous === null}
             />
           </div>
         </>
       )}
-      {read === null || read === undefined ? (
+      {answer === null ? (
         <div className="space-y-4">{fullScan}</div>
       ) : (
         <Disclosure
-          label={t('travel.pilot.dscan.danger.fullScan', { count: read.totalShips })}
+          label={t('travel.pilot.dscan.danger.fullScan', { count: answer.totalShips })}
           expanded={fullOpen}
           onToggle={() => setFullOpen((open) => !open)}
         >

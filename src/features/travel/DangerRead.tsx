@@ -105,6 +105,9 @@ export function DangerAnswer({
     parts.push(
       t(`${P}sub.pattern`, {
         reading: t(`travel.pilot.dscan.readout.reading.${read.pattern.reading}`),
+        evidence: read.pattern.evidence
+          .map((l) => t(`travel.pilot.dscan.readout.${l.key}`, l.params))
+          .join('. '),
       })
     );
   }
