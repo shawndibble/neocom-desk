@@ -75,10 +75,18 @@ const restrictedImportPaths = [
   },
 ];
 
+const linkArrowMessage =
+  'A typed arrow (→ ↗ ›) must not end a link label; leaving the app is Icon.External, a row that goes elsewhere is a trailing CaretRight (DESIGN.md §6c).';
+
 const sortArrowSyntax = [
   { selector: 'Literal[value=/[↑↓]/]', message: sortArrowMessage },
   { selector: 'TemplateElement[value.raw=/[↑↓]/]', message: sortArrowMessage },
   { selector: 'JSXText[value=/[↑↓]/]', message: sortArrowMessage },
+  {
+    selector:
+      'JSXElement[openingElement.name.name=/^(Link|ExternalLink|a)$/] > JSXText:last-child[value=/[→↗›]\\s*$/]',
+    message: linkArrowMessage,
+  },
 ];
 
 export default tseslint.config(

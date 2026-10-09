@@ -88,29 +88,48 @@ describe('MovePlanModal', () => {
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
     expect(await screen.findByText('Edit items or destination')).toBeTruthy();
-    const links = screen.getAllByRole('link', { name: 'Route Safety' });
+    const links = screen.getAllByRole('link', { name: /^Route Safety/ });
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute('href')).toContain(String(SYSTEM_JITA));
-    const heading = screen.getByRole('heading', { name: /Amarr VIII/ });
-    expect(within(heading).getByRole('link', { name: 'Route Safety' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Route Safety from Amarr VIII' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
   });
 
-  it('says there is nothing to move when everything picked is already at the destination', async () => {
+  it('marks stacks at the destination, unticks them and keeps them out of the plan', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at jita 4-4/i }));
+    expect(screen.getByText('1 stack · 10 m³')).toBeTruthy();
+
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    const jita = screen.getByRole('checkbox', { name: /select everything at jita 4-4/i });
+    expect((jita as HTMLInputElement).disabled).toBe(true);
+    expect((jita as HTMLInputElement).checked).toBe(false);
+    expect(screen.getAllByText('At destination').length).toBeGreaterThan(0);
+    expect(screen.getByText('Nothing picked yet')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Show plan' }) as HTMLButtonElement).disabled).toBe(
+      true
+    );
+  });
+
+  it('takes one of your stations as the destination from the chips', async () => {
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at jita 4-4/i }));
+    const group = screen.getByRole('group', { name: 'Or one of your stations' });
+    const amarr = within(group).getByRole('button', { name: 'Amarr VIII' });
+    await user.click(amarr);
+    expect(amarr.getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByText('Nothing to move')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Choose destination…' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(await screen.findByText('Edit items or destination')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Load split by pickup and trip' })).toBeTruthy();
+    expect(screen.getByText('Deliver everything here')).toBeTruthy();
   });
 
   it('folds a pickup group and keeps its picks, and selects a whole Character at once', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything for alice/i }));
-    expect(screen.getByText('3 stacks picked')).toBeTruthy();
+    expect(screen.getByText(/^3 stacks · /)).toBeTruthy();
 
     const amarr = screen.getByRole('button', { name: 'Alice, Amarr VIII, 2 of 2 stacks' });
     expect(amarr.getAttribute('aria-controls')).toBeTruthy();
@@ -118,16 +137,18 @@ describe('MovePlanModal', () => {
     await user.click(amarr);
     expect(amarr.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByText('Pyerite')).toBeNull();
-    expect(screen.getByText('3 stacks picked')).toBeTruthy();
+    expect(screen.getByText(/^3 stacks · /)).toBeTruthy();
   });
 
-  it('keeps Show plan disabled until there is a destination and a pick', async () => {
+  it('keeps Show plan disabled until there is a destination and a pick away from it', async () => {
     const user = await open();
     const show = screen.getByRole('button', { name: 'Show plan' });
     expect((show as HTMLButtonElement).disabled).toBe(true);
     await user.click(screen.getByRole('checkbox', { name: /select everything at jita 4-4/i }));
     expect((show as HTMLButtonElement).disabled).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    expect((show as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
     expect((show as HTMLButtonElement).disabled).toBe(false);
   });
 });

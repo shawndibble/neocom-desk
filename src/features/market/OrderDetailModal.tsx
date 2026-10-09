@@ -970,7 +970,7 @@ export function OrderDetailContent({
 
         {/* Cost basis and exits are sell-side ideas: a buy order has neither (#1733). */}
         {!row.isBuyOrder && (
-          <div className="grid gap-3 md:grid-cols-2 [&>*]:min-w-0">
+          <div className="grid items-start gap-3 md:grid-cols-2 [&>*]:min-w-0">
             <section className="rounded-xs border border-line">
               {row.costBasis === null ? (
                 <>

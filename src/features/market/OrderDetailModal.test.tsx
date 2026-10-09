@@ -415,6 +415,19 @@ describe('OrderDetailModal', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
+  it('top-aligns the cost-basis and better-exit cards so a collapsed bar is not stretched into an empty box (#3111)', () => {
+    for (const costBasis of [null, BASE_ROW.costBasis]) {
+      renderModal({ row: { ...BASE_ROW, costBasis } });
+      const costSection = screen
+        .getByText(/Where that price comes from|^Floor working/)
+        .closest('section')!;
+      const exitsSection = screen.getByText('Is there a better exit?').closest('section')!;
+      expect(costSection.parentElement).toBe(exitsSection.parentElement);
+      expect(costSection.parentElement).toHaveClass('items-start');
+      cleanup();
+    }
+  });
+
   it('renders the full cost-basis ledger, with the fill floor only inside the tooltip explanation — never as a second visible number', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,

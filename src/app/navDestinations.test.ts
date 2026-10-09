@@ -75,7 +75,6 @@ describe('NAV_LOCK_PATHS', () => {
         // Each page's sub-views, which the rail lists under the open page.
         '/clones',
         '/employment-history',
-        '/market/lp-store',
         '/skills/plans',
         '/skills/trained',
         '/skills/compare',

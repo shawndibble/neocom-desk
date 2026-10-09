@@ -56,9 +56,10 @@ export interface FittingItemActions {
   /** A weapon group's charges out, in one edit. */
   unloadGroup: (at: readonly ModuleAt[]) => void;
   copyToAllOfType: (rack: FittingSlotKind, index: number) => void;
-  /** A type's meta variants (itself left out), for "Swap for meta variant". */
-  variantsOf: (typeId: number) => { typeId: number; name: string }[];
-  swapType: (rack: FittingSlotKind, index: number, typeId: number) => void;
+  /** Whether a type has other meta variants — the menu's "Variations" entry shows only then. */
+  hasVariants: (typeId: number) => boolean;
+  /** Opens the module's dialog with its Variations unfolded. */
+  openVariations: (rack: FittingSlotKind, index: number) => void;
   removeAllOfType: (typeId: number) => void;
   remove: (rack: FittingSlotKind, index: number) => void;
   /** Moves a module within its rack, swapping with whatever sat at `to`. */
