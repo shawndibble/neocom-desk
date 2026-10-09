@@ -169,7 +169,7 @@ for (const width of [390, 1024, 1280]) {
       if (width < 768) expect(box!.height).toBeGreaterThanOrEqual(44);
 
       const card = await toggle.evaluate((el) => {
-        const panel = el.closest('section') ?? el.parentElement!.parentElement!;
+        const panel = el.closest('section')!;
         const r = panel.getBoundingClientRect();
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
       });
