@@ -534,9 +534,15 @@ here — they go one per file in `docs/context/decisions/`.
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
   zKillboard states, then their newest 25 kills and losses, each expanding to
   the victim's fit with Open in Fittings (the killmail is read only then).
-  Numbers, never a verdict: no pilot is called hostile or safe. "No
-  zKillboard history" and "zKillboard couldn't be reached" are different
-  answers.
+  A pilot carries a **Threat** badge beside the name, in Pilot Lookup and on
+  every Local list row; beyond that, numbers: no pilot is called hostile or
+  safe. "No zKillboard history" and "zKillboard couldn't be reached" are different
+  answers. A pasted or typed **Local list** is grouped by what each pilot
+  means to you: red and orange contacts, killed in the kind of space you are
+  in (your Current System's), killed elsewhere, quiet for 30 days, and
+  friendly (your corporation, alliance and blue contacts) last. Each row
+  gives kills in high, low and null space with how long ago the newest was.
+- **Threat**: A pilot's colour-coded verdict badge, read from their kills in the last 90 days and zKillboard's all-time danger ratio: **Dangerous** (10 or more recent kills and a danger ratio of 50 or more), **Active** (3 or more), **Low threat** (fewer), **Inactive** (none). Kills only, because a pilot's recent losses are not fetched, so it says how threatening a pilot looks and never that one is safe: there is no green level. A missing danger ratio can never reach Dangerous. A Local list row looks the ratio up only for a pilot with enough recent kills to be Dangerous. `threatVerdict` in `src/engine/pilotList/threatVerdict.ts`, drawn by `ThreatBadge` (beside a name) and, on the profile, `PilotThreatBand` (the level in large type, the sentence and chips); scope decision `20261008-181210`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes,
   entered by hand in Settings → Travel — ESI cannot read the game client's own
   autopilot avoidance list. Synced across devices as ids; shown with each
@@ -1011,10 +1017,26 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   reported for it — optional in both, unlike an Offer's, which always carries
   them. Named for the copy it quotes ("Rifter 10/20 ×5"), since a Character
   can hold a plain plan and several seeded plans for one blueprint at once.
+- **Survey**: A mining field tracked from pasted **Survey Scans**: how much is
+  mined, how fast, and when it will be gone. Stored as a `survey` **Share
+  Link**, so it has a short `/share/<id>` URL and the standard 7-day life, from
+  creation. Anyone holding the link can add a scan with no sign-in, which is
+  how a Survey carries on after the pilot who started it has left. Shown on the
+  Mining › Survey tab and on the public page of its link.
+- **Survey Scan**: One copy of the in-game Survey Scanner results: a row per
+  rock (ore, units, volume in m³, ISK value, distance), pasted as text. Stored
+  as that text, timed by the server's clock. Between two scans, rocks are
+  matched by ore; a rock that shrank or is gone was mined, and one the earlier
+  scan never showed extends the field.
+- **Survey chat message**: What "Copy chat message" puts on the clipboard:
+  four lines (status word with finish time in EVE time and time left, a block
+  bar with the percent, the rocks left by short ore name, the link), none wider
+  than about 50 characters so it doesn't wrap in chat. Only bold works in game
+  chat, so the style is words and block characters.
 - **Share Link**: A short `/share/<id>` link to something a pilot chose to
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
-  **Shared Appraisal**, a **Shared D-Scan**, or a **Fitting**. It opens with or without a session,
+  **Shared Appraisal**, a **Shared D-Scan**, a **Fitting**, or a **Survey**. It opens with or without a session,
   and says when it expires. It never names who shared it. A Fitting's Share
   Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
   in, it shows the Fitting at every skill level V; a logged-in visitor goes

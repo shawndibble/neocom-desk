@@ -170,3 +170,18 @@ describe('blueprint badge', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+describe('estimated value cell', () => {
+  it('shows a dim dash, not a green figure, when there is no estimate', () => {
+    const { container } = renderItemRow({ estimatedValue: 0 });
+    expect(screen.getByText('assets.noEstimate')).toBeInTheDocument();
+    expect(container.querySelector('.text-isk-pos')).toBeNull();
+    expect(container.querySelector('.text-text-faint')).not.toBeNull();
+  });
+
+  it('keeps a priced row green', () => {
+    const { container } = renderItemRow({ estimatedValue: 1000 });
+    expect(screen.queryByText('assets.noEstimate')).toBeNull();
+    expect(container.querySelector('.text-isk-pos')).not.toBeNull();
+  });
+});

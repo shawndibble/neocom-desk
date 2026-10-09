@@ -33,6 +33,7 @@ export const LAZY_SECTIONS: readonly string[] = [
   'settings',
   'piShared',
   'miningTax',
+  'survey',
   'plans',
   'contractSearch',
   'corp',
