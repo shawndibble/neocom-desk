@@ -192,7 +192,7 @@ describe('PilotLookupPanel', () => {
     expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
     // The meters and the ships they fly come from the stats, so they still show.
     expect(screen.getByRole('meter', { name: 'Kills vs losses' })).toBeTruthy();
-    expect(screen.getByText('Kronos')).toBeTruthy();
+    expect(await screen.findByText('Kronos')).toBeTruthy();
   });
 
   it('suggests matches with the search scope and selects one', async () => {

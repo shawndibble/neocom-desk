@@ -52,6 +52,8 @@ interface SeedOptions {
   nothingOwed?: boolean;
   /** Seed the Assignment with a zero value and zero tax, so its row has nothing to show in the value and tax columns. */
   withZeroValue?: boolean;
+  /** Seed the Assignment as `needs-review` (its entry grew after it was settled) instead of `outstanding`. */
+  needsReview?: boolean;
 }
 
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
@@ -77,6 +79,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       withUnassignedEntry,
       withMadePayment,
       nothingOwed,
+      needsReview,
     }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
@@ -169,7 +172,14 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
             taxPct: 10,
             estimatedValue: zeroValue ? 0 : 1_000_000,
             taxOwed: zeroValue ? 0 : taxOwed,
-            status: 'outstanding',
+            status: needsReview ? 'needs-review' : 'outstanding',
+            ...(needsReview
+              ? {
+                  reviewDiff: [
+                    { typeId: oreTypeId, before: oreQuantity, after: oreQuantity + 100 },
+                  ],
+                }
+              : {}),
             updatedAt: now,
           });
         tx.oncomplete = () => resolve();
@@ -195,6 +205,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       withUnassignedEntry: options.withUnassignedEntry ?? false,
       withMadePayment: options.withMadePayment ?? false,
       nothingOwed: options.nothingOwed ?? false,
+      needsReview: options.needsReview ?? false,
     }
   );
 }
@@ -779,5 +790,43 @@ test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', 
         /text-isk-neg/
       );
     });
+  });
+});
+
+test.describe('Mining Tax ledger — Needs Review status hint (#3122)', () => {
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+  ]) {
+    test(`pill stays on one line and the Status column fits at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { needsReview: true });
+      await page.goto('./mining/tax');
+
+      const pill = page.getByRole('table').getByText('Needs Review', { exact: true });
+      await expect(pill).toBeVisible();
+      const pillBox = (await pill.boundingBox())!;
+      expect(pillBox.height).toBeLessThan(24);
+      const cell = page.getByRole('table').getByRole('cell').filter({ hasText: 'Needs Review' });
+      const cellBox = (await cell.boundingBox())!;
+      expect(cellBox.x + cellBox.width).toBeLessThanOrEqual(viewport.width);
+      expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(cellBox.x + cellBox.width + 1);
+    });
+  }
+
+  test('card is unchanged at 390px: no sideways overflow', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page);
+    await seedPayeeBalance(page, { needsReview: true });
+    await page.goto('./mining/tax');
+
+    await expect(page.getByText('Needs Review', { exact: true }).first()).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

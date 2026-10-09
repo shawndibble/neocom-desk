@@ -61,6 +61,8 @@ describe('SurveyTab', () => {
       clipboardData: { getData: () => SCAN },
     });
     await screen.findByText('0% mined');
+    // The survey renders from `loadSurvey` before the paste's add settles; wait for it so it can't leak into the next test.
+    await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(startSurvey).toHaveBeenCalledWith({ characterId: 7 });
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
     expect(useCurrentSurveyId.getState().value).toBe(ID);

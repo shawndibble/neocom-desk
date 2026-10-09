@@ -4094,6 +4094,7 @@
       "paid": "Paid",
       "dismissed": "Dismissed"
     },
+    "needsReviewHint": "This entry grew after you settled it. Open the row to review the new total.",
     "selectForBulkAction": "Select this row",
     "selectionCount": "{{count}} selected",
     "selectAllAction": "Select all",

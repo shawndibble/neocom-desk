@@ -1435,7 +1435,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
       // Closes the phone card's second line at its right edge, so every
       // status sits in one column under the tax figure above it.
       stackEdge: 'end',
-      render: (dr) => <StatusPill status={dr.status} label={statusLabel(t, dr.status)} />,
+      render: (dr) => (
+        <StatusPill
+          status={dr.status}
+          label={statusLabel(t, dr.status)}
+          hint={dr.status === 'needs-review' ? t('miningTax.needsReviewHint') : undefined}
+        />
+      ),
       sortValue: (dr) => statusLabel(t, dr.status),
     },
   ];
