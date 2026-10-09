@@ -1233,6 +1233,8 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
 | `kind-skill-plan`        | 12.67 / 11.90 / 11.10 |
+| `space-nullsec`          | 7.42 / 6.97 / 6.51    |
+| `space-wormhole`         | 11.72 / 11.01 / 10.27 |
 
 Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
 

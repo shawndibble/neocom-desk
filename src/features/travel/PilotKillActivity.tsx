@@ -115,8 +115,13 @@ export function PilotKillActivityView({
       className="@container/kills flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3.5 py-3"
     >
       <div className="flex items-baseline justify-between gap-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        <h3>{t('travel.pilot.activity.chart')}</h3>
-        <span className="text-right">{t('travel.pilot.activity.chartPeriod')}</span>
+        <h3>
+          {t('travel.pilot.activity.chart')}
+          <span className="hidden @sm/kills:inline">{t('travel.pilot.activity.chartBySpace')}</span>
+        </h3>
+        <span className="text-right whitespace-nowrap">
+          {t('travel.pilot.activity.chartPeriod')}
+        </span>
       </div>
       <div
         role="img"
@@ -137,12 +142,12 @@ export function PilotKillActivityView({
         </div>
         <div
           aria-hidden
-          className="grid h-30 grid-cols-6 items-end gap-2 border-b border-line-bright @md/kills:h-38"
+          className="grid h-30 grid-cols-6 items-end gap-2 border-b border-line-bright @sm/kills:h-38"
         >
           {months.map((m) => (
             <div
               key={m.key}
-              className="mx-auto flex h-full w-full max-w-9 min-w-0 flex-col-reverse @md/kills:max-w-14"
+              className="mx-auto flex h-full w-full max-w-9 min-w-0 flex-col-reverse @sm/kills:max-w-14"
             >
               {monthTotal(m) === 0 && <span className="h-0.5 bg-line" />}
               {KILL_SPACES.map((space) =>
@@ -167,7 +172,7 @@ export function PilotKillActivityView({
       <h4 className="mt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {t('travel.pilot.activity.last30')}
       </h4>
-      <div aria-hidden className="hidden h-2 bg-panel-2 @md/kills:flex">
+      <div aria-hidden className="hidden h-2 bg-panel-2 @sm/kills:flex">
         {spaces.map((space) => (
           <span
             key={space}
@@ -188,12 +193,12 @@ export function PilotKillActivityView({
                 count > 0 ? SPACE_RULE[space] : 'border-t-line'
               )}
             >
-              <span className="block text-[0.625rem] font-semibold tracking-wider text-text-dim uppercase @md/kills:text-[0.6875rem] @md/kills:tracking-widest">
+              <span className="block text-[0.625rem] font-semibold tracking-wider text-text-dim uppercase @sm/kills:text-[0.6875rem] @sm/kills:tracking-widest">
                 {t(`common.spaceOption.${space}`)}
               </span>
               <span
                 className={cx(
-                  'block text-xl leading-tight font-semibold tabular-nums @md/kills:text-2xl',
+                  'block text-xl leading-tight font-semibold tabular-nums @sm/kills:text-2xl',
                   count > 0 ? SPACE_TEXT[space] : 'text-text-dim'
                 )}
               >
@@ -201,7 +206,7 @@ export function PilotKillActivityView({
               </span>
               <span
                 className={cx(
-                  'block text-[0.6875rem] @md/kills:text-xs',
+                  'block text-[0.6875rem] @sm/kills:text-xs',
                   tone === 'fresh' ? 'font-semibold text-text' : 'text-text-dim',
                   (tone === 'old' || tone === 'none') && 'opacity-60'
                 )}

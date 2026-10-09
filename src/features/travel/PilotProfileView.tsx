@@ -21,6 +21,7 @@ import {
   needsLossHistory,
   threatVerdict,
 } from '@/engine/pilotList/threatVerdict';
+import { cx } from '@/lib/cx';
 import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
@@ -117,7 +118,12 @@ export function PilotProfileView(props: PilotProfileViewProps) {
       />
       {/* The chart is the section the eye wants, so on a wide profile it takes the left, with "How
           they fight" beside it; on a phone the meters come first, as a row, and the chart under. */}
-      <div className="grid gap-3 @3xl/profile:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+      <div
+        className={cx(
+          'grid gap-3',
+          pilotStats !== null && '@3xl/profile:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]'
+        )}
+      >
         {pilotStats && (
           <div className="order-first h-full @3xl/profile:order-last">
             <ZkillRatioMeters stats={pilotStats} />

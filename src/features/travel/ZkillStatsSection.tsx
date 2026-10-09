@@ -197,7 +197,7 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
       className="flex h-full flex-col gap-2.5 rounded-xs border border-line bg-panel px-3 py-2.5"
     >
       <h3 className={termClassName}>{t('travel.pilot.fightTitle')}</h3>
-      <div className="grid flex-1 auto-cols-fr grid-flow-col gap-2.5 @3xl/profile:grid-flow-row @3xl/profile:content-around">
+      <div className="grid flex-1 auto-cols-fr grid-flow-col grid-rows-[auto_auto_auto] gap-x-2.5 @3xl/profile:grid-flow-row @3xl/profile:grid-rows-none @3xl/profile:content-around @3xl/profile:gap-y-2.5">
         {stats.dangerRatio !== null && (
           <RatioMeter
             label={t('travel.pilot.dangerMeter')}
@@ -272,8 +272,9 @@ function RatioMeter({
   const clamped = Math.min(100, Math.max(0, value));
   const rounded = Math.round(clamped);
   const text = valueText(rounded);
+  // Narrow: each meter spans the three rows of the shared grid, so the bars line up across columns even when a label wraps.
   return (
-    <div className="min-w-0 space-y-1.5">
+    <div className="row-span-3 grid min-w-0 grid-rows-subgrid gap-y-1.5 @3xl/profile:row-span-1 @3xl/profile:grid-rows-none">
       <div className="flex flex-col gap-0.5 @3xl/profile:flex-row @3xl/profile:items-baseline @3xl/profile:justify-between @3xl/profile:gap-x-2">
         <span className={termClassName}>
           {label}
@@ -283,7 +284,11 @@ function RatioMeter({
             className="normal-case"
           />
         </span>
-        <span className="text-base font-semibold text-text tabular-nums @3xl/profile:text-sm">
+        {/* Narrow: the figure alone, as the bar's number; wide: the words too. aria-valuetext has both. */}
+        <span className="text-base font-semibold text-text tabular-nums @3xl/profile:hidden">
+          {rounded}%
+        </span>
+        <span className="hidden text-sm font-semibold text-text tabular-nums @3xl/profile:inline">
           {text}
         </span>
       </div>

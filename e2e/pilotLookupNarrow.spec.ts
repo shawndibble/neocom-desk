@@ -158,9 +158,9 @@ test.describe('Pilot Lookup at 390px', () => {
     expect(Math.abs(box.y + box.height - (button.y + button.height))).toBeLessThanOrEqual(1);
   });
 
-  test('a tablet shows the three meters in one row, a phone stacks them', async ({ page }) => {
-    await page.setViewportSize(TABLET);
-    await openPilot(page);
+  test('the three meters sit in one row at a tablet and at a phone, with no overflow', async ({
+    page,
+  }) => {
     const tops = async () =>
       Promise.all(
         ['Danger', 'Fleet size', 'Kills vs losses'].map(async (name) => {
@@ -169,11 +169,12 @@ test.describe('Pilot Lookup at 390px', () => {
           return Math.round(box.y);
         })
       );
-    expect(new Set(await tops()).size).toBe(1);
-
-    await page.setViewportSize(PHONE);
-    expect(new Set(await tops()).size).toBe(3);
-    await expectNoPageOverflow(page);
+    for (const size of [TABLET, PHONE]) {
+      await page.setViewportSize(size);
+      if (size === TABLET) await openPilot(page);
+      expect(new Set(await tops()).size).toBe(1);
+      await expectNoPageOverflow(page);
+    }
   });
 });
 

@@ -9122,7 +9122,8 @@
         "none": "no kills",
         "last": "last {{age}}",
         "last30": "Last 30 days",
-        "chart": "Kills per month, by kind of space",
+        "chart": "Kills per month",
+        "chartBySpace": ", by kind of space",
         "chartPeriod": "Last 6 months",
         "chartLabel": "Kills per month by space: {{summary}}",
         "basis": "From their latest {{count}} kills on zKillboard."

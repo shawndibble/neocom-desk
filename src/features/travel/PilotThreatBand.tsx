@@ -1,10 +1,10 @@
 /**
  * The verdict band under a pilot's name: the Threat level in large type, the
  * sentence it was read from (recent kills and how long ago the last one was),
- * and chips for the facts that colour it: the kind of space they hunt in, how
+ * and neutral chips for the facts behind it: the kind of space they hunt in, how
  * often they fly in gangs and how many of their kills are pods. The "?" gives
- * the rule. The small badge beside the name is `ThreatBadge`; this band is the
- * same verdict spelled out.
+ * the rule. The level word is the one red on a pilot's profile. The small
+ * `ThreatBadge` belongs to the Local list rows, not here.
  */
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from '@/components/ui';
