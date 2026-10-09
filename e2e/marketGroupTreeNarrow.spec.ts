@@ -72,3 +72,42 @@ test('item-finder tree rows keep their dense height at exactly md (768px)', asyn
   expect(await heightOf(page, 'Minerals')).toBe(24);
   expect(await heightOf(page, 'Tritanium')).toBe(24);
 });
+
+for (const size of [
+  { width: 1024, height: 768 },
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
+]) {
+  test(`finder keeps the Quickbar in view with a search and a pinned item (${size.width}px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    for (const kind of ['orders', 'history']) {
+      await page.route(`https://esi.evetech.net/markets/*/${kind}*`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      );
+    }
+    await page.route('https://esi.evetech.net/universe/types/*', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"nf"}' })
+    );
+    await searchTritanium(page);
+    await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
+    await page.getByRole('button', { name: 'Add Tritanium to Quickbar' }).click();
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritaniu');
+
+    const quickbar = page.getByTestId('quickbar');
+    await expect(quickbar.getByRole('heading')).toBeVisible();
+    const heading = await quickbar.getByRole('heading').boundingBox();
+    const panel = await page.locator('section', { has: quickbar }).boundingBox();
+    // Inside the viewport-bounded panel (not the viewport itself: at scroll 0 the page chrome
+    // offsets the sticky panel, which only reaches `top-4` once the page scrolls).
+    expect(heading!.y + heading!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
+    // Height, not bottom edge: at scroll 0 the page chrome offsets the panel; once stuck it sits at `top-4`.
+    expect(panel!.height).toBeLessThanOrEqual(size.height - 32);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    );
+    expect(overflow).toBe(false);
+  });
+}

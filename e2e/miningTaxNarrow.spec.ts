@@ -48,6 +48,8 @@ interface SeedOptions {
   withUnassignedEntry?: boolean;
   /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
   withMadePayment?: boolean;
+  /** Seed the Assignment with a zero value and zero tax, so its row has nothing to show in the value and tax columns. */
+  withZeroValue?: boolean;
 }
 
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
@@ -66,6 +68,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       assignmentId,
       oreQuantity,
       taxOwed,
+      zeroValue,
       unassignedDate,
       paymentDate,
       journalRefId,
@@ -160,8 +163,8 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           payeeId,
           oreLines: [{ typeId: oreTypeId, quantity: oreQuantity }],
           taxPct: 10,
-          estimatedValue: 1_000_000,
-          taxOwed,
+          estimatedValue: zeroValue ? 0 : 1_000_000,
+          taxOwed: zeroValue ? 0 : taxOwed,
           status: 'outstanding',
           updatedAt: now,
         });
@@ -181,6 +184,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       assignmentId: ASSIGNMENT_ID,
       oreQuantity: ORE_QUANTITY,
       taxOwed: TAX_OWED,
+      zeroValue: options.withZeroValue ?? false,
       unassignedDate: UNASSIGNED_DATE,
       paymentDate: PAYMENT_DATE,
       journalRefId: JOURNAL_REF_ID,
@@ -650,5 +654,57 @@ test.describe('Mining Tax ledger — long Payee name overflow', () => {
     expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(WIDE_DESKTOP.width);
 
     await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
+  });
+});
+
+test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', () => {
+  async function noOverflow(page: Page) {
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
+
+  test.describe('phone', () => {
+    test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+    test('a zero-value row prints no "value" affix and a priced row still does', async ({
+      page,
+    }) => {
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { withZeroValue: true });
+      await page.goto('./mining/tax');
+      const valueCell = page.locator('tbody td[data-label="Est. value"]').first();
+      await expect(valueCell).toBeHidden();
+      await noOverflow(page);
+
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+      const priced = page.locator('tbody td[data-label="Est. value"]').first();
+      await expect(priced).toBeVisible();
+      expect(await priced.evaluate((td) => getComputedStyle(td, '::after').content)).toContain(
+        'value'
+      );
+    });
+  });
+
+  test.describe('desktop', () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+
+    test('a zero tax amount is muted, a positive one stays red', async ({ page }) => {
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { withZeroValue: true });
+      await page.goto('./mining/tax');
+      const tax = page.locator('tbody td[data-label="Tax owed"]').first();
+      await expect(tax).toBeVisible();
+      await expect(tax).not.toHaveClass(/text-isk-neg/);
+      await noOverflow(page);
+
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+      await expect(page.locator('tbody td[data-label="Tax owed"]').first()).toHaveClass(
+        /text-isk-neg/
+      );
+    });
   });
 });

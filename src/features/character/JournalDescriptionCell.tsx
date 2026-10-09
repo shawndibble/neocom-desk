@@ -81,7 +81,7 @@ export function JournalDescriptionCell({
             className={`${inlineLinkClassName} w-fit`}
             aria-label={t('wallet.journalMiningTaxReasonLink', { reason: entry.reason })}
           >
-            {entry.reason} →
+            {entry.reason}
           </Link>
         ) : (
           <span className="text-text-dim">{entry.reason}</span>
