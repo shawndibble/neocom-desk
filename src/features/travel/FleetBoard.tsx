@@ -13,8 +13,10 @@ import {
   type FleetRole,
 } from '@/engine/pilotList/dscanRoles';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
+import { buildReadout, type Readout } from '@/engine/pilotList/dscanReadout';
 import { cx } from '@/lib/cx';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { DscanReadout } from './DscanReadout';
 
 /**
  * Role -> clock-kind token. Identity only, never a status; the legend and the
@@ -47,6 +49,7 @@ function formatRange(hull: FleetHull): string | null {
 interface Loaded {
   board: FleetBoardData;
   names: ReadonlyMap<number, string>;
+  readout: Readout | null;
 }
 
 /**
@@ -65,19 +68,25 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
     let cancelled = false;
     void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
       if (cancelled) return;
-      const board = buildFleetBoard(rows, (typeId) => {
+      const infoOf = (typeId: number) => {
         const type = types[String(typeId)];
         return type === undefined
           ? undefined
           : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
-      });
+      };
+      const board = buildFleetBoard(rows, infoOf);
+      const readout = buildReadout(
+        rows,
+        infoOf,
+        (typeId) => types[String(typeId)]?.name ?? `#${typeId}`
+      );
       const names = new Map<number, string>();
       for (const role of board.roles) {
         for (const { typeId } of role.hulls) {
           names.set(typeId, types[String(typeId)]?.name ?? `#${typeId}`);
         }
       }
-      setLoaded({ board, names });
+      setLoaded({ board, names, readout });
     });
     return () => {
       cancelled = true;
@@ -93,7 +102,7 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
       </div>
     );
   }
-  const { board, names } = loaded;
+  const { board, names, readout } = loaded;
   if (board.roles.length === 0) {
     return (
       <EmptyState
@@ -105,6 +114,7 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
 
   return (
     <div className="space-y-4">
+      {readout !== null && <DscanReadout readout={readout} />}
       <div>
         <button
           type="button"

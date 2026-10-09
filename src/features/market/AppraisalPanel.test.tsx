@@ -898,6 +898,56 @@ describe('AppraisalPanel — Copy lists', () => {
   });
 });
 
+describe('AppraisalPanel — result header controls', () => {
+  const noMatches = outcome({
+    appraisal: {
+      rows: [],
+      totals: {
+        buy: 0,
+        sell: 0,
+        spread: 0,
+        unpricedRows: 0,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: 0,
+        cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
+      },
+      items: [],
+    },
+    unmatched: [{ name: 'Nope', lines: [1] }],
+  });
+
+  function expectNoControls() {
+    expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Appraisal/ })).not.toBeInTheDocument();
+  }
+
+  it('shows no columns, share or table-actions control before anything is appraised', () => {
+    renderPanel();
+    expectNoControls();
+  });
+
+  it('shows no controls when the catalogue failed to load', () => {
+    renderPanel({ controller: controller({ failed: true }) });
+    expectNoControls();
+  });
+
+  it('shows no controls when no row matched', () => {
+    renderPanel({ controller: controller({ result: noMatches }) });
+    expectNoControls();
+  });
+
+  it('shows all three controls once there is a result', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Appraisal/ })).toBeInTheDocument();
+  });
+});
+
 describe('AppraisalPanel — Columns', () => {
   it('hides an optional column once toggled off, and shows it again', async () => {
     renderPanel({ controller: controller({ result: outcome() }) });
@@ -1161,6 +1211,34 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     const recent = screen.getByRole('combobox', { name: 'Load a recent list' });
     const box = screen.getByRole('textbox');
     expect(recent.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps Clear recent last in the card and clears the saved lists', async () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    renderPanel({
+      controller: controller({
+        result: outcome({ unmatched: [{ name: 'Nanite Repair Past', lines: [3, 7] }] }),
+      }),
+    });
+    const appraise = screen.getByRole('button', { name: 'Appraise' });
+    const clearRecent = screen.getByRole('button', { name: 'Clear recent' });
+    const unmatched = screen.getByText('1 line not matched');
+    expect(
+      appraise.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      unmatched.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await userEvent.click(clearRecent);
+    expect(useRecentAppraisals.getState().value).toEqual([]);
+  });
+
+  it('hides Clear recent when nothing was saved', () => {
+    renderPanel({ controller: controller() });
+    expect(screen.queryByRole('button', { name: 'Clear recent' })).not.toBeInTheDocument();
   });
 
   it('hides Recent when nothing was saved', () => {

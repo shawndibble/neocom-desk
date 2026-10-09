@@ -456,3 +456,44 @@ test.describe('Market Appraisal — stacked result card', () => {
     });
   }
 });
+
+test.describe('Market Appraisal — result header controls (#3112)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockHubPrices(page);
+    await signInAndGoto(page);
+  });
+
+  for (const width of [390, 1024, 1280]) {
+    test(`has no header buttons until appraised, then fits its controls at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('./market/appraisal?hub=jita');
+      const header = page
+        .locator('section')
+        .filter({ has: page.getByRole('heading', { name: 'Appraisal', exact: true }) })
+        .locator('header')
+        .last();
+      await expect(page.getByText('Nothing appraised yet')).toBeVisible();
+      await expect(header.getByRole('button')).toHaveCount(0);
+
+      await appraise(page, SIX_COLUMN_PASTE);
+      await expect(header.getByRole('button', { name: 'Columns' })).toBeVisible();
+      await expect(header.getByRole('button', { name: 'Copy Share Link' })).toBeVisible();
+
+      // Invariants, not pixels: the title stays on one line and the header
+      // does not spill sideways.
+      const fit = await header.evaluate((el) => {
+        const h2 = el.querySelector('h2')!;
+        return {
+          overflows: el.scrollWidth > el.clientWidth + 1,
+          titleWraps:
+            h2.getBoundingClientRect().height > parseFloat(getComputedStyle(h2).lineHeight) * 1.5,
+        };
+      });
+      expect(fit.overflows).toBe(false);
+      expect(fit.titleWraps).toBe(false);
+      await expectNoPageOverflow(page);
+    });
+  }
+});
