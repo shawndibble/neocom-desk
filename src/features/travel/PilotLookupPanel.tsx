@@ -284,7 +284,7 @@ function PilotSearch({
                   onList(pasted);
                 }}
                 onKeyDown={handleKeyDown}
-                className="w-full"
+                className="block w-full"
               />
               {listOpen && (
                 <ul

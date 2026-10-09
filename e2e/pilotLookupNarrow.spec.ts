@@ -138,4 +138,14 @@ test.describe('Pilot Lookup at 390px', () => {
     const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
     expect(corpBox?.height).toBeLessThanOrEqual(24);
   });
+
+  test('the Look up button sits flush with the search box bottom', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await openPilot(page);
+
+    const box = await page.getByRole('combobox', { name: 'Pilot' }).boundingBox();
+    const button = await page.getByRole('button', { name: 'Look up' }).boundingBox();
+    if (box === null || button === null) throw new Error('search row not laid out');
+    expect(Math.abs(box.y + box.height - (button.y + button.height))).toBeLessThanOrEqual(1);
+  });
 });
