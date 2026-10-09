@@ -9582,6 +9582,7 @@
       "group": "Route Safety only · your default on this page, can be overridden in the link",
       "enabled": "Route through Thera / Turnur",
       "shipSize": "My ship fits",
+      "sizeFromHull": "Set from {{hull}}",
       "ship": "Ship I am moving",
       "shipNone": "No ship",
       "shipPlaceholder": "Pick a hull to check mass",
