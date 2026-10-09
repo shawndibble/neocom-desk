@@ -57,3 +57,30 @@ export function yourShare(input: YourShareInput): YourShare {
     input.surveyMined > 0 ? Math.min(100, Math.round((minedM3 / input.surveyMined) * 100)) : null;
   return { minedM3, percentOfMined };
 }
+
+/**
+ * The systems the pilot mined in on the survey's days (inclusive), as ids:
+ * the latest day first, then the day's biggest haul, each system once. Where
+ * the survey was most likely scanned, offered ahead of typing a name.
+ */
+export function miningSystems(
+  rows: readonly LedgerLine[],
+  fromDate: string,
+  toDate: string
+): number[] {
+  const best = new Map<number, { date: string; quantity: number }>();
+  for (const row of rows) {
+    if (row.date < fromDate || row.date > toDate) continue;
+    const seen = best.get(row.solar_system_id);
+    if (seen === undefined || row.date > seen.date) {
+      best.set(row.solar_system_id, { date: row.date, quantity: row.quantity });
+    } else if (row.date === seen.date) {
+      seen.quantity += row.quantity;
+    }
+  }
+  return [...best.entries()]
+    .sort(([, a], [, b]) =>
+      a.date === b.date ? b.quantity - a.quantity : a.date < b.date ? 1 : -1
+    )
+    .map(([id]) => id);
+}

@@ -3,11 +3,11 @@
  * `SURVEY_POLL_MS` while the tab is visible, because other people may be
  * adding scans (the Firestore lite SDK has no live listener).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SurveyScan } from '@/engine/survey/series';
 import { loadSurvey, type LoadSurveyResult } from './surveyStore';
 
-export const SURVEY_POLL_MS = 20_000;
+export const SURVEY_POLL_MS = 60_000;
 
 export type SurveyLoadState =
   | { status: 'none' }
@@ -18,6 +18,28 @@ export type SurveyLoadState =
 
 type Loaded = { id: string; result: LoadSurveyResult } | null;
 
+/**
+ * What a poll should leave on screen. A poll that finds nothing new, or that
+ * fails for a moment, keeps the very same state, so the page isn't re-rendered
+ * (or swapped for an error and back) every minute. Scans only ever get
+ * appended, so a matching count and times mean nothing changed.
+ */
+function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
+  const before = prev?.id === id ? prev.result : null;
+  if (before?.ok) {
+    if (!result.ok && result.reason === 'failed') return prev;
+    if (
+      result.ok &&
+      result.expiresAt === before.expiresAt &&
+      result.scans.length === before.scans.length &&
+      result.scans.every((scan, i) => scan.at === before.scans[i].at)
+    ) {
+      return prev;
+    }
+  }
+  return { id, result };
+}
+
 export function useSurvey(id: string | null): {
   state: SurveyLoadState;
   refresh: () => Promise<void>;
@@ -27,7 +49,7 @@ export function useSurvey(id: string | null): {
   const refresh = useCallback(async () => {
     if (id === null) return;
     const result = await loadSurvey(id);
-    setLoaded({ id, result });
+    setLoaded((prev) => settle(prev, id, result));
   }, [id]);
 
   useEffect(() => {
@@ -35,7 +57,7 @@ export function useSurvey(id: string | null): {
     let cancelled = false;
     const run = () => {
       void loadSurvey(id).then((result) => {
-        if (!cancelled) setLoaded({ id, result });
+        if (!cancelled) setLoaded((prev) => settle(prev, id, result));
       });
     };
     run();
@@ -48,15 +70,13 @@ export function useSurvey(id: string | null): {
     };
   }, [id]);
 
-  if (id === null) return { state: { status: 'none' }, refresh };
-  // A result for another id (the pilot switched surveys) is stale.
-  const result = loaded?.id === id ? loaded.result : null;
-  if (result === null) return { state: { status: 'loading' }, refresh };
-  if (result.ok) {
-    return {
-      state: { status: 'ready', scans: result.scans, expiresAt: result.expiresAt },
-      refresh,
-    };
-  }
-  return { state: { status: result.reason === 'not-found' ? 'gone' : 'failed' }, refresh };
+  const state = useMemo<SurveyLoadState>(() => {
+    if (id === null) return { status: 'none' };
+    // A result for another id (the pilot switched surveys) is stale.
+    const result = loaded?.id === id ? loaded.result : null;
+    if (result === null) return { status: 'loading' };
+    if (result.ok) return { status: 'ready', scans: result.scans, expiresAt: result.expiresAt };
+    return { status: result.reason === 'not-found' ? 'gone' : 'failed' };
+  }, [id, loaded]);
+  return { state, refresh };
 }

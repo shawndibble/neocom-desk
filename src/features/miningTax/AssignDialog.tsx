@@ -2,6 +2,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { OreIcon, OreLink } from './OreIcon';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSurveyPayeeId } from './surveyPayeePref';
 import {
   Button,
   Select,
@@ -148,8 +149,11 @@ export function AssignDialog({
   // falling back to one remembered for it. Still never `payees[0]`: with no
   // history here at all, pre-selecting an arbitrary Payee would let a pilot
   // in a hurry create a real Assignment against one they never chose.
+  const surveyPayeeId = useSurveyPayeeId((state) => state.value);
   const autoMatch =
-    suggestion?.suggested ?? payees.find((p) => p.systemId === row.entry.solarSystemId);
+    suggestion?.suggested ??
+    payees.find((p) => p.systemId === row.entry.solarSystemId) ??
+    payees.find((p) => p.id === surveyPayeeId);
   const orderedPayees = suggestion ? suggestion.ranked : payees;
   const [payeeId, setPayeeId] = useState<string | null>(autoMatch?.id ?? null);
   const [taxPct, setTaxPct] = useState(String(autoMatch?.defaultTaxPct ?? ''));

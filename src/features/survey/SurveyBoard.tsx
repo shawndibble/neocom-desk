@@ -12,6 +12,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } 
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, TextArea } from '@/components/ui';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
+import { priceScans } from '@/engine/survey/pricing';
 import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -20,6 +21,7 @@ import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
 import { SurveyStats } from './SurveyStats';
+import { useOrePrices } from './useOrePrices';
 
 const LazySurveyCharts = lazy(() =>
   import('./SurveyCharts').then((m) => ({ default: m.SurveyCharts }))
@@ -118,7 +120,13 @@ export function SurveyBoard({
   panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
-  const summary = useMemo(() => summarizeSurvey(scans), [scans]);
+  const oreNames = useMemo(() => scans.flatMap((s) => s.rocks.map((r) => r.ore)), [scans]);
+  const orePrices = useOrePrices(oreNames);
+  // The scanner's own ISK column is not trusted: rocks are valued at market.
+  const summary = useMemo(
+    () => summarizeSurvey(priceScans(scans, orePrices.prices)),
+    [scans, orePrices.prices]
+  );
   const [outcome, setOutcome] = useCopyOutcome();
   const phone = useIsPhone();
 
@@ -224,7 +232,12 @@ export function SurveyBoard({
         </div>
       </Panel>
 
-      {summary.ores.length > 0 && <SurveyOres summary={summary} />}
+      {summary.ores.length > 0 && (
+        <SurveyOres
+          summary={summary}
+          priceNote={{ hub: orePrices.hub.systemName, compressed: orePrices.compressed }}
+        />
+      )}
     </div>
   );
 }

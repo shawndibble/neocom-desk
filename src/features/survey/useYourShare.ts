@@ -14,6 +14,7 @@ import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadSystemName } from '@/features/character/systemSecurity';
 import { loadMiningLedger } from '@/features/miningTax/ledger';
 import {
+  miningSystems,
   utcDate,
   yourShare,
   type LedgerLine,
@@ -29,8 +30,12 @@ export type YourShareState =
   /** No mining ledger to read: the grant is missing, ESI did not answer, or there is no Survey yet. */
   | { status: 'unavailable' }
   /** A ledger, but no chosen system and the current one is unknown (no location grant). */
-  | { status: 'needSystem' }
-  | { status: 'ready'; system: SurveySystem; share: YourShare };
+  | { status: 'needSystem'; suggestions: SurveySystem[] }
+  | { status: 'ready'; system: SurveySystem; share: YourShare; suggestions: SurveySystem[] };
+
+/** How often the ledger is re-read while the page is open; ESI's own cache decides what is new. */
+const LEDGER_REFRESH_MS = 60_000;
+const MAX_SUGGESTIONS = 4;
 
 interface LedgerData {
   rows: readonly LedgerLine[];
@@ -71,6 +76,12 @@ export function useYourShare(
   const [ledger, setLedger] = useState<LoadedLedger>(null);
   const [here, setHere] = useState<SurveySystem | null | undefined>(undefined);
   const lastAt = summary?.lastAt;
+  const [refreshes, setRefreshes] = useState(0);
+  useEffect(() => {
+    if (characterId === null) return;
+    const timer = window.setInterval(() => setRefreshes((n) => n + 1), LEDGER_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [characterId]);
 
   useEffect(() => {
     if (characterId === null || lastAt === undefined) return;
@@ -81,7 +92,7 @@ export function useYourShare(
     return () => {
       cancelled = true;
     };
-  }, [characterId, lastAt]);
+  }, [characterId, lastAt, refreshes]);
 
   // Where the pilot is now, asked once per Character.
   useEffect(() => {
@@ -96,6 +107,26 @@ export function useYourShare(
       cancelled = true;
     };
   }, [characterId]);
+
+  // Where the ledger says they mined on the survey's days, to pick from first.
+  const firstAt = summary?.firstAt;
+  const [suggested, setSuggested] = useState<SurveySystem[]>([]);
+  useEffect(() => {
+    const rows = ledger?.characterId === characterId ? ledger.data?.rows : undefined;
+    if (rows === undefined || firstAt === undefined || lastAt === undefined) return;
+    const ids = miningSystems(rows, utcDate(firstAt), utcDate(lastAt)).slice(0, MAX_SUGGESTIONS);
+    let cancelled = false;
+    void Promise.all(
+      ids.map(async (id) => ({ id, name: await loadSystemName(id).catch(() => null) }))
+    ).then((named) => {
+      if (!cancelled) {
+        setSuggested(named.flatMap((n) => (n.name === null ? [] : [{ id: n.id, name: n.name }])));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ledger, characterId, firstAt, lastAt]);
 
   const system = chosen ?? here ?? null;
   const data = ledger?.characterId === characterId ? ledger.data : null;
@@ -120,6 +151,11 @@ export function useYourShare(
   if (characterId === null || summary === null) return { status: 'unavailable' };
   if (!hydrated || ledger?.characterId !== characterId) return { status: 'loading' };
   if (data === null) return { status: 'unavailable' };
-  if (system === null) return here === undefined ? { status: 'loading' } : { status: 'needSystem' };
-  return share === null ? { status: 'loading' } : { status: 'ready', system, share };
+  if (system === null)
+    return here === undefined
+      ? { status: 'loading' }
+      : { status: 'needSystem', suggestions: suggested };
+  return share === null
+    ? { status: 'loading' }
+    : { status: 'ready', system, share, suggestions: suggested };
 }
