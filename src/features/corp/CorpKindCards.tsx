@@ -167,23 +167,43 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
 }
 
 export function CorpKindCards({ grouped, capabilities }: CorpKindCardsProps) {
+  const { t } = useTranslation();
   const readable = CARD_KINDS.filter((kind) => capabilities[CAPABILITY_FOR_KIND[kind]]);
   if (readable.length === 0) return null;
 
+  // Only kinds that were readable and came back empty can fold: an unreadable
+  // kind never reaches `readable`, so "could not read" is never summarised away
+  // as "nothing due". One empty card keeps its own quiet line; the summary is
+  // for two or more (issue #3142).
+  const empty = readable.filter((kind) => (grouped.get(kind) ?? []).length === 0);
+  const folded = empty.length >= 2 ? empty : [];
+  const cards = readable.filter((kind) => !folded.includes(kind));
+
   return (
-    // One column on a phone, two from `sm`, all four across only from `2xl`.
-    // The sidebar leaves ~1030px of content at 1280, so four columns there are
-    // ~246px each and a Fuel row has ~100px for its name; two columns give ~500px,
-    // enough for a whole structure name. Four cards read at ~370px from 1536px.
-    //
-    // `items-start` so each card is its own height. Stretched to match its
-    // tallest neighbour, a card holding one job would carry ~180px of air —
-    // which is the thing this rework exists to remove (DESIGN.md: density over
-    // whitespace).
-    <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-      {readable.map((kind) => (
-        <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
-      ))}
+    <div className="grid min-w-0 gap-3">
+      {cards.length > 0 && (
+        // One column on a phone, two from `sm`, all four across only from `2xl`.
+        // The sidebar leaves ~1030px of content at 1280, so four columns there are
+        // ~246px each and a Fuel row has ~100px for its name; two columns give ~500px,
+        // enough for a whole structure name. Four cards read at ~370px from 1536px.
+        //
+        // `items-start` so each card is its own height. Stretched to match its
+        // tallest neighbour, a card holding one job would carry ~180px of air —
+        // which is the thing this rework exists to remove (DESIGN.md: density over
+        // whitespace).
+        <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+          {cards.map((kind) => (
+            <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
+          ))}
+        </div>
+      )}
+      {folded.length > 0 && (
+        <p className="px-1 text-xs text-text-dim">
+          {t('corp.cards.nothingDue', {
+            kinds: folded.map((kind) => t(TITLE_FOR_KIND[kind])).join(' · '),
+          })}
+        </p>
+      )}
     </div>
   );
 }

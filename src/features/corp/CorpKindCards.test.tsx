@@ -76,7 +76,7 @@ describe('CorpKindCards', () => {
       withItemActions(
         <MemoryRouter>
           <CorpKindCards
-            grouped={new Map()}
+            grouped={new Map([['structureFuel', [fuel(1)]]])}
             capabilities={{ canReadStructures: true } as CorpCapabilities}
           />
         </MemoryRouter>,
@@ -88,5 +88,94 @@ describe('CorpKindCards', () => {
     expect(line.tagName).toBe('P');
     expect(line).not.toHaveClass('uppercase');
     expect(screen.queryByRole('heading', { name: 'Industry jobs' })).not.toBeInTheDocument();
+  });
+
+  const renderCards = (grouped: Map<CorpBoardItemKind, CorpBoardItem[]>) =>
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={grouped}
+            capabilities={
+              {
+                canReadStructures: true,
+                canReadMoonExtractions: true,
+                canReadIndustry: true,
+              } as CorpCapabilities
+            }
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+
+  it('folds two empty readable cards into one summary line beside a data card', () => {
+    renderCards(new Map([['structureFuel', [fuel(1)]]]));
+    expect(screen.getByText('Structure 1')).toBeInTheDocument();
+    expect(
+      screen.getByText('Nothing due: Structure timers · Moon chunks · Industry jobs')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No structure is on a timer.')).not.toBeInTheDocument();
+  });
+
+  it('keeps a single empty card as its own quiet line', () => {
+    renderCards(
+      new Map([
+        ['structureFuel', [fuel(1)]],
+        ['structureTimer', [fuel(2)]],
+        ['moonExtraction', [fuel(3)]],
+      ])
+    );
+    expect(screen.getByText('No job is waiting.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
+  });
+
+  it('renders only the summary when every card is empty', () => {
+    renderCards(new Map());
+    expect(
+      screen.getByText('Nothing due: Fuel · Structure timers · Moon chunks · Industry jobs')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  it('does not fold an unreadable kind into the summary', () => {
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map()}
+            capabilities={{ canReadStructures: true } as CorpCapabilities}
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    const summary = screen.getByText(/Nothing due/);
+    expect(summary).not.toHaveTextContent('Moon chunks');
+    expect(summary).not.toHaveTextContent('Industry jobs');
+  });
+
+  it('moves a card out of the summary when it gains rows', () => {
+    const { rerender } = renderCards(new Map());
+    expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
+    rerender(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map([['structureFuel', [fuel(1)]]])}
+            capabilities={
+              {
+                canReadStructures: true,
+                canReadMoonExtractions: true,
+                canReadIndustry: true,
+              } as CorpCapabilities
+            }
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.getByText('Structure 1')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing due: Structure timers/)).toBeInTheDocument();
   });
 });

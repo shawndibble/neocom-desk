@@ -8791,6 +8791,7 @@
       "moonsEmpty": "No moon drill is running.",
       "jobs": "Industry jobs",
       "jobsEmpty": "No job is waiting.",
+      "nothingDue": "Nothing due: {{kinds}}",
       "services": "Offline services",
       "servicesCount_one": "{{count}} offline",
       "servicesCount_other": "{{count}} offline",
