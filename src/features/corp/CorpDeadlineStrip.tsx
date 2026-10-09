@@ -66,7 +66,11 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
   const busiest = days.reduce((max, day) => Math.max(max, day.count), 0);
   const total = days.reduce((sum, day) => sum + day.count, 0);
 
-  const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
+  // One letter and a day number fit a 20px column at `xl`, where the strip shares
+  // a row with the hero figures; the month is named only where it begins.
+  const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'narrow' });
+  const dayOfMonth = new Intl.DateTimeFormat(i18n.language, { day: 'numeric' });
+  const month = new Intl.DateTimeFormat(i18n.language, { month: 'short' });
   const dayMonth = new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' });
 
   /**
@@ -76,10 +80,12 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
    * nobody maintains, it cannot drift from what is drawn.
    */
   const described = days
-    .filter((day) => day.count > 0)
-    .map((day) =>
+    .map((day, index) => ({ day, index }))
+    .filter(({ day }) => day.count > 0)
+    .map(({ day, index }) =>
       t('corp.standing.strip.describeDay', {
-        day: dayMonth.format(day.startMs),
+        // The visible column is a bare "F / 9" now, so today is named here instead.
+        day: index === 0 ? t('corp.standing.strip.today') : dayMonth.format(day.startMs),
         count: day.count,
         severity: t(SEVERITY_LABEL[day.severity ?? 'clear']),
       })
@@ -125,10 +131,21 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
       >
         {days.map((day, index) => {
           const isToday = index === 0;
+          // The first column names its month, and so does every column that opens a new one.
+          // A label is skipped when the next column opens a month: two would collide.
+          const opensMonth = (i: number) =>
+            i === 0 ||
+            new Date(days[i].startMs).getMonth() !== new Date(days[i - 1].startMs).getMonth();
+          const isLast = index === days.length - 1;
+          const showMonth = opensMonth(index) && (isLast || !opensMonth(index + 1));
           const percent =
             day.count === 0 ? 0 : Math.max(MIN_BAR_PERCENT, (day.count / busiest) * 100);
           return (
-            <div key={day.startMs} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+            <div
+              key={day.startMs}
+              data-today={isToday || undefined}
+              className="flex min-w-0 flex-1 flex-col items-center gap-1"
+            >
               {/* Reserved whether or not there is a count, so every baseline lines up. */}
               <span className="h-4 text-xs leading-4 font-semibold tabular-nums">
                 {day.count > 0 ? day.count : ''}
@@ -141,16 +158,30 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                   />
                 )}
               </div>
-              {/* `truncate` in a `min-w-0` column: 14 labels in 320px clip rather than overflow. */}
+              {/* `truncate` in a `min-w-0` column: even a one-letter label clips rather than overflows. */}
               <span
                 className={`w-full truncate text-center text-[0.6875rem] ${
                   isToday ? 'font-semibold text-text' : 'text-text-dim'
                 }`}
               >
-                {isToday ? t('corp.standing.strip.today') : weekday.format(day.startMs)}
+                {weekday.format(day.startMs)}
               </span>
-              <span className="w-full truncate text-center text-[0.6875rem] text-text-dim tabular-nums">
-                {dayMonth.format(day.startMs)}
+              <span
+                className={`w-full truncate text-center text-[0.6875rem] tabular-nums ${
+                  isToday
+                    ? 'font-semibold text-text underline decoration-2 underline-offset-2'
+                    : 'text-text-dim'
+                }`}
+              >
+                {dayOfMonth.format(day.startMs)}
+              </span>
+              {/* Reserved on every column so baselines match; it may spill into the empty cells beside it. */}
+              <span
+                className={`h-3.5 w-full text-[0.6875rem] leading-3.5 whitespace-nowrap text-text-dim ${
+                  isLast ? 'text-right' : 'text-left'
+                }`}
+              >
+                {showMonth ? month.format(day.startMs) : ''}
               </span>
             </div>
           );
