@@ -457,7 +457,7 @@ describe('projection wiring', () => {
     });
   });
 
-  it('gives exactly the eight fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the nine fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
@@ -467,6 +467,7 @@ describe('projection wiring', () => {
         'cloneJump',
         'colonies',
         'contracts',
+        'corpIndustryJobs',
         'eveNotification',
         'industryJobs',
         'skillQueue',
@@ -567,6 +568,40 @@ describe('projection wiring', () => {
     const rows = await industryJobDomain.projection!(7, 'Kestrel', snapshot, T0);
     expect(rows).toHaveLength(1);
     expect(rows[0].body).toContain('Rifter');
+  });
+
+  describe('corpIndustryJobDomain.projection', () => {
+    const snapshot = {
+      entries: [
+        {
+          jobId: 5,
+          endMs: T0 + 5 * HOUR_MS,
+          blueprintTypeId: 10,
+          productTypeId: 20,
+          activityId: 1,
+        },
+      ],
+      nowMs: T0,
+    };
+
+    it('projects an in-horizon job once Factory_Manager is held', async () => {
+      vi.mocked(loadCorporationId).mockResolvedValue(2);
+      vi.mocked(loadCharacterRoles).mockResolvedValue(
+        statusResult(roles(['Factory_Manager']), false)
+      );
+      vi.mocked(loadUniverseType).mockResolvedValue(universeTypeResult('Rifter'));
+      const rows = await corpIndustryJobDomain.projection!(7, 'Kestrel', snapshot, T0);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].eventId).toBe('corpIndustryJobReady');
+      expect(rows[0].occurrenceKey).toBe('7:corpIndustryJobReady:5');
+      expect(rows[0].body).toContain('Rifter');
+    });
+
+    it('projects nothing once the corp role is gone', async () => {
+      vi.mocked(loadCorporationId).mockResolvedValue(2);
+      vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles([]), false));
+      expect(await corpIndustryJobDomain.projection!(7, 'Kestrel', snapshot, T0)).toEqual([]);
+    });
   });
 
   it('carries each extractor install time into the colony snapshot, and omits it when ESI did', async () => {

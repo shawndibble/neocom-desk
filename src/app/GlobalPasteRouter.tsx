@@ -15,8 +15,9 @@ import {
   type MarketAppraiseState,
   type PilotListState,
   type SkillPlanImportState,
+  type SurveyScanState,
 } from '@/lib/shortcuts';
-import { MARKET_TABS } from './pageTabs';
+import { MARKET_TABS, MINING_TABS } from './pageTabs';
 
 const SKILL_PLANS_PATH = '/skills/plans';
 
@@ -35,6 +36,10 @@ const DESTINATIONS: Record<
   PasteDestination,
   (text: string, here: Pick<Location, 'pathname' | 'search'>) => [string, { state: unknown }]
 > = {
+  survey: (text) => [
+    tabPath(MINING_TABS, 'survey'),
+    { state: { surveyScanText: text } satisfies SurveyScanState },
+  ],
   fitting: (text) => [
     FITTINGS_PATH,
     { state: { fittingLoadText: text } satisfies FittingLoadState },

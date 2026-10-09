@@ -36,7 +36,7 @@
  * functions of their arguments — no i18next, no lookups — which keeps this
  * module as pure as before.
  *
- * 11 of the 25 Notification Events carry a timestamp fixed far enough in
+ * 12 of the 25 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
  * (new mail, a filled order, a wallet change) and have no seat here. EVE's
  * own notifications are mostly the same "as it happens" case — except a
@@ -57,6 +57,8 @@ import {
   type EveNotificationEntrySnapshot,
   type NotificationFire,
   type IndustryJobNotificationFire,
+  type CorpIndustryJobEntrySnapshot,
+  type CorpIndustryJobNotificationFire,
   type PlanetaryNotificationFire,
   type ExtractorExpiringFire,
   type CalendarEventStartingFire,
@@ -94,6 +96,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'planetaryExtractorExpiring',
   'calendarEventStarting',
   'structureFuelLow',
+  'corpIndustryJobReady',
   'eveNotification',
 ] as const;
 
@@ -140,6 +143,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'skillLevelComplete':
     case 'characterNotTraining':
     case 'industryJobComplete':
+    case 'corpIndustryJobReady':
     case 'cloneJumpReady':
     case 'calendarEventStarting':
     case 'eveNotification':
@@ -353,6 +357,46 @@ export function projectIndustryJobs(
       buildRow(
         characterId,
         'industryJobComplete',
+        fire,
+        entry.endMs,
+        copy(fire, characterName, { item: itemNames.get(itemTypeId) })
+      )
+    );
+  }
+  return rows;
+}
+
+/**
+ * The corp analogue of `projectIndustryJobs`: same horizon rule, keyed on the
+ * job id exactly as the poller's `corpIndustryJobReady` is, so a foreground
+ * poll and the scheduled push dedupe. The caller gates on `canReadIndustry`.
+ */
+export function projectCorpIndustryJobs(
+  characterId: number,
+  characterName: string,
+  entries: readonly CorpIndustryJobEntrySnapshot[],
+  itemNames: ReadonlyMap<number, string>,
+  copy: PushCopy<CorpIndustryJobNotificationFire, { item?: string }>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    if (!inHorizon(entry.endMs, nowMs, horizonMs)) continue;
+    const itemTypeId = entry.productTypeId ?? entry.blueprintTypeId;
+    const fire: CorpIndustryJobNotificationFire = {
+      eventId: 'corpIndustryJobReady',
+      characterId,
+      jobId: entry.jobId,
+      blueprintTypeId: entry.blueprintTypeId,
+      productTypeId: entry.productTypeId,
+      activityId: entry.activityId,
+      endMs: entry.endMs,
+    };
+    rows.push(
+      buildRow(
+        characterId,
+        'corpIndustryJobReady',
         fire,
         entry.endMs,
         copy(fire, characterName, { item: itemNames.get(itemTypeId) })

@@ -16,6 +16,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  InfoTooltip,
   Panel,
   Spinner,
   TextInput,
@@ -558,8 +559,12 @@ export function ProductionLogPanel({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-2">
           <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('industry.totalRealizedProfit')}
+              <InfoTooltip
+                label={t('industry.totalRealizedProfitTooltipLabel')}
+                content={t('industry.totalRealizedProfitTooltip')}
+              />
             </span>
             <span
               className={`text-3xl leading-tight font-semibold tabular-nums ${iskToneClass(totalRealizedProfit)}`}
@@ -567,11 +572,8 @@ export function ProductionLogPanel({
               {formatIsk(totalRealizedProfit)} ISK
             </span>
             <span className="text-[0.6875rem] text-text-dim">
-              {t('industry.productionLogSubtitle')}
-            </span>
-            <span className="text-[0.6875rem] text-text-dim">
-              {t('industry.productionLogCaveat', {
-                runs: filteredRunCount,
+              {t('industry.productionLogCoverage', {
+                count: filteredRunCount,
                 items: itemRows.length,
               })}
             </span>

@@ -1087,9 +1087,7 @@ export function Contacts() {
   if (tab === 'standings') {
     return (
       <div className="mx-auto max-w-6xl space-y-4">
-        <PageHeader title={t('contacts.title')} />
-        {tabBar}
-        <ContactsStandings characterId={activeCharacterId} />
+        <ContactsStandings characterId={activeCharacterId} tabBar={tabBar} />
       </div>
     );
   }

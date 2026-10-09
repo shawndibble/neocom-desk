@@ -12,9 +12,14 @@ import {
   type FleetHull,
   type FleetRole,
 } from '@/engine/pilotList/dscanRoles';
+import { formatDistanceKm as formatKm } from '@/engine/pilotList/formatDistanceKm';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
+import { buildReadout, type Readout } from '@/engine/pilotList/dscanReadout';
+import type { HullCount } from '@/engine/pilotList/dscanWorth';
 import { cx } from '@/lib/cx';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { DscanMeta } from './DscanMeta';
+import { DscanReadout } from './DscanReadout';
 
 /**
  * Role -> clock-kind token. Identity only, never a status; the legend and the
@@ -30,13 +35,6 @@ const ROLE_COLOUR: Record<DscanRole, string> = {
   structures: 'var(--color-kind-moon-chunk)',
 };
 
-const KM_PER_AU = 149_597_870.7;
-
-function formatKm(km: number): string {
-  if (km >= KM_PER_AU / 10) return `${(km / KM_PER_AU).toFixed(1)} AU`;
-  return `${Math.round(km).toLocaleString()} km`;
-}
-
 function formatRange(hull: FleetHull): string | null {
   if (hull.minKm === null || hull.maxKm === null) return null;
   const min = Math.round(hull.minKm);
@@ -44,9 +42,17 @@ function formatRange(hull: FleetHull): string | null {
   return min === max ? formatKm(hull.minKm) : `${formatKm(hull.minKm)} – ${formatKm(hull.maxKm)}`;
 }
 
+/** Ships only: drones and structures are not hulls anyone flies, so they stay out of worth and diff. */
+function shipHulls(board: FleetBoardData): HullCount[] {
+  return board.roles
+    .filter((r) => r.role !== 'drones' && r.role !== 'structures')
+    .flatMap((r) => r.hulls.map(({ typeId, count }) => ({ typeId, count })));
+}
+
 interface Loaded {
   board: FleetBoardData;
   names: ReadonlyMap<number, string>;
+  readout: Readout | null;
 }
 
 /**
@@ -55,7 +61,14 @@ interface Loaded {
  * Shared by the live Pilot Lookup view and a Shared D-Scan, so both group the
  * same way.
  */
-export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
+export function FleetBoard({
+  rows,
+  trackHistory = false,
+}: {
+  rows: readonly DscanRow[];
+  /** Compare with, and then store as, this device's last scan. The live paste only. */
+  trackHistory?: boolean;
+}) {
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<Loaded>();
   const [expanded, setExpanded] = useState(false);
@@ -65,19 +78,25 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
     let cancelled = false;
     void Promise.all([loadTypes(), loadGroupCategories()]).then(([types, categories]) => {
       if (cancelled) return;
-      const board = buildFleetBoard(rows, (typeId) => {
+      const infoOf = (typeId: number) => {
         const type = types[String(typeId)];
         return type === undefined
           ? undefined
           : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
-      });
+      };
+      const board = buildFleetBoard(rows, infoOf);
+      const readout = buildReadout(
+        rows,
+        infoOf,
+        (typeId) => types[String(typeId)]?.name ?? `#${typeId}`
+      );
       const names = new Map<number, string>();
       for (const role of board.roles) {
         for (const { typeId } of role.hulls) {
           names.set(typeId, types[String(typeId)]?.name ?? `#${typeId}`);
         }
       }
-      setLoaded({ board, names });
+      setLoaded({ board, names, readout });
     });
     return () => {
       cancelled = true;
@@ -93,7 +112,7 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
       </div>
     );
   }
-  const { board, names } = loaded;
+  const { board, names, readout } = loaded;
   if (board.roles.length === 0) {
     return (
       <EmptyState
@@ -105,6 +124,8 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
 
   return (
     <div className="space-y-4">
+      {readout !== null && <DscanReadout readout={readout} />}
+      <DscanMeta hulls={shipHulls(board)} names={names} trackHistory={trackHistory} />
       <div>
         <button
           type="button"

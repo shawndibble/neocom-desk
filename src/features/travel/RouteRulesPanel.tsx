@@ -40,6 +40,7 @@ import {
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
+import { wormholeSizeForShipGroup } from '@/engine/route/hullWormholeSize';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
   MIN_ROUTE_HOLE_MIN_LIFE,
@@ -50,6 +51,8 @@ import {
 } from '@/features/route/routeHoleSettings';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import type { RouteBridgeQuery } from '@/features/route/routeBridgeSettings';
+import { hullJumpDrive } from '@/engine/route/jumpLegs';
+import { SHORT_JUMP_SHARE, type RouteJumpRange } from '@/features/route/routeJumpSettings';
 import {
   ROUTE_PREFERENCE_LABEL_KEYS,
   ROUTE_PREFERENCE_SHORT_LABEL_KEYS,
@@ -115,6 +118,58 @@ export function RouteBridgeFields({
   );
 }
 
+/** What the hull's jump drive legs need: the switch and the longest single jump. */
+export interface RouteJumpFieldsProps {
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  range: RouteJumpRange;
+  onRangeChange: (range: RouteJumpRange) => void;
+}
+
+/**
+ * Allow jump drive legs (issue #3147): shown only for a hull with a jump drive,
+ * straight under the hull it reads.
+ */
+function RouteJumpFields({
+  jump,
+  maxLy,
+}: {
+  jump: RouteJumpFieldsProps;
+  /** The hull's range with its skills, the cap "Max" means. */
+  maxLy: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1.5">
+      <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
+        <Checkbox checked={jump.enabled} onChange={() => jump.onEnabledChange(!jump.enabled)} />
+        {t('travel.jumpDrive.enabled')}
+      </label>
+      <p className="text-text-dim">{t('travel.jumpDrive.hint')}</p>
+      {jump.enabled && (
+        <>
+          <p className="font-semibold">{t('travel.jumpDrive.range')}</p>
+          <SegmentedControl
+            label={t('travel.jumpDrive.range')}
+            options={[
+              {
+                value: 'short' as const,
+                label: t('travel.jumpDrive.short', { ly: (maxLy * SHORT_JUMP_SHARE).toFixed(1) }),
+              },
+              { value: 'max' as const, label: t('travel.jumpDrive.max', { ly: maxLy.toFixed(1) }) },
+            ]}
+            value={jump.range}
+            onChange={jump.onRangeChange}
+            size="sm"
+            fill
+            uppercase={false}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 const NO_SHIP = 'none';
 
 /**
@@ -128,6 +183,7 @@ export function RouteHoleFields({
   bridges,
   bare = false,
   nested = false,
+  jump,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
@@ -135,12 +191,16 @@ export function RouteHoleFields({
   bare?: boolean;
   /** Inside a disclosure that already draws the rule and padding above it. */
   nested?: boolean;
+  /** Route Safety only: Settings → Travel has no jump drive legs to switch. */
+  jump?: RouteJumpFieldsProps;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
   const { enabled, settings } = query;
-  const { hulls } = useRouteShipMass();
+  const { hulls, ship } = useRouteShipMass();
   const shipTypeId = useRouteShipTypeId((state) => state.value);
+  // Set when a hull choice filled the size; any edit of the size drops it (issue #2850).
+  const [sizeHull, setSizeHull] = useState<string | null>(null);
   return (
     <section
       className={
@@ -156,7 +216,14 @@ export function RouteHoleFields({
         {t('travel.holes.enabled')}
       </label>
       <div className="space-y-1.5">
-        <p className="font-semibold">{t('travel.holes.shipSize')}</p>
+        <p className="font-semibold">
+          {t('travel.holes.shipSize')}
+          {sizeHull !== null && (
+            <span className="ml-2 font-normal text-text-dim">
+              {t('travel.holes.sizeFromHull', { hull: sizeHull })}
+            </span>
+          )}
+        </p>
         <SegmentedControl
           label={t('travel.holes.shipSize')}
           options={WORMHOLE_SHIP_SIZES.map((value) => ({
@@ -164,7 +231,10 @@ export function RouteHoleFields({
             label: t(`travel.thera.fits.${value}`),
           }))}
           value={settings.shipSize}
-          onChange={(value) => onChange({ field: 'shipSize', value })}
+          onChange={(value) => {
+            setSizeHull(null);
+            onChange({ field: 'shipSize', value });
+          }}
           size="sm"
           fill
           uppercase={false}
@@ -174,9 +244,17 @@ export function RouteHoleFields({
         <p className="font-semibold">{t('travel.holes.ship')}</p>
         <Select
           value={shipTypeId === null ? NO_SHIP : String(shipTypeId)}
-          onValueChange={(value) =>
-            void useRouteShipTypeId.getState().setValue(value === NO_SHIP ? null : Number(value))
-          }
+          onValueChange={(value) => {
+            const hull =
+              value === NO_SHIP ? undefined : hulls.find((h) => String(h.typeId) === value);
+            void useRouteShipTypeId.getState().setValue(hull?.typeId ?? null);
+            // A hull the map names sets the size; clearing or an unmapped hull leaves it alone.
+            const size = hull && wormholeSizeForShipGroup(hull.groupId);
+            if (hull && size) {
+              onChange({ field: 'shipSize', value: size });
+              setSizeHull(hull.name);
+            }
+          }}
         >
           <SelectTrigger size="sm" aria-label={t('travel.holes.ship')}>
             <SelectValue placeholder={t('travel.holes.shipPlaceholder')} />
@@ -191,6 +269,9 @@ export function RouteHoleFields({
           </SelectContent>
         </Select>
       </div>
+      {jump && ship?.drive && (
+        <RouteJumpFields jump={jump} maxLy={hullJumpDrive(ship.groupId, ship.drive).rangeLy} />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={lifeId}>{t('travel.holes.minLifeBefore')}</label>
         <TextInput
@@ -299,6 +380,7 @@ export function RouteRulesPanel({
   holeQuery,
   onHoleChange,
   bridges,
+  jump,
 }: {
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
@@ -309,6 +391,7 @@ export function RouteRulesPanel({
   /** Saves the page's default, and drops the link's override of it. */
   onHoleChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
+  jump: RouteJumpFieldsProps;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -318,7 +401,11 @@ export function RouteRulesPanel({
   // Held until every setting is read, so a click cannot write a default over a stored value.
   const { settingsHydrated, podKillsUnavailable } = useRouteRules();
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
-  const moreOn = Number(holeQuery.enabled) + Number(bridges.bridgeQuery.enabled);
+  const { ship } = useRouteShipMass();
+  const moreOn =
+    Number(holeQuery.enabled) +
+    Number(bridges.bridgeQuery.enabled) +
+    Number(jump.enabled && ship?.drive != null);
 
   return (
     <CollapsiblePanel
@@ -378,7 +465,13 @@ export function RouteRulesPanel({
             className="-mx-3 border-t border-line"
           >
             <div className="p-3">
-              <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} nested />
+              <RouteHoleFields
+                query={holeQuery}
+                onChange={onHoleChange}
+                bridges={bridges}
+                jump={jump}
+                nested
+              />
             </div>
           </Disclosure>
         </div>

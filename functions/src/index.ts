@@ -31,6 +31,14 @@ import {
   decideAccountAction,
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
+import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
+import {
+  LP_STORE_OFFERS_CHUNK_SIZE,
+  LP_STORE_OFFERS_COLLECTION,
+  LP_STORE_OFFERS_META_DOC,
+  LP_STORE_REQUEST_GAP_MS,
+  fetchLpStoreRows,
+} from './lpOffersSnapshot.js';
 import { fetchArchiveFingerprint, streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
   INSURGENCY_URL,
@@ -367,6 +375,13 @@ async function writeChunkedSnapshot<Row>(
   });
   return publishedAt;
 }
+
+const LP_STORE_OFFERS_SNAPSHOT: ChunkedSnapshot = {
+  collection: LP_STORE_OFFERS_COLLECTION,
+  metaDoc: LP_STORE_OFFERS_META_DOC,
+  chunkSize: LP_STORE_OFFERS_CHUNK_SIZE,
+  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
+};
 
 const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
   collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
@@ -838,5 +853,49 @@ export const syncWorkbenchFits = onSchedule(
       requestGapMs: WORKBENCH_REQUEST_GAP_MS,
     });
     logInfo('EVE Workbench fits sync', { ...result });
+  }
+);
+
+/**
+ * syncLpStoreOffers: the LP Store page's item-first search (issue #2873). Reads
+ * every LP corporation's public offers from ESI (~170 requests, paced) and
+ * republishes them with each corporation's station systems to `lpStoreOffers`,
+ * so the app can search an item across all stores and rank corporations by jumps.
+ *
+ * Once a day: store offers change on patch days, not by the hour. A run that
+ * lost more than a tenth of the corporations (ESI down) publishes nothing and
+ * leaves yesterday's snapshot standing, since the write replaces it wholesale.
+ *
+ * Another Cloud Scheduler job past the free three, the same trade as
+ * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
+ */
+const LP_STORE_MAX_FAILED_SHARE = 0.1;
+
+export const syncLpStoreOffers = onSchedule(
+  { schedule: 'every 24 hours', memory: '512MiB', timeoutSeconds: 540 },
+  async () => {
+    const { rows, failed } = await fetchLpStoreRows({
+      corporations: LP_CORP_STATION_SYSTEMS,
+      fetchJson: async (url) => {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': MARKET_HISTORY_USER_AGENT,
+            'X-User-Agent': MARKET_HISTORY_USER_AGENT,
+            'X-Compatibility-Date': '2026-08-01',
+            Accept: 'application/json',
+          },
+        });
+        const body: unknown = response.ok ? await response.json().catch(() => null) : null;
+        return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
+      },
+      sleep,
+      requestGapMs: LP_STORE_REQUEST_GAP_MS,
+    });
+    logInfo('LP store offers sync', { corporations: rows.length, failed: failed.length });
+    if (rows.length === 0 || failed.length > Math.max(1, rows.length * LP_STORE_MAX_FAILED_SHARE)) {
+      logError('LP store offers sync skipped publishing', { failed });
+      return;
+    }
+    await writeChunkedSnapshot(getFirestore(), LP_STORE_OFFERS_SNAPSHOT, rows);
   }
 );
