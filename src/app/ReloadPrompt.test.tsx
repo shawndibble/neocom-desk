@@ -62,8 +62,7 @@ function navigateTo(path: string) {
   act(() => navigateRef.current?.(path));
 }
 
-const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
-const APPLY_CHECK_POLL_MS = 15 * 1000;
+const HIDDEN_FOR_MS = 10 * 60 * 1000;
 
 beforeEach(() => {
   updateServiceWorker.mockClear();
@@ -91,42 +90,17 @@ describe('ReloadPrompt', () => {
   it('does nothing when no update is waiting', async () => {
     state.needRefresh = false;
     renderPrompt();
-    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
+    await vi.advanceTimersByTimeAsync(HIDDEN_FOR_MS);
     navigateTo('/other');
     expect(updateServiceWorker).not.toHaveBeenCalled();
   });
 
-  it('applies the update once a hidden tab stays hidden past the grace period', async () => {
+  it('never applies an update because the tab was hidden, however long, even on coming back', async () => {
     renderPrompt();
     setHidden(true);
-    expect(updateServiceWorker).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
-
-    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies on resume when the grace period elapsed while backgrounded, even if the polling tick never ran (mobile OS freezes timers while hidden)', () => {
-    renderPrompt();
-    setHidden(true);
-    // No vi.advanceTimersByTimeAsync here — the tick never fires, as it
-    // wouldn't on a real phone that freezes JS while backgrounded. Only the
-    // wall clock moves.
-    vi.setSystemTime(new Date(Date.now() + HIDDEN_APPLY_GRACE_MS + 1000));
-    expect(updateServiceWorker).not.toHaveBeenCalled();
-
+    await vi.advanceTimersByTimeAsync(HIDDEN_FOR_MS);
     setHidden(false);
-
-    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not apply if the tab becomes visible again before the grace period elapses', async () => {
-    renderPrompt();
-    setHidden(true);
-    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS / 2);
-    setHidden(false);
-
-    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
+    await vi.advanceTimersByTimeAsync(HIDDEN_FOR_MS);
 
     expect(updateServiceWorker).not.toHaveBeenCalled();
   });
@@ -148,17 +122,6 @@ describe('ReloadPrompt', () => {
     renderPrompt();
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(updateServiceWorker).not.toHaveBeenCalled();
-  });
-
-  it('retries on the next tick if a hidden-tab apply did not cause the page to unload', async () => {
-    renderPrompt();
-    setHidden(true);
-    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
-    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(APPLY_CHECK_POLL_MS);
-
-    expect(updateServiceWorker).toHaveBeenCalledTimes(2);
   });
 
   it('treats a manual reload as consent to apply an update that is waiting', () => {
@@ -228,7 +191,7 @@ describe('ReloadPrompt', () => {
   });
 
   describe('periodic update check', () => {
-    const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+    const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
     function fireOnRegistered(registration: {
       installing: ServiceWorker | null;
@@ -256,7 +219,7 @@ describe('ReloadPrompt', () => {
     it('checks for an update without downloading sw.js a second time itself', async () => {
       const { update } = setup();
 
-      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
 
       // registration.update() already fetches sw.js past the HTTP cache; a
       // pre-fetch of our own made every check download it twice.
@@ -264,11 +227,25 @@ describe('ReloadPrompt', () => {
       expect(update).toHaveBeenCalledTimes(1);
     });
 
+    it('checks when the tab comes back, at most once a minute', async () => {
+      const { update } = setup();
+      setHidden(true);
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(update).toHaveBeenCalledTimes(1);
+
+      setHidden(true);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+
     it('skips the check while offline', async () => {
       vi.stubGlobal('navigator', { ...navigator, onLine: false });
       const { update } = setup();
 
-      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
 
       expect(fetch).not.toHaveBeenCalled();
       expect(update).not.toHaveBeenCalled();
@@ -281,10 +258,10 @@ describe('ReloadPrompt', () => {
       };
       setup(registration);
 
-      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
       expect(registration.update).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
       expect(registration.update).toHaveBeenCalledTimes(2);
     });
 
@@ -292,7 +269,7 @@ describe('ReloadPrompt', () => {
       const registration = setup();
       fireOnRegistered(registration);
 
-      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
 
       expect(registration.update).toHaveBeenCalledTimes(1);
     });
