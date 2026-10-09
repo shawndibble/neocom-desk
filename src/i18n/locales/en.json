@@ -7451,7 +7451,7 @@
       "recentPlaceholder": "Load a recent list",
       "recentLabel": "{{names}} · {{age}}",
       "recentLabelMore": "{{names}} +{{count}} more · {{age}}",
-      "clearRecent": "Clear recent",
+      "clearRecent": "Clear recent lists",
       "holdTitle": "Hold · {{ship}}",
       "holdFill": "{{used}} of {{capacity}} m³",
       "holdFits": "Fits in one trip.",
