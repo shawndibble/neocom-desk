@@ -49,6 +49,7 @@ function boxRow(content: string, width: number): string {
   const pad = Math.max(0, width - RAIL_LEFT.length - RAIL_RIGHT.length - visibleWidth(content));
   return `${RAIL_LEFT}${content}${' '.repeat(pad)}${RAIL_RIGHT}`;
 }
+
 /**
  * Widest a line of the message may run, in visible characters (`<b>` tags
  * don't show). RockRadar's own message is the benchmark: its widest lines are
@@ -160,7 +161,7 @@ export function formatDuration(ms: number): string {
 function barLine(percent: number, finished: boolean, width: number): string {
   const tail = ` ${percent}%`;
   const cells = Math.max(width - RAIL_LEFT.length - RAIL_RIGHT.length - tail.length, MIN_BAR_CELLS);
-  const filled = finished ? cells : Math.floor((percent / 100) * cells);
+  const filled = finished ? cells : Math.floor((percent * cells) / 100);
   return boxRow(`${'█'.repeat(filled)}${'░'.repeat(cells - filled)}${tail}`, width);
 }
 
