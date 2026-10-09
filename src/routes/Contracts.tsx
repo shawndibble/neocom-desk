@@ -156,6 +156,35 @@ function ContractStatusCell({ contract }: { contract: Contract }) {
   );
 }
 
+/** A phone day section's header: the date, and how many contracts were issued that day. */
+function ContractDayHeader({
+  date,
+  count,
+  timeZone,
+}: {
+  date: string;
+  count: number;
+  timeZone: string | undefined;
+}) {
+  const { t } = useTranslation();
+  // Today and yesterday read as words; anything older keeps its date.
+  const now = useTicker(CONTRACT_CLOCK_MS);
+  const label =
+    date === formatDateOnly(new Date(now), timeZone)
+      ? t('contracts.today')
+      : date === formatDateOnly(new Date(now - 24 * 60 * 60 * 1000), timeZone)
+        ? t('contracts.yesterday')
+        : date;
+  return (
+    <span className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3">
+      <span className="font-semibold">{label}</span>
+      <span className="text-[0.6875rem] text-text-dim tabular-nums">
+        {t('contracts.dayCount', { count })}
+      </span>
+    </span>
+  );
+}
+
 /** An accepted courier's delivery deadline, counting down to overdue. */
 function CourierDeadlineCell({
   deadlineMs,
@@ -480,6 +509,14 @@ export function Contracts() {
         },
         render: (contract) => {
           const receiver = receiverFor(contract);
+          // No receiver (a public contract nobody took): the phone card's meta
+          // line leaves the placeholder dash off rather than print a bare "—".
+          if (receiver === null)
+            return (
+              <span className="text-text-dim" data-dense-omit>
+                —
+              </span>
+            );
           return (
             <ContractReceiverLink
               receiver={receiver}
@@ -498,6 +535,8 @@ export function Contracts() {
         header: t('contracts.price'),
         align: 'right',
         className: 'tabular-nums',
+        // The dense phone card's headline figure, beside the title.
+        cardCorner: true,
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
           const amount = contractAmount(contract);
@@ -509,7 +548,12 @@ export function Contracts() {
         header: t('contracts.issued'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_issued).getTime(),
-        render: (contract) => <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />,
+        // Off the phone card: its day section header already says it.
+        render: (contract) => (
+          <span data-dense-omit>
+            <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />
+          </span>
+        ),
       },
       expires: {
         id: 'expires',
@@ -521,7 +565,13 @@ export function Contracts() {
         render: (contract) => {
           const deadlineMs = courierDeliveryDeadlineMs(contract);
           if (deadlineMs === null)
-            return <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />;
+            return (
+              <span>
+                {/* Phone card only: its meta line has no column labels. */}
+                <span className="sm:hidden">{t('contracts.expiresAffix')}</span>
+                <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />
+              </span>
+            );
           return <CourierDeadlineCell deadlineMs={deadlineMs} timeZone={timeZone} />;
         },
       },
@@ -546,6 +596,16 @@ export function Contracts() {
                 )
               )}
             >
+              {/* Phone only: the status tone as a dot, so a scan down the card
+                  list reads outcome without the Status column (which the
+                  picker can hide). The word stays on the meta line. */}
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'mr-2 size-2 shrink-0 rounded-full bg-current sm:hidden',
+                  STATUS_TONE[contract.status]
+                )}
+              />
               <ContractIdentity contract={contract} characterId={activeCharacterId} />
             </button>
           );
@@ -717,6 +777,28 @@ export function Contracts() {
               />
             }
           />
+          {/* Phone only: the filter sheet's status chips, one tap away. */}
+          <div
+            role="group"
+            aria-label={t('contracts.statusFilterLabel')}
+            className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
+          >
+            <FilterChip
+              label={t('contracts.statusAll')}
+              selected={filter.status === null}
+              onToggle={() => setFilter({ ...filter, status: null })}
+            />
+            {statusOptions.map((status) => (
+              <FilterChip
+                key={status}
+                label={t(CONTRACT_STATUS_KEY[status])}
+                selected={filter.status === status}
+                onToggle={() =>
+                  setFilter({ ...filter, status: filter.status === status ? null : status })
+                }
+              />
+            ))}
+          </div>
           {filteredContracts.length === 0 ? (
             // Zero matches with no active filter can't happen today (an empty
             // list is caught above), but the reset only belongs where a filter is on.
@@ -748,6 +830,22 @@ export function Contracts() {
               virtualize="auto"
               highlightRowKey={highlightedContractId}
               {...historySortProps}
+              stackLayout="dense"
+              // Issue days are sections on a phone, not folded duplicates:
+              // open, with members in line with the cards above them.
+              className="dt-flat-groups"
+              groupBy={{
+                key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
+                minSize: 1,
+                defaultExpanded: () => true,
+                renderHeader: (rows) => (
+                  <ContractDayHeader
+                    date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
+                    count={rows.length}
+                    timeZone={timeZone}
+                  />
+                ),
+              }}
             />
           )}
         </Panel>
