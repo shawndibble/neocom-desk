@@ -50,8 +50,14 @@ describe('SurveyShareScreen', () => {
   it('adds a scan pasted anywhere on the page, to this survey, with no sign-in', async () => {
     renderScreen();
     await screen.findByText('0% mined');
-    fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
-    await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
+    // The page's paste listener is re-registered once the survey has loaded
+    // (it needs the survey's expiry). A paste in the tick before that is
+    // dropped, so keep pasting until the page is ready: a dropped paste never
+    // reaches the store, so this adds exactly one scan.
+    await waitFor(() => {
+      fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
+      expect(addSurveyScan).toHaveBeenCalledTimes(1);
+    });
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
   });
 
