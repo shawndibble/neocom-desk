@@ -96,6 +96,7 @@ const DOM_TS_TESTS = [
   'src/app/onboardingBannerSlot.test.ts',
   'src/app/useGrantedScopes.test.ts',
   'src/features/character/characterFilterValue.test.ts',
+  'src/features/character/ship.test.ts',
   'src/features/corp/owner.test.ts',
   'src/features/corp/useCorpAccess.test.ts',
   'src/features/corp/useCorpRouteGate.test.ts',

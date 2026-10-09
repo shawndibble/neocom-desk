@@ -20,7 +20,11 @@ const mocks = vi.hoisted(() => ({
   encodeFittingShare: vi.fn(),
 }));
 
-vi.mock('@/app/useGrantedScopes', () => ({ useEndpointsGranted: () => mocks.granted }));
+vi.mock('@/app/useGrantedScopes', () => ({
+  useEndpointsGranted: () => mocks.granted,
+  // The D-Scan danger read asks which scopes are held, to read the current ship.
+  useGrantedScopes: () => undefined,
+}));
 vi.mock('@/stores/activeCharacter', () => ({
   useActiveCharacter: (select: (state: { activeCharacterId: number }) => unknown) =>
     select({ activeCharacterId: 1 }),

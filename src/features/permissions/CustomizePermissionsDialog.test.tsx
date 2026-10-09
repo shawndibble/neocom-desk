@@ -38,7 +38,7 @@ describe('CustomizePermissionsDialog', () => {
     expect(await screen.findByRole('checkbox', { name: 'Wallet' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Corporation' })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Structure markets' })).not.toBeChecked();
-    expect(screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length} of 15`)).toBeInTheDocument();
+    expect(screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length} of 16`)).toBeInTheDocument();
   });
 
   it('explains the dialog and tags each Core row as Required', async () => {
@@ -59,7 +59,7 @@ describe('CustomizePermissionsDialog', () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await user.click(await screen.findByRole('checkbox', { name: 'Wallet' }));
     expect(
-      screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length - 1} of 15`)
+      screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length - 1} of 16`)
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /log in with selected permissions/i }));
@@ -67,19 +67,19 @@ describe('CustomizePermissionsDialog', () => {
     expect(mockedLogin.mock.calls[0][0]).not.toContain('wallet');
   });
 
-  it('Select all checks every one of the 15, opt-in included', async () => {
+  it('Select all checks every one of the 16, opt-in included', async () => {
     const user = userEvent.setup();
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Select all' }));
     expect(screen.getByRole('checkbox', { name: 'Corporation' })).toBeChecked();
-    expect(screen.getByText('Optional · 15 of 15')).toBeInTheDocument();
+    expect(screen.getByText('Optional · 16 of 16')).toBeInTheDocument();
   });
 
   it('Select none unchecks every Permission, leaving the Core Grant alone', async () => {
     const user = userEvent.setup();
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Select none' }));
-    expect(screen.getByText('Optional · 0 of 15')).toBeInTheDocument();
+    expect(screen.getByText('Optional · 0 of 16')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /skills & skill queue/i })).toBeChecked();
   });
 
@@ -106,7 +106,7 @@ describe('CustomizePermissionsDialog', () => {
     await waitFor(() => expect(wallet).toBeEnabled());
     expect(wallet).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Mail' })).toBeChecked();
-    expect(screen.getByText('Optional · 1 of 15')).toBeInTheDocument();
+    expect(screen.getByText('Optional · 1 of 16')).toBeInTheDocument();
   });
 
   it('disables every Permission checkbox and Submit until hydration resolves, so a fast click can’t fork from the pre-hydration default', async () => {
