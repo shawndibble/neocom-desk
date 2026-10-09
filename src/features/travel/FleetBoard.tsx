@@ -12,6 +12,7 @@ import {
   type FleetHull,
   type FleetRole,
 } from '@/engine/pilotList/dscanRoles';
+import { formatDistanceKm as formatKm } from '@/engine/pilotList/formatDistanceKm';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import { buildReadout, type Readout } from '@/engine/pilotList/dscanReadout';
 import type { HullCount } from '@/engine/pilotList/dscanWorth';
@@ -33,13 +34,6 @@ const ROLE_COLOUR: Record<DscanRole, string> = {
   drones: 'var(--color-kind-skill-training)',
   structures: 'var(--color-kind-moon-chunk)',
 };
-
-const KM_PER_AU = 149_597_870.7;
-
-function formatKm(km: number): string {
-  if (km >= KM_PER_AU / 10) return `${(km / KM_PER_AU).toFixed(1)} AU`;
-  return `${Math.round(km).toLocaleString()} km`;
-}
 
 function formatRange(hull: FleetHull): string | null {
   if (hull.minKm === null || hull.maxKm === null) return null;

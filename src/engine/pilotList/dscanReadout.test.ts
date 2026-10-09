@@ -148,9 +148,23 @@ describe('buildReadout: readings', () => {
     expect(r.reading).toBe('mixed');
     expect(r.evidence).toEqual([
       { key: 'ev.hulls', params: { count: 4, hulls: 4 } },
-      { key: 'ev.spread', params: { km: 117 } },
+      { key: 'ev.spread', params: { distance: '117 km' } },
     ]);
     expect(r.confidence).toBe('likely');
+  });
+
+  it('prints a mixed scan spread of 2,000 km grouped, not raw', () => {
+    const r = read(rows(18, 1, 4), rows(10, 1, 33), rows(17, 1, 90), rows(16, 1, 2004));
+    const spread = r.evidence.find((e) => e.key === 'ev.spread');
+    expect(spread?.params.distance).toBe(`${(2000).toLocaleString()} km`);
+  });
+
+  it('prints a spread of about 9 AU in AU with no long digit run', () => {
+    const nineAu = 9 * 149_597_870.7;
+    const r = read(rows(18, 1, 4), rows(10, 1, 33), rows(17, 1, 90), rows(16, 1, nineAu + 4));
+    const spread = r.evidence.find((e) => e.key === 'ev.spread');
+    expect(spread?.params.distance).toBe('9.0 AU');
+    expect(String(spread?.params.distance)).not.toMatch(/\d{7,}/);
   });
 
   it('gives a one-line reading Weak confidence', () => {
