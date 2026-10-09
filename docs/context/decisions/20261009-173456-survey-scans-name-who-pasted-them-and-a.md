@@ -2,8 +2,6 @@
 
 _Recorded 2026-10-09._
 
-- **<Decision>.** <Why, and what it rules out.>
-
 - A Survey Scan records the active Character's name as `by` when the pasting
   pilot has one, and none for an anonymous visitor. Anyone with the link sees
   it: the chart tooltip for a scan ends with "Scanned by <name>" or
