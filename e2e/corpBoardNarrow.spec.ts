@@ -106,7 +106,7 @@ async function openCorpBoard(page: Page, name: string): Promise<void> {
           // Deliberately long and unbroken: the regression this guards is
           // a flex child rendering without `min-w-0`, which overflows
           // instead of truncating — a short name would never surface it.
-          name: name,
+          name,
           fuel_expires: new Date(Date.now() + 2 * 86_400_000).toISOString(),
         },
       ]);
@@ -124,36 +124,52 @@ async function openCorpBoard(page: Page, name: string): Promise<void> {
   await expect(page.getByText(name)).toBeVisible();
 }
 
-/** `scrollWidth` is never below `clientWidth`, so "not wider" is the whole assertion. */
-async function expectNoPageOverflow(page: Page): Promise<void> {
-  // `scrollWidth` is never below `clientWidth`, so "not wider" is the whole
-  // assertion — the same technique `productionCss.built.spec.ts` uses.
-  const { scrollWidth, clientWidth, offenders } = await page.evaluate(() => {
-    const root = document.documentElement;
-    const limit = root.clientWidth;
-    const offenders = Array.from(document.body.querySelectorAll('*'))
-      .map((element) => ({ element, right: element.getBoundingClientRect().right }))
-      .filter((entry) => entry.right > limit + 1)
-      .sort((a, b) => b.right - a.right)
-      .slice(0, 5)
-      .map(({ element, right }) => {
-        const name = element.getAttribute('aria-label') ?? element.id;
-        return `${element.tagName.toLowerCase()}[class="${element.className}"]${name ? ` (${name})` : ''} @ ${Math.round(right)}px`;
-      });
-    return { scrollWidth: root.scrollWidth, clientWidth: limit, offenders };
-  });
-  expect(
-    scrollWidth,
-    `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest: ${offenders.join(', ')}`
-  ).toBeLessThanOrEqual(clientWidth);
-}
-
 test.describe('corp ops board — 320px width', () => {
   test.use({ viewport: NARROW });
 
-  test('the board holds without a horizontal scroll', async ({ page }) => {
+  test('the board holds without a horizontal scroll, and empty cards stay compact', async ({
+    page,
+  }) => {
     await openCorpBoard(page, LONG_NAME);
-    await expectNoPageOverflow(page);
+
+    // `scrollWidth` is never below `clientWidth`, so "not wider" is the whole
+    // assertion — the same technique `productionCss.built.spec.ts` uses.
+    const { scrollWidth, clientWidth, offenders } = await page.evaluate(() => {
+      const root = document.documentElement;
+      const limit = root.clientWidth;
+      const offenders = Array.from(document.body.querySelectorAll('*'))
+        .map((element) => ({ element, right: element.getBoundingClientRect().right }))
+        .filter((entry) => entry.right > limit + 1)
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 5)
+        .map(({ element, right }) => {
+          const name = element.getAttribute('aria-label') ?? element.id;
+          return `${element.tagName.toLowerCase()}[class="${element.className}"]${name ? ` (${name})` : ''} @ ${Math.round(right)}px`;
+        });
+      return { scrollWidth: root.scrollWidth, clientWidth: limit, offenders };
+    });
+    expect(
+      scrollWidth,
+      `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest: ${offenders.join(', ')}`
+    ).toBeLessThanOrEqual(clientWidth);
+
+    // Empty cards stay (so "nothing due" differs from "cannot read") but are
+    // one quiet line: shorter than the fuel card holding a single row.
+    for (const width of [390, 1024, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      const height = (title: string) =>
+        page
+          .getByRole('heading', { name: title })
+          .locator('xpath=ancestor::section[1]')
+          .evaluate((el) => el.getBoundingClientRect().height);
+      const withRow = await height('Fuel');
+      expect(await height('Moon chunks'), `moons at ${width}`).toBeLessThan(withRow);
+      expect(await height('Structure timers'), `timers at ${width}`).toBeLessThan(withRow);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${width}`
+      ).toBe(true);
+    }
   });
 });
 
@@ -169,10 +185,14 @@ test.describe('corp Kind Cards — whole structure names (#3124)', () => {
       await page.setViewportSize(viewport);
       await openCorpBoard(page, LONG_NAME);
 
-      const subject = page.getByText(LONG_NAME);
-      const fits = await subject.evaluate((element) => element.scrollWidth <= element.clientWidth);
+      const fits = await page
+        .getByText(LONG_NAME)
+        .evaluate((element) => element.scrollWidth <= element.clientWidth);
       expect(fits, 'the name is cut off on one line instead of wrapping').toBe(true);
-      await expectNoPageOverflow(page);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${viewport.width}`
+      ).toBe(true);
     });
   }
 });

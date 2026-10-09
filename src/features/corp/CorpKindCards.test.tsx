@@ -52,4 +52,23 @@ describe('CorpKindCards', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
     expect(screen.queryByText('Structure 4')).not.toBeInTheDocument();
   });
+
+  it('gives an empty readable kind one quiet line, and no card for an unreadable kind', () => {
+    render(
+      withItemActions(
+        <MemoryRouter>
+          <CorpKindCards
+            grouped={new Map()}
+            capabilities={{ canReadStructures: true } as CorpCapabilities}
+          />
+        </MemoryRouter>,
+        fakeItemActions()
+      )
+    );
+    expect(screen.getByRole('heading', { name: 'Structure timers' })).toBeInTheDocument();
+    const line = screen.getByText('No structure is on a timer.');
+    expect(line.tagName).toBe('P');
+    expect(line).not.toHaveClass('uppercase');
+    expect(screen.queryByRole('heading', { name: 'Industry jobs' })).not.toBeInTheDocument();
+  });
 });

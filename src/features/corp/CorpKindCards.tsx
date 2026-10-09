@@ -19,7 +19,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel } from '@/components/ui';
+import { Panel } from '@/components/ui';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { CorpBoardItem, CorpBoardItemKind } from '@/engine/corp/board';
 import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
@@ -110,7 +110,7 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
       }
     >
       {items.length === 0 ? (
-        <EmptyState title={t(EMPTY_FOR_KIND[kind])} />
+        <p className="px-3 py-2.5 text-xs text-text-dim">{t(EMPTY_FOR_KIND[kind])}</p>
       ) : (
         <>
           <ul className="divide-y divide-line">
