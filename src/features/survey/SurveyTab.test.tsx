@@ -56,6 +56,17 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 describe('SurveyTab', () => {
+  it('pasting something that is not a scan says so and starts no survey', async () => {
+    renderTab();
+    await screen.findByText('No survey yet');
+    fireEvent.paste(screen.getByLabelText('Survey scan'), {
+      clipboardData: { getData: () => 'Tritanium\t100' },
+    });
+    expect((await screen.findByRole('alert')).textContent).toContain("isn't a Survey Scanner copy");
+    expect(startSurvey).not.toHaveBeenCalled();
+    expect(addSurveyScan).not.toHaveBeenCalled();
+  });
+
   it('starts a survey on the first pasted scan, then adds the scan to it', async () => {
     renderTab();
     await screen.findByText('No survey yet');

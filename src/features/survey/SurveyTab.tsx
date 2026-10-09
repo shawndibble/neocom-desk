@@ -17,7 +17,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
 import { YourShareRow } from './YourShareRow';
-import { scanFailure, type AddScanResult } from './scanResult';
+import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { useCurrentSurveyId } from './surveyPref';
 import { addSurveyScan, loadSurvey, startSurvey } from './surveyStore';
 import { useSurvey } from './useSurvey';
@@ -52,6 +52,9 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
 
   const add = useCallback(
     async (text: string): Promise<AddScanResult> => {
+      // Before anything is sent, so a wrong paste never starts a survey.
+      const rejected = rejectScanText(text);
+      if (rejected !== null) return rejected;
       try {
         let target: { id: string; expiresAt: number } | null = null;
         if (currentId !== null) {

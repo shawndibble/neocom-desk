@@ -18,6 +18,11 @@ const ROW = new RegExp(
 
 const num = (text: string): number => Number(text.replace(/,/g, ''));
 
+/** "Scordite II-Grade" and "Scordite III-Grade" are grades of one ore. */
+const GRADE = /\s(?:I|II|III|IV|V)-Grade$/;
+
+const firstWord = (name: string): string => name.split(' ')[0];
+
 /** Every non-blank line as a rock, or null if any line is not a scan row. */
 export function parseSurveyScan(text: string): SurveyRock[] | null {
   const lines = text
@@ -26,12 +31,30 @@ export function parseSurveyScan(text: string): SurveyRock[] | null {
     .filter((line) => line !== '');
   if (lines.length === 0) return null;
 
+  // The first word of every ore that has a row ("Pyroxeres", "Veldspar"), so a
+  // header for a grade with no rocks can be told from a stray line.
+  const rowOres = new Set<string>();
+  for (const line of lines) {
+    const match = ROW.exec(line);
+    if (match) rowOres.add(firstWord(match[1]));
+  }
+
   const rocks: SurveyRock[] = [];
   for (const [i, line] of lines.entries()) {
     const match = ROW.exec(line);
     if (!match) {
-      // The scanner prints each ore's name on a line of its own above its rows.
-      if (!/\d/.test(line) && lines[i + 1]?.startsWith(line) && ROW.test(lines[i + 1])) continue;
+      // The scanner prints each ore group's name on a line of its own above
+      // its rows, and prints it for a group with no rocks too. A bare line is
+      // a header when a row of the same ore follows, or (an empty group) when
+      // it names a grade or an ore the scan has rows for and another bare line
+      // or the end of the paste follows. Anything else is a stray line.
+      const next = lines[i + 1];
+      const bare = !/\d/.test(line);
+      const nextRowIsSameOre = next !== undefined && ROW.test(next) && next.startsWith(line);
+      const emptyGroup =
+        (next === undefined || !/\d/.test(next)) &&
+        (GRADE.test(line) || rowOres.has(firstWord(line)));
+      if (bare && (nextRowIsSameOre || emptyGroup)) continue;
       return null;
     }
     rocks.push({

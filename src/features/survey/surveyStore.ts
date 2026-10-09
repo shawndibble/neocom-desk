@@ -16,11 +16,11 @@ import { parseSurveyScan } from '@/engine/survey/parseScan';
 import type { SurveyScan } from '@/engine/survey/series';
 import { loadShare, saveShare, shareUrl } from '@/features/share/shareStore';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ScanRejected } from './scanResult';
+import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
+
+export { MAX_SCAN_TEXT };
 
 export const SURVEY_SCANS_COLLECTION = 'surveyScans';
-/** Mirrored by the size check in `firestore.rules`. */
-export const MAX_SCAN_TEXT = 40_000;
 
 export async function startSurvey(input: {
   characterId: number;
@@ -41,8 +41,8 @@ export async function addSurveyScan(input: {
   /** The survey's own expiry, as `loadSurvey` or `startSurvey` returned it. */
   expiresAt: number;
 }): Promise<void> {
-  if (parseSurveyScan(input.text) === null) throw new ScanRejected('not-a-scan');
-  if (input.text.length > MAX_SCAN_TEXT) throw new ScanRejected('too-large');
+  const rejected = rejectScanText(input.text);
+  if (rejected !== null) throw new ScanRejected(rejected);
   await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_SCANS_COLLECTION), {
     text: input.text,
     createdAt: serverTimestamp(),

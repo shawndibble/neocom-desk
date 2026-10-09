@@ -51,8 +51,42 @@ describe('parseSurveyScan', () => {
     ]);
   });
 
-  it('does not accept a header with no rows under it', () => {
+  it('does not accept headers with no rows at all', () => {
     expect(parseSurveyScan('Scordite\nVeldspar')).toBeNull();
+    expect(parseSurveyScan('Tritanium\nPyerite\nMexallon')).toBeNull();
+  });
+
+  it('skips the header of an ore group that has no rocks, wherever it sits', () => {
+    // As the scanner printed it: every grade gets a header, rocks or not.
+    const text = [
+      'Pyroxeres\t3,928\t1,178 m3\t90,000.00 ISK\t22 km',
+      'Pyroxeres II-Grade',
+      'Pyroxeres II-Grade\t3,644\t1,093 m3\t81,700.00 ISK\t21 km',
+      'Scordite II-Grade',
+      'Scordite II-Grade\t7,396\t1,109 m3\t128,000.00 ISK\t19 km',
+      'Scordite III-Grade', // empty, and the next header is another ore's
+      'Veldspar',
+      'Veldspar\t23,799\t2,379 m3\t223,000.00 ISK\t20 km',
+      'Veldspar III-Grade',
+      'Veldspar III-Grade\t34,126\t3,412 m3\t364,000.00 ISK\t19 km',
+      'Veldspar IV-Grade', // empty, and last
+    ].join('\n');
+    expect(parseSurveyScan(text)?.map((r) => r.ore)).toEqual([
+      'Pyroxeres',
+      'Pyroxeres II-Grade',
+      'Scordite II-Grade',
+      'Veldspar',
+      'Veldspar III-Grade',
+    ]);
+  });
+
+  it('is still not a scan when a stray line sits among the rows', () => {
+    const text = [
+      'Veldspar\t23,799\t2,379 m3\t223,000.00 ISK\t20 km',
+      'not a header 12',
+      'Veldspar\t28,422\t2,842 m3\t266,000.00 ISK\t23 km',
+    ].join('\n');
+    expect(parseSurveyScan(text)).toBeNull();
   });
 
   it('reads an ice scan, where a unit is 1,000 m3', () => {

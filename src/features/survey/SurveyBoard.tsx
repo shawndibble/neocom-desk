@@ -6,14 +6,13 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Panel, Spinner, StatChip, StatChips, TextArea } from '@/components/ui';
+import { EmptyState, Panel, Spinner, StatChip, StatChips, TextArea } from '@/components/ui';
 import {
   formatDuration,
   formatEveClock,
   surveyChatMessage,
   type SurveyMessageLabels,
 } from '@/engine/survey/chatMessage';
-import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
@@ -54,9 +53,13 @@ function useCopyOutcome(): [CopyOutcome, (next: CopyOutcome) => void] {
   ];
 }
 
+/**
+ * The paste box takes whatever lands in it and sends it on at once, with no
+ * button: a scan is added, and anything else says why it wasn't. The box
+ * stays empty (typing does nothing), since its only job is to be pasted into.
+ */
 function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
   const { t } = useTranslation();
-  const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AddScanResult | null>(null);
 
@@ -66,8 +69,7 @@ function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
     setError(null);
     const result = await onAdd(value);
     setBusy(false);
-    if (result === 'ok') setText('');
-    else setError(result);
+    if (result !== 'ok') setError(result);
   }
 
   return (
@@ -78,32 +80,28 @@ function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
       >
         {t('survey.pasteLabel')}
       </label>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-        <TextArea
-          id="survey-paste"
-          mono
-          rows={2}
-          value={text}
-          placeholder={t('survey.pastePlaceholder')}
-          onChange={(event) => setText(event.target.value)}
-          onPaste={(event) => {
-            // A real scan goes straight in; anything else lands in the box as text.
-            const pasted = event.clipboardData.getData('text/plain');
-            if (parseSurveyScan(pasted) !== null) {
-              event.preventDefault();
-              void submit(pasted);
-            }
-          }}
-          className="sm:flex-1"
-        />
-        <Button onClick={() => void submit(text)} loading={busy} disabled={text.trim() === ''}>
-          {busy ? t('survey.adding') : t('survey.addScan')}
-        </Button>
-      </div>
+      <TextArea
+        id="survey-paste"
+        mono
+        rows={2}
+        aria-busy={busy}
+        placeholder={t('survey.pastePlaceholder')}
+        onChange={(event) => {
+          event.currentTarget.value = '';
+        }}
+        onPaste={(event) => {
+          event.preventDefault();
+          void submit(event.clipboardData.getData('text/plain'));
+        }}
+      />
+      <p role="status" className="min-h-4 text-xs text-text-dim">
+        {busy && t('survey.adding')}
+      </p>
       {error !== null && (
         <p role="alert" className="text-xs text-danger">
           {error === 'not-a-scan' && t('survey.notAScan')}
           {error === 'too-large' && t('survey.tooLarge')}
+          {error === 'refused' && t('survey.refused')}
           {error === 'failed' && t('survey.saveFailed')}
         </p>
       )}
