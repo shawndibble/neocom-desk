@@ -82,7 +82,7 @@ export interface CharacterFilterControlProps {
    * `'icon'` (default): the compact header trigger above. `'field'`: a form
    * control for a settings row — field chrome (§6c "a box sized like a field")
    * with the current value as text and a trailing `CaretDown` at every width.
-   * The icon-only trigger has no label or caret and, where the portrait does
+   * Below `md` the icon-only trigger has no label or caret and, where the portrait does
    * not load, reads as a blank square; it only suits a header row where the
    * panel title says what it filters.
    */
