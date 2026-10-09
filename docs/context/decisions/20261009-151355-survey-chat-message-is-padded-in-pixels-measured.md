@@ -24,8 +24,8 @@ _Recorded 2026-10-09._
 - **The message starts with a "Neocom Desk Report" heading line.** Chat puts the speaker's name
   before the first line of a message, which pushed the top rail's corner out of line with the
   rows below it. The heading takes that spot and the box starts underneath it.
-- **The ore line is capped in pixels, not characters: 416px (`MAX_ROW_PX`),** replacing the
-  60-character cap. RockRadar's widest lines are about 52 box-drawing characters at 8px each, and
-  they never wrap. A link longer than that still lengthens the rails past the cap. It is a guess
-  about the chat window's width; shrink it, and drop the second ore, if a row is seen to wrap in
-  game.
+- **The ore line is capped in pixels, not characters: 300px (`MAX_ROW_PX`),** replacing the
+  60-character cap. Measured in game: boxes with rows of 267-274px fit a default chat window, and a
+  box with 367px rows wrapped (top rail and ore line both), so the window holds about 335px. 300px
+  leaves room to spare; a long ore name drops the second ore first. A link longer than the cap
+  still lengthens the rails past it, as the link cannot be shortened.

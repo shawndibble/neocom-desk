@@ -221,6 +221,26 @@ describe('chat message width', () => {
     expect(box[2]).toMatch(/^│ Left: .* · \d+ other$/);
   });
 
+  it('names only one ore when a long first name leaves no room for a second', () => {
+    // Plain Zeolites and Bitumens are on the field too, so "Brimful" stays in the names.
+    const ores = (k: number): [string, number][] => [
+      ['Brimful Zeolites', 90_000 * k],
+      ['Brimful Bitumens', 80_000 * k],
+      ['Zeolites', 20_000 * k],
+      ['Bitumens', 10_000 * k],
+    ];
+    const { box } = message([scan(0, ...ores(1)), scan(10, ...ores(0.9))]);
+    expect(box[2]).toMatch(/^│ Left: \d+ Brimful Zeolites · \d+ other$/);
+    expect(textWidth(box[2])).toBeLessThanOrEqual(MAX_ROW_PX);
+  });
+
+  it('names two ores when both fit', () => {
+    const { box } = message([
+      scan(0, ['Scordite', 90_000], ['Veldspar', 80_000], ['Kernite', 70_000]),
+    ]);
+    expect(box[2]).toMatch(/^│ Left: \d+ Scordite · \d+ Veldspar · \d+ other$/);
+  });
+
   it('never drops the biggest ore, even when its name alone is long', () => {
     const { box } = message([scan(0, ['An Extremely Long Ore Name Indeed Mercoxit II-Grade', 5])]);
     expect(box[2]).toContain('Extremely');

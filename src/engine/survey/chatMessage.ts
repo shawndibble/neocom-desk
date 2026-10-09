@@ -75,12 +75,13 @@ function barRow(percent: number, finished: boolean, width: number): string {
 }
 
 /**
- * Widest a row of the message may run, in pixels, before a chat window may wrap
- * it. RockRadar's own message is the benchmark: its widest lines are about 52
- * box-drawing characters (8px each), and they never wrap. It limits what the
- * ore line may name; a long link can still widen the box past it.
+ * Widest a row of the message may run, in pixels, so it does not wrap in a
+ * default-width chat window. Measured in game: rows of 267-274px fit, and a row
+ * of 367px wrapped; the window holds about 335px, so this leaves room to spare.
+ * It limits what the ore line may name; a long link can still lengthen the rails
+ * past it.
  */
-export const MAX_ROW_PX = 416;
+export const MAX_ROW_PX = 300;
 const SEPARATOR = ' · ';
 
 /**

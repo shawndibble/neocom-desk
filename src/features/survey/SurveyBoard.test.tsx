@@ -87,7 +87,8 @@ describe('SurveyBoard', () => {
     expect(lines[1]).toMatch(/^│ █+░+ 13%$/);
     expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
     expect(lines[3]).toContain(`[ ${URL} ]`);
-    for (const line of lines) expect(textWidth(line)).toBeLessThanOrEqual(MAX_ROW_PX);
+    // The link's rail can run past the cap (a link cannot be shortened); the ore line cannot.
+    expect(textWidth(lines[2])).toBeLessThanOrEqual(MAX_ROW_PX);
     await screen.findByText('Copied');
   });
 
