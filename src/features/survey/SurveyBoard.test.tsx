@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { MAX_LINE_WIDTH } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
@@ -79,6 +80,21 @@ describe('SurveyBoard', () => {
       expect(line.replace(/<\/?b>/g, '').length).toBeLessThanOrEqual(MAX_LINE_WIDTH);
     }
     await screen.findByText('Copied');
+  });
+
+  it('copies the link alone from the caret next to the chat button', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+    const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'More copy options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy link' }));
+    await waitFor(() => expect(written).toEqual([URL]));
+    // The one button that flashed is the main one, so the outcome shows where the pilot is looking.
+    await screen.findByRole('button', { name: 'Link copied' });
   });
 
   it('adds a scan pasted into the box without a button press', () => {

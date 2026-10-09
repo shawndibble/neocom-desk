@@ -3953,6 +3953,7 @@
     "copiedChat": "Copied",
     "copyFailed": "Couldn't copy",
     "copyLink": "Copy link",
+    "moreCopy": "More copy options",
     "copiedLink": "Link copied",
     "newSurvey": "New survey",
     "expires": "Link works until {{date}}",
