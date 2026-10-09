@@ -15,7 +15,7 @@ _Recorded 2026-10-09._
   characters `╌┄┈`, which draw in EVE (a `▓▒░` taper was a hard jump from a thin line to blocks and
   was dropped). The frame is single-line (`┌ ─ └ │`), lighter than the double line (`╔ ═ ╚ ║`) it
   replaced.
-- **A rail is never shorter than the content under it, and under two characters longer.** The
+- **A rail is never shorter than the content under it, and under one character longer.** The
   rails are as long as the ore line, or as the link's rail when the link is longer, rounded up to
   a whole `─`; the bar rounds down so it never outruns them. The ETA is set into the top rail and
   the link into the bottom one, each centred between the corner and the taper.

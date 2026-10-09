@@ -7,9 +7,10 @@
  * Measured by pasting `║` + one character ten or twenty times + `║` into chat
  * and measuring the screenshot, once per character. The lowercase and uppercase
  * alphabets and the digits add up to their measured whole rows. Every box,
- * line, dash, shade and block character used (`═ ║ ╔ ╗ ╚ ╝ ─ │ ┌ └ ╌ ┄ ┈ ▒ ▓ █ ░`)
- * measured 8px. A character not listed counts as a digit (7px). A different chat font size scales every width,
- * so the padding is exact only at the size this was measured at.
+ * line, dash, shade and block character measured (`═ ║ ╔ ╗ ╚ ╝ ─ │ ┌ └ ╌ ┄ ┈ ▒ ▓ █ ░`)
+ * is 8px, and each digit is 7px. A character not listed counts as a digit
+ * (7px). A different chat font size scales every width, so the sizing is exact
+ * only at the size this was measured at.
  */
 const WIDTHS: Record<string, number> = {
   ' ': 7,
@@ -52,6 +53,7 @@ const UPPER_PX = [8, 8, 7, 8, 7, 7, 8, 8, 4, 6, 7, 6, 8, 8, 8, 7, 8, 8, 8, 6, 8,
 
 [...LOWER].forEach((c, i) => (WIDTHS[c] = LOWER_PX[i]));
 [...UPPER].forEach((c, i) => (WIDTHS[c] = UPPER_PX[i]));
+[...'0123456789'].forEach((c) => (WIDTHS[c] = 7));
 
 const DEFAULT_PX = 7;
 
