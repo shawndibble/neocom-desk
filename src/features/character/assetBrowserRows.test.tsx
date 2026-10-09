@@ -118,6 +118,19 @@ describe('ItemRow name', () => {
     );
   });
 
+  it('caps the name cell at md+ and truncates a long name, leaving phone layout alone', () => {
+    const long = 'A very long item name that cannot possibly fit inside the capped name cell';
+    renderItemRow({ name: long });
+    const text = screen.getByText(long);
+    expect(text).toHaveClass('truncate');
+    const cell = text.parentElement;
+    expect(cell).toHaveClass('md:flex-[0_1_24rem]');
+    expect(cell).not.toBeNull();
+    expect(cell).toHaveClass('min-w-0');
+    // The cap is md-only: no unprefixed width/flex class on the cell.
+    expect(cell).not.toHaveClass('flex-1');
+  });
+
   it('keeps the name plain text without a type id', () => {
     renderItemRow();
     expect(screen.queryByRole('link', { name: 'Rifter Blueprint' })).toBeNull();
@@ -168,5 +181,20 @@ describe('blueprint badge', () => {
     expect(screen.getByText('assets.blueprintBadge.copy.label')).toBeInTheDocument();
     expect(screen.getByRole('link')).toHaveAttribute('href', '/assets/60003760');
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+describe('estimated value cell', () => {
+  it('shows a dim dash, not a green figure, when there is no estimate', () => {
+    const { container } = renderItemRow({ estimatedValue: 0 });
+    expect(screen.getByText('assets.noEstimate')).toBeInTheDocument();
+    expect(container.querySelector('.text-isk-pos')).toBeNull();
+    expect(container.querySelector('.text-text-faint')).not.toBeNull();
+  });
+
+  it('keeps a priced row green', () => {
+    const { container } = renderItemRow({ estimatedValue: 1000 });
+    expect(screen.queryByText('assets.noEstimate')).toBeNull();
+    expect(container.querySelector('.text-isk-pos')).not.toBeNull();
   });
 });

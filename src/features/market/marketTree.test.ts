@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { filterMarketTree, addAncestors, MARKET_TREE_MATCH_LIMIT } from './marketTree';
+import {
+  filterMarketTree,
+  addAncestors,
+  summarizeSearchCategories,
+  MARKET_TREE_MATCH_LIMIT,
+  MARKET_TREE_OPEN_ROW_LIMIT,
+} from './marketTree';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
 // Ships (1)
@@ -139,5 +145,46 @@ describe('filterMarketTree', () => {
       expect(result?.fuzzy).toBe(false);
       expect(result?.totalMatches).toBe(0);
     });
+  });
+});
+
+describe('summarizeSearchCategories', () => {
+  const groupsById = new Map(GROUPS.map((g) => [g.id, g]));
+
+  it('counts matched items per top-level category', () => {
+    const result = filterMarketTree(GROUPS, TYPES, 'rif')!;
+    const { countsByRoot } = summarizeSearchCategories(groupsById, result);
+    expect(countsByRoot.get(1)).toBe(1);
+    expect(countsByRoot.has(4)).toBe(false);
+  });
+
+  it('opens a lone category by default', () => {
+    const many: MarketTypeEntry[] = Array.from({ length: 30 }, (_, i) => ({
+      typeId: 1000 + i,
+      name: `Rifter ${i}`,
+      marketGroupId: 2,
+      volume: 1,
+    }));
+    const result = filterMarketTree(GROUPS, many, 'rifter')!;
+    expect(summarizeSearchCategories(groupsById, result).openByDefault).toBe(true);
+  });
+
+  it('opens several categories only when their rows fit, else starts them collapsed', () => {
+    const entry = (n: number, group: number): MarketTypeEntry => ({
+      typeId: 2000 + n,
+      name: `Widget ${n}`,
+      marketGroupId: group,
+      volume: 1,
+    });
+    const fits = Array.from({ length: MARKET_TREE_OPEN_ROW_LIMIT }, (_, i) =>
+      entry(i, i % 2 ? 2 : 4)
+    );
+    const over = [...fits, entry(99, 4)];
+    expect(
+      summarizeSearchCategories(groupsById, filterMarketTree(GROUPS, fits, 'widget')!).openByDefault
+    ).toBe(true);
+    expect(
+      summarizeSearchCategories(groupsById, filterMarketTree(GROUPS, over, 'widget')!).openByDefault
+    ).toBe(false);
   });
 });

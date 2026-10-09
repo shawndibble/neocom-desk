@@ -17,6 +17,7 @@ Each file: summary table, per-page behavior, persistence/sync, states, formulas,
 | ships.md               | Ship Tree, Ship Info, mastery, time-to-fly                                  |
 | fittings.md            | Fittings library, Compare, Shared, Save to EVE, share codes                 |
 | mining.md              | Mining ledger + Moon mining tax                                             |
+| mining-survey.md       | Mining Survey tab: pasted survey scans, chat message, public page           |
 | corp.md                | Corp home, Members, Wallet, Assets, role gating                             |
 | settings.md            | Every Settings section, defaults, storage keys, sync status                 |
 

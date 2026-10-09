@@ -25,7 +25,9 @@ import { useLocationMode, type LocationMode } from '@/features/market/locationMo
 import {
   filterMarketTree,
   addAncestors,
+  summarizeSearchCategories,
   type MarketTreeFilterResult,
+  type SearchCategorySummary,
 } from '@/features/market/marketTree';
 import { ALL_REGIONS, type RegionChoice } from '@/engine/market/locationMode';
 import {
@@ -39,6 +41,8 @@ import type { MarketGroupNode, MarketTypeEntry, MarketRegionEntry } from '@/sde/
 
 /** Tree search, in the URL (ADR 0015) scoped to the Browser tab. */
 const BROWSER_SEARCH_KEY = 'browser.q';
+
+const NO_IDS: ReadonlySet<number> = new Set();
 
 /** The selected item's own views: its Order Book, its Variations, its Price History. */
 export type MarketItemTab = 'orders' | 'variations' | 'history';
@@ -89,7 +93,10 @@ export interface MarketBrowserController {
   query: string;
   setQuery: (next: string) => void;
   expandedIds: ReadonlySet<number>;
+  /** Search-mode groups flipped away from their default: nested groups default open, top-level categories per `searchCategories`. */
   searchCollapsedIds: ReadonlySet<number>;
+  /** Top-level category counts and default state for the active search; null when not searching. */
+  searchCategories: SearchCategorySummary | null;
   filterResult: MarketTreeFilterResult | null;
   handleToggle: (groupId: number) => void;
 
@@ -167,11 +174,15 @@ export function useMarketBrowser({
     }, TEXT_DEBOUNCE_MS);
   }
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
-  // Groups the user has explicitly collapsed while a search is filtering the
-  // tree (see MarketGroupTree's `expanded` calc) — kept apart from
-  // `expandedIds` (the plain-browsing expand state) so clearing the search
-  // returns to whatever the tree looked like before it started.
-  const [searchCollapsedIds, setSearchCollapsedIds] = useState<ReadonlySet<number>>(new Set());
+  // Groups the user has flipped away from their default while a search is
+  // filtering the tree (see MarketGroupTree's `expanded` calc) — kept apart
+  // from `expandedIds` (the plain-browsing expand state) so clearing the
+  // search returns to whatever the tree looked like before it started. Tagged
+  // with the search text it was made under: a new search starts from defaults.
+  const [searchToggles, setSearchToggles] = useState<{
+    query: string;
+    ids: ReadonlySet<number>;
+  }>({ query: '', ids: new Set() });
 
   const [itemTab, setItemTab] = useUrlParam('browser.itemTab', ITEM_TAB_PARAM);
 
@@ -320,14 +331,27 @@ export function useMarketBrowser({
     [groups, types, deferredQuery]
   );
 
+  const searchCollapsedIds = searchToggles.query === deferredQuery ? searchToggles.ids : NO_IDS;
+  const searchCategories = useMemo(
+    () => (filterResult && groupsById ? summarizeSearchCategories(groupsById, filterResult) : null),
+    [filterResult, groupsById]
+  );
+
   function handleToggle(groupId: number) {
-    const setter = filterResult !== null ? setSearchCollapsedIds : setExpandedIds;
-    setter((current) => {
+    const flip = (current: ReadonlySet<number>) => {
       const next = new Set(current);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
       return next;
-    });
+    };
+    if (filterResult !== null) {
+      setSearchToggles((current) => ({
+        query: deferredQuery,
+        ids: flip(current.query === deferredQuery ? current.ids : NO_IDS),
+      }));
+    } else {
+      setExpandedIds(flip);
+    }
   }
 
   // Every handler that changes the selected item or the location writes the
@@ -416,6 +440,7 @@ export function useMarketBrowser({
     setQuery,
     expandedIds,
     searchCollapsedIds,
+    searchCategories,
     filterResult,
     handleToggle,
     itemTab,
