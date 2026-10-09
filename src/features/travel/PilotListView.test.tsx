@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   loadPilotList: vi.fn(),
   syncConfigured: true,
   here: { space: 'highsec' as KillSpace | null },
+  phone: false,
 }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => mocks.phone }));
 vi.mock('./pilotListData', () => ({
   loadPilotList: mocks.loadPilotList,
   loadViewerContext: () => Promise.resolve({}),
@@ -92,6 +94,7 @@ describe('PilotListView (Local list)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.here.space = 'highsec';
+    mocks.phone = false;
     mocks.loadPilotList.mockImplementation(
       (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
         onRows(ROWS);
@@ -111,6 +114,45 @@ describe('PilotListView (Local list)', () => {
     expect(badgeOf('Nullbear')).toContain('Low threat');
     expect(badgeOf('Sleeper')).toContain('Inactive');
     expect(badgeOf('Offline') ?? null).toBeNull();
+  });
+
+  it('washes a Dangerous row red and fills its badge, and leaves an Inactive one plain', async () => {
+    const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
+    const rows = [
+      row('Reaper', {
+        kills: ready(...killedLately),
+        extras: { kind: 'ready', dangerRatio: 80, killerRatio: 80, lossTimesMs: null },
+      }),
+      row('Sleeper', { kills: ready(kill(100 * DAY, 'lowsec')) }),
+    ];
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(rows);
+        return Promise.resolve();
+      }
+    );
+    renderList();
+    await screen.findByText('Reaper');
+    const rowOf = (name: string) => screen.getByText(name).closest('tr');
+    expect(rowOf('Reaper')?.className).toContain('border-l-danger!');
+    expect(screen.getByText('Dangerous').closest('span.inline-flex')?.className).toContain(
+      'bg-danger!'
+    );
+    expect(rowOf('Sleeper')?.className).not.toContain('border-l-danger!');
+  });
+
+  it('draws each pilot as a card on a phone: badge, big kill count and kills by space', async () => {
+    mocks.phone = true;
+    renderList();
+    const list = await screen.findByRole('list', { name: 'Killed in highsec, last 30 days' });
+    expect(screen.queryByRole('table')).toBeNull();
+    const card = within(list).getByText('Gankerton').closest('li');
+    expect(card).not.toBeNull();
+    const inCard = within(card as HTMLElement);
+    expect(inCard.getAllByText('2').length).toBeGreaterThan(0);
+    expect(inCard.getByText('Kills, 30 days')).toBeTruthy();
+    expect(inCard.getByText('Highsec')).toBeTruthy();
+    expect(inCard.getByText('Low threat')).toBeTruthy();
   });
 
   it('groups pilots by what they mean to you, in a fixed order', async () => {
