@@ -28,7 +28,7 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - The chat message's "Left:" line names the three ores with the most ISK left (the scanner's own ISK column), each with its rock count, and groups the rocks of every other ore as "N other". The page's ore list follows the same order; each bar is coloured gray, blue, yellow or orange by ISK per m³ left against the richest ore (`valueTier.ts`; DESIGN.md "Ore value ramp"), with the ISK and percent printed beside it.
 - Layout follows the chart-led mockup: a paste bar above the panel, then the percent, the chart legend, the two charts, large stat tiles, and the ore list. On a phone the Copy chat message button sits full width under the chart instead of in the panel header.
 - Your share (Survey tab only): under the stats, how many m³ of the survey's ores the viewer's mining ledger shows in one system on the survey's UTC day(s), and the percent of what the survey says has been mined. The system is the Character's current one unless they type another; it is a device-local setting. The ledger has no times, so it is a running total, and the line is hidden when there is no ledger (the ledger is read before the system is asked for, so a pilot without the mining grant is never prompted to name one). Escape closes the system field.
-- Anyone with the link can add a scan with no sign-in; the page re-reads every 20 s while visible.
+- Anyone with the link can add a scan with no sign-in; the page re-reads every 60 s while visible.
 
 ## Persistence and sync
 
