@@ -12,6 +12,7 @@ import type { KillSpace } from '@/engine/pilotList/killActivity';
 import {
   ACTIVE_MIN_KILLS,
   DANGEROUS_MIN_DANGER_RATIO,
+  DANGEROUS_MIN_KILLER_RATIO,
   DANGEROUS_MIN_KILLS,
   THREAT_WINDOW_DAYS,
   type ThreatVerdict,
@@ -69,7 +70,13 @@ export function PilotThreatBand({
   const age = verdict.lastKillMs === null ? null : formatAge(nowMs - verdict.lastKillMs, t);
   const days = THREAT_WINDOW_DAYS;
   let sentence: string;
-  if (verdict.recentKills === 0) {
+  if (verdict.recentKills === 0 && verdict.recentLosses > 0 && verdict.lastLossMs !== null) {
+    sentence = t('travel.pilot.threat.lossesOnly', {
+      count: verdict.recentLosses,
+      days,
+      age: formatAge(nowMs - verdict.lastLossMs, t),
+    });
+  } else if (verdict.recentKills === 0) {
     sentence =
       age === null
         ? t('travel.pilot.threat.inactive', { days })
@@ -138,6 +145,7 @@ export function PilotThreatBand({
               days,
               dangerousKills: DANGEROUS_MIN_KILLS,
               dangerRatio: DANGEROUS_MIN_DANGER_RATIO,
+              killerRatio: DANGEROUS_MIN_KILLER_RATIO,
               activeKills: ACTIVE_MIN_KILLS,
             })}
           />
@@ -151,7 +159,7 @@ export function PilotThreatBand({
             ))}
           </ul>
         )}
-        {!verdict.dangerKnown && verdict.recentKills >= DANGEROUS_MIN_KILLS && (
+        {!verdict.ratiosKnown && verdict.recentKills >= DANGEROUS_MIN_KILLS && (
           <p className="text-xs text-warning">{t('travel.pilot.threat.dangerUnknown')}</p>
         )}
       </div>

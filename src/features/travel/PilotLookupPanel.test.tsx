@@ -179,6 +179,101 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
   });
 
+  describe('a pilot with no recent kill', () => {
+    const lossAt = (daysAgo: number) => ({
+      killmailId: 77,
+      hash: 'cc',
+      side: 'loss' as const,
+      value: 1_000_000,
+      detail: {
+        time: new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
+        systemId: 30000142,
+        victim: { ship_type_id: 587, items: [] },
+        victimParty: { characterId: 42, corporationId: 901, shipTypeId: 587 },
+        finalBlow: { characterId: 900, corporationId: 200, shipTypeId: 11 },
+      },
+    });
+
+    async function lookUp() {
+      mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+      renderTab();
+      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+        target: { value: 'some pilot' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      return screen.findByRole('heading', { name: 'Some Pilot' });
+    }
+
+    it('is not inactive when they lost a ship in the last 90 days', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(3)] });
+      const heading = await lookUp();
+      const row = heading.parentElement as HTMLElement;
+      expect(await within(row).findByText('Low threat')).toBeTruthy();
+      expect(within(row).queryByText('Inactive')).toBeNull();
+      expect(
+        await screen.findByText(/No kills in the last 90 days. 1 loss in that time/)
+      ).toBeTruthy();
+    });
+
+    it('gives no verdict, and says why, when their losses could not be read', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: false });
+      const heading = await lookUp();
+      expect(
+        await screen.findByText(/recent losses for this pilot could not be read/)
+      ).toBeTruthy();
+      const row = heading.parentElement as HTMLElement;
+      expect(within(row).queryByText('Inactive')).toBeNull();
+      expect(within(row).queryByText('Checking')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
+    });
+
+    it('gives no verdict when a loss has no date, since it might be the recent one', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: [{ killmailId: 5, hash: 'h', side: 'loss', value: null, detail: null }],
+      });
+      const heading = await lookUp();
+      expect(
+        await screen.findByText(/recent losses for this pilot could not be read/)
+      ).toBeTruthy();
+      expect(within(heading.parentElement as HTMLElement).queryByText('Inactive')).toBeNull();
+    });
+
+    it('is inactive when their only losses are older than that', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(200)] });
+      const heading = await lookUp();
+      expect(
+        await within(heading.parentElement as HTMLElement).findByText('Inactive')
+      ).toBeTruthy();
+    });
+  });
+
+  it('counts a high share of kills as dangerous even with a low danger ratio', async () => {
+    const day = 86_400_000;
+    mocks.fetchPilotStats.mockResolvedValue({
+      kind: 'stats',
+      stats: { ...STATS.stats, dangerRatio: 42, kills: 610, losses: 304 },
+    });
+    mocks.fetchPilotKillHistory.mockResolvedValue({
+      ok: true,
+      kills: Array.from({ length: 12 }, (_, i) => ({
+        timeMs: Date.now() - (i + 1) * day,
+        space: 'nullsec',
+        systemId: 1,
+        victimShipTypeId: 587,
+        ownShipTypeId: 20,
+      })),
+    });
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
+    renderTab();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'some pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
+    expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
+  });
+
   it('shows no verdict band when the kill history could not be read', async () => {
     mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false });
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });

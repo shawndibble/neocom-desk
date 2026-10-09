@@ -16,7 +16,11 @@ import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { AllianceLink, CorporationLink } from '@/features/entities';
-import { needsDangerRatio, threatVerdict } from '@/engine/pilotList/threatVerdict';
+import {
+  needsDangerRatio,
+  needsLossHistory,
+  threatVerdict,
+} from '@/engine/pilotList/threatVerdict';
 import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
@@ -24,6 +28,8 @@ import { PilotShips } from './PilotShips';
 import { PilotThreatBand } from './PilotThreatBand';
 import { ThreatBadge } from './ThreatBadge';
 import { usePilotKillHistory } from './usePilotKillHistory';
+import { usePilotLossTimes } from './usePilotLossTimes';
+import { killerRatio } from './zkillFigures';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillRatioMeters, ZkillStatsSection } from './ZkillStatsSection';
 import { pilotAge, type PilotProfile } from './pilotLookup';
@@ -47,6 +53,7 @@ interface PilotIdentityProps extends PilotProfileViewProps {
 
 /** Mount it keyed by the character id, so a new pilot never shows the last one's stats. */
 export function PilotProfileView(props: PilotProfileViewProps) {
+  const { t } = useTranslation();
   const { characterId } = props.profile;
   const [stats, setStats] = useState<PilotStatsResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -54,18 +61,32 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   const now = useNow();
   const pilotStats = stats?.kind === 'stats' ? stats.stats : null;
 
+  // A pilot with no recent kill is "inactive" unless they lost a ship lately, so
+  // their losses are read (from the list Recent kills and losses already loads).
+  const needsLosses = history.kind === 'ready' && needsLossHistory(history.kills, now);
+  const losses = usePilotLossTimes(characterId, needsLosses);
+  // Their losses could not be read or dated: "inactive" would be a guess, so there is no verdict.
+  const lossesUnreadable =
+    needsLosses &&
+    (losses.kind === 'failed' || (losses.kind === 'ready' && losses.timesMs === null));
+
   // The verdict reads the kills and, for a pilot busy enough to be dangerous,
-  // the danger ratio; until that ratio arrives the badge says it is checking
-  // rather than showing a level that could still change.
+  // the two ratios; until those arrive (or the losses, for a pilot with no
+  // recent kill) the badge says it is checking rather than showing a level
+  // that could still change.
   const threat = useMemo(() => {
-    if (history.kind !== 'ready') return null;
+    if (history.kind !== 'ready' || lossesUnreadable) return null;
     const verdict = threatVerdict({
       kills: history.kills,
       dangerRatio: pilotStats?.dangerRatio ?? null,
+      killerRatio: pilotStats ? killerRatio(pilotStats) : null,
+      lossTimesMs: losses.kind === 'ready' ? losses.timesMs : null,
       nowMs: now,
     });
-    return { verdict, pending: stats === null && needsDangerRatio(history.kills, now) };
-  }, [history, pilotStats, stats, now]);
+    const waitingForRatios = stats === null && needsDangerRatio(history.kills, now);
+    const waitingForLosses = needsLosses && losses.kind === 'loading';
+    return { verdict, pending: waitingForRatios || waitingForLosses };
+  }, [history, pilotStats, stats, losses, needsLosses, lossesUnreadable, now]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +115,9 @@ export function PilotProfileView(props: PilotProfileViewProps) {
           gangRatio={pilotStats?.gangRatio ?? null}
           nowMs={now}
         />
+      )}
+      {lossesUnreadable && (
+        <p className="text-xs text-text-dim">{t('travel.pilot.threat.lossesUnknown')}</p>
       )}
       <PilotStandingLine
         characterId={characterId}

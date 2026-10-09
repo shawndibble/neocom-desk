@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveNames: vi.fn(),
   fetchPilotKillHistory: vi.fn(),
   fetchPilotStats: vi.fn(),
+  fetchPilotKillmails: vi.fn(),
   loadContacts: vi.fn(),
 }));
 vi.mock('@/esi/endpoints', () => ({ postUniverseIds: mocks.postUniverseIds }));
@@ -17,6 +18,7 @@ vi.mock('@/features/character/contacts', () => ({ loadContacts: mocks.loadContac
 vi.mock('@/lib/zkillboard', () => ({
   fetchPilotKillHistory: mocks.fetchPilotKillHistory,
   fetchPilotStats: mocks.fetchPilotStats,
+  fetchPilotKillmails: mocks.fetchPilotKillmails,
 }));
 
 import { rowThreat } from './rowThreat';
@@ -119,13 +121,66 @@ describe('loadPilotList', () => {
       );
       mocks.fetchPilotStats.mockResolvedValue({
         kind: 'stats',
-        stats: { dangerRatio: 60 },
+        stats: { dangerRatio: 60, kills: 10, losses: 10 },
       });
       const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
       expect(mocks.fetchPilotStats).toHaveBeenCalledTimes(1);
       expect(mocks.fetchPilotStats).toHaveBeenCalledWith(1);
       expect(rowThreat(alpha, Date.now())).toBe('dangerous');
       expect(rowThreat(beta, Date.now())).toBe('low');
+    });
+
+    it('counts a high share of kills as dangerous even when the danger ratio is low', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: busy });
+      mocks.fetchPilotStats.mockResolvedValue({
+        kind: 'stats',
+        stats: { dangerRatio: 42, kills: 610, losses: 304 },
+      });
+      const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
+      expect(rowThreat(alpha, Date.now())).toBe('dangerous');
+    });
+
+    it('reads the losses of a pilot with no recent kill, and not of anyone else', async () => {
+      mocks.fetchPilotKillHistory.mockImplementation((id: number) =>
+        Promise.resolve({ ok: true, kills: id === 1 ? [kill(100 * DAY)] : [kill(2 * DAY)] })
+      );
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: [
+          {
+            killmailId: 9,
+            hash: 'h',
+            side: 'loss',
+            value: null,
+            detail: { time: new Date(Date.now() - 3 * DAY).toISOString() },
+          },
+        ],
+      });
+      const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
+      expect(mocks.fetchPilotKillmails).toHaveBeenCalledTimes(1);
+      expect(mocks.fetchPilotKillmails).toHaveBeenCalledWith(1);
+      expect(mocks.fetchPilotStats).not.toHaveBeenCalled();
+      expect(rowThreat(alpha, Date.now())).toBe('low');
+      expect(rowThreat(beta, Date.now())).toBe('low');
+    });
+
+    it('is inactive when a pilot with no recent kill has no recent loss either', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+      const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
+      expect(rowThreat(alpha, Date.now())).toBe('inactive');
+    });
+
+    it('gives no verdict when the losses of a pilot with no recent kill could not be read or dated', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
+      mocks.fetchPilotKillmails.mockResolvedValueOnce({ ok: false });
+      mocks.fetchPilotKillmails.mockResolvedValueOnce({
+        ok: true,
+        entries: [{ killmailId: 5, hash: 'h', side: 'loss', value: null, detail: null }],
+      });
+      const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
+      expect(rowThreat(alpha, Date.now())).toBeNull();
+      expect(rowThreat(beta, Date.now())).toBeNull();
     });
 
     it('falls back to active when the stats could not be read', async () => {
@@ -148,17 +203,17 @@ describe('loadPilotList', () => {
         ownOrganization: null,
       } satisfies Partial<PilotListRow>;
       expect(
-        rowThreat({ ...base, kills: { kind: 'loading' }, danger: { kind: 'idle' } }, Date.now())
+        rowThreat({ ...base, kills: { kind: 'loading' }, extras: { kind: 'idle' } }, Date.now())
       ).toBeNull();
       expect(
-        rowThreat({ ...base, kills: { kind: 'skipped' }, danger: { kind: 'idle' } }, Date.now())
+        rowThreat({ ...base, kills: { kind: 'skipped' }, extras: { kind: 'idle' } }, Date.now())
       ).toBeNull();
       expect(
         rowThreat(
           {
             ...base,
             kills: { kind: 'ready', kills: busy, summary: summarizeKills(busy, Date.now()) },
-            danger: { kind: 'loading' },
+            extras: { kind: 'loading' },
           },
           Date.now()
         )

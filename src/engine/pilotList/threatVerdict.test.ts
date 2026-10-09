@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KillRecord } from './killActivity';
-import { needsDangerRatio, threatVerdict } from './threatVerdict';
+import { needsDangerRatio, needsLossHistory, threatVerdict } from './threatVerdict';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
 const HOUR = 3_600_000;
@@ -68,7 +68,7 @@ describe('threatVerdict', () => {
   it('never reaches dangerous without a danger ratio', () => {
     const verdict = threatVerdict({ kills: kills(40), dangerRatio: null, nowMs: NOW });
     expect(verdict.level).toBe('active');
-    expect(verdict.dangerKnown).toBe(false);
+    expect(verdict.ratiosKnown).toBe(false);
   });
 
   it('ignores kills older than 90 days when counting', () => {
@@ -160,6 +160,117 @@ describe('threatVerdict alsoSpaces', () => {
     expect(
       threatVerdict({ kills: [kill(DAY, null)], dangerRatio: null, nowMs: NOW }).alsoSpaces
     ).toEqual([]);
+  });
+});
+
+describe('threatVerdict killer share', () => {
+  it('is dangerous at ten recent kills when most of the record is killing, even with a low danger ratio', () => {
+    const verdict = threatVerdict({
+      kills: kills(10),
+      dangerRatio: 42,
+      killerRatio: 67,
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('dangerous');
+  });
+
+  it('counts a killer share of exactly 60 and not 59', () => {
+    expect(
+      threatVerdict({ kills: kills(10), dangerRatio: 40, killerRatio: 60, nowMs: NOW }).level
+    ).toBe('dangerous');
+    expect(
+      threatVerdict({ kills: kills(10), dangerRatio: 40, killerRatio: 59, nowMs: NOW }).level
+    ).toBe('active');
+  });
+
+  it('is dangerous on the killer share alone when there is no danger ratio', () => {
+    const verdict = threatVerdict({
+      kills: kills(10),
+      dangerRatio: null,
+      killerRatio: 80,
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('dangerous');
+    expect(verdict.ratiosKnown).toBe(true);
+  });
+
+  it('still needs ten recent kills however high the share', () => {
+    expect(
+      threatVerdict({ kills: kills(9), dangerRatio: 90, killerRatio: 95, nowMs: NOW }).level
+    ).toBe('active');
+  });
+
+  it('knows no ratio when neither is given', () => {
+    expect(threatVerdict({ kills: kills(10), dangerRatio: null, nowMs: NOW }).ratiosKnown).toBe(
+      false
+    );
+  });
+});
+
+describe('threatVerdict recent losses', () => {
+  const none: KillRecord[] = [];
+
+  it('is low, not inactive, for a pilot with no recent kills who lost a ship recently', () => {
+    const verdict = threatVerdict({
+      kills: none,
+      dangerRatio: null,
+      lossTimesMs: [NOW - 3 * DAY, NOW - 10 * DAY],
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('low');
+    expect(verdict.recentKills).toBe(0);
+    expect(verdict.recentLosses).toBe(2);
+    expect(verdict.lastLossMs).toBe(NOW - 3 * DAY);
+  });
+
+  it('stays inactive when the losses are older than the window', () => {
+    const verdict = threatVerdict({
+      kills: none,
+      dangerRatio: null,
+      lossTimesMs: [NOW - 100 * DAY],
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('inactive');
+    expect(verdict.recentLosses).toBe(0);
+    expect(verdict.lastLossMs).toBe(NOW - 100 * DAY);
+  });
+
+  it('counts a loss exactly 90 days old as recent', () => {
+    expect(
+      threatVerdict({ kills: none, dangerRatio: null, lossTimesMs: [NOW - 90 * DAY], nowMs: NOW })
+        .level
+    ).toBe('low');
+  });
+
+  it('is inactive when the losses were not looked up', () => {
+    const verdict = threatVerdict({
+      kills: none,
+      dangerRatio: null,
+      lossTimesMs: null,
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('inactive');
+    expect(verdict.recentLosses).toBe(0);
+    expect(verdict.lastLossMs).toBeNull();
+  });
+
+  it('does not change the level of a pilot who has recent kills', () => {
+    const verdict = threatVerdict({
+      kills: kills(4),
+      dangerRatio: null,
+      lossTimesMs: [NOW - DAY],
+      nowMs: NOW,
+    });
+    expect(verdict.level).toBe('active');
+    expect(verdict.recentLosses).toBe(1);
+  });
+});
+
+describe('needsLossHistory', () => {
+  it('is true only when there is no kill in the window to show activity already', () => {
+    expect(needsLossHistory([], NOW)).toBe(true);
+    expect(needsLossHistory([kill(100 * DAY)], NOW)).toBe(true);
+    expect(needsLossHistory([kill(2 * DAY)], NOW)).toBe(false);
   });
 });
 
