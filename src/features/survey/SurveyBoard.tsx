@@ -6,7 +6,15 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, Spinner, StatChip, StatChips, TextArea } from '@/components/ui';
+import {
+  EmptyState,
+  IskAmount,
+  Panel,
+  Spinner,
+  StatChip,
+  StatChips,
+  TextArea,
+} from '@/components/ui';
 import {
   formatDuration,
   formatEveClock,
@@ -15,7 +23,6 @@ import {
 } from '@/engine/survey/chatMessage';
 import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { AddScanResult } from './scanResult';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
@@ -223,7 +230,10 @@ export function SurveyBoard({
             />
             <StatChip label={t('survey.statRocks')} value={summary.rocksLeft} />
             {summary.iskLeft !== null && (
-              <StatChip label={t('survey.statIsk')} value={formatIskCompact(summary.iskLeft)} />
+              <StatChip
+                label={t('survey.statIsk')}
+                value={<IskAmount value={summary.iskLeft} decimals={0} />}
+              />
             )}
           </StatChips>
 

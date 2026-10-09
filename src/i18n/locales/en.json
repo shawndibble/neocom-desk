@@ -9331,7 +9331,7 @@
         "worth": {
           "title": "Worth on the scan, hulls only",
           "total": "Total",
-          "isk": "{{amount}} ISK",
+          "isk": "<isk/> ISK",
           "noPrice": "price unavailable",
           "unpriced_one": "1 ship has no price and is left out.",
           "unpriced_other": "{{count}} ships have no price and are left out.",
