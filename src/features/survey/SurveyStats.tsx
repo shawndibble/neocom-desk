@@ -9,8 +9,13 @@ import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
 import { IskAmount, Tooltip } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { formatLocalClock } from './localClock';
 import { useDoneAtLocal } from './surveyPref';
+
+// Accent says it's pressable; no underline, since that reads as a link to
+// somewhere. The tooltip names what a press does.
+const toggleClassName = `text-accent rounded-xs ${interactiveClassName} ${focusRingClassName}`;
 
 function Tile({
   label,
@@ -64,19 +69,9 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
           '–'
         ) : (
           <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
-            <button
-              type="button"
-              className={inlineLinkClassName}
-              onClick={() => void setLocal(!local)}
-            >
+            <button type="button" className={toggleClassName} onClick={() => void setLocal(!local)}>
               {local
-                ? t('survey.localTime', {
-                    time: new Date(summary.etaAt).toLocaleTimeString(i18n.language, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false,
-                    }),
-                  })
+                ? formatLocalClock(summary.etaAt)
                 : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
             </button>
           </Tooltip>
