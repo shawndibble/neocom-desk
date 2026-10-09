@@ -328,8 +328,9 @@ service cloud.firestore {
 
       // A Survey's moon tax (src/features/survey/surveyStore.ts): who gets it and
       // the rate, one create-only doc per change, the newest one counting. Any
-      // signed-in pilot may write one (the share carries no uid, so the starter
-      // can't be told apart); anyone with the link reads them. Same expiry rule
+      // signed-in pilot may write one: the survey names its starter by Character
+      // name, which rules can't check against a sign-in, so the app only writes
+      // for the owner. Anyone with the link reads them. Same expiry rule
       // as a scan, so the TTL policy on `surveyTax` removes it with the survey.
       match /surveyTax/{taxId} {
         allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;

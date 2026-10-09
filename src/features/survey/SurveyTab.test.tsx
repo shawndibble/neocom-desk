@@ -19,6 +19,14 @@ vi.mock('./surveyStore', () => ({ startSurvey, addSurveyScan, loadSurvey }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/share/${id}`,
 }));
+// The moon tax has its own test; here only who sees it editable matters.
+vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
+vi.mock('./MoonTaxRow', () => ({
+  MoonTaxRow: () => <div data-testid="tax-edit" />,
+  MoonTaxReadout: ({ tax }: { tax: { name: string } }) => (
+    <div data-testid="tax-readout">{tax.name}</div>
+  ),
+}));
 // Its own test covers the ledger read; here it would reach for ESI.
 vi.mock('./YourShareRow', () => ({ YourShareRow: () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
@@ -202,5 +210,26 @@ describe('SurveyTab', () => {
     pasteInApp(SCAN);
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(useCurrentSurveyId.getState().value).toBe(ID);
+  });
+
+  it("lets the survey's owner edit the moon tax", async () => {
+    await useCurrentSurveyId.getState().setValue(ID);
+    renderTab();
+    await screen.findByTestId('tax-edit');
+    expect(screen.queryByTestId('tax-readout')).toBeNull();
+  });
+
+  it("shows another pilot's survey tax read-only, so theirs can't overwrite it", async () => {
+    loadSurvey.mockResolvedValue({
+      ok: true,
+      expiresAt: EXPIRES,
+      owner: 'Someone Else',
+      tax: { name: 'Moon Corp', pct: 8 },
+      scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
+    });
+    await useCurrentSurveyId.getState().setValue(ID);
+    renderTab();
+    expect((await screen.findByTestId('tax-readout')).textContent).toBe('Moon Corp');
+    expect(screen.queryByTestId('tax-edit')).toBeNull();
   });
 });

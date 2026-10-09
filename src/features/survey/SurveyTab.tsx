@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Button, EmptyState, PageHeader, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
@@ -25,14 +26,14 @@ import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyBoard } from './SurveyBoard';
 import { SurveyPicker } from './SurveyPicker';
-import { MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
+import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
 import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
-import { addSurveyScan, loadSurvey, startSurvey } from './surveyStore';
+import { addSurveyScan, loadSurvey, startSurvey, type SurveyTaxShare } from './surveyStore';
 import { useSurvey } from './useSurvey';
 
 interface SurveyTabProps {
@@ -165,6 +166,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
     });
   }, [hydrated, characterId]);
 
+  const characterNames = useLiveQuery(() => db.characters.toArray())?.map((c) => c.name) ?? [];
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
@@ -207,6 +209,8 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
                 <MoonTaxLine
                   characterId={characterId}
                   oreNames={summary.oreNames}
+                  owned={state.status === 'ready' && ownsSurvey(state.owner, characterNames)}
+                  published={state.status === 'ready' ? state.tax : null}
                   survey={
                     currentId !== null && state.status === 'ready'
                       ? { id: currentId, expiresAt: state.expiresAt, published: state.tax }
@@ -235,15 +239,26 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
   );
 }
 
-/** The moon tax row, only once the Survey shows a moon ore. */
+/**
+ * The moon tax, only once the Survey shows a moon ore. The pilot who started the
+ * Survey edits it and stores it on the Survey; anyone else opening it in the app
+ * sees what the owner stored, read-only, so their own saved tax can't overwrite it.
+ */
 function MoonTaxLine({
   characterId,
   oreNames,
+  owned,
+  published,
   survey,
 }: {
   characterId: number;
   oreNames: string[];
+  owned: boolean;
+  published: SurveyTaxShare | null;
   survey?: TaxSurvey;
 }) {
-  return useHasMoonOre(oreNames) ? <MoonTaxRow characterId={characterId} survey={survey} /> : null;
+  const moon = useHasMoonOre(oreNames);
+  if (!moon) return null;
+  if (owned) return <MoonTaxRow characterId={characterId} survey={survey} />;
+  return published === null ? null : <MoonTaxReadout tax={published} />;
 }
