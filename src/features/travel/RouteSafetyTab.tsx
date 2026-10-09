@@ -45,7 +45,7 @@
  *
  * Ways to fly each leg (issue #2477): beside each leg's rows, gates only and
  * the way through each hub with a qualifying hole, with facts side by side
- * (`LegWays`). Use for this leg pins one in the link (`pin`), and a Thera /
+ * (`LegWays`). Clicking a way pins it in the link (`pin`), and a Thera /
  * Turnur row's Route via opens this page with its hole pinned for the first
  * leg (`routeSafetyLink.ts`). Editing the stops or their order drops the
  * pins, which belong to legs by position — except the first stop added to a
