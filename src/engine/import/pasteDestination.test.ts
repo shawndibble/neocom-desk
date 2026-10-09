@@ -24,7 +24,30 @@ const SOURCES: PasteSources = { catalogue: CATALOGUE, hullNames: HULLS, skillByN
 
 const FIT = ['[Rifter, Kite Fit]', '', 'Damage Control II', '', 'Warp Disruptor II'].join('\n');
 
+const SCAN = [
+  'Pyroxeres\t8,016\t2,404 m3\t184,000.00 ISK\t33 km',
+  'Pyroxeres II-Grade\t9,840\t2,952 m3\t221,000.00 ISK\t13 km',
+].join('\n');
+
 describe('pasteDestination', () => {
+  it('sends a scan with empty ore groups to the Survey tab, not the Appraisal', () => {
+    // The scanner prints a header for every grade, and some have no rocks.
+    const scan = [
+      'Scordite II-Grade',
+      'Scordite II-Grade\t7,396\t1,109 m3\t128,000.00 ISK\t19 km',
+      'Scordite III-Grade',
+      'Veldspar',
+      'Veldspar\t23,799\t2,379 m3\t223,000.00 ISK\t20 km',
+      'Veldspar IV-Grade',
+    ].join('\n');
+    expect(pasteDestination(scan, SOURCES)).toBe('survey');
+  });
+
+  it('sends a Survey Scanner copy to the Survey tab, never the Appraisal', () => {
+    expect(pasteDestination(SCAN, SOURCES)).toBe('survey');
+    expect(pasteDestination('Tritanium\t1000\nPyerite\t500', SOURCES)).toBe('appraisal');
+  });
+
   it('sends an EFT fit of a known hull to Fittings', () => {
     expect(pasteDestination(FIT, SOURCES)).toBe('fitting');
   });
@@ -201,8 +224,9 @@ describe('detectPasteDestination', () => {
     expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
   });
 
-  it('keeps the shipped order: fit, chat link, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
+  it('keeps the shipped order: survey scan, fit, chat link, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
     expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
+      'survey',
       'fitting',
       'chatLink',
       'dscan',

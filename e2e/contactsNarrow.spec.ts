@@ -109,3 +109,38 @@ test.describe('Contacts sort picker', () => {
     await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
   });
 });
+
+test.describe('Contacts standings cards', () => {
+  test('a non-fee card drops its fees cell and separator at 390px', async ({ page }) => {
+    await signInAndGoto(page);
+    await page.route(
+      (url) => url.pathname === `/characters/${CHARACTER_ID}/contacts/labels`,
+      (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    );
+    await page.route(
+      (url) => url.pathname === `/characters/${CHARACTER_ID}/standings/`,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { from_id: 1000035, from_type: 'npc_corp', standing: 5 },
+            { from_id: 1000125, from_type: 'npc_corp', standing: 2 },
+          ]),
+        })
+    );
+    await page.setViewportSize(PHONE);
+    await page.goto('./contacts/standings');
+
+    const rows = page.getByRole('table').getByRole('row');
+    const feeRow = rows.filter({ hasText: 'Used for fees' });
+    await expect(feeRow).toHaveCount(1);
+    await expect(feeRow.getByText('Used for fees')).toBeVisible();
+
+    const plainRow = rows.filter({ hasNotText: 'Used for fees' }).filter({ hasText: 'NPC corp' });
+    await expect(plainRow).toHaveCount(1);
+    const feesCell = plainRow.locator('td').last();
+    await expect(feesCell).toBeAttached();
+    expect(await feesCell.evaluate((el) => getComputedStyle(el).display)).toBe('none');
+  });
+});

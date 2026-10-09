@@ -79,6 +79,7 @@ export const PI_TABS = definePageTabs('/planetary-industry', [
 export const MINING_TABS = definePageTabs('/mining', [
   { id: 'overview', labelKey: 'miningTax.overviewTab' },
   { id: 'tax', labelKey: 'miningTax.taxTab' },
+  { id: 'survey', labelKey: 'miningTax.surveyTab' },
 ]);
 
 /**
@@ -130,6 +131,9 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
   { id: 'hauling', labelKey: 'market.sections.hauling' },
+  // Its own route (`/market/lp-store[/:corporationId]`) outranks Market's, so
+  // `LoyaltyStore` draws the tab bar itself; the entry is what makes the path a Market tab.
+  { id: 'lp-store', labelKey: 'loyaltyStore.title' },
 ]);
 
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {

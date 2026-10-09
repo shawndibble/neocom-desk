@@ -18,6 +18,7 @@ import {
   Panel,
   SearchInput,
   Spinner,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
@@ -938,15 +939,20 @@ function MailView({ scope, scopeControl }: MailViewProps) {
                                 </span>
                                 <span className="min-w-0 truncate">{party}</span>
                                 {isAll && (
-                                  <span className="inline-flex max-w-32 shrink-0 items-center gap-1 rounded-xs border border-line px-1 text-[0.6875rem]">
-                                    <CharacterAvatar
-                                      characterId={row.ownerId}
-                                      size="sm"
-                                      loading="lazy"
-                                      className="rounded-full"
-                                    />
-                                    <span className="truncate">{row.ownerName}</span>
-                                  </span>
+                                  // Portrait alone: the name beside it repeated down the
+                                  // whole list and crowded the sender. The name stays
+                                  // reachable via the alt/title and the reading pane.
+                                  <Tooltip content={t('mail.rowOwner', { name: row.ownerName })}>
+                                    <span className="shrink-0">
+                                      <CharacterAvatar
+                                        characterId={row.ownerId}
+                                        size="sm"
+                                        loading="lazy"
+                                        alt={t('mail.rowOwner', { name: row.ownerName })}
+                                        className="rounded-full border-0"
+                                      />
+                                    </span>
+                                  </Tooltip>
                                 )}
                                 {header.timestamp && (
                                   // `text-text-dim`, not the `text-text-faint` this

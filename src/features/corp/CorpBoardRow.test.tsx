@@ -53,6 +53,16 @@ describe('CorpBoardRow', () => {
     );
   });
 
+  it('lets a long subject wrap to two lines instead of truncating to one, and keeps its tooltip', async () => {
+    renderRow({ ...jobItem, typeId: null, subject: 'Nakugard - Citadel Fortizar One' });
+
+    const subject = screen.getByText('Nakugard - Citadel Fortizar One');
+    expect(subject).toHaveClass('line-clamp-2');
+    expect(subject).not.toHaveClass('truncate');
+    await userEvent.hover(subject);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Nakugard - Citadel Fortizar One');
+  });
+
   it('links an item subject to its Show info and leaves other subjects plain', () => {
     renderRow(jobItem);
     expect(screen.getByRole('link', { name: 'Rifter Blueprint' }).getAttribute('href')).toContain(

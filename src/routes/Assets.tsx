@@ -2007,7 +2007,7 @@ export function Assets() {
                         <span className="hidden sm:inline">
                           {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                         </span>
-                        <span className="text-isk-pos">
+                        <span className="text-sm font-semibold text-isk-pos">
                           <IskAmount value={currentTotals.estimatedValue} decimals={0} />
                         </span>
                       </span>
@@ -2037,9 +2037,12 @@ export function Assets() {
                         className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         {t('assets.section.locationCount', { count: sortedTree.length })}
+                        {showTotalValueChip && ' · '}
                         {showTotalValueChip && (
-                          <span className="text-isk-pos">
-                            {' · '}
+                          <span
+                            data-testid="assets-total-value"
+                            className="text-sm font-semibold tracking-normal text-isk-pos normal-case tabular-nums"
+                          >
                             {totalValueFiltered
                               ? t('assets.section.totalValueFiltered', {
                                   value: formatIsk(totalValue),

@@ -98,6 +98,18 @@
   --color-series-order-count: #e9a13b;
 
   /*
+   * Plan a move: one hue per pickup location, so a location's rail dot, its
+   * share of the split bar and its footer segment match from the picker to
+   * the plan. NOMINAL identity only (the location's name is always written
+   * beside it), never a status. Four slots, reused in order after that. Clear
+   * of accent (interactive) and of every status tone.
+   */
+  --color-pickup-1: #6ea8fe;
+  --color-pickup-2: #b79cff;
+  --color-pickup-3: #4fd1b5;
+  --color-pickup-4: #f08fb8;
+
+  /*
    * The PI Map's "what if I add a planet" colour: what a planet type you do
    * not have would unlock. One meaning, drawn only beside a non-colour marker
    * (a "+" on the tile, "what if" under the planet, words in the accessible

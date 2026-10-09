@@ -654,7 +654,6 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
-  const hasOwnedBlueprints = ownedBlueprints.length > 0;
   const marketWidePanel = catalog && (
     <MarketWideOpportunitiesPanel
       key="market-wide"
@@ -664,7 +663,6 @@ export function Industry() {
       modifiers={modifiers}
       activeCharacterId={activeCharacterId}
       onStartPlan={handleStartPlan}
-      startFolded={hasOwnedBlueprints}
     />
   );
   // Waits on the pricing-settings hydration gate (issue #2054): not mounting
@@ -690,9 +688,7 @@ export function Industry() {
       onDataAgeChange={setOpportunitiesDataAge}
     />
   );
-  const opportunitiesPanels = hasOwnedBlueprints
-    ? [ownedRankingPanel, marketWidePanel]
-    : [marketWidePanel, ownedRankingPanel];
+  const opportunitiesPanels = [marketWidePanel, ownedRankingPanel];
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto max-w-7xl space-y-4">
@@ -718,11 +714,8 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
-                {/* With owned blueprints the owned-blueprint ranking leads
-                    and "what's profitable" folds under it; with none, the
-                    market-wide scan is the whole answer and stays first,
-                    open. Keyed, so a late-arriving blueprint list reorders
-                    the two without remounting (and losing) a scan. */}
+                {/* "What's profitable" (the market-wide scan) always leads,
+                    open; the owned-blueprint ranking follows it. */}
                 {opportunitiesPanels}
               </div>
             ) : tab === 'records' ? (

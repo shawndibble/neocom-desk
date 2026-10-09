@@ -75,6 +75,13 @@ import {
   useRouteQuery,
 } from '@/features/route/routeRules';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
+import {
+  useRouteJump,
+  useRouteJumpRange,
+  useRouteJumpsEnabled,
+} from '@/features/route/routeJumpSettings';
+import type { JumpWayFacts } from '@/engine/route/jumpLegs';
+import { formatDuration } from '@/lib/duration';
 import { routeMassCheck } from '@/engine/route/jumpMass';
 import { useRouteShipMass } from '@/features/route/routeShip';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
@@ -121,19 +128,24 @@ function RouteFacts({
   summary,
   holeJumps,
   bridgeJumps,
+  driveJumps,
+  jump,
   massBlocked,
   shipName,
 }: {
   summary: RouteSafetySummary;
   holeJumps: number;
   bridgeJumps: number;
+  /** Jumps by jump drive, and the trip's fuel and time when there are any (issue #3147). */
+  driveJumps: number;
+  jump: JumpWayFacts | null;
   /** Hole and bridge hops the chosen ship may not pass; the chip shows only when above 0. */
   massBlocked: number;
   /** The hull the mass check runs for; shown only when the route flies a hole or bridge. */
   shipName: string | null;
 }) {
   const { t } = useTranslation();
-  const flownOtherwise = holeJumps > 0 || bridgeJumps > 0;
+  const flownOtherwise = holeJumps > 0 || bridgeJumps > 0 || driveJumps > 0;
   return (
     <div role="group" aria-label={t('travel.summary.label')} className="min-w-0">
       <StatChips>
@@ -141,7 +153,25 @@ function RouteFacts({
         {flownOtherwise && (
           <StatChip
             label={t('travel.summary.byGateLabel')}
-            value={summary.jumps - holeJumps - bridgeJumps}
+            value={summary.jumps - holeJumps - bridgeJumps - driveJumps}
+          />
+        )}
+        {driveJumps > 0 && <StatChip label={t('travel.summary.driveLabel')} value={driveJumps} />}
+        {jump && (
+          <StatChip
+            label={t('travel.summary.fuelLabel')}
+            value={t('travel.jumpDrive.fuelValue', {
+              count: jump.fuel,
+              fuel: jump.fuel.toLocaleString(),
+            })}
+          />
+        )}
+        {jump && (
+          <StatChip
+            label={t('travel.summary.arriveLabel')}
+            value={t('travel.jumpDrive.arriveValue', {
+              time: formatDuration(Math.round(jump.arriveMinutes) * 60),
+            })}
           />
         )}
         {holeJumps > 0 && <StatChip label={t('travel.summary.holesLabel')} value={holeJumps} />}
@@ -223,6 +253,9 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const bridges =
     bridgeQuery.enabled && bridgeQuery.hydrated && gateRecords !== undefined ? gateRecords : null;
   const [bridgeDialog, setBridgeDialog] = useState<AnsiblexDialogMode | null>(null);
+  const jumpDrive = useRouteJump();
+  const jumpEnabled = useRouteJumpsEnabled((s) => s.value);
+  const jumpRange = useRouteJumpRange((s) => s.value);
   const state = useRouteSafety({
     fromId,
     stops,
@@ -234,12 +267,14 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
     // Held until Use jump bridges and the list are read, so the route is not drawn once without them.
     route: {
       ...routeQuery,
-      hydrated: routeQuery.hydrated && bridgeQuery.hydrated && gateRecords !== undefined,
+      hydrated:
+        routeQuery.hydrated && bridgeQuery.hydrated && gateRecords !== undefined && jumpDrive.ready,
     },
     holes,
     pins: params.pin,
     listed,
     bridges,
+    jump: jumpDrive.setup,
   });
   const pinLeg = (index: number, pin: string | null) => {
     const next = [...params.pin];
@@ -354,6 +389,13 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
                 bridgeCount: gateRecords?.length ?? 0,
                 onManageBridges: () => setBridgeDialog('search'),
               }}
+              jump={{
+                enabled: jumpEnabled,
+                onEnabledChange: (enabled) =>
+                  void useRouteJumpsEnabled.getState().setValue(enabled),
+                range: jumpRange,
+                onRangeChange: (range) => void useRouteJumpRange.getState().setValue(range),
+              }}
             />
           </div>
         </div>
@@ -458,6 +500,8 @@ function RouteBody({
                   summary={trip.summary}
                   holeJumps={trip.holeJumps}
                   bridgeJumps={trip.bridgeJumps}
+                  driveJumps={trip.driveJumps}
+                  jump={trip.jump}
                   massBlocked={massBlocked}
                   shipName={mass.ship?.name ?? null}
                 />

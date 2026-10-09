@@ -368,7 +368,8 @@ beforeEach(async () => {
 });
 
 // The Market Group, not the nav rail's "Ships" link: the group is a button.
-const SHIPS_GROUP = { name: 'Ships' } as const;
+// Matches the plain browse header and the search one, which appends " · <count>".
+const SHIPS_GROUP = { name: /^Ships(?: ·|$)/ } as const;
 
 /** Variations live behind their own item tab, next to Order Book and Price History. */
 async function openVariationsTab(user: ReturnType<typeof userEvent.setup>) {
@@ -451,6 +452,82 @@ describe('Market Browser', () => {
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
   });
 
+  describe('search category headers (issue #3136)', () => {
+    const zephyrs = (count: number, marketGroupId: number): MarketTypeEntry[] =>
+      Array.from({ length: count }, (_, i) => ({
+        typeId: 90000 + marketGroupId * 100 + i,
+        name: `Zephyr ${marketGroupId}-${i}`,
+        marketGroupId,
+        volume: 1,
+      }));
+
+    it('starts a lone matching category expanded, with its count in the header name', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await user.type(await screen.findByRole('searchbox'), 'rift');
+
+      const ships = await screen.findByRole('button', { name: 'Ships · 1' });
+      expect(ships).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('Rifter')).toBeInTheDocument();
+    });
+
+    it('opens every category when the matches fit in a dozen rows', async () => {
+      vi.mocked(loadMarketTypes).mockResolvedValueOnce([
+        ...TYPES,
+        ...zephyrs(2, 2),
+        ...zephyrs(3, 3),
+      ]);
+      const user = userEvent.setup();
+      render(<App />);
+      await user.type(await screen.findByRole('searchbox'), 'zephyr');
+
+      expect(await screen.findByRole('button', { name: 'Ships · 2' })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      );
+      expect(screen.getByRole('button', { name: 'Ore · 3' })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      );
+      expect(screen.getByText('Zephyr 3-2')).toBeInTheDocument();
+    });
+
+    it('starts broad searches collapsed, expands one on click, and resets when the text changes', async () => {
+      vi.mocked(loadMarketTypes).mockResolvedValueOnce([
+        ...TYPES,
+        ...zephyrs(8, 2),
+        ...zephyrs(8, 3),
+      ]);
+      const user = userEvent.setup();
+      render(<App />);
+      const box = await screen.findByRole('searchbox');
+      await user.type(box, 'zephyr');
+
+      const ships = await screen.findByRole('button', { name: 'Ships · 8' });
+      const ore = screen.getByRole('button', { name: 'Ore · 8' });
+      expect(ships).toHaveAttribute('aria-expanded', 'false');
+      expect(ore).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText('Zephyr 3-0')).not.toBeInTheDocument();
+
+      await user.click(ore);
+      expect(await screen.findByText('Zephyr 3-0')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Ore · 8' })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      );
+
+      // Typing on is a new search: the flip is forgotten and Ore folds again.
+      await user.clear(box);
+      await user.type(box, 'phyr');
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Ore · 8' })).toHaveAttribute(
+          'aria-expanded',
+          'false'
+        )
+      );
+    });
+  });
+
   it('a ?group= link lands the tree expanded down to that category (issue #407)', async () => {
     window.history.pushState({}, '', '/market?group=4');
     render(<App />);
@@ -486,11 +563,13 @@ describe('Market Browser', () => {
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('1,000,000')).toBeInTheDocument();
+    // The hub is one station, which the scope bar names: rows don't repeat it.
     expect(
-      within(sellTable).getByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
+      within(sellTable).queryByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant', {
         exact: false,
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    expect(within(sellTable).queryByRole('columnheader', { name: /Location/ })).toBeNull();
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
     expect(within(buyTable).getByText('500,000')).toBeInTheDocument();
@@ -1261,6 +1340,21 @@ describe('Quickbar (issue #7)', () => {
   it('shows a short hint when empty', async () => {
     render(<App />);
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
+  });
+
+  it('keeps the finder a bounded flex column: tree scrolls, Quickbar stays rendered', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await pinRifterFromHeaderBell(user);
+
+    const quickbar = await screen.findByTestId('quickbar');
+    await within(quickbar).findByText('Rifter');
+    // Structure only (jsdom has no layout): the tree wrapper is the flexible,
+    // scrolling part; the Quickbar never shrinks and its list scrolls itself.
+    const tree = quickbar.parentElement!.querySelector('.overflow-y-auto');
+    expect(tree).toHaveClass('overflow-y-auto', 'lg:flex-1', 'lg:min-h-0');
+    expect(quickbar).toHaveClass('shrink-0');
+    expect(within(quickbar).getByRole('list')).toHaveClass('overflow-y-auto');
   });
 
   it('pins an item from the header price alert bell, and a re-save does not duplicate it', async () => {

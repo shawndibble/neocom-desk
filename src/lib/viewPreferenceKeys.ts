@@ -53,4 +53,5 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'piPlanControls',
   'planColumnVisibility.v2',
   'planGroupingMode',
+  'walletJournalBreakdownOpen',
 ];

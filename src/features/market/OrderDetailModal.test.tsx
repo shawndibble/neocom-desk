@@ -415,6 +415,19 @@ describe('OrderDetailModal', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
+  it('top-aligns the cost-basis and better-exit cards so a collapsed bar is not stretched into an empty box (#3111)', () => {
+    for (const costBasis of [null, BASE_ROW.costBasis]) {
+      renderModal({ row: { ...BASE_ROW, costBasis } });
+      const costSection = screen
+        .getByText(/Where that price comes from|^Floor working/)
+        .closest('section')!;
+      const exitsSection = screen.getByText('Is there a better exit?').closest('section')!;
+      expect(costSection.parentElement).toBe(exitsSection.parentElement);
+      expect(costSection.parentElement).toHaveClass('items-start');
+      cleanup();
+    }
+  });
+
   it('renders the full cost-basis ledger, with the fill floor only inside the tooltip explanation — never as a second visible number', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
@@ -1039,24 +1052,39 @@ describe('OrderDetailModal', () => {
       },
     };
 
-    it('starts every foldable section collapsed, each with its own one-line trailing read', () => {
+    it('starts the other sections collapsed, each with its own one-line trailing read, and opens "Who is cheaper" on an undercut (#3137)', () => {
       renderModal({ row: RICH_ROW, stationChecked: true });
 
       // Collapsed: only the heading/trailing row shows, not the content.
-      expect(screen.queryByText('Nobody cheaper here')).not.toBeInTheDocument();
       expect(screen.queryByText('Qty')).not.toBeInTheDocument();
       expect(screen.queryByText('Hold at')).not.toBeInTheDocument();
 
-      const who = screen.getByRole('button', { name: /Who is cheaper/ });
+      const [who] = screen.getAllByRole('button', { name: /Who is cheaper/ });
       const cost = screen.getByRole('button', { name: /Where that price comes from/ });
       const exits = screen.getByRole('button', { name: /Is there a better exit/ });
-      expect(who).toHaveAttribute('aria-expanded', 'false');
+      expect(who).toHaveAttribute('aria-expanded', 'true');
       expect(cost).toHaveAttribute('aria-expanded', 'false');
       expect(exits).toHaveAttribute('aria-expanded', 'false');
       // One-line trailing reads, visible without expanding.
       expect(who).toHaveTextContent('Station · 450.00');
       expect(cost).toHaveTextContent('400.00 ISK/unit');
       expect(exits).toHaveTextContent(/Hold ·/);
+    });
+
+    it('keeps "Who is cheaper" collapsed when nothing is cheaper or unchecked, and a manual toggle sticks (#3137)', () => {
+      renderModal({ row: BASE_ROW, stationChecked: true, deep: null });
+      expect(screen.getByRole('button', { name: /Who is cheaper/ })).toHaveAttribute(
+        'aria-expanded',
+        'false'
+      );
+
+      cleanup();
+      renderModal({ row: RICH_ROW, stationChecked: true });
+      const [who] = screen.getAllByRole('button', { name: /Who is cheaper/ });
+      fireEvent.click(who);
+      expect(who).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(who);
+      expect(who).toHaveAttribute('aria-expanded', 'true');
     });
 
     it('reads "Clear" once every scope is checked and clean, and "Not checked" while any scope still is not', () => {

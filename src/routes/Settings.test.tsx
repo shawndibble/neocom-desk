@@ -356,6 +356,8 @@ describe('Settings', () => {
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
+    // Nothing to fold, so no caret.
+    expect(screen.queryByRole('button', { name: /show data age/i })).not.toBeInTheDocument();
   });
 
   it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
@@ -387,6 +389,12 @@ describe('Settings', () => {
         outcome: 'success',
       });
     });
+
+    // Folded by default: a one-line summary and the export menu, no table.
+    expect(await screen.findByText(/1 source · last update/i)).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /data age/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export data age/i })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: /show data age/i }));
 
     const table = await screen.findByRole('table', { name: /data age/i });
     const rows = within(table).getAllByRole('row');

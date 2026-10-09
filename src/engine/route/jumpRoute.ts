@@ -130,9 +130,9 @@ function securityStepCost(
 }
 
 /** What entering a system costs, by stargate (`viaExtra` false) or over an extra connection. */
-type StepCost = (systemId: number, viaExtra: boolean) => number;
+export type StepCost = (systemId: number, viaExtra: boolean) => number;
 
-function stepCostFor(options: FindJumpRouteOptions): StepCost {
+export function stepCostFor(options: FindJumpRouteOptions): StepCost {
   const base = securityStepCost(
     options.preference ?? 'shortest',
     options.securityOf,
@@ -178,7 +178,7 @@ function neighboursFor(graph: JumpGraph, options: FindJumpRouteOptions): Neighbo
  * edges, so this is never the expensive part — but a linear scan for the
  * cheapest frontier node would make it O(n²) for no reason.
  */
-class CostQueue {
+export class CostQueue {
   private readonly heap: { systemId: number; cost: number }[] = [];
 
   push(systemId: number, cost: number): void {

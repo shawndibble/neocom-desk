@@ -11,7 +11,7 @@
  */
 
 /** How one hop of a leg is flown. Anything but `gate` is beyond the client's autopilot. */
-export type HopKind = 'gate' | 'hole' | 'bridge';
+export type HopKind = 'gate' | 'hole' | 'bridge' | 'jump';
 
 /** A leg as the trip lays it out: its systems in flying order, each tagged with how it was entered. */
 export interface WaypointLeg {
