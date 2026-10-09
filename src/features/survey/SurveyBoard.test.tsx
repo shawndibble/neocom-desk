@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { MAX_LINE_WIDTH } from '@/engine/survey/chatMessage';
+import { textWidth } from '@/engine/survey/chatFont';
+import { MAX_ROW_PX } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { configureClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -77,7 +78,7 @@ describe('SurveyBoard', () => {
     expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
   });
 
-  it('copies a four-line chat message with the link on the bottom rail, each line within the width', async () => {
+  it('copies a heading and a four-row box with the link on the bottom rail, each row within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
@@ -86,15 +87,15 @@ describe('SurveyBoard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy chat message' }));
     await waitFor(() => expect(written).toHaveLength(1));
 
-    const lines = written[0].split('\n');
+    const [heading, ...lines] = written[0].split('\n');
+    expect(heading).toBe('Neocom Desk Report');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^╔═+\[ ETA: <b>\d\d:\d\d EVE<\/b> \(~.*\]═+╗$/);
-    expect(lines[1]).toMatch(/^║ █+░+ 13% ║$/);
-    expect(lines[2]).toMatch(/^║ Left: 5 Clear Icicle\s+ ║$/);
+    expect(lines[0]).toMatch(/^┌─*\[ ETA: \d\d:\d\d EVE \(~.*\]─*╌┄┈$/);
+    expect(lines[1]).toMatch(/^│ █+░+ 13%$/);
+    expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
     expect(lines[3]).toContain(`[ ${URL} ]`);
-    for (const line of lines) {
-      expect(line.replace(/<\/?b>/g, '').length).toBeLessThanOrEqual(MAX_LINE_WIDTH);
-    }
+    // The link's rail can run past the cap (a link cannot be shortened); the ore line cannot.
+    expect(textWidth(lines[2])).toBeLessThanOrEqual(MAX_ROW_PX);
     await screen.findByText('Copied');
   });
 

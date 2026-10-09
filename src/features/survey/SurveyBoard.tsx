@@ -77,6 +77,7 @@ export function SurveyBoard({
   const phone = useIsPhone();
 
   const labels: SurveyMessageLabels = {
+    heading: t('survey.message.heading'),
     done: t('survey.message.done'),
     waiting: t('survey.message.waiting'),
     left: t('survey.message.left'),
