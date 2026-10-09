@@ -11,3 +11,9 @@ export const useCurrentSurveyId = createLocalSetting<string | null>({
   defaultValue: null,
   parse: (raw) => (typeof raw === 'string' && isShareId(raw) ? raw : null),
 });
+
+/** Whether the "Done at" tile shows the pilot's own clock instead of EVE time (UTC). */
+export const useDoneAtLocal = createLocalSetting<boolean>({
+  key: 'miningSurveyDoneAtLocal',
+  defaultValue: false,
+});
