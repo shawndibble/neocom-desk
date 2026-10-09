@@ -8733,7 +8733,10 @@
       "servicesCount_other": "{{count}} offline",
       "criticalCount_one": "{{count}} critical",
       "criticalCount_other": "{{count}} critical",
-      "showAll": "Show all {{count}}",
+      "total_one": "{{count}} total",
+      "total_other": "{{count}} total",
+      "showMore_one": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more",
       "showFewer": "Show fewer"
     }
   },

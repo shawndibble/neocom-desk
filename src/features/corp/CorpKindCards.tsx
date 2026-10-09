@@ -20,7 +20,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
-import { textActionClassName } from '@/components/ui/textActionClassName';
+import {
+  disabledClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { Caret } from '@/components/ui/Disclosure';
+import { cx } from '@/lib/cx';
 import type { CorpBoardItem, CorpBoardItemKind } from '@/engine/corp/board';
 import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import { CorpBoardRow } from './CorpBoardRow';
@@ -102,9 +108,22 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
       // `truncate` widens the whole track instead of being clipped (issue #419).
       className="min-w-0"
       meta={
-        critical > 0 ? (
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-danger uppercase tabular-nums">
-            {t('corp.cards.criticalCount', { count: critical })}
+        critical > 0 || hidden > 0 ? (
+          <span className="flex items-center gap-2 text-[0.6875rem] tabular-nums">
+            {critical > 0 && (
+              <span className="font-semibold tracking-widest text-danger uppercase">
+                {t('corp.cards.criticalCount', { count: critical })}
+              </span>
+            )}
+            {/* The total, only when rows are hidden: "there are more" without scrolling to the footer. */}
+            {hidden > 0 && (
+              <span
+                className="text-text-dim"
+                aria-label={t('corp.cards.total', { count: items.length })}
+              >
+                {items.length}
+              </span>
+            )}
           </span>
         ) : undefined
       }
@@ -128,13 +147,17 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
               type="button"
               aria-expanded={expanded}
               onClick={() => setExpanded((open) => !open)}
-              className={textActionClassName(
-                'w-full border-t border-line px-3 py-2 text-left tabular-nums'
+              // `textActionClassName`'s recipe, minus its 11px caps: normal-case
+              // `text-xs` so it reads as an action under `text-sm` rows.
+              className={cx(
+                'flex min-h-11 w-full items-center gap-1.5 rounded-xs border-t border-line px-3 py-2 text-left text-xs font-semibold text-accent tabular-nums hover:underline active:text-accent/75 md:min-h-0',
+                interactiveClassName,
+                focusRingClassName,
+                disabledClassName
               )}
             >
-              {expanded
-                ? t('corp.cards.showFewer')
-                : t('corp.cards.showAll', { count: items.length })}
+              <Caret expanded={expanded} />
+              {expanded ? t('corp.cards.showFewer') : t('corp.cards.showMore', { count: hidden })}
             </button>
           )}
         </>

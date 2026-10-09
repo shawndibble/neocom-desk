@@ -62,7 +62,7 @@ function makeAccessTokenWithCorpScopes(): string {
 const LONG_NAME = 'Nakugard - Home Sweet Home Fortizar Citadel Deployment Alpha';
 
 /** Logs in with the corp scopes granted, mocks one structure called `name`, and opens `/corp`. */
-async function openCorpBoard(page: Page, name: string): Promise<void> {
+async function openCorpBoard(page: Page, name: string, structureCount = 1): Promise<void> {
   // Registered after `installSsoMock` (the `page` fixture's own setup), so
   // Playwright tries this one first: same endpoint, a token carrying the
   // corp scope group too.
@@ -96,9 +96,9 @@ async function openCorpBoard(page: Page, name: string): Promise<void> {
       return json({ roles: ['Station_Manager'] });
     }
     if (path === `/corporations/${CORPORATION_ID}/structures`) {
-      return json([
-        {
-          structure_id: 1,
+      return json(
+        Array.from({ length: structureCount }, (_, index) => ({
+          structure_id: index + 1,
           corporation_id: CORPORATION_ID,
           system_id: 1,
           type_id: 1,
@@ -106,10 +106,10 @@ async function openCorpBoard(page: Page, name: string): Promise<void> {
           // Deliberately long and unbroken: the regression this guards is
           // a flex child rendering without `min-w-0`, which overflows
           // instead of truncating — a short name would never surface it.
-          name,
-          fuel_expires: new Date(Date.now() + 2 * 86_400_000).toISOString(),
-        },
-      ]);
+          name: index === 0 ? name : `${name} ${index + 1}`,
+          fuel_expires: new Date(Date.now() + (index + 2) * 86_400_000).toISOString(),
+        }))
+      );
     }
     if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) return json([]);
 
@@ -121,7 +121,7 @@ async function openCorpBoard(page: Page, name: string): Promise<void> {
   await expect(page).toHaveURL(/\/overview$/);
 
   await page.goto('./corp');
-  await expect(page.getByText(name)).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 }
 
 test.describe('corp ops board — 320px width', () => {
@@ -196,3 +196,35 @@ test.describe('corp Kind Cards — whole structure names (#3124)', () => {
     });
   }
 });
+
+for (const width of [390, 1024, 1280]) {
+  test.describe(`corp kind card footer — ${width}px width`, () => {
+    test.use({ viewport: { width, height: 800 } });
+
+    test('the Show more button fits inside its card and the page does not overflow', async ({
+      page,
+    }) => {
+      await openCorpBoard(page, LONG_NAME, 5);
+
+      const toggle = page.getByRole('button', { name: 'Show 2 more' });
+      await expect(toggle).toBeVisible();
+      const box = await toggle.boundingBox();
+      // `min-h-11` is the touch tier below `md` only.
+      if (width < 768) expect(box!.height).toBeGreaterThanOrEqual(44);
+
+      const card = await toggle.evaluate((el) => {
+        const r = el.closest('section')!.getBoundingClientRect();
+        return { left: r.left, right: r.right, bottom: r.bottom };
+      });
+      expect(box!.x).toBeGreaterThanOrEqual(card.left - 1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(card.right + 1);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(card.bottom + 1);
+
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
+  });
+}
