@@ -112,45 +112,6 @@ export function PilotKillActivityView({
   return (
     <section className="space-y-3" aria-label={t('travel.pilot.activity.title')}>
       {heading}
-      <ul
-        className={cx(
-          'grid gap-2',
-          spaces.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
-        )}
-      >
-        {spaces.map((space) => {
-          const { count, lastMs } = summary.bySpace[space];
-          const tone = ageTone(lastMs, now);
-          return (
-            <li key={space} className="rounded-xs border border-line bg-panel-2 px-3 py-2">
-              <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t(`common.spaceOption.${space}`)}
-              </span>
-              <span
-                className={cx(
-                  'block text-lg font-semibold tabular-nums',
-                  count > 0 ? SPACE_TEXT[space] : 'text-text-dim'
-                )}
-              >
-                {count}
-              </span>
-              <span
-                className={cx(
-                  'block text-xs',
-                  tone === 'fresh' ? 'font-semibold text-text' : 'text-text-dim',
-                  (tone === 'old' || tone === 'none') && 'opacity-60'
-                )}
-              >
-                {lastMs === null
-                  ? t('travel.pilot.activity.none')
-                  : t('travel.pilot.activity.last', { age: formatAge(now - lastMs, t) })}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <p className="text-[0.6875rem] text-text-dim">{t('travel.pilot.activity.window')}</p>
-
       <Disclosure
         label={t('travel.pilot.activity.chart')}
         expanded={chartOpen}
@@ -212,6 +173,45 @@ export function PilotKillActivityView({
           </ul>
         </div>
       </Disclosure>
+
+      <ul
+        className={cx(
+          'grid gap-2',
+          spaces.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+        )}
+      >
+        {spaces.map((space) => {
+          const { count, lastMs } = summary.bySpace[space];
+          const tone = ageTone(lastMs, now);
+          return (
+            <li key={space} className="rounded-xs border border-line bg-panel-2 px-3 py-2">
+              <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t(`common.spaceOption.${space}`)}
+              </span>
+              <span
+                className={cx(
+                  'block text-lg font-semibold tabular-nums',
+                  count > 0 ? SPACE_TEXT[space] : 'text-text-dim'
+                )}
+              >
+                {count}
+              </span>
+              <span
+                className={cx(
+                  'block text-xs',
+                  tone === 'fresh' ? 'font-semibold text-text' : 'text-text-dim',
+                  (tone === 'old' || tone === 'none') && 'opacity-60'
+                )}
+              >
+                {lastMs === null
+                  ? t('travel.pilot.activity.none')
+                  : t('travel.pilot.activity.last', { age: formatAge(now - lastMs, t) })}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-[0.6875rem] text-text-dim">{t('travel.pilot.activity.window')}</p>
     </section>
   );
 }
