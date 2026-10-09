@@ -49,7 +49,7 @@ describe('SurveyShareScreen', () => {
     renderScreen();
     await screen.findByText('0% mined');
     expect(loadSurvey).toHaveBeenCalledWith(ID);
-    expect(screen.getByText(/Anyone with this link can add a scan/)).toBeTruthy();
+    expect(screen.getByText(/Paste a Survey Scanner copy anywhere on this page/)).toBeTruthy();
   });
 
   it('names the page once, and puts the way in in the header', async () => {

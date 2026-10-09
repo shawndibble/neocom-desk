@@ -51,10 +51,10 @@ afterEach(() => {
 });
 
 describe('SurveyBoard', () => {
-  it('with no scans shows the empty state and a paste box', () => {
+  it('with no scans shows the empty state, and no paste box', () => {
     render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
     expect(screen.getByText('No survey yet')).toBeTruthy();
-    expect(screen.getByLabelText('Survey scan')).toBeTruthy();
+    expect(screen.queryByLabelText('Survey scan')).toBeNull();
   });
 
   it('shows progress, pace and rocks left for two scans', async () => {
@@ -106,34 +106,6 @@ describe('SurveyBoard', () => {
     await screen.findByRole('button', { name: 'Link copied' });
   });
 
-  it('adds a scan pasted into the box without a button press', () => {
-    const onAdd = vi.fn(async () => 'ok' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => FIRST },
-    });
-    expect(onAdd).toHaveBeenCalledWith(FIRST);
-  });
-
-  it('processes anything pasted into the box at once, and says so when it is not a scan', async () => {
-    const onAdd = vi.fn(async () => 'not-a-scan' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => 'hello' },
-    });
-    expect(onAdd).toHaveBeenCalledWith('hello');
-    expect((await screen.findByRole('alert')).textContent).toContain("isn't a Survey Scanner copy");
-  });
-
-  it('has no Add scan button, and typing into the box does nothing', () => {
-    const onAdd = vi.fn(async () => 'ok' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
-    expect(screen.queryByRole('button', { name: 'Add scan' })).toBeNull();
-    const box = screen.getByLabelText('Survey scan') as HTMLTextAreaElement;
-    fireEvent.change(box, { target: { value: 'typed' } });
-    expect(box.value).toBe('');
-    expect(onAdd).not.toHaveBeenCalled();
-  });
   describe('value colours and layout', () => {
     // Priced at 1 ISK a unit by the mocked market, so units are the ISK.
     const row = (ore: string, volume: number, units: number) => ({ ore, volume, units });
