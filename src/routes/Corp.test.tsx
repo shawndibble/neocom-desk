@@ -181,7 +181,7 @@ describe('access states (AC1)', () => {
     );
 
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalled());
-    expect(await screen.findByText('Every structure is fuelled.')).toBeInTheDocument();
+    expect(await screen.findByText(/Nothing due: Fuel/)).toBeInTheDocument();
   });
 
   it('shows no board and no Grant for a none character who reached the URL anyway', () => {
@@ -559,9 +559,7 @@ describe('the board (AC2, AC5, AC6)', () => {
   it('states the hourly cache in the data-age tooltip', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() =>
-      expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
     fireEvent.focus(screen.getByText('30m ago'));
     expect(screen.getByRole('tooltip')).toHaveTextContent('about an hour');
   });
@@ -569,18 +567,14 @@ describe('the board (AC2, AC5, AC6)', () => {
   it('offers the section’s sub-nav, which Members will join', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() =>
-      expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
   });
 
   it('does not blank the board while a manual refresh is in flight (issue #418)', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() =>
-      expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
 
     let resolveSecondFetch!: (value: ReturnType<typeof cached<never[]>>) => void;
     mocked.loadCorporationStructures.mockReturnValueOnce(
@@ -590,11 +584,11 @@ describe('the board (AC2, AC5, AC6)', () => {
     );
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp data' }));
-    expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
 
     resolveSecondFetch(cached([]));
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument();
+    expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
   });
 });
 
@@ -608,9 +602,7 @@ describe('an unknown corporation', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
     mocked.loadCorporationId.mockResolvedValue(null);
     renderCorp();
-    await waitFor(() =>
-      expect(screen.getByText('Every structure is fuelled.')).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
   });
 });

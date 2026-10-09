@@ -14,7 +14,7 @@
  * should override this route" (the `/roles` fixture answering `{}` puts
  * every corp capability off).
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import {
   CHARACTER_NAME,
@@ -153,18 +153,20 @@ test.describe('corp ops board — 320px width', () => {
       `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest: ${offenders.join(', ')}`
     ).toBeLessThanOrEqual(clientWidth);
 
-    // Empty cards stay (so "nothing due" differs from "cannot read") but are
-    // one quiet line: shorter than the fuel card holding a single row.
+    // Empty-and-fine cards fold into one "Nothing due" line instead of a card
+    // each: shorter than the fuel card holding a single row, and the folded
+    // kinds are named in it so "nothing due" stays distinguishable (#3142).
     for (const width of [390, 1024, 1280]) {
       await page.setViewportSize({ width, height: 900 });
-      const height = (title: string) =>
-        page
-          .getByRole('heading', { name: title })
-          .locator('xpath=ancestor::section[1]')
-          .evaluate((el) => el.getBoundingClientRect().height);
-      const withRow = await height('Fuel');
-      expect(await height('Moon chunks'), `moons at ${width}`).toBeLessThan(withRow);
-      expect(await height('Structure timers'), `timers at ${width}`).toBeLessThan(withRow);
+      const box = (locator: Locator) => locator.evaluate((el) => el.getBoundingClientRect().height);
+      const withRow = await box(
+        page.getByRole('heading', { name: 'Fuel' }).locator('xpath=ancestor::section[1]')
+      );
+      const summary = page.getByText(/^Nothing due: /);
+      await expect(summary).toContainText('Moon chunks');
+      await expect(summary).toContainText('Structure timers');
+      await expect(page.getByRole('heading', { name: 'Moon chunks' })).toHaveCount(0);
+      expect(await box(summary), `summary at ${width}`).toBeLessThan(withRow);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         `no overflow at ${width}`
