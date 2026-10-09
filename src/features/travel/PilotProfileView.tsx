@@ -53,6 +53,7 @@ interface PilotIdentityProps extends PilotProfileViewProps {
 
 /** Mount it keyed by the character id, so a new pilot never shows the last one's stats. */
 export function PilotProfileView(props: PilotProfileViewProps) {
+  const { t } = useTranslation();
   const { characterId } = props.profile;
   const [stats, setStats] = useState<PilotStatsResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -64,13 +65,17 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   // their losses are read (from the list Recent kills and losses already loads).
   const needsLosses = history.kind === 'ready' && needsLossHistory(history.kills, now);
   const losses = usePilotLossTimes(characterId, needsLosses);
+  // Their losses could not be read or dated: "inactive" would be a guess, so there is no verdict.
+  const lossesUnreadable =
+    needsLosses &&
+    (losses.kind === 'failed' || (losses.kind === 'ready' && losses.timesMs === null));
 
   // The verdict reads the kills and, for a pilot busy enough to be dangerous,
   // the two ratios; until those arrive (or the losses, for a pilot with no
   // recent kill) the badge says it is checking rather than showing a level
   // that could still change.
   const threat = useMemo(() => {
-    if (history.kind !== 'ready') return null;
+    if (history.kind !== 'ready' || lossesUnreadable) return null;
     const verdict = threatVerdict({
       kills: history.kills,
       dangerRatio: pilotStats?.dangerRatio ?? null,
@@ -81,7 +86,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
     const waitingForRatios = stats === null && needsDangerRatio(history.kills, now);
     const waitingForLosses = needsLosses && losses.kind === 'loading';
     return { verdict, pending: waitingForRatios || waitingForLosses };
-  }, [history, pilotStats, stats, losses, needsLosses, now]);
+  }, [history, pilotStats, stats, losses, needsLosses, lossesUnreadable, now]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +115,9 @@ export function PilotProfileView(props: PilotProfileViewProps) {
           gangRatio={pilotStats?.gangRatio ?? null}
           nowMs={now}
         />
+      )}
+      {lossesUnreadable && (
+        <p className="text-xs text-text-dim">{t('travel.pilot.threat.lossesUnknown')}</p>
       )}
       <PilotStandingLine
         characterId={characterId}

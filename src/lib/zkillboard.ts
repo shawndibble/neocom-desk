@@ -319,6 +319,12 @@ type PilotListPath = 'kills' | 'losses';
 
 const pilotListCache = new Map<string, { at: number; body: Promise<unknown[] | null> }>();
 
+/**
+ * Lists kept at once. Each holds up to 200 full killmail bodies, so a long Local
+ * list must not pin them all for the session: the oldest go first.
+ */
+const PILOT_LIST_CACHE_MAX = 120;
+
 /** Test seam: forget every cached pilot's kills and losses. */
 export function resetPilotKillmailsCache(): void {
   pilotListCache.clear();
@@ -347,6 +353,14 @@ function fetchPilotList(characterId: number, path: PilotListPath): Promise<unkno
     })
     .catch(() => null);
   const entry = { at: Date.now(), body };
+  // Expired lists first, then the oldest, until there is room (a Map keeps insertion order).
+  for (const [oldKey, old] of pilotListCache) {
+    if (Date.now() - old.at >= PILOT_STATS_CACHE_MS) pilotListCache.delete(oldKey);
+  }
+  for (const oldKey of pilotListCache.keys()) {
+    if (pilotListCache.size < PILOT_LIST_CACHE_MAX) break;
+    pilotListCache.delete(oldKey);
+  }
   pilotListCache.set(key, entry);
   void body.then((list) => {
     if (list === null && pilotListCache.get(key) === entry) pilotListCache.delete(key);

@@ -215,6 +215,30 @@ describe('PilotLookupPanel', () => {
       ).toBeTruthy();
     });
 
+    it('gives no verdict, and says why, when their losses could not be read', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: false });
+      const heading = await lookUp();
+      expect(
+        await screen.findByText(/recent losses for this pilot could not be read/)
+      ).toBeTruthy();
+      const row = heading.parentElement as HTMLElement;
+      expect(within(row).queryByText('Inactive')).toBeNull();
+      expect(within(row).queryByText('Checking')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
+    });
+
+    it('gives no verdict when a loss has no date, since it might be the recent one', async () => {
+      mocks.fetchPilotKillmails.mockResolvedValue({
+        ok: true,
+        entries: [{ killmailId: 5, hash: 'h', side: 'loss', value: null, detail: null }],
+      });
+      const heading = await lookUp();
+      expect(
+        await screen.findByText(/recent losses for this pilot could not be read/)
+      ).toBeTruthy();
+      expect(within(heading.parentElement as HTMLElement).queryByText('Inactive')).toBeNull();
+    });
+
     it('is inactive when their only losses are older than that', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(200)] });
       const heading = await lookUp();

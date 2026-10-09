@@ -31,10 +31,17 @@ describe('lossTimesMs', () => {
     ]);
   });
 
-  it('leaves out a loss with no body, no time or an unreadable one', () => {
-    expect(
-      lossTimesMs([entry('loss', 'none'), entry('loss', null), entry('loss', 'not a date')])
-    ).toEqual([]);
+  it('is null when any loss has no body, no time or an unreadable one: the losses cannot be told', () => {
+    expect(lossTimesMs([entry('loss', 'none')])).toBeNull();
+    expect(lossTimesMs([entry('loss', null)])).toBeNull();
+    expect(lossTimesMs([entry('loss', 'not a date')])).toBeNull();
+    expect(lossTimesMs([entry('loss', '2026-10-05T00:00:00Z'), entry('loss', 'none')])).toBeNull();
+  });
+
+  it('does not mind a kill with no body, which is not a loss', () => {
+    expect(lossTimesMs([entry('kill', 'none'), entry('loss', '2026-10-05T00:00:00Z')])).toEqual([
+      Date.parse('2026-10-05T00:00:00Z'),
+    ]);
   });
 
   it('is empty for an empty list', () => {

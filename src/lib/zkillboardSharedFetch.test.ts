@@ -72,6 +72,15 @@ describe('one zKillboard request per list, however many readers', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps only a bounded number of lists, dropping the oldest first', async () => {
+    for (let id = 1; id <= 130; id += 1) await fetchPilotKillHistory(id);
+    fetchMock.mockClear();
+    await fetchPilotKillHistory(130);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await fetchPilotKillHistory(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps an answer a mutation by one reader cannot reach another', async () => {
     const first = await fetchPilotKillHistory(PILOT);
     if (!first.ok) throw new Error('expected kills');

@@ -9044,7 +9044,8 @@
           "also": "Also {{space}}",
           "solo": "Mostly solo"
         },
-        "dangerUnknown": "zKillboard's danger ratio could not be read, so this may understate the threat."
+        "dangerUnknown": "zKillboard's danger ratio could not be read, so this may understate the threat.",
+        "lossesUnknown": "zKillboard's recent losses for this pilot could not be read, so there is no Threat reading."
       },
       "activity": {
         "title": "Where they kill",

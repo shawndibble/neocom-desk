@@ -164,13 +164,23 @@ describe('loadPilotList', () => {
       expect(rowThreat(beta, Date.now())).toBe('low');
     });
 
-    it('is inactive when a pilot with no recent kill has no recent loss either, or none could be read', async () => {
+    it('is inactive when a pilot with no recent kill has no recent loss either', async () => {
       mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
-      mocks.fetchPilotKillmails.mockResolvedValueOnce({ ok: true, entries: [] });
-      mocks.fetchPilotKillmails.mockResolvedValueOnce({ ok: false });
-      const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
+      mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
+      const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
       expect(rowThreat(alpha, Date.now())).toBe('inactive');
-      expect(rowThreat(beta, Date.now())).toBe('inactive');
+    });
+
+    it('gives no verdict when the losses of a pilot with no recent kill could not be read or dated', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
+      mocks.fetchPilotKillmails.mockResolvedValueOnce({ ok: false });
+      mocks.fetchPilotKillmails.mockResolvedValueOnce({
+        ok: true,
+        entries: [{ killmailId: 5, hash: 'h', side: 'loss', value: null, detail: null }],
+      });
+      const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
+      expect(rowThreat(alpha, Date.now())).toBeNull();
+      expect(rowThreat(beta, Date.now())).toBeNull();
     });
 
     it('falls back to active when the stats could not be read', async () => {

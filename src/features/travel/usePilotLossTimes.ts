@@ -13,7 +13,8 @@ export type PilotLossTimesState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'failed' }
-  | { kind: 'ready'; timesMs: number[] };
+  /** `timesMs` is null when a loss came without a date, so the losses cannot be told. */
+  | { kind: 'ready'; timesMs: number[] | null };
 
 export function usePilotLossTimes(characterId: number, enabled: boolean): PilotLossTimesState {
   const [answer, setAnswer] = useState<{
