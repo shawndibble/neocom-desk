@@ -187,49 +187,54 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   const killer = killerRatio(stats);
   if (stats.dangerRatio === null && stats.gangRatio === null && killer === null) return null;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {stats.dangerRatio !== null && (
-        <RatioMeter
-          label={t('travel.pilot.dangerMeter')}
-          help={t('travel.pilot.dangerMeterHelp')}
-          low={t('travel.pilot.snuggly')}
-          high={t('travel.pilot.dangerous')}
-          value={stats.dangerRatio}
-          valueText={(v) => t('travel.pilot.dangerousShare', { value: v })}
-        />
-      )}
-      {stats.gangRatio !== null && (
-        <RatioMeter
-          label={t('travel.pilot.gangMeter')}
-          help={t('travel.pilot.gangMeterHelp')}
-          low={t('travel.pilot.solo')}
-          high={t('travel.pilot.gang')}
-          value={stats.gangRatio}
-          valueText={(v) =>
-            v > 50
-              ? t('travel.pilot.gangShare', { value: v })
-              : v < 50
-                ? t('travel.pilot.soloShare', { value: 100 - v })
-                : t('travel.pilot.evenShare')
-          }
-        />
-      )}
-      {killer !== null && (
-        <RatioMeter
-          label={t('travel.pilot.killerMeter')}
-          help={t('travel.pilot.killerMeterHelp')}
-          low={t('travel.pilot.victim')}
-          high={t('travel.pilot.killer')}
-          value={killer}
-          valueText={(v) =>
-            v > 50
-              ? t('travel.pilot.killerShare', { value: v })
-              : v < 50
-                ? t('travel.pilot.victimShare', { value: 100 - v })
-                : t('travel.pilot.evenShare')
-          }
-        />
-      )}
+    // The meters' own container decides: three across once it is about 32rem wide,
+    // one column below that, so a tablet and the Show Info modal both fit and no
+    // meter is left alone on a second row.
+    <div className="@container">
+      <div className="grid gap-3 @lg:grid-cols-3">
+        {stats.dangerRatio !== null && (
+          <RatioMeter
+            label={t('travel.pilot.dangerMeter')}
+            help={t('travel.pilot.dangerMeterHelp')}
+            low={t('travel.pilot.snuggly')}
+            high={t('travel.pilot.dangerous')}
+            value={stats.dangerRatio}
+            valueText={(v) => t('travel.pilot.dangerousShare', { value: v })}
+          />
+        )}
+        {stats.gangRatio !== null && (
+          <RatioMeter
+            label={t('travel.pilot.gangMeter')}
+            help={t('travel.pilot.gangMeterHelp')}
+            low={t('travel.pilot.solo')}
+            high={t('travel.pilot.gang')}
+            value={stats.gangRatio}
+            valueText={(v) =>
+              v > 50
+                ? t('travel.pilot.gangShare', { value: v })
+                : v < 50
+                  ? t('travel.pilot.soloShare', { value: 100 - v })
+                  : t('travel.pilot.evenShare')
+            }
+          />
+        )}
+        {killer !== null && (
+          <RatioMeter
+            label={t('travel.pilot.killerMeter')}
+            help={t('travel.pilot.killerMeterHelp')}
+            low={t('travel.pilot.victim')}
+            high={t('travel.pilot.killer')}
+            value={killer}
+            valueText={(v) =>
+              v > 50
+                ? t('travel.pilot.killerShare', { value: v })
+                : v < 50
+                  ? t('travel.pilot.victimShare', { value: 100 - v })
+                  : t('travel.pilot.evenShare')
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -264,7 +269,7 @@ function RatioMeter({
   const lean = rounded > 50 ? 'high' : rounded < 50 ? 'low' : 'even';
   return (
     <div className="space-y-1.5 rounded-xs border border-line bg-panel-2 px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
         <span className={termClassName}>
           {label}
           <InfoTooltip

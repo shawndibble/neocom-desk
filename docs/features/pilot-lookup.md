@@ -74,13 +74,13 @@ Distinction rests on `publicInfoOrNull`: the cached loader folds "no such charac
 
 Shared with `PublicInfoModal`'s Character tab (`src/components/PublicInfoModal.tsx:40`), which lazy-loads it and owns its own loading/failure; mount keyed by character id.
 
-- Identity: `CharacterAvatar` (lg) + name heading (hidden in the modal via `hideName`); definition list: Corporation (`CorporationLink` -> Show Info; inside the modal a button switching tabs), Alliance (`AllianceLink`, or "No alliance"), Security status (1 decimal, or Unknown), Age ("N years, M days" from birthday, to last anniversary, UTC; Unknown for unreadable/future). External "zKillboard" link to `characterZkillUrl`. 44 px hit area on phone for the corp/alliance links (#2520). Unresolved corp/alliance names show `#id`.
+- Identity: `CharacterAvatar` (lg) + name heading (hidden in the modal via `hideName`); definition list: Corporation (`CorporationLink` -> Show Info; inside the modal a button switching tabs), Alliance (`AllianceLink`, or "No alliance"), Security status (1 decimal, or Unknown), Age ("N years, M days" from birthday, to last anniversary, UTC; Unknown for unreadable/future). External "zKillboard" link to `characterZkillUrl`. corp/alliance links stay text height (they were 44 px hit areas in #2520; the compact header dropped that). Unresolved corp/alliance names show `#id`.
 - Loads `fetchPilotStats` on mount; fits section independent.
 
 ### Stats (`ZkillStatsSection.tsx`)
 
 - Status (`ZkillStatsStatus`): loading ("statsLoading"), failed EmptyState, `no-history` EmptyState (no kill or loss recorded; wording differs for pilot / corporation / alliance). Failed vs no-history are separate answers.
-- Ratio meters (`ZkillRatioMeters`): Danger (Snuggly 0 ... Dangerous 100, always read "N% dangerous"), Gang (Solo 0 ... Gang 100) and Kills vs losses (`killerRatio`: kills / (kills + losses) by ship count, Victim 0 ... Killer 100); `role=meter`; fill and readout coloured by the end it leans to (green low, red high, neutral at 50) and text names the end in words. Three columns from `lg`, two from `sm`, one on a phone. The Corporation and Alliance tabs draw the same meters.
+- Ratio meters (`ZkillRatioMeters`): Danger (Snuggly 0 ... Dangerous 100, always read "N% dangerous"), Gang (Solo 0 ... Gang 100) and Kills vs losses (`killerRatio`: kills / (kills + losses) by ship count, Victim 0 ... Killer 100); `role=meter`; fill and readout coloured by the end it leans to (green low, red high, neutral at 50) and text names the end in words. Three across when their container is about 32rem wide (a tablet, a wide modal), one column below that. The Corporation and Alliance tabs draw the same meters.
 - All-time line (`ZkillStatsSection`): kills (green), losses (red), ISK destroyed and lost (`IskAmount`, compact with exact on hover), solo kills, then "All-time figures as zKillboard states them." The Corporation and Alliance tabs keep `StatTiles`. No ISK efficiency anywhere on a pilot: the danger ratio and the kills meter already are kills against losses.
 - Top ships (`ZkillTopShips`): up to `PILOT_TOP_SHIPS = 5` ranked rows: rank, `TypeIcon`, `ItemInfoLink` name, bar sized vs top hull, kill count. Half width on desktop. Names resolved with `loadTypeNames`. Corporation and Alliance tabs only; a pilot's profile draws `PilotShips` (two columns, no bars).
 - Parts exported for reuse: Corporation and Alliance tabs of Show Info reuse `StatTiles`, `ZkillRatioMeters`, `ZkillTopShips`, `ZkillStatsNote` with `fetchCorporationStats` / `fetchAllianceStats`.
@@ -179,7 +179,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 ## Mobile vs desktop
 
 - Page `max-w-6xl`; search input `w-72 max-w-full`. Stat tiles 6 columns from `md`, 2-3 below; ratio meters side by side, stacked on phone; top ships half width on desktop (`md:w-1/2`).
-- Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links 44 px tall on phone (#2520).
+- Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links stay text height on a phone (they were 44 px tall in #2520; the compact header dropped that).
 - No separate mobile layout for search; `mobileTab: true` puts the page in the phone tab bar's More area.
 
 ## Permissions

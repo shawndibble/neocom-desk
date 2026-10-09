@@ -46,6 +46,14 @@ describe('PilotKillActivity', () => {
     });
   });
 
+  it('puts the kills-per-month toggle above the four space boxes', async () => {
+    renderSection();
+    const section = await screen.findByRole('region', { name: 'Where they kill' });
+    const toggle = within(section).getByRole('button', { name: /Kills per month/ });
+    const tiles = within(section).getByText('Highsec').closest('ul') as HTMLElement;
+    expect(toggle.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('keeps the six-month chart folded until it is asked for', async () => {
     renderSection();
     const section = await screen.findByRole('region', { name: 'Where they kill' });

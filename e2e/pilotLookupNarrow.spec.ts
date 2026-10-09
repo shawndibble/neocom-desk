@@ -4,8 +4,8 @@
  * - A Recent kills and losses row cut the other pilot's name to ~9
  *   characters ("Victim: Aurelianu…"), with nowhere else on the page to read
  *   it: below `sm` the name now takes the row's last line of its own.
- * - The identity header's Corporation and Alliance links, the only way into
- *   those orgs from this page, were 20px targets 2px apart: 44px on a phone.
+ * - The identity header's Corporation and Alliance links were once 44px
+ *   targets; they are text height again, and must not overlap when they wrap.
  *
  * The looked-up pilot is the signed-in fixture character, whose public info,
  * corporation and alliance the shared ESI mock already answers. zKillboard
@@ -21,6 +21,7 @@ import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
+const TABLET = { width: 820, height: 1100 };
 /** A cold dev server can take longer than Playwright's default 5s to serve the route. */
 const COLD_LOAD = { timeout: 15_000 };
 
@@ -61,7 +62,14 @@ const KILL = {
   zkb: { hash: 'e2e-hash', totalValue: 12_500_000 },
 };
 
-const STATS = { shipsDestroyed: 12, shipsLost: 3, iskDestroyed: 4e8, iskLost: 6e7 };
+const STATS = {
+  shipsDestroyed: 12,
+  shipsLost: 3,
+  iskDestroyed: 4e8,
+  iskLost: 6e7,
+  dangerRatio: 62,
+  gangRatio: 90,
+};
 
 async function mockPilot(page: Page) {
   await page.route('https://zkillboard.com/api/**', (route) => {
@@ -108,7 +116,7 @@ function killmailRow(page: Page) {
 }
 
 test.describe('Pilot Lookup at 390px', () => {
-  test('the victim name shows in full and the org links are 44px targets', async ({ page }) => {
+  test('the victim name shows in full and the org links do not overlap', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openPilot(page);
 
@@ -116,15 +124,12 @@ test.describe('Pilot Lookup at 390px', () => {
     const fits = await nameSpan.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
 
-    const corporation = page.getByRole('link', { name: LONG_CORPORATION_NAME });
-    const alliance = page.getByRole('link', { name: ALLIANCE_NAME });
-    const corpBox = await corporation.boundingBox();
-    const allianceBox = await alliance.boundingBox();
+    // The header's links stay text height (DESIGN.md "Touch tier"): they sit on
+    // one line when they fit and wrap onto two when they do not, and either way
+    // neither covers the other.
+    const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
+    const allianceBox = await page.getByRole('link', { name: ALLIANCE_NAME }).boundingBox();
     if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
-    expect(corpBox.height).toBeGreaterThanOrEqual(44);
-    expect(allianceBox.height).toBeGreaterThanOrEqual(44);
-    // The two sit on one line when they fit and wrap onto two when they do not;
-    // either way neither covers the other.
     const apart =
       corpBox.y + corpBox.height <= allianceBox.y || corpBox.x + corpBox.width <= allianceBox.x;
     expect(apart).toBe(true);
@@ -141,5 +146,23 @@ test.describe('Pilot Lookup at 390px', () => {
     expect(rowBox?.height).toBeLessThan(40);
     const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
     expect(corpBox?.height).toBeLessThanOrEqual(24);
+  });
+
+  test('a tablet shows the three meters in one row, a phone stacks them', async ({ page }) => {
+    await page.setViewportSize(TABLET);
+    await openPilot(page);
+    const tops = async () =>
+      Promise.all(
+        ['Danger', 'Fleet size', 'Kills vs losses'].map(async (name) => {
+          const box = await page.getByRole('meter', { name }).boundingBox();
+          if (box === null) throw new Error(`${name} meter not laid out`);
+          return Math.round(box.y);
+        })
+      );
+    expect(new Set(await tops()).size).toBe(1);
+
+    await page.setViewportSize(PHONE);
+    expect(new Set(await tops()).size).toBe(3);
+    await expectNoPageOverflow(page);
   });
 });
