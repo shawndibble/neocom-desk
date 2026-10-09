@@ -131,7 +131,7 @@ test.describe('Fitting Compare control toolbar', () => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page, './ships/fittings/compare');
     await expect(page.getByText(/\d+ m sig · \d+ m\/s/).first()).toBeVisible();
-    expect(await page.locator('body').innerText()).not.toMatch(/bfittings\.\w+\./);
+    expect(await page.locator('body').innerText()).not.toMatch(/\bfittings\.\w+\./);
   });
 
   test('at 1440 the three selects share one row', async ({ page }) => {
