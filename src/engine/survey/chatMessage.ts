@@ -22,7 +22,7 @@ export interface SurveyMessageLabels {
   cleared: string;
 }
 
-/** Longer than any text line in the message, so the bar is its widest line. */
+/** Longer than the usual text line, so the bar is the message's widest line; a long ore name can still pass it, up to MAX_LINE_WIDTH. */
 const BAR_CELLS = 48;
 /**
  * Widest a line of the message may run, in visible characters (`<b>` tags
@@ -138,10 +138,10 @@ function bar(percent: number, finished: boolean): string {
 const MAX_NAMED_ORES = 2;
 
 /**
- * "Left: 5 Scordite · 15 Pyroxeres · 32 other": the two ores
- * richest per m³ (ISK left over m³ left, as the page orders them), each with its rock count, and the rocks of every other
- * ore grouped into one count. `ores` arrives richest first, and fewer
- * than two are named if a longer line would wrap.
+ * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores richest per m³ left
+ * (the order the page lists them in), each with its rock count, and the rocks
+ * of every other ore grouped into one count. `ores` arrives richest first, and
+ * fewer than two are named if a longer line would wrap.
  */
 function oreLine(
   ores: SurveySummary['ores'],

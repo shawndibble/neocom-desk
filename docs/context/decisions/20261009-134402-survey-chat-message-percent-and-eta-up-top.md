@@ -11,3 +11,4 @@ _Recorded 2026-10-09._
   order the page's ore list uses (`sortByValuePerM3`, compressed Jita-style prices), so the
   message and the page agree. It replaces the order by total ISK left. With no ISK, volume
   order stands.
+- **Supersedes the "top three ores, by total ISK left" ordering in the 095750 decision;** its 56-character line limit still stands. A long ore name can make the Left line longer than the bar.
