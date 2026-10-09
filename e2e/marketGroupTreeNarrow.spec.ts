@@ -72,3 +72,30 @@ test('item-finder tree rows keep their dense height at exactly md (768px)', asyn
   expect(await heightOf(page, 'Minerals')).toBe(24);
   expect(await heightOf(page, 'Tritanium')).toBe(24);
 });
+
+/**
+ * Issue #3136: a broad search lists its top-level categories with counts, so a
+ * pilot looking for a ship sees the category list first rather than a column
+ * of skins and modules. Invariants, not pixels: headers sit in the first
+ * viewport, nothing overflows sideways.
+ */
+for (const viewport of [PHONE, DESKTOP]) {
+  test(`a broad search shows category headers in the first viewport at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './market');
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Caldari');
+
+    const headers = page.getByRole('button', { name: /^.+ · \d+$/ });
+    await expect(headers.first()).toBeVisible();
+    const box = await headers.first().boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
