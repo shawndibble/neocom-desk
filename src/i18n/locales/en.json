@@ -4144,7 +4144,7 @@
     "settleUpContractIdLabel": "Contract id",
     "settleUpContractIdPlaceholder": "Optional",
     "balancesLabel": "You owe",
-    "balancesNothing": "Nothing outstanding",
+    "balancesNothing": "No moon mining tax outstanding",
     "settleUpAction": "Settle up…",
     "filterToPayee": "Show only {{payee}}'s entries",
     "unassignedCardTitle": "Unassigned",

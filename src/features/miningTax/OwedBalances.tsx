@@ -115,26 +115,26 @@ export function OwedBalances({
   );
 
   return (
-    <section aria-label={t('miningTax.balancesLabel')} className="space-y-2">
+    <section
+      aria-label={t(owed.length === 0 ? 'miningTax.balancesNothing' : 'miningTax.balancesLabel')}
+      className="space-y-2"
+    >
       {/* One owed Payee: the single card already carries the name and the
           same amount, so the summary would only repeat it (issue #3065). */}
-      {owed.length !== 1 && (
+      {owed.length === 0 && (
+        <p className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</p>
+      )}
+      {owed.length > 1 && (
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-[0.6875rem] font-semibold text-text-dim">
             {t('miningTax.balancesLabel')}
           </span>
-          {owed.length > 1 ? (
-            <>
-              <span className="text-base font-semibold text-isk-neg tabular-nums">
-                {formatIsk(owedTotal)} ISK
-              </span>
-              <span className="text-xs text-text-dim">
-                {t('miningTax.owed.acrossPayees', { count: owed.length })}
-              </span>
-            </>
-          ) : (
-            <span className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</span>
-          )}
+          <span className="text-base font-semibold text-isk-neg tabular-nums">
+            {formatIsk(owedTotal)} ISK
+          </span>
+          <span className="text-xs text-text-dim">
+            {t('miningTax.owed.acrossPayees', { count: owed.length })}
+          </span>
         </p>
       )}
 

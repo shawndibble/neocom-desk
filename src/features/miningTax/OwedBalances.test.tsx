@@ -50,8 +50,10 @@ describe('OwedBalances summary line', () => {
 
   it('says nothing is outstanding when no Payee is owed', () => {
     renderBalances([balance('a', 0)]);
-    expect(screen.getByText('You owe')).toBeInTheDocument();
-    expect(screen.getByText('Nothing outstanding')).toBeInTheDocument();
+    expect(screen.queryByText('You owe')).not.toBeInTheDocument();
+    const line = screen.getByText('No moon mining tax outstanding');
+    expect(line).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: line.textContent ?? '' })).toBeInTheDocument();
   });
 });
 
