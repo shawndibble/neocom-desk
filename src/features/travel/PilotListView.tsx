@@ -16,10 +16,10 @@ import {
   Button,
   DataTable,
   EmptyState,
+  IconButton,
   Panel,
   Spinner,
   TextInput,
-  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -532,24 +532,24 @@ export function DscanShareControl({
         : share.status === 'copied'
           ? t('travel.pilot.dscan.shareCopied')
           : undefined;
+  // Icon only on a phone; the label shows beside it from `md` up (DESIGN.md §6c Header controls).
+  // The bubble says what is happening or what failed; at rest it says what the button does.
   const button = (
-    <Button
-      size="sm"
+    <IconButton
+      icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+      label={t('travel.pilot.dscan.share')}
+      tooltip={tooltip}
+      visibleLabel={t('travel.pilot.dscan.share')}
       disabled={
         characterId === null || !isSyncConfigured() || !snapshot.ok || share.status === 'saving'
       }
       onClick={() => void handleShare()}
-    >
-      <span className="inline-flex items-center gap-1.5">
-        {share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-        {t('travel.pilot.dscan.share')}
-      </span>
-    </Button>
+    />
   );
 
   return (
     <>
-      {tooltip === undefined ? button : <Tooltip content={tooltip}>{button}</Tooltip>}
+      {button}
       {share.status === 'manual' && (
         <div className="flex w-full min-w-72 max-w-full items-center gap-2">
           <label
