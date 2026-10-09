@@ -103,9 +103,10 @@ export function ReloadPrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
-      if (!registration || pollingRegistrations.has(registration)) return;
-      pollingRegistrations.add(registration);
+      if (!registration) return;
       registrationRef.current = registration;
+      if (pollingRegistrations.has(registration)) return;
+      pollingRegistrations.add(registration);
       setInterval(() => void checkForUpdate(registration), UPDATE_CHECK_INTERVAL_MS);
     },
     onNeedReload: coverViewportAndReload,
@@ -143,15 +144,15 @@ export function ReloadPrompt() {
   // for a page change), since a frozen mobile PWA's interval never ran.
   useEffect(() => {
     let lastCheck = Date.now();
-    const onVisible = () => {
+    const onVisibilityChange = () => {
       const registration = registrationRef.current;
       if (document.hidden || !registration) return;
       if (Date.now() - lastCheck < RESUME_CHECK_MIN_GAP_MS) return;
       lastCheck = Date.now();
       void checkForUpdate(registration);
     };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, []);
 
   // The only place a running tab reloads for an update: the next in-app route
