@@ -66,17 +66,17 @@ export function DangerAnswer({
   read,
   names,
   age,
-  shipName,
-  children,
+  shipControl,
+  notes,
 }: {
   read: DangerReadData;
   names: ReadonlyMap<number, string>;
   /** Null for a Shared D-Scan: nobody knows when it was taken. */
   age: ScanAge | null;
-  /** The pilot's ship, or null when it is not set. */
-  shipName: string | null;
-  /** The ship picker, placed in the card's footer. */
-  children?: ReactNode;
+  /** "Your ship" as an editable line of text, beside the level. */
+  shipControl: ReactNode;
+  /** Anything the card should say beneath the read, such as the Grant note. */
+  notes?: ReactNode;
 }) {
   const { t } = useTranslation();
   const hl = read.headline;
@@ -165,9 +165,7 @@ export function DangerAnswer({
           })()}
           {t(`${P}level.${read.level}`)}
         </span>
-        <span className="text-sm text-text-dim">
-          {shipName === null ? t(`${P}readForUnknown`) : t(`${P}readFor`, { ship: shipName })}
-        </span>
+        {shipControl}
       </div>
       <h3 className="mt-2 text-xl leading-tight font-semibold text-balance text-text sm:text-2xl">
         {headline}
@@ -178,7 +176,7 @@ export function DangerAnswer({
           <StatusMark tone={age?.stale ? 'warn' : 'ok'}>{ageLine}</StatusMark>
         </p>
       )}
-      {children !== undefined && <div className="mt-3 border-t border-line pt-3">{children}</div>}
+      {notes ? <div className="mt-3 max-w-md">{notes}</div> : null}
     </section>
   );
 }

@@ -200,24 +200,24 @@ export function FleetBoard({
             read={answer}
             names={names}
             age={trackHistory ? scanAge(Math.max(0, now - loaded.at)) : null}
-            shipName={shipName}
-          >
-            <div className="max-w-md space-y-3">
+            shipControl={
               <OwnShipPicker
                 typeId={manual.typeId}
                 autoTypeId={current.typeId}
                 onChange={manual.setTypeId}
               />
-              {manual.typeId === null && (
+            }
+            notes={
+              manual.typeId === null ? (
                 <GrantNote
                   endpoints={['getCharacterShip']}
                   title={t('travel.pilot.dscan.danger.grant.title')}
                   hint={t('travel.pilot.dscan.danger.grant.hint')}
                   actionLabel={t('travel.pilot.dscan.danger.grant.action')}
                 />
-              )}
-            </div>
-          </DangerAnswer>
+              ) : undefined
+            }
+          />
           {answer.promoteRoles && roleShare}
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <WatchCard
