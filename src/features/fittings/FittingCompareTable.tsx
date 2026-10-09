@@ -6,6 +6,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
+import { Tooltip } from '@/components/ui';
 import type { CompareRow } from '@/engine/fittings/fittingCompare';
 import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
@@ -106,10 +107,11 @@ export function FittingCompareTable({
             {columns.map((column) => (
               <th
                 key={column.index}
-                title={column.name}
-                className="sticky top-0 z-10 truncate border-b border-line bg-panel p-2 text-right font-medium text-text"
+                className="sticky top-0 z-10 border-b border-line bg-panel p-2 text-right font-medium text-text"
               >
-                {column.name}
+                <Tooltip content={column.name}>
+                  <span className="block truncate">{column.name}</span>
+                </Tooltip>
               </th>
             ))}
           </tr>

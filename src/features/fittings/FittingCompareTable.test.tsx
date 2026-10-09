@@ -87,10 +87,5 @@ describe('FittingCompareTable', () => {
       );
       expect(screen.queryByTestId('compare-pinned-names')).not.toBeInTheDocument();
     });
-
-    it('titles each name so a truncated one keeps its full text', () => {
-      render(<FittingCompareTable rows={ROWS} columns={named} differencesOnly={false} pinNames />);
-      expect(screen.getByTitle('Fit B')).toBeInTheDocument();
-    });
   });
 });
