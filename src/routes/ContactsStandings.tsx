@@ -132,7 +132,8 @@ export function ContactsStandings({
       {
         id: 'fees',
         header: t('contacts.standingsUsedForFees'),
-        render: (row) => (row.usedForFees ? t('contacts.standingsUsedForFeesYes') : null),
+        render: (row) =>
+          row.usedForFees ? t('contacts.standingsUsedForFeesYes') : <span data-dense-omit />,
         sortValue: (row) => (row.usedForFees ? 1 : 0),
       },
     ],
