@@ -27,16 +27,15 @@ import { tabPath } from '../src/lib/pageTabs';
 /**
  * Concrete URL for a route whose path carries a dynamic segment. The id need
  * not resolve to anything real: `SkillPlanEditor`/`IndustryGroupPage` redirect
- * a genuinely-missing id to their list route rather than erroring, and the two
- * `/assets`-shaped splats render the exact same `ScopeGate`-replaced component
- * as their non-splat base regardless of the segment (routeScopes.ts).
+ * a genuinely-missing id to their list route rather than erroring, and the
+ * `/corp/assets` splat renders the exact same `ScopeGate`-replaced component
+ * as its non-splat base regardless of the segment (routeScopes.ts).
  */
 const CONCRETE_PATH: Partial<Record<AppRoutePath, string>> = {
   '/skills/plans/:planId': '/skills/plans/e2e-missing-plan',
   '/industry/plans/:planId': '/industry/plans/e2e-missing-plan',
   '/industry/groups/:groupId': '/industry/groups/e2e-missing-group',
   '/market/lp-store/:corporationId': `/market/lp-store/${CORPORATION_ID}`,
-  '/assets/*': '/assets/e2e-missing-location',
   '/corp/assets/*': '/corp/assets/e2e-missing-location',
 };
 

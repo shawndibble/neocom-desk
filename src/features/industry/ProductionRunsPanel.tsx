@@ -252,11 +252,11 @@ export function ProductionRunsPanel({
       <CollapsiblePanel
         title={t('industry.productionRuns')}
         wrapMeta
+        metaOwnRow
         meta={
-          // Its own line under the title on a phone (the title stays whole
-          // beside the header controls); nothing at all when there is
-          // neither a summary nor an unlogged-delivery chip to say.
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:basis-full empty:hidden">
+          // Its own full-width row under the title and controls on a phone; nothing at all when there
+          // is neither a summary nor an unlogged-delivery chip to say.
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 max-md:order-last max-md:basis-full empty:hidden">
             {rollup.count > 0 && (
               <span className="text-xs tabular-nums text-text-dim">{runsSummary}</span>
             )}

@@ -845,8 +845,8 @@ route ad hoc.
   area, so any movement reads as the whole app sliding rather than a page turn.
 - **Animate the element; never re-key the outlet to replay a CSS animation.**
   Restarting a CSS animation requires a new element, and six `ROUTE_ELEMENTS`
-  entries in `app/App.tsx` match more than one pathname (`/assets/*`,
-  `/corp/assets/*`, and the four `:param` routes). React Router keeps one
+  entries in `app/App.tsx` match more than one pathname (`/corp/assets/*`,
+  the tabbed pages' `<path>/*` splats, and the four `:param` routes). React Router keeps one
   component instance across those, so a `key` would throw away Assets' search,
   filters and selection on every drill-down and re-run its loader — churn far
   worse than the fade is worth.

@@ -54,6 +54,13 @@ vi.mock('@/sde/loadSde', () => ({
   loadCompressedOreTypeIds: vi.fn(async () => ({})),
 }));
 
+// The Move tab reads hull capacities from the Fitting catalogue and the pilot's
+// skills; its own tests (MovePlanTab.test.tsx) cover that, this file only opens the tab.
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({ useFittingCatalogue: () => null }));
+vi.mock('@/features/fittings/fittingPilotProfile', () => ({
+  usePilotProfile: () => ({ profile: null, failed: false, retry: () => {} }),
+}));
+
 // Only reached by the "View in Market" navigation test below: Market Browser
 // lazy-loads its own SDE payloads on mount, which this file otherwise never
 // touches. Empty catalogues are enough to mount it without an unhandled fetch.
@@ -258,8 +265,53 @@ describe('Assets', () => {
     expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
 
     await user.click(tools);
-    expect(await screen.findByRole('menuitem', { name: /^My ships.*nearest first/ })).toBeVisible();
     expect(await screen.findByRole('menuitem', { name: /^Refresh/ })).toBeEnabled();
+    // My ships and Plan a move are the Ships and Move tabs now, not menu items.
+    expect(screen.queryByRole('menuitem', { name: /^My ships/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /^Plan a move/ })).not.toBeInTheDocument();
+  });
+
+  it('has Items, Ships and Move tabs, opening on Items', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/assets/items');
+    const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(tabs).toEqual(expect.arrayContaining(['Items', 'Ships', 'Move']));
+    expect(screen.getByRole('tab', { name: 'Items' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('tab', { name: 'Move' }));
+    expect(window.location.pathname).toBe('/assets/move');
+    expect(await screen.findByRole('region', { name: 'Plan a move' })).toBeVisible();
+    // Item-only controls and the Tools menu stay on the Items tab.
+    expect(screen.queryByRole('searchbox', { name: /search items/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Tools' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the query string when switching tabs', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/items?chars=current&min=5');
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Ships' }));
+    expect(window.location.pathname).toBe('/assets/ships');
+    expect(window.location.search).toBe('?chars=current&min=5');
+  });
+
+  it('moves a pre-tabs drill-down link under the Items tab', async () => {
+    window.history.replaceState({}, '', '/assets/60003760?min=5');
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/assets/items/60003760');
+    expect(window.location.search).toBe('?min=5');
+  });
+
+  it('opens a pre-tabs ?view=ships link on the Ships tab', async () => {
+    window.history.replaceState({}, '', '/assets?view=ships');
+    render(<App />);
+    expect(await screen.findByRole('region', { name: 'My ships' })).toBeVisible();
+    expect(window.location.pathname).toBe('/assets/ships');
+    expect(window.location.search).toBe('');
   });
 
   it('heads the two toggles with a View caption and separates them from the actions (#3087)', async () => {
@@ -274,13 +326,13 @@ describe('Assets', () => {
     const allItems = within(menu).getByRole('menuitemcheckbox', { name: 'All items' });
     const select = within(menu).getByRole('menuitemcheckbox', { name: 'Select' });
     const separator = within(menu).getAllByRole('separator')[0];
-    const myShips = within(menu).getByRole('menuitem', { name: /^My ships/ });
+    const refresh = within(menu).getByRole('menuitem', { name: /^Refresh/ });
     const before = (a: Element, b: Element) =>
       Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(before(caption, allItems)).toBe(true);
     expect(before(allItems, select)).toBe(true);
     expect(before(select, separator)).toBe(true);
-    expect(before(separator, myShips)).toBe(true);
+    expect(before(separator, refresh)).toBe(true);
 
     expect(allItems).toHaveAttribute('aria-checked', 'false');
     await user.click(allItems);
@@ -801,7 +853,7 @@ describe('Assets', () => {
   it('reports an unresolved bookmark rather than silently landing on the root', async () => {
     // A stale bookmark into a container that no longer has that item —
     // navigated straight to, not reached via in-app links.
-    window.history.pushState({}, '', '/assets/60003760/i:999');
+    window.history.pushState({}, '', '/assets/items/60003760/i:999');
     const user = userEvent.setup();
     render(<App />);
     expect(await screen.findByText('This location is gone')).toBeInTheDocument();
@@ -1373,17 +1425,16 @@ describe('cross-character search (issue #85)', () => {
 
     async function openMyShips(user: ReturnType<typeof userEvent.setup>) {
       await screen.findByText(JITA);
-      await user.click(screen.getByRole('button', { name: 'Tools' }));
-      await user.click(await screen.findByRole('menuitem', { name: /^My ships/ }));
-      return screen.findByRole('dialog', { name: 'My ships' });
+      await user.click(screen.getByRole('tab', { name: 'Ships' }));
+      return screen.findByRole('region', { name: 'My ships' });
     }
 
-    it('opens from the Tools menu, backed by ?view=ships, and lists only the filtered characters’ ships', async () => {
+    it('opens from the Ships tab and lists only the filtered characters’ ships', async () => {
       const user = userEvent.setup();
       render(<App />);
       const panel = await openMyShips(user);
 
-      expect(window.location.search).toContain('view=ships');
+      expect(window.location.pathname).toBe('/assets/ships');
       expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
       expect(
         within(panel)
@@ -1393,13 +1444,13 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
     });
 
-    it('widens to every character from the panel’s own filter', async () => {
+    it('widens to every character from the page’s Character filter', async () => {
       const user = userEvent.setup();
       render(<App />);
       const panel = await openMyShips(user);
       await within(panel).findByText('Rifter');
 
-      await user.click(within(panel).getByRole('button', { name: 'This character' }));
+      await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       await waitFor(() =>
@@ -1446,8 +1497,7 @@ describe('cross-character search (issue #85)', () => {
       const panel = await openMyShips(user);
 
       const row = (await within(panel).findAllByRole('row')).find((r) => r.tagName === 'A');
-      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/60003760'));
-      expect(row).not.toHaveAttribute('href', expect.stringContaining('view=ships'));
+      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
       expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
     });
 
@@ -1715,7 +1765,7 @@ describe('jumps-away distance (issue #87)', () => {
     it('puts security · ISK · jumps on a second line, jumps opening the route', async () => {
       const matchMedia = phoneViewport();
       try {
-        window.history.pushState({}, '', '/assets/60003760');
+        window.history.pushState({}, '', '/assets/items/60003760');
         render(<App />);
 
         const jumps = await screen.findByRole('button', { name: '0 jumps' });
@@ -1737,7 +1787,7 @@ describe('jumps-away distance (issue #87)', () => {
     });
 
     it('leaves desktop with the security and jumps cluster beside the heading', async () => {
-      window.history.pushState({}, '', '/assets/60003760');
+      window.history.pushState({}, '', '/assets/items/60003760');
       render(<App />);
 
       const jumps = await screen.findByRole('button', { name: '0 jumps' });
@@ -2143,23 +2193,23 @@ describe('view state in the URL (issue #1306)', () => {
 
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/assets/60003760');
+    expect(window.location.pathname).toBe('/assets/items/60003760');
     expect(window.location.search).toBe('?min=5');
 
     await goBack(user);
     await screen.findByText(STRUCTURE);
-    expect(window.location.pathname).toBe('/assets');
+    expect(window.location.pathname).toBe('/assets/items');
     expect(window.location.search).toBe('?min=5');
   });
 
   it('opens a drilled-in path with a query already on it', async () => {
-    window.history.replaceState({}, '', '/assets/60003760?q=pyerite');
+    window.history.replaceState({}, '', '/assets/items/60003760?q=pyerite');
     render(<App />);
 
     // Search wins over browsing, as it does when typed.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(window.location.pathname).toBe('/assets/60003760');
+    expect(window.location.pathname).toBe('/assets/items/60003760');
   });
 
   it('uses the synced default character filter when the URL has none, without writing it to the URL', async () => {

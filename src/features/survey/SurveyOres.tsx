@@ -11,7 +11,14 @@ import { oreValueTiers } from '@/engine/survey/valueTier';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { VALUE_TIER_COLORS, VALUE_TIER_ORDER } from './surveyTones';
 
-export function SurveyOres({ summary }: { summary: SurveySummary }) {
+export function SurveyOres({
+  summary,
+  priceNote,
+}: {
+  summary: SurveySummary;
+  /** Where the ISK figures come from: the market hub's system, and the ore form priced. */
+  priceNote: { hub: string; compressed: boolean };
+}) {
   const { t } = useTranslation();
   const tiers = oreValueTiers(summary.ores);
   const hasIsk = summary.iskLeft !== null;
@@ -68,7 +75,12 @@ export function SurveyOres({ summary }: { summary: SurveySummary }) {
         </ul>
         {hasIsk && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-dim">
-            <span>{t('survey.valueRamp')}</span>
+            <span>
+              {t('survey.valueRamp', {
+                hub: priceNote.hub,
+                form: t(priceNote.compressed ? 'survey.formCompressed' : 'survey.formRaw'),
+              })}
+            </span>
             <span className="flex items-center gap-1" aria-hidden="true">
               {t('survey.valueLow')}
               {VALUE_TIER_ORDER.map((tier) => (

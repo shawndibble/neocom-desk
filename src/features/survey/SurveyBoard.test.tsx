@@ -10,6 +10,19 @@ import { SurveyBoard } from './SurveyBoard';
 
 // Recharts needs a real layout; the chart has its own concerns.
 vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: vi.fn(() => false) }));
+// Rocks are valued at market; the hook's own lookup has its own concerns.
+vi.mock('./useOrePrices', () => ({
+  useOrePrices: () => ({
+    prices: new Map([
+      ['Clear Icicle', 200_000],
+      ['Scordite', 1],
+      ['Veldspar', 1],
+      ['Pyroxeres', 1],
+    ]),
+    hub: { id: 'jita', name: 'Jita IV - Moon 4', systemName: 'Jita' },
+    compressed: true,
+  }),
+}));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
 const FIRST = [
@@ -58,9 +71,9 @@ describe('SurveyBoard', () => {
     expect(screen.getByText('43.3 m³/s')).toBeTruthy();
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
-    // The scanner's own ISK column, summed.
+    // 169 units left at the market price, summed (the scanner's own ISK is ignored).
     // The figure is an `IskAmount`: shorthand on screen, the exact value one hover away.
-    expect(screen.getByText('ISK left').parentElement?.textContent).toMatch(/34\.\d+M/);
+    expect(screen.getByText('ISK left').parentElement?.textContent).toMatch(/33\.\d+M/);
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
@@ -129,7 +142,8 @@ describe('SurveyBoard', () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
   describe('value colours and layout', () => {
-    const row = (ore: string, volume: number, isk: number) => ({ ore, volume, isk });
+    // Priced at 1 ISK a unit by the mocked market, so units are the ISK.
+    const row = (ore: string, volume: number, units: number) => ({ ore, volume, units });
     // ISK per m3: Scordite 108, Veldspar 93, Pyroxeres 77, so orange, yellow and blue against the richest.
     const richScans = [
       {
@@ -153,7 +167,7 @@ describe('SurveyBoard', () => {
       expect(tierOf('Scordite')).toBe('orange');
       expect(tierOf('Veldspar')).toBe('yellow');
       expect(tierOf('Pyroxeres')).toBe('blue');
-      expect(screen.getByText('Bar colour is ISK per m³ left')).toBeTruthy();
+      expect(screen.getByText('Bar colour is ISK per m³ left · Jita buy, compressed')).toBeTruthy();
       // Colour is never the only signal: each row also says its tier in words for a screen reader.
       expect(screen.getByText(/highest value per m³/)).toBeTruthy();
       expect(screen.getByText(/low value per m³/)).toBeTruthy();

@@ -1,6 +1,6 @@
 # Assets — feature inventory
 
-Route `/assets` and `/assets/:stationId/*` (`src/routes/Assets.tsx`, 2.2k lines). Economy nav group, mobile tab (`src/app/navDestinations.ts:205`). Not a tabbed page (not in `PAGE_TABS`): depth is drill-down in the URL path. Read-only, cached for offline. Terms per `CONTEXT.md`: **Quickbar**, **Compare Set**, **Station Pin**, **Jump Basis**, **BPO/BPC**, **Character filter**.
+Route `/assets/*` (`src/routes/Assets.tsx`): tabs Items (`/assets/items`, drill-down `/assets/items/:stationId/*`), Ships (`/assets/ships`, `features/character/MyShipsView.tsx`) and Move (`/assets/move`, `features/assets/MovePlanTab.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:205`). A tabbed page (`ASSETS_TABS`, Items is `deep`): depth is drill-down in the URL path below Items. Old `/assets/<id>/…` and `/assets?view=ships` redirect via `legacyAssetsLocation`. Read-only, cached for offline. Terms per `CONTEXT.md`: **Quickbar**, **Compare Set**, **Station Pin**, **Jump Basis**, **BPO/BPC**, **Character filter**.
 
 Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row components and tree engine; pointer only, see end.
 
@@ -9,7 +9,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 | Feature                                                    | Where                                       | Notes                                                                                                                                                                                          |
 | ---------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Location list (root `/assets`)                             | `Assets.tsx:1118-1190`                      | one row per location; pinned first, unresolved last                                                                                                                                            |
-| Drill-down (`/assets/<locationId>/<seg>/…`)                | `engine/assetPath.ts`                       | station → ship/container/bay → items; Back + breadcrumb                                                                                                                                        |
+| Drill-down (`/assets/items/<locationId>/<seg>/…`)          | `engine/assetPath.ts`                       | station → ship/container/bay → items; Back + breadcrumb                                                                                                                                        |
 | Search (`?q=`)                                             | `Assets.tsx:683`                            | name substring, flattens to result list, across all locations                                                                                                                                  |
 | "All items" flat view (`?all=1`)                           | `Assets.tsx:1627`                           | every item, sortable, no drill-down                                                                                                                                                            |
 | Min-value filter (`?min=`)                                 | `Assets.tsx:1742-1750`                      | flat views only; ISK shorthand accepted                                                                                                                                                        |
@@ -28,12 +28,12 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 | Open in Fittings                                           | `Assets.tsx:1841-1855`                      | shown on a ship level                                                                                                                                                                          |
 | CSV/XLSX/copy export                                       | `assetsCsv.ts`                              | active Character, search-matched only                                                                                                                                                          |
 | Re-login, offline, truncated, stale-link states            | `Assets.tsx:1691-1722,1939`                 |                                                                                                                                                                                                |
-| Command Palette "Assets" group                             | `features/commandPalette/assetsProvider.ts` | item → `/assets?q=`                                                                                                                                                                            |
+| Command Palette "Assets" group                             | `features/commandPalette/assetsProvider.ts` | item → `/assets/items?q=`                                                                                                                                                                      |
 
 ## Route, nav, gating
 
 - Nav: `/assets`, `group: 'economy'`, `gating: 'scope'`, `mobileTab: true`.
-- `/assets` and `/assets/*` gate on a scope bundle (`src/app/routeScopes.ts:178,193`): `getCharacterAssets`, `getUniverseStation`, `getUniverseSystem`, `postUniverseNames`, `getUniverseType`, `getUniverseGroup` with `strings: 'assets'`. `getCharacterLocation` is deliberately not required (jumps degrade).
+- `/assets` (and every tab below it) gates on a scope bundle (`src/app/routeScopes.ts`): `getCharacterAssets`, `getUniverseStation`, `getUniverseSystem`, `postUniverseNames`, `getUniverseType`, `getUniverseGroup` with `strings: 'assets'`. `getCharacterLocation` is deliberately not required (jumps degrade).
 - Redirect: no active Character → `/characters` (`Assets.tsx:1565`).
 - Back: browser Back steps up one level (path is state). Level heading receives focus on drill/back (`useFocusHeading`, issue #1485). List scroll resets to top on level change.
 - URL query kept across every drill-down link (`assetHref`).
@@ -66,7 +66,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row compone
 `PageHeader` title "Assets":
 
 - Meta: `DataAgeBadge` (assets fetch), the Character filter control (`CharacterFilterControl`, size md; hidden for one-Character accounts), small spinner "Searching other characters…" while cross-character data loads.
-- Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Select, My ships (hint "nearest first"), **Plan a move…** (opens `MovePlanModal`: tick items per Character and pickup, pick any system or one of your stations, get totals, a suggested hauler and a Route Safety link per pickup), **Refresh** (with the data's age) and Export table ▸.
+- Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Select, **Refresh** (with the data's age) and Export table ▸ — Items tab only. **Plan a move** is the Move tab (`MovePlanTab`: tick items per Character and pickup, pick any system or one of your stations, get totals, a suggested hauler and a Route Safety link per pickup).
 - Below: `SearchInput` "Search items…" — only shown when assets are loaded and no re-login needed. Debounced 250 ms for matching; input stays instant.
 - Select-mode bar (when on) between search and list.
 - List panel fills the viewport height (`h-[calc(100dvh-…)]`); only the list scrolls (virtualized with TanStack Virtual, overscan 10, measured heights because rows wrap on phones).
@@ -89,7 +89,7 @@ Location labels (`locationLabel`): station name; structure name or "Structure #i
 
 ## Drill-down
 
-Path `/assets/<locationId>/<seg>/<seg>…`, segments `i:<item_id>` or `b:<bay>` (`assetNodeSegment`). Stable across re-sorts and refetch.
+Path `/assets/items/<locationId>/<seg>/<seg>…`, segments `i:<item_id>` or `b:<bay>` (`assetNodeSegment`). Stable across re-sorts and refetch.
 
 - Level header: Back `IconButton` ("Back one level"), `h2` current name (sr-only item count suffix), breadcrumb of ancestor links (`›` separated), on a location: security + jumps-away, and on any non-leaf: "N items · ISK" aggregate. Ship level adds **Open in Fittings** button (`assetShipEditLocation`: builds a Fitting Share Code from the ship as it sits, slots/charges/drones/fighters/cargo; null if too large).
 - Rows by node kind:
@@ -163,7 +163,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 
 ## Related
 
-- Command Palette: "Assets" group lists every owned type once (summed across Characters, cache-only, no request) → `/assets?q=<name>` (adds `chars=all` if an alt holds it, `assetsProvider.ts:78`).
+- Command Palette: "Assets" group lists every owned type once (summed across Characters, cache-only, no request) → `/assets/items?q=<name>` (adds `chars=all` if an alt holds it, `assetsProvider.ts:78`).
 - Industry Build Plans read all Characters' assets for owned stock (`loadAllCharactersAssets`, `assets.ts`); Fittings reads asset ships.
 - Corp assets `/corp/assets` (`routes/CorpAssets.tsx`, `engine/corp/assetDivisions.ts`): division-first; `LocationRow` hides pin there (`showPin`). Pointer only.
 
@@ -184,7 +184,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 
 | State                                          | Where                                                                                              | Synced                                                                                   |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Drill path                                     | URL `/assets/<id>/<seg>…`                                                                          | no                                                                                       |
+| Drill path                                     | URL `/assets/items/<id>/<seg>…`                                                                    | no                                                                                       |
 | Search, All items, min value, Character filter | `?q`, `?all`, `?min`, `?chars` (ADR `docs/adr/0015-tab-is-a-path-segment-url-holds-view-state.md`) | no                                                                                       |
 | Location sort                                  | device-local `assetsStationSort`                                                                   | no                                                                                       |
 | Item (flat) sort                               | device-local `assetsItemSort`                                                                      | no                                                                                       |

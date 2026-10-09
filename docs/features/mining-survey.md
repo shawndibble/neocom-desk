@@ -20,6 +20,7 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 ## Behaviour
 
 - A Survey Scanner copy is one row per rock, `ore  units  volume m3  ISK  distance`, tab separated (runs of spaces also read), with an ore-name header line above each group. The scanner prints a header for every grade even when it has no rocks, so a bare line is a header when a row of the same ore follows, or when it names a grade or an ore the scan has rows for and another bare line or the end follows. A bare line anywhere else, or a header with no rows at all, is not a scan. Anything else is not a scan: the parser needs every line to be one.
+- The public page uses the share frame: brand and login at the top, the `<h1>` "Mining Survey" once, and the board's panel titled "Field progress" (`SurveyBoard`'s `panelTitle`; the tab leaves it unset).
 - Ctrl+V anywhere in the app with a scan on the clipboard goes to this tab (`survey` is the first paste detector, strict enough that no item list or fit matches). The first scan starts a Survey (a `survey` Share Link); later ones add to it. The paste box has no button: anything pasted into it is processed at once, and text that is not a scan says so. The text is checked before anything is sent, so a wrong paste never starts a survey. A write the server refuses (permission-denied, for example while the rules are not deployed) says "The server refused this scan" instead of the generic save error.
 - Progress is volume mined of everything the scans have shown. Rocks are matched between scans by ore, biggest first, each taking the smallest earlier rock at least as big. A rock that shrank or vanished was mined; a rock never seen before extends the field. The scanner's range is far, so a rock drifting out of range is not handled.
 - Each ore is shown against what the scans first showed of it (plus any that came into range), as a percent left; an ore mined out stays on the list at 0%. A scan whose rocks match any earlier scan is ignored, even with a newer scan in between: mining only removes ore, so the same rocks can't be a later state. ISK left is the scanner's own ISK column summed over the latest scan.
@@ -28,7 +29,7 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - The chat message's "Left:" line names the three ores with the most ISK left (the scanner's own ISK column), each with its rock count, and groups the rocks of every other ore as "N other". The page's ore list follows the same order; each bar is coloured gray, blue, yellow or orange by ISK per m³ left against the richest ore (`valueTier.ts`; DESIGN.md "Ore value ramp"), with the ISK and percent printed beside it.
 - Layout follows the chart-led mockup: a paste bar above the panel, then the percent, the chart legend, the two charts, large stat tiles, and the ore list. On a phone the Copy chat message button sits full width under the chart instead of in the panel header.
 - Your share (Survey tab only): under the stats, how many m³ of the survey's ores the viewer's mining ledger shows in one system on the survey's UTC day(s), and the percent of what the survey says has been mined. The system is the Character's current one unless they type another; it is a device-local setting. The ledger has no times, so it is a running total, and the line is hidden when there is no ledger (the ledger is read before the system is asked for, so a pilot without the mining grant is never prompted to name one). Escape closes the system field.
-- Anyone with the link can add a scan with no sign-in; the page re-reads every 20 s while visible.
+- Anyone with the link can add a scan with no sign-in; the page re-reads every 60 s while visible.
 
 ## Persistence and sync
 
@@ -47,3 +48,9 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - A genuinely older scan that was never pasted before is read as the newest, because a scan's time is when it was pasted.
 - A survey has no "stop sharing": a create-only share can only expire.
 - A junk-paste flood is bounded only by the per-scan size cap and the 7-day expiry.
+
+**Value.** Rocks are valued at market, not at the scanner's ISK column (`priceScans`, `useOrePrices`): units times the highest buy price of the ore's Compressed form at the pilot's default Trade Hub (Jita for a visitor with no session). An ore with no price has no value and reads gray.
+
+**Moon tax.** On the Survey tab, a Survey with a moon ore shows a Payee and rate row (`MoonTaxRow`); "Open in Mining Tax" finds or creates the Payee and opens the Tax tab, whose Assign dialog then preselects that Payee. Not on the public page.
+
+**Your share refresh.** The ledger is re-read when a newer scan arrives and every 60 seconds (ESI's own cache decides what is new). The system editor offers the systems the ledger shows you mined in on the survey's days, latest first, above the typed name.

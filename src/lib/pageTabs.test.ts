@@ -82,3 +82,22 @@ describe('isIndexPath', () => {
     expect(isIndexPath(page, '/contacts')).toBe(false);
   });
 });
+
+describe('a tab that owns the whole path below it (Assets’ Items drill-down)', () => {
+  const assets = definePageTabs('/assets', [
+    { id: 'items', labelKey: 'a', deep: true },
+    { id: 'ships', labelKey: 'b' },
+  ]);
+
+  it('resolves the tab for any depth below it', () => {
+    expect(tabFromPathname(assets, '/assets/items')).toBe('items');
+    expect(tabFromPathname(assets, '/assets/items/60008494')).toBe('items');
+    expect(tabFromPathname(assets, '/assets/items/60008494/i:20/b:cargoHold')).toBe('items');
+  });
+
+  it('still names no tab for an unknown first segment, or depth below a plain tab', () => {
+    expect(tabFromPathname(assets, '/assets/60008494')).toBeNull();
+    expect(tabFromPathname(assets, '/assets/ships/1')).toBeNull();
+    expect(tabFromPathname(assets, '/assets/itemsx')).toBeNull();
+  });
+});

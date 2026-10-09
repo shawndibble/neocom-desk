@@ -184,7 +184,6 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
   '/corp/assets': loadCorpAssets,
   '/corp/assets/*': loadCorpAssets,
   '/assets': loadAssets,
-  '/assets/*': loadAssets,
   '/mail': loadMail,
   '/calendar': loadCalendar,
   '/contracts': loadContracts,
