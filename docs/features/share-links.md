@@ -4,7 +4,7 @@ User goal: send someone a short URL to an appraisal or a fitting; the recipient 
 
 | Route / piece                                                     | What                                                   | Where                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
-| `/s/:shareId` (+ legacy `/share/:shareId`)                        | Stored Share Link, 7-char key, 7 days                  | `src/routes/SharedLink.tsx`                               |
+| `/s/:shareId` (+ legacy `/share/:shareId`)                        | Stored Share Link, 6-char key, 7 days                  | `src/routes/SharedLink.tsx`                               |
 | `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
 | Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
 | Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
@@ -50,7 +50,7 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 ## Rules and thresholds
 
 - `SHARE_TYPES = ['appraisal','fitting']`, `SHARE_TTL_MS` 7 d. Rules: `get` iff `expiresAt > request.time`; `list` denied; `create` needs auth, id `^[0-9A-Za-z]{9}$`, exact keys, type in list, `payload` map, `createdAt == request.time`, `expiresAt` future and < 8 d; appraisal `items` list <= 1000; fitting `code` <= 20100 chars; update/delete denied. A Firestore TTL deletes docs (can lag ~1 day), so `loadShare` also checks expiry.
-- Id: 7 chars of a 31-letter unambiguous lowercase alphabet (no 0/o/1/l/i), unbiased rejection sampling, ~35 bits; legacy 9-char base-62 ids from `/share/<id>` still open until they expire, minted client-side (`engine/share/shareId.ts`); a collision is refused by the create-only rule.
+- Id: 6 chars of a 31-letter unambiguous lowercase alphabet (no 0/o/1/l/i), unbiased rejection sampling, ~30 bits; legacy 9-char base-62 ids from `/share/<id>` still open until they expire, minted client-side (`engine/share/shareId.ts`); a collision is refused by the create-only rule.
 - Reuse: same content returns the session's link unless < 24 h from expiry (`REUSE_MARGIN_MS`).
 
 ## Decisions
@@ -66,7 +66,7 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 ## Interview Q&A
 
 1. Why stored short links? Big appraisals and fits exceed sane URLs (decision `20261002-125432`).
-2. Who can read one? Anyone with the 7-char key; `get` only, no list, no uid (`firestore.rules:243-263`).
+2. Who can read one? Anyone with the 6-char key; `get` only, no list, no uid (`firestore.rules:243-263`).
 3. How is expiry enforced? Rules, client re-check, TTL policy (lags ~1 day).
 4. How are duplicates avoided? In-session reuse by content unless < 24 h left (`shareStore.ts`).
 5. Why copy inside the click? The client-minted id lets a reused link copy with no await; failures fall to a manual-copy row.

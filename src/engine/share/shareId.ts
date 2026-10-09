@@ -1,8 +1,8 @@
 /**
- * The key a stored Share Link lives under — the `k7m2xq4` in `/s/k7m2xq4`.
- * Seven characters from a 31-letter alphabet with nothing easily misread
+ * The key a stored Share Link lives under — the `k7m2xq` in `/s/k7m2xq`.
+ * Six characters from a 31-letter alphabet with nothing easily misread
  * (no `0/o`, `1/l/i`) and no capitals, so it can be read aloud in fleet comms
- * or typed from a screenshot. 31^7 is ~35 bits: enough that a week-long link
+ * or typed from a screenshot. 31^6 is ~30 bits (about 887 million keys): enough that a week-long link
  * can't be stumbled on, since `shares` can only be read by id, never listed.
  *
  * Minted on the client, before the doc is written, so the URL is known up
@@ -15,7 +15,7 @@
  * accepts them (and `firestore.rules` still serves them).
  */
 
-export const SHARE_ID_LENGTH = 7;
+export const SHARE_ID_LENGTH = 6;
 
 const ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
 /** Bytes at or past this would make the first `256 % 31` characters likelier than the rest. */

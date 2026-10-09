@@ -19,7 +19,7 @@ describe('generateShareId', () => {
   });
 
   it('maps bytes onto the alphabet in order', () => {
-    expect(generateShareId(bytes(0, 1, 6, 7, 30))).toBe('2389z23');
+    expect(generateShareId(bytes(0, 1, 6, 7, 30))).toBe('2389z2');
   });
 
   it('rejects bytes that would bias the alphabet rather than wrapping them', () => {

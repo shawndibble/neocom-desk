@@ -133,7 +133,7 @@ describe('createShareLink', () => {
 
   it('stores the share under a fresh id and returns its short URL', async () => {
     const url = await createShareLink(input);
-    expect(url).toMatch(/^https:\/\/neocomdesk\.com\/s\/[2-9a-km-np-z]{7}$/);
+    expect(url).toMatch(/^https:\/\/neocomdesk\.com\/s\/[2-9a-km-np-z]{6}$/);
     expect(setDoc).toHaveBeenCalledTimes(1);
     expect(setDoc.mock.calls[0][0]).toEqual({ path: `shares/${url.split('/').pop()}` });
   });

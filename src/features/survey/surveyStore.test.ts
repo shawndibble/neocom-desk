@@ -55,7 +55,7 @@ describe('startSurvey', () => {
         characterId: 7,
       })
     );
-    expect(started.id).toMatch(/^[2-9a-km-np-z]{7}$/);
+    expect(started.id).toMatch(/^[2-9a-km-np-z]{6}$/);
     expect(started.url).toBe(`https://neocomdesk.test/s/${started.id}`);
     expect(started.expiresAt).toBe(EXPIRES);
   });
