@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { stashPendingScan, takePendingScan } from './pendingScan';
+import { noteSubmittedScan } from './submitted';
 import { useSurveyHistory } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 
@@ -112,7 +113,12 @@ describe('SurveyTab', () => {
     // The survey renders from `loadSurvey` before the paste's add settles; wait for it so it can't leak into the next test.
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(startSurvey).toHaveBeenCalledWith({ characterId: 7, ownerName: 'Shawn Dibble' });
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: SCAN,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
     expect(useCurrentSurveyId.getState().value).toBe(ID);
   });
 
@@ -128,7 +134,12 @@ describe('SurveyTab', () => {
   it('adds a scan the app-wide paste router carried here', async () => {
     renderTab({ pathname: '/mining/survey', state: { surveyScanText: SCAN } });
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: SCAN,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
   });
 
   it('adds a paste that only shrinks the field to the survey in view, with no question', async () => {
@@ -137,9 +148,63 @@ describe('SurveyTab', () => {
     await screen.findByText('0% mined');
     pasteInApp(SHRUNK);
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SHRUNK, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: SHRUNK,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
     expect(startSurvey).not.toHaveBeenCalled();
     expect(screen.queryByRole('group', { name: /different field/i })).toBeNull();
+  });
+
+  describe('first scan with a section missing', () => {
+    // The survey shows two ores; the paste has only one, as when a group is left collapsed.
+    const TWO_ORES = `${SCAN}
+Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
+    beforeEach(async () => {
+      loadSurvey.mockResolvedValue({
+        ok: true,
+        expiresAt: EXPIRES,
+        owner: 'Shawn Dibble',
+        tax: null,
+        scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(TWO_ORES)! }],
+      });
+      await useCurrentSurveyId.getState().setValue(ID);
+    });
+
+    it('asks to confirm every section is expanded before adding it', async () => {
+      renderTab();
+      await screen.findByText(/mined/);
+      pasteInApp(SHRUNK);
+      const check = await screen.findByRole('group', { name: /every section is expanded/i });
+      expect(check.textContent).toContain('Blue Ice is no longer on this report');
+      expect(addSurveyScan).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'All are expanded' }));
+      await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
+      expect(addSurveyScan).toHaveBeenCalledWith(
+        expect.objectContaining({ id: ID, text: SHRUNK, by: 'Shawn Dibble' })
+      );
+    });
+
+    it('adds nothing when the upload is cancelled', async () => {
+      renderTab();
+      await screen.findByText(/mined/);
+      pasteInApp(SHRUNK);
+      await screen.findByRole('group', { name: /every section is expanded/i });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+      expect(screen.queryByRole('group', { name: /every section is expanded/i })).toBeNull();
+      expect(addSurveyScan).not.toHaveBeenCalled();
+    });
+
+    it('does not ask a pilot who has already added a scan', async () => {
+      noteSubmittedScan();
+      renderTab();
+      await screen.findByText(/mined/);
+      pasteInApp(SHRUNK);
+      await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('group', { name: /every section is expanded/i })).toBeNull();
+    });
   });
 
   it("asks the owner what to do with a different field, and 'Create new survey' starts one", async () => {
@@ -153,7 +218,12 @@ describe('SurveyTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create new survey' }));
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: DIFFERENT,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: /different field/i })).toBeNull()
     );
@@ -166,7 +236,12 @@ describe('SurveyTab', () => {
     pasteInApp(DIFFERENT);
     fireEvent.click(await screen.findByRole('button', { name: 'Add to existing survey' }));
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: DIFFERENT,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
     expect(startSurvey).not.toHaveBeenCalled();
   });
 
@@ -184,15 +259,25 @@ describe('SurveyTab', () => {
     pasteInApp(DIFFERENT);
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('group', { name: /different field/i })).toBeNull();
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: DIFFERENT,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
   });
 
   it('starts a survey from the scan a shared page held for the login, once', async () => {
     stashPendingScan(DIFFERENT);
     renderTab();
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
-    expect(localStorage.length).toBe(0);
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: DIFFERENT,
+      expiresAt: EXPIRES,
+      by: 'Shawn Dibble',
+    });
+    expect(localStorage.getItem('miningSurveyPendingScan')).toBeNull();
   });
 
   it('keeps the held scan for the next visit when starting the survey fails', async () => {

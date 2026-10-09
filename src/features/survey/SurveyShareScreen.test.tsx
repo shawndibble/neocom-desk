@@ -10,6 +10,7 @@ const { addSurveyScan, loadSurvey } = vi.hoisted(() => ({
   loadSurvey: vi.fn(),
 }));
 vi.mock('./surveyStore', () => ({ addSurveyScan, loadSurvey }));
+vi.mock('./submitterName', () => ({ submitterName: async () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
 import { SurveyShareScreen } from './SurveyShareScreen';
@@ -70,12 +71,18 @@ describe('SurveyShareScreen', () => {
     // The page's paste listener is re-registered once the survey has loaded
     // (it needs the survey's expiry). A paste in the tick before that is
     // dropped, so keep pasting until the page is ready: a dropped paste never
-    // reaches the store, so this adds exactly one scan.
+    // reaches the store. Each paste re-renders the page, and the waitFor runs again
+    // on that, so more than one paste can land; one is all these tests need.
     await waitFor(() => {
       fireEvent.paste(document.body, { clipboardData: { getData: () => SCAN } });
-      expect(addSurveyScan).toHaveBeenCalledTimes(1);
+      expect(addSurveyScan).toHaveBeenCalled();
     });
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: SCAN,
+      expiresAt: EXPIRES,
+      by: null,
+    });
   });
 
   it('adds a paste that only shrinks the field', async () => {
@@ -83,9 +90,14 @@ describe('SurveyShareScreen', () => {
     await screen.findByText('0% mined');
     await waitFor(() => {
       fireEvent.paste(document.body, { clipboardData: { getData: () => SHRUNK } });
-      expect(addSurveyScan).toHaveBeenCalledTimes(1);
+      expect(addSurveyScan).toHaveBeenCalled();
     });
-    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SHRUNK, expiresAt: EXPIRES });
+    expect(addSurveyScan).toHaveBeenCalledWith({
+      id: ID,
+      text: SHRUNK,
+      expiresAt: EXPIRES,
+      by: null,
+    });
   });
 
   it('holds a different field for the login instead of adding it, and says why', async () => {

@@ -11,15 +11,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { classifyScan, lastSeenField } from '@/engine/survey/scanUpdate';
+import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { MoonTaxReadout } from './MoonTaxRow';
 import { SurveyBoard } from './SurveyBoard';
+import { ExpandedCheck } from './ExpandedCheck';
 import { stashPendingScan } from './pendingScan';
+import { hasSubmittedScan, noteSubmittedScan } from './submitted';
+import { submitterName } from './submitterName';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { addSurveyScan, loadSurvey } from './surveyStore';
 import { useHasMoonOre } from './useHasMoonOre';
@@ -32,9 +36,13 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   // A pasted scan of a different field waits for the pilot to log in (or open
   // the app), where it starts their own survey: starting one needs a session.
   const [diverted, setDiverted] = useState(false);
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  // A first scan lacking an ore the survey shows, waiting for the pilot to
+  // confirm every section was expanded.
+  const [checking, setChecking] = useState<{ text: string; ores: string[] } | null>(null);
 
   const add = useCallback(
-    async (text: string): Promise<AddScanResult> => {
+    async (text: string, confirmed = false): Promise<AddScanResult> => {
       const rejected = rejectScanText(text);
       if (rejected !== null) return rejected;
       try {
@@ -54,14 +62,30 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
           setDiverted(true);
           return 'ok';
         }
-        await addSurveyScan({ id: shareId, text, expiresAt: found.expiresAt });
+        if (!confirmed && !hasSubmittedScan()) {
+          const ores = missingOres(
+            lastSeenField(found.scans.map((scan) => scan.rocks)),
+            parseSurveyScan(text) ?? []
+          );
+          if (ores.length > 0) {
+            setChecking({ text, ores });
+            return 'ok';
+          }
+        }
+        await addSurveyScan({
+          id: shareId,
+          text,
+          expiresAt: found.expiresAt,
+          by: await submitterName(characterId),
+        });
+        noteSubmittedScan();
         await refresh();
         return 'ok';
       } catch (error) {
         return scanFailure(error);
       }
     },
-    [refresh, shareId]
+    [characterId, refresh, shareId]
   );
 
   const { trackedAdd, busy, error } = useScanFeedback(add);
@@ -105,6 +129,17 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             <p role="status" className="text-sm text-warning">
               {t('survey.differentOnShare')}
             </p>
+          )}
+          {checking !== null && (
+            <ExpandedCheck
+              ores={checking.ores}
+              onConfirm={() => {
+                const { text } = checking;
+                setChecking(null);
+                void trackedAdd(text, true);
+              }}
+              onCancel={() => setChecking(null)}
+            />
           )}
           <ScanFeedback busy={busy} error={error} />
           <SurveyBoard

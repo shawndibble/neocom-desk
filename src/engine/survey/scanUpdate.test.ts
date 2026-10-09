@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SurveyRock } from './series';
-import { classifyScan, lastSeenField, SCAN_UPDATE_TOLERANCE } from './scanUpdate';
+import { classifyScan, lastSeenField, missingOres, SCAN_UPDATE_TOLERANCE } from './scanUpdate';
 
 const rocks = (...rows: [string, number][]): SurveyRock[] =>
   rows.map(([ore, volume]) => ({ ore, volume }));
@@ -69,5 +69,21 @@ describe('lastSeenField', () => {
   it('uses the newest scan that showed an ore, not its largest reading', () => {
     const field = lastSeenField([rocks(['Veldspar', 1000]), rocks(['Veldspar', 400])]);
     expect(classifyScan(field, rocks(['Veldspar', 800]))).toBe('different');
+  });
+});
+
+describe('missingOres', () => {
+  const field = rocks(['Veldspar', 1000], ['Sylvite', 500], ['Zeolites', 200]);
+
+  it('lists the ores of the field the paste has no rocks for', () => {
+    expect(missingOres(field, rocks(['Veldspar', 900]))).toEqual(['Sylvite', 'Zeolites']);
+  });
+
+  it('is empty when every ore of the field is still there', () => {
+    expect(missingOres(field, rocks(['Veldspar', 1], ['Sylvite', 1], ['Zeolites', 1]))).toEqual([]);
+  });
+
+  it('has nothing missing before the first scan', () => {
+    expect(missingOres(null, rocks(['Veldspar', 1]))).toEqual([]);
   });
 });

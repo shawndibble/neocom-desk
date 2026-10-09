@@ -35,6 +35,9 @@ export interface SurveyTaxShare {
 
 export const MAX_TAX_NAME = 100;
 
+/** Mirrored by the size check in `firestore.rules`. */
+export const MAX_SCAN_BY = 100;
+
 export async function startSurvey(input: {
   characterId: number;
   /** The starting pilot's Character name, kept on the survey so they can be recognised as its owner. */
@@ -55,11 +58,15 @@ export async function addSurveyScan(input: {
   text: string;
   /** The survey's own expiry, as `loadSurvey` or `startSurvey` returned it. */
   expiresAt: number;
+  /** The submitting Character's name, or none for an anonymous visitor. */
+  by?: string | null;
 }): Promise<void> {
   const rejected = rejectScanText(input.text);
   if (rejected !== null) throw new ScanRejected(rejected);
+  const by = input.by?.trim().slice(0, MAX_SCAN_BY) ?? '';
   await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_SCANS_COLLECTION), {
     text: input.text,
+    ...(by === '' ? {} : { by }),
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(input.expiresAt),
   });
@@ -110,7 +117,8 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
       const data = d.data();
       const rocks = typeof data.text === 'string' ? parseSurveyScan(data.text) : null;
       if (rocks === null || !(data.createdAt instanceof Timestamp)) continue;
-      scans.push({ at: data.createdAt.toMillis(), rocks });
+      const by = typeof data.by === 'string' && data.by.trim() !== '' ? data.by.trim() : undefined;
+      scans.push({ at: data.createdAt.toMillis(), rocks, ...(by === undefined ? {} : { by }) });
     }
     scans.sort((a, b) => a.at - b.at);
     return {
