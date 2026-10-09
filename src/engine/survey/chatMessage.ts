@@ -10,9 +10,8 @@ import type { SurveySummary } from './series';
 import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyMessageLabels {
-  /** `{percent}` is the whole-number progress, `{time}` HH:MM EVE time, `{left}` the time remaining. */
+  /** `{time}` is HH:MM EVE time, `{left}` the time remaining. */
   done: string;
-  /** `{percent}` as in `done`. */
   waiting: string;
   /** `{ores}` is the joined ore list. */
   left: string;
@@ -22,17 +21,34 @@ export interface SurveyMessageLabels {
   cleared: string;
 }
 
-/** Longer than the usual text line, so the bar is the message's widest line; a long ore name can still pass it, up to MAX_LINE_WIDTH. */
-const BAR_CELLS = 48;
 /**
- * The frame: a top rail with the headline set into it, a left rail down the bar
- * and the ore line, and a bottom rail. The right side stays open because the
- * chat window's proportional font would never line a right edge up. Both rails
- * stay short, so the bar remains the one long line.
+ * The frame: a closed box. The ETA is set into the top rail and the link into
+ * the bottom one, each centred; the bar and the ore line sit between `║` rails.
+ * The ore line sets the box's width, unless a rail's label needs more (the link
+ * usually does not outrun it by much), and the rails and bar stretch to match.
+ * The chat font is proportional, so the right edge lines up by character count,
+ * not pixel for pixel.
  */
 const RAIL_LEFT = '║ ';
-const BOTTOM_RAIL = '╚' + '═'.repeat(11);
-const topRail = (headline: string): string => `╔═[ ${headline} ]══`;
+const RAIL_RIGHT = ' ║';
+/** Fewest cells the bar may shrink to. */
+const MIN_BAR_CELLS = 10;
+
+/** Width of a line as it shows in chat: `<b>` tags take no room. */
+const visibleWidth = (line: string): number => line.replace(/<\/?b>/g, '').length;
+
+/** `╔═══[ label ]═══╗`, `width` characters wide as far as the label allows, label centred. */
+function rail(left: string, right: string, label: string, width: number): string {
+  const fillWidth = Math.max(width - 2 - visibleWidth(label) - 4, 0);
+  const before = Math.floor(fillWidth / 2);
+  return `${left}${'═'.repeat(before)}[ ${label} ]${'═'.repeat(fillWidth - before)}${right}`;
+}
+
+/** A row between the side rails, padded to `width`. */
+function boxRow(content: string, width: number): string {
+  const pad = Math.max(0, width - RAIL_LEFT.length - RAIL_RIGHT.length - visibleWidth(content));
+  return `${RAIL_LEFT}${content}${' '.repeat(pad)}${RAIL_RIGHT}`;
+}
 /**
  * Widest a line of the message may run, in visible characters (`<b>` tags
  * don't show). RockRadar's own message is the benchmark: its widest lines are
@@ -40,7 +56,7 @@ const topRail = (headline: string): string => `╔═[ ${headline} ]══`;
  * characters, which run wider than letters in the chat window's proportional
  * font, so a line of plain text can be a little longer than that and still fit.
  */
-export const MAX_LINE_WIDTH = 56;
+export const MAX_LINE_WIDTH = 60;
 const SEPARATOR = ' · ';
 
 /**
@@ -137,10 +153,15 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-/** Flush left with no end caps: the caps indent the bar and read thin next to the blocks. */
-function bar(percent: number, finished: boolean): string {
-  const filled = finished ? BAR_CELLS : Math.floor((percent / 100) * BAR_CELLS);
-  return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled);
+/**
+ * The bar row: the bar fills the box's width once the percent after it has its
+ * room. No end caps: they indent the bar and read thin next to the blocks.
+ */
+function barLine(percent: number, finished: boolean, width: number): string {
+  const tail = ` ${percent}%`;
+  const cells = Math.max(width - RAIL_LEFT.length - RAIL_RIGHT.length - tail.length, MIN_BAR_CELLS);
+  const filled = finished ? cells : Math.floor((percent / 100) * cells);
+  return boxRow(`${'█'.repeat(filled)}${'░'.repeat(cells - filled)}${tail}`, width);
 }
 
 /** How many ores the "Left:" line names before grouping the rest. */
@@ -158,7 +179,7 @@ function oreLine(
   labels: SurveyMessageLabels
 ): string {
   const rocksIn = (list: SurveySummary['ores']): number => list.reduce((n, o) => n + o.rocks, 0);
-  const prefixWidth = RAIL_LEFT.length + fill(labels.left, { ores: '' }).length;
+  const prefixWidth = RAIL_LEFT.length + RAIL_RIGHT.length + fill(labels.left, { ores: '' }).length;
   const listed: string[] = [];
   let named = 0;
   for (const ore of ores.slice(0, MAX_NAMED_ORES)) {
@@ -180,20 +201,23 @@ export function surveyChatMessage(
   url: string,
   labels: SurveyMessageLabels
 ): string {
+  // The narrowest a rail can be and still hold its label: `╚[ label ]╝`, no `═` to spare.
+  const railWidth = (label: string): number => 2 + 4 + visibleWidth(label);
+
   if (summary.finished) {
+    const headline = fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) });
+    const width = Math.max(railWidth(headline), railWidth(url));
     return [
-      topRail(fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) })),
-      RAIL_LEFT + bar(100, true),
-      BOTTOM_RAIL,
-      url,
+      rail('╔', '╗', headline, width),
+      barLine(100, true, width),
+      rail('╚', '╝', url, width),
     ].join('\n');
   }
 
   const timing =
     summary.etaAt === null
-      ? fill(labels.waiting, { percent: summary.percent })
+      ? labels.waiting
       : fill(labels.done, {
-          percent: summary.percent,
           time: formatEveClock(summary.etaAt),
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
@@ -201,12 +225,16 @@ export function surveyChatMessage(
   // Richest per m³ first, as the page lists them; with no ISK the volume order stands.
   const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
   const left = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
+  const width = Math.max(
+    RAIL_LEFT.length + visibleWidth(left) + RAIL_RIGHT.length,
+    railWidth(timing),
+    railWidth(url)
+  );
 
   return [
-    topRail(timing),
-    RAIL_LEFT + bar(summary.percent, false),
-    RAIL_LEFT + left,
-    BOTTOM_RAIL,
-    url,
+    rail('╔', '╗', timing, width),
+    barLine(summary.percent, false, width),
+    boxRow(left, width),
+    rail('╚', '╝', url, width),
   ].join('\n');
 }
