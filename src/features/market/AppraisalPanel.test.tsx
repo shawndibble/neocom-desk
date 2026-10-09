@@ -886,6 +886,56 @@ describe('AppraisalPanel — Copy lists', () => {
   });
 });
 
+describe('AppraisalPanel — result header controls', () => {
+  const noMatches = outcome({
+    appraisal: {
+      rows: [],
+      totals: {
+        buy: 0,
+        sell: 0,
+        spread: 0,
+        unpricedRows: 0,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: 0,
+        cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
+      },
+      items: [],
+    },
+    unmatched: [{ name: 'Nope', lines: [1] }],
+  });
+
+  function expectNoControls() {
+    expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Appraisal/ })).not.toBeInTheDocument();
+  }
+
+  it('shows no columns, share or table-actions control before anything is appraised', () => {
+    renderPanel();
+    expectNoControls();
+  });
+
+  it('shows no controls when the catalogue failed to load', () => {
+    renderPanel({ controller: controller({ failed: true }) });
+    expectNoControls();
+  });
+
+  it('shows no controls when no row matched', () => {
+    renderPanel({ controller: controller({ result: noMatches }) });
+    expectNoControls();
+  });
+
+  it('shows all three controls once there is a result', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Appraisal/ })).toBeInTheDocument();
+  });
+});
+
 describe('AppraisalPanel — Columns', () => {
   it('hides an optional column once toggled off, and shows it again', async () => {
     renderPanel({ controller: controller({ result: outcome() }) });
