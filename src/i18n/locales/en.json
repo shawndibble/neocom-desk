@@ -3975,7 +3975,9 @@
     "oreRocks_other": "{{count}} rocks",
     "oreRow": "{{rocks}} · {{volume}} m³ · {{percent}}% left",
     "oreRowIsk": "{{rocks}} · {{volume}} m³ · <isk/> ISK · {{percent}}% left",
-    "valueRamp": "Bar colour is ISK per m³ left",
+    "valueRamp": "Bar colour is ISK per m³ left · {{hub}} buy, {{form}}",
+    "formCompressed": "compressed",
+    "formRaw": "raw",
     "tier": {
       "gray": "lowest value per m³",
       "blue": "low value per m³",
