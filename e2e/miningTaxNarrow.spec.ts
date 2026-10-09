@@ -662,6 +662,38 @@ test.describe('Mining Tax ledger — long Payee name overflow', () => {
   });
 });
 
+test.describe('Mining Tax attention strip — collapsed header stays one line', () => {
+  for (const viewport of [PHONE, { width: 1024, height: 768 }, DESKTOP]) {
+    test(`one control row tall, no overflow at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+
+      const header = page
+        .getByRole('alert')
+        .or(page.getByRole('status'))
+        .getByRole('button', {
+          name: /needs? attention/,
+          expanded: false,
+        });
+      await expect(header.first()).toBeVisible();
+      const label = header.first().locator('span').first();
+      // The row is one line when the preview truncates rather than wraps:
+      // the button is no taller than its 44px touch floor plus padding slack.
+      const box = (await header.first().boundingBox())!;
+      expect(box.height).toBeLessThanOrEqual(44);
+      const lineHeight = await label.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+      const labelBox = (await label.boundingBox())!;
+      expect(labelBox.height).toBeLessThanOrEqual(lineHeight * 1.5);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
+});
+
 /**
  * Nothing owed, entries Unassigned (#3120): the prompt is a slim row, not a
  * half-width tile, so the Assign button stays on screen and the ledger starts

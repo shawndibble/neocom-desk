@@ -4392,6 +4392,8 @@
     "attention": {
       "title_one": "{{count}} thing needs attention",
       "title_other": "{{count}} things need attention",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more",
       "show": "Show",
       "hide": "Hide",
       "unclassifiedOre": "{{character}} mined an ore type this app doesn't recognise: {{ore}}"
