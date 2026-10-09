@@ -264,6 +264,6 @@ function MoonTaxLine({
 }) {
   const moon = useHasMoonOre(oreNames);
   if (!moon) return null;
-  if (owned) return <MoonTaxRow characterId={characterId} survey={survey} />;
+  if (owned) return <MoonTaxRow key={survey?.id} characterId={characterId} survey={survey} />;
   return published === null ? null : <MoonTaxReadout tax={published} />;
 }
