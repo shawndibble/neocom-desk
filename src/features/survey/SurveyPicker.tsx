@@ -95,15 +95,21 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
           {currentId !== null ? (labels[currentId] ?? t('common.loading')) : undefined}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        className="max-md:max-w-[var(--radix-select-content-available-width)]"
+        collisionPadding={8}
+      >
         {history.map((entry) => {
           const label = labels[entry.id] ?? t('common.loading');
           return (
             <SelectItem key={entry.id} value={entry.id}>
-              <span className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate">{label}</span>
+              <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 max-md:[overflow-wrap:anywhere] md:truncate">
+                  {label}
+                </span>
                 {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
                 <span
+                  className="shrink-0"
                   onPointerDown={(e) => e.stopPropagation()}
                   onPointerUp={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
