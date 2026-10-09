@@ -9,6 +9,7 @@
  * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
  * rule every other categorical series follows, so no new palette.
  */
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -25,6 +26,7 @@ import {
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { formatEveClock } from '@/engine/survey/chatMessage';
+import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -33,12 +35,17 @@ import { oreTone } from './surveyTones';
 /** Left edge shared by both charts so their time axes line up. */
 const Y_AXIS_WIDTH = 52;
 const MARGIN = { top: 16, right: 12, bottom: 0, left: 0 };
+/** Room a label needs, in px: "−301.8K" and "1,116" at 10px. */
+const DELTA_LABEL_GAP = 46;
+const RATE_LABEL_GAP = 34;
 
 interface VolumeRow {
   at: number;
   total?: number;
   delta?: number;
   projected?: number;
+  /** `delta`, only on the scans whose label has room. */
+  deltaLabel?: number;
   [ore: string]: number | undefined;
 }
 
@@ -58,6 +65,7 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
 
 export function SurveyCharts({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
+  const [plotWidth, setPlotWidth] = useState(0);
   // A little past the finish, so its marker and label sit inside the plot.
   const end = summary.etaAt ?? summary.lastAt;
   const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.07];
@@ -75,6 +83,24 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
           { at: last.to, rate: last.rate },
         ];
   const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
+  // Scans can bunch up in time, so labels are thinned to the ones that fit.
+  // Every scan keeps its dot; the tooltip carries the rest.
+  const plotPx = Math.max(0, plotWidth - Y_AXIS_WIDTH - MARGIN.right);
+  const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
+  // Before the chart reports a width there is nothing to measure, so show all.
+  const thin = (labels: { x: number; weight: number }[], gap: number) =>
+    plotPx === 0 ? new Set(labels.keys()) : spacedLabels(labels, gap);
+  // The projected finish row sits after the scans and draws no label.
+  const deltaShown = thin(
+    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.delta ?? 0 })),
+    DELTA_LABEL_GAP
+  );
+  const rateShown = thin(
+    rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
+    RATE_LABEL_GAP
+  );
+  const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, deltaLabel: r.delta } : r));
+  const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
   // Both charts share this axis so their times line up; only the lower one shows it.
   const xAxis = (hide: boolean) => (
     <XAxis
@@ -93,18 +119,42 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
     if (!active || !row || row.total === undefined) return null;
+    // Most valuable first, which is the top of the stack, so the list reads like the chart.
+    const layers = summary.oreNames.map((ore, i) => ({ ore, tone: oreTone(i) }));
     return (
       <ChartTooltipShell>
-        <div className="font-semibold text-text">
-          {t('survey.eveTime', { time: formatEveClock(row.at) })}
-        </div>
-        {summary.oreNames.map((ore) => (
-          <div key={ore}>
-            {ore}: {formatCompactNumber(row[ore] ?? 0)} m³
+        <div className="min-w-48 space-y-1 text-xs">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="font-semibold text-text">
+              {t('survey.eveTime', { time: formatEveClock(row.at) })}
+            </span>
+            {row.delta !== undefined && row.delta > 0 && (
+              <span>{t('survey.chartMined', { amount: formatCompactNumber(row.delta) })}</span>
+            )}
           </div>
-        ))}
-        <div className="text-text">
-          {t('survey.chartTotal')}: {formatCompactNumber(row.total)} m³
+          <div className="space-y-0.5 border-t border-line pt-1">
+            {layers.map(({ ore, tone }) => {
+              const value = row[ore] ?? 0;
+              return (
+                <div
+                  key={ore}
+                  className={`flex items-center gap-2 ${value === 0 ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="size-2 shrink-0 rounded-xs"
+                    style={{ background: tone }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{ore}</span>
+                  <span className="text-text">{formatCompactNumber(value)} m³</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold text-text">
+            <span>{t('survey.chartTotal')}</span>
+            <span>{formatCompactNumber(row.total)} m³</span>
+          </div>
         </div>
       </ChartTooltipShell>
     );
@@ -114,8 +164,8 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
     <div className="space-y-1">
       <figure aria-label={t('survey.chartVolume')} className="m-0">
         <div className="h-56 w-full">
-          <ResponsiveContainer>
-            <ComposedChart data={rows} margin={MARGIN}>
+          <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
+            <ComposedChart data={chartRows} margin={MARGIN}>
               <CartesianGrid stroke="var(--color-line)" vertical={false} />
               {xAxis(true)}
               <YAxis
@@ -124,19 +174,23 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                 stroke="var(--color-line-bright)"
                 tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
               />
-              {summary.oreNames.map((ore, i) => (
-                <Area
-                  key={ore}
-                  type="linear"
-                  dataKey={ore}
-                  name={ore}
-                  stackId="ore"
-                  stroke={oreTone(i)}
-                  fill={oreTone(i)}
-                  fillOpacity={0.45}
-                  isAnimationActive={false}
-                />
-              ))}
+              {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
+              {summary.oreNames
+                .map((ore, i) => ({ ore, i }))
+                .reverse()
+                .map(({ ore, i }) => (
+                  <Area
+                    key={ore}
+                    type="linear"
+                    dataKey={ore}
+                    name={ore}
+                    stackId="ore"
+                    stroke={oreTone(i)}
+                    fill={oreTone(i)}
+                    fillOpacity={0.45}
+                    isAnimationActive={false}
+                  />
+                ))}
               <Line
                 type="linear"
                 dataKey="total"
@@ -152,7 +206,7 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                 legendType="none"
               >
                 <LabelList
-                  dataKey="delta"
+                  dataKey="deltaLabel"
                   position="top"
                   offset={8}
                   fill="var(--color-text)"
@@ -223,7 +277,7 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                   isAnimationActive={false}
                 />
                 <Line
-                  data={rateLabels}
+                  data={shownRateLabels}
                   dataKey="rate"
                   stroke="none"
                   dot={false}

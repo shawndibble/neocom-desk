@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui';
-import { Expanded } from '@/components/ui/icons';
+import { CopyToClipboard, Expanded } from '@/components/ui/icons';
 
 /** What the button last copied and how it went, for the label it flashes. */
 export type CopyOutcome = { what: 'chat' | 'link'; result: 'copied' | 'failed' } | null;
@@ -34,7 +34,7 @@ export function SurveyCopyButton({
   const { t } = useTranslation();
   const label =
     outcome === null
-      ? t('survey.copyChat')
+      ? t('survey.chatMessage')
       : outcome.result === 'failed'
         ? t('survey.copyFailed')
         : outcome.what === 'chat'
@@ -44,15 +44,19 @@ export function SurveyCopyButton({
     <div className={fill ? 'flex w-full' : 'flex'}>
       <Button
         variant="primary"
+        size="sm"
         onClick={onCopyChat}
+        aria-label={outcome === null ? t('survey.copyChat') : undefined}
         className={fill ? 'flex-1 rounded-r-none' : 'rounded-r-none'}
       >
+        {outcome === null && <CopyToClipboard aria-hidden />}
         {label}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="primary"
+            size="sm"
             aria-label={t('survey.moreCopy')}
             className="rounded-l-none border-l border-l-accent-contrast/30 px-2"
           >

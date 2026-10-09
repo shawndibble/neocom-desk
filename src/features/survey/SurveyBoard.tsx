@@ -138,6 +138,12 @@ export function SurveyBoard({
             </span>
           </div>
 
+          {scans.length <= 1 && (
+            <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-line px-4 text-center text-sm text-text-dim">
+              {t('survey.addSecondScan')}
+            </div>
+          )}
+
           {scans.length > 1 && (
             <>
               <SurveyLegend summary={summary} />

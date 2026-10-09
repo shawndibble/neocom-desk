@@ -55,7 +55,7 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 describe('MoonTaxRow', () => {
-  it('reads as text until the name or rate is clicked, then edits just that part', async () => {
+  it('reads as text until the name or rate is clicked, then edits both together', async () => {
     await useSurveyTax.getState().setValue({ name: 'Moon Corp', pct: '8' });
     renderRow();
     expect(screen.queryByRole('textbox')).toBeNull();
@@ -63,10 +63,26 @@ describe('MoonTaxRow', () => {
     edit(/tax rate/i);
     const rate = screen.getByLabelText('Tax rate, percent') as HTMLInputElement;
     expect(rate.value).toBe('8');
+    expect((screen.getByLabelText('Who gets the tax') as HTMLInputElement).value).toBe('Moon Corp');
     fireEvent.change(rate, { target: { value: '12' } });
     fireEvent.keyDown(rate, { key: 'Enter' });
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('12%');
+  });
+
+  it('keeps editing while focus moves between the two fields, and stops when it leaves them', async () => {
+    await useSurveyTax.getState().setValue({ name: 'Moon Corp', pct: '8' });
+    renderRow();
+    edit(/who gets the tax/i);
+    const name = screen.getByLabelText('Who gets the tax');
+    const rate = screen.getByLabelText('Tax rate, percent');
+    fireEvent.blur(name, { relatedTarget: rate });
+    // The name input has a datalist, so it is a combobox, not a textbox.
+    expect(screen.getByLabelText('Who gets the tax')).toBeTruthy();
+    expect(screen.getByLabelText('Tax rate, percent')).toBeTruthy();
+    fireEvent.blur(rate, { relatedTarget: document.body });
+    expect(screen.queryByLabelText('Tax rate, percent')).toBeNull();
+    expect(screen.queryByLabelText('Who gets the tax')).toBeNull();
   });
 
   it("fills in a known Payee's rate from its name and offers the Payees to complete", async () => {

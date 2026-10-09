@@ -172,7 +172,10 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('miningTax.title')} />
+      <PageHeader
+        title={t('miningTax.title')}
+        actions={<SurveyPicker currentId={currentId} onPick={(id) => void setCurrentId(id)} />}
+      />
       {tabBar}
       {state.status === 'loading' ? null : (
         <>
@@ -184,7 +187,6 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           {state.status === 'gone' && (
             <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-6" />
           )}
-          <SurveyPicker currentId={currentId} onPick={(id) => void setCurrentId(id)} />
           {asking !== null && asking.forId === currentId && (
             <div
               role="group"

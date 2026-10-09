@@ -71,6 +71,13 @@ describe('SurveyBoard', () => {
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
+  it('with one scan shows a dash for done at, and asks for another scan where the chart goes', () => {
+    render(<SurveyBoard scans={SCANS.slice(0, 1)} url={URL} expiresAt={null} />);
+    expect(screen.getByText('Add another scan to see the chart')).toBeTruthy();
+    expect(screen.queryByTestId('charts')).toBeNull();
+    expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
+  });
+
   it('copies a heading and a four-row box with the link on the bottom rail, each row within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
@@ -154,10 +161,9 @@ describe('SurveyBoard', () => {
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
     });
 
-    it('explains the chart: a swatch per ore, the rate and the projection', () => {
+    it('explains the chart: a swatch per ore, and the rate', () => {
       render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getByText('Mining rate')).toBeTruthy();
-      expect(screen.getByText('Dashed: finish at the current pace')).toBeTruthy();
       expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);
     });
   });
