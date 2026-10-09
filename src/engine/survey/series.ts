@@ -3,7 +3,7 @@
  * how fast, and when it will be gone. Pure — the scans arrive already parsed
  * (and, for a shared Survey, already fetched); nothing here reads a clock.
  */
-import { sortByValuePerM3 } from './valueTier';
+import { sortByValuePerM3, valuePerM3 } from './valueTier';
 
 export interface SurveyRock {
   /** Ore name as the scanner printed it, e.g. "Glistening Sylvite". */
@@ -47,6 +47,8 @@ export interface SurveyOre {
   isk: number;
   /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
   startVolume: number;
+  /** ISK per m³ of it as the latest scan that still showed it priced; null if none did. Keeps a mined-out ore in its place. */
+  iskPerM3: number | null;
 }
 
 /** One scan as a point on the volume chart. */
@@ -198,7 +200,20 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const byOre = new Map<string, SurveyOre>();
   for (const [ore, startVolume] of Object.entries(startByOre)) {
-    byOre.set(ore, { ore, rocks: 0, volume: 0, isk: 0, startVolume });
+    byOre.set(ore, { ore, rocks: 0, volume: 0, isk: 0, startVolume, iskPerM3: null });
+  }
+  for (const scan of scans) {
+    const seen = new Map<string, { volume: number; isk: number }>();
+    for (const rock of scan.rocks) {
+      const sum = seen.get(rock.ore) ?? { volume: 0, isk: 0 };
+      sum.volume += rock.volume;
+      sum.isk += rock.isk ?? 0;
+      seen.set(rock.ore, sum);
+    }
+    for (const [name, sum] of seen) {
+      const density = valuePerM3(sum);
+      if (density !== null) byOre.get(name)!.iskPerM3 = density;
+    }
   }
   for (const rock of last.rocks) {
     const entry = byOre.get(rock.ore)!;
