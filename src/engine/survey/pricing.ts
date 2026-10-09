@@ -14,11 +14,13 @@ export function priceScans(
 ): SurveyScan[] {
   return scans.map((scan) => ({
     ...scan,
-    rocks: scan.rocks.map(({ isk: _scanner, ...rock }) => {
+    rocks: scan.rocks.map((rock) => {
+      const { isk, ...unvalued } = rock;
+      void isk;
       const price = unitPrice.get(rock.ore);
       return rock.units !== undefined && price !== undefined && price > 0
-        ? { ...rock, isk: rock.units * price }
-        : rock;
+        ? { ...unvalued, isk: rock.units * price }
+        : unvalued;
     }),
   }));
 }
