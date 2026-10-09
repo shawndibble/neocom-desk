@@ -1059,6 +1059,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   wrecks). One share bar shows each role's count and percent and expands to
   the distance of every ship from the scanner, by role. Counts and distances
   only: D-Scan gives no bearing and never names a pilot.
+- **Danger read**: The answer a D-Scan view opens with: "am I in danger, and
+  what should I watch?" A level (Clear on scan, Watch, Danger, Busy), one
+  sentence of counts, then **Watch these** (ranked groups of identical hulls that
+  can pin, reinforce, hurt or find the pilot, each with its reason) and **Leave
+  or re-check if** (those four things with live counts). It is read for the
+  pilot's own ship, so what can "hurt you" differs for a hauler and a
+  battlecruiser. The Fleet board, worth and changes sit beneath, collapsed, as
+  the **Full scan**. States a condition, never a verdict.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**

@@ -1869,6 +1869,25 @@ export function getCharacterLocation(
   });
 }
 
+// --- GET /characters/{character_id}/ship (esi-location.read_ship_type.v1) ---
+
+export interface CharacterShip {
+  ship_item_id: number;
+  ship_name: string;
+  ship_type_id: number;
+}
+
+export function getCharacterShip(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterShip>> {
+  return esiFetch<CharacterShip>(`/characters/${characterId}/ship`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterShip',
+  });
+}
+
 // --- POST /route/{origin_system_id}/{destination_system_id} (public) ---
 
 export interface RouteOptions extends EndpointOptions {

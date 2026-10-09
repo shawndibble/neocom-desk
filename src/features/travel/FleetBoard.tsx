@@ -1,25 +1,30 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { Caret } from '@/components/ui/Disclosure';
+import { Caret, Disclosure } from '@/components/ui/Disclosure';
+import { buildDangerRead, scanAge } from '@/engine/pilotList/dscanDanger';
 import {
   buildFleetBoard,
   DSCAN_AXIS_KM,
   laneOffset,
   type DscanRole,
+  type DscanTypeInfo,
   type FleetBoard as FleetBoardData,
   type FleetHull,
   type FleetRole,
 } from '@/engine/pilotList/dscanRoles';
 import { formatDistanceKm as formatKm } from '@/engine/pilotList/formatDistanceKm';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
-import { buildReadout, type Readout } from '@/engine/pilotList/dscanReadout';
 import type { HullCount } from '@/engine/pilotList/dscanWorth';
+import { useCharacterShipTypeId } from '@/features/character/ship';
 import { cx } from '@/lib/cx';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { DangerAnswer, TripwireCard, WatchCard } from './DangerRead';
 import { DscanMeta } from './DscanMeta';
-import { DscanReadout } from './DscanReadout';
+import { useLastScan } from './lastScan';
+import { OwnShipPicker } from './OwnShipPicker';
+import { useManualShip } from './ownShip';
 
 /**
  * Role -> clock-kind token. Identity only, never a status; the legend and the
@@ -52,14 +57,20 @@ function shipHulls(board: FleetBoardData): HullCount[] {
 interface Loaded {
   board: FleetBoardData;
   names: ReadonlyMap<number, string>;
-  readout: Readout | null;
+  infoOf: (typeId: number) => DscanTypeInfo | undefined;
+  nameOf: (typeId: number) => string;
+  /** When the scan was read, in ms: a live paste's age counts from here. */
+  at: number;
 }
 
+/** How often the scan's age line re-reads the clock. */
+const AGE_TICK_MS = 15_000;
+
 /**
- * A D-Scan read as a Fleet board: ships grouped by role under one share bar.
- * The bar is the single control — it expands the distance lanes beneath it.
- * Shared by the live Pilot Lookup view and a Shared D-Scan, so both group the
- * same way.
+ * A D-Scan read for danger: an answer to "am I in danger?", the ships to watch,
+ * what would change the answer, and the full scan (fleet by role, worth,
+ * changes) collapsed beneath. Shared by the live Pilot Lookup view and a Shared
+ * D-Scan, so both group the same way.
  */
 export function FleetBoard({
   rows,
@@ -72,7 +83,9 @@ export function FleetBoard({
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<Loaded>();
   const [expanded, setExpanded] = useState(false);
+  const [fullOpen, setFullOpen] = useState(false);
   const lanesId = useId();
+  const rowsKey = rows.map((r) => `${r.typeId}|${r.name}|${r.distanceKm}`).join(',');
 
   useEffect(() => {
     let cancelled = false;
@@ -84,35 +97,61 @@ export function FleetBoard({
           ? undefined
           : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
       };
+      const nameOf = (typeId: number) => types[String(typeId)]?.name ?? `#${typeId}`;
       const board = buildFleetBoard(rows, infoOf);
-      const readout = buildReadout(
-        rows,
-        infoOf,
-        (typeId) => types[String(typeId)]?.name ?? `#${typeId}`
-      );
       const names = new Map<number, string>();
       for (const role of board.roles) {
-        for (const { typeId } of role.hulls) {
-          names.set(typeId, types[String(typeId)]?.name ?? `#${typeId}`);
-        }
+        for (const { typeId } of role.hulls) names.set(typeId, nameOf(typeId));
       }
-      setLoaded({ board, names, readout });
+      setLoaded({ board, names, infoOf, nameOf, at: Date.now() });
     });
     return () => {
       cancelled = true;
     };
     // Keyed on the rows themselves: a caller re-parsing the same scan hands a new array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.map((r) => `${r.typeId}|${r.name}|${r.distanceKm}`).join(',')]);
+  }, [rowsKey]);
 
-  if (loaded === undefined) {
+  // The age of a live paste, re-read on a slow tick. A Shared D-Scan has none to show.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), AGE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  const hulls = useMemo(() => (loaded === undefined ? [] : shipHulls(loaded.board)), [loaded]);
+  const previous = useLastScan(hulls, trackHistory && loaded !== undefined);
+
+  const manual = useManualShip();
+  const current = useCharacterShipTypeId();
+  const ownTypeId = manual.typeId ?? current.typeId;
+  const ownShipGroupId =
+    loaded === undefined || ownTypeId === null ? null : (loaded.infoOf(ownTypeId)?.groupId ?? null);
+  const shipName =
+    loaded === undefined || ownTypeId === null || ownShipGroupId === null
+      ? null
+      : loaded.nameOf(ownTypeId);
+
+  const read = useMemo(
+    () =>
+      loaded === undefined || (trackHistory && previous === undefined)
+        ? undefined
+        : buildDangerRead(rows, loaded.infoOf, loaded.nameOf, {
+            ownShipGroupId,
+            previous: previous ?? null,
+          }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loaded, previous, ownShipGroupId, rowsKey, trackHistory]
+  );
+
+  if (loaded === undefined || (trackHistory && previous === undefined)) {
     return (
       <div className="flex justify-center py-10">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
-  const { board, names, readout } = loaded;
+  const { board, names } = loaded;
   if (board.roles.length === 0) {
     return (
       <EmptyState
@@ -122,70 +161,143 @@ export function FleetBoard({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {readout !== null && <DscanReadout readout={readout} />}
-      <DscanMeta hulls={shipHulls(board)} names={names} trackHistory={trackHistory} />
-      <div>
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={lanesId}
-          onClick={() => setExpanded((open) => !open)}
-          className={cx(
-            'block w-full space-y-2 rounded-xs border border-line p-3 text-left',
-            rowInteractiveClassName,
-            focusRingInsetClassName
-          )}
-        >
-          <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            <Caret expanded={expanded} />
-            {t('travel.pilot.dscan.boardLabel')}
-          </span>
-          <span aria-hidden="true" className="flex h-5 gap-0.5 overflow-hidden rounded-xs">
-            {board.roles.map((r) => (
-              <span
-                key={r.role}
-                style={{ flexGrow: r.total, backgroundColor: ROLE_COLOUR[r.role] }}
-                className="min-w-1"
-              />
-            ))}
-          </span>
-          <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {board.roles.map((r) => (
-              <span key={r.role} className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  style={{ backgroundColor: ROLE_COLOUR[r.role] }}
-                  className="size-2.5 shrink-0 rounded-xs"
-                />
-                {t(`travel.pilot.dscan.role.${r.role}`)}{' '}
-                <span className="text-text-dim tabular-nums">
-                  {t('travel.pilot.dscan.legendEntry', {
-                    count: r.total,
-                    percent: Math.round(r.percent),
-                  })}
-                </span>
-              </span>
-            ))}
-          </span>
-        </button>
-        <div id={lanesId} hidden={!expanded} className="mt-3 space-y-1 px-1">
-          {expanded && <Lanes roles={board.roles} />}
-        </div>
-      </div>
-
+  const roleShare = (
+    <ShareBar
+      board={board}
+      expanded={expanded}
+      lanesId={lanesId}
+      onToggle={() => setExpanded((open) => !open)}
+    />
+  );
+  const fullScan = (
+    <>
+      {(read === null || read === undefined || !read.promoteRoles) && roleShare}
       <div className="grid gap-3 md:grid-cols-2">
         {board.roles.map((r) => (
           <RoleCard key={r.role} role={r} names={names} />
         ))}
       </div>
-
+      <DscanMeta hulls={hulls} names={names} trackHistory={trackHistory} previous={previous} />
       {board.leftOut > 0 && (
         <p className="text-xs text-text-dim">
           {t('travel.pilot.dscan.leftOut', { count: board.leftOut })}
         </p>
       )}
+      <p className="text-xs text-text-dim">{t('travel.pilot.dscan.readout.caveat')}</p>
+    </>
+  );
+
+  return (
+    <div className="space-y-4">
+      {read !== null && read !== undefined && (
+        <>
+          <DangerAnswer
+            read={read}
+            names={names}
+            age={trackHistory ? scanAge(Math.max(0, now - loaded.at)) : null}
+            shipName={shipName}
+          >
+            <div className="max-w-md">
+              <OwnShipPicker
+                typeId={manual.typeId}
+                autoTypeId={current.typeId}
+                onChange={manual.setTypeId}
+              />
+            </div>
+          </DangerAnswer>
+          {read.promoteRoles && roleShare}
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+            <WatchCard
+              read={read}
+              names={names}
+              shipName={shipName}
+              groupLabel={(groupId) =>
+                t(`travel.pilot.dscan.group.${groupId}`, { defaultValue: '' })
+              }
+            />
+            <TripwireCard
+              tripwires={read.tripwires}
+              firstScan={trackHistory && previous === null}
+            />
+          </div>
+        </>
+      )}
+      {read === null || read === undefined ? (
+        <div className="space-y-4">{fullScan}</div>
+      ) : (
+        <Disclosure
+          label={t('travel.pilot.dscan.danger.fullScan', { count: read.totalShips })}
+          expanded={fullOpen}
+          onToggle={() => setFullOpen((open) => !open)}
+        >
+          <div className="space-y-4 pt-3">{fullScan}</div>
+        </Disclosure>
+      )}
+    </div>
+  );
+}
+
+/** The share bar: roles as one bar with a legend. It is the control that expands the distance lanes. */
+function ShareBar({
+  board,
+  expanded,
+  lanesId,
+  onToggle,
+}: {
+  board: FleetBoardData;
+  expanded: boolean;
+  lanesId: string;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={lanesId}
+        onClick={onToggle}
+        className={cx(
+          'block min-h-11 w-full space-y-2 rounded-xs border border-line p-3 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <Caret expanded={expanded} />
+          {t('travel.pilot.dscan.boardLabel')}
+        </span>
+        <span aria-hidden="true" className="flex h-5 gap-0.5 overflow-hidden rounded-xs">
+          {board.roles.map((r) => (
+            <span
+              key={r.role}
+              style={{ flexGrow: r.total, backgroundColor: ROLE_COLOUR[r.role] }}
+              className="min-w-1"
+            />
+          ))}
+        </span>
+        <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          {board.roles.map((r) => (
+            <span key={r.role} className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden="true"
+                style={{ backgroundColor: ROLE_COLOUR[r.role] }}
+                className="size-2.5 shrink-0 rounded-xs"
+              />
+              {t(`travel.pilot.dscan.role.${r.role}`)}{' '}
+              <span className="text-text-dim tabular-nums">
+                {t('travel.pilot.dscan.legendEntry', {
+                  count: r.total,
+                  percent: Math.round(r.percent),
+                })}
+              </span>
+            </span>
+          ))}
+        </span>
+      </button>
+      <div id={lanesId} hidden={!expanded} className="mt-3 space-y-1 px-1">
+        {expanded && <Lanes roles={board.roles} />}
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -20,9 +21,14 @@ import { PilotListView } from './PilotListView';
 const SCAN =
   '626\tA\tVexor\t1 km\n626\tB\tVexor\t2 km\n23773\tC\tRagnarok\t3 AU\n1\tD\tDrone\t1 km';
 
-// Worth and Since-last-scan are market and device state, not the scan itself.
+// The answer, Worth and Since-last-scan are read, market and device state, not the scan itself.
 const ROLE_SECTIONS =
-  'section[aria-label]:not([aria-label^="Worth on the scan"]):not([aria-label^="Since your last scan"])';
+  'section[aria-label]:not([data-testid="dscan-answer"]):not([aria-label^="Worth on the scan"]):not([aria-label^="Since your last scan"])';
+
+/** The roles sit in the collapsed Full scan. */
+async function openFullScan() {
+  await userEvent.click(await screen.findByRole('button', { name: /^Full scan/ }));
+}
 
 afterEach(cleanup);
 
@@ -40,7 +46,8 @@ describe('Shared D-Scan', () => {
         <PilotListView paste={sender} />
       </MemoryRouter>
     );
-    await screen.findByText('Ragnarok');
+    await openFullScan();
+    await screen.findByRole('region', { name: 'Capitals' });
     const senderSections = [...live.container.querySelectorAll(ROLE_SECTIONS)].map(
       (el) => el.textContent
     );
@@ -54,7 +61,8 @@ describe('Shared D-Scan', () => {
         />
       </MemoryRouter>
     );
-    await screen.findByText('Ragnarok');
+    await openFullScan();
+    await screen.findByRole('region', { name: 'Capitals' });
     const recipientSections = [...shared.container.querySelectorAll(ROLE_SECTIONS)].map(
       (el) => el.textContent
     );

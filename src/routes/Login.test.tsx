@@ -40,6 +40,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-characters.read_loyalty.v1': 'loyalty points',
   'esi-characters.read_standings.v1': 'standings',
   'esi-location.read_location.v1': 'current location',
+  'esi-location.read_ship_type.v1': 'the ship you are flying',
   'esi-fittings.read_fittings.v1': 'in-game fittings',
 };
 

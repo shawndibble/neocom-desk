@@ -1,0 +1,84 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+
+vi.mock('@/sde/loadSde', () => ({
+  loadTypes: async () => ({
+    '24702': { name: 'Hurricane', groupID: 419 },
+    '33153': { name: 'Hurricane Fleet Issue', groupID: 419 },
+    '587': { name: 'Rifter', groupID: 25 },
+  }),
+  loadGroupCategories: async () => ({ '419': 6, '25': 6 }),
+}));
+
+import { OwnShipPicker } from './OwnShipPicker';
+
+afterEach(cleanup);
+
+describe('OwnShipPicker', () => {
+  it('shows suggestions while typing and picks one with arrows and Enter', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
+    const input = screen.getByRole('combobox', { name: 'Your ship' });
+    expect(input).toHaveAttribute('placeholder', 'Type your ship, e.g. Hurricane');
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    await screen.findByRole('combobox');
+    await user.type(input, 'hurr');
+    const options = await screen.findAllByRole('option');
+    expect(options.map((o) => o.textContent)).toEqual(['Hurricane', 'Hurricane Fleet Issue']);
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    expect(input.getAttribute('aria-activedescendant')).toBe(options[1].id);
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenCalledWith(33153);
+    expect(screen.queryByRole('option')).toBeNull();
+  });
+
+  it('picks a suggestion with a click', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
+    await user.type(screen.getByRole('combobox'), 'rif');
+    await user.click(await screen.findByRole('option', { name: 'Rifter' }));
+    expect(onChange).toHaveBeenCalledWith(587);
+  });
+
+  it('closes on Escape without picking', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
+    await user.type(screen.getByRole('combobox'), 'hurr');
+    await screen.findAllByRole('option');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('option')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('shows the manual pick and Clear removes it', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<OwnShipPicker typeId={587} autoTypeId={null} onChange={onChange} />);
+    expect(await screen.findByDisplayValue('Rifter')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it('offers "Use my current ship" over a manual pick when the character has one', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<OwnShipPicker typeId={587} autoTypeId={24702} onChange={onChange} />);
+    await user.click(await screen.findByRole('button', { name: 'Use my current ship' }));
+    expect(onChange).toHaveBeenCalledWith(null);
+    expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
+  });
+
+  it('names the character ship in the placeholder when nothing is picked by hand', async () => {
+    render(<OwnShipPicker typeId={null} autoTypeId={24702} onChange={vi.fn()} />);
+    expect(
+      await screen.findByPlaceholderText('Your ship: Hurricane (from your character)')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+});

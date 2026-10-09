@@ -64,6 +64,7 @@ export const SCOPE_GROUPS = [
   'characterDetails',
   'fittings',
   'autopilot',
+  'currentShip',
   'corp',
   'structureMarkets',
 ] as const;
@@ -148,6 +149,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   autopilot: {
     labelKey: 'permissions.autopilot.label',
     captionKey: 'permissions.autopilot.caption',
+    defaultOn: true,
+  },
+  currentShip: {
+    labelKey: 'permissions.currentShip.label',
+    captionKey: 'permissions.currentShip.caption',
     defaultOn: true,
   },
   corp: {
@@ -461,6 +467,17 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/location',
     scope: 'esi-location.read_location.v1',
     group: 'characterDetails',
+  },
+  /**
+   * Base grant, in a Permission of its own (scope decision `20261009-*`): the
+   * D-Scan danger read defaults "Your ship" to the hull the active Character is
+   * flying. Not folded into `characterDetails`, so a Character that signed in
+   * before it reads as lacking only this.
+   */
+  getCharacterShip: {
+    route: '/characters/{character_id}/ship',
+    scope: 'esi-location.read_ship_type.v1',
+    group: 'currentShip',
   },
   postRoute: {
     route: '/route/{origin_system_id}/{destination_system_id}',
