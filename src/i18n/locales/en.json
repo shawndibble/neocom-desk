@@ -4012,7 +4012,8 @@
     "gone": "This survey has expired",
     "goneHint": "A survey link works for 7 days.",
     "message": {
-      "done": "ETA: <b>{time} EVE</b> (~{left})",
+      "heading": "Neocom Desk Report",
+      "done": "ETA: {time} EVE (~{left})",
       "waiting": "waiting for a second scan",
       "left": "Left: {ores}",
       "more": "{count} other",
