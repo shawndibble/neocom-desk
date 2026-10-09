@@ -6,38 +6,44 @@
  * At `sm` and up the same rows are a table.
  */
 import { useTranslation } from 'react-i18next';
+import * as Icon from '@/components/ui/icons';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
-import { ageTone, type AgeTone, type KillSpace } from '@/engine/pilotList/killActivity';
+import type { KillSpace, KillSummary } from '@/engine/pilotList/killActivity';
 import type { ThreatLevel } from '@/engine/pilotList/threatVerdict';
 import { CharacterLink } from '@/features/entities';
-import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import type { PilotListRow } from './pilotListData';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_TEXT } from './pilotListStyles';
 import { ThreatBadge } from './ThreatBadge';
-import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS, THREAT_TEXT_CLASS } from './threatTone';
+import { DANGEROUS_MIN_KILLS } from '@/engine/pilotList/threatVerdict';
+import {
+  THREAT_BAR_CLASS,
+  THREAT_LEVEL_TONE,
+  THREAT_ROW_CLASS,
+  THREAT_TEXT_CLASS,
+} from './threatTone';
 
-const AGE_TEXT: Record<AgeTone, string> = {
-  fresh: 'font-semibold text-text',
-  week: 'text-text-dim',
-  old: 'text-text-dim',
-  none: 'text-text-dim',
-};
+/** Where most of the recent kills were; the worse space wins a tie. Null with no recent kill that says where. */
+function mainSpaceOf(bySpace: KillSummary['bySpace']): KillSpace | null {
+  let best: KillSpace | null = null;
+  for (const space of ['nullsec', 'wormhole', 'lowsec', 'highsec'] as const) {
+    if (bySpace[space].count > (best === null ? 0 : bySpace[best].count)) best = space;
+  }
+  return best;
+}
 
 export function PilotCard({
   row,
   threat,
   spaces,
   flew,
-  now,
 }: {
   row: PilotListRow;
   threat: ThreatLevel | 'pending' | null;
   spaces: readonly KillSpace[];
   /** Hull names already joined for display; null when there are none to show. */
   flew: string | null;
-  now: number;
 }) {
   const { t } = useTranslation();
   const tone = threat === null ? null : THREAT_LEVEL_TONE[threat];
@@ -51,13 +57,16 @@ export function PilotCard({
         ? t('travel.pilot.list.stateUnreachable')
         : null;
   const own = row.ownOrganization;
+  const mainSpace = ready === null ? null : mainSpaceOf(ready.bySpace);
   const affiliation = [row.corporationName, row.allianceName].filter(Boolean).join(' · ');
 
   return (
     <li
       className={cx(
-        'space-y-2 border border-l-2 border-line border-l-transparent bg-panel p-2.5',
-        tone !== null && THREAT_ROW_CLASS[tone]
+        'space-y-1.5 border border-l-2 border-line border-l-transparent p-2.5',
+        tone !== null && THREAT_ROW_CLASS[tone] !== '' ? THREAT_ROW_CLASS[tone] : 'bg-panel',
+        threat === 'dangerous' &&
+          'border-danger bg-linear-to-r from-danger/20 to-danger/5 shadow-[0_0_18px_-4px] shadow-danger/50'
       )}
     >
       <div className="flex items-center gap-2.5">
@@ -86,9 +95,10 @@ export function PilotCard({
               threat === 'dangerous' && 'text-[2.125rem]'
             )}
           >
+            <span className="sr-only">{t('travel.pilot.list.killsLabel')}: </span>
             {big}
           </b>
-          <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
+          <span aria-hidden className="text-[0.625rem] tracking-widest text-text-dim uppercase">
             {t('travel.pilot.list.killsLabel')}
           </span>
         </div>
@@ -97,9 +107,31 @@ export function PilotCard({
       {(threat !== null || row.standing !== null || own !== null || status !== null) && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-dim">
           {threat !== null && <ThreatBadge level={threat} solid />}
+          {mainSpace !== null && (
+            <span
+              className={cx(
+                'inline-flex items-center gap-1 rounded-xs border border-line-bright px-1.5 py-px text-[0.6875rem] leading-4 font-semibold tracking-widest uppercase',
+                SPACE_TEXT[mainSpace]
+              )}
+            >
+              <Icon.Combat size={12} />
+              {t('travel.pilot.list.mainSpace', {
+                space: t(`common.spaceOption.${mainSpace}`).toLowerCase(),
+              })}
+            </span>
+          )}
           {own !== null && <span>{t(`travel.pilot.list.own.${own}`)}</span>}
           {row.standing !== null && <PilotStandingTag standing={row.standing} />}
           {status !== null && <span>{status}</span>}
+        </div>
+      )}
+
+      {ready !== null && tone !== null && (
+        <div aria-hidden className="h-1 bg-line">
+          <div
+            className={cx('h-full', THREAT_BAR_CLASS[tone])}
+            style={{ width: `${Math.min(ready.recentCount / DANGEROUS_MIN_KILLS, 1) * 100}%` }}
+          />
         </div>
       )}
 
@@ -109,7 +141,7 @@ export function PilotCard({
           style={{ gridTemplateColumns: `repeat(${spaces.length}, minmax(0, 1fr))` }}
         >
           {spaces.map((space) => {
-            const { count, lastMs } = ready.bySpace[space];
+            const { count } = ready.bySpace[space];
             return (
               <div key={space} className="bg-panel-2 px-2 py-1">
                 <dt className="text-[0.625rem] tracking-widest text-text-dim uppercase">
@@ -123,9 +155,6 @@ export function PilotCard({
                     )}
                   >
                     {count}
-                  </span>
-                  <span className={cx('block text-[0.6875rem]', AGE_TEXT[ageTone(lastMs, now)])}>
-                    {lastMs === null ? '—' : formatAge(now - lastMs, t)}
                   </span>
                 </dd>
               </div>

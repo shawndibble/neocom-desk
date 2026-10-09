@@ -30,13 +30,7 @@ import {
   MAX_DSCAN_SNAPSHOT_CHARS,
 } from '@/engine/pilotList/dscanSnapshot';
 import { groupOf, PILOT_GROUP_ORDER, type PilotGroupId } from '@/engine/pilotList/grouping';
-import {
-  ageTone,
-  topShips,
-  windowStart,
-  type AgeTone,
-  type KillSpace,
-} from '@/engine/pilotList/killActivity';
+import { ageTone, topShips, windowStart, type KillSpace } from '@/engine/pilotList/killActivity';
 import { CharacterLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
@@ -56,7 +50,7 @@ import { PilotCard } from './PilotCard';
 import { ThreatBadge } from './ThreatBadge';
 import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS } from './threatTone';
 import { PilotStandingTag } from './PilotStandingTag';
-import { SPACE_TEXT } from './pilotListStyles';
+import { AGE_TEXT, SPACE_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
@@ -71,13 +65,6 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
     </Panel>
   );
 }
-
-const AGE_TEXT: Record<AgeTone, string> = {
-  fresh: 'font-semibold text-text',
-  week: 'text-text-dim',
-  old: 'text-text-dim opacity-60',
-  none: 'text-text-dim opacity-60',
-};
 
 /** How many hulls a row names under "Flew on kills". */
 const ROW_HULLS = 2;
@@ -269,7 +256,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
             threat={rowThreat(row, now)}
             spaces={spaces}
             flew={flewOf(row)}
-            now={now}
           />
         ))}
       </ul>

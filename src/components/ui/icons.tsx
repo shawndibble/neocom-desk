@@ -336,6 +336,8 @@ export const PiFactory = withWeight(Factory);
 export const PiLaunchpad = withWeight(RocketLaunch);
 export const PiCommandCenter = withWeight(Broadcast);
 export const PiCustomsOffice = withWeight(Crosshair);
+/** Where a pilot fights: the main space on a Local list card. */
+export const Combat = withWeight(Crosshair);
 export const PiSkyhook = withWeight(ArrowLineUp);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);

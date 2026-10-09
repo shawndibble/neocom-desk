@@ -46,6 +46,14 @@ export const THREAT_ROW_CLASS: Record<ThreatTone, string> = {
   dim: '',
 };
 
+/** The fill of the kill bar on a phone card, by level. */
+export const THREAT_BAR_CLASS: Record<ThreatTone, string> = {
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  neutral: 'bg-line-bright',
+  dim: 'bg-line-bright',
+};
+
 export const THREAT_LEVEL_TONE: Record<ThreatLevel | 'pending', ThreatTone> = {
   dangerous: 'danger',
   active: 'warning',
