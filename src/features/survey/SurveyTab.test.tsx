@@ -15,6 +15,8 @@ vi.mock('./surveyStore', () => ({ startSurvey, addSurveyScan, loadSurvey }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/share/${id}`,
 }));
+// Its own test covers the ledger read; here it would reach for ESI.
+vi.mock('./YourShareRow', () => ({ YourShareRow: () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
 
 import { SurveyTab } from './SurveyTab';

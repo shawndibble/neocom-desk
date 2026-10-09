@@ -4,16 +4,18 @@ Route `/mining/survey` (the third Mining tab) and, for anyone with the link, `/s
 
 User goal: paste the in-game Survey Scanner results and see how much of the field is mined, how fast, and when it will be gone; post that to fleet chat in one tap; let other pilots watch and keep it updated, with no login.
 
-| Piece                                          | Where                                                                   |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| Tab, adopts `?survey=<id>`, routed paste       | `src/features/survey/SurveyTab.tsx`                                     |
-| Board: paste box, stats, charts, ores, buttons | `SurveyBoard.tsx`                                                       |
-| Charts (lazy Recharts): volume by ore, rate    | `SurveyCharts.tsx`, `surveyTones.ts`                                    |
-| Public page, listens for paste itself          | `SurveyShareScreen.tsx`, case `survey` in `src/routes/SharedLink.tsx`   |
-| Store, polling hook, current-survey pref       | `surveyStore.ts`, `useSurvey.ts`, `surveyPref.ts`                       |
-| Parse, series maths, chat message, ticks       | `src/engine/survey/`                                                    |
-| Paste routing                                  | `survey` detector in `src/engine/import/pasteDestination.ts`            |
-| Rules and TTL                                  | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json` |
+| Piece                                          | Where                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Tab, adopts `?survey=<id>`, routed paste       | `src/features/survey/SurveyTab.tsx`                                                   |
+| Board: paste box, stats, charts, ores, buttons | `SurveyBoard.tsx`                                                                     |
+| Charts (lazy Recharts): volume by ore, rate    | `SurveyCharts.tsx`, `surveyTones.ts`                                                  |
+| Public page, listens for paste itself          | `SurveyShareScreen.tsx`, case `survey` in `src/routes/SharedLink.tsx`                 |
+| Store, polling hook, current-survey pref       | `surveyStore.ts`, `useSurvey.ts`, `surveyPref.ts`                                     |
+| Parse, series maths, chat message, ticks       | `src/engine/survey/`                                                                  |
+| Your share: ledger read, system pref, line     | `yourShare.ts` (engine), `useYourShare.ts`, `surveySystemPref.ts`, `YourShareRow.tsx` |
+| Copy chat message split button                 | `SurveyCopyButton.tsx`                                                                |
+| Paste routing                                  | `survey` detector in `src/engine/import/pasteDestination.ts`                          |
+| Rules and TTL                                  | `firestore.rules` (`shares/{id}/surveyScans`), `firestore.indexes.json`               |
 
 ## Behaviour
 
@@ -22,7 +24,8 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 - Progress is volume mined of everything the scans have shown. Rocks are matched between scans by ore, biggest first, each taking the smallest earlier rock at least as big. A rock that shrank or vanished was mined; a rock never seen before extends the field. The scanner's range is far, so a rock drifting out of range is not handled.
 - Each ore is shown against what the scans first showed of it (plus any that came into range), as a percent left; an ore mined out stays on the list at 0%. A scan whose rocks match any earlier scan is ignored, even with a newer scan in between: mining only removes ore, so the same rocks can't be a later state. ISK left is the scanner's own ISK column summed over the latest scan.
 - Pace is volume mined over the last three intervals divided by their time; ETA is the volume left over that pace from the latest scan. One scan gives neither.
-- Copy chat message: four lines, none wider than 50 visible characters, bold only. A cleared field is three lines with the total mining time.
+- Copy chat message is a split button: the button copies the message, and its caret menu has Copy link for the URL alone. The message is four lines, none wider than 50 visible characters, bold only. A cleared field is three lines with the total mining time.
+- Your share (Survey tab only): under the stats, how many m³ of the survey's ores the viewer's mining ledger shows in one system on the survey's UTC day(s), and the percent of what the survey says has been mined. The system is the Character's current one unless they type another; it is a device-local setting. The ledger has no times, so it is a running total, and the line is hidden when there is no ledger.
 - Anyone with the link can add a scan with no sign-in; the page re-reads every 20 s while visible.
 
 ## Persistence and sync
@@ -33,11 +36,11 @@ User goal: paste the in-game Survey Scanner results and see how much of the fiel
 
 ## Decisions
 
-`docs/context/decisions/20261008-175716-survey-scans-append-to-a-survey-share-link.md`.
+`docs/context/decisions/20261008-175716-survey-scans-append-to-a-survey-share-link.md`, `docs/context/decisions/20261008-221334-survey-your-share-reads-the-mining-ledger-for.md`.
 
 ## Observed gaps
 
-- "Your share" from the personal mining ledger (system and day granular) is not built; it needs a system picker.
+- Your share is a running total: ore mined in that system before the first scan counts, and it lags the game by a few minutes.
 - A "Field cleared" state needs a scan with every rock at 0 m³. The scanner prints no rows for an empty field, so the finish message may never show; a "Mark cleared" control or clearing at the finish time are the fallbacks.
 - A genuinely older scan that was never pasted before is read as the newest, because a scan's time is when it was pasted.
 - A survey has no "stop sharing": a create-only share can only expire.

@@ -35,6 +35,8 @@ interface SurveyBoardProps {
   onAdd: (text: string) => Promise<AddScanResult>;
   /** Extra header controls, e.g. "New survey". */
   actions?: ReactNode;
+  /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
+  viewerLine?: ReactNode;
 }
 
 /** What the copy button last copied, shown on it for two seconds. */
@@ -109,7 +111,14 @@ function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
   );
 }
 
-export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoardProps) {
+export function SurveyBoard({
+  scans,
+  url,
+  expiresAt,
+  onAdd,
+  actions,
+  viewerLine,
+}: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
   const summary = useMemo(() => summarizeSurvey(scans), [scans]);
   const [outcome, setOutcome] = useCopyOutcome();
@@ -219,6 +228,8 @@ export function SurveyBoard({ scans, url, expiresAt, onAdd, actions }: SurveyBoa
               <StatChip label={t('survey.statIsk')} value={formatIskCompact(summary.iskLeft)} />
             )}
           </StatChips>
+
+          {viewerLine}
 
           {scans.length > 1 && (
             <Suspense
