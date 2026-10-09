@@ -23,7 +23,7 @@ function waitForInstall(registration: ServiceWorkerRegistration): Promise<void> 
 /**
  * Settings → "Update now". Checks for a new build immediately, activates it if
  * one is waiting, then reloads — instead of waiting for ReloadPrompt's polling
- * and route-change/hidden-tab rules. Reloads when already current or when
+ * and route-change rule. Reloads when already current or when
  * there is no service worker (dev). Resolves `'failed'` without reloading when
  * the check itself fails (offline, network error), so the caller can say so
  * rather than silently reloading onto the old build.
