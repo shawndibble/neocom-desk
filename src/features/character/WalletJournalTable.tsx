@@ -64,13 +64,13 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
-/** The ref-type / date-range / text filter row above a journal table (issue #413). */
 /** Ledger figure at full precision, with an explicit `+` on gains (the wallet reconciles against the game client). */
 function formatIskSigned(value: number): string {
   const text = formatIsk(value, 2);
   return value > 0 && !text.startsWith('-') ? `+${text}` : text;
 }
 
+/** The ref-type / date-range / text filter row above a journal table (issue #413). */
 function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
