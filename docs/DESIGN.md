@@ -181,6 +181,15 @@ a dusty red at 100, blended between. Every stop is desaturated so the Threat ver
 red on the profile, and nothing warm shows until a value passes about half. The readout beside the
 fill is plain `text`, and the figure is always printed, so colour is never the only signal.
 
+### Ore value ramp
+
+`oreValueTiers` (`src/engine/survey/valueTier.ts`) colours the Mining Survey's
+ore bars by ISK per m³ left, against the richest ore on the field: gray
+(`line-bright`), blue (`accent`), yellow (`warning`) and orange (halfway along
+`warning`→`danger`), richer left to right. It borrows Kill heat's yellow and
+orange rather than adding tokens. The ISK and percent are printed beside every
+bar, and a legend line names the ramp (§7).
+
 ### Damage types
 
 | Token           | Value     | Use                          |
