@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { ItemInfoLink } from '@/features/entities';
-import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
+import { AddRow, Close, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
   droneBayUsed,
@@ -139,8 +139,6 @@ export interface ModuleRowProps extends EditContext {
   result: FittingModuleResult | null;
   /** The active Character lacks the skills for it. */
   cantUse: boolean;
-  /** List view only — Ring opens the same panel via its own slot click; absent inside that panel's own Modal, which needs no further affordance. */
-  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
   /**
    * A row of the List (or a rack sheet): a drop target, dragged by its grip
    * on a pointer, with Move up / down / to slot in its menu. Off in the
@@ -172,7 +170,6 @@ export function ModuleRow({
   catalogue,
   context,
   edit,
-  onOpenVariations,
   inRack = false,
 }: ModuleRowProps) {
   const { t } = useTranslation();
@@ -262,15 +259,6 @@ export function ModuleRow({
           context={context}
           edit={edit}
           className="flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
-        />
-      )}
-      {onOpenVariations && (
-        <IconButton
-          icon={<Compare />}
-          variant="plain"
-          label={t('fittings.list.variationsFor', { name })}
-          tooltip={t('fittings.variations.title')}
-          onClick={() => onOpenVariations(slot, slotIndex)}
         />
       )}
     </SlotCard>
@@ -566,7 +554,6 @@ interface RackSlotsProps extends EditContext {
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
   unusableModuleKeys?: ReadonlySet<string>;
-  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
   /** Hides the rack's own heading — a rack sheet titles it already. */
   hideLabel?: boolean;
 }
@@ -582,7 +569,6 @@ export function RackSlots({
   target,
   onSelectTarget,
   unusableModuleKeys,
-  onOpenVariations,
   hideLabel = false,
   ...context
 }: RackSlotsProps) {
@@ -612,7 +598,6 @@ export function RackSlots({
                 module={entry.module}
                 result={moduleResults?.[entry.index] ?? null}
                 cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
-                onOpenVariations={onOpenVariations}
                 inRack
               />
             );
@@ -778,7 +763,6 @@ interface FittingRackListProps extends EditContext {
   onSelectTarget: (target: AddTarget) => void;
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
-  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -800,7 +784,6 @@ export function FittingRackList({
   target,
   onSelectTarget,
   unusableModuleKeys,
-  onOpenVariations,
   actions,
 }: FittingRackListProps) {
   const { t } = useTranslation();
@@ -868,7 +851,6 @@ export function FittingRackList({
             target={target}
             onSelectTarget={onSelectTarget}
             unusableModuleKeys={unusableModuleKeys}
-            onOpenVariations={onOpenVariations}
           />
         ))}
 

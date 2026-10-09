@@ -275,6 +275,11 @@ function FittingsPage() {
     setTarget(next);
     setAddOpen(true);
   }, []);
+  const openVariations = useCallback((slot: FittingSlotKind, slotIndex: number) => {
+    setRackSheet(null);
+    setModuleSlot({ slot, slotIndex });
+    setVariationsOpen(true);
+  }, []);
   const { itemActions, fitAt, droneBay, noteRecent, defaultCharges } = useEditorItemActions({
     fitting,
     stats,
@@ -288,6 +293,7 @@ function FittingsPage() {
     dragEnabled: isDesktop,
     selectTarget,
     openCargoQuantity: setCargoQuantityFor,
+    openVariations,
   });
 
   function openLibrary(action: LibraryAction) {
@@ -334,7 +340,7 @@ function FittingsPage() {
 
   /**
    * Opens a fitted module's dialog. A slot tap leads with its state and ammo,
-   * variations folded; the List's Variations button opens them unfolded.
+   * variations folded; the menu's Variations entry opens them unfolded.
    */
   function openModuleDialog(slot: FittingSlotKind, slotIndex: number, withVariations: boolean) {
     setModuleSlot({ slot, slotIndex });
@@ -504,7 +510,6 @@ function FittingsPage() {
         target={target}
         onSelectTarget={selectTarget}
         unusableModuleKeys={gaps?.unusableModuleKeys}
-        onOpenVariations={(slot, slotIndex) => openModuleDialog(slot, slotIndex, true)}
         actions={addButton}
       />
     );
@@ -984,10 +989,6 @@ function FittingsPage() {
                   target={target}
                   onSelectTarget={selectTargetFromSheet}
                   unusableModuleKeys={gaps?.unusableModuleKeys}
-                  onOpenVariations={(slot, slotIndex) => {
-                    setRackSheet(null);
-                    openModuleDialog(slot, slotIndex, true);
-                  }}
                 />
               )}
             </Modal>
