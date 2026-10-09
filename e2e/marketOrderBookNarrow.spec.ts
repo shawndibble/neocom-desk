@@ -78,11 +78,15 @@ const BUY_ORDER = order({
 });
 
 async function seedOrderBook(page: Page): Promise<void> {
-  await page.route(`**/markets/${REGION}/orders*`, (route) =>
+  // Every region, since a Jump Range reads the regions in reach; only the
+  // Forge has orders.
+  await page.route('**/markets/*/orders*', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([SELL_ORDER, BUY_ORDER]),
+      body: JSON.stringify(
+        route.request().url().includes(`/markets/${REGION}/`) ? [SELL_ORDER, BUY_ORDER] : []
+      ),
     })
   );
   // Not in `mockEsi.ts`'s bundled `UNIVERSE_TYPES` fixture (that set is only
@@ -103,8 +107,13 @@ async function seedOrderBook(page: Page): Promise<void> {
   );
 }
 
-async function openTritanium(page: Page): Promise<void> {
-  await signInAndGoto(page, './market');
+/**
+ * A Jump Range by default, so the book spans stations and keeps its Location
+ * column; `singleStation` reads the hub alone, whose scope bar names the
+ * station instead.
+ */
+async function openTritanium(page: Page, { singleStation = false } = {}): Promise<void> {
+  await signInAndGoto(page, singleStation ? './market' : './market?browser.jumps=5');
   await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
   await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
   // Only Sell: a phone shows one side at a time, behind the Sell | Buy toggle.
@@ -350,6 +359,26 @@ test.describe('Market Browser — order book stacked cards', () => {
     for (const cell of buy.cells.filter((c) => c.label !== 'Location' && c.label !== 'Range')) {
       expect(cell.clipped, cell.label).toBe(false);
     }
+  });
+
+  test('a single-station book drops Location: Price titles the card (390px)', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await openTritanium(page, { singleStation: true });
+
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(labelLines(sell.cells, 8)).toEqual([['Price'], ['Qty', 'Jumps', 'Sec', 'Expires']]);
+    for (const cell of sell.cells) expect(cell.clipped, cell.label).toBe(false);
+    await expectNoPageOverflow(page);
+  });
+
+  test('a single-station book has no Location column on a desktop (1280px)', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await openTritanium(page, { singleStation: true });
+
+    const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
+    expect(sell.cells.map((c) => c.label)).not.toContain('Location');
+    expect(sell.cells.some((c) => c.text.includes(STATION_A_NAME))).toBe(false);
+    await expectNoPageOverflow(page);
   });
 
   test('a wide desktop keeps one real row per order (1440px)', async ({ page }) => {
