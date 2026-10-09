@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, RowCaret, SlideOver, Spinner, TypeIcon } from '@/components/ui';
+import { Button, EmptyState, RowCaret, SearchInput, Spinner, TypeIcon } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { findShips, sortShipsByJumps, type OwnedAsset, type ShipRow } from '@/engine/myShips';
+import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
@@ -111,9 +112,8 @@ function usePlaces(
   rows: readonly ShipRow[],
   activeCharacterId: number | null,
   route: JumpBasis
-): { places: Places; systemOf: ReadonlyMap<string, number | null>; originName: string | null } {
+): { places: Places; systemOf: ReadonlyMap<string, number | null> } {
   const [places, setPlaces] = useState<Places>(NO_PLACES);
-  const [originName, setOriginName] = useState<string | null>(null);
   const [systemOf, setSystemOf] = useState<ReadonlyMap<string, number | null>>(new Map());
   const routeKey = route.key;
   useEffect(() => {
@@ -123,7 +123,6 @@ function usePlaces(
     /* eslint-disable react-hooks/set-state-in-effect */
     setPlaces(NO_PLACES);
     setSystemOf(new Map());
-    setOriginName(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     const distinct = [...new Map(rows.map((r) => [placeKey(r), r])).values()];
     void (async () => {
@@ -131,13 +130,6 @@ function usePlaces(
         activeCharacterId === null
           ? null
           : await loadCharacterSolarSystemId(activeCharacterId).catch(() => null);
-      if (originSystemId !== null) {
-        void loadSystemName(originSystemId)
-          .then((name) => {
-            if (!cancelled) setOriginName(name);
-          })
-          .catch(() => {});
-      }
       await mapWithConcurrencyLimit(distinct, ESI_FANOUT_CONCURRENCY, async (row) => {
         const key = placeKey(row);
         let place: ResolvedPlace = { name: null, systemId: null };
@@ -172,17 +164,13 @@ function usePlaces(
     // `route` itself changes identity with its settings; `key` names the basis.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, activeCharacterId, routeKey, route.hydrated]);
-  return { places, systemOf, originName };
+  return { places, systemOf };
 }
 
-interface MyShipsPanelProps {
-  open: boolean;
-  onClose: () => void;
+interface MyShipsViewProps {
   /** The Character filter, already resolved to the Characters whose ships to list. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
-  /** The page's Character filter control; absent for a one-Character account. */
-  filterControl?: ReactNode;
   /** Set while the filter reads "This character" and there are more Characters to show. */
   onShowAllCharacters?: () => void;
   /** Where a ship's location opens in the Assets browser. */
@@ -193,6 +181,16 @@ interface MyShipsPanelProps {
 /** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. */
 const ROW_GRID =
   'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_1rem] sm:gap-y-0.5';
+
+type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
+
+interface SortKeys {
+  ship: string;
+  character: string;
+  location: string;
+  security: number | null;
+  jumps: number | null;
+}
 
 /** Ship classes (SDE groups) by group id; lands after the list, which never waits on it. */
 function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string> {
@@ -215,23 +213,19 @@ function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string
 
 /**
  * My ships (issue #2853): every ship the chosen Characters own, nearest
- * first. Opened from the Assets page's Tools menu, backed by `?view=ships`.
+ * first. The Assets page's Ships tab (`/assets/ships`).
  */
-export function MyShipsPanel({
-  open,
-  onClose,
+export function MyShipsView({
   characterIds,
   activeCharacterId,
-  filterControl,
   onShowAllCharacters,
   hrefFor,
   route,
-}: MyShipsPanelProps) {
+}: MyShipsViewProps) {
   const { t } = useTranslation();
   const idsKey = [...characterIds].sort((a, b) => a - b).join(',');
   const [state, setState] = useState<ShipsState>({ status: 'loading' });
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new filter restarts the read
     setState({ status: 'loading' });
@@ -246,10 +240,10 @@ export function MyShipsPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, idsKey]);
+  }, [idsKey]);
 
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
-  const { places, systemOf, originName } = usePlaces(open ? rows : [], activeCharacterId, route);
+  const { places, systemOf } = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
     () =>
       state.status === 'ready'
@@ -260,26 +254,73 @@ export function MyShipsPanel({
         : [],
     [state, rows]
   );
-  const shipClasses = useShipClasses(open ? groupIds : []);
-  const sorted = useMemo(
-    () =>
-      sortShipsByJumps(rows, (row) => {
-        const result = places.jumps.get(placeKey(row));
-        return result?.kind === 'known' ? result.jumps : null;
-      }),
-    [rows, places.jumps]
-  );
+  const shipClasses = useShipClasses(groupIds);
+  const [sort, setSort] = useState<{ column: SortColumn; direction: 'asc' | 'desc' }>({
+    column: 'jumps',
+    direction: 'asc',
+  });
+  const [query, setQuery] = useState('');
+  const sorted = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const { data } = state;
+    const describe = (row: ShipRow): SortKeys & { shipClass: string; trail: string } => {
+      const key = placeKey(row);
+      const jumps = places.jumps.get(key);
+      const systemId = systemOf.get(key);
+      return {
+        ship: data.typeNames.get(row.typeId) ?? '',
+        shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
+        character: data.characterNames.get(row.characterId) ?? '',
+        location: places.names.get(key) ?? '',
+        trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
+        security: typeof systemId === 'number' ? (places.security.get(systemId) ?? null) : null,
+        jumps: jumps?.kind === 'known' ? jumps.jumps : null,
+      };
+    };
+    const needle = query.trim().toLowerCase();
+    const items = rows
+      .map((row) => ({ row, d: describe(row) }))
+      .filter(
+        ({ d }) =>
+          needle === '' ||
+          [d.ship, d.shipClass, d.location, d.trail].some((v) => v.toLowerCase().includes(needle))
+      );
+    const sign = sort.direction === 'asc' ? 1 : -1;
+    items.sort((x, y) => {
+      const va = x.d[sort.column] === '' ? null : x.d[sort.column];
+      const vb = y.d[sort.column] === '' ? null : y.d[sort.column];
+      // Unresolved values sort last in either direction.
+      if (va === null || vb === null) return va === vb ? 0 : va === null ? 1 : -1;
+      const cmp =
+        typeof va === 'number' && typeof vb === 'number'
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+      return cmp * sign;
+    });
+    return items.map((item) => item.row);
+  }, [state, rows, places, systemOf, shipClasses, query, sort]);
+  const toggleSort = (column: SortColumn) =>
+    setSort((prev) =>
+      prev.column === column
+        ? { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' }
+    );
 
   return (
-    <SlideOver
-      open={open}
-      onClose={onClose}
-      title={t('assets.myShips.title')}
-      closeOnBack={false}
-      wide
+    <section
+      aria-label={t('assets.myShips.title')}
+      className="min-h-0 flex-1 overflow-y-auto rounded-xs border border-line bg-panel"
     >
       <div className="flex flex-col gap-3 p-3">
-        {filterControl && <div className="flex items-center gap-2">{filterControl}</div>}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('assets.myShips.searchPlaceholder')}
+            aria-label={t('assets.myShips.searchLabel')}
+            className="w-full sm:ml-auto sm:w-64"
+          />
+        </div>
         {state.status === 'loading' && (
           <div className="flex justify-center py-10">
             <Spinner size="md" label={t('assets.myShips.loading')} />
@@ -289,8 +330,9 @@ export function MyShipsPanel({
         {state.status === 'ready' && sorted.length === 0 && (
           <EmptyState
             title={t('assets.myShips.emptyTitle')}
-            hint={t('assets.myShips.emptyHint')}
+            hint={query.trim() ? t('assets.myShips.noMatches') : t('assets.myShips.emptyHint')}
             action={
+              !query.trim() &&
               onShowAllCharacters && (
                 <Button size="sm" onClick={onShowAllCharacters}>
                   {t('assets.myShips.showAllCharacters')}
@@ -301,26 +343,40 @@ export function MyShipsPanel({
         )}
         {state.status === 'ready' && sorted.length > 0 && (
           <div role="table" aria-label={t('assets.myShips.title')}>
-            <div className="flex flex-col gap-0.5 px-3 pb-2 text-xs text-text-dim">
-              <span>
-                {t('assets.myShips.summary', {
-                  ships: t('assets.myShips.shipCount', { count: sorted.length }),
-                  characters: t('assets.myShips.characterCount', {
-                    count: new Set(sorted.map((r) => r.characterId)).size,
-                  }),
-                })}
-              </span>
-              {originName && <span>{t('assets.myShips.jumpsFrom', { system: originName })}</span>}
-            </div>
             <div
               role="row"
               className={`${ROW_GRID} border-b border-line px-3 py-1 text-[0.6875rem] tracking-widest text-text-dim uppercase max-sm:hidden`}
             >
-              <span role="columnheader">{t('assets.myShips.columns.ship')}</span>
-              <span role="columnheader">{t('assets.myShips.columns.character')}</span>
-              <span role="columnheader">{t('assets.myShips.columns.location')}</span>
-              <span role="columnheader">{t('assets.myShips.columns.security')}</span>
-              <span role="columnheader">{t('assets.myShips.columns.jumps')}</span>
+              {(['ship', 'character', 'location', 'security', 'jumps'] as const).map((column) => {
+                const active = sort.column === column;
+                const SortGlyph = !active
+                  ? Icon.Sort
+                  : sort.direction === 'asc'
+                    ? Icon.Ascending
+                    : Icon.Descending;
+                return (
+                  <span
+                    key={column}
+                    role="columnheader"
+                    aria-sort={
+                      active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(column)}
+                      className="inline-flex items-center gap-1 tracking-widest uppercase hover:text-text"
+                    >
+                      {t(`assets.myShips.columns.${column}`)}
+                      <SortGlyph
+                        aria-hidden="true"
+                        size={Icon.ICON_SIZE.sm}
+                        className={active ? 'text-accent' : 'text-text-faint'}
+                      />
+                    </button>
+                  </span>
+                );
+              })}
               <span />
             </div>
             {sorted.map((row) => {
@@ -400,6 +456,6 @@ export function MyShipsPanel({
           </div>
         )}
       </div>
-    </SlideOver>
+    </section>
   );
 }

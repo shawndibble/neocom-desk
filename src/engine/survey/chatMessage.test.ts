@@ -19,7 +19,7 @@ const labels: SurveyMessageLabels = {
   done: 'done <b>{time} EVE</b> (~{left})',
   waiting: 'waiting for a second scan',
   left: 'Left: {ores}',
-  more: '+{count} more',
+  more: '{count} other',
   cleared: 'Field cleared in {duration}',
 };
 
@@ -91,10 +91,32 @@ describe('surveyChatMessage', () => {
     expect(word(50)).toBe('Last rocks!'); // 95%
   });
 
-  it('lists every ore that fits the line', () => {
-    const s = summarizeSurvey([scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1])])!;
+  it('names the three biggest ores and counts the rocks of the rest as one group', () => {
+    const s = summarizeSurvey([
+      scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1], ['E', 1]),
+    ])!;
     expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
-      'Left: 1 A · 1 B · 1 C · 1 D · 1 E'
+      'Left: 1 A · 1 B · 1 C · 3 other'
+    );
+  });
+
+  it('calls out ores by the ISK left in them, with how many rocks each has', () => {
+    // Veldspar 20 rocks worth 10M, Scordite 5 worth 25M, Pyroxeres 15 worth 12M, Kernite 4 worth 3M.
+    const rocks = (ore: string, count: number, each: number) =>
+      Array.from({ length: count }, () => ({ ore, volume: 100, isk: each }));
+    const s = summarizeSurvey([
+      {
+        at: T0,
+        rocks: [
+          ...rocks('Veldspar', 20, 500_000),
+          ...rocks('Scordite', 5, 5_000_000),
+          ...rocks('Pyroxeres', 15, 800_000),
+          ...rocks('Kernite', 4, 750_000),
+        ],
+      },
+    ])!;
+    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
+      'Left: 5 Scordite · 15 Pyroxeres · 20 Veldspar · 4 other'
     );
   });
 
@@ -142,7 +164,7 @@ describe('chat message width', () => {
     const lines = surveyChatMessage(s, URL, labels).split('\n');
     expect(lines).toHaveLength(4);
     for (const line of lines.slice(0, 3)) expect(visible(line)).toBeLessThanOrEqual(MAX_LINE_WIDTH);
-    expect(lines[2]).toMatch(/^Left: .*\+\d+ more$/);
+    expect(lines[2]).toMatch(/^Left: .* · \d+ other$/);
   });
 
   it('never drops the biggest ore, even when its name alone is long', () => {

@@ -276,8 +276,8 @@ function RouteOutlet() {
     /*
       Deliberately not `key={location.pathname}`, which would replay a CSS
       animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
-      match more than one pathname (`/assets/*`, `/corp/assets/*`, and the
-      four `:param` routes), and React Router keeps one component instance
+      match more than one pathname (`/corp/assets/*`, the tabbed pages'
+      `<path>/*` splats, and the four `:param` routes), and React Router keeps one component instance
       across those — so re-keying would throw away Assets' search, filters
       and selection on every drill-down and re-run its loader. Animating
       the element in place keeps the instance and still replays.

@@ -77,6 +77,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             url={shareUrl(shareId)}
             expiresAt={state.expiresAt}
             onAdd={add}
+            panelTitle={t('survey.sharePanelTitle')}
           />
         </>
       )}

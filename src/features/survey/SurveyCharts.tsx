@@ -12,7 +12,6 @@
 import { useTranslation } from 'react-i18next';
 import {
   Area,
-  Bar,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -59,11 +58,25 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
 
 export function SurveyCharts({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
-  const domain: [number, number] = [summary.firstAt, summary.etaAt ?? summary.lastAt];
+  // A little past the finish, so its marker and label sit inside the plot.
+  const end = summary.etaAt ?? summary.lastAt;
+  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.07];
   const ticks = timeTicks(domain[0], domain[1]);
   const rows = volumeRows(summary);
-  const rates = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
-  const xAxis = (
+  // The rate is one flat block per pair of scans, from the earlier scan to the
+  // later: a step area drawn from each interval's start, closed at the last
+  // scan. The values are labelled at the middle of each block.
+  const last = summary.intervals[summary.intervals.length - 1];
+  const rateSteps =
+    last === undefined
+      ? []
+      : [
+          ...summary.intervals.map((i) => ({ at: i.from, rate: i.rate })),
+          { at: last.to, rate: last.rate },
+        ];
+  const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
+  // Both charts share this axis so their times line up; only the lower one shows it.
+  const xAxis = (hide: boolean) => (
     <XAxis
       dataKey="at"
       type="number"
@@ -73,6 +86,7 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
       tickFormatter={formatEveClock}
       stroke="var(--color-line-bright)"
       tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
+      hide={hide}
     />
   );
 
@@ -103,7 +117,7 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
           <ResponsiveContainer>
             <ComposedChart data={rows} margin={MARGIN}>
               <CartesianGrid stroke="var(--color-line)" vertical={false} />
-              {xAxis}
+              {xAxis(true)}
               <YAxis
                 width={Y_AXIS_WIDTH}
                 tickFormatter={formatCompactNumber}
@@ -165,7 +179,8 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                   strokeDasharray="2 3"
                   label={{
                     value: t('survey.chartDone', { time: formatEveClock(summary.etaAt) }),
-                    position: 'insideTopRight',
+                    position: 'insideTopLeft',
+                    textAnchor: 'end',
                     fill: 'var(--color-text)',
                     fontSize: 11,
                   }}
@@ -178,13 +193,13 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
         <figcaption className="sr-only">{t('survey.chartVolume')}</figcaption>
       </figure>
 
-      {rates.length > 0 && (
+      {rateSteps.length > 0 && (
         <figure aria-label={t('survey.chartRate')} className="m-0">
-          <div className="h-28 w-full">
+          <div className="h-32 w-full">
             <ResponsiveContainer>
-              <ComposedChart data={rates} margin={MARGIN}>
+              <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
                 <CartesianGrid stroke="var(--color-line)" vertical={false} />
-                {xAxis}
+                {xAxis(false)}
                 <YAxis
                   width={Y_AXIS_WIDTH}
                   tickFormatter={formatCompactNumber}
@@ -198,12 +213,34 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
                     fontSize: 10,
                   }}
                 />
-                <Bar
+                <Area
+                  data={rateSteps}
                   dataKey="rate"
+                  type="stepAfter"
+                  stroke="var(--color-accent)"
                   fill="var(--color-accent-dim)"
-                  maxBarSize={28}
+                  fillOpacity={0.75}
                   isAnimationActive={false}
                 />
+                <Line
+                  data={rateLabels}
+                  dataKey="rate"
+                  stroke="none"
+                  dot={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                >
+                  <LabelList
+                    dataKey="rate"
+                    position="top"
+                    offset={4}
+                    fill="var(--color-text)"
+                    fontSize={10}
+                    formatter={(value: unknown) =>
+                      typeof value === 'number' ? Math.round(value).toLocaleString() : ''
+                    }
+                  />
+                </Line>
                 {summary.pace !== null && (
                   <ReferenceLine
                     y={summary.pace}

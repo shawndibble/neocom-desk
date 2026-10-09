@@ -133,6 +133,14 @@
   --color-kind-contract-expiry: #f2879f;
   --color-kind-order-expiry: #c9d96a;
   --color-kind-skill-plan: #e0d0a8;
+  /*
+   * Kind of space on a pilot's kill activity and the Local list. Highsec and
+   * lowsec keep success and warning; nullsec and wormhole get their own hues so
+   * nullsec stops reading as the Threat verdict's red. Same values as
+   * kind-calendar-event / kind-skill-training, so the AA ratios in DESIGN.md hold.
+   */
+  --color-space-nullsec: #7e9cfd;
+  --color-space-wormhole: #d8beff;
 
   /*
    * Damage types — a second NOMINAL set, and a deliberate exception to the
@@ -806,8 +814,25 @@
     order: -3;
     flex: none;
     align-self: center;
-    width: 1.75rem;
-    margin-left: -1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-left: -1.5rem;
+    margin-right: 0.5rem;
+    /* Over the title, so the coarse pointer's 44px label overhang takes the tap. */
+    z-index: 1;
+  }
+
+  /* Never shrunk to the cell: the overhang is the touch target, centred on
+     the box so it neither touches the name nor adds height to line one. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-start > label {
+    flex: none;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-tight tr:has(> td.dt-edge-start) {
+    padding-left: 2.25rem;
   }
 
   /* The button keeps its 44px touch target, but negative margins stop it

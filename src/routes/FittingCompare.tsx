@@ -297,7 +297,7 @@ export function FittingCompare() {
       {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. */}
       <div
         data-testid="compare-controls"
-        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-x-2 md:gap-y-2"
+        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-start md:gap-x-2 md:gap-y-2"
       >
         <DamageProfilePicker damageProfiles={damageProfiles} />
         <AbyssalWeatherPicker />

@@ -97,6 +97,33 @@ test.describe('Fitting Compare at 390px', () => {
   });
 });
 
+test.describe('Fitting Compare long names at 390px', () => {
+  test('a long Fitting name keeps the Modules table inside its panel', async ({ page }) => {
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+    const longFit = [
+      '[Merlin, Fit B With A Rather Long Name Indeed]',
+      '125mm Gatling AutoCannon I',
+      '125mm Gatling AutoCannon I',
+    ].join(String.fromCharCode(10));
+    await addFitting(page, FIT_A);
+    await addFitting(page, longFit);
+    const modules = page.locator('table').nth(1);
+    await expect(modules.locator('thead th')).toHaveCount(3, { timeout: 20_000 });
+
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+
+    const table = (await modules.boundingBox())!;
+    const remove = (await modules.locator('thead th').last().getByRole('button').boundingBox())!;
+    expect(remove.x + remove.width).toBeLessThanOrEqual(table.x + table.width + 0.5);
+  });
+});
+
 test.describe('Fitting Compare control toolbar', () => {
   const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
 

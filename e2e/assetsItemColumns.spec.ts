@@ -65,7 +65,7 @@ for (const width of [1440, 1280, 1024]) {
       await seedAssets(page);
       await signInAndGoto(page);
       await page.setViewportSize({ width, height: 900 });
-      await page.goto(`./assets/${STATION}`);
+      await page.goto(`./assets/items/${STATION}`);
       await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
     });
 
@@ -147,33 +147,29 @@ test('the label strip is absent below md', async ({ page }) => {
   await seedAssets(page);
   await signInAndGoto(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`./assets/${STATION}`);
+  await page.goto(`./assets/items/${STATION}`);
   await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
   await expect(page.getByTestId('item-column-labels')).toBeHidden();
 });
 
-// #3087: the toggles sit under a "View" caption; the actions below share one left edge.
+// #3087: the toggles sit under a "View" caption. My ships and Plan a move are
+// tabs now, so the menu holds only the view toggles and Refresh.
 for (const width of [1280, 390]) {
-  test(`the Tools menu actions share a left edge and fit the viewport at ${width}px`, async ({
+  test(`the Tools menu fits the viewport at ${width}px and lists no tab destinations`, async ({
     page,
   }) => {
     await seedAssets(page);
     await signInAndGoto(page);
     await page.setViewportSize({ width, height: 844 });
-    await page.goto(`./assets/${STATION}`);
+    await page.goto(`./assets/items/${STATION}`);
     await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
     await page.getByRole('button', { name: 'Tools' }).click();
     const menu = page.getByRole('menu');
     await expect(menu.getByText('View', { exact: true })).toBeVisible();
 
-    const lefts: number[] = [];
-    for (const name of [/^My ships/, /^Plan a move/, /^Refresh/]) {
-      const item = menu.getByRole('menuitem', { name });
-      const box = await item.boundingBox();
-      expect(box).not.toBeNull();
-      lefts.push(box!.x);
-    }
-    expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
+    await expect(menu.getByRole('menuitem', { name: /^Refresh/ })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: /^My ships/ })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: /^Plan a move/ })).toHaveCount(0);
 
     const menuBox = await menu.boundingBox();
     expect(menuBox!.x).toBeGreaterThanOrEqual(0);
@@ -188,7 +184,7 @@ for (const width of [1280, 1024, 390]) {
     await seedAssets(page);
     await signInAndGoto(page);
     await page.setViewportSize({ width, height: 844 });
-    await page.goto(`./assets/${STATION}`);
+    await page.goto(`./assets/items/${STATION}`);
     await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
 
     const rows = page.locator('[data-virtual-scroll-root] [data-index]');

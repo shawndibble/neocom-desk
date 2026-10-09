@@ -11,7 +11,7 @@
  * Neither links to the modal's Character tab, which would only repeat this view.
  */
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -21,12 +21,12 @@ import {
   needsLossHistory,
   threatVerdict,
 } from '@/engine/pilotList/threatVerdict';
+import { cx } from '@/lib/cx';
 import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
 import { PilotShips } from './PilotShips';
 import { PilotThreatBand } from './PilotThreatBand';
-import { ThreatBadge } from './ThreatBadge';
 import { usePilotKillHistory } from './usePilotKillHistory';
 import { usePilotLossTimes } from './usePilotLossTimes';
 import { killerRatio } from './zkillFigures';
@@ -44,11 +44,6 @@ export interface PilotProfileViewProps {
   onOpenAlliance?: (allianceId: number) => void;
   /** Hides the name heading where the surrounding dialog already titles it. */
   hideName?: boolean;
-}
-
-interface PilotIdentityProps extends PilotProfileViewProps {
-  /** The Threat badge, drawn beside the name (alone where the dialog already titles it). */
-  threat?: ReactNode;
 }
 
 /** Mount it keyed by the character id, so a new pilot never shows the last one's stats. */
@@ -104,11 +99,8 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <PilotIdentity
-        {...props}
-        threat={threat && <ThreatBadge level={threat.pending ? 'pending' : threat.verdict.level} />}
-      />
+    <div className="@container/profile space-y-4">
+      <PilotIdentity {...props} />
       {threat && !threat.pending && (
         <PilotThreatBand
           verdict={threat.verdict}
@@ -124,8 +116,21 @@ export function PilotProfileView(props: PilotProfileViewProps) {
         corporationId={props.profile.corporationId}
         allianceId={props.profile.allianceId}
       />
-      {pilotStats && <ZkillRatioMeters stats={pilotStats} />}
-      <PilotKillActivityView history={history} onRetry={retryHistory} />
+      {/* The chart is the section the eye wants, so on a wide profile it takes the left, with "How
+          they fight" beside it; on a phone the meters come first, as a row, and the chart under. */}
+      <div
+        className={cx(
+          'grid gap-3',
+          pilotStats !== null && '@3xl/profile:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]'
+        )}
+      >
+        {pilotStats && (
+          <div className="order-first h-full @3xl/profile:order-last">
+            <ZkillRatioMeters stats={pilotStats} />
+          </div>
+        )}
+        <PilotKillActivityView history={history} onRetry={retryHistory} />
+      </div>
       <PilotShips
         kills={history.kind === 'ready' ? history.kills : null}
         flown={pilotStats?.topShips ?? null}
@@ -148,8 +153,7 @@ function PilotIdentity({
   onOpenCorporation,
   onOpenAlliance,
   hideName = false,
-  threat,
-}: PilotIdentityProps) {
+}: PilotProfileViewProps) {
   const { t } = useTranslation();
   // Rendered once per lookup; "now" for an age in years and days needs no ticking.
   const [now] = useState(() => new Date());
@@ -162,12 +166,7 @@ function PilotIdentity({
     <div className="flex items-start gap-3">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
       <div className="min-w-0 space-y-0.5">
-        {(!hideName || threat) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
-            {threat}
-          </div>
-        )}
+        {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
         <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
           <span className="sr-only">{t('travel.pilot.corporation')}: </span>
           {onOpenCorporation ? (

@@ -217,6 +217,39 @@ test.describe('Shared appraisal — phone table', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 
+  test('puts the brand and the way in at the top, without overflow, at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await openShare(page);
+
+    const header = page.getByRole('banner').first();
+    const login = header.getByRole('button', { name: 'Log in with EVE Online' });
+    const brand = header.getByRole('link', { name: 'Neocom Desk' });
+    await expect(login).toBeVisible();
+    await expect(brand).toBeVisible();
+
+    const [headerBox, loginBox, brandBox] = await Promise.all([
+      header.boundingBox(),
+      login.boundingBox(),
+      brand.boundingBox(),
+    ]);
+    // The entry control is on the first screen, inside the header, and does not sit on the brand.
+    expect(loginBox!.y + loginBox!.height).toBeLessThan(PHONE.height);
+    expect(loginBox!.x).toBeGreaterThanOrEqual(0);
+    expect(loginBox!.x + loginBox!.width).toBeLessThanOrEqual(PHONE.width);
+    expect(loginBox!.y + loginBox!.height).toBeLessThanOrEqual(
+      headerBox!.y + headerBox!.height + 1
+    );
+    const apart =
+      loginBox!.y >= brandBox!.y + brandBox!.height - 1 ||
+      loginBox!.x >= brandBox!.x + brandBox!.width - 1;
+    expect(apart).toBe(true);
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+
   test('still renders one real table row per item at 1280px', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await openShare(page);

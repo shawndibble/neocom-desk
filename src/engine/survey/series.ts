@@ -40,6 +40,8 @@ export interface SurveyOre {
   rocks: number;
   /** m³ of it left. */
   volume: number;
+  /** The scanner's ISK value of what is left of it; 0 when no row carried one. */
+  isk: number;
   /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
   startVolume: number;
 }
@@ -61,7 +63,7 @@ export interface SurveySummary {
   rocksLeft: number;
   /** The scanner's ISK value of everything left, summed; null when no row carried one. */
   iskLeft: number | null;
-  /** Ores still in the field, biggest first. */
+  /** Every ore the scans showed, the most valuable left first (biggest volume when no scan carries ISK); mined-out ores last. */
   ores: SurveyOre[];
   intervals: SurveyInterval[];
   /** Every scan, oldest first, for the chart. */
@@ -194,15 +196,19 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
 
   const byOre = new Map<string, SurveyOre>();
   for (const [ore, startVolume] of Object.entries(startByOre)) {
-    byOre.set(ore, { ore, rocks: 0, volume: 0, startVolume });
+    byOre.set(ore, { ore, rocks: 0, volume: 0, isk: 0, startVolume });
   }
   for (const rock of last.rocks) {
     const entry = byOre.get(rock.ore)!;
     entry.rocks += 1;
     entry.volume += rock.volume;
+    entry.isk += rock.isk ?? 0;
   }
+  // Biggest value left first when the scan carries ISK, else biggest volume.
+  const hasIsk = last.rocks.some((r) => r.isk !== undefined);
+  const rank = (o: SurveyOre): number => (hasIsk ? o.isk : o.volume);
   const ores = [...byOre.values()].sort(
-    (a, b) => b.volume - a.volume || b.startVolume - a.startVolume
+    (a, b) => rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume
   );
 
   return {

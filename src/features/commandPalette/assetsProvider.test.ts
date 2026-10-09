@@ -79,13 +79,15 @@ describe('buildPaletteAssets', () => {
 
 describe('assetsHref', () => {
   it('searches the active Character’s assets when it is the only holder', () => {
-    expect(assetsHref('Rifter', [1], 1)).toBe('/assets?q=Rifter');
+    expect(assetsHref('Rifter', [1], 1)).toBe('/assets/items?q=Rifter');
   });
 
   it('widens to every Character when another one holds some', () => {
-    expect(assetsHref("Pilot's Rifter", [1, 2], 1)).toBe('/assets?q=Pilot%27s+Rifter&chars=all');
-    expect(assetsHref('Rifter', [2], 1)).toBe('/assets?q=Rifter&chars=all');
-    expect(assetsHref('Rifter', [2], null)).toBe('/assets?q=Rifter&chars=all');
+    expect(assetsHref("Pilot's Rifter", [1, 2], 1)).toBe(
+      '/assets/items?q=Pilot%27s+Rifter&chars=all'
+    );
+    expect(assetsHref('Rifter', [2], 1)).toBe('/assets/items?q=Rifter&chars=all');
+    expect(assetsHref('Rifter', [2], null)).toBe('/assets/items?q=Rifter&chars=all');
   });
 });
 
@@ -130,9 +132,9 @@ describe('createAssetsProvider', () => {
   it('opens the Assets page searching for it', () => {
     const navigate = vi.fn();
     answer(provider({ navigate }), 'trit')[0].run();
-    expect(navigate).toHaveBeenCalledWith('/assets?q=Tritanium&chars=all');
+    expect(navigate).toHaveBeenCalledWith('/assets/items?q=Tritanium&chars=all');
     answer(provider({ navigate }), 'rift')[0].run();
-    expect(navigate).toHaveBeenCalledWith('/assets?q=Rifter');
+    expect(navigate).toHaveBeenCalledWith('/assets/items?q=Rifter');
   });
 
   it('sits just before Market Items, searched from two characters', () => {
