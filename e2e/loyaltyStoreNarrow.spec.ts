@@ -169,3 +169,42 @@ for (const width of [390, 1024, 1280]) {
     }
   });
 }
+
+for (const width of [390, 1024, 1280]) {
+  test(`the list panel names the hub and price basis inside its header at ${width}px (issue #3118)`, async ({
+    page,
+  }) => {
+    await mockLoyaltyOffers(page);
+    await signInAndGoto(page, `./market/lp-store/${CORPORATION_ID}?affordableOnly=0`);
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
+
+    const readout = page.getByTestId('lp-basis-readout');
+    await expect(readout).toHaveText('Jita · Sell');
+    const panelHeader = readout.locator('xpath=ancestor::header[1]');
+    const title = panelHeader.getByRole('heading', { level: 2 });
+    const [r, t, h, actions] = await Promise.all([
+      readout.boundingBox(),
+      title.boundingBox(),
+      panelHeader.boundingBox(),
+      panelHeader.getByRole('button').last().boundingBox(),
+    ]);
+    // Inside the header, clear of the title and the export button.
+    expect(r!.x).toBeGreaterThanOrEqual(h!.x - 1);
+    expect(r!.x + r!.width).toBeLessThanOrEqual(h!.x + h!.width + 1);
+    expect(r!.y).toBeGreaterThanOrEqual(h!.y - 1);
+    expect(r!.y + r!.height).toBeLessThanOrEqual(h!.y + h!.height + 1);
+    const apart = (a: { x: number; y: number; width: number; height: number }) =>
+      r!.x + r!.width <= a.x + 1 ||
+      a.x + a.width <= r!.x + 1 ||
+      r!.y + r!.height <= a.y + 1 ||
+      a.y + a.height <= r!.y + 1;
+    expect(apart(t!)).toBe(true);
+    if (actions) expect(apart(actions)).toBe(true);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
