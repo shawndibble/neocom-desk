@@ -183,8 +183,7 @@ test.describe('Realized-profit hero — captions folded into a tooltip (issue #3
       await page.goto('./industry/records');
 
       const hero = page
-        .getByText('Total realized profit', { exact: true })
-        .first()
+        .getByRole('button', { name: 'About total realized profit' })
         .locator('xpath=ancestor::div[contains(@class,"bg-panel-2")][1]');
       await expect(hero).toBeVisible();
       const heroHeight = (await hero.boundingBox())!.height;
