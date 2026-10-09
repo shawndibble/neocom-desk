@@ -113,6 +113,31 @@ describe('PilotListView (Local list)', () => {
     expect(badgeOf('Offline') ?? null).toBeNull();
   });
 
+  it('washes a Dangerous row red and fills its badge, and dims an Inactive one', async () => {
+    const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
+    const rows = [
+      row('Reaper', {
+        kills: ready(...killedLately),
+        extras: { kind: 'ready', dangerRatio: 80, killerRatio: 80, lossTimesMs: null },
+      }),
+      row('Sleeper', { kills: ready(kill(100 * DAY, 'lowsec')) }),
+    ];
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(rows);
+        return Promise.resolve();
+      }
+    );
+    renderList();
+    await screen.findByText('Reaper');
+    const rowOf = (name: string) => screen.getByText(name).closest('tr');
+    expect(rowOf('Reaper')?.className).toContain('border-l-danger!');
+    expect(screen.getByText('Dangerous').closest('span.inline-flex')?.className).toContain(
+      'bg-danger!'
+    );
+    expect(rowOf('Sleeper')?.className).toContain('opacity-70');
+  });
+
   it('groups pilots by what they mean to you, in a fixed order', async () => {
     renderList();
     await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });

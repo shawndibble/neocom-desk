@@ -14,9 +14,12 @@ import { THREAT_LEVEL_TONE, THREAT_PILL_CLASS } from './threatTone';
 export function ThreatBadge({
   level,
   className,
+  solid = false,
 }: {
   level: ThreatLevel | 'pending';
   className?: string;
+  /** Fills a Dangerous badge solid, for a list row where it has to read at a glance. */
+  solid?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -24,6 +27,7 @@ export function ThreatBadge({
       className={cx(
         'inline-flex shrink-0 items-center rounded-xs border px-1.5 py-px text-[0.6875rem] leading-4 font-semibold tracking-widest whitespace-nowrap uppercase',
         THREAT_PILL_CLASS[THREAT_LEVEL_TONE[level]],
+        solid && level === 'dangerous' && 'border-danger! bg-danger! text-accent-contrast!',
         className
       )}
     >

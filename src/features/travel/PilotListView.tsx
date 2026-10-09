@@ -52,6 +52,7 @@ import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
 import { rowThreat } from './rowThreat';
 import { ThreatBadge } from './ThreatBadge';
+import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS } from './threatTone';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
@@ -183,7 +184,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     {
       id: 'pilot',
       header: t('travel.pilot.list.pilot'),
-      stickyStart: true,
       render: (row) => {
         const threat = rowThreat(row, now);
         return (
@@ -194,7 +194,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
               ) : (
                 <CharacterLink id={row.characterId}>{row.name}</CharacterLink>
               )}
-              {threat !== null && <ThreatBadge level={threat} />}
+              {threat !== null && <ThreatBadge level={threat} solid />}
             </span>
             {(row.corporationName || row.allianceName) && (
               <span className="block truncate text-[0.6875rem] text-text-dim">
@@ -246,6 +246,10 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       columns={columns}
       rows={list}
       rowKey={(row) => row.name}
+      rowClassName={(row) => {
+        const threat = rowThreat(row, now);
+        return threat === null ? undefined : THREAT_ROW_CLASS[THREAT_LEVEL_TONE[threat]];
+      }}
       responsive="stack"
     />
   );
