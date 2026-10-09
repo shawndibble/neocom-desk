@@ -76,7 +76,7 @@ export function lightYearDistance(a: SystemPosition, b: SystemPosition): number 
 }
 
 /** True when a jump drive cannot land in the system whatever the beacon situation. */
-function isUntargetable(system: JumpSystem): boolean {
+export function isUntargetable(system: JumpSystem): boolean {
   return (
     system.security >= HIGHSEC_MIN_SECURITY ||
     system.id >= WORMHOLE_SPACE_MIN_ID ||

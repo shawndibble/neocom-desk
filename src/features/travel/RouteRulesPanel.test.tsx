@@ -55,6 +55,12 @@ function renderPanel({ holes = false, bridges = false } = {}) {
         bridgeCount: 2,
         onManageBridges: () => undefined,
       }}
+      jump={{
+        enabled: false,
+        onEnabledChange: () => undefined,
+        range: 'max',
+        onRangeChange: () => undefined,
+      }}
     />
   );
 }

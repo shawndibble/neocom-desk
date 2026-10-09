@@ -22,9 +22,12 @@
  * the jump shown: the pilot can always fly the gate.
  */
 import { bridgeBetween, bridgeConnections, type AnsiblexGate } from './ansiblex';
+import { lightYearDistance, type SystemPosition } from './jumpDrive';
+import { jumpWayFacts, type JumpDriveOptions, type JumpHop, type JumpWayFacts } from './jumpLegs';
 import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 import {
   legWays,
+  type JumpContext,
   parseLegPin,
   pinWaitsOnHoleList,
   pinnedLegRoute,
@@ -51,7 +54,8 @@ import type { TripPlan } from './tripPlan';
 export type RouteStep =
   | { kind: 'gate' }
   | { kind: 'hole'; hole: TheraConnection }
-  | { kind: 'bridge'; gate: AnsiblexGate };
+  | { kind: 'bridge'; gate: AnsiblexGate }
+  | { kind: 'jump'; distanceLy: number };
 
 /** A Route Safety row, tagged with how its system was entered. */
 export interface RouteSafetyTripRow extends RouteSafetyRow {
@@ -78,12 +82,14 @@ export interface RouteSafetyWayBridge {
  * writes — `null` for the planner's own pick, which un-pins the leg.
  */
 export interface RouteSafetyWay {
-  kind: 'planner' | 'gates' | 'thera' | 'turnur' | 'hole' | 'ansiblex';
+  kind: 'planner' | 'gates' | 'thera' | 'turnur' | 'hole' | 'ansiblex' | 'jump';
   pin: string | null;
   /** `null` when this way does not reach the leg's far end. */
   summary: RouteSafetySummary | null;
   holes: RouteSafetyWayHole[];
   bridges: RouteSafetyWayBridge[];
+  /** Fuel, light years and fatigue of the jump drive legs; `null` when the way has none. */
+  jump: JumpWayFacts | null;
   inUse: boolean;
 }
 
@@ -114,6 +120,10 @@ export interface RouteSafetyTrip {
   holeJumps: number;
   /** How many go over an Ansiblex; the rest are by gate. */
   bridgeJumps: number;
+  /** How many go by jump drive. */
+  driveJumps: number;
+  /** The trip's jump drive legs, or `null` when it has none. */
+  jump: JumpWayFacts | null;
 }
 
 /** A trip as the planner left it: the stargate graph it was planned on, and the search, holes and all. */
@@ -158,7 +168,8 @@ export function routeSafetyNetwork(
 export function planLegAlternatives(
   trip: PlannedTrip,
   network: { holes: readonly HoleEnds[]; bridges: readonly AnsiblexGate[] },
-  pins: { tokens: readonly string[]; listed: readonly PinnableHole[] | null }
+  pins: { tokens: readonly string[]; listed: readonly PinnableHole[] | null },
+  jump: JumpContext | null = null
 ): { legs: LegAlternatives[]; systemIds: number[] } {
   const { plan, graph, options } = trip;
   const crossed = new Set<number>();
@@ -166,7 +177,7 @@ export function planLegAlternatives(
   const qualifying = network.holes.map((ends) => ({ ...ends, id: '' }));
   const legs = plan.legs.map((leg, index): LegAlternatives => {
     if (leg.route.kind === 'route') cross(leg.route.systems);
-    const ways = legWays(graph, leg.from, leg.to, options, network.holes, network.bridges);
+    const ways = legWays(graph, leg.from, leg.to, options, network.holes, network.bridges, jump);
     for (const way of ways) if (way.route.kind === 'route') cross(way.route.systems);
     const pin = parseLegPin(pins.tokens[index] ?? '');
     const waiting = pins.listed === null && pin !== null && pinWaitsOnHoleList(pin);
@@ -177,6 +188,7 @@ export function planLegAlternatives(
             qualifying,
             listed: pins.listed ?? [],
             bridges: network.bridges,
+            jump,
           });
     if (pinned?.kind === 'route') cross(pinned.systems);
     return { ways, pinned };
@@ -213,6 +225,11 @@ export interface RouteSafetyTripInput {
   activity: RouteSafetyActivity | null;
   /** Systems under a lawless insurgency now; leave out while there is no fresh list. */
   lawless?: ReadonlySet<number>;
+  /** The hull's drive and every system's position, when jump legs are on. */
+  jump?: {
+    positions: ReadonlyMap<number, SystemPosition>;
+    drive: Pick<JumpDriveOptions, 'fuelPerLy' | 'distanceFactor'>;
+  } | null;
 }
 
 export type RouteSafetyAssembly =
@@ -239,14 +256,30 @@ const GATE_STEP: RouteStep = { kind: 'gate' };
 export function stepJumps(rows: readonly Pick<RouteSafetyTripRow, 'entry'>[]): {
   holeJumps: number;
   bridgeJumps: number;
+  driveJumps: number;
 } {
   let holeJumps = 0;
   let bridgeJumps = 0;
+  let driveJumps = 0;
   for (const { entry } of rows) {
     if (entry?.kind === 'hole') holeJumps += 1;
     else if (entry?.kind === 'bridge') bridgeJumps += 1;
+    else if (entry?.kind === 'jump') driveJumps += 1;
   }
-  return { holeJumps, bridgeJumps };
+  return { holeJumps, bridgeJumps, driveJumps };
+}
+
+/** The jump hops and gate hops a run of tagged rows holds, in order. */
+function hopsOf(rows: readonly Pick<RouteSafetyTripRow, 'entry' | 'systemId'>[]): JumpHop[] {
+  return rows.flatMap((row, at): JumpHop[] => {
+    if (at === 0 || !row.entry) return [];
+    const from = rows[at - 1].systemId;
+    return [
+      row.entry.kind === 'jump'
+        ? { kind: 'jump', from, to: row.systemId, distanceLy: row.entry.distanceLy }
+        : { kind: 'gate', from, to: row.systemId },
+    ];
+  });
 }
 
 /**
@@ -258,14 +291,18 @@ export function stepJumps(rows: readonly Pick<RouteSafetyTripRow, 'entry'>[]): {
 function stepReader(
   graph: JumpGraph,
   holes: readonly TheraConnection[],
-  bridges: readonly AnsiblexGate[]
+  bridges: readonly AnsiblexGate[],
+  positions: ReadonlyMap<number, SystemPosition> | null
 ): (systems: readonly number[]) => (RouteStep | null)[] {
   const stepOf = (from: number, to: number): RouteStep => {
     if (graph.get(from)?.includes(to)) return GATE_STEP;
     const hole = holeBetween(holes, from, to);
     if (hole) return { kind: 'hole', hole };
     const gate = bridgeBetween(bridges, from, to);
-    return gate ? { kind: 'bridge', gate } : GATE_STEP;
+    if (gate) return { kind: 'bridge', gate };
+    const a = positions?.get(from);
+    const b = positions?.get(to);
+    return a && b ? { kind: 'jump', distanceLy: lightYearDistance(a, b) } : GATE_STEP;
   };
   return (systems) =>
     systems.map((to, index) => (index === 0 ? null : stepOf(systems[index - 1], to)));
@@ -287,7 +324,12 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       pinned?.kind === 'route' && pinned.hole ? listedById.get(pinned.hole.id) : undefined;
     return hole && !qualifyingIds.has(hole.id) ? [hole] : [];
   });
-  const stepsOn = stepReader(graph, [...holes, ...pinnedHoles], bridges ?? []);
+  const stepsOn = stepReader(
+    graph,
+    [...holes, ...pinnedHoles],
+    bridges ?? [],
+    input.jump?.positions ?? null
+  );
   // One stop is the page as it always was: no route is the whole answer.
   if (
     input.singleStop &&
@@ -322,6 +364,12 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       else if (step?.kind === 'bridge') bridgeJumps.push({ ...ends, gate: step.gate });
     });
     return { holes: holeJumps, bridges: bridgeJumps };
+  };
+  const jumpOn = (rows: readonly Pick<RouteSafetyTripRow, 'entry' | 'systemId'>[]) => {
+    const hops = hopsOf(rows);
+    return input.jump && hops.some((hop) => hop.kind === 'jump')
+      ? jumpWayFacts(hops, input.jump.drive)
+      : null;
   };
 
   const legs = plan.legs.map((leg, index): RouteSafetyLeg => {
@@ -375,6 +423,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
         pin: candidate.pin,
         summary: candidate.systems ? summaryOf(candidate.systems) : null,
         ...(candidate.systems ? jumpsOn(candidate.systems) : { holes: [], bridges: [] }),
+        jump: candidate.systems ? jumpOn(tagRows(candidate.systems)) : null,
         inUse,
       };
     });
@@ -404,6 +453,7 @@ export function assembleRouteSafety(input: RouteSafetyTripInput): RouteSafetyAss
       stopIndexes: joined.stopIndexes,
       summary: summarizeTrip(legRows),
       ...stepJumps(joined.rows),
+      jump: jumpOn(joined.rows),
     };
   }
   return {

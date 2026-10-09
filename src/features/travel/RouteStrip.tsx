@@ -43,6 +43,11 @@ const STEP_CELL = {
     testId: 'route-strip-bridge',
     className: 'border-y border-dashed border-line-bright',
   },
+  jump: {
+    tip: 'travel.jumpDrive.stripCell',
+    testId: 'route-strip-jump',
+    className: 'border border-dashed border-accent text-accent',
+  },
 } as const;
 
 function securityText(row: RouteSafetyRow): string {
@@ -84,7 +89,7 @@ export function RouteStrip({
         })
       : t('travel.strip.system', { name: routeSystemName(row), security: securityText(row) });
   const withKills = rows.filter((row) => hasKills(row, killsOf(row.systemId)));
-  const { holeJumps, bridgeJumps } = stepJumps(rows);
+  const { holeJumps, bridgeJumps, driveJumps } = stepJumps(rows);
   const label = [
     t('travel.strip.label', {
       count: rows.length,
@@ -101,6 +106,7 @@ export function RouteStrip({
         ]),
     ...(holeJumps === 0 ? [] : [t('travel.holes.stripLabel', { count: holeJumps })]),
     ...(bridgeJumps === 0 ? [] : [t('travel.bridges.stripLabel', { count: bridgeJumps })]),
+    ...(driveJumps === 0 ? [] : [t('travel.jumpDrive.stripLabel', { count: driveJumps })]),
   ].join(' ');
 
   return (
@@ -118,12 +124,18 @@ export function RouteStrip({
                   content={t(step.tip, {
                     from: routeSystemName(previous),
                     to: routeSystemName(row),
+                    distance: row.entry?.kind === 'jump' ? row.entry.distanceLy.toFixed(1) : '',
                   })}
                 >
                   <span
                     data-testid={step.testId}
-                    className={`min-w-0 flex-1 rounded-[1px] bg-panel-2 ${step.className}`}
-                  />
+                    className={`min-w-0 flex-1 overflow-hidden rounded-[1px] bg-panel-2 text-center text-[0.625rem] leading-[0.875rem] ${step.className}`}
+                  >
+                    {row.entry?.kind === 'jump' &&
+                      t('travel.jumpDrive.stripDistance', {
+                        distance: row.entry.distanceLy.toFixed(1),
+                      })}
+                  </span>
                 </Tooltip>
               )}
               <Tooltip content={tip}>
