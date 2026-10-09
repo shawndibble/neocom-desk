@@ -187,11 +187,9 @@ export const NAV_PAGES = [
     group: 'economy',
     gating: 'scope',
     mobileTab: true,
-    // Shopping an LP store is a market errand; the balances stay on Wallet
-    // (scope decision `20261002-145653-lp-store-under-market-pilot-lookup-its-own`).
-    subViews: [
-      { path: '/market/lp-store', labelKey: 'loyaltyStore.title', searchKeys: ['loyalty.title'] },
-    ],
+    // LP Store is a Market tab (`MARKET_TABS`); the balances stay on Wallet
+    // (scope decisions `20261002-145653-lp-store-under-market-pilot-lookup-its-own`
+    // and the one making it a tab).
   },
   {
     path: '/wallet',

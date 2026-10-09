@@ -59,7 +59,7 @@ async function seedAssets(page: Page): Promise<void> {
   );
 }
 
-for (const width of [1440, 1024]) {
+for (const width of [1440, 1280, 1024]) {
   test.describe(`Assets item columns at ${width}px`, () => {
     test.beforeEach(async ({ page }) => {
       await seedAssets(page);
@@ -103,6 +103,33 @@ for (const width of [1440, 1024]) {
         expect(new Set(edges).size).toBe(1);
         expect(edges[0]).toBe(labelEdges[labelIndex]);
       }
+    });
+
+    test('the figures sit beside the capped name, not at the panel edge', async ({ page }) => {
+      const rows = page.locator('[data-virtual-scroll-root] [data-index]');
+      const gaps = await rows.evaluateAll((els) =>
+        els.map((row) => {
+          const cells = row.querySelectorAll<HTMLElement>('.tabular-nums > span');
+          const value = cells[4].getBoundingClientRect();
+          return {
+            left: value.left - row.getBoundingClientRect().left,
+            right: value.right,
+            rowRight: row.getBoundingClientRect().right,
+          };
+        })
+      );
+      const rem = await page.evaluate(() =>
+        parseFloat(getComputedStyle(document.documentElement).fontSize)
+      );
+      for (const g of gaps) {
+        // 24rem name cell + Qty + m3 + gaps: the Value cell starts well inside the row.
+        expect(g.left).toBeLessThanOrEqual(40 * rem);
+        expect(g.right).toBeLessThanOrEqual(g.rowRight);
+      }
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
     });
 
     test('a long name and an oversized value keep every row one line tall', async ({ page }) => {
@@ -151,5 +178,37 @@ for (const width of [1280, 390]) {
     const menuBox = await menu.boundingBox();
     expect(menuBox!.x).toBeGreaterThanOrEqual(0);
     expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width);
+  });
+}
+
+// #3116: an item with no estimate (only type 34 is priced here) reads as a dim
+// dash in the same value column, not a green "0".
+for (const width of [1280, 1024, 390]) {
+  test(`an unpriced item's dash shares the value column at ${width}px`, async ({ page }) => {
+    await seedAssets(page);
+    await signInAndGoto(page);
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`./assets/${STATION}`);
+    await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
+
+    const rows = page.locator('[data-virtual-scroll-root] [data-index]');
+    expect(await rows.count()).toBe(4);
+    await expect(rows.getByText('No estimate')).toHaveCount(3);
+    await expect(rows.locator('.text-isk-pos')).toHaveCount(1);
+
+    const cells = await rows.evaluateAll((els) =>
+      els.map((row) => {
+        const value = row.querySelector<HTMLElement>('.tabular-nums > span:last-child')!;
+        const box = value.getBoundingClientRect();
+        return {
+          dim: value.classList.contains('text-text-faint'),
+          right: Math.round(box.right),
+          overflow: value.scrollWidth > value.clientWidth + 1,
+        };
+      })
+    );
+    expect(cells.filter((c) => c.dim)).toHaveLength(3);
+    expect(cells.some((c) => c.overflow)).toBe(false);
+    if (width >= 768) expect(new Set(cells.map((c) => c.right)).size).toBe(1);
   });
 }

@@ -38,9 +38,14 @@ const CONCRETE_PATH: Partial<Record<AppRoutePath, string>> = {
   '/corp/assets/*': '/corp/assets/e2e-missing-location',
 };
 
+// A path can be both a route and a tab (`/market/lp-store`), so the list is de-duplicated.
 const PATHS = [
-  ...(Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).map((path) => CONCRETE_PATH[path] ?? path),
-  ...Object.values(PAGE_TABS).flatMap((page) => page.tabs.map((tab) => tabPath(page, tab.id))),
+  ...new Set([
+    ...(Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).map(
+      (path) => CONCRETE_PATH[path] ?? path
+    ),
+    ...Object.values(PAGE_TABS).flatMap((page) => page.tabs.map((tab) => tabPath(page, tab.id))),
+  ]),
 ];
 
 /** Every lazy key, plus the plural base i18next falls back to (`items` for `items_one`). */

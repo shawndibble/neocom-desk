@@ -506,6 +506,18 @@
       "indexes": []
     },
     {
+      "collectionGroup": "surveyScans",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "surveyScans",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "netWorthSnapshots",
       "fieldPath": "*",
       "ttl": false,

@@ -139,6 +139,8 @@ for (const width of [390, 1024, 1280]) {
     await page.getByRole('button', { name: 'Appraise', exact: true }).click();
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
+    // Below lg the paste card folds into its summary once a result exists (#3135).
+    if (width < 1024) await page.getByRole('button', { name: /Edit list/ }).click();
     const select = page.getByRole('combobox', { name: 'Load a recent list' });
     await expect(select).toBeVisible();
     const g = await select.evaluate((el) => {

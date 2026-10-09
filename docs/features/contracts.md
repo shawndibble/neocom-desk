@@ -36,7 +36,7 @@ User goal by tab:
   - Items: `items.q`, `items.type`, `items.region`, `items.maxPrice`, `items.minQty`, `items.kind` (exchange|auction), `items.hideAuctions`, `items.hidePlex`, `items.jumps`, `items.sort` (default price asc).
   - Courier: `courier.q`, `.origin`, `.dest`, `.space` (set), `.hideRisky`, `.overRate` (all|only|hide), `.minReward`, `.maxCollateral`, `.maxVolume`, `.minDays`, `.pref`, `.sort` (default iskPerJump desc).
   - History: `history.q`, `history.status`, `history.type`, `history.sort` (default issued desc).
-  - `highlight=<contractId>` pulses a History row (target of `contractAccepted` alerts and of the wallet journal "Contract →" link).
+  - `highlight=<contractId>` pulses a History row (target of `contractAccepted` alerts and of the wallet journal "Contract" link).
 - Header per tab: History shows `DataAgeBadge` of the contracts fetch, export menu, Refresh. Search tabs show a `DataAgeBadge` of the snapshot's `lastSyncedAt` (when the backend last crawled, not when the browser read it) and one Refresh that reloads both snapshots (`Contracts.tsx:563-594`). Export button is History-only in the header; Items and Courier export from inside their filter bars.
 
 ## Data sources and scopes
@@ -226,7 +226,7 @@ Dense cards and mobile sort on both search tabs; filters in a funnel sheet; pane
 ## Cross-page hooks and shared surfaces
 
 - **Item Detail (Show info)** opened from every item line in the three modals (`ItemInfoLink`): full spec in `docs/features/assets.md` section "Item Detail (Show info) as reached from Assets" and host mechanics in `docs/features/entities-share.md`. Contract lines never show a price in Item Detail from the contract; it shows the Order Book at the saved hub/region.
-- **Wallet journal** deep-links here: a journal line with `context_id_type === contract_id` shows "Contract →" to `/contracts/history?highlight=<id>` (`features/character/JournalDescriptionCell.tsx`); the History table pulses that row (`highlightRowKey`, `Contracts.tsx` History `DataTable`). The same line can link to the Moon Mining Tax row it settled (`docs/features/wallet.md`).
+- **Wallet journal** deep-links here: a journal line with `context_id_type === contract_id` shows "Contract" to `/contracts/history?highlight=<id>` (`features/character/JournalDescriptionCell.tsx`); the History table pulses that row (`highlightRowKey`, `Contracts.tsx` History `DataTable`). The same line can link to the Moon Mining Tax row it settled (`docs/features/wallet.md`).
 - **Market**: `docs/features/market.md` section 6 covers Contract search from the Market side; this file is the Contracts-page spec. BPC Sourcing (Industry) reads the same Public Contract Offers snapshot narrowed to blueprint copies (`docs/features/industry-records-sourcing.md`).
 - **Notifications**: `contractAccepted` and `courierDeliveryDue` (default both channels), `contractCompleted` and `contractFailed` (feed only), all need `esi-contracts.read_character_contracts.v1` (`features/notifications/events.ts:165-190`); `contractAccepted` alerts deep-link to `/contracts/history?highlight=<id>`. Courier Delivery Due fires when the accepted courier's deliver-by (`courierDeliveryDeadlineMs`) is within the lead time (default 6 h, `courierDeliveryDueLeadHours`), never off `date_expired`.
 - **Calendar/Overview** read the same contract list for deadlines (`engine/courierDeadline.ts` shared with the History table; decision `20260925-203743-overview-contracts-row-feeds-next-deadline`).

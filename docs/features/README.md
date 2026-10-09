@@ -29,7 +29,7 @@ alerts.md (A) and notifications.md (C) overlap. share-links.md (A) and entities-
 6. **Copy/code drift.** Settings hint says device-only but feed prefs sync. Copy says Overview, feed lives on `/alerts`. Permission count 13 vs 15. Mining Tax reads ESI's 30-day ledger while Overview keeps 90 days. Decision says ten-minute poll, code is 5 min. Contacts row menu promised, not shipped. Help/FAQ thin on Wallet, Assets, Contracts.
 7. **View state local-only.** PI Find best toggles, Compare Set, pasted Appraisal list, Ship Tree URL (`?faction=` only), oversized fittings (no `?f=`), saved skill comparisons. Pilot Lookup ignores `?pilot=` for the search box.
 8. **Phone/desktop parity.** Price history phone-only in Opportunities. Map has no phone trace. Group page hides Owned on phone. No desktop context menus in Opportunities.
-9. **Push limits.** Only 11 of 25 alert events wake a closed app. Push registration failures log to console only.
+9. **Push limits.** Only 12 of 25 alert events wake a closed app. Push registration failures log to console only.
 10. **Stale data unlabeled.** (Contract search shows a snapshot age badge.) Pilot Lookup and Market-Wide have no data-age badge.
 
 Per-area detail and line cites live in each file. Gaps flagged "inferred" or "unverified" in files were not confirmed in code.

@@ -64,7 +64,9 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import { resolveCategories, resolveNames, type NameCategory } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
+import { cx } from '@/lib/cx';
+import { HintText } from '@/components/ui/HintText';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
@@ -154,14 +156,82 @@ function ContractStatusCell({ contract }: { contract: Contract }) {
   );
 }
 
+/**
+ * Yesterday's calendar day in `timeZone`, formatted like `formatDateOnly`.
+ * Walks the calendar rather than subtracting 24h, which lands on the wrong day
+ * across a DST change (a 23- or 25-hour day).
+ */
+function formatYesterday(nowMs: number, timeZone: string | undefined): string {
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(new Date(nowMs))
+    .split('-')
+    .map(Number);
+  return formatDateOnly(new Date(Date.UTC(year, month - 1, day - 1, 12)), 'UTC');
+}
+
+/** A phone day section's header: the date, and how many contracts were issued that day. */
+function ContractDayHeader({
+  date,
+  count,
+  timeZone,
+}: {
+  date: string;
+  count: number;
+  timeZone: string | undefined;
+}) {
+  const { t } = useTranslation();
+  // Today and yesterday read as words; anything older keeps its date.
+  const now = useTicker(CONTRACT_CLOCK_MS);
+  const label =
+    date === formatDateOnly(new Date(now), timeZone)
+      ? t('contracts.today')
+      : date === formatYesterday(now, timeZone)
+        ? t('contracts.yesterday')
+        : date;
+  return (
+    <span className="flex flex-1 flex-wrap items-baseline justify-between gap-x-3">
+      <span className="font-semibold">{label}</span>
+      <span className="text-[0.6875rem] text-text-dim tabular-nums">
+        {t('contracts.dayCount', { count })}
+      </span>
+    </span>
+  );
+}
+
 /** An accepted courier's delivery deadline, counting down to overdue. */
-function CourierDeadlineCell({ deadlineMs, time }: { deadlineMs: number; time: string }) {
+function CourierDeadlineCell({
+  deadlineMs,
+  timeZone,
+}: {
+  deadlineMs: number;
+  timeZone: string | undefined;
+}) {
   const { t } = useTranslation();
   const remainingMs = deadlineMs - useTicker(CONTRACT_CLOCK_MS);
-  return remainingMs <= 0 ? (
-    <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
-  ) : (
-    t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+  const date = new Date(deadlineMs);
+  const time = formatDateOnly(date, timeZone);
+  return (
+    <HintText
+      content={formatTimestamp(date, timeZone)}
+      className={remainingMs <= 0 ? 'text-danger' : undefined}
+    >
+      {remainingMs <= 0
+        ? t('contracts.deliverOverdue', { time })
+        : t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })}
+    </HintText>
+  );
+}
+
+/** A date alone in the cell; the exact time rides a tooltip (the detail modal carries it on touch). */
+function ContractDateCell({ iso, timeZone }: { iso: string; timeZone: string | undefined }) {
+  const date = new Date(iso);
+  return (
+    <HintText content={formatTimestamp(date, timeZone)}>{formatDateOnly(date, timeZone)}</HintText>
   );
 }
 
@@ -457,6 +527,14 @@ export function Contracts() {
         },
         render: (contract) => {
           const receiver = receiverFor(contract);
+          // No receiver (a public contract nobody took): the phone card's meta
+          // line leaves the placeholder dash off rather than print a bare "—".
+          if (receiver === null)
+            return (
+              <span className="text-text-dim" data-dense-omit>
+                —
+              </span>
+            );
           return (
             <ContractReceiverLink
               receiver={receiver}
@@ -475,6 +553,8 @@ export function Contracts() {
         header: t('contracts.price'),
         align: 'right',
         className: 'tabular-nums',
+        // The dense phone card's headline figure, beside the title.
+        cardCorner: true,
         sortValue: (contract) => contractAmount(contract),
         render: (contract) => {
           const amount = contractAmount(contract);
@@ -486,7 +566,12 @@ export function Contracts() {
         header: t('contracts.issued'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_issued).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_issued), timeZone),
+        // Off the phone card: its day section header already says it.
+        render: (contract) => (
+          <span data-dense-omit>
+            <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />
+          </span>
+        ),
       },
       expires: {
         id: 'expires',
@@ -498,13 +583,14 @@ export function Contracts() {
         render: (contract) => {
           const deadlineMs = courierDeliveryDeadlineMs(contract);
           if (deadlineMs === null)
-            return formatTimestamp(new Date(contract.date_expired), timeZone);
-          return (
-            <CourierDeadlineCell
-              deadlineMs={deadlineMs}
-              time={formatTimestamp(new Date(deadlineMs), timeZone)}
-            />
-          );
+            return (
+              <span>
+                {/* Phone card only: its meta line has no column labels. */}
+                <span className="sm:hidden">{t('contracts.expiresAffix')}</span>
+                <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />
+              </span>
+            );
+          return <CourierDeadlineCell deadlineMs={deadlineMs} timeZone={timeZone} />;
         },
       },
     }),
@@ -516,17 +602,35 @@ export function Contracts() {
         id: 'type',
         header: t('contracts.type'),
         sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
-        render: (contract) => (
-          <button
-            type="button"
-            onClick={() => setSelectedContract(contract)}
-            className={entityLinkClassName(
-              'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto'
-            )}
-          >
-            <ContractIdentity contract={contract} characterId={activeCharacterId} />
-          </button>
-        ),
+        render: (contract) => {
+          const opener = (
+            <button
+              type="button"
+              onClick={() => setSelectedContract(contract)}
+              className={entityLinkClassName(
+                cx(
+                  'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto',
+                  contract.title && 'md:max-w-72 md:truncate'
+                )
+              )}
+            >
+              {/* Phone only: the status tone as a dot, so a scan down the card
+                  list reads outcome without the Status column (which the
+                  picker can hide). The word stays on the meta line. */}
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'mr-2 size-2 shrink-0 rounded-full bg-current sm:hidden',
+                  STATUS_TONE[contract.status]
+                )}
+              />
+              <ContractIdentity contract={contract} characterId={activeCharacterId} />
+            </button>
+          );
+          // A title is the only free-text (so truncatable) identity; the full
+          // text reaches the tooltip on hover and touch-and-hold.
+          return contract.title ? <Tooltip content={contract.title}>{opener}</Tooltip> : opener;
+        },
       },
       ...CONTRACTS_HISTORY_COLUMN_IDS.filter(historyColumnVisibility.isVisible).map(
         (id) => optionalHistoryColumns[id]
@@ -691,6 +795,28 @@ export function Contracts() {
               />
             }
           />
+          {/* Phone only: the filter sheet's status chips, one tap away. */}
+          <div
+            role="group"
+            aria-label={t('contracts.statusFilterLabel')}
+            className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
+          >
+            <FilterChip
+              label={t('contracts.statusAll')}
+              selected={filter.status === null}
+              onToggle={() => setFilter({ ...filter, status: null })}
+            />
+            {statusOptions.map((status) => (
+              <FilterChip
+                key={status}
+                label={t(CONTRACT_STATUS_KEY[status])}
+                selected={filter.status === status}
+                onToggle={() =>
+                  setFilter({ ...filter, status: filter.status === status ? null : status })
+                }
+              />
+            ))}
+          </div>
           {filteredContracts.length === 0 ? (
             // Zero matches with no active filter can't happen today (an empty
             // list is caught above), but the reset only belongs where a filter is on.
@@ -722,6 +848,22 @@ export function Contracts() {
               virtualize="auto"
               highlightRowKey={highlightedContractId}
               {...historySortProps}
+              stackLayout="dense"
+              // Issue days are sections on a phone, not folded duplicates:
+              // open, with members in line with the cards above them.
+              className="dt-flat-groups"
+              groupBy={{
+                key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
+                minSize: 1,
+                defaultExpanded: () => true,
+                renderHeader: (rows) => (
+                  <ContractDayHeader
+                    date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
+                    count={rows.length}
+                    timeZone={timeZone}
+                  />
+                ),
+              }}
             />
           )}
         </Panel>
