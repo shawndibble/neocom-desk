@@ -27,7 +27,8 @@ function Tile({
         {label}
       </div>
       <div
-        className={`truncate text-lg font-semibold tabular-nums ${emphasis ? 'text-accent' : ''}`}
+        data-survey-stat
+        className={`text-lg font-semibold break-words tabular-nums ${emphasis ? 'text-accent' : ''}`}
       >
         {children}
       </div>
@@ -51,7 +52,7 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-x-4 gap-y-3">
       <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
       <Tile label={t('survey.statPace')}>
         {summary.pace === null ? '–' : t('survey.unitPace', { value: n(summary.pace, 1) })}
