@@ -48,10 +48,10 @@ function stored(data: Record<string, unknown> | null) {
 }
 
 describe('shareUrl', () => {
-  it('is the short /share/<id> path on this origin', () => {
+  it('is the short /s/<id> path on this origin', () => {
     vi.stubGlobal('window', { location: { origin: 'https://neocomdesk.com' } });
     try {
-      expect(shareUrl('abc123XYZ')).toBe('https://neocomdesk.com/share/abc123XYZ');
+      expect(shareUrl('abc123XYZ')).toBe('https://neocomdesk.com/s/abc123XYZ');
     } finally {
       vi.unstubAllGlobals();
     }
@@ -133,7 +133,7 @@ describe('createShareLink', () => {
 
   it('stores the share under a fresh id and returns its short URL', async () => {
     const url = await createShareLink(input);
-    expect(url).toMatch(/^https:\/\/neocomdesk\.com\/share\/[0-9A-Za-z]{9}$/);
+    expect(url).toMatch(/^https:\/\/neocomdesk\.com\/s\/[2-9a-km-np-z]{7}$/);
     expect(setDoc).toHaveBeenCalledTimes(1);
     expect(setDoc.mock.calls[0][0]).toEqual({ path: `shares/${url.split('/').pop()}` });
   });

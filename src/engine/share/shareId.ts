@@ -1,22 +1,29 @@
 /**
- * The id a stored Share Link lives under — the `asdu80ew7` in
- * `/share/asdu80ew7`. Nine base-62 characters is ~5.4 bits each, ~53 bits in
- * all: unguessable enough for a week-long link to an appraisal, and short
- * enough to read aloud in fleet comms.
+ * The key a stored Share Link lives under — the `k7m2xq4` in `/s/k7m2xq4`.
+ * Seven characters from a 31-letter alphabet with nothing easily misread
+ * (no `0/o`, `1/l/i`) and no capitals, so it can be read aloud in fleet comms
+ * or typed from a screenshot. 31^7 is ~35 bits: enough that a week-long link
+ * can't be stumbled on, since `shares` can only be read by id, never listed.
  *
  * Minted on the client, before the doc is written, so the URL is known up
  * front (the Share button copies it inside the click, before any await).
  * A collision is caught by Firestore rather than here: the `shares` rule only
  * allows `create`, so writing over a taken id is refused, not merged.
+ *
+ * Links made before the short key were nine base-62 characters under
+ * `/share/<id>`; they live a week at most, but until then `isShareId` still
+ * accepts them (and `firestore.rules` still serves them).
  */
 
-export const SHARE_ID_LENGTH = 9;
+export const SHARE_ID_LENGTH = 7;
 
-const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-/** Bytes at or past this would make the first `256 % 62` characters likelier than the rest. */
+const ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
+/** Bytes at or past this would make the first `256 % 31` characters likelier than the rest. */
 const UNBIASED_LIMIT = 256 - (256 % ALPHABET.length);
 
-const SHARE_ID_PATTERN = new RegExp(`^[0-9A-Za-z]{${SHARE_ID_LENGTH}}$`);
+const SHARE_ID_PATTERN = new RegExp(`^[${ALPHABET}]{${SHARE_ID_LENGTH}}$`);
+/** The pre-short-key id: nine characters, mixed case, digits included. */
+const LEGACY_SHARE_ID_PATTERN = /^[0-9A-Za-z]{9}$/;
 
 export type RandomBytes = (length: number) => Uint8Array;
 
@@ -35,5 +42,5 @@ export function generateShareId(randomBytes: RandomBytes = cryptoBytes): string 
 }
 
 export function isShareId(value: string): boolean {
-  return SHARE_ID_PATTERN.test(value);
+  return SHARE_ID_PATTERN.test(value) || LEGACY_SHARE_ID_PATTERN.test(value);
 }

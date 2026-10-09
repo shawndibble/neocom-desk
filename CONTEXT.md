@@ -1019,7 +1019,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   can hold a plain plan and several seeded plans for one blueprint at once.
 - **Survey**: A mining field tracked from pasted **Survey Scans**: how much is
   mined, how fast, and when it will be gone. Stored as a `survey` **Share
-  Link**, so it has a short `/share/<id>` URL and the standard 7-day life, from
+  Link**, so it has a short `/s/<id>` URL and the standard 7-day life, from
   creation. Anyone holding the link can add a scan with no sign-in, which is
   how a Survey carries on after the pilot who started it has left. It names its
   owner, the starting Character, so the app can tell the owner from someone who
@@ -1036,7 +1036,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   bar with the percent, the rocks left by short ore name, the link), none wider
   than about 50 characters so it doesn't wrap in chat. Only bold works in game
   chat, so the style is words and block characters.
-- **Share Link**: A short `/share/<id>` link to something a pilot chose to
+- **Share Link**: A short `/s/<id>` link to something a pilot chose to
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
   **Shared Appraisal**, a **Shared D-Scan**, a **Fitting**, or a **Survey**. It opens with or without a session,

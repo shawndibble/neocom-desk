@@ -102,7 +102,7 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
 
   /**
    * The short, 7-day **Share Link**: the Fitting Share Code stored under a
-   * `/share/<id>`. The same code shared again gets the same link. When saving
+   * `/s/<id>`. The same code shared again gets the same link. When saving
    * outlasts the click and the browser refuses the copy, the link is already
    * made — choosing it again copies it straight away, inside the click.
    */

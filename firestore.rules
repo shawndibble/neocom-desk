@@ -262,9 +262,9 @@ service cloud.firestore {
       allow write: if false;
     }
     // Stored Share Links (src/features/share/shareStore.ts): a short
-    // /share/{id} URL whose content lives here for a week. Not per-Character
+    // /s/{id} URL whose content lives here for a week. Not per-Character
     // data, and the person opening a link may have no account at all — so
-    // `get` is public, by id only. `list` stays denied: the 9-character
+    // `get` is public, by id only. `list` stays denied: the 7-character
     // random id is what keeps a share private to whoever holds the link, and
     // listing would hand every id out. An expired doc is refused here as well
     // as hidden by the client, because the TTL policy (firestore.indexes.json)
@@ -282,7 +282,7 @@ service cloud.firestore {
       allow get: if resource.data.expiresAt > request.time;
       allow list: if false;
       allow create: if request.auth != null
-        && shareId.matches('^[0-9A-Za-z]{9}$')
+        && shareId.matches('^([0-9A-Za-z]{9}|[2-9a-km-np-z]{7})$')
         && request.resource.data.keys().hasOnly(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.keys().hasAll(['type', 'payload', 'createdAt', 'expiresAt'])
         && request.resource.data.type in ['appraisal', 'fitting', 'dscan', 'survey']
@@ -306,7 +306,7 @@ service cloud.firestore {
       // doc per pasted Survey Scan, under a `survey` share. Anyone holding the
       // link may read them and add one, signed in or not: whoever keeps a
       // Survey going after the pilot who started it left may have no account,
-      // and the 9-character id is what keeps it private, as for any share.
+      // and the 7-character id is what keeps it private, as for any share.
       // The doc carries no uid. `createdAt` is the server's clock, so a scan
       // can't be backdated; `expiresAt` must equal the survey's own, so the TTL
       // policy on `surveyScans` removes it with the survey. A scan is only
