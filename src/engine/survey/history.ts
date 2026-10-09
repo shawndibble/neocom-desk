@@ -50,5 +50,7 @@ export function recordSurvey(
   now: number
 ): SurveyHistoryEntry[] {
   const known = list.find((entry) => entry.id === id);
-  return tidy([...list.filter((entry) => entry.id !== id), known ?? { id, addedAt: now }], now);
+  // First in the input, so a tie on the millisecond (two surveys opened back to
+  // back) still lists the new one first: the sort in `tidy` is stable.
+  return tidy([known ?? { id, addedAt: now }, ...list.filter((entry) => entry.id !== id)], now);
 }
