@@ -702,23 +702,18 @@ export function AppraisalPanel({
 
           <div className="flex flex-wrap gap-2">
             <Button
-              size="sm"
+              size="md"
               variant="primary"
+              className="max-sm:w-full"
               onClick={controller.appraise}
               disabled={!controller.canAppraise || loading}
             >
               {t('market.appraisal.appraise')}
             </Button>
-            <Button size="sm" onClick={controller.clear} disabled={text === ''}>
+            <Button size="md" onClick={controller.clear} disabled={text === ''}>
               {t('market.appraisal.clear')}
             </Button>
           </div>
-
-          {recent.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
-              {t('market.appraisal.clearRecent')}
-            </Button>
-          )}
 
           {unmatched.length > 0 && (
             <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
@@ -737,6 +732,17 @@ export function AppraisalPanel({
                 ))}
               </ul>
             </div>
+          )}
+
+          {recent.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="self-start text-text-dim"
+              onClick={() => void setRecent([])}
+            >
+              {t('market.appraisal.clearRecent')}
+            </Button>
           )}
         </div>
       </Panel>

@@ -1201,6 +1201,34 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(recent.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('keeps Clear recent last in the card and clears the saved lists', async () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    renderPanel({
+      controller: controller({
+        result: outcome({ unmatched: [{ name: 'Nanite Repair Past', lines: [3, 7] }] }),
+      }),
+    });
+    const appraise = screen.getByRole('button', { name: 'Appraise' });
+    const clearRecent = screen.getByRole('button', { name: 'Clear recent' });
+    const unmatched = screen.getByText('1 line not matched');
+    expect(
+      appraise.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      unmatched.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await userEvent.click(clearRecent);
+    expect(useRecentAppraisals.getState().value).toEqual([]);
+  });
+
+  it('hides Clear recent when nothing was saved', () => {
+    renderPanel({ controller: controller() });
+    expect(screen.queryByRole('button', { name: 'Clear recent' })).not.toBeInTheDocument();
+  });
+
   it('hides Recent when nothing was saved', () => {
     renderPanel({ controller: controller() });
     expect(screen.queryByRole('combobox', { name: 'Load a recent list' })).not.toBeInTheDocument();
