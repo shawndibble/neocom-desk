@@ -1246,6 +1246,26 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(appraiseText).toHaveBeenCalledWith('Tritanium 5\nPyerite 3');
   });
 
+  it('clears the history from the last Recent item without loading anything', async () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    const appraiseText = vi.fn();
+    renderPanel({ controller: controller({ appraiseText }) });
+    expect(screen.queryByRole('button', { name: /clear recent/i })).not.toBeInTheDocument();
+    const select = screen.getByRole('combobox', { name: 'Load a recent list' });
+    await userEvent.click(select);
+    const options = await screen.findAllByRole('option');
+    expect(options[options.length - 1]).toHaveTextContent('Clear recent lists');
+    await userEvent.click(options[options.length - 1]);
+    expect(appraiseText).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole('combobox', { name: 'Load a recent list' })).not.toBeInTheDocument()
+    );
+    expect(useRecentAppraisals.getState().value).toEqual([]);
+  });
+
   it('shows the hold bar only once a Cargo Space is set', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.queryByTestId('hold-bar')).not.toBeInTheDocument();

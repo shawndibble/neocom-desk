@@ -29,6 +29,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
   Spinner,
@@ -81,6 +82,9 @@ import { appraisalSellGroups } from '@/engine/market/appraisalSellGroups';
 import { appraisalMultibuyText } from './appraisalMultibuyText';
 import { useAppraisalOwnedPref } from './appraisalOwnedPref';
 import { recentLabel, useRecentAppraisals } from './appraisalRecent';
+
+// Reserved Select value for the action item; real entries use their list index.
+const CLEAR_RECENT = 'clear';
 import { appraisalSellListText } from './appraisalSellListText';
 import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
@@ -575,7 +579,10 @@ export function AppraisalPanel({
           recent.length > 0 ? (
             <Select
               value=""
-              onValueChange={(value) => controller.appraiseText(recent[Number(value)]?.text ?? '')}
+              onValueChange={(value) => {
+                if (value === CLEAR_RECENT) void setRecent([]);
+                else controller.appraiseText(recent[Number(value)]?.text ?? '');
+              }}
             >
               <SelectTrigger
                 size="sm"
@@ -603,6 +610,10 @@ export function AppraisalPanel({
                     </SelectItem>
                   );
                 })}
+                <SelectSeparator />
+                <SelectItem value={CLEAR_RECENT} className="text-text-dim">
+                  {t('market.appraisal.clearRecent')}
+                </SelectItem>
               </SelectContent>
             </Select>
           ) : undefined
@@ -713,12 +724,6 @@ export function AppraisalPanel({
               {t('market.appraisal.clear')}
             </Button>
           </div>
-
-          {recent.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
-              {t('market.appraisal.clearRecent')}
-            </Button>
-          )}
 
           {unmatched.length > 0 && (
             <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
