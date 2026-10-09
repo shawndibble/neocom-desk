@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -80,11 +80,24 @@ export function ContactsStandings({
     };
   }, [fetchState]);
 
+  // A refresh that outlives a character switch must not write the old
+  // character's rows over the new one's, nor clear its loading flag.
+  const currentCharacterId = useRef(characterId);
+  useEffect(() => {
+    currentCharacterId.current = characterId;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a switch abandons the old character's refresh
+    setRefreshing(false);
+  }, [characterId]);
+
   const refresh = () => {
+    const startedFor = characterId;
     setRefreshing(true);
-    void fetchState(true)
-      .then(setState)
-      .finally(() => setRefreshing(false));
+    void fetchState(true).then((next) => {
+      if (currentCharacterId.current !== startedFor) return;
+      // A failed refresh keeps the rows already on screen rather than blanking them.
+      setState((prev) => (next.failed && prev?.characterId === startedFor ? prev : next));
+      setRefreshing(false);
+    });
   };
 
   const rows = useMemo(() => filterNpcStandingRows(state?.rows ?? [], text), [state?.rows, text]);
