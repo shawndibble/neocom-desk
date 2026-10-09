@@ -25,8 +25,20 @@ import {
   type RouteSweep,
 } from './jumpRoute';
 import { bridgeConnections, type AnsiblexGate } from './ansiblex';
+import type { JumpSystem } from './jumpDrive';
+import { routeWithJumps, type JumpDriveOptions } from './jumpLegs';
 import { holeNetwork, type HoleEnds } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraHub } from './theraConnections';
+
+/**
+ * What a jump drive leg is searched with (issue #3147): the systems with a
+ * position, and the hull's drive. Absent when jump legs are off or the hull
+ * has no drive.
+ */
+export interface JumpContext {
+  systems: readonly JumpSystem[];
+  drive: JumpDriveOptions;
+}
 
 /** A hole a pin can name: its EVE-Scout id and the two systems it joins. */
 export type PinnableHole = HoleEnds & { id: string };
@@ -150,9 +162,33 @@ export function routeOverBridges(
   return crossesBridge ? route : { kind: 'no-route' };
 }
 
+/**
+ * The cheapest route by stargate and jump drive, holes and bridges left out —
+ * or `no-route` when jump legs are off or none is on the way, since that is
+ * the gate way.
+ */
+export function routeOverJumps(
+  graph: JumpGraph,
+  from: number,
+  to: number,
+  jump: JumpContext | null,
+  options: FindJumpRouteOptions
+): JumpRouteResult {
+  if (jump === null) return { kind: 'no-route' };
+  const route = routeWithJumps(
+    graph,
+    jump.systems,
+    from,
+    to,
+    jump.drive,
+    gatesOnlyOptions(options)
+  );
+  return route.kind === 'route' ? { kind: 'route', systems: route.systems } : route;
+}
+
 /** One way to fly a leg: by gates alone, the cheapest way through a hub, or over the bridges. */
 export interface LegWay {
-  way: 'gates' | TheraHub | 'ansiblex';
+  way: 'gates' | TheraHub | 'ansiblex' | 'jump';
   route: JumpRouteResult;
 }
 
@@ -170,7 +206,8 @@ export function legWays(
   to: number,
   options: FindJumpRouteOptions,
   holes: readonly HoleEnds[],
-  bridges: readonly AnsiblexGate[] = []
+  bridges: readonly AnsiblexGate[] = [],
+  jump: JumpContext | null = null
 ): LegWay[] {
   const ways: LegWay[] = [
     { way: 'gates', route: findJumpRoute(graph, from, to, gatesOnlyOptions(options)) },
@@ -183,6 +220,8 @@ export function legWays(
   }
   const overBridges = routeOverBridges(graph, from, to, bridges, options);
   if (overBridges.kind === 'route') ways.push({ way: 'ansiblex', route: overBridges });
+  const byDrive = routeOverJumps(graph, from, to, jump, options);
+  if (byDrive.kind === 'route') ways.push({ way: 'jump', route: byDrive });
   return ways;
 }
 
@@ -191,7 +230,8 @@ export type LegPin =
   | { kind: 'gates' }
   | { kind: 'hub'; hub: TheraHub }
   | { kind: 'hole'; id: string }
-  | { kind: 'ansiblex' };
+  | { kind: 'ansiblex' }
+  | { kind: 'jump' };
 
 /**
  * A pin read from its link token, or `null` for a token that names nothing.
@@ -201,6 +241,7 @@ export function parseLegPin(token: string): LegPin | null {
   if (token === 'gates') return { kind: 'gates' };
   if (token === 'thera' || token === 'turnur') return { kind: 'hub', hub: token };
   if (token === 'ansiblex') return { kind: 'ansiblex' };
+  if (token === 'jump') return { kind: 'jump' };
   return /^[\w-]{1,40}$/.test(token) ? { kind: 'hole', id: token } : null;
 }
 
@@ -223,6 +264,8 @@ export function legPinToken(pin: LegPin): string {
       return pin.id;
     case 'ansiblex':
       return 'ansiblex';
+    case 'jump':
+      return 'jump';
   }
 }
 
@@ -251,7 +294,12 @@ export function pinnedLegRoute<T extends PinnableHole>(
   to: number,
   pin: LegPin,
   options: FindJumpRouteOptions,
-  lists: { qualifying: readonly T[]; listed: readonly T[]; bridges?: readonly AnsiblexGate[] }
+  lists: {
+    qualifying: readonly T[];
+    listed: readonly T[];
+    bridges?: readonly AnsiblexGate[];
+    jump?: JumpContext | null;
+  }
 ): PinnedLegRoute<T> {
   let route: JumpRouteResult;
   let hole: T | null = null;
@@ -277,6 +325,9 @@ export function pinnedLegRoute<T extends PinnableHole>(
       route = routeOverBridges(graph, from, to, bridges, options);
       break;
     }
+    case 'jump':
+      route = routeOverJumps(graph, from, to, lists.jump ?? null, options);
+      break;
   }
   return route.kind === 'route' ? { kind: 'route', systems: route.systems, hole } : route;
 }

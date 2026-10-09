@@ -152,14 +152,17 @@ test.describe('Fitting Compare column alignment', () => {
         const tables = page.locator('table');
         await expect(tables).toHaveCount(2, { timeout: 20_000 });
         for (const index of [0, 1]) {
-          await expect(tables.nth(index).locator('thead th')).toHaveCount(fits.length + 1, {
-            timeout: 20_000,
-          });
+          await expect(tables.nth(index).locator('thead tr:first-child th')).toHaveCount(
+            fits.length + 1,
+            {
+              timeout: 20_000,
+            }
+          );
         }
         const rights = async (index: number) =>
           tables
             .nth(index)
-            .locator('thead th')
+            .locator('thead tr:first-child th')
             .evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().right));
         const stats = await rights(0);
         const modules = await rights(1);
@@ -168,4 +171,48 @@ test.describe('Fitting Compare column alignment', () => {
       });
     }
   }
+});
+
+test.describe('Fitting Compare pinned names row', () => {
+  test('keeps a slim row of Fitting names over their columns while the stats scroll at 1440', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await addFitting(page, FIT_A);
+    await addFitting(page, FIT_B);
+    const table = page.locator('table').first();
+    const pinned = table.getByTestId('compare-pinned-names');
+    await expect(pinned).toBeVisible({ timeout: 20_000 });
+
+    // Scroll until the table's first stat row has left the viewport.
+    const firstRow = table.locator('tbody tr').first();
+    await firstRow.evaluate((el) => {
+      const bottom = el.getBoundingClientRect().bottom + window.scrollY;
+      window.scrollTo(0, bottom + 1);
+    });
+    await expect(async () => {
+      const row = await firstRow.boundingBox();
+      expect(row!.y + row!.height).toBeLessThan(0);
+    }).toPass();
+
+    // The cells carry the sticky offset (a `tr`'s own box doesn't move with them), so measure one.
+    const box = (await pinned.locator('th').first().boundingBox())!;
+    expect(Math.abs(box.y)).toBeLessThanOrEqual(1);
+    expect(box.height).toBeLessThan(40);
+
+    // Each pinned name sits over its own column: same right edge as that column's cells.
+    const names = pinned.locator('th');
+    const cells = table.locator('tbody tr').first().locator('td');
+    for (const i of [1, 2]) {
+      const nameBox = (await names.nth(i).boundingBox())!;
+      const cellBox = (await cells.nth(i).boundingBox())!;
+      expect(Math.abs(nameBox.x + nameBox.width - (cellBox.x + cellBox.width))).toBeLessThanOrEqual(
+        1
+      );
+    }
+    await expect(names.nth(1)).toHaveText('Fit A');
+    await expect(names.nth(2)).toHaveText('Fit B');
+  });
 });

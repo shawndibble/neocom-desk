@@ -594,7 +594,7 @@ export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
         )}
       </TileRow>
       {price && (
-        <p className="mt-2 text-[0.6875rem] text-text-dim">
+        <p className="mt-2 px-3 text-[0.6875rem] text-text-dim">
           {price.loaded && price.net === null
             ? t('plans.injectors.noSellOrders', { hub: price.hubName })
             : t('overview.board.extractionBasis', { hub: price.hubName })}

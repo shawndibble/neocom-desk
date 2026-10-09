@@ -69,7 +69,7 @@ test.describe('contracts history — detail opener', () => {
     test('every opener meets the 44px touch floor and opens the detail', async ({ page }) => {
       await page.goto('./contracts/history');
       const table = page.getByRole('table').first();
-      const openers = table.locator('tbody tr td:first-child button');
+      const openers = table.locator('tbody tr:not(.dt-group-header) td:first-child button');
       await expect(openers).toHaveCount(CONTRACTS.length);
 
       for (const opener of await openers.all()) {
@@ -80,6 +80,18 @@ test.describe('contracts history — detail opener', () => {
       await openers.first().click();
       await expect(page.getByRole('dialog')).toBeVisible();
     });
+
+    test('issue days are sections: one header per day, none on a desktop table', async ({
+      page,
+    }) => {
+      await page.goto('./contracts/history');
+      // The three fixtures were issued together, so they share one day.
+      const headers = page.locator('tr.dt-group-header');
+      await expect(headers).toHaveCount(1);
+      await expect(headers.first()).toContainText('3 contracts');
+      const box = await headers.first().boundingBox();
+      expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);
+    });
   });
 
   test.describe('at 900px', () => {
@@ -87,10 +99,14 @@ test.describe('contracts history — detail opener', () => {
 
     test('the opener stays one text line tall', async ({ page }) => {
       await page.goto('./contracts/history');
-      const openers = page.getByRole('table').first().locator('tbody tr td:first-child button');
+      const openers = page
+        .getByRole('table')
+        .first()
+        .locator('tbody tr:not(.dt-group-header) td:first-child button');
       await expect(openers.first()).toBeVisible();
       const box = await openers.first().boundingBox();
       expect(box?.height ?? 0).toBeLessThan(TOUCH_TARGET_PX);
+      await expect(page.locator('tr.dt-group-header')).toHaveCount(0);
     });
   });
 });
@@ -115,7 +131,10 @@ test.describe('contracts history — untitled courier route (issue #1706)', () =
       })
     );
     await page.goto('./contracts/history');
-    const opener = page.getByRole('table').first().locator('tbody tr td:first-child button');
+    const opener = page
+      .getByRole('table')
+      .first()
+      .locator('tbody tr:not(.dt-group-header) td:first-child button');
     await expect(opener).toContainText(/Jita.+ → Amarr/);
     await expect(opener).toContainText('Collateral');
     const box = await opener.boundingBox();

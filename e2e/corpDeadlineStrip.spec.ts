@@ -132,7 +132,33 @@ async function widestLabelOverflow(page: Page) {
   });
 }
 
+async function stripOverflowsPanel(page: Page) {
+  return page.evaluate(() => {
+    const strip = document.querySelector('[role="img"][aria-label^="Deadlines per day"]');
+    const panel = strip?.parentElement;
+    if (!strip || !panel) return null;
+    const s = strip.getBoundingClientRect();
+    const p = panel.getBoundingClientRect();
+    return s.left < p.left - 1 || s.right > p.right + 1;
+  });
+}
+
 test.describe('corp overview — Deadline Strip day labels', () => {
+  for (const width of [1280, 390]) {
+    test(`do not clip at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await signInWithMockedDeadline(page);
+
+      const strip = page.locator('[role="img"][aria-label^="Deadlines per day"]');
+      await expect(strip).toBeVisible();
+
+      const { count, overflowing } = await widestLabelOverflow(page);
+      expect(count, 'expected the Deadline Strip to render day labels').toBeGreaterThan(0);
+      expect(overflowing, `clipped labels: ${overflowing.join(', ')}`).toEqual([]);
+      expect(await stripOverflowsPanel(page)).toBe(false);
+    });
+  }
+
   test('do not clip at 1024px', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await signInWithMockedDeadline(page);

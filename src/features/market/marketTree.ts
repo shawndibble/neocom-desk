@@ -85,3 +85,47 @@ export function filterMarketTree(
 
   return { visibleGroupIds, matchedTypesByGroup, bestMatch, totalMatches, capped, fuzzy };
 }
+
+/**
+ * A search's matched rows fit on screen at about this many, so that is as many
+ * as may start expanded across several top-level categories; more starts them
+ * all collapsed so the pilot sees the category list first.
+ */
+export const MARKET_TREE_OPEN_ROW_LIMIT = 12;
+
+export interface SearchCategorySummary {
+  /** Matched items under each top-level category that has any (bestMatch excluded). */
+  countsByRoot: ReadonlyMap<number, number>;
+  /** Whether every category starts expanded: a lone category, or few enough rows to fit. */
+  openByDefault: boolean;
+}
+
+/** Walks up to the top-level category; stops on a cycle rather than looping. */
+function rootOf(id: number, groupsById: ReadonlyMap<number, MarketGroupNode>): number {
+  const seen = new Set<number>();
+  let cur = id;
+  for (;;) {
+    seen.add(cur);
+    const parent = groupsById.get(cur)?.parentId ?? null;
+    if (parent === null || seen.has(parent)) return cur;
+    cur = parent;
+  }
+}
+
+/** Per-category match counts and the default expand state for a search's top-level groups. */
+export function summarizeSearchCategories(
+  groupsById: ReadonlyMap<number, MarketGroupNode>,
+  result: MarketTreeFilterResult
+): SearchCategorySummary {
+  const countsByRoot = new Map<number, number>();
+  let total = 0;
+  for (const [groupId, items] of result.matchedTypesByGroup) {
+    const root = rootOf(groupId, groupsById);
+    countsByRoot.set(root, (countsByRoot.get(root) ?? 0) + items.length);
+    total += items.length;
+  }
+  return {
+    countsByRoot,
+    openByDefault: countsByRoot.size <= 1 || total <= MARKET_TREE_OPEN_ROW_LIMIT,
+  };
+}

@@ -4,6 +4,7 @@ import {
   projectionWording,
   projectSkillQueue,
   projectIndustryJobs,
+  projectCorpIndustryJobs,
   projectColonies,
   projectCalendar,
   projectStructureFuel,
@@ -16,6 +17,7 @@ import { SHARED_NOTIFICATION_WORDING } from './notificationWording';
 import {
   calendarCopy,
   colonyCopy,
+  corpIndustryJobCopy,
   eveNotificationCopy,
   industryJobCopy,
   skillQueueCopy,
@@ -45,6 +47,7 @@ describe('projectionWording', () => {
       'skillLevelComplete',
       'characterNotTraining',
       'industryJobComplete',
+      'corpIndustryJobReady',
       'cloneJumpReady',
       'calendarEventStarting',
       'eveNotification',
@@ -279,6 +282,51 @@ describe('projectSkillQueue', () => {
     expect(() =>
       projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)
     ).not.toThrow();
+  });
+});
+
+describe('projectCorpIndustryJobs', () => {
+  const job = (jobId: number, endMs: number) => ({
+    jobId,
+    endMs,
+    blueprintTypeId: 10,
+    productTypeId: 20,
+    activityId: 1,
+  });
+  const project = (entries: ReturnType<typeof job>[]) =>
+    projectCorpIndustryJobs(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[20, 'Rifter']]),
+      corpIndustryJobCopy.push,
+      T0
+    );
+
+  it('projects a job ending inside the horizon, keyed like the poller', () => {
+    const rows = project([job(1, T0 + 5 * HOUR_MS)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('corpIndustryJobReady');
+    expect(rows[0].fireAt).toEqual(T0 + 5 * HOUR_MS);
+    expect(rows[0].body).toContain('Rifter');
+    expect(rows[0].occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'corpIndustryJobReady',
+          characterId: 7,
+          jobId: 1,
+          blueprintTypeId: 10,
+          productTypeId: 20,
+          activityId: 1,
+          endMs: T0 + 5 * HOUR_MS,
+        },
+        T0
+      )
+    );
+  });
+
+  it('skips jobs already finished (delivered or past) and past the horizon', () => {
+    expect(project([job(1, T0 - HOUR_MS), job(2, T0), job(3, T0 + 73 * HOUR_MS)])).toEqual([]);
   });
 });
 

@@ -321,6 +321,9 @@ describe('Assets', () => {
       screen.getByRole('heading', { level: 1 }).closest('header')
     );
     expect(locationHeading).toHaveTextContent('0 ISK');
+    const total = within(locationHeading).getByTestId('assets-total-value');
+    expect(total).toHaveClass('text-sm');
+    expect(locationHeading).not.toHaveClass('text-sm');
     expect(screen.queryByText(/Total value/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\(filtered\)/)).not.toBeInTheDocument();
 
