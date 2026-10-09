@@ -113,7 +113,7 @@ describe('PilotListView (Local list)', () => {
     expect(badgeOf('Offline') ?? null).toBeNull();
   });
 
-  it('washes a Dangerous row red and fills its badge, and dims an Inactive one', async () => {
+  it('washes a Dangerous row red and fills its badge, and leaves an Inactive one plain', async () => {
     const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
     const rows = [
       row('Reaper', {
@@ -135,7 +135,7 @@ describe('PilotListView (Local list)', () => {
     expect(screen.getByText('Dangerous').closest('span.inline-flex')?.className).toContain(
       'bg-danger!'
     );
-    expect(rowOf('Sleeper')?.className).toContain('opacity-70');
+    expect(rowOf('Sleeper')?.className).not.toContain('border-l-danger!');
   });
 
   it('groups pilots by what they mean to you, in a fixed order', async () => {

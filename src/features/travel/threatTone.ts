@@ -36,14 +36,14 @@ export const THREAT_FILL_CLASS: Record<ThreatTone, string> = {
 /**
  * A Local list row's wash and left edge, so a Dangerous pilot stands out
  * while scrolling a phone's cards. Only the two threatening levels are
- * tinted; Inactive recedes instead. The edge is `!` because the table row
+ * tinted; Inactive and Low threat stay on the panel. The edge is `!` because the table row
  * already sets a transparent one.
  */
 export const THREAT_ROW_CLASS: Record<ThreatTone, string> = {
   danger: 'bg-danger/10 border-l-danger!',
   warning: 'bg-warning/5 border-l-warning!',
   neutral: '',
-  dim: 'opacity-70',
+  dim: '',
 };
 
 export const THREAT_LEVEL_TONE: Record<ThreatLevel | 'pending', ThreatTone> = {
