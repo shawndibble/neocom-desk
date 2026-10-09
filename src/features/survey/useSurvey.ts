@@ -12,7 +12,7 @@ export const SURVEY_POLL_MS = 20_000;
 export type SurveyLoadState =
   | { status: 'none' }
   | { status: 'loading' }
-  | { status: 'ready'; scans: SurveyScan[]; expiresAt: number }
+  | { status: 'ready'; scans: SurveyScan[]; expiresAt: number; owner: string | null }
   | { status: 'gone' }
   | { status: 'failed' };
 
@@ -54,7 +54,12 @@ export function useSurvey(id: string | null): {
   if (result === null) return { state: { status: 'loading' }, refresh };
   if (result.ok) {
     return {
-      state: { status: 'ready', scans: result.scans, expiresAt: result.expiresAt },
+      state: {
+        status: 'ready',
+        scans: result.scans,
+        expiresAt: result.expiresAt,
+        owner: result.owner,
+      },
       refresh,
     };
   }

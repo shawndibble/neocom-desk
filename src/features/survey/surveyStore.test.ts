@@ -47,9 +47,13 @@ beforeEach(() => {
 describe('startSurvey', () => {
   it('stores a survey Share Link and returns its id and URL', async () => {
     saveShare.mockResolvedValue(EXPIRES);
-    const started = await startSurvey({ characterId: 7 });
+    const started = await startSurvey({ characterId: 7, ownerName: 'Shawn Dibble' });
     expect(saveShare).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'survey', payload: { v: 1 }, characterId: 7 })
+      expect.objectContaining({
+        type: 'survey',
+        payload: { v: 1, owner: 'Shawn Dibble' },
+        characterId: 7,
+      })
     );
     expect(started.id).toMatch(/^[0-9A-Za-z]{9}$/);
     expect(started.url).toBe(`https://neocomdesk.test/share/${started.id}`);
@@ -100,11 +104,34 @@ describe('loadSurvey', () => {
     expect(result).toEqual({
       ok: true,
       expiresAt: EXPIRES,
+      owner: null,
       scans: [
         { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
         { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
       ],
     });
+  });
+
+  it('returns the owner the survey was started under', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1, owner: 'Shawn Dibble' }, expiresAt: EXPIRES },
+    });
+    getDocs.mockResolvedValue(docs({ text: ROW(10, 5), at: 1000 }));
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.owner).toBe('Shawn Dibble');
+  });
+
+  it('has no owner for a survey stored before owners, or with a malformed one', async () => {
+    getDocs.mockResolvedValue(docs({ text: ROW(10, 5), at: 1000 }));
+    for (const payload of [{ v: 1 }, { v: 1, owner: 42 }, { v: 1, owner: '' }, null]) {
+      loadShare.mockResolvedValue({
+        ok: true,
+        share: { type: 'survey', payload, expiresAt: EXPIRES },
+      });
+      const result = await loadSurvey('abc123XYZ');
+      expect(result.ok && result.owner).toBeNull();
+    }
   });
 
   it('skips a stored scan that no longer parses', async () => {

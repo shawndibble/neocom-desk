@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { takePendingScan } from './pendingScan';
 
 const { addSurveyScan, loadSurvey } = vi.hoisted(() => ({
   addSurveyScan: vi.fn(),
@@ -15,6 +16,9 @@ import { SurveyShareScreen } from './SurveyShareScreen';
 
 const SCAN =
   'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km\nClear Icicle\t55\t55,000 m3\t11,300,000.00 ISK\t10 km';
+const SHRUNK = 'Clear Icicle\t25\t25,000 m3\t5,120,000.00 ISK\t28 km';
+// An ore the survey never showed: another field.
+const DIFFERENT = 'Blue Ice\t10\t1,000 m3\t1.00 ISK\t5 km';
 const ID = 'abc123XYZ';
 const EXPIRES = Date.UTC(2026, 9, 15);
 
@@ -27,6 +31,7 @@ function renderScreen() {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   addSurveyScan.mockReset();
   loadSurvey.mockReset();
   addSurveyScan.mockResolvedValue(undefined);
@@ -59,6 +64,27 @@ describe('SurveyShareScreen', () => {
       expect(addSurveyScan).toHaveBeenCalledTimes(1);
     });
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SCAN, expiresAt: EXPIRES });
+  });
+
+  it('adds a paste that only shrinks the field', async () => {
+    renderScreen();
+    await screen.findByText('0% mined');
+    await waitFor(() => {
+      fireEvent.paste(document.body, { clipboardData: { getData: () => SHRUNK } });
+      expect(addSurveyScan).toHaveBeenCalledTimes(1);
+    });
+    expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SHRUNK, expiresAt: EXPIRES });
+  });
+
+  it('holds a different field for the login instead of adding it, and says why', async () => {
+    renderScreen();
+    await screen.findByText('0% mined');
+    await waitFor(() => {
+      fireEvent.paste(document.body, { clipboardData: { getData: () => DIFFERENT } });
+      expect(screen.getByText(/different field than this survey/i)).toBeTruthy();
+    });
+    expect(addSurveyScan).not.toHaveBeenCalled();
+    expect(takePendingScan()).toBe(DIFFERENT);
   });
 
   it('ignores a paste that is not a survey scan', async () => {
