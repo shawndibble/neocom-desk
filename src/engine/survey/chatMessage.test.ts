@@ -12,12 +12,8 @@ const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 const URL = 'https://neocomdesk.test/survey/abc123XYZ';
 
 const labels: SurveyMessageLabels = {
-  cracking: 'Rocks cracking',
-  halfway: 'Halfway there',
-  almost: 'Almost clear',
-  last: 'Last rocks!',
-  done: 'done <b>{time} EVE</b> (~{left})',
-  waiting: 'waiting for a second scan',
+  done: '{percent}% · ETA: <b>{time} EVE</b> (~{left})',
+  waiting: '{percent}% · waiting for a second scan',
   left: 'Left: {ores}',
   more: '{count} other',
   cleared: 'Field cleared in {duration}',
@@ -49,7 +45,7 @@ describe('shortOreNames', () => {
 });
 
 describe('surveyChatMessage', () => {
-  it('writes status, finish time, bar, ore line and link', () => {
+  it('writes percent, ETA, bar, ore line and link', () => {
     // 930 m3 mined in 900 s, 70 left at 1.0333 m3/s: about 68 s to go
     const s = summarizeSurvey([
       scan(0, ['Glistening Sylvite', 800], ['Glistening Bitumens', 200]),
@@ -57,8 +53,8 @@ describe('surveyChatMessage', () => {
     ])!;
     const lines = surveyChatMessage(s, URL, labels).split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toBe('Almost clear · done <b>16:56 EVE</b> (~1m)');
-    expect(lines[1]).toBe('▕' + '█'.repeat(18) + '░░' + '▏ 93%');
+    expect(lines[0]).toBe('93% · ETA: <b>16:56 EVE</b> (~1m)');
+    expect(lines[1]).toBe('█'.repeat(44) + '░'.repeat(4));
     expect(lines[2]).toBe('Left: 2 Sylvite · 1 Bitumens');
     expect(lines[3]).toBe(URL);
   });
@@ -71,37 +67,27 @@ describe('surveyChatMessage', () => {
 
   it('with one scan says it is waiting for a second', () => {
     const s = summarizeSurvey([scan(0, ['A', 10_000])])!;
-    expect(surveyChatMessage(s, URL, labels).split('\n')[0]).toBe(
-      'Rocks cracking · waiting for a second scan'
-    );
+    expect(surveyChatMessage(s, URL, labels).split('\n')[0]).toBe('0% · waiting for a second scan');
   });
 
-  it('picks the status word by progress', () => {
-    const word = (left: number) =>
-      surveyChatMessage(
-        summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', left])])!,
-        URL,
-        labels
-      ).split(' · ')[0];
-    expect(word(900)).toBe('Rocks cracking'); // 10%
-    expect(word(750)).toBe('Halfway there'); // 25%
-    expect(word(260)).toBe('Halfway there'); // 74%
-    expect(word(250)).toBe('Almost clear'); // 75%
-    expect(word(60)).toBe('Almost clear'); // 94%
-    expect(word(50)).toBe('Last rocks!'); // 95%
+  it('draws the bar flush left, with no end caps, as the widest line', () => {
+    const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 750])])!;
+    const lines = surveyChatMessage(s, URL, labels).split('\n');
+    expect(lines[1]).toBe('█'.repeat(12) + '░'.repeat(36));
+    for (const i of [0, 2]) {
+      expect(lines[i].replace(/<\/?b>/g, '').length).toBeLessThan(lines[1].length);
+    }
   });
 
-  it('names the three biggest ores and counts the rocks of the rest as one group', () => {
+  it('names the two biggest ores and counts the rocks of the rest as one group', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1], ['E', 1]),
     ])!;
-    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
-      'Left: 1 A · 1 B · 1 C · 3 other'
-    );
+    expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe('Left: 1 A · 1 B · 4 other');
   });
 
-  it('calls out ores by the ISK left in them, with how many rocks each has', () => {
-    // Veldspar 20 rocks worth 10M, Scordite 5 worth 25M, Pyroxeres 15 worth 12M, Kernite 4 worth 3M.
+  it('calls out the two ores richest per m³, with how many rocks each has', () => {
+    // Per m³: Scordite 50k, Kernite 20k, Pyroxeres 8k, Veldspar 5k (total ISK would put Pyroxeres second).
     const rocks = (ore: string, count: number, each: number) =>
       Array.from({ length: count }, () => ({ ore, volume: 100, isk: each }));
     const s = summarizeSurvey([
@@ -111,19 +97,19 @@ describe('surveyChatMessage', () => {
           ...rocks('Veldspar', 20, 500_000),
           ...rocks('Scordite', 5, 5_000_000),
           ...rocks('Pyroxeres', 15, 800_000),
-          ...rocks('Kernite', 4, 750_000),
+          ...rocks('Kernite', 4, 2_000_000),
         ],
       },
     ])!;
     expect(surveyChatMessage(s, URL, labels).split('\n')[2]).toBe(
-      'Left: 5 Scordite · 15 Pyroxeres · 20 Veldspar · 4 other'
+      'Left: 5 Scordite · 4 Kernite · 35 other'
     );
   });
 
   it('a cleared field is three lines with the full bar and elapsed time', () => {
     const s = summarizeSurvey([scan(0, ['A', 1000]), scan(176)])!;
     expect(surveyChatMessage(s, URL, labels)).toBe(
-      ['Field cleared in 2h 56m', '▕' + '█'.repeat(20) + '▏ 100%', URL].join('\n')
+      ['Field cleared in 2h 56m', '█'.repeat(48), URL].join('\n')
     );
   });
 });

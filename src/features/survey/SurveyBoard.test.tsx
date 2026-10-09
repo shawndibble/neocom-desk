@@ -81,8 +81,8 @@ describe('SurveyBoard', () => {
 
     const lines = written[0].split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^Rocks cracking · done <b>\d\d:\d\d EVE<\/b> \(~/);
-    expect(lines[1]).toBe('▕██░░░░░░░░░░░░░░░░░░▏ 13%');
+    expect(lines[0]).toMatch(/^13% · ETA: <b>\d\d:\d\d EVE<\/b> \(~/);
+    expect(lines[1]).toBe('█'.repeat(6) + '░'.repeat(42));
     expect(lines[2]).toBe('Left: 5 Clear Icicle');
     expect(lines[3]).toBe(URL);
     for (const line of lines.slice(0, 3)) {

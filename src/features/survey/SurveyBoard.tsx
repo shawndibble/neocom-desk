@@ -77,10 +77,6 @@ export function SurveyBoard({
   const phone = useIsPhone();
 
   const labels: SurveyMessageLabels = {
-    cracking: t('survey.message.cracking'),
-    halfway: t('survey.message.halfway'),
-    almost: t('survey.message.almost'),
-    last: t('survey.message.last'),
     done: t('survey.message.done'),
     waiting: t('survey.message.waiting'),
     left: t('survey.message.left'),

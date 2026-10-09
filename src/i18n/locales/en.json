@@ -4012,12 +4012,8 @@
     "gone": "This survey has expired",
     "goneHint": "A survey link works for 7 days.",
     "message": {
-      "cracking": "Rocks cracking",
-      "halfway": "Halfway there",
-      "almost": "Almost clear",
-      "last": "Last rocks!",
-      "done": "done <b>{time} EVE</b> (~{left})",
-      "waiting": "waiting for a second scan",
+      "done": "{percent}% · ETA: <b>{time} EVE</b> (~{left})",
+      "waiting": "{percent}% · waiting for a second scan",
       "left": "Left: {ores}",
       "more": "{count} other",
       "cleared": "Field cleared in {duration}"

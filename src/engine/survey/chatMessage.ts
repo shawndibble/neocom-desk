@@ -7,14 +7,12 @@
  * (this engine imports no i18n); a label's `{placeholders}` are filled here.
  */
 import type { SurveySummary } from './series';
+import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyMessageLabels {
-  cracking: string;
-  halfway: string;
-  almost: string;
-  last: string;
-  /** `{time}` is HH:MM EVE time, `{left}` the time remaining. */
+  /** `{percent}` is the whole-number progress, `{time}` HH:MM EVE time, `{left}` the time remaining. */
   done: string;
+  /** `{percent}` as in `done`. */
   waiting: string;
   /** `{ores}` is the joined ore list. */
   left: string;
@@ -24,7 +22,8 @@ export interface SurveyMessageLabels {
   cleared: string;
 }
 
-const BAR_CELLS = 20;
+/** Longer than any text line in the message, so the bar is its widest line. */
+const BAR_CELLS = 48;
 /**
  * Widest a line of the message may run, in visible characters (`<b>` tags
  * don't show). RockRadar's own message is the benchmark: its widest lines are
@@ -129,26 +128,20 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function statusWord(percent: number, labels: SurveyMessageLabels): string {
-  if (percent < 25) return labels.cracking;
-  if (percent < 75) return labels.halfway;
-  if (percent < 95) return labels.almost;
-  return labels.last;
-}
-
+/** Flush left with no end caps: the caps indent the bar and read thin next to the blocks. */
 function bar(percent: number, finished: boolean): string {
   const filled = finished ? BAR_CELLS : Math.floor((percent / 100) * BAR_CELLS);
-  return `▕${'█'.repeat(filled)}${'░'.repeat(BAR_CELLS - filled)}▏ ${percent}%`;
+  return '█'.repeat(filled) + '░'.repeat(BAR_CELLS - filled);
 }
 
 /** How many ores the "Left:" line names before grouping the rest. */
-const MAX_NAMED_ORES = 3;
+const MAX_NAMED_ORES = 2;
 
 /**
- * "Left: 5 Scordite · 15 Pyroxeres · 20 Veldspar · 12 other": the ores with
- * the most ISK left, each with its rock count, and the rocks of every other
- * ore grouped into one count. `ores` arrives most valuable first, and fewer
- * than three are named if a longer line would wrap.
+ * "Left: 5 Scordite · 15 Pyroxeres · 32 other": the two ores
+ * richest per m³ (ISK left over m³ left, as the page orders them), each with its rock count, and the rocks of every other
+ * ore grouped into one count. `ores` arrives richest first, and fewer
+ * than two are named if a longer line would wrap.
  */
 function oreLine(
   ores: SurveySummary['ores'],
@@ -186,17 +179,18 @@ export function surveyChatMessage(
     ].join('\n');
   }
 
-  const status = statusWord(summary.percent, labels);
   const timing =
     summary.etaAt === null
-      ? labels.waiting
+      ? fill(labels.waiting, { percent: summary.percent })
       : fill(labels.done, {
+          percent: summary.percent,
           time: formatEveClock(summary.etaAt),
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
-  const present = summary.ores.filter((o) => o.rocks > 0);
+  // Richest per m³ first, as the page lists them; with no ISK the volume order stands.
+  const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
   const left = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
 
-  return [`${status}${SEPARATOR}${timing}`, bar(summary.percent, false), left, url].join('\n');
+  return [timing, bar(summary.percent, false), left, url].join('\n');
 }
