@@ -46,6 +46,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
 import { rowThreat } from './rowThreat';
+import { PilotAffiliation } from './PilotAffiliation';
 import { PilotCard } from './PilotCard';
 import { ThreatBadge } from './ThreatBadge';
 import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS } from './threatTone';
@@ -186,11 +187,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
               )}
               {threat !== null && <ThreatBadge level={threat} solid />}
             </span>
-            {(row.corporationName || row.allianceName) && (
-              <span className="block truncate text-[0.6875rem] text-text-dim">
-                {[row.corporationName, row.allianceName].filter(Boolean).join(' · ')}
-              </span>
-            )}
+            <PilotAffiliation row={row} className="text-[0.6875rem] text-text-dim" />
           </>
         );
       },
