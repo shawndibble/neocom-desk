@@ -93,6 +93,11 @@ describe('buildReadout: readings', () => {
     expect(r.confidence).toBe('strong');
   });
 
+  it('counts a booster once toward the mining share', () => {
+    // 3 of 7 are miners or boosters: under half, however many are Orcas.
+    expect(read(rows(8, 2), rows(7, 1), rows(1, 4)).reading).not.toBe('mining');
+  });
+
   it('is not a mining fleet when combat ships are over 15%', () => {
     expect(read(rows(7, 4), rows(1, 1)).reading).not.toBe('mining');
   });

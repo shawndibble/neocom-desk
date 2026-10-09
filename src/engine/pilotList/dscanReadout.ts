@@ -145,6 +145,7 @@ export function buildReadout(
   const logistics = inGroups(LOGISTICS_GROUPS);
   const boosters = inGroups(BOOSTER_GROUPS);
   const tackle = inGroups(TACKLE_SHIP_GROUPS) + disruptors;
+  // Boosters (Orca, Rorqual) are industrial hulls too, so this counts each once.
   const miners = count(ships, (s) => s.role === 'industrial');
   const damage = ships.filter((s) => s.role === 'dps');
   const combat = ships.filter(
@@ -184,12 +185,9 @@ export function buildReadout(
     reading = 'scout';
     evidence.push(line('ev.scouts', { count: n }));
     if (probes > 0) evidence.push(line('ev.probes', { count: probes }));
-  } else if (
-    miners + boosters >= MINING_MIN_SHARE * n &&
-    combat.length <= MINING_MAX_COMBAT_SHARE * n
-  ) {
+  } else if (miners >= MINING_MIN_SHARE * n && combat.length <= MINING_MAX_COMBAT_SHARE * n) {
     reading = 'mining';
-    evidence.push(line('ev.miners', { count: miners + boosters, total: n }));
+    evidence.push(line('ev.miners', { count: miners, total: n }));
     if (boosters > 0) evidence.push(line('ev.boosters', { count: boosters }));
     if (combat.length > 0) evidence.push(line('ev.fewCombat', { count: combat.length }));
   } else if (
