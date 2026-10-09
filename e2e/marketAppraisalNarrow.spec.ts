@@ -467,6 +467,9 @@ test.describe('Market Appraisal — stacked result card', () => {
         Array.from({ length: n }, (_, i) => (i % 2 ? 'Pyerite\t100' : 'Tritanium\t100')).join('\n');
       const measure = async (lineCount: number) => {
         await appraise(page, paste(lineCount));
+        // Below lg the form folds away once a result exists (#3135); open it to measure the box.
+        if (size.viewport.width < 1024)
+          await page.getByRole('button', { name: /Edit list/ }).click();
         const box = await page.getByLabel(/items from inventory/i).boundingBox();
         const table = await page.getByRole('table', { name: 'Appraisal' }).boundingBox();
         return {
