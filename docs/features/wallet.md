@@ -206,7 +206,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Wallet alerts key on the journal entry id so the deep link can pulse one row: `docs/context/decisions/20260905-195857-wallet-alerts-key-on-the-journal-entry-not.md`.
 - Corp wallet left Wallet for the Corp section: `20260929-131220-corp-wallet-moves-to-the-corp-section.md`.
 - Personal fills moved to Market › History: `20261001-113143-date-market-order-fills-from-wallet-transactions.md` (reads transactions) and `routes/Wallet.tsx` comments.
-- LP Store lives under Market, balances stay on Wallet: `20261002-145653-lp-store-under-market-pilot-lookup-its-own.md`; picker shape `20260930-144709-select-box-lp-store-picker.md`; loyalty scope gate `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate.md`.
+- LP Store lives under Market, balances stay on Wallet: `20261002-145653-lp-store-under-market-pilot-lookup-its-own.md`; picker shape `20260930-144709-select-box-lp-store-picker.md` (still applies to this card; the Market page dropped its picker in `20261009-163837-lp-store-switches-stores-through-its-search-not.md`); loyalty scope gate `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate.md`.
 - Character filter sits in the panel header and shrinks to This/All: `20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
 - Route ungated, panel-gated: `src/app/routeScopes.ts:120-123`.
 
