@@ -338,6 +338,53 @@ test.describe('Market Appraisal — stacked result card', () => {
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
 
+  test('keeps the result header groups apart and inside the page at 1280px (#2949)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(DESKTOP);
+    await appraise(page, SIX_COLUMN_PASTE);
+
+    const groups = await page
+      .locator(
+        'section[aria-label="You get"], section[aria-label="It\'s worth"], section[aria-label="Cargo"]'
+      )
+      .evaluateAll((sections) =>
+        sections.map((section) => {
+          const rect = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+          };
+          return {
+            box: rect(section),
+            chips: [...section.querySelectorAll('span.whitespace-nowrap')].map(rect),
+          };
+        })
+      );
+    expect(groups.length).toBeGreaterThanOrEqual(2);
+
+    // Side by side, as in the mockup, not reflowed to 2+1.
+    for (const g of groups) expect(g.box.top).toBeCloseTo(groups[0].box.top, 0);
+
+    for (const [i, a] of groups.entries()) {
+      expect(a.chips.length).toBeGreaterThan(0);
+      // A chip is never wider than the group that holds it.
+      for (const chip of a.chips) {
+        expect(chip.right).toBeLessThanOrEqual(a.box.right + 1);
+        expect(chip.left).toBeGreaterThanOrEqual(a.box.left - 1);
+      }
+      // No two groups overlap.
+      for (const b of groups.slice(i + 1)) {
+        const apart =
+          a.box.right <= b.box.left + 1 ||
+          b.box.right <= a.box.left + 1 ||
+          a.box.bottom <= b.box.top + 1 ||
+          b.box.bottom <= a.box.top + 1;
+        expect(apart).toBe(true);
+      }
+    }
+    await expectNoPageOverflow(page);
+  });
+
   test('offers a phone sort bar that reorders the stacked cards at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await appraise(page, SIX_COLUMN_PASTE);
@@ -378,4 +425,45 @@ test.describe('Market Appraisal — stacked result card', () => {
       ).toBeVisible();
     }
   });
+});
+
+test.describe('Market Appraisal — result header controls (#3112)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockHubPrices(page);
+    await signInAndGoto(page);
+  });
+
+  for (const width of [390, 1024, 1280]) {
+    test(`has no header buttons until appraised, then fits its controls at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('./market/appraisal?hub=jita');
+      const header = page
+        .locator('section')
+        .filter({ has: page.getByRole('heading', { name: 'Appraisal', exact: true }) })
+        .locator('header')
+        .last();
+      await expect(page.getByText('Nothing appraised yet')).toBeVisible();
+      await expect(header.getByRole('button')).toHaveCount(0);
+
+      await appraise(page, SIX_COLUMN_PASTE);
+      await expect(header.getByRole('button', { name: 'Columns' })).toBeVisible();
+      await expect(header.getByRole('button', { name: 'Copy Share Link' })).toBeVisible();
+
+      // Invariants, not pixels: the title stays on one line and the header
+      // does not spill sideways.
+      const fit = await header.evaluate((el) => {
+        const h2 = el.querySelector('h2')!;
+        return {
+          overflows: el.scrollWidth > el.clientWidth + 1,
+          titleWraps:
+            h2.getBoundingClientRect().height > parseFloat(getComputedStyle(h2).lineHeight) * 1.5,
+        };
+      });
+      expect(fit.overflows).toBe(false);
+      expect(fit.titleWraps).toBe(false);
+      await expectNoPageOverflow(page);
+    });
+  }
 });

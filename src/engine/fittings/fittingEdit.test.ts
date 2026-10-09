@@ -23,6 +23,7 @@ import {
   loadChargeIntoAll,
   loadChargeIntoCompatible,
   moveModule,
+  nextModuleState,
   reachableModuleStates,
   shownModuleState,
   newFitting,
@@ -1136,5 +1137,24 @@ describe('chargesPerLoad', () => {
     expect(chargesPerLoad(f32(0.5), 1)).toBe(1);
     expect(chargesPerLoad(0, 0.01)).toBe(1);
     expect(chargesPerLoad(1, 0)).toBe(1);
+  });
+});
+
+describe('nextModuleState', () => {
+  it('walks offline, online, active, overload and wraps to offline', () => {
+    expect(nextModuleState('offline', 'overload')).toBe('online');
+    expect(nextModuleState('online', 'overload')).toBe('active');
+    expect(nextModuleState('active', 'overload')).toBe('overload');
+    expect(nextModuleState('overload', 'overload')).toBe('offline');
+  });
+
+  it('skips states above what the module can reach', () => {
+    expect(nextModuleState('offline', 'online')).toBe('online');
+    expect(nextModuleState('online', 'online')).toBe('offline');
+    expect(nextModuleState('active', 'active')).toBe('offline');
+  });
+
+  it('wraps from a shown state above the reachable ones', () => {
+    expect(nextModuleState('overload', 'active')).toBe('offline');
   });
 });

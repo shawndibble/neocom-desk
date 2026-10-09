@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
+import { writeToClipboard } from '@/lib/clipboard';
 import { OreIcon, OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,6 +28,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
+import { usePriceBreakdown } from './usePriceBreakdown';
 import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -92,6 +95,22 @@ interface RowDetailModalProps {
   onLinkWalletPayment?: () => void;
 }
 
+/** Stand-in so the breakdown hook can run for a row with no assignment (its text is never used). */
+function placeholderAssignment(row: MoonMiningTaxRow): MiningTaxAssignmentRecord {
+  return {
+    id: '',
+    characterId: row.characterId,
+    date: row.entry.date,
+    solarSystemId: row.entry.solarSystemId,
+    oreLines: row.unassignedOreLines,
+    taxPct: 0,
+    estimatedValue: 0,
+    taxOwed: 0,
+    status: 'dismissed',
+    updatedAt: 0,
+  };
+}
+
 /**
  * Row detail (issue #523, reworked by scope decision 20261004 — mockup F4).
  * An unassigned entry opens straight into the Assign form, with the Payee
@@ -135,6 +154,8 @@ export function RowDetailModal({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [confirmUnassign, setConfirmUnassign] = useState(false);
+  const [copied, setCopied] = useState<{ at: number } | null>(null);
+  useTimedToast(copied, () => setCopied(null), NOTICE_MS);
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
   const estimatedValue = assignment
     ? assignment.estimatedValue
@@ -147,6 +168,18 @@ export function RowDetailModal({
   // pure duplication.
   const showOreCard = !(status === 'unassigned' && oreLines.length > 1);
 
+  // The breakdown card only shows for an assigned row; hooks can't be
+  // conditional, so the one that builds its copy text takes a placeholder
+  // assignment otherwise and the item is simply not offered.
+  const breakdownCopy = usePriceBreakdown({
+    assignment: assignment ?? placeholderAssignment(row),
+    payee,
+    systemName,
+    typeNames,
+    pricesFor,
+    priceSourcesFor,
+  });
+
   const moreItems = [
     onLinkWalletPayment && status === 'outstanding' && (
       <DropdownMenuItem key="wallet" onSelect={onLinkWalletPayment}>
@@ -156,6 +189,11 @@ export function RowDetailModal({
     onLinkTransaction && (
       <DropdownMenuItem key="transaction" onSelect={onLinkTransaction}>
         {t('miningTax.linkTransactionAction')}
+      </DropdownMenuItem>
+    ),
+    status === 'outstanding' && (
+      <DropdownMenuItem key="mark-paid" onSelect={onMarkPaid}>
+        {t('miningTax.markPaidAction')}
       </DropdownMenuItem>
     ),
     onJoin && status === 'outstanding' && (
@@ -183,6 +221,19 @@ export function RowDetailModal({
       <DropdownMenuContent align="end">
         {moreItems}
         {moreItems.length > 0 && <DropdownMenuSeparator />}
+        {assignment && (
+          <>
+            <DropdownMenuItem
+              onSelect={() => {
+                void writeToClipboard(breakdownCopy.text);
+                setCopied({ at: Date.now() });
+              }}
+            >
+              {t('miningTax.detail.breakdown.copy')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onSelect={() => setConfirmUnassign(true)} className="text-danger">
           {t('miningTax.detail.unassignAction')}
         </DropdownMenuItem>
@@ -208,6 +259,11 @@ export function RowDetailModal({
       }
     >
       <div className="space-y-3 text-sm">
+        {copied && (
+          <p role="status" className="text-xs text-text-dim">
+            {t('miningTax.detail.breakdown.copied')}
+          </p>
+        )}
         {/* Who it's owed to and how much lead, the same way the combined
             view does; the pilot and the paperwork sit on the line below. */}
         {assigned && assignment && (
@@ -389,11 +445,6 @@ export function RowDetailModal({
             {status === 'needs-review' && (
               <Button variant="primary" disabled={busy} onClick={onResolve}>
                 {t('miningTax.resolveConfirm')}
-              </Button>
-            )}
-            {status === 'outstanding' && (
-              <Button disabled={busy} onClick={onMarkPaid}>
-                {t('miningTax.markPaidAction')}
               </Button>
             )}
             <Button disabled={busy} onClick={onEdit}>

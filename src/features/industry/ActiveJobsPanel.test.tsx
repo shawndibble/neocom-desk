@@ -270,10 +270,10 @@ describe('ActiveJobsPanel: rendering', () => {
 
     // The table menu/Refresh live in the accordion body, not the title bar.
     expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Export Active jobs' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export Jobs' })).toBeNull();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(caret);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export Active jobs' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export Jobs' })).toBeInTheDocument();
   });
 
   it('says "None" beside the title, with no body at all, when ESI answers with zero jobs', async () => {
@@ -1213,7 +1213,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // two rows tall with a stray control under the summary it qualifies.
     const trigger = await screen.findByRole('button', { name: 'This character' });
     expect(trigger.closest('header')).not.toBeNull();
-    expect(screen.queryByRole('table', { name: 'Active jobs' })).toBeNull();
+    expect(screen.queryByRole('table', { name: 'Jobs' })).toBeNull();
   });
 
   it('keeps the character filter when nothing is running — an empty panel is where the cross-character view most needs finding', async () => {
@@ -1679,6 +1679,29 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
     renderPanel();
 
     expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
+  });
+
+  it('dismisses a delivered job: drops it from the count, marks the row, and Undo / Restore bring it back', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([esiJob(), RUNNING])));
+    renderPanel();
+    expect(await screen.findByText('1 delivered, not logged')).toBeInTheDocument();
+    expect(screen.queryByText(/delivered jobs?$/)).not.toBeInTheDocument();
+    await openHistory();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    expect(await screen.findByText('Dismissed')).toBeInTheDocument();
+    expect(screen.queryByText('1 delivered, not logged')).not.toBeInTheDocument();
+    expect((await screen.findByRole('button', { name: 'Restore' })).closest('tr')).not.toHaveClass(
+      'bg-warning/10'
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(await screen.findByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+    expect(screen.getByText('1 delivered, not logged')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    expect(await screen.findByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
 
   it('tints an unlogged row and offers Log production', async () => {

@@ -21,12 +21,48 @@ async function writeHistory(
     const stored = await db.industryJobHistory.get(characterId);
     const jobs = mergeJobHistory(stored?.jobs ?? [], fetched);
     if (stored && JSON.stringify(stored.jobs) === JSON.stringify(jobs)) return;
-    await db.industryJobHistory.put({ characterId, jobs, fetchedAt: now });
+    await db.industryJobHistory.put({
+      ...stored,
+      characterId,
+      jobs,
+      fetchedAt: now,
+    });
   } catch (error) {
     // History is a bonus on top of the active list; a Dexie failure must not
     // take the list (or every alert reading it) down.
     captureException(error);
   }
+}
+
+/**
+ * Dismiss (or restore) one delivered job: it stops counting as "not logged"
+ * but stays in History (issue #2991). Serialised with the fetch writes so a
+ * concurrent merge can't drop it. Resolves false when the write failed.
+ */
+export function setJobDismissed(
+  characterId: number,
+  jobId: number,
+  dismissed: boolean
+): Promise<boolean> {
+  let ok = true;
+  const next = (writeChains.get(characterId) ?? Promise.resolve()).then(async () => {
+    try {
+      await db.industryJobHistory
+        .where('characterId')
+        .equals(characterId)
+        .modify((row) => {
+          const ids = new Set(row.dismissedJobIds ?? []);
+          if (dismissed) ids.add(jobId);
+          else ids.delete(jobId);
+          row.dismissedJobIds = [...ids];
+        });
+    } catch (error) {
+      captureException(error);
+      ok = false;
+    }
+  });
+  writeChains.set(characterId, next);
+  return next.then(() => ok);
 }
 
 export function recordJobHistory(

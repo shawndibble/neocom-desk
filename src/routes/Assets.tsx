@@ -1,3 +1,4 @@
+import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import {
   createContext,
   useCallback,
@@ -7,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { ReactNode } from 'react';
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -16,10 +18,10 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
-  DropdownMenu,
-  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   IconButton,
   IskAmount,
   PageHeader,
@@ -45,7 +47,7 @@ import {
   loadOtherCharactersAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
-import { ConsolidationPanel } from '@/features/assets/ConsolidationPanel';
+import { MovePlanModal } from '@/features/assets/MovePlanModal';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   fromStoredCharacterFilterValue,
@@ -53,6 +55,9 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useViewedCharacterId } from '@/features/character/viewedCharacter';
+import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { MyShipsPanel } from '@/features/character/MyShipsPanel';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -68,6 +73,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { ROUTE_PREFERENCE_LABEL_KEYS, ROUTE_PREFERENCES } from '@/features/route/routePreferences';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useFocusHeading } from '@/lib/useFocusHeading';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -75,6 +81,7 @@ import { loadAssetCopyValues } from '@/features/character/assetCopyValues';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { loadCharacterBlueprints } from '@/features/industry/data';
+import { formatAge } from '@/lib/age';
 import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
 import type { TableExport } from '@/components/ui/useTableExport';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/character/assetsCsv';
@@ -116,7 +123,7 @@ import {
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { useItemActions } from '@/features/market/itemActions';
@@ -647,11 +654,13 @@ function isUnresolvedParent(
 
 /** Character assets, browsed one level at a time. Read-only, cached for offline. */
 export function Assets() {
+  const isPhone = useIsPhone();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadAssetsSnapshot,
-    undefined,
+    viewedCharacterId,
     { cacheKey: 'assets' }
   );
 
@@ -689,7 +698,7 @@ export function Assets() {
     [defaultCharacterFilter]
   );
   const [view, setView] = useUrlParams(viewParams);
-  const [showConsolidate, setShowConsolidate] = useState(false);
+  const [movePlanOpen, setMovePlanOpen] = useState(false);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
@@ -726,7 +735,10 @@ export function Assets() {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  const crossCharacterFilter = view.chars;
+  // Viewing a named Character is a fixed scope: the cross-Character filter
+  // (and its legacy `chars` value, which here named the Character) stands down.
+  const crossCharacterFilter: CharacterFilterValue =
+    viewedCharacterId === undefined ? view.chars : 'current';
   const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
     crossCharacterFilter,
     activeCharacterId
@@ -744,8 +756,12 @@ export function Assets() {
   // Absent for a one-Character account: "This character" and "All characters"
   // then resolve to the same pilot, leaving a control that cannot change
   // anything (`OpenOrdersPanel`'s precedent).
+  const viewedCharacter =
+    viewedCharacterId === undefined
+      ? undefined
+      : (allCharactersQuery ?? []).find((c) => c.characterId === viewedCharacterId);
   const crossCharacterFilterMeta =
-    crossCharacterCandidates.length > 1 ? (
+    crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
       <CharacterFilterControl
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
@@ -1622,6 +1638,48 @@ export function Assets() {
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
 
+  // Phone station header (#2989): security · ISK · jumps on a second line, so the
+  // top line is the back button and the full-width station name. An absent item
+  // (unknown security, jumps still loading) drops out with its dot.
+  const phoneFacts = (() => {
+    if (!isPhone || pathStationId === null || !resolved.station) return null;
+    const { station } = resolved;
+    const resolvedStation = !isUnresolvedParent(station, mergedLocationNames);
+    const facts: { key: string; node: ReactNode }[] = [];
+    const security = resolvedStation ? securityForStation(station.locationId) : null;
+    if (security !== null && security !== undefined) {
+      facts.push({ key: 'security', node: <SecurityValue security={security} /> });
+    }
+    if (currentTotals) {
+      facts.push({
+        key: 'isk',
+        node: (
+          <span className="text-isk-pos">
+            <IskAmount value={currentTotals.estimatedValue} decimals={0} />
+          </span>
+        ),
+      });
+    }
+    const jumps = resolvedStation
+      ? jumpsAwayByKey.get(`${station.locationId}:${jumpsFor}`)
+      : undefined;
+    if (jumps) {
+      facts.push({
+        key: 'jumps',
+        node: (
+          <JumpsAwayText
+            result={jumps}
+            t={t}
+            locationId={station.locationId}
+            preference={routeOverride}
+            linkClassName="inline-flex min-h-11 items-center"
+          />
+        ),
+      });
+    }
+    return facts.length > 0 ? facts : null;
+  })();
+
   return (
     <ItemActionsProvider page={itemActions}>
       <div
@@ -1638,6 +1696,7 @@ export function Assets() {
           'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
         )}
       >
+        <FromWalletCrumb />
         <PageHeader
           title={t('assets.title')}
           // `CharacterFilterControl` rides here rather than in `actions` per
@@ -1647,6 +1706,14 @@ export function Assets() {
           // is" role the decision describes for a panel's own `meta`.
           meta={
             <>
+              <WalletOriginCrumb />
+              {viewedCharacter && (
+                <CharacterScopeReadout
+                  scope="one"
+                  characterId={viewedCharacter.characterId}
+                  characterName={viewedCharacter.name}
+                />
+              )}
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
@@ -1657,57 +1724,78 @@ export function Assets() {
           actions={
             <>
               <div className="ml-auto flex items-center gap-1.5">
-                <IconButton
-                  icon={<Icon.FlatList />}
-                  label={t('assets.allItemsToggle')}
-                  pressed={allItemsView}
-                  onClick={() => setView({ all: !allItemsView })}
-                />
-                <IconButton
-                  icon={<Icon.Route />}
-                  label={t('assets.consolidate.toggle')}
-                  pressed={showConsolidate}
-                  onClick={() => setShowConsolidate((open) => !open)}
-                />
-                <IconButton
-                  icon={<Icon.Select />}
-                  label={t('assets.select.toggle')}
-                  pressed={selectMode}
-                  onClick={toggleSelectMode}
-                />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      icon={<Icon.Settings />}
-                      label={t('assets.tools.label')}
-                      size="md"
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
-                      {t('assets.myShips.title')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <TableActionsMenu name={t('assets.title')} tableExport={assetsExport} size="md" />
-                <IconButton
-                  icon={<Icon.Refresh />}
-                  label={t('assets.refresh')}
-                  disabled={loading}
-                  onClick={refresh}
-                />
+                <TableActionsMenu
+                  name={t('assets.title')}
+                  label={t('assets.tools.label')}
+                  triggerText={t('assets.tools.label')}
+                  tableExport={assetsExport}
+                  size="md"
+                >
+                  <DropdownMenuLabel>{t('assets.tools.view')}</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem
+                    checked={allItemsView}
+                    onCheckedChange={(on) => setView({ all: on })}
+                  >
+                    {t('assets.allItemsToggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
+                    {t('assets.select.toggle')}
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
+                    {t('assets.myShips.title')}
+                    <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setMovePlanOpen(true)}>
+                    {t('assets.movePlan.menuItem')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={loading} onSelect={refresh}>
+                    {t('assets.refresh')}
+                    {assetsResult && (
+                      <span className="ml-auto pl-3 text-text-dim">
+                        {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                </TableActionsMenu>
               </div>
             </>
           }
         />
-        {showConsolidate && <ConsolidationPanel />}
+        <MovePlanModal
+          open={movePlanOpen}
+          onClose={() => setMovePlanOpen(false)}
+          characterIds={shipCharacterIds}
+          activeCharacterId={activeCharacterId}
+          filterControl={
+            crossCharacterCandidates.length > 1 ? (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={crossCharacterFilter}
+                onChange={(chars: CharacterFilterValue) => setView({ chars })}
+                characterCount={crossCharacterCandidates.length}
+                variant="field"
+              />
+            ) : undefined
+          }
+        />
 
         <MyShipsPanel
           open={myShipsOpen}
           onClose={closeMyShips}
           characterIds={shipCharacterIds}
           activeCharacterId={activeCharacterId}
-          filterControl={crossCharacterFilterMeta}
+          filterControl={
+            crossCharacterCandidates.length > 1 ? (
+              <CharacterFilterControl
+                activeCharacterId={activeCharacterId}
+                value={crossCharacterFilter}
+                onChange={(chars: CharacterFilterValue) => setView({ chars })}
+                characterCount={crossCharacterCandidates.length}
+                variant="field"
+              />
+            ) : undefined
+          }
           onShowAllCharacters={
             !shipsFilterIsAll && crossCharacterCandidates.length > 1
               ? () => setView({ chars: 'all' })
@@ -1874,6 +1962,16 @@ export function Assets() {
                           </span>
                         )}
                       </h2>
+                      {phoneFacts && (
+                        <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
+                          {phoneFacts.map((fact, index) => (
+                            <span key={fact.key} className="flex items-center gap-1">
+                              {index > 0 && <span aria-hidden="true">·</span>}
+                              {fact.node}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {crumbs.length > 1 && (
                         <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
                           {crumbs.slice(0, -1).map((crumb, index) => (
@@ -1887,7 +1985,8 @@ export function Assets() {
                         </span>
                       )}
                     </div>
-                    {resolved.station &&
+                    {!phoneFacts &&
+                      resolved.station &&
                       !isUnresolvedParent(resolved.station, mergedLocationNames) && (
                         <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                           <SecurityValue
@@ -1903,7 +2002,7 @@ export function Assets() {
                           />
                         </span>
                       )}
-                    {currentTotals && (
+                    {currentTotals && !phoneFacts && (
                       <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
                         <span className="hidden sm:inline">
                           {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
@@ -2243,7 +2342,8 @@ function NodeRowView({
       onToggleSelection={() => onToggleSelection([asset.item_id])}
       t={t}
       wrap={(children) => (
-        <ItemContextMenu
+        <OreItemMenu
+          quantity={asset.quantity}
           typeId={asset.type_id}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
@@ -2251,7 +2351,7 @@ function NodeRowView({
           onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
         >
           {children}
-        </ItemContextMenu>
+        </OreItemMenu>
       )}
     />
   );

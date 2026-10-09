@@ -10,6 +10,9 @@ export const WALLET_JOURNAL_COLUMN_IDS = ['date', 'description', 'amount', 'bala
 
 export type WalletJournalColumnId = (typeof WALLET_JOURNAL_COLUMN_IDS)[number];
 
+/** Off by default on a phone, where a journal line is wide; ticking it shows it. */
+export const WALLET_JOURNAL_PHONE_OFF_BY_DEFAULT: readonly WalletJournalColumnId[] = ['balance'];
+
 export const useVisibleWalletJournalColumns = createColumnVisibilitySetting({
   key: 'walletJournalVisibleColumns',
   ids: WALLET_JOURNAL_COLUMN_IDS,

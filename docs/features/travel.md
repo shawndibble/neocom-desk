@@ -66,16 +66,15 @@ Component `src/features/travel/RouteSafetyTab.tsx`. Layout: grid, rail (Stops, R
 
 ### Link parameters (`src/features/travel/routeSafetyLink.ts:56`, `ROUTE_PARAMS`)
 
-| Param                             | Meaning                                                                                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `from`                            | Start system id; absent = Current System                                                                                                             |
-| `stops`                           | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read                                                                                |
-| `opt`, `ret`, `keep`              | Optimize stop order, Return to start, Keep last stop last                                                                                            |
-| `pref`                            | Route Preference override; absent = saved default                                                                                                    |
-| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override                                                                                             |
-| `whhull`                          | Hull type id the `whsize` was read from (`engine/route/hullWormholeSize.ts`); the Route rules panel shows "Set from <hull>" until the size is edited |
-| `jb`                              | Use jump bridges override                                                                                                                            |
-| `pin`                             | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick                                           |
+| Param                             | Meaning                                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `from`                            | Start system id; absent = Current System                                                                   |
+| `stops`                           | Ordered stop ids (max 10, dedup, order typed); legacy `to` still read                                      |
+| `opt`, `ret`, `keep`              | Optimize stop order, Return to start, Keep last stop last                                                  |
+| `pref`                            | Route Preference override; absent = saved default                                                          |
+| `wh`, `whsize`, `whlife`, `whhub` | Hole switch, ship size, min life (0-24 h), hubs override                                                   |
+| `jb`                              | Use jump bridges override                                                                                  |
+| `pin`                             | Per-leg pinned way, comma tokens (`gates`, `thera`, `turnur`, `ansiblex`, hole id), empty = planner's pick |
 
 Parameter edits `push` history (Back works). Unreadable pin tokens degrade to "not pinned".
 
@@ -113,7 +112,7 @@ Two groups; waits for settings hydration (spinner) so a click cannot overwrite s
    - Security penalty 0-100 (disabled under Prefer shorter, with note).
    - Avoid EDENCOM systems / Triglavian minor-victory systems / systems with >= N pod kills in last hour (threshold 1-100, default 3; warning when pod-kill feed unavailable).
    - Avoided Systems switch + add picker + list with remove (per-row security).
-2. Route Safety only (`RouteHoleFields`): Route through Thera / Turnur switch; My ship fits (Small..Capital); Skip holes with under N h left (0-24, default 1); Hubs (all / Thera / Turnur); Use jump bridges switch (device-local) + "Manage Ansiblex (N)" button opening the dialog. Changing one saves default and drops link override.
+2. Route Safety only (`RouteHoleFields`): Route through Thera / Turnur switch; My ship fits (Small..Capital; picking a hull in Ship I am moving sets it from the hull's SDE group via `engine/route/hullWormholeSize.ts` and shows "Set from <hull>" until the size is edited; industrials, barges, Orca and Rorqual leave it alone); Skip holes with under N h left (0-24, default 1); Hubs (all / Thera / Turnur); Use jump bridges switch (device-local) + "Manage Ansiblex (N)" button opening the dialog. Changing one saves default and drops link override.
 
 Phone: panel folds with `ActiveRuleChips` summarising rules on (preference, penalty if not shortest, avoid chips, avoided count, hole hub, bridge count).
 

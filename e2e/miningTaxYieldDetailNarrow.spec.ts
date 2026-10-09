@@ -173,6 +173,20 @@ test.describe('Yield Detail — ore-mined table', () => {
       }
     }
 
+    // Compressed ores share a long stem, so an ellipsis would make rows indistinguishable.
+    for (const { typeId } of ORE_LINES) {
+      const name = page
+        .locator(`table[aria-label="${ORE_TABLE}"] tbody tr[data-row-key="${typeId}"] td`)
+        .first()
+        .locator('a')
+        .first();
+      const fits = await name.evaluate((el) => {
+        const span = el.parentElement!;
+        return span.scrollWidth <= span.clientWidth;
+      });
+      expect(fits).toBe(true);
+    }
+
     const headers = await visibleHeaders(page);
     expect(headers).toContain('Raw sell value');
     expect(headers).toContain('Refined value');

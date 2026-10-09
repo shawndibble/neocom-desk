@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
+import { PASTE_DETECTORS } from '@/engine/import/pasteDestination';
 import {
   SHORTCUTS,
   commandPaletteDisplayKey,
@@ -61,22 +62,25 @@ export function ShortcutsPanel() {
           <Row label={t('shortcuts.saveFittingAsNew')}>
             <kbd className={KBD}>{modChordDisplayKey(apple, 'S', { shift: true })}</kbd>
           </Row>
+          <Row label={t('shortcuts.cycleModuleState')}>
+            <kbd className={KBD}>S</kbd>
+          </Row>
           <Row label={t('shortcuts.submitPaste')}>
             <kbd className={KBD}>{modChordDisplayKey(apple, 'Enter')}</kbd>
           </Row>
         </dl>
       </Panel>
       <Panel title={t('shortcuts.pasteTitle')}>
-        {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`). */}
+        {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`); rows come from its registry. */}
         <p className="mb-2 text-sm text-text-dim">{t('shortcuts.pasteHint')}</p>
         {/* One column: its rows name a destination, not a key, and wrap in a half-width column. */}
         <dl className="text-sm">
           <Row label={t('shortcuts.paste')}>
             <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
           </Row>
-          {(['pasteFitting', 'pasteItems'] as const).map((key) => (
-            <Row key={key} label={t(`shortcuts.${key}`)}>
-              <span className="text-text">{t(`shortcuts.${key}Opens`)}</span>
+          {PASTE_DETECTORS.map(({ id }) => (
+            <Row key={id} label={t(`shortcuts.pasteDestinations.${id}.label`)}>
+              <span className="text-text">{t(`shortcuts.pasteDestinations.${id}.opens`)}</span>
             </Row>
           ))}
         </dl>

@@ -21,6 +21,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { exportRows, type ExportFormat } from '@/lib/downloadCsv';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './DropdownMenu';
+import { Button } from './Button';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from './RowActions';
@@ -135,21 +136,32 @@ export function TableActionsMenu<T>({
   tableExport,
   children,
   size = 'sm',
+  label: labelOverride,
+  triggerText,
+  showLabel,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
   tableExport: TableExport<T>;
   children?: ReactNode;
   size?: 'sm' | 'md';
+  /** Replaces the default "<name> actions" button name when the menu is a page's named tools menu. */
+  label?: string;
+  /** Shows the word on the trigger (grid icon, text, caret) instead of a bare ⋯ icon: a page's named Tools menu. */
+  triggerText?: string;
+  /** Tier 2: an export-only trigger shows "Export" beside the download icon from `md` up. */
+  showLabel?: boolean;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const exportOnly = !children;
-  const label = exportOnly
-    ? t('common.tableExport.exportButtonLabel', { name })
-    : t('common.tableExport.menuLabel', { name });
+  const label =
+    labelOverride ??
+    (exportOnly
+      ? t('common.tableExport.exportButtonLabel', { name })
+      : t('common.tableExport.menuLabel', { name }));
   // An `md` button sits in a toolbar beside other md controls (a column
   // picker), whose glyphs are md too.
   const iconSize = size === 'md' ? Icon.ICON_SIZE.md : Icon.ICON_SIZE.sm;
@@ -162,19 +174,35 @@ export function TableActionsMenu<T>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={
-            copied !== null ? (
-              <Icon.Done size={iconSize} />
-            ) : exportOnly ? (
-              <Icon.Download size={iconSize} />
-            ) : (
-              <Icon.More size={iconSize} />
-            )
-          }
-          label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
-          size={size}
-        />
+        {triggerText ? (
+          <Button
+            size={size}
+            aria-label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
+          >
+            {copied !== null ? <Icon.Done size={iconSize} /> : <Icon.CardsView size={iconSize} />}
+            <span aria-hidden>{triggerText}</span>
+            <Icon.Expanded size={iconSize} />
+          </Button>
+        ) : (
+          <IconButton
+            icon={
+              copied !== null ? (
+                <Icon.Done size={iconSize} />
+              ) : exportOnly ? (
+                <Icon.Download size={iconSize} />
+              ) : (
+                <Icon.More size={iconSize} />
+              )
+            }
+            label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
+            size={size}
+            visibleLabel={
+              showLabel && exportOnly && copied === null
+                ? t('common.tableExport.exportVerb')
+                : undefined
+            }
+          />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <MenuKindContext.Provider value="dropdown">

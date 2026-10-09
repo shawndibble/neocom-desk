@@ -1,13 +1,13 @@
 # Industry shell, Records, BPC Sourcing, Opportunities (feature inventory)
 
-Scope: `src/routes/Industry.tsx` shell + header, Active Jobs, Records tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
+Scope: `src/routes/Industry.tsx` shell + header, Jobs panel, Records tab, BPC Sourcing tab, Opportunities tab (+ All owned, Market-Wide), Blueprint Acquisition link-up. Build Plans tab, plan page, group page, materials, Auto Build, Fit Import, facility defaults, `computeBuildPlan` are covered elsewhere.
 
 Terms per `CONTEXT.md`: **Production Log**, **Production Run**, **BPC Sourcing** (tab label in UI: "BPC Sourcing", i18n `industry.bpcSearchTab`; code comments still say "BPC Search"), **Offer**, **Public Contract Offers snapshot**, **Build Opportunities**, **Market-Wide Build Opportunities**, **Liquidity Floor**, **Order Depth**, **Seeded Build Plan**, **Blueprint Acquisition**.
 
 Where brief items actually live (code differs from the obvious guess):
 
 - Records tab renders only `ProductionLogPanel`. Nothing else.
-- Active Jobs panel (personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
+- Jobs panel (Active / History segments; personal + corp jobs, jobs CSV, Log production) is in `IndustryHeader`: shows above every tab and on plan/group pages.
 - Owned blueprints panel + `ownedBlueprints` CSV = Opportunities tab "All owned" view (`opps.view=owned`).
 - Corp blueprints = toggle inside All owned. Corp stock (`corpOwnedStock.ts`) and corp blueprints (`corpOwnedBlueprints.ts`) as plan sources = Build Plan "Corp Assets" toggle (other doc).
 - Job History (issue #2866): jobs are fetched `include_completed=true`; delivered personal jobs are kept in Dexie `industryJobHistory` past ESI's window (`jobHistoryStore.ts`), shown in the panel's History segment. Corp jobs have no history.
@@ -16,11 +16,11 @@ Where brief items actually live (code differs from the obvious guess):
 
 | Feature                                    | Where                                                                                                                 | Notes                                                                                                         |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Industry shell, 4-tab strip                | `/industry/{plans,records,sourcing,opportunities}` `src/routes/Industry.tsx`, `IndustryHeader.tsx`, `industryTabs.ts` | Tab = path segment (ADR 0015). Header + Active Jobs shared with plan/group pages                              |
+| Industry shell, 4-tab strip                | `/industry/{plans,records,sourcing,opportunities}` `src/routes/Industry.tsx`, `IndustryHeader.tsx`, `industryTabs.ts` | Tab = path segment (ADR 0015). Header + Jobs panel shared with plan/group pages                               |
 | Per-tab settings gear                      | `IndustryHeader.tsx` `tabSettings`                                                                                    | plans: IndustrySettingsForm; opportunities: assumed-ME only; sourcing: BpcSourcingSettingsForm; records: none |
 | Blueprints reauth banner                   | `IndustryHeader.tsx`                                                                                                  | GrantBanner for `getCharacterBlueprints`; all tabs                                                            |
 | Deep links `?product=` `?material=` + seed | `Industry.tsx`, `planSeed.ts`                                                                                         | Opens/creates plan, redirects to plan page                                                                    |
-| Active Jobs panel                          | header, all tabs `ActiveJobsPanel.tsx`                                                                                | Personal + corp jobs, filters, CSV, slot readout, Log production                                              |
+| Jobs panel                                 | header, all tabs `ActiveJobsPanel.tsx`                                                                                | Personal + corp jobs, filters, CSV, slot readout, Log production                                              |
 | Log production from job                    | job row button, `LogProductionFromJobDialog.tsx`, `logProductionFromJob.ts`                                           | Finished mfg/reaction personal jobs only; 0/1/many plan resolve                                               |
 | Production Log (Records)                   | `/industry/records` `ProductionLogPanel.tsx`                                                                          | Totals, profit chart, By item table, folded All runs table, date range, 2 CSVs                                |
 | Sold split button + modals                 | Records runs table `SaleLinkingControls.tsx`, `useSaleLinking.ts`                                                     | Link Past Sale, Watch Open Order, Manual Sale, Delete run                                                     |
@@ -52,9 +52,9 @@ Where brief items actually live (code differs from the obvious guess):
 - Keyboard: only the global `go-to-industry` shortcut (`src/lib/shortcuts.ts`). No tab-specific shortcuts in these files. Combobox arrow keys in BPC Sourcing search (see 5).
 - Data: `useIndustryWorkspace.ts` (catalog, owned blueprints, pricing inputs, facility defaults, modifiers, groups, owned-stock snapshot incl. corp stock state); `workspaceLoadCache.ts` keeps last load across the three Industry pages.
 
-## 3. Active Jobs panel (`ActiveJobsPanel.tsx`, `jobs.ts`, `corpJobs.ts`, `jobsCsv.ts`)
+## 3. Jobs panel (`ActiveJobsPanel.tsx`, `jobs.ts`, `corpJobs.ts`, `jobsCsv.ts`)
 
-What: "Active jobs" panel above the tabs; running industry jobs of all activities (manufacturing 1, research TE/ME, copying, invention, reactions 11), soonest end first.
+What: "Jobs" panel (Active / History segments) above the tabs; running industry jobs of all activities (manufacturing 1, research TE/ME, copying, invention, reactions 11), soonest end first.
 
 Data / scopes:
 
@@ -97,7 +97,7 @@ Layout:
 - Date range: `FilterBar` with From/To date inputs (`records.from`, `records.to`, ISO dates; mobile = filter sheet). Filters runs by logged date (`productionLogFilter.ts`).
 - By item columns: Product (ItemInfoLink), Runs logged, Units produced, Units sold, Realized profit, Avg margin, Sold-units margin, Unsold cost. Sort URL `records.itemSort`. CSV `production-log-items` via `TableActionsMenu`.
 - All runs (collapsed by default; `CollapsiblePanel` show/hide + count): Logged, Item, Quantity, Total cost, Sold, Realized profit (button opens `RealizedProfitBreakdown` modal: rule + substituted values; sales tax from Accounting, broker fee from Broker Relations + standing), Status chip (new/open/closed), Sold actions. Sort URL `records.runSort`. CSV `production-log-runs` (falls back to rollup order while folded). Row click -> run's plan page only when plan still exists (`planExists`; row link cue accent); else inert + ItemInfoLink.
-- Sold split button (`SoldSplitButton`): primary "Sold..." = Link Past Sale (picker of wallet sell transactions of that product not yet linked, `getCharacterWalletTransactions`, wallet scope), dropdown: Watch Open Order (picker of open non-buy orders of that product, `loadOrders`, `esi-markets.read_character_orders.v1`), Manual Sale (modal: quantity, unit price with validation), Delete production run (confirm modal; the only delete on Records), plus refresh icon when a run has unclosed order watches (re-reads orders, updates `lastKnownVolumeRemain`, closes watches whose order vanished).
+- Sold split button (`SoldSplitButton`): primary "Sold..." = Link Past Sale (picker of wallet sell transactions of that product not yet linked, `getCharacterWalletTransactions`, wallet scope), dropdown: Watch Open Order (picker of open non-buy orders of that product, `loadOrders`, `esi-markets.read_character_orders.v1`), Manual Sale (modal: quantity, unit price with validation), Mark as lost… (Run Loss modal: units lost, date, insurance from wallet journal `insurance` payouts / typed ISK / none, live net-loss preview; then per-loss Edit loss… / Remove loss; the row shows an "N lost" badge), Delete production run (confirm modal; the only delete on Records), plus refresh icon when a run has unclosed order watches (re-reads orders, updates `lastKnownVolumeRemain`, closes watches whose order vanished).
 - Empty: no runs at all -> `productionLogEmptyTitle` (hint: log a run from a plan's Results panel); date filter excludes all -> filtered empty state.
 - Mobile: tables stack (`DataTable` `mobileSort`, compact); filter in sheet; no separate card list.
 
@@ -212,11 +212,11 @@ Mounted by `BuildPlanDetail.tsx` (plan page, other doc); documented here because
 
 | Key                                                                                           | Panel             | Notes                                      |
 | --------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------ |
-| `jobs.chars`                                                                                  | Active Jobs       | Character filter; default = synced default |
-| `jobs.activity`, `jobs.status`                                                                | Active Jobs       | id list / enum set, empty = none           |
-| `jobs.sort`                                                                                   | Active Jobs       | default endsIn asc                         |
-| `jobs.view`                                                                                   | Active Jobs       | `active` (default) / `history`             |
-| `highlight`                                                                                   | Active Jobs       | job id from alert deep link                |
+| `jobs.chars`                                                                                  | Jobs              | Character filter; default = synced default |
+| `jobs.activity`, `jobs.status`                                                                | Jobs              | id list / enum set, empty = none           |
+| `jobs.sort`                                                                                   | Jobs              | default endsIn asc                         |
+| `jobs.view`                                                                                   | Jobs              | `active` (default) / `history`             |
+| `highlight`                                                                                   | Jobs              | job id from alert deep link                |
 | `records.from`, `records.to`                                                                  | Records           | ISO date                                   |
 | `records.itemSort`, `records.runSort`                                                         | Records           | optional sort, unsorted default            |
 | `sourcing.q`, `.region`, `.minMe`, `.minTe`, `.minRuns`, `.maxPrice`                          | BPC Sourcing      | text/id                                    |
@@ -239,7 +239,7 @@ Device-local settings (not URL): `bpcSearchVisibleColumns.v2`, `bpcSearchSpaceFi
 
 | Surface id                  | Where            | Rows                       |
 | --------------------------- | ---------------- | -------------------------- |
-| `industry-jobs`             | Active Jobs      | filtered jobs, table order |
+| `industry-jobs`             | Jobs             | filtered jobs, table order |
 | `production-log-items`      | Records By item  | rollup rows                |
 | `production-log-runs`       | Records All runs | filtered runs              |
 | `industry-owned-blueprints` | All owned        | filtered rows              |
@@ -275,7 +275,7 @@ Route `/industry` is UNGATED (`src/app/routeScopes.ts`); every panel gates itsel
 - ISK/hour (`buildVsBuy.ts`): profit / (job seconds / 3600); null when seconds 0.
 - `classifyOrderDepth` (`src/engine/industry/opportunities.ts`): sell-order ISK at hub / build cost: >=3 deep, <0.5 thin, else moderate, null price -> unknown.
 - `realizedProfit` (`src/engine/industry/realizedProfit.ts`): revenue less material cost, job fee, sales tax (Accounting), broker fee on watched-order revenue (Broker Relations + standing).
-- `aggregateJobSlotSummary` (`src/engine/industry/jobSlots.ts`): max slots per category from skills minus running jobs (Active Jobs panel adds corp jobs to their installer's running list before calling it).
+- `aggregateJobSlotSummary` (`src/engine/industry/jobSlots.ts`): max slots per category from skills minus running jobs (Jobs panel adds corp jobs to their installer's running list before calling it).
 - Market-wide: `selectLiquidCandidates`, `computeMarketWideRows`, `productTier`, `productCategory`, `passesMarketWideFilters` (`src/engine/industry/marketWide*.ts`).
 - BPC: `bpcSearch.ts` (see 5).
 
@@ -356,7 +356,7 @@ Realized profit (`engine/industry/realizedProfit.ts`): total cost = material + j
 ## 16. Missing-scope behavior
 
 - No blueprints scope: header `GrantBanner`; Ranked/All owned empty; BPC Sourcing owned source empty (401/403 resolves empty).
-- No jobs scope: reauth banner/ghost banners in Active Jobs; no cache fallback on 403.
+- No jobs scope: reauth banner/ghost banners in the Jobs panel; no cache fallback on 403.
 - No corp jobs/blueprints scope or role: corp rows/toggle absent, no app-wide banner.
 - No wallet scope: Link Past Sale picker cannot list transactions; no orders scope: Watch Open Order cannot list orders.
 - No LP scope: LP source adds nothing; Market-Wide notes "sources unavailable".
@@ -406,7 +406,7 @@ Realized profit (`engine/industry/realizedProfit.ts`): total cost = material + j
 
 - Add batch-aware ISK/hr option (priced runs selector, slot-aware throughput) to Ranked.
 - Fold order depth/sell-through (daily volume already fetched for rarely-sold) into a liquidity-adjusted score or sort.
-- Expose price history and a context menu on desktop Opportunities rows (parity with phone).
+- (Done, #2843) Price history and a row context menu on desktop Opportunities rows.
 - Show "N excluded: missing price" disclosure on Market-Wide.
 - Include corp blueprints as an opt-in source for Ranked and scan "owned".
 - Persist Ranked rows (Dexie) keyed by inputs key so reloads do not force recompute above 10.

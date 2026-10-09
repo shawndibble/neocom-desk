@@ -29,6 +29,7 @@ import type {
   NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
+  ProductionLossRecord,
   ProductionOrderWatchRecord,
   ProductionRunRecord,
   ProductionSaleLinkRecord,
@@ -47,6 +48,7 @@ import type {
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
   RemoteNetWorthSnapshotDoc,
+  RemoteProductionLossDoc,
   RemoteProductionOrderWatchDoc,
   RemoteProductionRunDoc,
   RemoteProductionSaleLinkDoc,
@@ -532,6 +534,46 @@ export const PRODUCTION_ORDER_WATCHES = defineEditableCollection<
   }),
 });
 
+/** One Run Loss for a Production Run (issue #2851) — its own document, like a sale link. */
+export const PRODUCTION_LOSSES = defineEditableCollection<
+  ProductionLossRecord,
+  RemoteProductionLossDoc
+>({
+  kind: 'editable',
+  remoteName: 'productionLosses',
+  table: 'productionLosses',
+  tombstoneSegment: 'productionLossTombstones',
+  onRemoval: 'delete',
+  faqItem: 'productionRuns',
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    quantity: r.quantity,
+    lostAt: r.lostAt,
+    insurancePayout: r.insurancePayout,
+    // Firestore rejects undefined, so the optional fields are only written when set.
+    ...(r.journalEntryId !== undefined ? { journalEntryId: r.journalEntryId } : {}),
+    ...(r.note !== undefined ? { note: r.note } : {}),
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    quantity: r.quantity,
+    lostAt: r.lostAt,
+    insurancePayout: r.insurancePayout,
+    ...(r.journalEntryId !== undefined ? { journalEntryId: r.journalEntryId } : {}),
+    ...(r.note !== undefined ? { note: r.note } : {}),
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  }),
+});
+
 /** Moon Mining Tax Payees (issue #523). */
 export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
   kind: 'editable',
@@ -665,8 +707,9 @@ export const NET_WORTH_SNAPSHOTS = defineEditableCollection<
     day: r.day,
     wallet: r.wallet,
     assetValue: r.assetValue,
-    plexValue: r.plexValue,
+    ...(r.plexValue !== undefined ? { plexValue: r.plexValue } : {}),
     escrow: r.escrow,
+    ...(r.sellStock !== undefined ? { sellStock: r.sellStock } : {}),
     hubId: r.hubId,
     updatedAt: r.updatedAt,
     ownerHash,
@@ -678,8 +721,9 @@ export const NET_WORTH_SNAPSHOTS = defineEditableCollection<
     day: r.day,
     wallet: r.wallet,
     assetValue: r.assetValue,
-    plexValue: r.plexValue,
+    ...(r.plexValue !== undefined ? { plexValue: r.plexValue } : {}),
     escrow: r.escrow,
+    ...(r.sellStock !== undefined ? { sellStock: r.sellStock } : {}),
     hubId: r.hubId,
     updatedAt: r.updatedAt,
   }),
@@ -699,6 +743,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   PRODUCTION_RUNS,
   PRODUCTION_SALE_LINKS,
   PRODUCTION_ORDER_WATCHES,
+  PRODUCTION_LOSSES,
   NET_WORTH_SNAPSHOTS,
   PAYEES,
   FITTINGS,

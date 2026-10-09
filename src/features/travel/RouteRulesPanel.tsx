@@ -13,15 +13,25 @@
  *   And Use jump bridges (issue #2478), with the Ansiblex list behind it:
  *   a device-local default, since the list itself never leaves the device.
  *
+ * Those two groups sit behind one "More route options" disclosure (issue #3084),
+ * closed by default, with an "N on" readout in its header while either is on.
+ *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useRouteShipMass, useRouteShipTypeId } from '@/features/route/routeShip';
 import {
   Button,
   Checkbox,
   CollapsiblePanel,
+  Disclosure,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SegmentedControl,
   Spinner,
   StatChip,
@@ -30,6 +40,7 @@ import {
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
+import { wormholeSizeForShipGroup } from '@/engine/route/hullWormholeSize';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
   MIN_ROUTE_HOLE_MIN_LIFE,
@@ -105,6 +116,8 @@ export function RouteBridgeFields({
   );
 }
 
+const NO_SHIP = 'none';
+
 /**
  * Route Safety's own group: whether, and through which holes and bridges,
  * routes may go. Shared with Settings → Travel (`bare`: the panel there
@@ -115,20 +128,28 @@ export function RouteHoleFields({
   onChange,
   bridges,
   bare = false,
-  sizeHullName,
+  nested = false,
 }: {
   query: RouteHoleQuery;
   onChange: (change: RouteHoleChange) => void;
   bridges: RouteBridgeFieldsProps;
   bare?: boolean;
-  /** The hull the link's size was read from: says so beside the control until it is edited. */
-  sizeHullName?: string | null;
+  /** Inside a disclosure that already draws the rule and padding above it. */
+  nested?: boolean;
 }) {
   const { t } = useTranslation();
   const lifeId = useId();
   const { enabled, settings } = query;
+  const { hulls } = useRouteShipMass();
+  const shipTypeId = useRouteShipTypeId((state) => state.value);
+  // Set when a hull choice filled the size; any edit of the size drops it (issue #2850).
+  const [sizeHull, setSizeHull] = useState<string | null>(null);
   return (
-    <section className={bare ? 'space-y-3 text-xs' : 'space-y-3 border-t border-line pt-4'}>
+    <section
+      className={
+        bare ? 'space-y-3 text-xs' : nested ? 'space-y-3' : 'space-y-3 border-t border-line pt-4'
+      }
+    >
       {!bare && <GroupLabel>{t('travel.holes.group')}</GroupLabel>}
       <label className={`flex items-center gap-2 font-semibold ${tappableRowClassName}`}>
         <Checkbox
@@ -140,9 +161,9 @@ export function RouteHoleFields({
       <div className="space-y-1.5">
         <p className="font-semibold">
           {t('travel.holes.shipSize')}
-          {sizeHullName != null && (
+          {sizeHull !== null && (
             <span className="ml-2 font-normal text-text-dim">
-              {t('travel.holes.sizeFromHull', { hull: sizeHullName })}
+              {t('travel.holes.sizeFromHull', { hull: sizeHull })}
             </span>
           )}
         </p>
@@ -153,11 +174,43 @@ export function RouteHoleFields({
             label: t(`travel.thera.fits.${value}`),
           }))}
           value={settings.shipSize}
-          onChange={(value) => onChange({ field: 'shipSize', value })}
+          onChange={(value) => {
+            setSizeHull(null);
+            onChange({ field: 'shipSize', value });
+          }}
           size="sm"
           fill
           uppercase={false}
         />
+      </div>
+      <div className="space-y-1.5">
+        <p className="font-semibold">{t('travel.holes.ship')}</p>
+        <Select
+          value={shipTypeId === null ? NO_SHIP : String(shipTypeId)}
+          onValueChange={(value) => {
+            const hull =
+              value === NO_SHIP ? undefined : hulls.find((h) => String(h.typeId) === value);
+            void useRouteShipTypeId.getState().setValue(hull?.typeId ?? null);
+            // A hull the map names sets the size; clearing or an unmapped hull leaves it alone.
+            const size = hull && wormholeSizeForShipGroup(hull.groupId);
+            if (hull && size) {
+              onChange({ field: 'shipSize', value: size });
+              setSizeHull(hull.name);
+            }
+          }}
+        >
+          <SelectTrigger size="sm" aria-label={t('travel.holes.ship')}>
+            <SelectValue placeholder={t('travel.holes.shipPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_SHIP}>{t('travel.holes.shipNone')}</SelectItem>
+            {hulls.map((hull) => (
+              <SelectItem key={hull.typeId} value={String(hull.typeId)}>
+                {hull.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={lifeId}>{t('travel.holes.minLifeBefore')}</label>
@@ -266,11 +319,8 @@ export function RouteRulesPanel({
   onPreferenceChange,
   holeQuery,
   onHoleChange,
-  sizeHullName,
   bridges,
 }: {
-  /** The hull the link's ship size was read from, while the size is still that link's. */
-  sizeHullName?: string | null;
   /** The preference this route is drawn with: the link's, else the pilot's default. */
   preference: RoutePreferenceKind;
   /** Saves the pilot's default (the one Settings → Travel shows), and drops the link's override. */
@@ -284,10 +334,12 @@ export function RouteRulesPanel({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [expanded, setExpanded] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const penaltyId = useId();
   // Held until every setting is read, so a click cannot write a default over a stored value.
   const { settingsHydrated, podKillsUnavailable } = useRouteRules();
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
+  const moreOn = Number(holeQuery.enabled) + Number(bridges.bridgeQuery.enabled);
 
   return (
     <CollapsiblePanel
@@ -339,12 +391,17 @@ export function RouteRulesPanel({
             />
           </section>
 
-          <RouteHoleFields
-            query={holeQuery}
-            onChange={onHoleChange}
-            bridges={bridges}
-            sizeHullName={sizeHullName}
-          />
+          <Disclosure
+            label={t('travel.rules.more')}
+            trailing={moreOn > 0 ? t('travel.rules.moreOn', { count: moreOn }) : undefined}
+            expanded={moreOpen}
+            onToggle={() => setMoreOpen((open) => !open)}
+            className="-mx-3 border-t border-line"
+          >
+            <div className="p-3">
+              <RouteHoleFields query={holeQuery} onChange={onHoleChange} bridges={bridges} nested />
+            </div>
+          </Disclosure>
         </div>
       ) : (
         <Spinner />

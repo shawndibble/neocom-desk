@@ -157,4 +157,14 @@ describe('countUnloggedDeliveries', () => {
     const states = classifyHistoryJobs(rows, []);
     expect(countUnloggedDeliveries(rows, states, { blueprintTypeId: 2 })).toBe(1);
   });
+
+  it('leaves out dismissed jobs, but a dismissed job that got logged is just logged', () => {
+    const rows = [
+      { ...job({ job_id: 1 }), characterId: 7 },
+      { ...job({ job_id: 2 }), characterId: 7 },
+      { ...job({ job_id: 3 }), characterId: 7 },
+    ];
+    const states = classifyHistoryJobs(rows, [run({ sourceJobId: 3 })]);
+    expect(countUnloggedDeliveries(rows, states, { dismissedJobIds: new Set([2, 3]) })).toBe(1);
+  });
 });

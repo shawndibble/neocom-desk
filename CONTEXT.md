@@ -534,9 +534,15 @@ here — they go one per file in `docs/context/decisions/`.
   kills, losses, ISK, solo kills, danger and gang ratios and most-used hulls
   zKillboard states, then their newest 25 kills and losses, each expanding to
   the victim's fit with Open in Fittings (the killmail is read only then).
-  Numbers, never a verdict: no pilot is called hostile or safe. "No
-  zKillboard history" and "zKillboard couldn't be reached" are different
-  answers.
+  A pilot carries a **Threat** badge beside the name, in Pilot Lookup and on
+  every Local list row; beyond that, numbers: no pilot is called hostile or
+  safe. "No zKillboard history" and "zKillboard couldn't be reached" are different
+  answers. A pasted or typed **Local list** is grouped by what each pilot
+  means to you: red and orange contacts, killed in the kind of space you are
+  in (your Current System's), killed elsewhere, quiet for 30 days, and
+  friendly (your corporation, alliance and blue contacts) last. Each row
+  gives kills in high, low and null space with how long ago the newest was.
+- **Threat**: A pilot's colour-coded verdict badge, read from their kills in the last 90 days and zKillboard's all-time danger ratio: **Dangerous** (10 or more recent kills and a danger ratio of 50 or more), **Active** (3 or more), **Low threat** (fewer), **Inactive** (none). Kills only, because a pilot's recent losses are not fetched, so it says how threatening a pilot looks and never that one is safe: there is no green level. A missing danger ratio can never reach Dangerous. A Local list row looks the ratio up only for a pilot with enough recent kills to be Dangerous. `threatVerdict` in `src/engine/pilotList/threatVerdict.ts`, drawn by `ThreatBadge`; scope decision `20261008-181210`.
 - **Avoided Systems**: The solar systems a pilot keeps off their routes,
   entered by hand in Settings → Travel — ESI cannot read the game client's own
   autopilot avoidance list. Synced across devices as ids; shown with each
@@ -598,6 +604,7 @@ here — they go one per file in `docs/context/decisions/`.
   selecting a row still opens a real Build Plan for exact numbers.
 - **LP Store**: An NPC corporation's loyalty-point store: offers that trade LP earned with that corporation (plus ISK and sometimes items) for goods. Every NPC corporation that runs one — navies, independents, CONCORD, pirate factions — ships in the static snapshot `market/lpCorporations.json` (id, name, faction), so any store can be searched offline, not only those of corporations a Character already holds LP with.
 - **LP Value**: What one loyalty point is counted as worth, in ISK per LP, when an LP Store pick is priced as ISK cost + LP cost × LP Value. Each corporation's LP has its own **market** LP Value — what its store's best offers turn a point into at the Trade Hub being priced at, after fees. The pilot can type their own instead (Blueprint Acquisition modal, synced as `sync.loyaltyLpValue`), which then applies to every store; 0, the default, means "use the market". When neither prices a store's LP, the LP is left unpriced, never counted free. Distinct from one LP Store offer's ISK/LP, which is what that offer earns per LP spent. See `docs/context/decisions/20261002-222635-lp-value-defaults-to-each-stores-market-rate.md`.
+- **CONCORD LP Exchange**: A station service converting CONCORD LP held in a Character wallet into a corporation's LP, at a per-corporation rate (0.8 verified for the Empire factions, 0.4 assumed elsewhere; 1,000 LP costs 1,250 CONCORD LP at 0.8). The LP Store can value offers in ISK per CONCORD LP; a corporation with no exchange shows none. _Avoid_: LP conversion.
 - **Liquidity Floor**: The minimum sell-order ISK a product must carry at the
   hub to be considered at all in **Market-Wide Build Opportunities** — the
   same `sellPrice * sellVolume` depth `classifyOrderDepth` (**Order Depth**)
@@ -856,6 +863,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   storage: a marker is an entry-list _position_, while a milestone means "when
   these skills are done, wherever they end up."
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
+- **Dismissed delivery**: A delivered manufacturing or reaction job in the Jobs panel's History segment that the pilot marked "won't be logged". It stops counting as "not logged" everywhere (panel, Build Plan badge) and loses its Log production prompt, but stays listed, marked Dismissed, and can be restored.
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,
   regardless of which Build Plan it came from, grouped by item. Distinct
@@ -873,6 +881,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   or dropped when it was logged in error — without leaving Records. That menu
   item is Records' only delete: its rows navigate, so there is no edit modal
   here to hold a danger button like the per-plan panel's.
+- **Run Loss**: Units of a **Production Run** destroyed or lost before they sold (issue #2851), recorded as their own synced record — several per run — with an optional insurance payout (a wallet-journal payout or typed ISK). It writes the lost units off Unsold cost and Open inventory value and counts the insurance as untaxed proceeds; the run's cost is still charged in full by Realized profit. Reached from the Sold… menu's "Mark as lost…".
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived
@@ -1011,7 +1020,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Share Link**: A short `/share/<id>` link to something a pilot chose to
   share. It lasts a fixed 7 days from creation, then expires; opening it does
   not extend it. Each one has a type, which names the page it opens: a
-  **Shared Appraisal**, or a **Fitting**. It opens with or without a session,
+  **Shared Appraisal**, a **Shared D-Scan**, or a **Fitting**. It opens with or without a session,
   and says when it expires. It never names who shared it. A Fitting's Share
   Link wraps that Fitting's **Fitting Share Code**: opened with nobody logged
   in, it shows the Fitting at every skill level V; a logged-in visitor goes
@@ -1022,6 +1031,18 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   and the time it was priced. Never re-priced. Read-only to whoever opens it;
   "Open Neocom Desk" carries it into the live Appraisal tab. Not a quote: it
   commits nobody to buying at those prices.
+- **Shared D-Scan**: A pasted D-Scan stored in a **Share Link** as its raw scan
+  text (capped in size), never just the counts. The recipient's **Fleet
+  board** is rebuilt from that text by the same parsing and role mapping
+  Pilot Lookup's live D-Scan view uses. Read-only; a visitor with a Character
+  gets "Open Neocom Desk", which carries the scan into the live view, and one
+  with none gets "Log in" with a "Choose permissions" link. Cannot be revoked:
+  expiry is the only end of the link.
+- **Fleet board**: A D-Scan read as its ships grouped by role (Capitals,
+  Industrial, Transport, Support, DPS, Drones and deployables, Structures and
+  wrecks). One share bar shows each role's count and percent and expands to
+  the distance of every ship from the scanner, by role. Counts and distances
+  only: D-Scan gives no bearing and never names a pilot.
 - **Ship Info window**: The window a hull opens from the **Ship Tree**, after
   the game's own: four tabs — Description (class, faction, bonuses, CCP's
   text), Fitting (base slots and resources; Simulate opens a new **Fitting**
@@ -1048,6 +1069,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   is what makes shorthand's one-fraction-digit rounding (`1,250,000,000` and
   `1,254,000,000` both render `1.25B`-ish) safe to accept. See
   `docs/context/decisions/` for the rule the rollout follows.
+- **Shared jump cooldown**: The single clone-jump cooldown a Character has, common to every Jump Clone (not per clone); the Clones page states it once.
+- **Worn clone**: The clone a Character is in right now, whose implants are the Character's fitted implants; listed on the Clones page as "Wearing now" and distinct from its Jump Clones.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends — `last_clone_jump_date` plus `24 - ` the Effective Skill Level of Infomorph Synchronizing hours (level 0 when skills can't be read, so late, never early). A Scheduled Push event. A Character who has never jumped never fires (issue #2316).
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (`engine/courierDeadline.ts`, never `date_expired`) falls within a Character's configured lead time (`courierDeliveryDueLeadHours`, default 6h) — a Scheduled Push warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only contracts the Character themselves accepted; a deadline already past fires nothing (issue #1713).
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
@@ -1114,7 +1137,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   on it. The four System Labels are the Mail page's folder filter: a
   multi-select toggle group, so any subset of them can be shown at once (see
   `docs/context/decisions/`, 2026-09-07).
-- **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX removed), hangar PLEX and buy-order escrow on one UTC day — numbers only, kept forever, synced as Editable Data, written once a day by the Tab Leader (`src/engine/netWorth/snapshot.ts`). A day the app was not opened has no row and is never interpolated.
+- **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX removed and never counted: the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day — numbers only, kept forever, synced as Editable Data, written once a day by the Tab Leader (`src/engine/netWorth/snapshot.ts`). A day the app was not opened has no row and is never interpolated.
 - **Tab Leader**: The one open tab that runs a piece of origin-wide background work — the **Foreground Poller**, the background sync sweep; each job elects its own — so several open tabs do it once, not once each. Always a visible tab: leadership is a Web Lock requested on becoming visible and given up on becoming hidden, so with every tab hidden nobody leads. Where the browser lacks Web Locks every tab is its own leader. Cache prefetch is not elected; it warms the tab it runs in (`src/lib/tabLeader.ts`).
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Throughput** (planetary): a **second budget, independent of the Pin

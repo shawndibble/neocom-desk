@@ -48,7 +48,14 @@ export interface DataTableSort {
   direction: 'asc' | 'desc';
 }
 
-const STICKY_START = 'sticky left-0 z-10 bg-bg max-md:border-r max-md:border-line';
+const STICKY_START_BASE = 'sticky left-0 z-10 max-md:border-r max-md:border-line';
+const STICKY_START = `${STICKY_START_BASE} bg-bg`;
+// For a table sitting on a Panel body, where `bg-bg` reads as a darker strip.
+const STICKY_START_ON_PANEL = `${STICKY_START_BASE} bg-panel`;
+
+function stickyStartClass(column: { stickyStartOnPanel?: boolean }) {
+  return column.stickyStartOnPanel ? STICKY_START_ON_PANEL : STICKY_START;
+}
 // `hover:bg-panel-2` lives on the `<tr>`, whose own background a sticky
 // cell's opaque one would otherwise cover.
 const STICKY_START_CELL = 'max-sm:max-w-30 [tr:hover>&]:bg-panel-2';
@@ -85,6 +92,11 @@ export interface DataTableColumn<T> {
    */
   stickyStart?: boolean;
   /**
+   * With `stickyStart`: paint the pinned cell on the panel surface instead of
+   * the page background, for a table inside a `Panel` body. Default unchanged.
+   */
+  stickyStartOnPanel?: boolean;
+  /**
    * One-line plain-language note on what the column's values *are*, shown as
    * a small info control beside the header text — e.g. that a ledger date is
    * an EVE/UTC calendar day, not a local one. Only for a genuine ambiguity a
@@ -98,6 +110,11 @@ export interface DataTableColumn<T> {
    * phone sheds its low-value columns this way instead of stacking into
    * cards. Ignored in the stacked card layout, where every cell is a labelled
    * row. The column still sorts and exports.
+   *
+   * Only for a table with no Columns menu: a pilot can't tick back a column
+   * that has no control to point at. A table with a Columns menu does not set
+   * this; it lists the columns that start unticked on a phone in
+   * `useColumnVisibility`'s `phoneOffByDefault`, so the menu stays truthful.
    */
   phoneHidden?: boolean;
   render: (row: T) => ReactNode;
@@ -946,7 +963,7 @@ export function DataTable<T>({
           column.align === 'right' && 'text-right',
           column.align === 'right' && column.sortValue && sortIconGutter,
           column.align === 'center' && 'text-center',
-          column.stickyStart && `${STICKY_START} ${STICKY_START_CELL}`,
+          column.stickyStart && `${stickyStartClass(column)} ${STICKY_START_CELL}`,
           column.className
         )
       ),
@@ -1351,7 +1368,7 @@ export function DataTable<T>({
                 scope="col"
                 className={cx(
                   sortable ? 'p-0' : headerTextClass[i],
-                  column.stickyStart && STICKY_START,
+                  column.stickyStart && stickyStartClass(column),
                   column.phoneHidden && !isStacked && 'max-sm:hidden',
                   column.headerCellClassName
                 )}

@@ -110,6 +110,7 @@ export function CalendarKindFilterMenu({
               : t('calendar.filter.openWithCount', { count: hidden.length })
           }
           pressed={hidden.length > 0}
+          visibleLabel={t('calendar.filter.visibleLabel')}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">

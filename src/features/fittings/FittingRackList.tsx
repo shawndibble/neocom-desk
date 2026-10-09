@@ -46,7 +46,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
-import { moduleKey } from '@/engine/fittings/skillGaps';
+import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
@@ -67,6 +67,7 @@ import type { AddTarget } from './addTarget';
 import type { FittingContext } from './fittingContext';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 
 const RACK_LABEL_CLASS =
@@ -807,6 +808,10 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  const overFit =
+    resourceOverage(stats?.cpuUsed ?? null, stats?.cpuTotal ?? null) > 0 ||
+    resourceOverage(stats?.powergridUsed ?? null, stats?.powergridTotal ?? null) > 0 ||
+    resourceOverage(stats?.calibrationUsed ?? null, stats?.calibrationTotal ?? null) > 0;
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -827,6 +832,12 @@ export function FittingRackList({
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}
           />
+          {/* CPU, powergrid and calibration can be fixed by swaps (drone bandwidth cannot), and all go through one dialog. */}
+          {overFit && (
+            <div className="flex justify-end">
+              <MakeItFitTrigger />
+            </div>
+          )}
           {dronesShown && (
             <ResourceBar
               label={t('fittings.list.droneBandwidth')}

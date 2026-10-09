@@ -29,6 +29,7 @@ import {
   type PilotKillmailsResult,
 } from '@/lib/zkillboard';
 import { loadTypes } from '@/sde/loadSde';
+import { LossSummary } from './LossSummary';
 import { loadKillmailFit, type KillmailFitResult } from './pilotKillmailFit';
 
 type TypeLabel = (typeId: number) => string;
@@ -273,6 +274,11 @@ function KillmailRow({
       {isOpen && (
         <div id={panelId} className="border-t border-line bg-panel-2 px-3 py-2">
           <KillmailFit read={read} typeLabel={typeLabel} />
+          {entry.side === 'loss' && detail !== null && (
+            <div className="mt-2 border-t border-line pt-2">
+              <LossSummary detail={detail} zkbValue={entry.value} />
+            </div>
+          )}
         </div>
       )}
     </li>

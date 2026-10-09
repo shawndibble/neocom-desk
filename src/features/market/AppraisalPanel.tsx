@@ -21,12 +21,9 @@ import {
   Checkbox,
   ColumnPickerMenu,
   DataTable,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  MenuItem,
   IskAmount,
   Panel,
   Select,
@@ -71,17 +68,20 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import {
   APPRAISAL_COLUMN_IDS,
+  DEFAULT_VISIBLE_APPRAISAL_COLUMNS,
   useVisibleAppraisalColumns,
   type AppraisalColumnId,
 } from './appraisalColumns';
 import { appraisalCsvColumns } from './appraisalCsv';
+import { appraisalSellGroups } from '@/engine/market/appraisalSellGroups';
 import { appraisalMultibuyText } from './appraisalMultibuyText';
 import { useAppraisalOwnedPref } from './appraisalOwnedPref';
 import { recentLabel, useRecentAppraisals } from './appraisalRecent';
-import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
+import { appraisalSellListText } from './appraisalSellListText';
 import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { useHaulingCargo } from './haulingCargo';
@@ -110,6 +110,17 @@ interface AppraisalPanelProps {
   characterId: number | null;
   /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
   defaultCompareExpanded?: boolean;
+}
+
+type CopyList = 'sellNow' | 'list' | 'refine' | 'multibuy';
+
+/** Menu order: the three ways out of the pile, then the way in. */
+const COPY_LISTS: readonly CopyList[] = ['sellNow', 'list', 'refine', 'multibuy'];
+
+/** A copy list's line count and text; an empty one has neither, and its menu item is disabled. */
+function copyListOf<T>(items: readonly T[], toText: (items: readonly T[]) => string) {
+  const text = toText(items);
+  return { count: text === '' ? 0 : text.split('\n').length, text };
 }
 
 /**
@@ -169,6 +180,10 @@ function comparisonCell(
   );
 }
 
+/** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
+const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
+const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
+
 export function AppraisalPanel({
   controller,
   pricePercent,
@@ -188,8 +203,12 @@ export function AppraisalPanel({
     setShareResult(result);
     setShare({ status: 'idle' });
   }
-  const [sellListCopied, setSellListCopied] = useState(false);
-  const [multibuyCopied, setMultibuyCopied] = useState(false);
+  const [copied, setCopied] = useState<{ list: CopyList; count: number } | null>(null);
+  useEffect(() => {
+    if (copied === null) return;
+    const timer = setTimeout(() => setCopied(null), 2500);
+    return () => clearTimeout(timer);
+  }, [copied]);
   const hubName = hub.systemName;
 
   // Ages in the Recent list are read against when the panel opened.
@@ -214,7 +233,16 @@ export function AppraisalPanel({
   const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
   const { owned } = useOwnedAtStation(minusOwned, ownedStationId);
 
-  const visibleColumns = useVisibleAppraisalColumns((state) => state.value);
+  const storedColumns = useVisibleAppraisalColumns((state) => state.value);
+  // Side by side below `xl` the results card is only ~500px wide, so with no
+  // stored selection the per-unit price and volume columns start unticked (the totals and the Cargo group say
+  // the same thing) rather than pushing the row menu out of reach. Only a
+  // default: ticking one shows it, and a stored selection is read as saved.
+  const compactResults = useMediaQuery(COMPACT_RESULTS_QUERY);
+  const visibleColumns =
+    compactResults && storedColumns === DEFAULT_VISIBLE_APPRAISAL_COLUMNS
+      ? DEFAULT_VISIBLE_APPRAISAL_COLUMNS.filter((id) => !COMPACT_OFF_BY_DEFAULT.includes(id))
+      : storedColumns;
   const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
   useEffect(() => {
@@ -277,34 +305,33 @@ export function AppraisalPanel({
 
   const shareItemCount = result?.appraisal.items.length ?? 0;
 
-  const sellListItems = result?.appraisal.items ?? [];
-  const canCopySellList = hasAppraisalSellList(sellListItems);
-
-  async function handleCopySellList() {
-    if (!canCopySellList) return;
-    setSellListCopied(false);
-    try {
-      await writeToClipboard(appraisalSellListText(sellListItems));
-      setSellListCopied(true);
-    } catch {
-      setSellListCopied(false);
-    }
-  }
+  const sellGroups = useMemo(
+    () => (result === null ? null : appraisalSellGroups(result.appraisal)),
+    [result]
+  );
 
   const multibuyItems = useMemo(() => {
     const items = result?.appraisal.items ?? [];
     return owned ? subtractOwned(items, owned) : items;
   }, [result, owned]);
-  const canCopyMultibuy = appraisalMultibuyText(multibuyItems) !== '';
 
-  async function handleCopyMultibuy() {
-    if (!canCopyMultibuy) return;
-    setMultibuyCopied(false);
+  /** Each list's items and clipboard text; an empty list has no text and its menu item is disabled. */
+  const copyLists: Record<CopyList, { count: number; text: string }> = {
+    sellNow: copyListOf(sellGroups?.sellNow ?? [], appraisalMultibuyText),
+    list: copyListOf(sellGroups?.list ?? [], appraisalSellListText),
+    refine: copyListOf(sellGroups?.refine ?? [], appraisalMultibuyText),
+    multibuy: copyListOf(multibuyItems, appraisalMultibuyText),
+  };
+
+  async function handleCopy(list: CopyList) {
+    const { count, text } = copyLists[list];
+    if (text === '') return;
+    setCopied(null);
     try {
-      await writeToClipboard(appraisalMultibuyText(multibuyItems));
-      setMultibuyCopied(true);
+      await writeToClipboard(text);
+      setCopied({ list, count });
     } catch {
-      setMultibuyCopied(false);
+      // Nothing was copied, so no confirmation either.
     }
   }
 
@@ -541,9 +568,45 @@ export function AppraisalPanel({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[18rem_minmax(0,1fr)]">
       <Panel
         title={t('market.appraisal.pasteTitle')}
+        actions={
+          recent.length > 0 ? (
+            <Select
+              value=""
+              onValueChange={(value) => controller.appraiseText(recent[Number(value)]?.text ?? '')}
+            >
+              <SelectTrigger
+                size="sm"
+                id="market-appraisal-recent"
+                aria-label={t('market.appraisal.recentPlaceholder')}
+                className="w-32 max-w-full min-w-0"
+              >
+                <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
+                {recent.map((entry, index) => {
+                  const { names, more } = recentLabel(entry.text);
+                  return (
+                    <SelectItem key={entry.text} value={String(index)}>
+                      {t(
+                        more > 0
+                          ? 'market.appraisal.recentLabelMore'
+                          : 'market.appraisal.recentLabel',
+                        {
+                          names: names.join(', '),
+                          count: more,
+                          age: formatAge(openedAt - entry.savedAt, t),
+                        }
+                      )}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          ) : undefined
+        }
         meta={
           controller.canAppraise ? (
             <StatChip
@@ -652,48 +715,9 @@ export function AppraisalPanel({
           </div>
 
           {recent.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <label
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  htmlFor="market-appraisal-recent"
-                >
-                  {t('market.appraisal.recent')}
-                </label>
-                <Select
-                  value=""
-                  onValueChange={(value) =>
-                    controller.appraiseText(recent[Number(value)]?.text ?? '')
-                  }
-                >
-                  <SelectTrigger size="sm" id="market-appraisal-recent" className="min-w-0 flex-1">
-                    <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {recent.map((entry, index) => {
-                      const { names, more } = recentLabel(entry.text);
-                      return (
-                        <SelectItem key={entry.text} value={String(index)}>
-                          {t(
-                            more > 0
-                              ? 'market.appraisal.recentLabelMore'
-                              : 'market.appraisal.recentLabel',
-                            {
-                              names: names.join(', '),
-                              count: more,
-                              age: formatAge(openedAt - entry.savedAt, t),
-                            }
-                          )}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
-                {t('market.appraisal.clearRecent')}
-              </Button>
-            </div>
+            <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
+              {t('market.appraisal.clearRecent')}
+            </Button>
           )}
 
           {unmatched.length > 0 && (
@@ -727,75 +751,68 @@ export function AppraisalPanel({
             ) : undefined
           }
           actions={
-            <>
-              <ColumnPickerMenu
-                available={availableColumns}
-                visible={visibleColumns}
-                columnsById={optionalColumnsById}
-                onToggle={toggleColumn}
-                buttonLabel={t('market.appraisal.columnsButton')}
-                menuTitle={t('market.appraisal.columnsMenuTitle')}
-                size="sm"
-              />
-              <IconButton
-                size="sm"
-                icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-                label={t('market.appraisal.share')}
-                tooltip={
-                  shareItemCount > MAX_SNAPSHOT_ITEMS
-                    ? t('market.appraisal.shareTooLarge')
-                    : share.status === 'saving'
-                      ? t('market.appraisal.shareSaving')
-                      : share.status === 'failed'
-                        ? t('market.appraisal.shareFailed')
-                        : share.status === 'copied'
-                          ? t('market.appraisal.shareCopied')
-                          : undefined
-                }
-                disabled={
-                  characterId === null ||
-                  !isSyncConfigured() ||
-                  rows.length === 0 ||
-                  shareItemCount > MAX_SNAPSHOT_ITEMS ||
-                  share.status === 'saving'
-                }
-                onClick={() => void handleShare()}
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton
-                    size="sm"
-                    icon={
-                      sellListCopied || multibuyCopied ? <Icon.Done /> : <Icon.CopyToClipboard />
-                    }
-                    label={t('market.appraisal.copyMenu')}
-                    disabled={!canCopySellList && !canCopyMultibuy}
-                  />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    disabled={!canCopySellList}
-                    onSelect={() => void handleCopySellList()}
-                  >
-                    {sellListCopied
-                      ? t('market.appraisal.sellListCopied')
-                      : t('market.appraisal.copySellList')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!canCopyMultibuy}
-                    onSelect={() => void handleCopyMultibuy()}
-                  >
-                    {multibuyCopied
-                      ? t('market.appraisal.multibuyCopied')
-                      : t('market.appraisal.copyMultibuy')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <TableActionsMenu
-                name={t('market.appraisal.resultTitle')}
-                tableExport={tableExport}
-              />
-            </>
+            result === null || failed || rows.length === 0 ? undefined : (
+              <>
+                <ColumnPickerMenu
+                  available={availableColumns}
+                  visible={visibleColumns}
+                  columnsById={optionalColumnsById}
+                  onToggle={toggleColumn}
+                  buttonLabel={t('market.appraisal.columnsButton')}
+                  menuTitle={t('market.appraisal.columnsMenuTitle')}
+                  size="sm"
+                />
+                <IconButton
+                  size="sm"
+                  icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+                  label={t('market.appraisal.share')}
+                  tooltip={
+                    shareItemCount > MAX_SNAPSHOT_ITEMS
+                      ? t('market.appraisal.shareTooLarge')
+                      : share.status === 'saving'
+                        ? t('market.appraisal.shareSaving')
+                        : share.status === 'failed'
+                          ? t('market.appraisal.shareFailed')
+                          : share.status === 'copied'
+                            ? t('market.appraisal.shareCopied')
+                            : undefined
+                  }
+                  disabled={
+                    characterId === null ||
+                    !isSyncConfigured() ||
+                    rows.length === 0 ||
+                    shareItemCount > MAX_SNAPSHOT_ITEMS ||
+                    share.status === 'saving'
+                  }
+                  onClick={() => void handleShare()}
+                />
+                {copied !== null && (
+                  <span role="status" className="text-[0.6875rem] text-text-dim">
+                    {t('market.appraisal.copied', {
+                      list: t(`market.appraisal.copyList.${copied.list}`),
+                      count: copied.count,
+                    })}
+                  </span>
+                )}
+                <TableActionsMenu
+                  name={t('market.appraisal.resultTitle')}
+                  tableExport={tableExport}
+                >
+                  {COPY_LISTS.map((list) => (
+                    <MenuItem
+                      key={list}
+                      disabled={copyLists[list].count === 0}
+                      onSelect={() => void handleCopy(list)}
+                    >
+                      {t(`market.appraisal.copyList.${list}`)}
+                      {copyLists[list].count > 0 && (
+                        <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
+                      )}
+                    </MenuItem>
+                  ))}
+                </TableActionsMenu>
+              </>
+            )
           }
         >
           {loading && result === null ? (
@@ -897,22 +914,25 @@ export function AppraisalPanel({
                 </p>
               )}
 
-              <DataTable
-                {...tableExport.tableProps}
-                columns={columns}
-                rows={tableRows}
-                rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
-                rowKey={(row) => row.typeId}
-                label={t('market.appraisal.resultTitle')}
-                className="pb-1"
-                rowContextMenu={rowContextMenu}
-                rowMoreActions
-                // Five or six short figures a card: one per line runs a priced
-                // row to six, and hiding a column buys the same height at the
-                // cost of a figure.
-                stackColumns={2}
-                mobileSort
-              />
+              {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
+              <div className="min-w-0 overflow-x-auto">
+                <DataTable
+                  {...tableExport.tableProps}
+                  columns={columns}
+                  rows={tableRows}
+                  rowClassName={(row) => ((row as OwnedRow).need === 0 ? 'opacity-50' : undefined)}
+                  rowKey={(row) => row.typeId}
+                  label={t('market.appraisal.resultTitle')}
+                  className="pb-1"
+                  rowContextMenu={rowContextMenu}
+                  rowMoreActions
+                  // Five or six short figures a card: one per line runs a priced
+                  // row to six, and hiding a column buys the same height at the
+                  // cost of a figure.
+                  stackColumns={2}
+                  mobileSort
+                />
+              </div>
             </>
           )}
         </Panel>

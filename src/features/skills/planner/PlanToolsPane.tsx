@@ -8,7 +8,9 @@ export interface PlanToolSection {
   /** Stable React key; not rendered. */
   id: string;
   title: string;
-  content: ReactNode;
+  content?: ReactNode;
+  /** Leave the `<h3>` out, for a section nested in a group whose own row already names it. */
+  hideTitle?: boolean;
   /**
    * Right-aligned beside the section heading, the way `Panel` puts a
    * `DataAgeBadge` beside its own title — so a section carrying ESI-derived
@@ -17,6 +19,12 @@ export interface PlanToolSection {
    * heading's accessible name.
    */
   actions?: ReactNode;
+  /**
+   * Fold `sections` into this one closed-by-default `Disclosure` row, titled
+   * `title`, with `summary` beside it so what is set stays visible while the
+   * controls are tucked away (the Assumptions group). Replaces `content`.
+   */
+  group?: { summary: string; sections: readonly PlanToolSection[] };
 }
 
 interface PlanToolsPaneProps {
@@ -50,27 +58,57 @@ export function PlanToolsPane({ sections, asDisclosure, className }: PlanToolsPa
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
-  const body = sections.map((section, index) => (
-    <section
-      key={section.id}
-      className={cx(
-        'space-y-2 p-3',
-        // Disclosure mode nests these in a `Disclosure`, whose `divide-y`
-        // already draws a line between adjacent children — adding our own
-        // bottom border there would stack two 1px hairlines into a 2px one,
-        // against DESIGN.md §3's "always 1px".
-        !asDisclosure && index < sections.length - 1 && 'border-b border-line'
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {section.title}
-        </h3>
-        {section.actions}
-      </div>
-      {section.content}
-    </section>
-  ));
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+
+  const renderSection = (section: PlanToolSection, bordered: boolean) => {
+    const { group } = section;
+    if (group) {
+      return (
+        <Disclosure
+          key={section.id}
+          label={section.title}
+          trailing={group.summary}
+          expanded={openGroups.has(section.id)}
+          onToggle={() =>
+            setOpenGroups((current) => {
+              const next = new Set(current);
+              if (!next.delete(section.id)) next.add(section.id);
+              return next;
+            })
+          }
+        >
+          {group.sections.map((inner) => renderSection(inner, false))}
+        </Disclosure>
+      );
+    }
+    return (
+      <section
+        key={section.id}
+        className={cx(
+          'space-y-2 p-3',
+          // Disclosure mode nests these in a `Disclosure`, whose `divide-y`
+          // already draws a line between adjacent children — adding our own
+          // bottom border there would stack two 1px hairlines into a 2px one,
+          // against DESIGN.md §3's "always 1px".
+          bordered && 'border-b border-line'
+        )}
+      >
+        {!section.hideTitle && (
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {section.title}
+            </h3>
+            {section.actions}
+          </div>
+        )}
+        {section.content}
+      </section>
+    );
+  };
+
+  const body = sections.map((section, index) =>
+    renderSection(section, !asDisclosure && index < sections.length - 1)
+  );
 
   if (asDisclosure) {
     return (

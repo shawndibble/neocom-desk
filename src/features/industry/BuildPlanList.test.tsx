@@ -740,7 +740,7 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
     );
     expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual([
       'Rename',
-      'Delete group',
+      'Delete group…',
     ]);
 
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));

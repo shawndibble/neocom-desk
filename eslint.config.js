@@ -5,10 +5,25 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
+// Raw text-like <input>s: banned in app code, fine in test fixtures (no
+// styling to be consistent with). Legit raw inputs are type="file"/"range".
+const rawInputSyntax = [
+  {
+    selector:
+      "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value=/^(text|date|number|datetime-local|time|email|password|url|tel|month)$/]",
+    message: 'Use TextInput from src/components/ui instead of a raw text-like <input>.',
+  },
+  {
+    selector: "JSXOpeningElement[name.name='input']:not(:has(> JSXAttribute[name.name='type']))",
+    message: 'Use TextInput from src/components/ui instead of a raw <input> with no type.',
+  },
+];
+
 // Shared by every non-primitive file. Flat config replaces a rule's options
 // rather than merging them, so a later block that adds selectors for a
 // narrower glob must re-list these.
 const restrictedSyntax = [
+  ...rawInputSyntax,
   {
     selector:
       "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
@@ -60,10 +75,18 @@ const restrictedImportPaths = [
   },
 ];
 
+const linkArrowMessage =
+  'A typed arrow (→ ↗ ›) must not end a link label; leaving the app is Icon.External, a row that goes elsewhere is a trailing CaretRight (DESIGN.md §6c).';
+
 const sortArrowSyntax = [
   { selector: 'Literal[value=/[↑↓]/]', message: sortArrowMessage },
   { selector: 'TemplateElement[value.raw=/[↑↓]/]', message: sortArrowMessage },
   { selector: 'JSXText[value=/[↑↓]/]', message: sortArrowMessage },
+  {
+    selector:
+      'JSXElement[openingElement.name.name=/^(Link|ExternalLink|a)$/] > JSXText:last-child[value=/[→↗›]\\s*$/]',
+    message: linkArrowMessage,
+  },
 ];
 
 export default tseslint.config(
@@ -136,6 +159,17 @@ export default tseslint.config(
     ignores: ['src/components/ui/**'],
     rules: {
       'no-restricted-syntax': ['error', ...restrictedSyntax, ...sortArrowSyntax],
+    },
+  },
+  {
+    files: ['src/**/*.test.tsx'],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...restrictedSyntax.filter((r) => !rawInputSyntax.includes(r)),
+        ...sortArrowSyntax,
+      ],
     },
   },
   {

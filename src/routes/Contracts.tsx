@@ -64,7 +64,9 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import { resolveCategories, resolveNames, type NameCategory } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
+import { cx } from '@/lib/cx';
+import { HintText } from '@/components/ui/HintText';
 import { formatCountdown } from '@/lib/duration';
 import { useTicker } from '@/lib/ticker';
 import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
@@ -155,13 +157,34 @@ function ContractStatusCell({ contract }: { contract: Contract }) {
 }
 
 /** An accepted courier's delivery deadline, counting down to overdue. */
-function CourierDeadlineCell({ deadlineMs, time }: { deadlineMs: number; time: string }) {
+function CourierDeadlineCell({
+  deadlineMs,
+  timeZone,
+}: {
+  deadlineMs: number;
+  timeZone: string | undefined;
+}) {
   const { t } = useTranslation();
   const remainingMs = deadlineMs - useTicker(CONTRACT_CLOCK_MS);
-  return remainingMs <= 0 ? (
-    <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
-  ) : (
-    t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+  const date = new Date(deadlineMs);
+  const time = formatDateOnly(date, timeZone);
+  return (
+    <HintText
+      content={formatTimestamp(date, timeZone)}
+      className={remainingMs <= 0 ? 'text-danger' : undefined}
+    >
+      {remainingMs <= 0
+        ? t('contracts.deliverOverdue', { time })
+        : t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })}
+    </HintText>
+  );
+}
+
+/** A date alone in the cell; the exact time rides a tooltip (the detail modal carries it on touch). */
+function ContractDateCell({ iso, timeZone }: { iso: string; timeZone: string | undefined }) {
+  const date = new Date(iso);
+  return (
+    <HintText content={formatTimestamp(date, timeZone)}>{formatDateOnly(date, timeZone)}</HintText>
   );
 }
 
@@ -228,6 +251,7 @@ function ContractsFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeContractsFilterCount(filter)}
+      triggerLabel
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -485,7 +509,7 @@ export function Contracts() {
         header: t('contracts.issued'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_issued).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_issued), timeZone),
+        render: (contract) => <ContractDateCell iso={contract.date_issued} timeZone={timeZone} />,
       },
       expires: {
         id: 'expires',
@@ -497,13 +521,8 @@ export function Contracts() {
         render: (contract) => {
           const deadlineMs = courierDeliveryDeadlineMs(contract);
           if (deadlineMs === null)
-            return formatTimestamp(new Date(contract.date_expired), timeZone);
-          return (
-            <CourierDeadlineCell
-              deadlineMs={deadlineMs}
-              time={formatTimestamp(new Date(deadlineMs), timeZone)}
-            />
-          );
+            return <ContractDateCell iso={contract.date_expired} timeZone={timeZone} />;
+          return <CourierDeadlineCell deadlineMs={deadlineMs} timeZone={timeZone} />;
         },
       },
     }),
@@ -515,17 +534,25 @@ export function Contracts() {
         id: 'type',
         header: t('contracts.type'),
         sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
-        render: (contract) => (
-          <button
-            type="button"
-            onClick={() => setSelectedContract(contract)}
-            className={entityLinkClassName(
-              'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto'
-            )}
-          >
-            <ContractIdentity contract={contract} characterId={activeCharacterId} />
-          </button>
-        ),
+        render: (contract) => {
+          const opener = (
+            <button
+              type="button"
+              onClick={() => setSelectedContract(contract)}
+              className={entityLinkClassName(
+                cx(
+                  'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto',
+                  contract.title && 'md:max-w-72 md:truncate'
+                )
+              )}
+            >
+              <ContractIdentity contract={contract} characterId={activeCharacterId} />
+            </button>
+          );
+          // A title is the only free-text (so truncatable) identity; the full
+          // text reaches the tooltip on hover and touch-and-hold.
+          return contract.title ? <Tooltip content={contract.title}>{opener}</Tooltip> : opener;
+        },
       },
       ...CONTRACTS_HISTORY_COLUMN_IDS.filter(historyColumnVisibility.isVisible).map(
         (id) => optionalHistoryColumns[id]
@@ -604,7 +631,12 @@ export function Contracts() {
         actions={
           tab === 'history' ? (
             <>
-              <TableActionsMenu name={t('contracts.title')} tableExport={historyExport} size="md" />
+              <TableActionsMenu
+                name={t('contracts.title')}
+                tableExport={historyExport}
+                size="md"
+                showLabel
+              />
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('contracts.refresh')}
@@ -676,6 +708,7 @@ export function Contracts() {
                 available={CONTRACTS_HISTORY_COLUMN_IDS}
                 visible={historyColumnVisibility.visible}
                 columnsById={optionalHistoryColumns}
+                showLabel
                 onToggle={historyColumnVisibility.toggle}
                 buttonLabel={t('common.columnsButton')}
                 menuTitle={t('common.columnsMenuTitle')}

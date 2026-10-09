@@ -15,6 +15,12 @@ export const CORP_TRANSACTIONS_COLUMN_IDS = [
 
 export type CorpTransactionsColumnId = (typeof CORP_TRANSACTIONS_COLUMN_IDS)[number];
 
+/** Off by default on a phone; ticking them shows them. */
+export const CORP_TRANSACTIONS_PHONE_OFF_BY_DEFAULT: readonly CorpTransactionsColumnId[] = [
+  'side',
+  'unitPrice',
+];
+
 export const useVisibleCorpTransactionsColumns = createColumnVisibilitySetting({
   key: 'corpTransactionsVisibleColumns',
   ids: CORP_TRANSACTIONS_COLUMN_IDS,

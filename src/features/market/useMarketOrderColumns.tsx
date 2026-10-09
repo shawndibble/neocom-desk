@@ -58,6 +58,11 @@ export interface UseMarketOrderColumnsArgs {
   cards: boolean;
   /** The book is short of room for Location's full cap: `ORDER_BOOK_LOCATION_REM.squeezed`. */
   locationSqueezed: boolean;
+  /**
+   * The book covers exactly one station, which the scope bar already names:
+   * Location is left off the tables and cards. The stored picks are untouched.
+   */
+  hideLocation: boolean;
 }
 
 export interface MarketOrderColumns {
@@ -79,17 +84,23 @@ export function useMarketOrderColumns({
   bestSell,
   cards,
   locationSqueezed,
+  hideLocation,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
-  const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
+  const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
+  const visibleOrderColumns = useMemo(
+    () =>
+      hideLocation ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
+    [hideLocation, pickedOrderColumns]
+  );
   const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
   const hydrateVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.hydrate);
   useEffect(() => {
     void hydrateVisibleOrderColumns();
   }, [hydrateVisibleOrderColumns]);
   function toggleOrderColumn(id: MarketOrderColumnId) {
-    const next = visibleOrderColumns.includes(id)
-      ? visibleOrderColumns.filter((existing) => existing !== id)
-      : [...visibleOrderColumns, id];
+    const next = pickedOrderColumns.includes(id)
+      ? pickedOrderColumns.filter((existing) => existing !== id)
+      : [...pickedOrderColumns, id];
     void setVisibleOrderColumns(next);
   }
 

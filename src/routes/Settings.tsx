@@ -1,3 +1,4 @@
+import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -319,6 +320,7 @@ function DataAgePanel() {
       {
         id: 'updated',
         header: t('dataAge.columnUpdated'),
+        cardCorner: true,
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (entry) => entry.timestamp,
         render: (entry) => (
@@ -352,7 +354,10 @@ function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
-            responsive="table"
+            // §4a: a log read row by row, not compared across columns, so a
+            // phone gets a two-line card (endpoint, then character) with the
+            // age at the right, not a table wider than the screen.
+            stackLayout="dense"
           />
         )}
       </div>
@@ -755,6 +760,7 @@ function MarketDefaultsPanel() {
 
             <LpValueField id="settings-lp-value" />
           </Fields>
+          <StructureFeesList />
         </div>
       ) : (
         <Spinner />
@@ -1104,8 +1110,10 @@ export function Settings() {
             <>
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <DataPanel />
-                <UpdatePanel />
-                <InstallAppPanel />
+                <div className="space-y-4">
+                  <UpdatePanel />
+                  <InstallAppPanel />
+                </div>
                 <ExportPanel />
                 <ImportPanel />
               </div>

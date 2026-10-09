@@ -13,6 +13,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
+import { REQUIRED_SCOPES } from '@/features/netWorth/recordSnapshots';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -96,7 +97,7 @@ beforeAll(async () => {
   const { unmount } = render(<App />);
   // Wait for real content, not just the shell: the first data load (Dexie, MSW,
   // the ESI cache) is part of the cold cost too.
-  await screen.findByText(/4,500\.00/, {}, { timeout: 25_000 });
+  await screen.findByText('EverMarks', {}, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
 }, 30_000);
@@ -128,12 +129,12 @@ beforeEach(seed);
 describe('Wallet', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
   });
 
   it('shows EverMarks (Paragon LP) alongside ISK, and other loyalty points in a table below', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.getByText('250')).toBeInTheDocument();
     expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
     expect(screen.getByText('5,000')).toBeInTheDocument();
@@ -143,7 +144,7 @@ describe('Wallet', () => {
 
   it("links each loyalty row's corporation name to the LP Store, with a trailing caret and no store column", async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // A real link, not just a row click: a keyboard or screen-reader user
     // reaches the LP Store without the row. Not a Show Info link any more.
     expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
@@ -161,13 +162,13 @@ describe('Wallet', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /LP Store corporation/ })).toBeInTheDocument();
   });
 
   it('has no row menu or More actions button on a loyalty row: the name and row open the store', async () => {
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
     expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
     fireEvent.contextMenu(row);
@@ -190,7 +191,7 @@ describe('Wallet', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/Paragon corporation/);
   });
 
-  it('shows the empty state under Loyalty Points when there is no non-EverMarks LP', async () => {
+  it('collapses to one muted line (no panel) when there is no non-EverMarks LP', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
         HttpResponse.json([{ corporation_id: 1000419, loyalty_points: 250 }])
@@ -198,7 +199,9 @@ describe('Wallet', () => {
     );
     render(<App />);
     expect(await screen.findByText('250')).toBeInTheDocument();
-    expect(screen.getByText(/^no loyalty points$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^loyalty points: none/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Loyalty Points' })).not.toBeInTheDocument();
+    expect(screen.getByText('Select an LP Store')).toBeInTheDocument();
   });
 
   it('shows a re-login prompt under Loyalty Points (not the wallet reauth) when the loyalty scope was revoked', async () => {
@@ -208,7 +211,7 @@ describe('Wallet', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.getByText('Log in again to see your loyalty points')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
   });
@@ -217,7 +220,8 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    const rows = await screen.findAllByRole('row');
+    const breakdown = await screen.findByRole('table', { name: 'Where the ISK went' });
+    const rows = (await screen.findAllByRole('row')).filter((row) => !breakdown.contains(row));
     // header + 2 entries, newest (2026-08-02) first
     expect(rows).toHaveLength(3);
     expect(screen.getByText('Bounty')).toBeInTheDocument();
@@ -281,16 +285,86 @@ describe('Wallet', () => {
   it('links the personal Journal header to Market › History › Transactions (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    const link = await screen.findByRole('link', { name: 'Transactions →' });
+    const link = await screen.findByRole('link', { name: 'Transactions' });
     expect(link).toHaveAttribute('href', '/market/history/transactions');
     // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');
   });
 
-  it('says the Journal reads one Character (issue #2846)', async () => {
+  describe('opened for a chosen Character (issue #2936)', () => {
+    async function seedSecond() {
+      await db.characters.put({ characterId: 92, name: 'Bex Roan', ownerHash: 'oh2', addedAt: 2 });
+      await db.tokens.put({
+        characterId: 92,
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'],
+      });
+      server.use(
+        http.get('https://esi.evetech.net/characters/92/wallet', () => HttpResponse.json(777)),
+        http.get('https://esi.evetech.net/characters/92/wallet/journal', () =>
+          HttpResponse.json(journalPage1, { headers: { 'X-Pages': '1' } })
+        ),
+        http.get('https://esi.evetech.net/characters/92/loyalty/points', () =>
+          HttpResponse.json([])
+        ),
+        http.get('https://esi.evetech.net/characters/92/wallet/transactions', () =>
+          HttpResponse.json([])
+        )
+      );
+    }
+
+    it.each(['char', 'chars'])(
+      'shows that Character via ?%s= without switching the active one',
+      async (key) => {
+        await seedSecond();
+        window.history.pushState({}, '', `/wallet/journal?${key}=92`);
+        render(<App />);
+        expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+        expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+      }
+    );
+
+    it('shows the ‹ Wallet crumb only when arriving from the Wallet chart', async () => {
+      await seedSecond();
+      window.history.pushState({}, '', '/wallet/journal?char=92');
+      const plain = render(<App />);
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('main')).queryByRole('link', { name: 'Wallet' })
+      ).not.toBeInTheDocument();
+      plain.unmount();
+
+      window.history.pushState(
+        { usr: { origin: 'wallet' }, key: 'k1', idx: 1 },
+        '',
+        '/wallet/journal?char=92'
+      );
+      render(<App />);
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('main')).getByRole('link', { name: /Wallet/ })
+      ).toHaveAttribute('href', '/wallet');
+    });
+
+    it('shows the grant note for a Character without the wallet scope', async () => {
+      await seedSecond();
+      await db.tokens.update(92, { scopes: [] });
+      window.history.pushState({}, '', '/wallet/journal?char=92');
+      render(<App />);
+      expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole('button', { name: /grant|log in again/i })).length
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it('keeps the Journal panel header free of a Character portrait and scope label (issue #2993)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    expect(await screen.findByText('Pilot One only')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Transactions/ })).toBeInTheDocument();
+    expect(screen.queryByText(/ only$/)).not.toBeInTheDocument();
   });
 
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
@@ -337,8 +411,7 @@ describe('Wallet', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     render(<App />);
-    expect(await screen.findByText(/999\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
   });
 
   it('warns that the journal is incomplete when a page fails mid-pagination (D4)', async () => {
@@ -378,6 +451,42 @@ describe('Wallet', () => {
     expect(screen.queryByText('Donation')).toBeNull();
   });
 
+  it('breaks the journal down by ref type and filters on a row click (issue #2858)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
+    await user.click(bountyRow);
+    expect(screen.queryByText('Donation')).toBeNull();
+    // The breakdown ignores the ref-type filter, so every type is still listed.
+    expect(within(breakdown).getAllByRole('row').length).toBeGreaterThan(2);
+
+    await user.click(bountyRow);
+    expect(await screen.findByText('Donation')).toBeInTheDocument();
+  });
+
+  it('shows one compact signed Net column in the breakdown (issue #2995)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    const breakdown = screen.getByRole('table', { name: 'Where the ISK went' });
+    const headers = within(breakdown)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers).toEqual(['Ref type', 'Net']);
+    const bountyRow = within(breakdown).getByText('Bounty prize').closest('tr') as HTMLElement;
+    expect(bountyRow).toHaveTextContent('+1K');
+    // Single-sided ref types carry no second in/out line.
+    expect(breakdown).not.toHaveTextContent(/in S+ · out/);
+    // The In / Out / Net summary is compact, not full figures.
+    expect(screen.getAllByText('+500').length).toBeGreaterThan(0);
+  });
+
   it('tones the filtered net total by sign (issue #1961)', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -388,7 +497,9 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
-    const net = await screen.findByText('+1,000.00');
+    const net = (await screen.findAllByText('+1,000.00')).find((el) =>
+      el.parentElement?.textContent?.includes('1 entry')
+    ) as HTMLElement;
     expect(net).toHaveClass('text-isk-pos');
     expect(net.parentElement).toHaveTextContent('1 entry · net +1,000.00');
   });
@@ -456,12 +567,24 @@ describe('Wallet', () => {
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there is no data at all', async () => {
+  it('still shows the Worth panel, with a dash for net worth, when the wallet read fails and nothing is cached', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     render(<App />);
-    expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
+    expect(screen.getByText('Net worth', { selector: 'p' }).nextElementSibling).toHaveTextContent(
+      '—'
+    );
+  });
+
+  it('puts net worth, EverMarks and the series picker in one Worth panel, with no scope readout', async () => {
+    render(<App />);
+    const header = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
+    expect(within(header!).getByRole('button', { name: /^Layers:/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Balance' })).toBeNull();
+    expect(screen.queryByText(/ only$/)).toBeNull();
   });
 
   it('distinguishes a failed manual Refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
@@ -475,7 +598,7 @@ describe('Wallet', () => {
     render(<App />);
 
     // Initial load succeeds live — no banner at all yet.
-    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).not.toBeInTheDocument();
 
     server.use(
@@ -618,32 +741,39 @@ describe('Wallet', () => {
       );
     }
 
+    /** Wallet, assets and orders: what a net worth snapshot needs. */
+    async function grantSnapshotScopes(...ids: number[]) {
+      for (const id of ids) {
+        await db.tokens.update(id, {
+          scopes: [...REQUIRED_SCOPES, 'esi-characters.read_loyalty.v1'],
+        });
+      }
+    }
+
     it('renders no character filter for an account with one Character — nothing for it to change', async () => {
       // Deliberately no `seedSecondCharacter()`: the outer beforeEach leaves
       // exactly one pilot in Dexie.
       render(<App />);
 
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
     });
 
-    it('puts the character filter in the balance panel header, and keeps it there across the panel swap', async () => {
+    it('puts the character filter in the Worth panel header, and keeps it there across the panel swap', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
       render(<App />);
 
       // In the panel's own title bar, not a bare row floating above it.
-      await screen.findByText(/4,500\.00/);
-      const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
+      await screen.findByText('EverMarks');
+      const balanceHeader = screen.getByRole('heading', { name: 'Worth' }).closest('header');
       expect(balanceHeader).not.toBeNull();
       await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
-      const wideHeader = (
-        await screen.findByRole('heading', { name: 'Balance by character' })
-      ).closest('header');
+      const wideHeader = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
       expect(
         within(wideHeader!).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
@@ -653,7 +783,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       render(<App />);
 
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
       expect(screen.queryByText(/1,500\.00/)).not.toBeInTheDocument();
     });
@@ -661,17 +791,39 @@ describe('Wallet', () => {
     it('switching to "All characters" shows every character\'s balance and a total', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
       render(<App />);
 
-      await screen.findByText(/4,500\.00/);
+      await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
-      // 4,500.00 + 1,500.00 = 6,000.00 — the Total line, distinct from either row.
-      expect(await screen.findByText(/6,000\.00/)).toBeInTheDocument();
+      // 4,500 + 1,500 = 6,000 — the Net worth figure, distinct from either row's own.
+      expect(await screen.findByText('6,000')).toBeInTheDocument();
+    });
+
+    it('drills into a Character from its row as route state, and Back returns to all', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+
+      await waitFor(() => expect(window.location.search).toContain('drill=92'));
+      expect(screen.queryByRole('table', { name: 'Balance by character' })).toBeNull();
+
+      // The browser Back button undoes the drill.
+      window.history.back();
+      expect(
+        await screen.findByRole('table', { name: 'Balance by character' })
+      ).toBeInTheDocument();
+      await waitFor(() => expect(window.location.search).not.toContain('drill='));
     });
 
     it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {
@@ -688,6 +840,7 @@ describe('Wallet', () => {
     it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
       const CHAR_C = 93;
       await db.characters.put({
         characterId: CHAR_C,
@@ -698,14 +851,14 @@ describe('Wallet', () => {
       // CHAR_C deliberately gets no token at all — never granted the scope.
       render(<App />);
 
-      await screen.findByText(/4,500\.00/);
+      await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // All three selected: Pilot Three's skipped notice shows.
-      expect(
-        await screen.findByText(/Pilot Three.*hasn't granted wallet access/)
-      ).toBeInTheDocument();
+      // All three selected: Pilot Three is left out, named by the scope readout
+      // and flagged on its own row.
+      expect(await screen.findByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
+      expect(await screen.findByText(/hasn't granted wallet access/)).toBeInTheDocument();
 
       // Narrow the filter back to "This character" — the notice list must
       // follow the same filter the balance rows do (issue #607 CodeRabbit
@@ -713,10 +866,8 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('button', { name: /^All characters/ }));
       await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
-      expect(
-        screen.queryByText(/Pilot Three.*hasn't granted wallet access/)
-      ).not.toBeInTheDocument();
-      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(screen.queryByText(/hasn't granted wallet access/)).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Worth' })).toBeInTheDocument();
       expect(screen.queryByRole('table', { name: 'Balance by character' })).not.toBeInTheDocument();
     });
   });

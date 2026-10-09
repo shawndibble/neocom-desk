@@ -72,6 +72,23 @@ describe('IconButton', () => {
   });
 });
 
+describe('IconButton visibleLabel', () => {
+  it('shows the text from md up, keeps the accessible name, and swaps the size classes', () => {
+    render(<IconButton icon="x" label="Filters (2 active)" visibleLabel="Filters" />);
+    const button = screen.getByRole('button', { name: 'Filters (2 active)' });
+    const text = screen.getByText('Filters');
+    expect(text).toHaveClass('hidden', 'md:inline');
+    expect(button).toHaveClass('size-11', 'md:size-auto', 'md:h-9');
+    expect(button).not.toHaveClass('md:size-9');
+  });
+
+  it('stays a bare icon without it', () => {
+    render(<IconButton icon="x" label="Go" />);
+    expect(screen.getByRole('button')).toHaveTextContent('x');
+    expect(screen.getByRole('button')).toHaveClass('md:size-9');
+  });
+});
+
 describe('IconButton states', () => {
   it('gives every tone a hover and a pressed step', () => {
     for (const tone of ['default', 'danger', 'positive', 'warning'] as const) {

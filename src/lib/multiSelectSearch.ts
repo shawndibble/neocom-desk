@@ -1,6 +1,10 @@
+import type { ReactNode } from 'react';
+
 export interface MultiSelectOption<Id> {
   readonly id: Id;
   readonly label: string;
+  /** Decoration shown before the label (a colour swatch); not searched. */
+  readonly swatch?: ReactNode;
 }
 
 export interface MultiSelectGroup<Id> {

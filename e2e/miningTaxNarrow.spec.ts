@@ -48,6 +48,8 @@ interface SeedOptions {
   withUnassignedEntry?: boolean;
   /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
   withMadePayment?: boolean;
+  /** Seed the Assignment with a zero value and zero tax, so its row has nothing to show in the value and tax columns. */
+  withZeroValue?: boolean;
 }
 
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
@@ -66,6 +68,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       assignmentId,
       oreQuantity,
       taxOwed,
+      zeroValue,
       unassignedDate,
       paymentDate,
       journalRefId,
@@ -160,8 +163,8 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           payeeId,
           oreLines: [{ typeId: oreTypeId, quantity: oreQuantity }],
           taxPct: 10,
-          estimatedValue: 1_000_000,
-          taxOwed,
+          estimatedValue: zeroValue ? 0 : 1_000_000,
+          taxOwed: zeroValue ? 0 : taxOwed,
           status: 'outstanding',
           updatedAt: now,
         });
@@ -181,6 +184,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
       assignmentId: ASSIGNMENT_ID,
       oreQuantity: ORE_QUANTITY,
       taxOwed: TAX_OWED,
+      zeroValue: options.withZeroValue ?? false,
       unassignedDate: UNASSIGNED_DATE,
       paymentDate: PAYMENT_DATE,
       journalRefId: JOURNAL_REF_ID,
@@ -501,11 +505,26 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
   });
 });
 
-test.describe('Mining Tax phone card — tick box clears the card text', () => {
+/** Left/top/right/bottom of a cell's text (not the cell's padded box), by the cell's class. */
+async function textRect(row: Locator, cellSelector: string) {
+  return row
+    .locator(cellSelector)
+    .first()
+    .evaluate((cell) => {
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      const { left, top, right, bottom } = range.getBoundingClientRect();
+      return { left, top, right, bottom };
+    });
+}
+
+test.describe('Mining Tax phone card — tick box on the date line (#2983)', () => {
   // A coarse pointer grows the tick box's label to 44px (`touch:size-11`).
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
-  test('tick box sits left of the card text with a visible gap', async ({ page }) => {
+  test('tick box shares the date line, line two starts under it, nothing overflows', async ({
+    page,
+  }) => {
     await signInAndGoto(page);
     await seedPayeeBalance(page);
     await page.goto('./mining/tax');
@@ -513,19 +532,61 @@ test.describe('Mining Tax phone card — tick box clears the card text', () => {
     const box = page.getByLabel('Select this row');
     await expect(box).toHaveCount(1);
     const row = page.locator('tr', { has: box });
-    const boxRect = await box.locator('xpath=ancestor::label[1]').boundingBox();
-    const rowCells = row.locator('td:not(.dt-edge)');
-    const textLefts = await rowCells.evaluateAll((cells) =>
-      cells.map((c) => {
-        const range = document.createRange();
-        range.selectNodeContents(c);
-        return range.getBoundingClientRect();
-      })
+    const boxRect = (await box.boundingBox())!;
+    const labelRect = (await box.locator('xpath=ancestor::label[1]').boundingBox())!;
+    const date = await textRect(row, 'td.dt-primary');
+    const lineTwo = await textRect(row, 'td.dt-meta-first');
+    const status = await textRect(row, 'td.dt-edge-end');
+
+    // Date and box on one line, a small gap between them.
+    const boxMid = boxRect.y + boxRect.height / 2;
+    expect(Math.abs(boxMid - (date.top + date.bottom) / 2)).toBeLessThanOrEqual(6);
+    const gap = date.left - (boxRect.x + boxRect.width);
+    expect(gap).toBeGreaterThanOrEqual(4);
+    expect(gap).toBeLessThanOrEqual(12);
+    // Line two sits under the box, at the card's left edge, not indented to the date.
+    expect(lineTwo.top).toBeGreaterThanOrEqual(date.bottom - 2);
+    expect(Math.abs(lineTwo.left - boxRect.x)).toBeLessThanOrEqual(2);
+    // The status joins line two when it fits.
+    expect(Math.abs(status.top - lineTwo.top)).toBeLessThanOrEqual(6);
+    // The touch target still meets the floor, without the box's own cell carrying it.
+    expect(labelRect.width).toBeGreaterThanOrEqual(44);
+    expect(labelRect.height).toBeGreaterThanOrEqual(44);
+    // And nothing pushes the page sideways.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
-    const textLeft = Math.min(...textLefts.filter((r) => r.width > 0).map((r) => r.left));
-    // Gap between the label's right edge and the first text: not touching.
-    expect(textLeft - (boxRect!.x + boxRect!.width)).toBeGreaterThanOrEqual(4);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
+});
+
+test.describe('Mining Tax table row — tick box clears the date (#2983)', () => {
+  for (const viewport of [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+  ]) {
+    test(`gap between the box and the date at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await signInAndGoto(page);
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+
+      const box = page.getByLabel('Select this row');
+      await expect(box).toHaveCount(1);
+      const row = page.locator('tr', { has: box });
+      const boxRect = (await box.boundingBox())!;
+      const date = await textRect(row, 'td.dt-primary');
+      const rowRect = (await row.boundingBox())!;
+
+      expect(date.left - (boxRect.x + boxRect.width)).toBeGreaterThanOrEqual(8);
+      // Little room left of the box.
+      expect(boxRect.x - rowRect.x).toBeLessThanOrEqual(12);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
 });
 
 /**
@@ -593,5 +654,57 @@ test.describe('Mining Tax ledger — long Payee name overflow', () => {
     expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(WIDE_DESKTOP.width);
 
     await expect(page.getByRole('table').getByText(PAYEE_NAME, { exact: true })).toBeVisible();
+  });
+});
+
+test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', () => {
+  async function noOverflow(page: Page) {
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
+
+  test.describe('phone', () => {
+    test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+    test('a zero-value row prints no "value" affix and a priced row still does', async ({
+      page,
+    }) => {
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { withZeroValue: true });
+      await page.goto('./mining/tax');
+      const valueCell = page.locator('tbody td[data-label="Est. value"]').first();
+      await expect(valueCell).toBeHidden();
+      await noOverflow(page);
+
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+      const priced = page.locator('tbody td[data-label="Est. value"]').first();
+      await expect(priced).toBeVisible();
+      expect(await priced.evaluate((td) => getComputedStyle(td, '::after').content)).toContain(
+        'value'
+      );
+    });
+  });
+
+  test.describe('desktop', () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+
+    test('a zero tax amount is muted, a positive one stays red', async ({ page }) => {
+      await signInAndGoto(page);
+      await seedPayeeBalance(page, { withZeroValue: true });
+      await page.goto('./mining/tax');
+      const tax = page.locator('tbody td[data-label="Tax owed"]').first();
+      await expect(tax).toBeVisible();
+      await expect(tax).not.toHaveClass(/text-isk-neg/);
+      await noOverflow(page);
+
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+      await expect(page.locator('tbody td[data-label="Tax owed"]').first()).toHaveClass(
+        /text-isk-neg/
+      );
+    });
   });
 });

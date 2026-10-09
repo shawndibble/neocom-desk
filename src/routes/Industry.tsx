@@ -3,7 +3,15 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-route
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, DataAgeBadge, EmptyState, Modal, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  Modal,
+  Spinner,
+  Toast,
+  useTimedToast,
+} from '@/components/ui';
 import { preloadRouteChunk } from '@/app/routeChunks';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { loadActivityFacilityDefaults } from '@/features/industry/facilityDefaults';
@@ -18,6 +26,9 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
+import { planReactionLocation } from '@/features/industry/planReactionLocation';
+import { industryActivityOf } from '@/engine/industry/types';
+import { toIndustryBlueprint } from '@/features/industry/blueprintCatalog';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
 import { MarketWideOpportunitiesPanel } from '@/features/industry/MarketWideOpportunitiesPanel';
@@ -54,7 +65,13 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
-import type { IndustryFitImportState } from '@/lib/shortcuts';
+import { applyBlueprintPaste, previewBlueprintPaste } from '@/features/industry/blueprintPaste';
+import { loadBlueprintNames } from '@/features/industry/blueprintNames';
+import type {
+  BlueprintPasteNoticeState,
+  IndustryBlueprintListState,
+  IndustryFitImportState,
+} from '@/lib/shortcuts';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
@@ -151,6 +168,74 @@ export function Industry() {
     setFitImportSeedText(text);
     setFitImportOpen(true);
   }, [location.key, location.state]);
+  // A pasted blueprint list (the app-wide paste router) becomes a Build Group
+  // once the data it needs is in, then the pilot lands on that group. The
+  // navigation's own state is cleared first so Back never replays the paste.
+  const [blueprintPasteNote, setBlueprintPasteNote] = useState<string | null>(null);
+  useTimedToast(blueprintPasteNote, () => setBlueprintPasteNote(null));
+  const handledBlueprintPasteKey = useRef<string | null>(null);
+  useEffect(() => {
+    const text = (location.state as Partial<IndustryBlueprintListState> | null)?.blueprintListText;
+    if (!text || handledBlueprintPasteKey.current === location.key) return;
+    if (activeCharacterId === null || !plans || !catalog || !buildGroupsHydrated) return;
+    handledBlueprintPasteKey.current = location.key;
+    void (async () => {
+      try {
+        const preview = previewBlueprintPaste(text, catalog, await loadBlueprintNames());
+        void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+        const result = await applyBlueprintPaste(preview, {
+          characterId: activeCharacterId,
+          plans,
+          ownedBlueprints,
+          defaultsFrom: mostRecentlyUpdatedPlan(plans),
+          // Off disk for the same reason as `createPlan`.
+          facilityDefaults: await loadActivityFacilityDefaults(),
+          assumedMe,
+          assumedTe,
+          buildGroups,
+          setBuildGroups,
+          groupName: t('industry.blueprintPasteGroupName'),
+        });
+        if (!result) {
+          setBlueprintPasteNote(
+            [
+              t('industry.blueprintPasteNone'),
+              t('industry.blueprintPasteSkipped', { count: preview.skipped }),
+            ].join(' ')
+          );
+          return;
+        }
+        await setExpandedGroups(
+          withGroupExpanded(expandedGroups, activeCharacterId, result.groupId, true)
+        );
+        void navigate(`/industry/groups/${result.groupId}`, {
+          state: {
+            blueprintPasteNotice: { skipped: preview.skipped, reused: result.reused },
+          } satisfies BlueprintPasteNoticeState,
+        });
+      } catch {
+        setBlueprintPasteNote(t('industry.blueprintPasteFailed'));
+      }
+    })();
+  }, [
+    location.key,
+    location.state,
+    location.pathname,
+    location.search,
+    activeCharacterId,
+    plans,
+    catalog,
+    buildGroupsHydrated,
+    ownedBlueprints,
+    assumedMe,
+    assumedTe,
+    buildGroups,
+    setBuildGroups,
+    expandedGroups,
+    setExpandedGroups,
+    navigate,
+    t,
+  ]);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
@@ -363,6 +448,16 @@ export function Industry() {
     // The Runs column is the plan's own `runs` input (how many runs the
     // plan prices), not a count of logged Production Runs.
     const runsByPlanId = new Map((plans ?? []).map((plan) => [plan.id, plan.runs]));
+    const planById = new Map((plans ?? []).map((plan) => [plan.id, plan]));
+    // Reactions planned in highsec cannot run (issue #2908): the row reads
+    // "Fix location" and keeps its figures, dimmed.
+    const reactionsBlocked = (planId: string): boolean => {
+      const plan = planById.get(planId);
+      const entry = plan && catalog?.byBlueprintTypeID.get(plan.blueprintTypeID);
+      if (!plan || !entry) return false;
+      const activity = industryActivityOf(toIndustryBlueprint(entry.blueprint));
+      return planReactionLocation(plan, activity)?.state === 'highsec';
+    };
     for (const row of [...groupedRows, ...ungroupedRows]) {
       // Displayed figure is profit after fees (matches the detail page's
       // headline number) — but the Build/Buy verdict stays keyed off
@@ -377,7 +472,9 @@ export function Industry() {
       // still had a hub price.
       map.set(row.planId, {
         profit: row.result?.profit ?? null,
-        verdict: row.result?.recommendation ?? 'unknown',
+        verdict: reactionsBlocked(row.planId)
+          ? 'fixLocation'
+          : (row.result?.recommendation ?? 'unknown'),
         buildCost: row.result?.unpriceable ? null : (row.result?.totalCost ?? null),
         buyCost: row.result?.unpriceable ? null : (row.result?.buyCost ?? null),
         runs: runsByPlanId.get(row.planId) ?? 0,
@@ -386,7 +483,7 @@ export function Industry() {
       });
     }
     return map;
-  }, [groupedRows, ungroupedRows, plans]);
+  }, [groupedRows, ungroupedRows, plans, catalog]);
 
   const statsByGroupId = useMemo(() => {
     const rowByPlanId = new Map(groupedRows.map((row) => [row.planId, row]));
@@ -557,6 +654,45 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
+  const hasOwnedBlueprints = ownedBlueprints.length > 0;
+  const marketWidePanel = catalog && (
+    <MarketWideOpportunitiesPanel
+      key="market-wide"
+      hub={DEFAULT_TRADE_HUB}
+      trees={marketWideTrees}
+      catalog={catalog}
+      modifiers={modifiers}
+      activeCharacterId={activeCharacterId}
+      onStartPlan={handleStartPlan}
+      startFolded={hasOwnedBlueprints}
+    />
+  );
+  // Waits on the pricing-settings hydration gate (issue #2054): not mounting
+  // the panel until `assumedMe` has hydrated is enough to stop its first pass
+  // from pricing every candidate at the default, without threading a readiness
+  // flag into `useOpportunities` itself. Market-Wide Build Opportunities reads
+  // no pricing input, so it renders regardless.
+  const ownedRankingPanel = !catalog ? null : !pricingInputs.hydrated ? (
+    <div key="owned-ranking" className="flex justify-center py-16">
+      <Spinner label={t('common.loading')} />
+    </div>
+  ) : (
+    <OpportunitiesPanel
+      key="owned-ranking"
+      catalog={catalog}
+      pi={pi}
+      facilityDefaults={facilityDefaults}
+      activeCharacterId={activeCharacterId}
+      ownedStockSnapshot={workspace.ownedStockSnapshot}
+      assumedMe={assumedMe}
+      onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+      onStartPlan={handleStartPlan}
+      onDataAgeChange={setOpportunitiesDataAge}
+    />
+  );
+  const opportunitiesPanels = hasOwnedBlueprints
+    ? [ownedRankingPanel, marketWidePanel]
+    : [marketWidePanel, ownedRankingPanel];
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto max-w-7xl space-y-4">
@@ -582,40 +718,12 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
-                {/* First: "what's profitable" is the question most
-                    visits here come to answer; the owned-blueprint ranking
-                    below narrows it to what you already hold. */}
-                <MarketWideOpportunitiesPanel
-                  hub={DEFAULT_TRADE_HUB}
-                  trees={marketWideTrees}
-                  catalog={catalog}
-                  modifiers={modifiers}
-                  activeCharacterId={activeCharacterId}
-                  onStartPlan={handleStartPlan}
-                />
-                {/* Waits on the pricing-settings hydration gate (issue #2054):
-                    not mounting the panel until `assumedMe` has hydrated is
-                    enough to stop its first pass from pricing every candidate
-                    at the default, without threading a readiness flag into
-                    `useOpportunities` itself. Market-Wide Build Opportunities
-                    reads no pricing input, so it renders regardless. */}
-                {!pricingInputs.hydrated ? (
-                  <div className="flex justify-center py-16">
-                    <Spinner label={t('common.loading')} />
-                  </div>
-                ) : (
-                  <OpportunitiesPanel
-                    catalog={catalog}
-                    pi={pi}
-                    facilityDefaults={facilityDefaults}
-                    activeCharacterId={activeCharacterId}
-                    ownedStockSnapshot={workspace.ownedStockSnapshot}
-                    assumedMe={assumedMe}
-                    onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-                    onStartPlan={handleStartPlan}
-                    onDataAgeChange={setOpportunitiesDataAge}
-                  />
-                )}
+                {/* With owned blueprints the owned-blueprint ranking leads
+                    and "what's profitable" folds under it; with none, the
+                    market-wide scan is the whole answer and stays first,
+                    open. Keyed, so a late-arriving blueprint list reorders
+                    the two without remounting (and losing) a scan. */}
+                {opportunitiesPanels}
               </div>
             ) : tab === 'records' ? (
               <ProductionLogPanel
@@ -737,6 +845,8 @@ export function Industry() {
             </Button>
           </div>
         </Modal>
+
+        {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
 
         {fitImportOpen && catalog && (
           <FitImportDialog

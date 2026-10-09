@@ -51,7 +51,7 @@
  * pins, which belong to legs by position — except the first stop added to a
  * Route via link, which is the leg its pin was made for.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
@@ -75,8 +75,9 @@ import {
   useRouteQuery,
 } from '@/features/route/routeRules';
 import { useRouteBridgeQuery, useRouteBridgesEnabled } from '@/features/route/routeBridgeSettings';
+import { routeMassCheck } from '@/engine/route/jumpMass';
+import { useRouteShipMass } from '@/features/route/routeShip';
 import { useSolarSystemIndex, useSystemName } from '@/features/route/useSolarSystems';
-import { typeName } from '@/sde/loadSde';
 import { useUrlParams } from '@/lib/useUrlState';
 import { AnsiblexGatesDialog, type AnsiblexDialogMode } from './AnsiblexGatesDialog';
 import { useAnsiblexGates } from './ansiblexGates';
@@ -120,10 +121,16 @@ function RouteFacts({
   summary,
   holeJumps,
   bridgeJumps,
+  massBlocked,
+  shipName,
 }: {
   summary: RouteSafetySummary;
   holeJumps: number;
   bridgeJumps: number;
+  /** Hole and bridge hops the chosen ship may not pass; the chip shows only when above 0. */
+  massBlocked: number;
+  /** The hull the mass check runs for; shown only when the route flies a hole or bridge. */
+  shipName: string | null;
 }) {
   const { t } = useTranslation();
   const flownOtherwise = holeJumps > 0 || bridgeJumps > 0;
@@ -140,6 +147,16 @@ function RouteFacts({
         {holeJumps > 0 && <StatChip label={t('travel.summary.holesLabel')} value={holeJumps} />}
         {bridgeJumps > 0 && (
           <StatChip label={t('travel.summary.bridgesLabel')} value={bridgeJumps} />
+        )}
+        {flownOtherwise && shipName !== null && (
+          <StatChip label={t('travel.summary.shipLabel')} value={shipName} />
+        )}
+        {massBlocked > 0 && (
+          <StatChip
+            label={t('travel.summary.massLabel')}
+            value={t('travel.summary.massValue', { count: massBlocked })}
+            tone="warning"
+          />
         )}
         <StatChip label={t('travel.summary.highsecLabel')} value={summary.highsec} />
         <StatChip label={t('travel.summary.lowsecLabel')} value={summary.lowsec} />
@@ -176,20 +193,6 @@ function RouteFacts({
 export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(ROUTE_PARAMS);
-  const hullTypeId = params.whsize === null ? null : params.whhull;
-  const [hullName, setHullName] = useState<{ typeId: number; name: string } | null>(null);
-  useEffect(() => {
-    if (hullTypeId === null) return;
-    let live = true;
-    void typeName(hullTypeId)
-      .then((name) => live && setHullName({ typeId: hullTypeId, name }))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [hullTypeId]);
-  const sizeHullName =
-    hullTypeId !== null && hullName?.typeId === hullTypeId ? hullName.name : null;
   const current = useCurrentSystem();
   const fromId = params.from ?? current.systemId;
   const fromIsCurrent = params.from === null && current.systemId !== null;
@@ -338,13 +341,9 @@ export function RouteSafetyTab({ tabBar }: { tabBar: ReactNode }) {
                 setParams({ pref: null });
               }}
               holeQuery={holeQuery}
-              sizeHullName={sizeHullName}
               onHoleChange={(change) => {
                 saveRouteHoleDefault(change);
-                setParams({
-                  [HOLE_PARAM[change.field]]: null,
-                  ...(change.field === 'shipSize' ? { whhull: null } : {}),
-                });
+                setParams({ [HOLE_PARAM[change.field]]: null });
               }}
               bridges={{
                 bridgeQuery,
@@ -412,6 +411,7 @@ function RouteBody({
   onUse: (index: number, pin: string | null) => void;
 } & Pick<LegWaysProps, 'bridges' | 'onSetUpBridges'>) {
   const { t } = useTranslation();
+  const mass = useRouteShipMass();
   switch (state.kind) {
     case 'incomplete':
       return (
@@ -434,6 +434,10 @@ function RouteBody({
       );
     case 'route': {
       const { trip } = state;
+      const check = trip
+        ? routeMassCheck(trip.rows, mass.ship?.massKg ?? null, mass.holeTable)
+        : null;
+      const massBlocked = check ? check.blocked + check.bridgeBlocked : 0;
       const onlyLeg = state.legs[0];
       const holeRows: HoleRowProps = {
         holesFetchedAt: holesState.kind === 'ready' ? holesState.fetchedAt : null,
@@ -454,6 +458,8 @@ function RouteBody({
                   summary={trip.summary}
                   holeJumps={trip.holeJumps}
                   bridgeJumps={trip.bridgeJumps}
+                  massBlocked={massBlocked}
+                  shipName={mass.ship?.name ?? null}
                 />
               </SetWaypoints>
             )}

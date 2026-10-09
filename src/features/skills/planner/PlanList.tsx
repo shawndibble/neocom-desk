@@ -175,7 +175,7 @@ function PlanRow({
             </DropdownMenuItem>
           )}
           <DropdownMenuItem className="text-danger" onSelect={() => onRequestDelete(plan)}>
-            {t('plans.delete')}
+            {t('plans.deleteMenu')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

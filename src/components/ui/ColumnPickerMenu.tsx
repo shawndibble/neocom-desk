@@ -28,6 +28,8 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   resetLabel?: string;
   /** Trigger size; defaults to `IconButton`'s own default so existing callers are unchanged. */
   size?: ComponentProps<typeof IconButton>['size'];
+  /** Tier 2: show "Columns" beside the icon from `md` up. */
+  showLabel?: boolean;
 }
 
 /**
@@ -50,13 +52,19 @@ export function ColumnPickerMenu<Id extends string, Row>({
   onReset,
   resetLabel,
   size,
+  showLabel,
 }: ColumnPickerMenuProps<Id, Row>) {
   const visibleSet = new Set(visible);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
+        <IconButton
+          icon={<Icon.ColumnsPicker />}
+          label={buttonLabel}
+          size={size}
+          visibleLabel={showLabel ? buttonLabel : undefined}
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

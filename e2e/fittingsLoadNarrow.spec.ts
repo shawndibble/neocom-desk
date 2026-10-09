@@ -144,7 +144,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 
-  test('a long fit name gets its own line: two lines at most, Save and the menu beside the chips', async ({
+  test('a long fit name takes two lines at most, with Save and the menu beside it on one row', async ({
     page,
   }) => {
     await signInAndGoto(page, './ships/fittings');
@@ -160,8 +160,8 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     const h1 = page.getByRole('heading', { level: 1 });
     await expect(h1).toContainText('Rifter - long PvE');
     const h1Box = (await h1.boundingBox())!;
-    // Wider than the ~65px it had beside Save, and no more than two 28px lines.
-    expect(h1Box.width).toBeGreaterThan(200);
+    // Readable beside Save and ⋮ (Rename is in that menu), and no more than two 28px lines.
+    expect(h1Box.width).toBeGreaterThan(80);
     expect(h1Box.height).toBeLessThanOrEqual(60);
     const h1Size = await h1.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(h1Size).toBe(true);
@@ -171,7 +171,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
       page.getByRole('button', { name: /^Save/ }).first(),
     ]) {
       const box = (await control.boundingBox())!;
-      expect(box.y).toBeGreaterThan(h1Box.y + 20);
+      expect(box.x).toBeGreaterThanOrEqual(h1Box.x + h1Box.width);
       expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
       expect(box.height).toBeGreaterThanOrEqual(44);
     }

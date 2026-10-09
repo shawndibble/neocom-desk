@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, StatChip, StatChips } from '@/components/ui';
+import { IskAmount, StatChip } from '@/components/ui';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
@@ -28,7 +28,11 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
       </h3>
-      <StatChips>{children}</StatChips>
+      {/* One readout per line, label left and value right (the mockup's shape), so a
+          wide value has the column to itself and can't run into a neighbour group. */}
+      <div className="flex min-w-0 flex-col [&>span]:w-full [&>span>span:last-child]:ml-auto">
+        {children}
+      </div>
     </section>
   );
 }
@@ -43,12 +47,12 @@ export function AppraisalHeaderStats({
 }: AppraisalHeaderStatsProps) {
   const { t } = useTranslation();
   return (
-    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2">
       {net && (
         <Group title={t('market.appraisal.groupYouGet')}>
           <StatChip
             label={t('market.appraisal.instantNet')}
-            className="font-semibold"
+            emphasis
             value={
               <span className={iskToneClass(net.instantNet)}>
                 <IskAmount value={net.instantNet} decimals={0} />
@@ -73,14 +77,14 @@ export function AppraisalHeaderStats({
       <Group title={t('market.appraisal.groupWorth')}>
         <StatChip
           label={t('market.appraisal.sellTotal')}
-          value={<FullIskTotal value={totals.sell} />}
+          value={<FullIskTotal value={totals.sell} compact />}
           tone="accent"
-          className="font-semibold"
+          emphasis
           tooltip={t('market.appraisal.sellTotalHelp')}
         />
         <StatChip
           label={t('market.appraisal.buyTotal')}
-          value={<FullIskTotal value={totals.buy} />}
+          value={<FullIskTotal value={totals.buy} compact />}
           tooltip={t('market.appraisal.buyTotalHelp')}
         />
         <StatChip
@@ -101,7 +105,7 @@ export function AppraisalHeaderStats({
         )}
       </Group>
       <Group title={t('market.appraisal.groupCargo')}>
-        <AppraisalVolumeChip totals={totals} />
+        <AppraisalVolumeChip totals={totals} emphasis />
         <StatChip label={t('market.appraisal.items')} value={itemCount} />
         {showRefine && (
           <StatChip

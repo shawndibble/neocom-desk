@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { legPinsParam, ROUTE_PARAMS, routeToHref, routeViaHref } from './routeSafetyLink';
+import { legPinsParam, routeToHref, routeViaHref } from './routeSafetyLink';
 
 describe('legPinsParam', () => {
   const codec = legPinsParam();
@@ -26,13 +26,6 @@ describe('routeViaHref', () => {
 });
 
 describe('routeToHref', () => {
-  it('carries a hull and the wormhole size it needs for this link only', () => {
-    expect(routeToHref(30000142, null, null, { typeId: 587, size: 'small' })).toBe(
-      '/travel/route?stops=30000142&whsize=small&whhull=587'
-    );
-    expect(ROUTE_PARAMS.whhull.parse('587')).toBe(587);
-  });
-
   it('opens Route Safety to the system, leaving the start to the page (the current system)', () => {
     expect(routeToHref(30000142)).toBe('/travel/route?stops=30000142');
   });

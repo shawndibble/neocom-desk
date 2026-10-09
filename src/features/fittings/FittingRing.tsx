@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MakeItFitTrigger } from './MakeItFitTrigger';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { AddRow, Warn } from '@/components/ui/icons';
@@ -33,7 +34,7 @@ import {
   type RingSlot,
   type SlotLayout,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups, shownModuleState } from '@/engine/fittings/fittingEdit';
+import { cargoGroups, nextModuleState, shownModuleState } from '@/engine/fittings/fittingEdit';
 import type { HardpointKind, HardpointKindOf } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
@@ -76,15 +77,17 @@ import {
 } from './fittingItemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
+import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 
 /**
  * The ring grows with its column up to 48rem, where a tile is 48/648 of it —
  * about 57px — but never taller than the window leaves beside the tabs and
- * readouts (16rem is an estimate of them; past it the column scrolls), so
- * the sticky column still shows it whole; a short window (a
+ * readouts (24rem covers the header, tabs, panel header and the whole
+ * calibration / powergrid / CPU / sustained block, so the readouts end inside
+ * the first viewport; past it the column scrolls); a short window (a
  * landscape phone) keeps at least 20rem.
  */
-const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 16rem)))';
+const RING_MAX_WIDTH = 'max(20rem, min(48rem, calc(100dvh - 24rem)))';
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
@@ -430,6 +433,28 @@ function Readout({
   );
 }
 
+/** The four module-state border colours the tiles use, named — touch has no hover to learn them from. */
+function ModuleStateLegend() {
+  const { t } = useTranslation();
+  const states: FittingItemState[] = ['offline', 'online', 'active', 'overload'];
+  return (
+    <ul
+      aria-label={t('fittings.ring.legend.title')}
+      className="mx-auto flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-text-dim"
+    >
+      {states.map((state) => (
+        <li key={state} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className={`size-3 shrink-0 border-2 bg-bg ${MODULE_STATE_STYLE[state].border}`}
+          />
+          {t(`fittings.ring.state.${state}`)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** The ship's own render, falling back to its icon when the image server has none. */
 function ShipRender({ typeId }: { typeId: number }) {
   const [failed, setFailed] = useState(false);
@@ -544,23 +569,6 @@ function SlotTile({
     : onDropType
       ? 'fittings.ring.tooltipEmpty'
       : 'fittings.ring.tooltipEmptyClick';
-  const tooltip = module
-    ? [
-        t('fittings.ring.tooltipFitted', {
-          rack: rackLabel,
-          index,
-          name: nameOf(module.typeId),
-          state,
-        }),
-        module.chargeTypeId !== undefined
-          ? t('fittings.ring.tooltipCharge', { name: nameOf(module.chargeTypeId) })
-          : null,
-        hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Tile`) : null,
-        cantUse ? t('fittings.ring.tooltipCantUse') : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-    : t(emptyTooltipKey, { rack: rackLabel, index });
 
   // Only an empty tile on the full ring is a "fill this slot" target, as the
   // List's empty-slot buttons are; a fitted one opens its module instead.
@@ -586,6 +594,40 @@ function SlotTile({
   const draggable = !compact && module !== undefined && onMoveModule !== undefined;
   const interactive = !compact && onSelect !== undefined;
   const menu = !compact && actions !== null;
+  // A click on a fitted module steps its state, as the game does; a subsystem
+  // has none, and Enter/Space (a click with no detail) keep selecting.
+  const cycles =
+    menu && module !== undefined && shownState !== undefined && slot.rack !== 'subsystem';
+  // The one tooltip says what a click does, only where it does something.
+  const cycleHint =
+    cycles && shownState !== undefined
+      ? t('fittings.ring.tooltipCycle', {
+          state: t(`fittings.ring.state.${nextModuleState(shownState, maxState ?? 'overload')}`),
+        })
+      : null;
+  const tooltip = module
+    ? [
+        t('fittings.ring.tooltipFitted', {
+          rack: rackLabel,
+          index,
+          name: nameOf(module.typeId),
+          state,
+        }),
+        module.chargeTypeId !== undefined
+          ? t('fittings.ring.tooltipCharge', { name: nameOf(module.chargeTypeId) })
+          : null,
+        hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Tile`) : null,
+        cantUse ? t('fittings.ring.tooltipCantUse') : null,
+        cycleHint,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : t(emptyTooltipKey, { rack: rackLabel, index });
+  const guard = useLiftAfterHoldGuard();
+  function cycleState() {
+    if (!cycles || !actions || shownState === undefined) return;
+    actions.setState(slot.rack, slot.index, nextModuleState(shownState, maxState ?? 'overload'));
+  }
   const onDelete = deleteKeyHandler(
     menu && module !== undefined ? () => actions.remove(slot.rack, slot.index) : undefined
   );
@@ -624,10 +666,33 @@ function SlotTile({
       data-ring-slot={`${slot.rack}-${slot.index}`}
       data-module-state={module ? shownState : undefined}
       tabIndex={tabbable ? 0 : -1}
-      className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+      className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? `cursor-pointer${module === undefined ? ' hover:border-accent' : ''}` : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
-      onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
+      {...(cycles ? guard.handlers : undefined)}
+      onClick={
+        interactive || cycles
+          ? (event) => {
+              // The click a touch lifting off a long-press sends is the menu's, not a cycle.
+              if (cycles && guard.swallowClick(event)) return;
+              if (cycles && event.detail > 0) cycleState();
+              else onSelect?.(slot.rack, slot.index);
+            }
+          : undefined
+      }
       onKeyDown={(event) => {
+        if (cycles) guard.handlers.onKeyDown();
+        if (
+          cycles &&
+          event.key === 's' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.shiftKey
+        ) {
+          event.preventDefault();
+          cycleState();
+          return;
+        }
         onDelete?.(event);
         if (!event.defaultPrevented) onKeyDown?.(event);
       }}
@@ -887,6 +952,9 @@ export function FittingRing({
     ? ['calibration', 'droneBandwidth', 'cpu', 'powergrid']
     : ['calibration', 'cpu', 'powergrid'];
 
+  // One "Make it fit…" for the whole ring: CPU, powergrid and calibration all go through the same dialog.
+  const overFit = [cpuFlash, pgFlash, calFlash].some((flash) => flash.overBudget);
+
   const cantUse = (slot: RingSlot) =>
     slot.module !== undefined && (unusableModuleKeys?.has(moduleKey(slot.module)) ?? false);
   const isSelected = (slot: RingSlot) =>
@@ -1103,9 +1171,36 @@ export function FittingRing({
             )}
             <Readout gauge="powergrid" budget={budgets.powergrid} align="start" />
             <Readout gauge="cpu" budget={budgets.cpu} align="end" />
+            {overFit && (
+              <div className="col-span-2 text-center">
+                <MakeItFitTrigger />
+              </div>
+            )}
             <SustainedTankReadout stats={stats ?? null} className="col-span-2 text-center" />
           </div>
         )}
+
+        {/* The phone editor has no readouts under the ring, so the two budgets that gate a fit sit above the rack buttons. (The Start preview is compact too, but carries its own meters.) */}
+        {compact && onRackOpen && (
+          <div
+            className="mx-auto grid grid-cols-2 gap-x-4 gap-y-1"
+            style={{ maxWidth: RING_MAX_WIDTH }}
+          >
+            <Readout gauge="cpu" budget={budgets.cpu} align="start" />
+            <Readout gauge="powergrid" budget={budgets.powergrid} align="end" />
+            {/* Calibration can gate a fit too, but only earns a line on the phone when it is the one over. */}
+            {calFlash.overBudget && (
+              <Readout gauge="calibration" budget={budgets.calibration} align="start" />
+            )}
+            {overFit && (
+              <div className="col-span-2 text-center">
+                <MakeItFitTrigger />
+              </div>
+            )}
+          </div>
+        )}
+
+        {bandSlots.some((slot) => slot.module !== undefined) && <ModuleStateLegend />}
 
         {compact && onRackOpen && (
           <>

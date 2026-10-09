@@ -429,7 +429,6 @@ export function BuildGroupPanel({
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
-        phoneHidden: true,
         align: 'right',
         render: (material) => {
           const owned = ownedStockMap.get(material.typeID);
@@ -742,8 +741,13 @@ export function BuildGroupPanel({
           group page redesign) — Members and Materials sit side by side
           rather than competing with a nav rail and a 20rem list column for
           the same row. */}
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <div className="space-y-4">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+        {/* The plans sit above the table, not beside it: the buy table has six
+            figure columns and "Still to buy" is the one that matters, so it
+            gets the page's full width rather than what a 20rem list leaves. */}
+        <div
+          className={`grid grid-cols-[minmax(0,1fr)] items-start gap-4 ${craftedTypeIds.length > 0 ? 'md:grid-cols-2' : ''}`}
+        >
           <Panel title={t('industry.groupMembers')} padded={false}>
             <ul className="divide-y divide-line text-xs">
               {plans.map((plan) => {
@@ -755,8 +759,8 @@ export function BuildGroupPanel({
                       onClick={onPlanLinkClick(() => onOpenPlan(plan.id))}
                       className={`${tappableRowClassName} group flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left ${rowInteractiveClassName} ${focusRingInsetClassName}`}
                     >
-                      <span className="truncate text-accent">{plan.name}</span>
-                      <span className="shrink-0 tabular-nums text-text-dim">
+                      <span className="min-w-0 flex-1 truncate text-accent">{plan.name}</span>
+                      <span className="shrink-0 text-right tabular-nums text-text-dim">
                         {row?.result ? (
                           <IskAmount value={row.result.totalCost} decimals={0} />
                         ) : (

@@ -33,6 +33,10 @@ the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
 EVE PvP Corp Activity Search (both intel). Blizbor's skill trio (EvE Modular
 Skillplans, EVEMon Pilot Progression, EVEMon Certificates Enhanced — no license,
 so their data is unusable; surfaced #2390).
+EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
+eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
+closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
+already Active Jobs / job-slot count).
 
 **Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
 in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
@@ -350,6 +354,10 @@ Grouped by the test that killed them; the reason is what stops a re-pitch.
   Chain (closed planner class); EVE MCP Server (developer infrastructure);
   Abyssal pricing (`unpricedRows` flags them); Skill Extractor ISK/hr; Corp
   Wallet chart by division (Accountant-only).
+- **Reach:** Capsuleers.app Asset Consolidator (multi-character haul plan via
+  0-ISK contracts between own alts) and EVE Console (buffer/priority management
+  across dozens of indy alts, nullsec capital builder) — second-account and
+  null-scale play, few players.
 - **On merit:** Skill ROI in any framing incl. the owner's invited re-frame — no
   realized ISK/hr per job exists. Curated starter-plan/template library (13:
   hand-authored role modules rot on every CCP rework; masteries are CCP's own

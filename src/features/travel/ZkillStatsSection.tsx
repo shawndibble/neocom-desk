@@ -19,11 +19,6 @@ import { cx } from '@/lib/cx';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killFigures, type StatTileItem } from './zkillFigures';
 
-/** A 0-1 share as a percentage. */
-function percent(value: number | null, digits = 0): string {
-  return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
-}
-
 const NO_HISTORY_HINT = {
   pilot: 'travel.pilot.noHistoryHint',
   corporation: 'travel.pilot.noHistoryHintCorporation',
@@ -138,9 +133,12 @@ export function ZkillStatsNote({
 export function ZkillStatsSection({
   stats,
   onRetry,
+  metersAbove = false,
 }: {
   stats: PilotStatsResult | null;
   onRetry?: () => void;
+  /** The caller draws the meters itself, above this block, so they are left out here. */
+  metersAbove?: boolean;
 }) {
   const { t } = useTranslation();
   const status = <ZkillStatsStatus stats={stats} subject="pilot" onRetry={onRetry} />;
@@ -148,24 +146,25 @@ export function ZkillStatsSection({
   const s = stats.stats;
   const figures = killFigures(t, s);
   return (
-    <section aria-label={t('travel.pilot.statsLabel')} className="space-y-3">
-      <ZkillRatioMeters stats={s} />
+    // DOM order is the phone's reading order: figures, note, then meters. From `md`
+    // up the meters lead, as they always did (`md:order-first` on a flex column).
+    <section aria-label={t('travel.pilot.statsLabel')} className="flex flex-col gap-3">
       <StatTiles
-        className="md:grid-cols-6"
+        className="md:grid-cols-5"
         items={[
           figures.kills,
           figures.losses,
           figures.iskDestroyed,
           figures.iskLost,
-          {
-            label: t('travel.pilot.iskEfficiency'),
-            value: percent(s.iskEfficiency, 1),
-            help: t('travel.pilot.iskEfficiencyHelp'),
-          },
           { label: t('travel.pilot.soloKills'), value: s.soloKills.toLocaleString() },
         ]}
       />
       <ZkillStatsNote stats={stats} subject="pilot" />
+      {!metersAbove && (
+        <div className="empty:hidden md:order-first">
+          <ZkillRatioMeters stats={s} />
+        </div>
+      )}
       {/* Half the modal's width on desktop: bars stretched across all of it
           make the spread between hulls harder to compare, not easier. */}
       {s.topShips.length > 0 && (

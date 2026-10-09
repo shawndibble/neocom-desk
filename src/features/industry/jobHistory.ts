@@ -122,19 +122,21 @@ export function isLoggableHistoryJob(
 
 /**
  * Delivered, loggable jobs with no run — the "N delivered, not logged" figure.
- * `blueprintTypeId` narrows it to one Build Plan's blueprint.
+ * `blueprintTypeId` narrows it to one Build Plan's blueprint. A dismissed job
+ * (`dismissedJobIds`) is left out; one that was logged counts as logged either way.
  */
 export function countUnloggedDeliveries(
   jobs: readonly (Pick<IndustryJob, 'job_id' | 'activity_id' | 'product_type_id'> & {
     blueprint_type_id: number;
   })[],
   states: ReadonlyMap<number, HistoryJobState>,
-  options: { blueprintTypeId?: number } = {}
+  options: { blueprintTypeId?: number; dismissedJobIds?: ReadonlySet<number> } = {}
 ): number {
   return jobs.filter(
     (job) =>
       isLoggableHistoryJob(job) &&
       states.get(job.job_id)?.kind !== 'logged' &&
+      !options.dismissedJobIds?.has(job.job_id) &&
       (options.blueprintTypeId === undefined || job.blueprint_type_id === options.blueprintTypeId)
   ).length;
 }

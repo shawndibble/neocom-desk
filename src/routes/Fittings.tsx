@@ -16,6 +16,8 @@ import {
   SlideOver,
   Tabs,
   TextInput,
+  Toast,
+  useTimedToast,
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
@@ -43,6 +45,8 @@ import {
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
+import { MakeItFitContext } from '@/features/fittings/makeItFitContext';
+import { MakeItFitDialog } from '@/features/fittings/MakeItFitDialog';
 import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
 import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
 import { useChargeLoading } from '@/features/fittings/useChargeLoading';
@@ -79,8 +83,6 @@ import {
   useFittingViewPreference,
   type FittingView,
 } from '@/features/fittings/fittingViewPreference';
-import { AlphaCloneChip } from '@/features/fittings/AlphaCloneChip';
-import { MasteryChip } from '@/features/fittings/MasteryChip';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { FittingWhatToTrainPanel } from '@/features/fittings/FittingWhatToTrainPanel';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
@@ -145,6 +147,11 @@ function FittingsPage() {
   // Opened by an empty slot, or by "+ Add module" — which works before the
   // ship data (and so the empty slots) exists.
   const [addOpen, setAddOpen] = useState(false);
+  const [makeItFitOpen, setMakeItFitOpen] = useState(false);
+  // What the last applied Make it fit swap changed, for its confirmation toast.
+  const [swapped, setSwapped] = useState<string | null>(null);
+  useTimedToast(swapped, () => setSwapped(null));
+  const openMakeItFit = useCallback(() => setMakeItFitOpen(true), []);
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useFittingViewPreference((state) => state.hydrated);
   const hydrateView = useFittingViewPreference((state) => state.hydrate);
@@ -504,7 +511,7 @@ function FittingsPage() {
 
   const editor = (
     <div className="min-w-0 space-y-3">
-      {editorBody}
+      <MakeItFitContext.Provider value={openMakeItFit}>{editorBody}</MakeItFitContext.Provider>
       {fightersShown && (
         <Panel title={t('fittings.fighters.title')}>
           <FittingFightersPanel
@@ -599,6 +606,8 @@ function FittingsPage() {
   // Under the name: the hull, unless the Fitting is simply named after it,
   // and whether this is a saved Fitting.
   const hullName = typeName(fitting.shipTypeId);
+  // The open slide-out takes 26rem off the page, too little for the one-row header.
+  const headerCompact = addMode === 'sheet' || (addMode === 'slideOut' && addOpen);
   const subtitle = [
     hullName !== fitting.name ? hullName : null,
     workspace.savedId !== null ? t('fittings.header.savedInMyFittings') : null,
@@ -633,22 +642,22 @@ function FittingsPage() {
             }}
             price={workspace.price}
             cloneImplants={workspace.profile?.implantTypeIds}
-            // The open slide-out takes 26rem off the page, too little for the one-row header.
-            compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
-            context={
-              <>
-                <AlphaCloneChip blockers={alpha.blockers} skillName={alpha.skillName} />
-                {activeCharacterId !== null && (
-                  <MasteryChip
-                    hullTypeId={fitting.shipTypeId}
-                    hullName={hullName}
-                    characterId={activeCharacterId}
-                  />
-                )}
-              </>
-            }
+            compact={headerCompact}
+            stats={stats}
+            badges={{
+              alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
+              mastery:
+                activeCharacterId !== null
+                  ? {
+                      hullTypeId: fitting.shipTypeId,
+                      hullName,
+                      characterId: activeCharacterId,
+                    }
+                  : null,
+            }}
             save={
               <FittingSaveButton
+                compact={headerCompact}
                 onSave={() => void workspace.save()}
                 canSave={workspace.canSave}
                 saveBlockedReason={
@@ -681,7 +690,7 @@ function FittingsPage() {
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
-              {t('fittings.load.tooLargeToShare')}
+              {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
             </p>
           )}
           {/* Only a Load that opened a Fitting describes this one; a failed Load's
@@ -770,6 +779,44 @@ function FittingsPage() {
               </div>
             ))}
 
+          <MakeItFitDialog
+            open={makeItFitOpen}
+            onClose={() => setMakeItFitOpen(false)}
+            variants={workspace.variants}
+            catalogue={catalogue}
+            placement={isPhone ? 'sheet' : 'center'}
+            onOpenList={
+              view === 'list'
+                ? undefined
+                : () => {
+                    void setView('list');
+                    setMakeItFitOpen(false);
+                  }
+            }
+            onApply={(option) => {
+              edit((f) =>
+                option.swaps.reduce(
+                  (acc, swap) => swapModuleType(acc, swap.slot, swap.slotIndex, swap.toTypeId),
+                  f
+                )
+              );
+              setMakeItFitOpen(false);
+              setSwapped(
+                option.swaps
+                  .map((swap) =>
+                    t('fittings.makeItFit.swap', {
+                      from: catalogueTypeName(catalogue, swap.fromTypeId),
+                      to: catalogueTypeName(catalogue, swap.toTypeId),
+                    })
+                  )
+                  .join('; ')
+              );
+            }}
+          />
+          {/* No Undo here: the editor has no in-app undo, only the browser's Back (one swap is one history entry). */}
+          {swapped !== null && (
+            <Toast message={t('fittings.makeItFit.applied', { swap: swapped })} />
+          )}
           <Modal
             open={saveAsNewOpen}
             onClose={() => setSaveAsNewOpen(false)}
