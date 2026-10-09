@@ -159,6 +159,15 @@ Safety's last-hour ship-kill count: default text at none, blending to
 Computed like `securityStatusColor`; the count is always printed beside the
 color (§7).
 
+### Ore value ramp
+
+`oreValueTiers` (`src/engine/survey/valueTier.ts`) colours the Mining Survey's
+ore bars by ISK per m³ left, against the richest ore on the field: gray
+(`line-bright`), blue (`accent`), yellow (`warning`) and orange (halfway along
+`warning`→`danger`), richer left to right. It borrows Kill heat's yellow and
+orange rather than adding tokens. The ISK and percent are printed beside every
+bar, and a legend line names the ramp (§7).
+
 ### Damage types
 
 | Token           | Value     | Use                          |

@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, PageHeader } from '@/components/ui';
+import { EmptyState, PageHeader, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -121,9 +121,15 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
             url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
             expiresAt={expiresAt}
             onAdd={add}
-            actions={
+            footerActions={
               currentId !== null ? (
-                <Button onClick={() => void setCurrentId(null)}>{t('survey.newSurvey')}</Button>
+                <button
+                  type="button"
+                  className={textActionClassName()}
+                  onClick={() => void setCurrentId(null)}
+                >
+                  {t('survey.newSurvey')}
+                </button>
               ) : undefined
             }
           />
