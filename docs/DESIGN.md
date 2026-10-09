@@ -91,9 +91,10 @@ dashed against solid, bars against a line, its own strip.
 
 ### PI Map what-if
 
-| Token        | Value     | Use                                                                                                                                                     |
-| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map-whatif` | `#ff79c6` | The PI Map's "what if I add a planet" highlight: the products and wires a planet type you do not have would unlock. Always with a "+" marker and words. |
+| Token                   | Value                                   | Use                                                                                                                                                                                                                                                  |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `map-whatif`            | `#ff79c6`                               | The PI Map's "what if I add a planet" highlight: the products and wires a planet type you do not have would unlock. Always with a "+" marker and words.                                                                                              |
+| `pickup-1` … `pickup-4` | `#6ea8fe` `#b79cff` `#4fd1b5` `#f08fb8` | Plan a move: one hue per pickup location, shared by its rail dot, its slice of the split bar and the picker footer bar. Nominal identity only: the location's name is always written beside it, and slots repeat in order past four. Never a status. |
 
 One meaning only. It is never a status, never interactive, and never the only signal: the tile
 carries a "+" and the accessible name says "unlocked by a Lava planet".
