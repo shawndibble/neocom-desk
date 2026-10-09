@@ -5,11 +5,10 @@
  * box's right edge ragged.
  *
  * Measured by pasting `║` + one character ten or twenty times + `║` into chat
- * and measuring the screenshot, once per letter. The lowercase and uppercase
- * alphabets and the digits add up to their measured whole rows. The corners
- * `╔ ╗ ╚ ╝` were not measured on their own: they take the width of `═` and `║`
- * (8px), which the rows ending in a corner are consistent with. A character not
- * listed counts as a digit (7px). A different chat font size scales every width,
+ * and measuring the screenshot, once per character. The lowercase and uppercase
+ * alphabets and the digits add up to their measured whole rows. Every box,
+ * line, dash, shade and block character used (`═ ║ ╔ ╗ ╚ ╝ ─ │ ┌ └ ╌ ┄ ┈ ▒ ▓ █ ░`)
+ * measured 8px. A character not listed counts as a digit (7px). A different chat font size scales every width,
  * so the padding is exact only at the size this was measured at.
  */
 const WIDTHS: Record<string, number> = {
@@ -22,6 +21,15 @@ const WIDTHS: Record<string, number> = {
   '╝': 8,
   '█': 8,
   '░': 8,
+  '▒': 8,
+  '▓': 8,
+  '─': 8,
+  '│': 8,
+  '┌': 8,
+  '└': 8,
+  '╌': 8,
+  '┄': 8,
+  '┈': 8,
   '·': 4,
   ':': 4,
   '.': 4,

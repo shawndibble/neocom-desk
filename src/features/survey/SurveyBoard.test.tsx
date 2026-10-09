@@ -83,9 +83,9 @@ describe('SurveyBoard', () => {
     const [heading, ...lines] = written[0].split('\n');
     expect(heading).toBe('Neocom Desk Report');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^╔═*\[ +ETA: \d\d:\d\d EVE \(~.*\]═*╗$/);
-    expect(lines[1]).toMatch(/^║ █+░+ +13% ║$/);
-    expect(lines[2]).toMatch(/^║ Left: 5 Clear Icicle +║$/);
+    expect(lines[0]).toMatch(/^┌─*\[ ETA: \d\d:\d\d EVE \(~.*\]─*╌┄┈$/);
+    expect(lines[1]).toMatch(/^│ █+░+ 13%$/);
+    expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
     expect(lines[3]).toContain(`[ ${URL} ]`);
     for (const line of lines) expect(textWidth(line)).toBeLessThanOrEqual(MAX_ROW_PX);
     await screen.findByText('Copied');

@@ -11,6 +11,7 @@ import { summarizeSurvey, type SurveyScan } from './series';
 const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 const URL = 'https://neocomdesk.test/survey/abc123XYZ';
+const CHARACTER_PX = textWidth('─');
 
 const labels: SurveyMessageLabels = {
   heading: 'Neocom Desk Report',
@@ -62,17 +63,22 @@ function parts(message: string): { heading: string; box: string[] } {
 const message = (scans: SurveyScan[], url = URL): { heading: string; box: string[] } =>
   parts(surveyChatMessage(summarizeSurvey(scans)!, url, labels));
 
-/** The ore row pads in 7px spaces, so its edge can sit up to half a space off the rails'. */
-const MAX_SPREAD_PX = 4;
-
-/** Pixels between the widest and narrowest row of the box. */
-const spread = (box: string[]): number => {
-  const widths = box.map(textWidth);
-  return Math.max(...widths) - Math.min(...widths);
-};
+/**
+ * The rails sit over the bar without ever being shorter than it, and less than
+ * two characters longer (the bar rounds down, the rails up); and the two rails
+ * end within a character of each other.
+ */
+function expectRailsOverBar(box: string[]): void {
+  const [top, bar, bottom] = [box[0], box[1], box[box.length - 1]].map(textWidth);
+  for (const rail of [top, bottom]) {
+    expect(rail).toBeGreaterThanOrEqual(bar);
+    expect(rail).toBeLessThan(bar + 2 * CHARACTER_PX);
+  }
+  expect(Math.abs(top - bottom)).toBeLessThan(CHARACTER_PX);
+}
 
 describe('surveyChatMessage', () => {
-  it('opens with a heading line, then a closed box of ETA, bar, ore line and link', () => {
+  it('opens with a heading line, then an ETA rail, the bar, the ore line and a link rail', () => {
     // 930 m3 mined in 900 s, 70 left at 1.0333 m3/s: about 68 s to go
     const { heading, box } = message([
       scan(0, ['Glistening Sylvite', 800], ['Glistening Bitumens', 200]),
@@ -80,24 +86,34 @@ describe('surveyChatMessage', () => {
     ]);
     expect(heading).toBe('Neocom Desk Report');
     expect(box).toHaveLength(4);
-    expect(box[0]).toMatch(/^╔═*\[ +ETA: 16:56 EVE \(~1m\) +\]═*╗$/);
-    expect(box[1]).toMatch(/^║ █+░+ +93% ║$/);
-    expect(box[2]).toMatch(/^║ Left: 2 Sylvite · 1 Bitumens +║$/);
-    expect(box[3]).toMatch(/^╚═*\[ +https:\/\/neocomdesk\.test\/survey\/abc123XYZ +\]═*╝$/);
+    expect(box[0]).toMatch(/^┌─*\[ ETA: 16:56 EVE \(~1m\) \]─*╌┄┈$/);
+    expect(box[1]).toMatch(/^│ █+░+ 93%$/);
+    expect(box[2]).toBe('│ Left: 2 Sylvite · 1 Bitumens');
+    expect(box[3]).toMatch(/^└─*\[ https:\/\/neocomdesk\.test\/survey\/abc123XYZ \]─*╌┄┈$/);
   });
 
-  it('pads every row of the box to the same pixel width, within four pixels', () => {
-    expect(spread(message([scan(0, ['A', 1000]), scan(5, ['A', 750])]).box)).toBeLessThanOrEqual(
-      MAX_SPREAD_PX
-    );
+  it('never makes a rail shorter than the content, and at most a character longer', () => {
+    const cases = [
+      // the ore line sets the width
+      [
+        scan(0, ['Brimful Zeolites', 90_000], ['Brimful Bitumens', 80_000], ['Sylvite', 70_000]),
+        scan(10, ['Brimful Zeolites', 80_000], ['Brimful Bitumens', 80_000], ['Sylvite', 60_000]),
+      ],
+      // the link sets the width
+      [scan(0, ['A', 1000]), scan(5, ['A', 750])],
+    ];
+    for (const scans of cases) {
+      const { box } = message(scans);
+      const content = Math.max(textWidth(box[1]), textWidth(box[2]));
+      for (const rail of [box[0], box[3]]) {
+        expect(textWidth(rail)).toBeGreaterThanOrEqual(content);
+        expect(textWidth(rail)).toBeLessThan(content + 2 * CHARACTER_PX);
+      }
+    }
   });
 
-  it('keeps every row of a long-named field within four pixels of one another', () => {
-    const { box } = message([
-      scan(0, ['Brimful Zeolites', 90_000], ['Brimful Bitumens', 80_000], ['Sylvite', 70_000]),
-      scan(10, ['Brimful Zeolites', 80_000], ['Brimful Bitumens', 80_000], ['Sylvite', 60_000]),
-    ]);
-    expect(spread(box)).toBeLessThanOrEqual(MAX_SPREAD_PX);
+  it('sets the rails over the bar, never shorter and at most two characters longer', () => {
+    expectRailsOverBar(message([scan(0, ['A', 1000]), scan(5, ['A', 750])]).box);
   });
 
   it('centres the ETA and the link in their rails', () => {
@@ -107,17 +123,18 @@ describe('surveyChatMessage', () => {
       [box[3], 'https:'],
     ] as const) {
       const before = textWidth(row.slice(0, row.indexOf(label)));
-      const after = textWidth(row.slice(row.lastIndexOf(']')));
-      expect(Math.abs(before - after)).toBeLessThanOrEqual(2 * textWidth('═'));
+      // everything between the label's closing bracket and the taper
+      const after = textWidth(row.slice(row.lastIndexOf(']'), -3));
+      expect(Math.abs(before - after)).toBeLessThanOrEqual(2 * CHARACTER_PX);
     }
   });
 
-  it('widens the whole box when the link is longer than the ore line', () => {
+  it('lengthens the rails and bar when the link is longer than the ore line', () => {
     const scans = [scan(0, ['A', 1000]), scan(5, ['A', 750])];
     const short = message(scans, 'https://x.test/s/a').box;
     const long = message(scans, 'https://neocomdesk.test/survey/' + 'a'.repeat(60)).box;
     expect(textWidth(long[0])).toBeGreaterThan(textWidth(short[0]) + 100);
-    expect(spread(long)).toBeLessThanOrEqual(MAX_SPREAD_PX);
+    expectRailsOverBar(long);
   });
 
   it('shows hours and minutes when long', () => {
@@ -129,20 +146,20 @@ describe('surveyChatMessage', () => {
   it('with one scan says it is waiting for a second', () => {
     const { box } = message([scan(0, ['A', 10_000])]);
     expect(box[0]).toContain('waiting for a second scan');
-    expect(box[1]).toMatch(/ 0% ║$/);
+    expect(box[1]).toMatch(/ 0%$/);
   });
 
   it('fills the bar by progress', () => {
     const { box } = message([scan(0, ['A', 1000]), scan(5, ['A', 750])]);
     const filled = box[1].match(/█/g)?.length ?? 0;
     const empty = box[1].match(/░/g)?.length ?? 0;
-    expect(box[1]).toMatch(/ 25% ║$/);
+    expect(box[1]).toMatch(/ 25%$/);
     expect(filled / (filled + empty)).toBeCloseTo(0.25, 1);
   });
 
   it('names the two biggest ores and counts the rocks of the rest as one group', () => {
     const { box } = message([scan(0, ['A', 5], ['B', 4], ['C', 3], ['D', 2], ['E', 1], ['E', 1])]);
-    expect(box[2]).toMatch(/^║ Left: 1 A · 1 B · 4 other +║$/);
+    expect(box[2]).toBe('│ Left: 1 A · 1 B · 4 other');
   });
 
   it('calls out the two ores richest per m³, with how many rocks each has', () => {
@@ -160,18 +177,18 @@ describe('surveyChatMessage', () => {
         ],
       },
     ]);
-    expect(box[2]).toMatch(/^║ Left: 5 Scordite · 4 Kernite · 35 other +║$/);
+    expect(box[2]).toBe('│ Left: 5 Scordite · 4 Kernite · 35 other');
   });
 
   it('a cleared field is a heading and three rows, the full bar and the time in the top rail', () => {
     const { heading, box } = message([scan(0, ['A', 1000]), scan(176)]);
     expect(heading).toBe('Neocom Desk Report');
     expect(box).toHaveLength(3);
-    expect(box[0]).toMatch(/^╔═*\[ +Field cleared in 2h 56m +\]═*╗$/);
-    expect(box[1]).toMatch(/^║ █+ +100% ║$/);
+    expect(box[0]).toMatch(/^┌─*\[ Field cleared in 2h 56m \]─*╌┄┈$/);
+    expect(box[1]).toMatch(/^│ █+ 100%$/);
     expect(box[1]).not.toContain('░');
     expect(box[2]).toContain(URL);
-    expect(spread(box)).toBeLessThanOrEqual(MAX_SPREAD_PX);
+    expectRailsOverBar(box);
   });
 });
 
@@ -201,7 +218,7 @@ describe('chat message width', () => {
     ]);
     expect(box).toHaveLength(4);
     expect(textWidth(box[2])).toBeLessThanOrEqual(MAX_ROW_PX);
-    expect(box[2]).toMatch(/^║ Left: .* · \d+ other +║$/);
+    expect(box[2]).toMatch(/^│ Left: .* · \d+ other$/);
   });
 
   it('never drops the biggest ore, even when its name alone is long', () => {

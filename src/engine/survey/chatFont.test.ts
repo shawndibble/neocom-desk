@@ -14,7 +14,7 @@ describe('textWidth', () => {
   });
 
   it('measures the box and block characters at 8px and a space at 7px', () => {
-    for (const c of '═║█░╔╗╚╝') expect(textWidth(c)).toBe(8);
+    for (const c of '═║█░▒▓╔╗╚╝─│┌└╌┄┈') expect(textWidth(c)).toBe(8);
     expect(textWidth(' ')).toBe(7);
   });
 

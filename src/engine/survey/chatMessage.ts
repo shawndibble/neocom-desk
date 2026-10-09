@@ -26,82 +26,38 @@ export interface SurveyMessageLabels {
 }
 
 /**
- * The frame: a closed box. The ETA is set into the top rail and the link into
- * the bottom one, each centred; the bar and the ore line sit between `║` rails.
+ * The frame: an open box. The ETA is set into the top rail and the link into the
+ * bottom one, each centred; the bar and the ore line sit beside a `║` rail on the
+ * left. Nothing closes the right side: chat draws a proportional font, so a right
+ * edge never lined up. Each rail tapers off (`╌┄┈`) instead.
  *
- * Chat draws a proportional font (an `i` is 4px, an `m` 10px), so the rows are
- * padded to one pixel width using the measured character widths in
- * `chatFont.ts`, not to one character count. Padding comes in steps (a `═` or
- * `█` is 8px, a space 7px), so a row can end a pixel or two short of the box;
- * the width picked is the one where the worst row is closest.
+ * A rail is never shorter than the content under it, and at most a character
+ * longer: it is as long as the ore line, or as the link's rail when that is
+ * longer, rounded up to a whole `─`. The bar rounds the other way, so it never
+ * outruns the rails. Lengths are measured in pixels with the widths in
+ * `chatFont.ts` (an `i` is 4px, an `m` 10px), not counted in characters.
  */
-const SIDE_LEFT = '║ ';
-const SIDE_RIGHT = ' ║';
-const SIDE_PX = textWidth(SIDE_LEFT + SIDE_RIGHT);
-const RAIL_CHAR = '═';
+const SIDE = '│ ';
+const SIDE_PX = textWidth(SIDE);
+const RAIL_CHAR = '─';
 const RAIL_PX = textWidth(RAIL_CHAR);
 const BLOCK_PX = textWidth('█');
 const SPACE_PX = textWidth(' ');
-/** A rail without its fill or label: two corners, two brackets, a space inside each bracket. */
-const RAIL_FRAME_PX = textWidth('╔[  ]╗');
+const TAPER = '╌┄┈';
+/** A rail without its fill or label: the corner, the label's brackets with a space inside each, the taper. */
+const RAIL_FRAME_PX = textWidth('┌[  ]' + TAPER);
 /** Fewest cells the bar may shrink to. */
 const MIN_BAR_CELLS = 10;
-/** Spaces a row may borrow from its fill to land closer to the box width; more would read as gaps. */
-const MAX_EXTRA_SPACES = 1;
 
-interface GapFit {
-  units: number;
-  spaces: number;
-  error: number;
-}
+/** How many `unit`-wide characters cover `gap` px, rounded by `round`; never negative. */
+const unitsFor = (gap: number, unit: number, round: (n: number) => number): number =>
+  Math.max(0, round(gap / unit));
 
-/** Cover `gap` px with `unit`-wide characters and a few spaces, as closely as the pixel steps allow. */
-function fitGap(gap: number, unit: number): GapFit {
-  let best: GapFit = { units: 0, spaces: 0, error: Infinity };
-  for (let spaces = 0; spaces <= MAX_EXTRA_SPACES; spaces++) {
-    const rest = gap - spaces * SPACE_PX;
-    if (rest < 0) break;
-    const floor = Math.floor(rest / unit);
-    for (const units of [floor, floor + 1]) {
-      const error = Math.abs(gap - units * unit - spaces * SPACE_PX);
-      if (error < best.error) best = { units, spaces, error };
-    }
-  }
-  return best;
-}
-
-/** Split a fit over a label's two sides so the label sits as near the middle as the pixels allow. */
-function splitAround(fit: GapFit): [GapFit, GapFit] {
-  let best: [GapFit, GapFit] = [fit, { units: 0, spaces: 0, error: 0 }];
-  let bestImbalance = Infinity;
-  for (let units = 0; units <= fit.units; units++) {
-    for (let spaces = 0; spaces <= fit.spaces; spaces++) {
-      const left = units * RAIL_PX + spaces * SPACE_PX;
-      const right = (fit.units - units) * RAIL_PX + (fit.spaces - spaces) * SPACE_PX;
-      if (Math.abs(left - right) < bestImbalance) {
-        bestImbalance = Math.abs(left - right);
-        best = [
-          { units, spaces, error: 0 },
-          { units: fit.units - units, spaces: fit.spaces - spaces, error: 0 },
-        ];
-      }
-    }
-  }
-  return best;
-}
-
-/** `╔═══[ label ]═══╗`, `width` px wide as far as the pixel steps allow, label centred. */
-function rail(corners: readonly [string, string], label: string, width: number): string {
-  const fit = fitGap(width - RAIL_FRAME_PX - textWidth(label), RAIL_PX);
-  const [a, b] = splitAround(fit);
-  const side = (part: GapFit): string => RAIL_CHAR.repeat(part.units);
-  return `${corners[0]}${side(a)}[${' '.repeat(1 + a.spaces)}${label}${' '.repeat(1 + b.spaces)}]${side(b)}${corners[1]}`;
-}
-
-/** A row between the side rails, padded with spaces toward `width`. */
-function boxRow(content: string, width: number): string {
-  const pad = Math.max(0, Math.round((width - SIDE_PX - textWidth(content)) / SPACE_PX));
-  return `${SIDE_LEFT}${content}${' '.repeat(pad)}${SIDE_RIGHT}`;
+/** `┌───[ label ]───╌┄┈`, at least `width` px long and under a character more, label centred. */
+function rail(corner: string, label: string, width: number): string {
+  const fill = unitsFor(width - RAIL_FRAME_PX - textWidth(label), RAIL_PX, Math.ceil);
+  const before = Math.floor(fill / 2);
+  return `${corner}${RAIL_CHAR.repeat(before)}[ ${label} ]${RAIL_CHAR.repeat(fill - before)}${TAPER}`;
 }
 
 /**
@@ -110,11 +66,12 @@ function boxRow(content: string, width: number): string {
  */
 function barRow(percent: number, finished: boolean, width: number): string {
   const tail = `${percent}%`;
-  const fit = fitGap(width - SIDE_PX - SPACE_PX - textWidth(tail), BLOCK_PX);
-  const cells = Math.max(fit.units, MIN_BAR_CELLS);
+  const cells = Math.max(
+    unitsFor(width - SIDE_PX - SPACE_PX - textWidth(tail), BLOCK_PX, Math.floor),
+    MIN_BAR_CELLS
+  );
   const filled = finished ? cells : Math.floor((percent * cells) / 100);
-  const bar = '█'.repeat(filled) + '░'.repeat(cells - filled);
-  return `${SIDE_LEFT}${bar}${' '.repeat(1 + fit.spaces)}${tail}${SIDE_RIGHT}`;
+  return `${SIDE}${'█'.repeat(filled)}${'░'.repeat(cells - filled)} ${tail}`;
 }
 
 /**
@@ -253,9 +210,8 @@ function oreLine(
 }
 
 /**
- * The box's four rows (three for a cleared field, which has no ore line): the
- * narrowest width that holds them all, nudged up to the first width where the
- * worst row lands closest to it.
+ * The box's rows (three for a cleared field, which has no ore line), all as long
+ * as the longest of: the ore row, and each rail holding its label.
  */
 function box(
   headline: string,
@@ -264,44 +220,17 @@ function box(
   ore: string | null,
   url: string
 ): string[] {
-  const tail = `${percent}%`;
-  const barGap = (width: number): number => width - SIDE_PX - SPACE_PX - textWidth(tail);
-  const oreGap = (width: number): number => width - SIDE_PX - textWidth(ore ?? '');
-  const railError = (label: string) => (width: number) =>
-    fitGap(width - RAIL_FRAME_PX - textWidth(label), RAIL_PX).error;
-
-  const errors = [
-    railError(headline),
-    railError(url),
-    (width: number) => fitGap(barGap(width), BLOCK_PX).error,
-    ...(ore === null
-      ? []
-      : [
-          (width: number) =>
-            Math.abs(oreGap(width) - SPACE_PX * Math.round(oreGap(width) / SPACE_PX)),
-        ]),
-  ];
-  const minWidth = Math.max(
+  const width = Math.max(
     RAIL_FRAME_PX + textWidth(headline),
     RAIL_FRAME_PX + textWidth(url),
-    SIDE_PX + SPACE_PX + textWidth(tail) + MIN_BAR_CELLS * BLOCK_PX,
+    SIDE_PX + SPACE_PX + textWidth(`${percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
     ore === null ? 0 : SIDE_PX + textWidth(ore)
   );
-  let width = minWidth;
-  let worst = Infinity;
-  for (let candidate = minWidth; candidate < minWidth + 2 * RAIL_PX; candidate++) {
-    const error = Math.max(...errors.map((errorAt) => errorAt(candidate)));
-    if (error < worst) {
-      worst = error;
-      width = candidate;
-    }
-  }
-
   return [
-    rail(['╔', '╗'], headline, width),
+    rail('┌', headline, width),
     barRow(percent, finished, width),
-    ...(ore === null ? [] : [boxRow(ore, width)]),
-    rail(['╚', '╝'], url, width),
+    ...(ore === null ? [] : [SIDE + ore]),
+    rail('└', url, width),
   ];
 }
 
