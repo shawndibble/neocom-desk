@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   loadPilotList: vi.fn(),
   syncConfigured: true,
   here: { space: 'highsec' as KillSpace | null },
+  phone: false,
 }));
+vi.mock('@/lib/useIsPhone', () => ({ useIsPhone: () => mocks.phone }));
 vi.mock('./pilotListData', () => ({
   loadPilotList: mocks.loadPilotList,
   loadViewerContext: () => Promise.resolve({}),
@@ -92,6 +94,7 @@ describe('PilotListView (Local list)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.here.space = 'highsec';
+    mocks.phone = false;
     mocks.loadPilotList.mockImplementation(
       (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
         onRows(ROWS);
@@ -136,6 +139,20 @@ describe('PilotListView (Local list)', () => {
       'bg-danger!'
     );
     expect(rowOf('Sleeper')?.className).not.toContain('border-l-danger!');
+  });
+
+  it('draws each pilot as a card on a phone: badge, big kill count and kills by space', async () => {
+    mocks.phone = true;
+    renderList();
+    const list = await screen.findByRole('list', { name: 'Killed in highsec, last 30 days' });
+    expect(screen.queryByRole('table')).toBeNull();
+    const card = within(list).getByText('Gankerton').closest('li');
+    expect(card).not.toBeNull();
+    const inCard = within(card as HTMLElement);
+    expect(inCard.getAllByText('2').length).toBeGreaterThan(0);
+    expect(inCard.getByText('Kills, 30 days')).toBeTruthy();
+    expect(inCard.getByText('Highsec')).toBeTruthy();
+    expect(inCard.getByText('Low threat')).toBeTruthy();
   });
 
   it('groups pilots by what they mean to you, in a fixed order', async () => {

@@ -45,12 +45,14 @@ import { createShareLink, existingShareLink } from '@/features/share/shareStore'
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
 import type { PilotPaste } from '@/engine/pilotList/parsePilotPaste';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FleetBoard } from './FleetBoard';
 import { loadPilotList, loadViewerContext, type PilotListRow } from './pilotListData';
 import { rowThreat } from './rowThreat';
+import { PilotCard } from './PilotCard';
 import { ThreatBadge } from './ThreatBadge';
 import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS } from './threatTone';
 import { PilotStandingTag } from './PilotStandingTag';
@@ -105,6 +107,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   const [hullNames, setHullNames] = useState<Map<number, string>>(new Map());
   const [showFriendly, setShowFriendly] = useState(false);
   const now = useNow();
+  const isPhone = useIsPhone();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -240,19 +243,49 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     },
   ];
 
-  const table = (id: PilotGroupId, list: PilotListRow[]) => (
-    <DataTable
-      label={groupTitle(id, t, here.space)}
-      columns={columns}
-      rows={list}
-      rowKey={(row) => row.name}
-      rowClassName={(row) => {
-        const threat = rowThreat(row, now);
-        return threat === null ? undefined : THREAT_ROW_CLASS[THREAT_LEVEL_TONE[threat]];
-      }}
-      responsive="stack"
-    />
-  );
+  const flewOf = (row: PilotListRow): string | null => {
+    if (row.kills.kind !== 'ready') return null;
+    const hulls = topShips(
+      recentKills(row, now).map((kill) => kill.ownShipTypeId),
+      ROW_HULLS
+    );
+    return hulls.length === 0
+      ? null
+      : hulls
+          .map(
+            (hull) =>
+              hullNames.get(hull.shipTypeId) ?? t('common.unknownType', { id: hull.shipTypeId })
+          )
+          .join(', ');
+  };
+
+  const table = (id: PilotGroupId, list: PilotListRow[]) =>
+    isPhone ? (
+      <ul aria-label={groupTitle(id, t, here.space)} className="space-y-2">
+        {list.map((row) => (
+          <PilotCard
+            key={row.name}
+            row={row}
+            threat={rowThreat(row, now)}
+            spaces={spaces}
+            flew={flewOf(row)}
+            now={now}
+          />
+        ))}
+      </ul>
+    ) : (
+      <DataTable
+        label={groupTitle(id, t, here.space)}
+        columns={columns}
+        rows={list}
+        rowKey={(row) => row.name}
+        rowClassName={(row) => {
+          const threat = rowThreat(row, now);
+          return threat === null ? undefined : THREAT_ROW_CLASS[THREAT_LEVEL_TONE[threat]];
+        }}
+        responsive="stack"
+      />
+    );
 
   return (
     <Panel>

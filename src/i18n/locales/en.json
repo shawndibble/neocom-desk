@@ -9075,6 +9075,7 @@
         "pilot": "Pilot",
         "standing": "Your standing",
         "flew": "Flew on kills",
+        "killsLabel": "Kills, 30 days",
         "progress": "Loading zKillboard, {{done}} of {{total}}",
         "stateLoading": "Loading…",
         "stateUnreachable": "zKillboard couldn't be reached",
