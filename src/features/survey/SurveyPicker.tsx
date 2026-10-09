@@ -81,7 +81,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       open={open}
       onOpenChange={setOpen}
     >
-      <SelectTrigger size="sm" aria-label={t('survey.historyLabel')} className="w-full sm:w-72">
+      <SelectTrigger size="sm" aria-label={t('survey.historyLabel')} className="w-56 max-w-full">
         <SelectValue placeholder={t('survey.historyPlaceholder')} />
       </SelectTrigger>
       <SelectContent>

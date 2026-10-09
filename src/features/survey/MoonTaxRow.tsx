@@ -2,8 +2,9 @@
  * Moon ore is taxed by whoever owns the moon, so a Survey that shows any asks
  * who and at what rate, and hands both to the Moon Mining Tax tab. It sits in
  * its own panel under Field progress and reads as one line of text, "8% to
- * Moon Corp"; clicking the rate or the name turns just that part into a field
- * (Enter or leaving it saves). The name completes from the pilot's Payees (and
+ * Moon Corp"; clicking the rate or the name turns both into fields (the one
+ * clicked has focus), since a rate means little without its payee. Enter, or
+ * focus leaving the pair, saves. The name completes from the pilot's Payees (and
  * fills in that Payee's rate), and the link opens the Tax tab, where the ledger
  * shows what is owed once the ore is in it.
  *
@@ -12,7 +13,7 @@
  * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
  * the link sees it.
  */
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -53,6 +54,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Which field was clicked: both show while editing, and this one takes focus.
   const [editing, setEditing] = useState<'name' | 'pct' | null>(null);
   const inFlight = useRef(false);
 
@@ -101,8 +103,13 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
     }
   }
 
+  // Focus moving between the two fields keeps editing; only leaving the pair ends it.
   const stopEditing = {
-    onBlur: () => setEditing(null),
+    onBlur: (event: FocusEvent<HTMLInputElement>) => {
+      if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
+        setEditing(null);
+      }
+    },
     onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter' || event.key === 'Escape') setEditing(null);
     },
@@ -111,11 +118,14 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   return (
     <Panel title={t('survey.moonTax.label')}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold">
-          {editing === 'pct' ? (
+        <div
+          data-tax-fields
+          className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold"
+        >
+          {editing !== null ? (
             <span className="flex items-center gap-1">
               <TextInput
-                autoFocus
+                autoFocus={editing === 'pct'}
                 size="sm"
                 inputMode="decimal"
                 aria-label={t('survey.moonTax.rate')}
@@ -140,10 +150,10 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
             </button>
           )}
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
-          {editing === 'name' ? (
+          {editing !== null ? (
             <>
               <TextInput
-                autoFocus
+                autoFocus={editing === 'name'}
                 size="sm"
                 list={listId}
                 aria-label={t('survey.moonTax.payee')}
