@@ -187,7 +187,7 @@ export function ZkillRatioMeters({ stats }: { stats: PilotStats }) {
   const killer = killerRatio(stats);
   if (stats.dangerRatio === null && stats.gangRatio === null && killer === null) return null;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
       {stats.dangerRatio !== null && (
         <RatioMeter
           label={t('travel.pilot.dangerMeter')}

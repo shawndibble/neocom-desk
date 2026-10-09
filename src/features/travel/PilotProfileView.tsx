@@ -115,13 +115,10 @@ export function PilotProfileView(props: PilotProfileViewProps) {
 export default PilotProfileView;
 
 /**
- * The Corporation and Alliance links are this page's only way into those orgs,
- * side by side on one line: a 44px hit area on a phone, no overhang to overlap
- * when the two wrap onto separate rows (#2520).
+ * The compact header: the portrait, then name and badge, corporation and alliance, and a facts line.
+ * Its links stay text height on a phone: the header is three tight lines beside a portrait, and a 44px
+ * box around each one pushed them apart more than it helped a thumb (see DESIGN.md "Touch tier").
  */
-const identityLinkClassName = 'inline-flex min-h-11 items-center md:min-h-0';
-
-/** The compact header: the portrait, then name and badge, corporation and alliance, and a facts line. */
 function PilotIdentity({
   profile,
   onOpenCorporation,
@@ -152,15 +149,13 @@ function PilotIdentity({
           {onOpenCorporation ? (
             <button
               type="button"
-              className={entityLinkClassName(identityLinkClassName)}
+              className={entityLinkClassName()}
               onClick={() => onOpenCorporation(profile.corporationId)}
             >
               {corporationLabel}
             </button>
           ) : (
-            <CorporationLink id={profile.corporationId} className={identityLinkClassName}>
-              {corporationLabel}
-            </CorporationLink>
+            <CorporationLink id={profile.corporationId}>{corporationLabel}</CorporationLink>
           )}
           <span aria-hidden className="text-text-dim">
             ·
@@ -171,15 +166,13 @@ function PilotIdentity({
           ) : onOpenAlliance ? (
             <button
               type="button"
-              className={entityLinkClassName(identityLinkClassName)}
+              className={entityLinkClassName()}
               onClick={() => onOpenAlliance(allianceId)}
             >
               {allianceLabel(allianceId)}
             </button>
           ) : (
-            <AllianceLink id={allianceId} className={identityLinkClassName}>
-              {allianceLabel(allianceId)}
-            </AllianceLink>
+            <AllianceLink id={allianceId}>{allianceLabel(allianceId)}</AllianceLink>
           )}
         </p>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim">
@@ -202,10 +195,7 @@ function PilotIdentity({
                   })}
             </b>
           </span>
-          <ExternalLink
-            href={characterZkillUrl(profile.characterId)}
-            className="inline-flex min-h-11 items-center md:min-h-0"
-          >
+          <ExternalLink href={characterZkillUrl(profile.characterId)}>
             {t('travel.pilot.zkillboard')}
           </ExternalLink>
         </p>

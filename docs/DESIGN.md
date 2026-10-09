@@ -310,6 +310,12 @@ shape has to be carried into them by hand.
   page hard to tap. So the scale is **`sm` = `h-9 md:h-7 touch:h-9`, `md` =
   `h-11 md:h-9 touch:h-11`** — pointer users never get the 44px box, touch users never get the
   36px one.
+  **Exception: a link inside a dense identity block stays text height.** The pilot
+  profile's header (corporation and alliance, the zKillboard link) is three tight
+  lines beside a portrait; a 44px box around each link spread them apart and
+  hid the portrait's neighbours more than it helped a thumb. They keep the
+  text line (`#2520` first gave them 44px; this reverses that). It is an
+  exception for that header, not for a link in a table row or a button.
 - **The scale lives in one file.** `src/components/ui/controlStyles.ts` holds
   it, and every interactive control reads from it: `Button`, `IconButton`,
   `FilterChip`, `TextInput`, `SearchInput`, `NativeSelect`, `SelectTrigger`.

@@ -4,8 +4,8 @@
  * - A Recent kills and losses row cut the other pilot's name to ~9
  *   characters ("Victim: Aurelianu…"), with nowhere else on the page to read
  *   it: below `sm` the name now takes the row's last line of its own.
- * - The identity header's Corporation and Alliance links, the only way into
- *   those orgs from this page, were 20px targets 2px apart: 44px on a phone.
+ * - The identity header's Corporation and Alliance links were once 44px
+ *   targets; they are text height again, and must not overlap when they wrap.
  *
  * The looked-up pilot is the signed-in fixture character, whose public info,
  * corporation and alliance the shared ESI mock already answers. zKillboard
@@ -108,7 +108,7 @@ function killmailRow(page: Page) {
 }
 
 test.describe('Pilot Lookup at 390px', () => {
-  test('the victim name shows in full and the org links are 44px targets', async ({ page }) => {
+  test('the victim name shows in full and the org links do not overlap', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openPilot(page);
 
@@ -116,15 +116,13 @@ test.describe('Pilot Lookup at 390px', () => {
     const fits = await nameSpan.evaluate((el) => el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
 
-    const corporation = page.getByRole('link', { name: LONG_CORPORATION_NAME });
-    const alliance = page.getByRole('link', { name: ALLIANCE_NAME });
-    const corpBox = await corporation.boundingBox();
-    const allianceBox = await alliance.boundingBox();
+    // The header's links stay text height (DESIGN.md "Touch tier"): they sit on
+    // one line when they fit and wrap onto two when they do not, and either way
+    // neither covers the other.
+    const corpBox = await page.getByRole('link', { name: LONG_CORPORATION_NAME }).boundingBox();
+    const allianceBox = await page.getByRole('link', { name: ALLIANCE_NAME }).boundingBox();
     if (corpBox === null || allianceBox === null) throw new Error('org links not laid out');
-    expect(corpBox.height).toBeGreaterThanOrEqual(44);
-    expect(allianceBox.height).toBeGreaterThanOrEqual(44);
-    // The two sit on one line when they fit and wrap onto two when they do not;
-    // either way neither covers the other.
+    expect(corpBox.height).toBeLessThan(44);
     const apart =
       corpBox.y + corpBox.height <= allianceBox.y || corpBox.x + corpBox.width <= allianceBox.x;
     expect(apart).toBe(true);

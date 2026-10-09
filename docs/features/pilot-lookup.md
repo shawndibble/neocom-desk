@@ -179,7 +179,7 @@ Folder is `features/travel/` for history only (page left Travel, `20261002-14565
 ## Mobile vs desktop
 
 - Page `max-w-6xl`; search input `w-72 max-w-full`. Stat tiles 6 columns from `md`, 2-3 below; ratio meters side by side, stacked on phone; top ships half width on desktop (`md:w-1/2`).
-- Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links 44 px tall on phone (#2520).
+- Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links stay text height on a phone (they were 44 px tall in #2520; the compact header dropped that).
 - No separate mobile layout for search; `mobileTab: true` puts the page in the phone tab bar's More area.
 
 ## Permissions
