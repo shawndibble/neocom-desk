@@ -123,6 +123,24 @@ describe('YieldDetailModal', () => {
     expect(within(gas).getAllByText('—')).toHaveLength(2);
   });
 
+  it('shows an em dash in both summary tiles when nothing on the day is priced (#3095)', () => {
+    const base = row();
+    renderModal(
+      row({ valuation: { ...base.valuation, rawValue: 0, refineValue: 0, pricedAll: false } })
+    );
+    const sellRaw = screen.getByText('Sell raw').closest('div') as HTMLElement;
+    const refine = screen.getByText('Refine, then sell').closest('div') as HTMLElement;
+    expect(within(sellRaw).getByText('—')).toBeInTheDocument();
+    expect(within(refine).getByText('—')).toBeInTheDocument();
+  });
+
+  it('keeps the figures on a partly priced day (#3095)', () => {
+    renderModal();
+    const sellRaw = screen.getByText('Sell raw').closest('div') as HTMLElement;
+    expect(within(sellRaw).queryByText('—')).not.toBeInTheDocument();
+    expect(within(sellRaw).getByText(/1,000/)).toBeInTheDocument();
+  });
+
   it('keeps both tables plain tables on a phone (compare across columns)', () => {
     renderModal();
     // The stacked-card layout lives in stylesheet rules jsdom never loads, so

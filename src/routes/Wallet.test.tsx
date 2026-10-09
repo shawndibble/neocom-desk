@@ -191,7 +191,7 @@ describe('Wallet', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/Paragon corporation/);
   });
 
-  it('shows the empty state under Loyalty Points when there is no non-EverMarks LP', async () => {
+  it('collapses to one muted line (no panel) when there is no non-EverMarks LP', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
         HttpResponse.json([{ corporation_id: 1000419, loyalty_points: 250 }])
@@ -199,7 +199,9 @@ describe('Wallet', () => {
     );
     render(<App />);
     expect(await screen.findByText('250')).toBeInTheDocument();
-    expect(screen.getByText(/^no loyalty points$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^loyalty points: none/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Loyalty Points' })).not.toBeInTheDocument();
+    expect(screen.getByText('Select an LP Store')).toBeInTheDocument();
   });
 
   it('shows a re-login prompt under Loyalty Points (not the wallet reauth) when the loyalty scope was revoked', async () => {
@@ -283,7 +285,7 @@ describe('Wallet', () => {
   it('links the personal Journal header to Market › History › Transactions (issue #1749)', async () => {
     window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
-    const link = await screen.findByRole('link', { name: 'Transactions →' });
+    const link = await screen.findByRole('link', { name: 'Transactions' });
     expect(link).toHaveAttribute('href', '/market/history/transactions');
     // Rests in the accent colour so it reads as a link (issue #2019).
     expect(link).toHaveClass('text-accent');

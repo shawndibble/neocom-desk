@@ -5,7 +5,7 @@
  * and one column-visibility store, so hiding a column on one hides it on the
  * other.
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
@@ -28,6 +28,7 @@ import {
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
+import { useJournalBreakdownPref } from '@/features/character/journalBreakdownPref';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
@@ -159,9 +160,17 @@ export function JournalTable({
 }: JournalTableProps) {
   const { t } = useTranslation();
   const breakdown = useMemo(() => journalRefTypeBreakdown(breakdownJournal), [breakdownJournal]);
-  // Open on desktop, folded on a phone where the headline alone answers the question.
+  // Open on desktop, folded on a phone where the headline alone answers the
+  // question — until the pilot toggles it, then their choice sticks.
   const isNarrow = useIsNarrow();
-  const [breakdownOpen, setBreakdownOpen] = useState(!isNarrow);
+  const storedBreakdownOpen = useJournalBreakdownPref((state) => state.value);
+  const breakdownPrefHydrated = useJournalBreakdownPref((state) => state.hydrated);
+  const hydrateBreakdownOpen = useJournalBreakdownPref((state) => state.hydrate);
+  const setStoredBreakdownOpen = useJournalBreakdownPref((state) => state.setValue);
+  useEffect(() => {
+    void hydrateBreakdownOpen();
+  }, [hydrateBreakdownOpen]);
+  const breakdownOpen = storedBreakdownOpen ?? !isNarrow;
   const breakdownColumns = useMemo<DataTableColumn<RefTypeBreakdownRow>[]>(
     () => [
       {
@@ -260,11 +269,12 @@ export function JournalTable({
           />
         }
       />
-      {breakdown.rows.length > 0 && (
+      {/* Held back until the stored choice has loaded, so a pilot who folded it never sees it flash open. */}
+      {breakdown.rows.length > 0 && breakdownPrefHydrated && (
         <CollapsiblePanel
           title={t('wallet.journalBreakdownTitle')}
           expanded={breakdownOpen}
-          onToggle={() => setBreakdownOpen((open) => !open)}
+          onToggle={() => void setStoredBreakdownOpen(!breakdownOpen)}
           labels={{
             show: t('wallet.journalBreakdownShow'),
             hide: t('wallet.journalBreakdownHide'),
