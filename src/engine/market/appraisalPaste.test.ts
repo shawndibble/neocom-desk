@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { countPasteLines, parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { countPasteLines, parseAppraisalPaste, pasteBoxRows } from '@/engine/market/appraisalPaste';
 
 describe('countPasteLines', () => {
   it('counts the lines the parser would read, skipping blanks', () => {
@@ -19,6 +19,26 @@ describe('countPasteLines', () => {
   it('counts nothing in empty or whitespace-only text', () => {
     expect(countPasteLines('')).toBe(0);
     expect(countPasteLines('  \n\n \t \n')).toBe(0);
+  });
+});
+
+describe('pasteBoxRows', () => {
+  const lines = (n: number) => Array.from({ length: n }, (_, i) => `Item ${i}`).join('\n');
+
+  it('keeps the placeholder visible in an empty box', () => {
+    expect(pasteBoxRows('')).toBe(6);
+    expect(pasteBoxRows('  \n ')).toBe(6);
+  });
+
+  it('gives short pastes one spare row, never fewer than four', () => {
+    expect(pasteBoxRows(lines(1))).toBe(4);
+    expect(pasteBoxRows(lines(3))).toBe(4);
+    expect(pasteBoxRows(lines(6))).toBe(7);
+  });
+
+  it('stops growing at fourteen rows', () => {
+    expect(pasteBoxRows(lines(13))).toBe(14);
+    expect(pasteBoxRows(lines(40))).toBe(14);
   });
 });
 
