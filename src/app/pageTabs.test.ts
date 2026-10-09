@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isTabRedirectPath, pageKeyFor, routePatternFor, tabbedPagePathFor } from './pageTabs';
+import {
+  isTabRedirectPath,
+  pageKeyFor,
+  PAGE_LEGACY_LOCATIONS,
+  routePatternFor,
+  tabbedPagePathFor,
+} from './pageTabs';
 
 describe('routePatternFor', () => {
   it('mounts a tabbed page with a splat and leaves the rest alone', () => {
@@ -46,7 +52,7 @@ describe('pageKeyFor', () => {
 
   it('passes everything else through', () => {
     expect(pageKeyFor('/contactsx')).toBe('/contactsx');
-    expect(pageKeyFor('/assets/60003760')).toBe('/assets/60003760');
+    expect(pageKeyFor('/assets60003760')).toBe('/assets60003760');
   });
 });
 
@@ -130,5 +136,27 @@ describe('Settings index state', () => {
     expect(isTabRedirectPath('/settings/nope')).toBe(true);
     vi.stubGlobal('window', { matchMedia: (media: string) => ({ media, matches: true }) });
     expect(isTabRedirectPath('/settings')).toBe(true);
+  });
+});
+
+describe('Assets (Items, Ships, Move)', () => {
+  it('keeps every drill-down level inside the Items tab, so it never fades or redirects', () => {
+    expect(pageKeyFor('/assets/items/60003760/i:5')).toBe('/assets');
+    expect(isTabRedirectPath('/assets/items/60003760/i:5')).toBe(false);
+    expect(tabbedPagePathFor('/assets/items/60003760/i:5')).toBe('/assets/items');
+    expect(pageKeyFor('/assets/ships')).toBe('/assets');
+    expect(tabbedPagePathFor('/assets/move')).toBe('/assets/move');
+  });
+
+  it('treats the bare page and a pre-tabs drill-down as redirects', () => {
+    expect(isTabRedirectPath('/assets')).toBe(true);
+    expect(isTabRedirectPath('/assets/60003760')).toBe(true);
+  });
+
+  it('moves old links where they now live', () => {
+    expect(PAGE_LEGACY_LOCATIONS['/assets']?.('/assets/60003760', '')).toEqual({
+      pathname: '/assets/items/60003760',
+      search: '',
+    });
   });
 });

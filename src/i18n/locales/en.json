@@ -4518,8 +4518,12 @@
     "saveFailed": "Couldn’t save — nothing was changed. Try again."
   },
   "assets": {
+    "tabs": {
+      "items": "Items",
+      "ships": "Ships",
+      "move": "Move"
+    },
     "movePlan": {
-      "menuItem": "Plan a move…",
       "title": "Plan a move",
       "loading": "Reading the assets…",
       "failed": "Could not read assets.",
@@ -4697,7 +4701,6 @@
     },
     "myShips": {
       "title": "My ships",
-      "hint": "nearest first",
       "loading": "Loading ships…",
       "error": "Could not read your ships.",
       "emptyTitle": "No ships found",
@@ -4705,7 +4708,6 @@
       "showAllCharacters": "Show all characters",
       "inCargo": "In cargo",
       "here": "Here",
-      "summary": "{{ships}} across {{characters}} · nearest first",
       "unknownType": "Type #{{id}}",
       "searchLabel": "Search ships",
       "searchPlaceholder": "Ship, hull or location",

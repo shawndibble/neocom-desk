@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -54,14 +55,14 @@ function Probe() {
   );
 }
 
-function renderAt(initial: string) {
+function renderAt(initial: string, legacy?: ComponentProps<typeof TabRoute>['legacy']) {
   return render(
     <MemoryRouter initialEntries={['/elsewhere', initial]} initialIndex={1}>
       <Routes>
         <Route
           path="/page/*"
           element={
-            <TabRoute page={PAGE}>
+            <TabRoute page={PAGE} legacy={legacy}>
               <Page />
             </TabRoute>
           }
@@ -95,6 +96,21 @@ describe('TabRoute', () => {
     renderAt('/page/two');
     expect(probe()).toBe('/page/two|POP|false');
     expect(screen.getByTestId('tab')).toHaveTextContent('two');
+  });
+});
+
+describe('TabRoute legacy locations', () => {
+  const legacy = (pathname: string, search: string) =>
+    pathname === '/page/old' ? { pathname: '/page/two', search } : null;
+
+  it('replaces a moved path with its new home instead of the default tab', () => {
+    renderAt('/page/old?q=1#x', legacy);
+    expect(probe()).toBe('/page/two?q=1#x|REPLACE|false');
+  });
+
+  it('still defaults a path the page never moved', () => {
+    renderAt('/page/nope', legacy);
+    expect(probe()).toBe('/page/one|REPLACE|true');
   });
 });
 

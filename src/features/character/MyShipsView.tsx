@@ -1,15 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  EmptyState,
-  RowCaret,
-  SearchInput,
-  SlideOver,
-  Spinner,
-  TypeIcon,
-} from '@/components/ui';
+import { Button, EmptyState, RowCaret, SearchInput, Spinner, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
@@ -175,14 +167,10 @@ function usePlaces(
   return { places, systemOf };
 }
 
-interface MyShipsPanelProps {
-  open: boolean;
-  onClose: () => void;
+interface MyShipsViewProps {
   /** The Character filter, already resolved to the Characters whose ships to list. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
-  /** The page's Character filter control; absent for a one-Character account. */
-  filterControl?: ReactNode;
   /** Set while the filter reads "This character" and there are more Characters to show. */
   onShowAllCharacters?: () => void;
   /** Where a ship's location opens in the Assets browser. */
@@ -225,23 +213,19 @@ function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string
 
 /**
  * My ships (issue #2853): every ship the chosen Characters own, nearest
- * first. Opened from the Assets page's Tools menu, backed by `?view=ships`.
+ * first. The Assets page's Ships tab (`/assets/ships`).
  */
-export function MyShipsPanel({
-  open,
-  onClose,
+export function MyShipsView({
   characterIds,
   activeCharacterId,
-  filterControl,
   onShowAllCharacters,
   hrefFor,
   route,
-}: MyShipsPanelProps) {
+}: MyShipsViewProps) {
   const { t } = useTranslation();
   const idsKey = [...characterIds].sort((a, b) => a - b).join(',');
   const [state, setState] = useState<ShipsState>({ status: 'loading' });
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new filter restarts the read
     setState({ status: 'loading' });
@@ -256,10 +240,10 @@ export function MyShipsPanel({
     return () => {
       cancelled = true;
     };
-  }, [open, idsKey]);
+  }, [idsKey]);
 
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
-  const { places, systemOf } = usePlaces(open ? rows : [], activeCharacterId, route);
+  const { places, systemOf } = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
     () =>
       state.status === 'ready'
@@ -270,7 +254,7 @@ export function MyShipsPanel({
         : [],
     [state, rows]
   );
-  const shipClasses = useShipClasses(open ? groupIds : []);
+  const shipClasses = useShipClasses(groupIds);
   const [sort, setSort] = useState<{ column: SortColumn; direction: 'asc' | 'desc' }>({
     column: 'jumps',
     direction: 'asc',
@@ -323,16 +307,12 @@ export function MyShipsPanel({
     );
 
   return (
-    <SlideOver
-      open={open}
-      onClose={onClose}
-      title={t('assets.myShips.title')}
-      closeOnBack={false}
-      wide
+    <section
+      aria-label={t('assets.myShips.title')}
+      className="min-h-0 flex-1 overflow-y-auto rounded-xs border border-line bg-panel"
     >
       <div className="flex flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          {filterControl}
           <SearchInput
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -476,6 +456,6 @@ export function MyShipsPanel({
           </div>
         )}
       </div>
-    </SlideOver>
+    </section>
   );
 }

@@ -34,7 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
 import { TabRoute } from './TabRoute';
-import { PAGE_TABS, routePatternFor } from './pageTabs';
+import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
@@ -194,7 +194,6 @@ const ROUTE_ELEMENTS = {
   '/corp/assets': <CorpAssets />,
   '/corp/assets/*': <CorpAssets />,
   '/assets': <Assets />,
-  '/assets/*': <Assets />,
   '/mail': <Mail />,
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,
@@ -354,7 +353,15 @@ export function App() {
                     <Route
                       key={path}
                       path={routePatternFor(path)}
-                      element={tabs ? <TabRoute page={tabs}>{gated}</TabRoute> : gated}
+                      element={
+                        tabs ? (
+                          <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
+                            {gated}
+                          </TabRoute>
+                        ) : (
+                          gated
+                        )
+                      }
                     />
                   );
                 })}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assetNodeSegment,
   assetPathHref,
+  legacyAssetsLocation,
   parseAssetPath,
   resolveAssetPath,
   type ResolvedAssetPath,
@@ -116,43 +117,81 @@ describe('resolveAssetPath', () => {
 });
 
 describe('parseAssetPath', () => {
-  it('reads the station id and the segments below it out of a wildcard match', () => {
-    expect(parseAssetPath('60008494/i:20/b:cargoHold')).toEqual({
+  it('reads the station id and the segments below it out of the Items tab wildcard', () => {
+    expect(parseAssetPath('items/60008494/i:20/b:cargoHold')).toEqual({
       stationId: 60008494,
       segments: ['i:20', 'b:cargoHold'],
     });
   });
 
   it('reads a bare station id', () => {
-    expect(parseAssetPath('60008494')).toEqual({ stationId: 60008494, segments: [] });
+    expect(parseAssetPath('items/60008494')).toEqual({ stationId: 60008494, segments: [] });
   });
 
-  it('reads the root, tolerating the empty string and stray slashes', () => {
+  it('reads the root, tolerating the empty string, the bare tab and stray slashes', () => {
     expect(parseAssetPath('')).toEqual({ stationId: null, segments: [] });
     expect(parseAssetPath('/')).toEqual({ stationId: null, segments: [] });
+    expect(parseAssetPath('items')).toEqual({ stationId: null, segments: [] });
+    expect(parseAssetPath('items/')).toEqual({ stationId: null, segments: [] });
+  });
+
+  it('is the root on another tab', () => {
+    expect(parseAssetPath('ships')).toEqual({ stationId: null, segments: [] });
+    expect(parseAssetPath('move')).toEqual({ stationId: null, segments: [] });
   });
 
   it('decodes percent-encoded segments', () => {
-    expect(parseAssetPath('60008494/b%3AcargoHold')).toEqual({
+    expect(parseAssetPath('items/60008494/b%3AcargoHold')).toEqual({
       stationId: 60008494,
       segments: ['b:cargoHold'],
     });
   });
 
   it('rejects a non-numeric station id instead of coercing it to NaN', () => {
-    expect(parseAssetPath('not-a-station/i:20')).toEqual({ stationId: null, segments: [] });
+    expect(parseAssetPath('items/not-a-station/i:20')).toEqual({ stationId: null, segments: [] });
   });
 });
 
 describe('assetPathHref', () => {
-  it('links to the root when there is no station', () => {
-    expect(assetPathHref(null, [])).toBe('/assets');
+  it('links to the Items tab when there is no station', () => {
+    expect(assetPathHref(null, [])).toBe('/assets/items');
   });
 
   it('links to a station and to a node below it', () => {
-    expect(assetPathHref(60008494, [])).toBe('/assets/60008494');
+    expect(assetPathHref(60008494, [])).toBe('/assets/items/60008494');
     expect(assetPathHref(60008494, ['i:20', 'b:cargoHold'])).toBe(
-      '/assets/60008494/i:20/b:cargoHold'
+      '/assets/items/60008494/i:20/b:cargoHold'
     );
+  });
+});
+
+describe('legacyAssetsLocation', () => {
+  it('moves a pre-tabs drill-down under the Items tab, keeping the rest of the path', () => {
+    expect(legacyAssetsLocation('/assets/60008494', '')).toEqual({
+      pathname: '/assets/items/60008494',
+      search: '',
+    });
+    expect(legacyAssetsLocation('/assets/60008494/i:20/b:cargoHold', '?chars=all')).toEqual({
+      pathname: '/assets/items/60008494/i:20/b:cargoHold',
+      search: '?chars=all',
+    });
+  });
+
+  it('sends ?view=ships to the Ships tab, dropping the retired param and keeping the rest', () => {
+    expect(legacyAssetsLocation('/assets', '?view=ships')).toEqual({
+      pathname: '/assets/ships',
+      search: '',
+    });
+    expect(legacyAssetsLocation('/assets', '?chars=all&view=ships&q=x')).toEqual({
+      pathname: '/assets/ships',
+      search: '?chars=all&q=x',
+    });
+  });
+
+  it('leaves everything else to the default-tab redirect', () => {
+    expect(legacyAssetsLocation('/assets', '')).toBeNull();
+    expect(legacyAssetsLocation('/assets', '?q=x')).toBeNull();
+    expect(legacyAssetsLocation('/assets/nope', '')).toBeNull();
+    expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeNull();
   });
 });
