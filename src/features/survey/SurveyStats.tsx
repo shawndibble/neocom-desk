@@ -52,11 +52,9 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-x-4 gap-y-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-x-4 gap-y-3">
       <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
-      <Tile label={t('survey.statPace')}>
-        {summary.pace === null ? '–' : t('survey.unitPace', { value: n(summary.pace, 1) })}
-      </Tile>
+      <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
       <Tile label={t('survey.statDone')} emphasis>
         {summary.finished ? (
           t('survey.finished')
