@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, Disclosure } from '@/components/ui';
+import { SkillLink } from '@/features/entities';
 import { formatLocalDate } from '@/lib/localDate';
 import type { QueueEndProjection } from '@/features/skills/queueStatus';
 
@@ -38,7 +39,8 @@ export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadP
     >
       {queuedLevels.map((e) => (
         <div key={e.queue_position} className="px-2.5 py-1 text-xs text-text-dim">
-          {nameFor(e.skill_id)} {ROMAN[e.finished_level - 1]}
+          <SkillLink typeId={e.skill_id}>{nameFor(e.skill_id)}</SkillLink>{' '}
+          {ROMAN[e.finished_level - 1]}
           {e.finish_date && (
             <span className="ml-2 tabular-nums">{formatLocalDate(new Date(e.finish_date))}</span>
           )}
