@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
+import { IskAmount } from '@/components/ui';
 import { db } from '@/db';
 import { buildWorth, diffHulls, sameHulls, type HullCount } from '@/engine/pilotList/dscanWorth';
 import { useMarketHub } from '@/features/market/hub';
 import { cx } from '@/lib/cx';
-import { formatIskCompact } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 
@@ -95,7 +95,10 @@ function WorthCard({
                   {line.total === null ? (
                     <span className="text-text-dim">{t('travel.pilot.dscan.worth.noPrice')}</span>
                   ) : (
-                    t('travel.pilot.dscan.worth.isk', { amount: formatIskCompact(line.total) })
+                    <Trans
+                      i18nKey="travel.pilot.dscan.worth.isk"
+                      components={{ isk: <IskAmount value={line.total} decimals={0} /> }}
+                    />
                   )}
                 </td>
               </tr>
@@ -103,7 +106,10 @@ function WorthCard({
             <tr className="border-t border-line font-semibold">
               <td className="py-0.5">{t('travel.pilot.dscan.worth.total')}</td>
               <td className="py-0.5 text-right tabular-nums">
-                {t('travel.pilot.dscan.worth.isk', { amount: formatIskCompact(worth.total) })}
+                <Trans
+                  i18nKey="travel.pilot.dscan.worth.isk"
+                  components={{ isk: <IskAmount value={worth.total} decimals={0} /> }}
+                />
               </td>
             </tr>
           </tbody>

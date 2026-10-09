@@ -40,7 +40,7 @@ import {
 } from '@/features/character/walletJournalFilter';
 import { signedIsk } from '@/features/market/signedIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { clampIskZero, formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
+import { clampIskZero, formatIsk } from '@/lib/isk';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   useVisibleWalletJournalColumns,
@@ -65,6 +65,12 @@ interface JournalFilterBarProps {
 const ALL_REF_TYPES = '__all';
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
+/** Ledger figure at full precision, with an explicit `+` on gains (the wallet reconciles against the game client). */
+function formatIskSigned(value: number): string {
+  const text = formatIsk(value, 2);
+  return value > 0 && !text.startsWith('-') ? `+${text}` : text;
+}
+
 function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
@@ -187,12 +193,12 @@ export function JournalTable({
         cellClassName: (row) => (clampIskZero(row.net, 0) === 0 ? '' : iskToneClass(row.net)),
         render: (row) => (
           <>
-            {formatIskCompactSigned(row.net)}
+            {formatIskSigned(row.net)}
             {row.income > 0 && row.expense > 0 && (
               <span className="block text-xs font-normal text-text-dim">
                 {t('wallet.journalBreakdownBothSides', {
-                  in: formatIskCompact(row.income),
-                  out: formatIskCompact(row.expense),
+                  in: formatIsk(row.income, 2),
+                  out: formatIsk(row.expense, 2),
                 })}
               </span>
             )}
@@ -207,16 +213,16 @@ export function JournalTable({
     <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
       <span>
         {t('wallet.journalBreakdownIn')}{' '}
-        <span className="text-isk-pos">{formatIskCompact(breakdown.totalIn)}</span>
+        <span className="text-isk-pos">{formatIsk(breakdown.totalIn, 2)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownOut')}{' '}
-        <span className="text-isk-neg">{formatIskCompact(breakdown.totalOut)}</span>
+        <span className="text-isk-neg">{formatIsk(breakdown.totalOut, 2)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownNet')}{' '}
         <span className={clampIskZero(breakdown.net, 0) === 0 ? '' : iskToneClass(breakdown.net)}>
-          {formatIskCompactSigned(breakdown.net)}
+          {formatIskSigned(breakdown.net)}
         </span>
       </span>
     </span>
