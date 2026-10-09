@@ -134,7 +134,8 @@ test.describe('Corp Assets — item row volume', () => {
         .locator('[data-virtual-scroll-root] [data-index]')
         .filter({ hasText: 'Type #999999' });
       await expect(unknownRow).toBeVisible();
-      await expect(unknownRow.getByText('-', { exact: true })).toBeVisible();
+      // The volume dash comes first; the unpriced value cell shows one too (#3116).
+      await expect(unknownRow.getByText('-', { exact: true }).first()).toBeVisible();
     });
   }
 

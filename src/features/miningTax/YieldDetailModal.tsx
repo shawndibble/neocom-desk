@@ -33,6 +33,7 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
+import { UnpricedIsk } from './UnpricedIsk';
 import { VolumeDisplay } from './volumeDisplay';
 import {
   yieldOreCsvColumns,
@@ -96,10 +97,11 @@ export function YieldDetailModal({
 
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
 
-  const typeNameCell = (typeId: number) => (
+  /** `wrapOnPhone` lets a name break onto a second line below `sm` instead of ellipsizing. */
+  const typeNameCell = (typeId: number, wrapOnPhone = false) => (
     <span className="flex items-center gap-1.5">
       <OreIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
-      <span className="truncate">
+      <span className={wrapOnPhone ? 'min-w-0 break-words sm:truncate' : 'truncate'}>
         <OreLink typeId={typeId}>{typeName(typeId)}</OreLink>
       </span>
     </span>
@@ -167,7 +169,7 @@ export function YieldDetailModal({
       id: 'type',
       header: t('miningTax.oreColumn'),
       stickyStart: true,
-      render: (line) => typeNameCell(line.typeId),
+      render: (line) => typeNameCell(line.typeId, true),
       sortValue: (line) => typeName(line.typeId),
     },
     {
@@ -345,7 +347,7 @@ export function YieldDetailModal({
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
             <p className="mt-1 text-xl font-semibold tabular-nums">
-              <IskAmount value={valuation.rawValue} decimals={0} />
+              <UnpricedIsk valuation={valuation} value={valuation.rawValue} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
@@ -361,7 +363,7 @@ export function YieldDetailModal({
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">
-                  <IskAmount value={valuation.refineValue} decimals={0} />
+                  <UnpricedIsk valuation={valuation} value={valuation.refineValue} />
                 </p>
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {

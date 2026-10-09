@@ -6,7 +6,10 @@
  * exists — an appraisal is usually edited two or three times (a line typo, a
  * stack left out), and a list you can still see is a list you can still fix.
  * That is also where unmatched lines are reported, next to the text they
- * refer to.
+ * refer to. Below `lg` the paste card sits above the result instead of
+ * beside it and would push the answer a screen down, so there (and only once
+ * a result exists) it folds into a one-line "N lines · Edit list" summary;
+ * the unmatched report stays visible and the list is one tap away.
  *
  * The Browser's own two-column grid holds two halves: the paste box, one
  * `Panel`, narrower on the left since it does not need the width the Market
@@ -14,7 +17,7 @@
  * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -49,13 +52,15 @@ import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
 import { formatAge } from '@/lib/age';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import {
   appraisalNet,
   lpBeatsMarket,
   refineBeatsSellAsIs,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { countPasteLines } from '@/engine/market/appraisalPaste';
+import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
 import {
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -200,6 +205,32 @@ export function AppraisalPanel({
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
+  // Phone only: the pilot opened the folded paste card to edit the list. The
+  // result of an Appraise (or a Recent pick) from the open form folds it
+  // again, adjusted during render like the idioms below. A re-price from a
+  // changed Price % or hub also lands a new result, but must not pull the form
+  // out from under someone mid-typing, hence the explicit request flag.
+  const isDesktop = useIsDesktop();
+  const [editingList, setEditingList] = useState(false);
+  const [foldOnResult, setFoldOnResult] = useState(false);
+  const [foldedFor, setFoldedFor] = useState(result);
+  if (result !== foldedFor) {
+    setFoldedFor(result);
+    if (foldOnResult) {
+      setFoldOnResult(false);
+      setEditingList(false);
+    }
+  }
+  function appraiseFromForm(run: () => void) {
+    setFoldOnResult(true);
+    run();
+  }
+  const focusListOnOpen = useRef(false);
+  useEffect(() => {
+    if (!editingList || !focusListOnOpen.current) return;
+    focusListOnOpen.current = false;
+    document.getElementById('market-appraisal-text')?.focus();
+  }, [editingList]);
   const [share, setShare] = useState<ShareState>({ status: 'idle' });
   // A link belongs to the result it was made from; a new appraisal drops it.
   const [shareResult, setShareResult] = useState(result);
@@ -571,180 +602,213 @@ export function AppraisalPanel({
     );
   }
 
+  const pasteFolded = !isDesktop && rows.length > 0 && !editingList;
+  // About the pasted list, so it shows folded or open.
+  const unmatchedNote = unmatched.length > 0 && (
+    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+      <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+        <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+        {t('market.appraisal.unmatched', { count: unmatched.length })}
+      </p>
+      <ul className="pt-1">
+        {unmatched.map((entry) => (
+          <li key={entry.name} className="font-mono text-[0.6875rem] text-text-dim">
+            {t('market.appraisal.unmatchedLine', {
+              lines: entry.lines.join(', '),
+              name: entry.name,
+            })}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start xl:grid-cols-[18rem_minmax(0,1fr)]">
-      <Panel
-        title={t('market.appraisal.pasteTitle')}
-        actions={
-          recent.length > 0 ? (
-            <Select
-              value=""
-              onValueChange={(value) => {
-                if (value === CLEAR_RECENT) void setRecent([]);
-                else controller.appraiseText(recent[Number(value)]?.text ?? '');
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                id="market-appraisal-recent"
-                aria-label={t('market.appraisal.recentPlaceholder')}
-                className="w-32 max-w-full min-w-0"
-              >
-                <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {recent.map((entry, index) => {
-                  const { names, more } = recentLabel(entry.text);
-                  return (
-                    <SelectItem key={entry.text} value={String(index)}>
-                      {t(
-                        more > 0
-                          ? 'market.appraisal.recentLabelMore'
-                          : 'market.appraisal.recentLabel',
-                        {
-                          names: names.join(', '),
-                          count: more,
-                          age: formatAge(openedAt - entry.savedAt, t),
-                        }
-                      )}
-                    </SelectItem>
-                  );
-                })}
-                <SelectSeparator />
-                <SelectItem value={CLEAR_RECENT} className="text-text-dim">
-                  {t('market.appraisal.clearRecent')}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          ) : undefined
-        }
-        meta={
-          controller.canAppraise ? (
-            <StatChip
-              label={t('market.appraisal.linesLabel')}
-              // The box's own line count, which is deliberately not the
-              // table's row count: repeated names merge into one priced row,
-              // so "15 lines" and "14 items" can both be true. Split by the
-              // parser's own rule rather than a second regex here, so the two
-              // can never disagree about what a line is.
-              value={formatVolume(countPasteLines(text))}
-            />
-          ) : undefined
-        }
-      >
-        <div className="flex flex-col gap-2">
-          <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
-            {t('market.appraisal.pasteLabel')}
-          </label>
-          <TextArea
-            id="market-appraisal-text"
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onSubmitChord={() => {
-              if (controller.canAppraise && !loading) controller.appraise();
+      {pasteFolded ? (
+        <div className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85">
+          <button
+            type="button"
+            aria-expanded={false}
+            onClick={() => {
+              focusListOnOpen.current = true;
+              setEditingList(true);
             }}
-            rows={14}
-            spellCheck={false}
-            placeholder={t('market.appraisal.pastePlaceholder')}
-            mono
-            className="text-[0.6875rem]"
-          />
-
-          <div className="flex items-center gap-2">
-            <label
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-              htmlFor="market-appraisal-percent"
-            >
-              {t('market.appraisal.pricePercentLabel')}
-            </label>
-            <TextInput
-              id="market-appraisal-percent"
-              size="sm"
-              type="number"
-              inputMode="decimal"
-              min={MIN_PRICE_PERCENT}
-              max={MAX_PRICE_PERCENT}
-              value={percentText}
-              onChange={(event) => handlePercentChange(event.target.value)}
-              className="field-no-spinner w-16 text-right"
-            />
-            <span className="text-xs text-text-dim">{t('market.appraisal.pricePercentHint')}</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="flex min-h-9 items-center gap-2 text-xs">
-              <Checkbox
-                checked={minusOwned}
-                disabled={lacksAssets || characterId === null}
-                onChange={(event) =>
-                  void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
-                }
-              />
-              {t('market.appraisal.minusOwned')}
-            </label>
-            {ownedPref.enabled && !lacksAssets && characterId !== null && (
+            className={`flex min-h-11 w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs ${rowInteractiveClassName} ${focusRingInsetClassName}`}
+          >
+            <Caret expanded={false} />
+            <span className="font-medium">
+              {t('market.appraisal.pasteFolded', { count: countPasteLines(text) })}
+            </span>
+            <span className="text-text-dim">
+              {t('market.appraisal.pasteFoldedMeta', { hub: hubName, percent: pricePercent })}
+            </span>
+          </button>
+          {unmatchedNote && <div className="px-3 pb-3">{unmatchedNote}</div>}
+        </div>
+      ) : (
+        <Panel
+          title={t('market.appraisal.pasteTitle')}
+          actions={
+            recent.length > 0 ? (
               <Select
-                value={String(ownedStationId)}
-                onValueChange={(value) =>
-                  void setOwnedPref({ ...ownedPref, stationId: Number(value) })
-                }
+                value=""
+                onValueChange={(value) => {
+                  if (value === CLEAR_RECENT) void setRecent([]);
+                  else
+                    appraiseFromForm(() =>
+                      controller.appraiseText(recent[Number(value)]?.text ?? '')
+                    );
+                }}
               >
-                <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
-                  <SelectValue />
+                <SelectTrigger
+                  size="sm"
+                  id="market-appraisal-recent"
+                  aria-label={t('market.appraisal.recentPlaceholder')}
+                  className="w-32 max-w-full min-w-0"
+                >
+                  <SelectValue placeholder={t('market.appraisal.recentPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {TRADE_HUBS.map((h) => (
-                    <SelectItem key={h.id} value={String(h.stationId)}>
-                      {h.systemName}
-                    </SelectItem>
-                  ))}
+                  {recent.map((entry, index) => {
+                    const { names, more } = recentLabel(entry.text);
+                    return (
+                      <SelectItem key={entry.text} value={String(index)}>
+                        {t(
+                          more > 0
+                            ? 'market.appraisal.recentLabelMore'
+                            : 'market.appraisal.recentLabel',
+                          {
+                            names: names.join(', '),
+                            count: more,
+                            age: formatAge(openedAt - entry.savedAt, t),
+                          }
+                        )}
+                      </SelectItem>
+                    );
+                  })}
+                  <SelectSeparator />
+                  <SelectItem value={CLEAR_RECENT} className="text-text-dim">
+                    {t('market.appraisal.clearRecent')}
+                  </SelectItem>
                 </SelectContent>
               </Select>
-            )}
-            {lacksAssets && (
-              <GrantNote
-                endpoints={ASSETS_ENDPOINTS}
-                title={t('market.appraisal.minusOwnedGrantTitle')}
-                hint={t('market.appraisal.minusOwnedGrantHint')}
-                actionLabel={t('market.appraisal.minusOwnedGrantAction')}
+            ) : undefined
+          }
+          meta={
+            controller.canAppraise ? (
+              <StatChip
+                label={t('market.appraisal.linesLabel')}
+                // The box's own line count, which is deliberately not the
+                // table's row count: repeated names merge into one priced row,
+                // so "15 lines" and "14 items" can both be true. Split by the
+                // parser's own rule rather than a second regex here, so the two
+                // can never disagree about what a line is.
+                value={formatVolume(countPasteLines(text))}
               />
-            )}
-          </div>
+            ) : undefined
+          }
+        >
+          <div className="flex flex-col gap-2">
+            <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
+              {t('market.appraisal.pasteLabel')}
+            </label>
+            <TextArea
+              id="market-appraisal-text"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onSubmitChord={() => {
+                if (controller.canAppraise && !loading) appraiseFromForm(controller.appraise);
+              }}
+              rows={pasteBoxRows(text)}
+              spellCheck={false}
+              placeholder={t('market.appraisal.pastePlaceholder')}
+              mono
+              className="text-[0.6875rem]"
+            />
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={controller.appraise}
-              disabled={!controller.canAppraise || loading}
-            >
-              {t('market.appraisal.appraise')}
-            </Button>
-            <Button size="sm" onClick={controller.clear} disabled={text === ''}>
-              {t('market.appraisal.clear')}
-            </Button>
-          </div>
-
-          {unmatched.length > 0 && (
-            <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
-              <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
-                <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-                {t('market.appraisal.unmatched', { count: unmatched.length })}
-              </p>
-              <ul className="pt-1">
-                {unmatched.map((entry) => (
-                  <li key={entry.name} className="font-mono text-[0.6875rem] text-text-dim">
-                    {t('market.appraisal.unmatchedLine', {
-                      lines: entry.lines.join(', '),
-                      name: entry.name,
-                    })}
-                  </li>
-                ))}
-              </ul>
+            <div className="flex items-center gap-2">
+              <label
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                htmlFor="market-appraisal-percent"
+              >
+                {t('market.appraisal.pricePercentLabel')}
+              </label>
+              <TextInput
+                id="market-appraisal-percent"
+                size="sm"
+                type="number"
+                inputMode="decimal"
+                min={MIN_PRICE_PERCENT}
+                max={MAX_PRICE_PERCENT}
+                value={percentText}
+                onChange={(event) => handlePercentChange(event.target.value)}
+                className="field-no-spinner w-16 text-right"
+              />
+              <span className="text-xs text-text-dim">
+                {t('market.appraisal.pricePercentHint')}
+              </span>
             </div>
-          )}
-        </div>
-      </Panel>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="flex min-h-9 items-center gap-2 text-xs">
+                <Checkbox
+                  checked={minusOwned}
+                  disabled={lacksAssets || characterId === null}
+                  onChange={(event) =>
+                    void setOwnedPref({ ...ownedPref, enabled: event.target.checked })
+                  }
+                />
+                {t('market.appraisal.minusOwned')}
+              </label>
+              {ownedPref.enabled && !lacksAssets && characterId !== null && (
+                <Select
+                  value={String(ownedStationId)}
+                  onValueChange={(value) =>
+                    void setOwnedPref({ ...ownedPref, stationId: Number(value) })
+                  }
+                >
+                  <SelectTrigger size="sm" aria-label={t('market.appraisal.minusOwnedStation')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_HUBS.map((h) => (
+                      <SelectItem key={h.id} value={String(h.stationId)}>
+                        {h.systemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {lacksAssets && (
+                <GrantNote
+                  endpoints={ASSETS_ENDPOINTS}
+                  title={t('market.appraisal.minusOwnedGrantTitle')}
+                  hint={t('market.appraisal.minusOwnedGrantHint')}
+                  actionLabel={t('market.appraisal.minusOwnedGrantAction')}
+                />
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="md"
+                variant="primary"
+                className="max-sm:w-full"
+                onClick={() => appraiseFromForm(controller.appraise)}
+                disabled={!controller.canAppraise || loading}
+              >
+                {t('market.appraisal.appraise')}
+              </Button>
+              <Button size="md" onClick={controller.clear} disabled={text === ''}>
+                {t('market.appraisal.clear')}
+              </Button>
+            </div>
+
+            {unmatchedNote}
+          </div>
+        </Panel>
+      )}
 
       <div className="flex flex-col gap-4">
         <Panel
@@ -756,63 +820,68 @@ export function AppraisalPanel({
             ) : undefined
           }
           actions={
-            <>
-              <ColumnPickerMenu
-                available={availableColumns}
-                visible={visibleColumns}
-                columnsById={optionalColumnsById}
-                onToggle={toggleColumn}
-                buttonLabel={t('market.appraisal.columnsButton')}
-                menuTitle={t('market.appraisal.columnsMenuTitle')}
-                size="sm"
-              />
-              <IconButton
-                size="sm"
-                icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-                label={t('market.appraisal.share')}
-                tooltip={
-                  shareItemCount > MAX_SNAPSHOT_ITEMS
-                    ? t('market.appraisal.shareTooLarge')
-                    : share.status === 'saving'
-                      ? t('market.appraisal.shareSaving')
-                      : share.status === 'failed'
-                        ? t('market.appraisal.shareFailed')
-                        : share.status === 'copied'
-                          ? t('market.appraisal.shareCopied')
-                          : undefined
-                }
-                disabled={
-                  characterId === null ||
-                  !isSyncConfigured() ||
-                  rows.length === 0 ||
-                  shareItemCount > MAX_SNAPSHOT_ITEMS ||
-                  share.status === 'saving'
-                }
-                onClick={() => void handleShare()}
-              />
-              {copied !== null && (
-                <span role="status" className="text-[0.6875rem] text-text-dim">
-                  {t('market.appraisal.copied', {
-                    list: t(`market.appraisal.copyList.${copied.list}`),
-                    count: copied.count,
-                  })}
-                </span>
-              )}
-              <TableActionsMenu name={t('market.appraisal.resultTitle')} tableExport={tableExport}>
-                {COPY_LISTS.map((list) => (
-                  <MenuItem
-                    key={list}
-                    disabled={copyLists[list].count === 0}
-                    onSelect={() => void handleCopy(list)}
-                  >
-                    {t(`market.appraisal.copyList.${list}`)}
-                    {copyLists[list].count > 0 && (
-                      <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
-                    )}
-                  </MenuItem>
-                ))}
-              </TableActionsMenu>
-            </>
+            result === null || failed || rows.length === 0 ? undefined : (
+              <>
+                <ColumnPickerMenu
+                  available={availableColumns}
+                  visible={visibleColumns}
+                  columnsById={optionalColumnsById}
+                  onToggle={toggleColumn}
+                  buttonLabel={t('market.appraisal.columnsButton')}
+                  menuTitle={t('market.appraisal.columnsMenuTitle')}
+                  size="sm"
+                />
+                <IconButton
+                  size="sm"
+                  icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+                  label={t('market.appraisal.share')}
+                  tooltip={
+                    shareItemCount > MAX_SNAPSHOT_ITEMS
+                      ? t('market.appraisal.shareTooLarge')
+                      : share.status === 'saving'
+                        ? t('market.appraisal.shareSaving')
+                        : share.status === 'failed'
+                          ? t('market.appraisal.shareFailed')
+                          : share.status === 'copied'
+                            ? t('market.appraisal.shareCopied')
+                            : undefined
+                  }
+                  disabled={
+                    characterId === null ||
+                    !isSyncConfigured() ||
+                    rows.length === 0 ||
+                    shareItemCount > MAX_SNAPSHOT_ITEMS ||
+                    share.status === 'saving'
+                  }
+                  onClick={() => void handleShare()}
+                />
+                {copied !== null && (
+                  <span role="status" className="text-[0.6875rem] text-text-dim">
+                    {t('market.appraisal.copied', {
+                      list: t(`market.appraisal.copyList.${copied.list}`),
+                      count: copied.count,
+                    })}
+                  </span>
+                )}
+                <TableActionsMenu
+                  name={t('market.appraisal.resultTitle')}
+                  tableExport={tableExport}
+                >
+                  {COPY_LISTS.map((list) => (
+                    <MenuItem
+                      key={list}
+                      disabled={copyLists[list].count === 0}
+                      onSelect={() => void handleCopy(list)}
+                    >
+                      {t(`market.appraisal.copyList.${list}`)}
+                      {copyLists[list].count > 0 && (
+                        <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
+                      )}
+                    </MenuItem>
+                  ))}
+                </TableActionsMenu>
+              </>
+            )
           }
         >
           {loading && result === null ? (

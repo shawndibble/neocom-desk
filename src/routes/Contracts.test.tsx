@@ -14,7 +14,7 @@ import {
   DEFAULT_CONTRACT_SEARCH_MODE,
   useContractSearchMode,
 } from '@/features/contractSearch/contractSearchModePref';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -111,10 +111,6 @@ const contractPage2 = [
 ];
 
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
-function openFilters() {
-  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
-}
-
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
     const page = new URL(request.url).searchParams.get('page');
@@ -323,7 +319,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Courier')).toBeInTheDocument();
 
-    openFilters();
+    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
 
     expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
@@ -348,7 +344,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
 
-    openFilters();
+    // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
     await user.click(screen.getByRole('button', { name: 'Outstanding' }));
     await user.type(
       screen.getByPlaceholderText('Search issuer, receiver or title…'),
@@ -536,7 +532,7 @@ describe('Contact standing cross-reference', () => {
     const issued = within(table).getByRole('columnheader', { name: /Issued/ });
     expect(issued).toHaveAttribute('aria-sort', 'descending');
     expect(
-      within(table).getByText(formatTimestamp(new Date(contractPage1[0].date_issued)))
+      within(table).getByText(formatDateOnly(new Date(contractPage1[0].date_issued)))
     ).toBeInTheDocument();
   });
 
@@ -617,7 +613,7 @@ describe('Time format preference', () => {
   });
 
   it('renders the Expires column in UTC when the stored preference is EVE time', async () => {
-    expect(formatTimestamp(EXPIRES, 'UTC')).not.toBe(formatTimestamp(EXPIRES));
+    expect(formatDateOnly(EXPIRES, 'UTC')).not.toBe(formatDateOnly(EXPIRES));
     await db.settings.put({ key: TIME_FORMAT_SETTING_KEY, value: 'eve' });
 
     render(<App />);
@@ -625,9 +621,9 @@ describe('Time format preference', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
 
     await waitFor(() =>
-      expect(within(table).getByText(formatTimestamp(EXPIRES, 'UTC'))).toBeInTheDocument()
+      expect(within(table).getByText(formatDateOnly(EXPIRES, 'UTC'))).toBeInTheDocument()
     );
-    expect(within(table).queryByText(formatTimestamp(EXPIRES))).not.toBeInTheDocument();
+    expect(within(table).queryByText(formatDateOnly(EXPIRES))).not.toBeInTheDocument();
   });
 
   /**
@@ -637,12 +633,12 @@ describe('Time format preference', () => {
    * what actually proves the table re-renders instead of holding stale strings.
    */
   it('reformats an already-rendered table when the pilot switches to EVE time', async () => {
-    expect(formatTimestamp(EXPIRES, 'UTC')).not.toBe(formatTimestamp(EXPIRES));
+    expect(formatDateOnly(EXPIRES, 'UTC')).not.toBe(formatDateOnly(EXPIRES));
 
     render(<App />);
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
-    expect(within(table).getByText(formatTimestamp(EXPIRES))).toBeInTheDocument();
+    expect(within(table).getByText(formatDateOnly(EXPIRES))).toBeInTheDocument();
 
     // The store's own setter, exactly as a Settings control would call it —
     // it takes the hydration generation, so App's in-flight `hydrate()`
@@ -651,8 +647,8 @@ describe('Time format preference', () => {
       await useTimeFormat.getState().setValue('eve');
     });
 
-    expect(within(table).getByText(formatTimestamp(EXPIRES, 'UTC'))).toBeInTheDocument();
-    expect(within(table).queryByText(formatTimestamp(EXPIRES))).not.toBeInTheDocument();
+    expect(within(table).getByText(formatDateOnly(EXPIRES, 'UTC'))).toBeInTheDocument();
+    expect(within(table).queryByText(formatDateOnly(EXPIRES))).not.toBeInTheDocument();
   });
 });
 
@@ -864,5 +860,54 @@ describe('Contracts Search tab page header', () => {
     );
     expect(window.location.pathname).toBe('/contracts/search/courier');
     expect(useContractSearchMode.getState().value).toBe('courier');
+  });
+});
+
+describe('Issued / Expires date-only cells (issue #3105)', () => {
+  const base = contractPage1[0];
+
+  it('shows a date without the time, with the full timestamp on a tooltip', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const issued = new Date(base.date_issued);
+    const cell = within(table).getByText(formatDateOnly(issued));
+    expect(within(table).queryByText(formatTimestamp(issued))).not.toBeInTheDocument();
+    await user.hover(cell);
+    expect((await screen.findAllByText(formatTimestamp(issued))).length).toBeGreaterThan(0);
+  });
+
+  it('sorts same-day contracts by their full timestamp', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([
+          { ...base, contract_id: 21, title: 'Morning one', date_issued: '2026-08-01T01:00:00Z' },
+          { ...base, contract_id: 22, title: 'Evening one', date_issued: '2026-08-01T23:00:00Z' },
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Morning one');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const names = () =>
+      within(table)
+        .getAllByRole('button', { name: /one$/ })
+        .map((b) => b.textContent);
+    expect(names()).toEqual(['Evening one', 'Morning one']);
+    fireEvent.click(
+      within(table)
+        .getByRole('columnheader', { name: /Issued/ })
+        .querySelector('button')!
+    );
+    expect(names()).toEqual(['Morning one', 'Evening one']);
+  });
+
+  it('exposes a title in full through a tooltip on its opener', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    await user.hover(screen.getByRole('button', { name: 'Rifter fit' }));
+    expect((await screen.findAllByText('Rifter fit')).length).toBeGreaterThan(1);
   });
 });

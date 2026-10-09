@@ -415,6 +415,34 @@ test.describe('Market Appraisal — stacked result card', () => {
     ]);
   });
 
+  test('folds the paste form so the first result group is on screen at 390px (#3135)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await appraise(page, SIX_COLUMN_PASTE);
+
+    await expect(page.getByLabel(/items from inventory/i)).toHaveCount(0);
+    const summary = page.getByRole('button', { name: /Edit list/ });
+    await expect(summary).toHaveAttribute('aria-expanded', 'false');
+
+    const group = page.locator('section[aria-label="You get"]');
+    await expect(group).toBeVisible();
+    const box = (await group.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeLessThan(PHONE.height);
+    await expectNoPageOverflow(page);
+
+    await summary.click();
+    await expect(page.getByLabel(/items from inventory/i)).toHaveValue(SIX_COLUMN_PASTE);
+  });
+
+  test('keeps the paste form open beside the result at 1280px (#3135)', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await appraise(page, SIX_COLUMN_PASTE);
+    await expect(page.getByLabel(/items from inventory/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Edit list/ })).toHaveCount(0);
+  });
+
   test('has no phone sort bar at 640px or 1280px', async ({ page }) => {
     for (const width of [640, DESKTOP.width]) {
       await page.setViewportSize({ width, height: DESKTOP.height });
@@ -425,4 +453,78 @@ test.describe('Market Appraisal — stacked result card', () => {
       ).toBeVisible();
     }
   });
+
+  // #3114: the paste box follows its content, so a short list does not leave a
+  // mostly empty box pushing the result down. Compared in-test, no pixel values.
+  for (const size of [
+    { name: '390px', viewport: PHONE },
+    { name: '1024px', viewport: { width: 1024, height: 800 } },
+    { name: '1280px', viewport: DESKTOP },
+  ]) {
+    test(`sizes the paste box to its content at ${size.name}`, async ({ page }) => {
+      await page.setViewportSize(size.viewport);
+      const paste = (n: number) =>
+        Array.from({ length: n }, (_, i) => (i % 2 ? 'Pyerite\t100' : 'Tritanium\t100')).join('\n');
+      const measure = async (lineCount: number) => {
+        await appraise(page, paste(lineCount));
+        // Below lg the form folds away once a result exists (#3135); open it to measure the box.
+        if (size.viewport.width < 1024)
+          await page.getByRole('button', { name: /Edit list/ }).click();
+        const box = await page.getByLabel(/items from inventory/i).boundingBox();
+        const table = await page.getByRole('table', { name: 'Appraisal' }).boundingBox();
+        return {
+          textareaHeight: box!.height,
+          resultTop: table!.y + (await page.evaluate(() => window.scrollY)),
+        };
+      };
+      const short = await measure(3);
+      await expectNoPageOverflow(page);
+      const long = await measure(14);
+      await expectNoPageOverflow(page);
+
+      expect(short.textareaHeight).toBeLessThan(long.textareaHeight);
+      if (size.viewport.width < 1024) expect(short.resultTop).toBeLessThan(long.resultTop);
+    });
+  }
+});
+
+test.describe('Market Appraisal — result header controls (#3112)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockHubPrices(page);
+    await signInAndGoto(page);
+  });
+
+  for (const width of [390, 1024, 1280]) {
+    test(`has no header buttons until appraised, then fits its controls at ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('./market/appraisal?hub=jita');
+      const header = page
+        .locator('section')
+        .filter({ has: page.getByRole('heading', { name: 'Appraisal', exact: true }) })
+        .locator('header')
+        .last();
+      await expect(page.getByText('Nothing appraised yet')).toBeVisible();
+      await expect(header.getByRole('button')).toHaveCount(0);
+
+      await appraise(page, SIX_COLUMN_PASTE);
+      await expect(header.getByRole('button', { name: 'Columns' })).toBeVisible();
+      await expect(header.getByRole('button', { name: 'Copy Share Link' })).toBeVisible();
+
+      // Invariants, not pixels: the title stays on one line and the header
+      // does not spill sideways.
+      const fit = await header.evaluate((el) => {
+        const h2 = el.querySelector('h2')!;
+        return {
+          overflows: el.scrollWidth > el.clientWidth + 1,
+          titleWraps:
+            h2.getBoundingClientRect().height > parseFloat(getComputedStyle(h2).lineHeight) * 1.5,
+        };
+      });
+      expect(fit.overflows).toBe(false);
+      expect(fit.titleWraps).toBe(false);
+      await expectNoPageOverflow(page);
+    });
+  }
 });

@@ -34,6 +34,7 @@ import {
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
   type MarketTreeFilterResult,
+  type SearchCategorySummary,
 } from '@/features/market/marketTree';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -98,6 +99,7 @@ import {
   BUY_ORDER_COLUMN_IDS,
   orderBookFigureChars,
   orderBookWidthsRem,
+  type MarketOrderColumnId,
   useVisibleMarketOrderColumns,
 } from '@/features/market/marketOrderColumns';
 import { useTimedToast } from '@/components/ui/useTimedToast';
@@ -149,6 +151,7 @@ interface MarketGroupTreeProps {
   filterResult: MarketTreeFilterResult | null;
   expandedIds: ReadonlySet<number>;
   searchCollapsedIds: ReadonlySet<number>;
+  searchCategories: SearchCategorySummary | null;
   onToggle: (id: number) => void;
   onSelect: (typeId: number) => void;
   selectedTypeId: number | null;
@@ -160,6 +163,7 @@ function MarketGroupTree({
   filterResult,
   expandedIds,
   searchCollapsedIds,
+  searchCategories,
   onToggle,
   onSelect,
   selectedTypeId,
@@ -205,7 +209,17 @@ function MarketGroupTree({
     // a starting point: `onToggle` below lets the user collapse/re-expand any
     // group while search is active, independent of which items still match.
     // Search only ever prunes *items*, never forces expand state.
-    const expanded = filtering ? !searchCollapsedIds.has(group.id) : expandedIds.has(group.id);
+    // The one exception is a top-level category: those start collapsed when
+    // the matches are too many to fit (`searchCategories.openByDefault`), so
+    // the set holds flips from that default rather than only collapses.
+    const categoryCount =
+      filtering && depth === 0 ? searchCategories?.countsByRoot.get(group.id) : undefined;
+    const flipped = searchCollapsedIds.has(group.id);
+    const expanded = !filtering
+      ? expandedIds.has(group.id)
+      : categoryCount !== undefined && !searchCategories?.openByDefault
+        ? flipped
+        : !flipped;
     const expandable = children.length > 0 || items.length > 0;
 
     // `min-h-11 md:min-h-0` gives a thumb the 44px floor on the leaf row and
@@ -227,7 +241,11 @@ function MarketGroupTree({
           }`}
         >
           {expandable && <Caret expanded={expanded} />}
-          <span className={expandable ? '' : 'pl-3'}>{group.name}</span>
+          <span className={expandable ? '' : 'pl-3'}>
+            {categoryCount === undefined
+              ? group.name
+              : t('market.categoryHeader', { name: group.name, count: categoryCount })}
+          </span>
         </button>
         {expanded && (children.length > 0 || items.length > 0) && (
           <ul>
@@ -241,12 +259,10 @@ function MarketGroupTree({
 
   const roots = childrenByParent.get(null) ?? [];
   return (
-    // Flat cap, not viewport-relative: `QuickbarList` renders below this
-    // tree in the same column, so sizing the tree to all remaining viewport
-    // height would push the quickbar off-screen.
-    // On a desktop the finder column is sticky, so the tree takes what the
-    // viewport has left after the search and the Quickbar beneath it.
-    <div className="max-h-[32rem] overflow-y-auto lg:max-h-[calc(100dvh-18rem)]">
+    // Below `lg` a flat cap. From `lg` the finder panel is a viewport-bounded
+    // flex column and the tree is its flexible part: it takes whatever the
+    // search and the Quickbar leave, so neither is pushed off-screen.
+    <div className="max-h-[32rem] overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
       {filterResult?.bestMatch && (
         <div className="mb-2 border-b border-line pb-2">
           <p className="pb-1 text-[0.6875rem] text-text-dim uppercase">{t('market.bestMatch')}</p>
@@ -429,6 +445,7 @@ export function Market() {
     setQuery,
     expandedIds,
     searchCollapsedIds,
+    searchCategories,
     filterResult,
     handleToggle,
     itemTab,
@@ -605,8 +622,15 @@ export function Market() {
   // card. Short of that, Location narrows first, so fewer widths need cards.
   const isPhone = useIsPhone();
   const bookBestSell = loadedView?.summary.bestSell ?? null;
+  // One station, already named by the scope bar: no Location column to repeat it.
+  const singleStationBook =
+    !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
+  const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
+  // Location can't be ticked while it is held back, so the picker doesn't offer it.
+  const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
+    singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
-    useVisibleMarketOrderColumns((state) => state.value),
+    singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
     orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
@@ -635,6 +659,7 @@ export function Market() {
     bestSell: loadedView?.summary.bestSell ?? null,
     cards: orderCards,
     locationSqueezed: orderLocationSqueezed,
+    hideLocation: singleStationBook,
   });
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
@@ -859,6 +884,7 @@ export function Market() {
             { id: 'history', label: t('market.sections.history') },
             { id: 'appraisal', label: t('market.sections.appraisal') },
             { id: 'hauling', label: t('market.sections.hauling') },
+            { id: 'lp-store', label: t('loyaltyStore.title') },
           ]}
         />
 
@@ -901,7 +927,12 @@ export function Market() {
               ref={finderPanelRef}
               // Sticky beside a long order book, so the search stays in reach
               // while the book scrolls.
-              className={isDesktop || selectedTypeId === null ? 'lg:sticky lg:top-4' : 'hidden'}
+              fill
+              className={
+                isDesktop || selectedTypeId === null
+                  ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col'
+                  : 'hidden'
+              }
             >
               <BrowserFilterBar
                 {...browserFilterBarProps}
@@ -918,19 +949,19 @@ export function Market() {
               />
 
               {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
-                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
                   {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
                 </p>
               )}
 
               {filterResult?.fuzzy && (
-                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
                   {t('market.searchFuzzy')}
                 </p>
               )}
 
               {filterResult?.capped && (
-                <p className="pt-2 text-[0.6875rem] text-warning uppercase">
+                <p className="shrink-0 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('market.searchCapped', {
                     limit: MARKET_TREE_MATCH_LIMIT,
                     total: filterResult.totalMatches,
@@ -953,7 +984,7 @@ export function Market() {
                 !filterResult.bestMatch ? (
                 <EmptyState title={t('market.noResults')} className="py-8" />
               ) : (
-                <div className="mt-3 border-t border-line pt-2">
+                <div className="mt-3 flex min-h-0 flex-col border-t border-line pt-2 lg:flex-1">
                   <MarketGroupTree
                     groups={groups ?? []}
                     childrenByParent={childrenByParent}
@@ -961,6 +992,7 @@ export function Market() {
                     filterResult={filterResult}
                     expandedIds={expandedIds}
                     searchCollapsedIds={searchCollapsedIds}
+                    searchCategories={searchCategories}
                     onToggle={handleToggle}
                     onSelect={handleSelectItem}
                     selectedTypeId={selectedTypeId}
@@ -1198,7 +1230,7 @@ export function Market() {
                         total={sortedSell.length}
                         best={loadedView?.summary.bestSell ?? null}
                         columns={baseColumns}
-                        availableColumns={SELL_ORDER_COLUMN_IDS}
+                        availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
                         visibleColumns={visibleOrderColumns}
                         columnsById={orderColumnsById}
                         onToggleColumn={toggleOrderColumn}
@@ -1256,7 +1288,7 @@ export function Market() {
                         total={sortedBuy.length}
                         best={loadedView?.summary.bestBuy ?? null}
                         columns={buyColumns}
-                        availableColumns={BUY_ORDER_COLUMN_IDS}
+                        availableColumns={pickableColumns(BUY_ORDER_COLUMN_IDS)}
                         visibleColumns={visibleOrderColumns}
                         columnsById={orderColumnsById}
                         onToggleColumn={toggleOrderColumn}

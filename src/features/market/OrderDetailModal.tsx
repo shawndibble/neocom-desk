@@ -470,18 +470,13 @@ export function OrderDetailContent({
 }: OrderDetailContentProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  // Everything folds by default; the modal remounts per row (`OpenOrdersPanel`
-  // keys it by `orderId`), so this never carries state from one order to the
-  // next. `numbers` only ever folds on a phone (owner decision, issue #1428)
-  // but stays in the same set for uniform toggling.
-  const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(() => new Set());
-  const toggleSection = (id: SectionId) =>
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // Everything folds by default, except "Who is cheaper" while an undercut
+  // exists (issue #3137, narrowing #1428). The modal remounts per row
+  // (`OpenOrdersPanel` keys it by `orderId`), so this never carries state from
+  // one order to the next. `numbers` only ever folds on a phone (owner
+  // decision, issue #1428) but stays in the same map for uniform toggling.
+  // A pilot's own toggle is recorded here and wins over the default.
+  const [manualSections, setManualSections] = useState<Map<SectionId, boolean>>(() => new Map());
 
   const location: LocationState = !stationsLoaded
     ? 'unknown'
@@ -550,6 +545,14 @@ export function OrderDetailContent({
     );
     return `${scopeLabel} · ${formatMarketIsk(tightest.price)}`;
   })();
+
+  // Open on arrival only where the section has something to say: a rival is
+  // cheaper. "Clear" and "not checked" stay folded behind their trailing read.
+  const hasUndercut = typeof tightestRivalScope(station, system, region) === 'object';
+  const isExpanded = (id: SectionId) =>
+    manualSections.get(id) ?? (id === 'whoCheaper' && hasUndercut);
+  const toggleSection = (id: SectionId) =>
+    setManualSections((prev) => new Map(prev).set(id, !isExpanded(id)));
 
   const costBasisTrailing = row.costBasis
     ? t('market.orders.trailingCostPerUnit', { amount: formatMarketIsk(row.costBasis.unitCost) })
@@ -818,7 +821,7 @@ export function OrderDetailContent({
               <Disclosure
                 label={t('market.orders.sectionNumbers')}
                 trailing={sellValue}
-                expanded={expandedSections.has('numbers')}
+                expanded={isExpanded('numbers')}
                 onToggle={() => toggleSection('numbers')}
               >
                 <div className="p-2">{numbersContent}</div>
@@ -833,7 +836,7 @@ export function OrderDetailContent({
           <Disclosure
             label={whoLabel}
             trailing={whoTrailing}
-            expanded={expandedSections.has('whoCheaper')}
+            expanded={isExpanded('whoCheaper')}
             onToggle={() => toggleSection('whoCheaper')}
           >
             {/* The Disclosure's own header is its toggle button, so the grid's ⋯
@@ -967,7 +970,7 @@ export function OrderDetailContent({
 
         {/* Cost basis and exits are sell-side ideas: a buy order has neither (#1733). */}
         {!row.isBuyOrder && (
-          <div className="grid gap-3 md:grid-cols-2 [&>*]:min-w-0">
+          <div className="grid items-start gap-3 md:grid-cols-2 [&>*]:min-w-0">
             <section className="rounded-xs border border-line">
               {row.costBasis === null ? (
                 <>
@@ -1002,7 +1005,7 @@ export function OrderDetailContent({
                 <Disclosure
                   label={t('market.orders.floorWorking')}
                   trailing={costBasisTrailing ?? undefined}
-                  expanded={expandedSections.has('costBasis')}
+                  expanded={isExpanded('costBasis')}
                   onToggle={() => toggleSection('costBasis')}
                 >
                   <div className="space-y-1.5 px-3 py-2">
@@ -1150,7 +1153,7 @@ export function OrderDetailContent({
               <Disclosure
                 label={t('market.orders.exitsTitle')}
                 trailing={exitsTrailing}
-                expanded={expandedSections.has('exits')}
+                expanded={isExpanded('exits')}
                 onToggle={() => toggleSection('exits')}
               >
                 <div className="space-y-1.5 px-3 py-2 text-xs">

@@ -8,6 +8,7 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
+import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { resetShareLinksForTests } from '@/features/share/shareStore';
@@ -134,10 +135,115 @@ function renderPanel(
   return { onPricePercentChange, actions };
 }
 
+/**
+ * jsdom's `matchMedia` stub never matches, which `useIsDesktop` reads as a
+ * phone — where a result folds the paste card away (#3135). Every test here
+ * but the phone block below is about the desktop two-column layout.
+ */
+const realMatchMedia = window.matchMedia;
+function setViewport(desktop: boolean) {
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: desktop && media === DESKTOP_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+beforeEach(() => setViewport(true));
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+});
+
+describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => {
+  beforeEach(() => setViewport(false));
+
+  it('folds to a summary once a result exists, and opens on the textarea', async () => {
+    const user = userEvent.setup();
+    renderPanel({ controller: controller({ text: 'Tritanium 5\nPyerite 2', result: outcome() }) });
+    expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
+    const summary = screen.getByRole('button', { name: /2 lines · Edit list/ });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    expect(summary).toHaveTextContent('Jita · 90%');
+    await user.click(summary);
+    const box = screen.getByLabelText(/Items from inventory/);
+    expect(box).toHaveValue('Tritanium 5\nPyerite 2');
+    expect(box).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Appraise' })).toBeInTheDocument();
+  });
+
+  it('stays open with no result', () => {
+    renderPanel({ controller: controller({ text: 'Tritanium 5' }) });
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the unmatched-lines warning while folded', () => {
+    renderPanel({
+      controller: controller({
+        text: 'Tritanium 5\nNope 1',
+        result: outcome({ unmatched: [{ name: 'Nope', lines: [2] }] }),
+      }),
+    });
+    expect(screen.getByRole('button', { name: /Edit list/ })).toBeInTheDocument();
+    expect(screen.getByText(/Nope/)).toBeInTheDocument();
+  });
+
+  it('folds again when an Appraise from the open form lands, not on a re-price', async () => {
+    const user = userEvent.setup();
+    const first = controller({ text: 'Tritanium 5', result: outcome(), canAppraise: true });
+    const ui = (c: AppraisalController) => (
+      <MemoryRouter initialEntries={['/market/appraisal?hub=jita']}>
+        <FakeItemActions actions={fakeItemActions()}>
+          <AppraisalPanel
+            controller={c}
+            pricePercent={90}
+            onPricePercentChange={vi.fn()}
+            hub={TRADE_HUBS[0]}
+            standing={ZERO_STANDINGS}
+            characterId={1}
+          />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const { rerender } = render(ui(first));
+    await user.click(screen.getByRole('button', { name: /Edit list/ }));
+    // A re-price (new result, no Appraise) leaves the form where the pilot is typing.
+    rerender(ui({ ...first, result: outcome() }));
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Appraise' }));
+    rerender(ui({ ...first, result: outcome() }));
+    expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
+  });
+
+  it('never folds at desktop width', () => {
+    setViewport(true);
+    renderPanel({ controller: controller({ text: 'Tritanium 5', result: outcome() }) });
+    expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('AppraisalPanel', () => {
   it('prompts for a paste before anything has been appraised', () => {
     renderPanel();
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
+  });
+
+  it('sizes the paste box to its content', () => {
+    const rowsFor = (text: string) => {
+      cleanup();
+      renderPanel({ controller: controller({ text }) });
+      return screen.getByLabelText(/Items from inventory/).getAttribute('rows');
+    };
+    expect(rowsFor('')).toBe('6');
+    expect(rowsFor('a\nb\nc')).toBe('4');
+    expect(rowsFor('a\nb\nc\nd\ne\nf')).toBe('7');
+    expect(rowsFor(Array.from({ length: 40 }, (_, i) => `Item ${i}`).join('\n'))).toBe('14');
   });
 
   it('renders a priced row with both sides', () => {
@@ -886,6 +992,56 @@ describe('AppraisalPanel — Copy lists', () => {
   });
 });
 
+describe('AppraisalPanel — result header controls', () => {
+  const noMatches = outcome({
+    appraisal: {
+      rows: [],
+      totals: {
+        buy: 0,
+        sell: 0,
+        spread: 0,
+        unpricedRows: 0,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: 0,
+        cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
+      },
+      items: [],
+    },
+    unmatched: [{ name: 'Nope', lines: [1] }],
+  });
+
+  function expectNoControls() {
+    expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy Share Link' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Appraisal/ })).not.toBeInTheDocument();
+  }
+
+  it('shows no columns, share or table-actions control before anything is appraised', () => {
+    renderPanel();
+    expectNoControls();
+  });
+
+  it('shows no controls when the catalogue failed to load', () => {
+    renderPanel({ controller: controller({ failed: true }) });
+    expectNoControls();
+  });
+
+  it('shows no controls when no row matched', () => {
+    renderPanel({ controller: controller({ result: noMatches }) });
+    expectNoControls();
+  });
+
+  it('shows all three controls once there is a result', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Share Link' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Appraisal/ })).toBeInTheDocument();
+  });
+});
+
 describe('AppraisalPanel — Columns', () => {
   it('hides an optional column once toggled off, and shows it again', async () => {
     renderPanel({ controller: controller({ result: outcome() }) });
@@ -1149,6 +1305,34 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     const recent = screen.getByRole('combobox', { name: 'Load a recent list' });
     const box = screen.getByRole('textbox');
     expect(recent.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps Clear recent last in the card and clears the saved lists', async () => {
+    useRecentAppraisals.setState({
+      value: [{ text: 'Tritanium 5', savedAt: Date.now() }],
+      hydrated: true,
+    });
+    renderPanel({
+      controller: controller({
+        result: outcome({ unmatched: [{ name: 'Nanite Repair Past', lines: [3, 7] }] }),
+      }),
+    });
+    const appraise = screen.getByRole('button', { name: 'Appraise' });
+    const clearRecent = screen.getByRole('button', { name: 'Clear recent' });
+    const unmatched = screen.getByText('1 line not matched');
+    expect(
+      appraise.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      unmatched.compareDocumentPosition(clearRecent) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    await userEvent.click(clearRecent);
+    expect(useRecentAppraisals.getState().value).toEqual([]);
+  });
+
+  it('hides Clear recent when nothing was saved', () => {
+    renderPanel({ controller: controller() });
+    expect(screen.queryByRole('button', { name: 'Clear recent' })).not.toBeInTheDocument();
   });
 
   it('hides Recent when nothing was saved', () => {

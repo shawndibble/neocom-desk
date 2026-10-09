@@ -405,6 +405,27 @@ describe('FittingRackList with the editor’s item actions', () => {
     expect(actions.move).toHaveBeenCalledWith('high', 0, 1);
   });
 
+  it('opens the module dialog from a Variations menu entry, only for a module that has variants', async () => {
+    const without = fakeItemActions({ names });
+    const { unmount } = renderList(without);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await screen.findByRole('menuitem', { name: 'Move up' });
+    expect(screen.queryByRole('menuitem', { name: 'Variations' })).toBeNull();
+    unmount();
+
+    const actions = fakeItemActions({ names }, { hasVariants: () => true });
+    renderList(actions);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Variations' }));
+    expect(actions.openVariations).toHaveBeenCalledWith('high', 0);
+  });
+
   it('gives an empty slot the Ring’s empty-slot menu — Paste and Fill rack from its More actions', async () => {
     const actions = fakeItemActions(
       { names },

@@ -452,20 +452,20 @@ Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed 
 
 Summary
 
-| Feature                        | Where                                                 | Notes                                                                                                                 |
-| ------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| LP Store page                  | `/market/lp-store[/:corporationId]`                   | Market subView (`src/app/navDestinations.ts:185-195`), not a MARKET_TABS tab. Own route `src/routes/LoyaltyStore.tsx` |
-| Store picker                   | page header, `src/features/loyalty/LpStorePicker.tsx` | Hand-built combobox popover; held-LP corps pinned first with balance                                                  |
-| Landing state                  | `/market/lp-store`                                    | Picker + empty state only (`LoyaltyStore.tsx:406`)                                                                    |
-| Offers list                    | left panel, `DataTable`                               | Ranked ISK/LP desc; virtualized; select row -> detail                                                                 |
-| Offer detail                   | right panel (desktop) / bottom-sheet `Modal` (phone)  | Profit breakdown, View in Market, Plan in Industry, materials table                                                   |
-| Filters                        | `FilterBar`                                           | Hub, price basis, affordable-only (default on), blueprints-only, search; all but hub/basis in URL                     |
-| Column picker                  | filter bar action                                     | Optional cols `profit`, `iskPerLp`; device-local                                                                      |
-| CSV export                     | list panel action + materials table                   | `surface: lp-offers`, `lp-offer-materials`                                                                            |
-| LP Value setting               | gear -> `PageSettingsButton` -> `LpValueSettingsForm` | Synced `sync.loyaltyLpValue`; 0 = market rate                                                                         |
-| LpStoreLink                    | `src/features/loyalty/LpStoreLink.tsx`                | Icon link used by Appraisal LP column + Blueprint Acquisition modal                                                   |
-| Wallet LP rows                 | `src/routes/Wallet.tsx:331,753`                       | Link/row click into the store                                                                                         |
-| Legacy `/wallet/loyalty[/:id]` | `src/app/legacyPaths.ts:9`, `src/app/App.tsx:181-182` | `LegacyPathRedirect`; UNGATED (`routeScopes.ts:265,268`)                                                              |
+| Feature                        | Where                                                 | Notes                                                                                                                                                                                                            |
+| ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LP Store page                  | `/market/lp-store[/:corporationId]`                   | a `MARKET_TABS` tab (`lp-store`) that keeps its own route `src/routes/LoyaltyStore.tsx`, which draws Market's tab bar                                                                                            |
+| Store picker                   | page header, `src/features/loyalty/LpStorePicker.tsx` | Hand-built combobox popover; held-LP corps pinned first with balance                                                                                                                                             |
+| Landing state                  | `/market/lp-store`                                    | Item-first search (`features/loyalty/LpStoreSearch.tsx`, `?q=`): stacked Panels per item, nearest store first, Profit + ISK/LP; snapshot `lpStoreOffers` (daily `syncLpStoreOffers`); decision `20261009-000246` |
+| Offers list                    | left panel, `DataTable`                               | Ranked ISK/LP desc; virtualized; select row -> detail                                                                                                                                                            |
+| Offer detail                   | right panel (desktop) / bottom-sheet `Modal` (phone)  | Profit breakdown, View in Market, Plan in Industry, materials table                                                                                                                                              |
+| Filters                        | `FilterBar`                                           | Hub, price basis, affordable-only (default on), blueprints-only, search; all but hub/basis in URL                                                                                                                |
+| Column picker                  | filter bar action                                     | Optional cols `profit`, `iskPerLp`; device-local                                                                                                                                                                 |
+| CSV export                     | list panel action + materials table                   | `surface: lp-offers`, `lp-offer-materials`                                                                                                                                                                       |
+| LP Value setting               | gear -> `PageSettingsButton` -> `LpValueSettingsForm` | Synced `sync.loyaltyLpValue`; 0 = market rate                                                                                                                                                                    |
+| LpStoreLink                    | `src/features/loyalty/LpStoreLink.tsx`                | Icon link used by Appraisal LP column + Blueprint Acquisition modal                                                                                                                                              |
+| Wallet LP rows                 | `src/routes/Wallet.tsx:331,753`                       | Link/row click into the store                                                                                                                                                                                    |
+| Legacy `/wallet/loyalty[/:id]` | `src/app/legacyPaths.ts:9`, `src/app/App.tsx:181-182` | `LegacyPathRedirect`; UNGATED (`routeScopes.ts:265,268`)                                                                                                                                                         |
 
 ### Nav, route, gating
 
@@ -530,7 +530,7 @@ Summary
 - "Use my own materials" per-offer state is not persisted or in the URL.
 - No `loading` retry/stale indicator for market snapshot; spinner only.
 - Picker silently swallows corp-list/balance load failures (`.catch(() => {})`).
-- No bulk/compare across stores; page ranks within one store only.
+- Cross-store search ranks stores by jumps to their nearest station (offers carry no home station); the single-store view still ranks within one store only.
 
 ---
 
