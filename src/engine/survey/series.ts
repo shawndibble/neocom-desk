@@ -68,7 +68,7 @@ export interface SurveySummary {
   intervals: SurveyInterval[];
   /** Every scan, oldest first, for the chart. */
   points: SurveyPoint[];
-  /** Every ore any scan showed, biggest first at the start, so chart layers keep their order. */
+  /** Every ore any scan showed, in `ores` order (most valuable left first), so chart layers read like the ore list. */
   oreNames: string[];
   /** m³/s over the last few intervals, or null before there is any real mining. */
   pace: number | null;
@@ -174,13 +174,6 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     for (const rock of scan.rocks) byOre[rock.ore] = (byOre[rock.ore] ?? 0) + rock.volume;
     return { at: scan.at, total: total(scan), byOre };
   });
-  const oreNames: string[] = [];
-  for (const point of [...points].reverse()) {
-    for (const ore of Object.keys(point.byOre)) if (!oreNames.includes(ore)) oreNames.push(ore);
-  }
-  const peak = (ore: string): number => Math.max(...points.map((p) => p.byOre[ore] ?? 0));
-  oreNames.sort((a, b) => peak(b) - peak(a));
-
   const recent = intervals.slice(-PACE_INTERVALS);
   const minedRecent = recent.reduce((sum, i) => sum + i.mined, 0);
   const secondsRecent = recent.reduce((sum, i) => sum + (i.to - i.from) / 1000, 0);
@@ -222,7 +215,7 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     ores,
     intervals,
     points,
-    oreNames,
+    oreNames: ores.map((o) => o.ore),
     pace,
     etaAt,
     finished,
