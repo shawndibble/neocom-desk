@@ -111,6 +111,13 @@ describe('loadPilotList', () => {
     expect(mocks.fetchPilotKillHistory).toHaveBeenCalledWith(2);
   });
 
+  it('asks zKillboard about unknown and neutral pilots before red and orange contacts', async () => {
+    // Beta is an orange contact (already known to be bad); Alpha has no standing.
+    // Pasted order is Beta first, but the unknown is the one worth waiting on.
+    await run(['Beta', 'Alpha']);
+    expect(mocks.fetchPilotKillHistory.mock.calls.map(([id]) => id)).toEqual([1, 2]);
+  });
+
   describe('Threat verdict', () => {
     const DAY = 24 * HOUR;
     const busy = Array.from({ length: 12 }, (_, i) => kill((i + 1) * DAY));
