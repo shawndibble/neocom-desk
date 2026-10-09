@@ -9087,6 +9087,8 @@
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name. Shift+Enter adds another name; Ctrl+Enter looks up the whole list.",
       "searchHintExact": "Type the pilot's full name and press Enter. Shift+Enter adds another name; Ctrl+Enter looks up the whole list. Suggestions need this character's search permission.",
+      "searchHintSuggest_touch": "Type at least 3 characters for suggestions, then tap Look up.",
+      "searchHintExact_touch": "Type the pilot's full name, then tap Look up. Suggestions need this character's search permission.",
       "threat": {
         "label": "Threat",
         "level": {

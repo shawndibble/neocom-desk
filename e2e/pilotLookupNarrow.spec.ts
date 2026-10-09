@@ -176,3 +176,21 @@ test.describe('Pilot Lookup at 390px', () => {
     await expectNoPageOverflow(page);
   });
 });
+
+/**
+ * `hasTouch` is scoped to this block: it flips `(pointer: coarse)`, which is
+ * what swaps the hint's "press Enter" for "tap Look up" (issue #3203).
+ */
+test.describe('Pilot Lookup hint on a touch device', () => {
+  test.use({ hasTouch: true });
+
+  test('the hint says to tap Look up, not press Enter, at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await openPilot(page);
+
+    const hint = page.getByText(/Suggestions need|then tap Look up/);
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText('tap Look up');
+    await expect(hint).not.toContainText('Enter');
+  });
+});
