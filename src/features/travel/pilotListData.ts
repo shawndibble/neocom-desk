@@ -6,7 +6,8 @@
  * zKillboard kill list per pilot who is not already friendly.
  *
  * Rows are reported as they settle so the table fills in while zKillboard
- * answers. zKillboard calls are made a few at a time, not all 40 at once.
+ * answers. zKillboard calls are made a few at a time, not all 40 at once, with
+ * unknown and neutral pilots ahead of red and orange contacts.
  */
 import { postUniverseIds } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
@@ -112,6 +113,10 @@ function isFriendly(row: PilotListRow): boolean {
   return row.ownOrganization !== null || row.standing?.band === 'blue';
 }
 
+function isKnownBad(row: PilotListRow): boolean {
+  return row.standing?.band === 'red' || row.standing?.band === 'orange';
+}
+
 export async function loadPilotList(
   names: readonly string[],
   { signal, onRows, viewer = Promise.resolve(NO_VIEWER) }: LoadPilotListOptions
@@ -199,9 +204,13 @@ export async function loadPilotList(
     })
     .catch(() => undefined);
 
-  const toLookUp = rows.flatMap((row) =>
-    row.characterId !== null && row.kills.kind === 'loading' ? [row.characterId] : []
-  );
+  // Red and orange contacts go last: the viewer already knows they are bad news,
+  // so the unknowns and neutrals are the ones worth waiting on. Array sort is
+  // stable, so each group keeps its pasted order.
+  const toLookUp = rows
+    .filter((row) => row.characterId !== null && row.kills.kind === 'loading')
+    .sort((a, b) => Number(isKnownBad(a)) - Number(isKnownBad(b)))
+    .flatMap((row) => (row.characterId === null ? [] : [row.characterId]));
   await mapWithConcurrencyLimit(toLookUp, ZKILL_CONCURRENCY, async (characterId) => {
     if (signal?.aborted) return;
     const result = await fetchPilotKillHistory(characterId).catch(() => ({ ok: false as const }));

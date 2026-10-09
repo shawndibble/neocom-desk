@@ -77,10 +77,7 @@ export function SurveyBoard({
   const phone = useIsPhone();
 
   const labels: SurveyMessageLabels = {
-    cracking: t('survey.message.cracking'),
-    halfway: t('survey.message.halfway'),
-    almost: t('survey.message.almost'),
-    last: t('survey.message.last'),
+    heading: t('survey.message.heading'),
     done: t('survey.message.done'),
     waiting: t('survey.message.waiting'),
     left: t('survey.message.left'),
@@ -140,6 +137,12 @@ export function SurveyBoard({
               })}
             </span>
           </div>
+
+          {scans.length <= 1 && (
+            <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-line px-4 text-center text-sm text-text-dim">
+              {t('survey.addSecondScan')}
+            </div>
+          )}
 
           {scans.length > 1 && (
             <>

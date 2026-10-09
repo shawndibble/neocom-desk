@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { MAX_LINE_WIDTH } from '@/engine/survey/chatMessage';
+import { textWidth } from '@/engine/survey/chatFont';
+import { MAX_ROW_PX } from '@/engine/survey/chatMessage';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { configureClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -70,7 +71,14 @@ describe('SurveyBoard', () => {
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 
-  it('copies a four-line chat message ending in the link, each line within the width', async () => {
+  it('with one scan shows a dash for done at, and asks for another scan where the chart goes', () => {
+    render(<SurveyBoard scans={SCANS.slice(0, 1)} url={URL} expiresAt={null} />);
+    expect(screen.getByText('Add another scan to see the chart')).toBeTruthy();
+    expect(screen.queryByTestId('charts')).toBeNull();
+    expect(screen.getByText('Done at').nextElementSibling?.textContent).toBe('–');
+  });
+
+  it('copies a heading and a four-row box with the link on the bottom rail, each row within the width', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
@@ -79,15 +87,15 @@ describe('SurveyBoard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy chat message' }));
     await waitFor(() => expect(written).toHaveLength(1));
 
-    const lines = written[0].split('\n');
+    const [heading, ...lines] = written[0].split('\n');
+    expect(heading).toBe('Neocom Desk Report');
     expect(lines).toHaveLength(4);
-    expect(lines[0]).toMatch(/^Rocks cracking · done <b>\d\d:\d\d EVE<\/b> \(~/);
-    expect(lines[1]).toBe('▕██░░░░░░░░░░░░░░░░░░▏ 13%');
-    expect(lines[2]).toBe('Left: 5 Clear Icicle');
-    expect(lines[3]).toBe(URL);
-    for (const line of lines.slice(0, 3)) {
-      expect(line.replace(/<\/?b>/g, '').length).toBeLessThanOrEqual(MAX_LINE_WIDTH);
-    }
+    expect(lines[0]).toMatch(/^┌─*\[ ETA: \d\d:\d\d EVE \(~.*\]─*╌┄┈$/);
+    expect(lines[1]).toMatch(/^│ █+░+ 13%$/);
+    expect(lines[2]).toBe('│ Left: 5 Clear Icicle');
+    expect(lines[3]).toContain(`[ ${URL} ]`);
+    // The link's rail can run past the cap (a link cannot be shortened); the ore line cannot.
+    expect(textWidth(lines[2])).toBeLessThanOrEqual(MAX_ROW_PX);
     await screen.findByText('Copied');
   });
 
@@ -153,10 +161,9 @@ describe('SurveyBoard', () => {
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
     });
 
-    it('explains the chart: a swatch per ore, the rate and the projection', () => {
+    it('explains the chart: a swatch per ore, and the rate', () => {
       render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getByText('Mining rate')).toBeTruthy();
-      expect(screen.getByText('Dashed: finish at the current pace')).toBeTruthy();
       expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);
     });
   });

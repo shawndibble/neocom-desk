@@ -2,17 +2,18 @@
  * The message the Survey tab's "Copy chat message" button puts on the
  * clipboard, for pasting into an in-game channel.
  *
- * In-game chat keeps `<b>` and drops colour, size, hint and link tags, so
- * the style is words and block characters. Wording comes in as `labels`
- * (this engine imports no i18n); a label's `{placeholders}` are filled here.
+ * In-game chat drops colour, size, hint and link tags, and the message leaves
+ * out bold (its glyph widths were not measured), so the style is words and
+ * box and block characters. Wording comes in as `labels` (this engine imports
+ * no i18n); a label's `{placeholders}` are filled here.
  */
 import type { SurveySummary } from './series';
+import { textWidth } from './chatFont';
+import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyMessageLabels {
-  cracking: string;
-  halfway: string;
-  almost: string;
-  last: string;
+  /** The first line, before the box: chat puts the speaker's name beside it. */
+  heading: string;
   /** `{time}` is HH:MM EVE time, `{left}` the time remaining. */
   done: string;
   waiting: string;
@@ -24,15 +25,63 @@ export interface SurveyMessageLabels {
   cleared: string;
 }
 
-const BAR_CELLS = 20;
 /**
- * Widest a line of the message may run, in visible characters (`<b>` tags
- * don't show). RockRadar's own message is the benchmark: its widest lines are
- * about 52 characters, and they never wrap. Most of those are box-drawing
- * characters, which run wider than letters in the chat window's proportional
- * font, so a line of plain text can be a little longer than that and still fit.
+ * The frame: an open box. The ETA is set into the top rail and the link into the
+ * bottom one, each centred; the bar and the ore line sit beside a `║` rail on the
+ * left. Nothing closes the right side: chat draws a proportional font, so a right
+ * edge never lined up. Each rail tapers off (`╌┄┈`) instead.
+ *
+ * A rail is never shorter than the content under it, and at most a character
+ * longer: it is as long as the ore line, or as the link's rail when that is
+ * longer, rounded up to a whole `─`. The bar rounds the other way, so it never
+ * outruns the rails. Lengths are measured in pixels with the widths in
+ * `chatFont.ts` (an `i` is 4px, an `m` 10px), not counted in characters.
  */
-export const MAX_LINE_WIDTH = 56;
+const SIDE = '│ ';
+const SIDE_PX = textWidth(SIDE);
+const RAIL_CHAR = '─';
+const RAIL_PX = textWidth(RAIL_CHAR);
+const BLOCK_PX = textWidth('█');
+const SPACE_PX = textWidth(' ');
+const TAPER = '╌┄┈';
+/** A rail without its fill or label: the corner, the label's brackets with a space inside each, the taper. */
+const RAIL_FRAME_PX = textWidth('┌[  ]' + TAPER);
+/** Fewest cells the bar may shrink to. */
+const MIN_BAR_CELLS = 10;
+
+/** How many `unit`-wide characters cover `gap` px, rounded by `round`; never negative. */
+const unitsFor = (gap: number, unit: number, round: (n: number) => number): number =>
+  Math.max(0, round(gap / unit));
+
+/** `┌───[ label ]───╌┄┈`, at least `width` px long and under a character more, label centred. */
+function rail(corner: string, label: string, width: number): string {
+  const fill = unitsFor(width - RAIL_FRAME_PX - textWidth(label), RAIL_PX, Math.ceil);
+  const before = Math.floor(fill / 2);
+  return `${corner}${RAIL_CHAR.repeat(before)}[ ${label} ]${RAIL_CHAR.repeat(fill - before)}${TAPER}`;
+}
+
+/**
+ * The bar row: the bar fills the box's width once the percent after it has its
+ * room. No end caps: they indent the bar and read thin next to the blocks.
+ */
+function barRow(percent: number, finished: boolean, width: number): string {
+  const tail = `${percent}%`;
+  const cells = Math.max(
+    unitsFor(width - SIDE_PX - SPACE_PX - textWidth(tail), BLOCK_PX, Math.floor),
+    MIN_BAR_CELLS
+  );
+  const filled = finished ? cells : Math.floor((percent * cells) / 100);
+  return `${SIDE}${'█'.repeat(filled)}${'░'.repeat(cells - filled)} ${tail}`;
+}
+
+/**
+ * Widest a row of the message may run, in pixels, so it does not wrap in a
+ * default-width chat window. Measured in game: rows of 267-274px fit, and a row
+ * of 367px wrapped; the window holds about 335px, so this leaves room to spare.
+ * It limits what the ore line may name; a long link can still lengthen the rails
+ * past it.
+ */
+export const MAX_ROW_PX = 300;
 const SEPARATOR = ' · ';
 
 /**
@@ -129,26 +178,14 @@ export function formatDuration(ms: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function statusWord(percent: number, labels: SurveyMessageLabels): string {
-  if (percent < 25) return labels.cracking;
-  if (percent < 75) return labels.halfway;
-  if (percent < 95) return labels.almost;
-  return labels.last;
-}
-
-function bar(percent: number, finished: boolean): string {
-  const filled = finished ? BAR_CELLS : Math.floor((percent / 100) * BAR_CELLS);
-  return `▕${'█'.repeat(filled)}${'░'.repeat(BAR_CELLS - filled)}▏ ${percent}%`;
-}
-
 /** How many ores the "Left:" line names before grouping the rest. */
-const MAX_NAMED_ORES = 3;
+const MAX_NAMED_ORES = 2;
 
 /**
- * "Left: 5 Scordite · 15 Pyroxeres · 20 Veldspar · 12 other": the ores with
- * the most ISK left, each with its rock count, and the rocks of every other
- * ore grouped into one count. `ores` arrives most valuable first, and fewer
- * than three are named if a longer line would wrap.
+ * "Left: 5 Scordite · 4 Kernite · 35 other": the two ores richest per m³ left
+ * (the order the page lists them in), each with its rock count, and the rocks
+ * of every other ore grouped into one count. `ores` arrives richest first, and
+ * fewer than two are named if a longer line would wrap.
  */
 function oreLine(
   ores: SurveySummary['ores'],
@@ -156,15 +193,15 @@ function oreLine(
   labels: SurveyMessageLabels
 ): string {
   const rocksIn = (list: SurveySummary['ores']): number => list.reduce((n, o) => n + o.rocks, 0);
-  const prefixWidth = fill(labels.left, { ores: '' }).length;
+  const prefixPx = SIDE_PX + textWidth(fill(labels.left, { ores: '' }));
   const listed: string[] = [];
   let named = 0;
   for (const ore of ores.slice(0, MAX_NAMED_ORES)) {
     const entry = `${ore.rocks} ${short[ore.ore]}`;
     const rest = rocksIn(ores.slice(named + 1));
     const other = rest > 0 ? [fill(labels.more, { count: rest })] : [];
-    const width = prefixWidth + [...listed, entry, ...other].join(SEPARATOR).length;
-    if (listed.length > 0 && width > MAX_LINE_WIDTH) break;
+    const px = prefixPx + textWidth([...listed, entry, ...other].join(SEPARATOR));
+    if (listed.length > 0 && px > MAX_ROW_PX) break;
     listed.push(entry);
     named++;
   }
@@ -173,20 +210,45 @@ function oreLine(
   return fill(labels.left, { ores: listed.join(SEPARATOR) });
 }
 
+/**
+ * The box's rows (three for a cleared field, which has no ore line), all as long
+ * as the longest of: the ore row, and each rail holding its label.
+ */
+function box(
+  headline: string,
+  percent: number,
+  finished: boolean,
+  ore: string | null,
+  url: string
+): string[] {
+  const width = Math.max(
+    RAIL_FRAME_PX + textWidth(headline),
+    RAIL_FRAME_PX + textWidth(url),
+    SIDE_PX + SPACE_PX + textWidth(`${percent}%`) + MIN_BAR_CELLS * BLOCK_PX,
+    ore === null ? 0 : SIDE_PX + textWidth(ore)
+  );
+  return [
+    rail('┌', headline, width),
+    barRow(percent, finished, width),
+    ...(ore === null ? [] : [SIDE + ore]),
+    rail('└', url, width),
+  ];
+}
+
 export function surveyChatMessage(
   summary: SurveySummary,
   url: string,
   labels: SurveyMessageLabels
 ): string {
+  // Chat puts the speaker's name before the first line, so a heading line takes that
+  // spot and the box starts underneath it instead of beside the name.
+  const lead = `${labels.heading}\n`;
+
   if (summary.finished) {
-    return [
-      fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) }),
-      bar(100, true),
-      url,
-    ].join('\n');
+    const headline = fill(labels.cleared, { duration: formatDuration(summary.elapsedMs) });
+    return lead + box(headline, 100, true, null, url).join('\n');
   }
 
-  const status = statusWord(summary.percent, labels);
   const timing =
     summary.etaAt === null
       ? labels.waiting
@@ -195,8 +257,8 @@ export function surveyChatMessage(
           left: formatDuration(summary.etaAt - summary.lastAt),
         });
 
-  const present = summary.ores.filter((o) => o.rocks > 0);
-  const left = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
-
-  return [`${status}${SEPARATOR}${timing}`, bar(summary.percent, false), left, url].join('\n');
+  // Richest per m³ first, as the page lists them; with no ISK the volume order stands.
+  const present = sortByValuePerM3(summary.ores.filter((o) => o.rocks > 0));
+  const ore = oreLine(present, shortOreNames(present.map((o) => o.ore)), labels);
+  return lead + box(timing, summary.percent, false, ore, url).join('\n');
 }

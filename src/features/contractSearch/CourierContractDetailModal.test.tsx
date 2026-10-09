@@ -144,3 +144,11 @@ describe('CourierContractDetailModal route path', () => {
     expect(screen.getByText('2 jumps').tagName).not.toBe('BUTTON');
   });
 });
+
+describe('CourierContractDetailModal contract ID', () => {
+  it('puts a copy button beside the contract ID', () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    renderModal();
+    expect(screen.getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
+  });
+});

@@ -114,13 +114,19 @@ describe('summarizeSurvey', () => {
     ]);
   });
 
-  it('orders chart layers like the ore list: most valuable left first', () => {
+  it('orders chart layers like the ore bars: richest per m³ first, not most ISK left', () => {
+    // Veldspar holds more ISK in total but Scordite is richer per m³.
     const s = summarizeSurvey([
-      iskScan(0, ['Veldspar', 900, 1_000_000], ['Scordite', 100, 5_000_000]),
-      iskScan(5, ['Veldspar', 800, 900_000], ['Scordite', 50, 2_500_000]),
+      iskScan(0, ['Veldspar', 9_000, 9_000_000], ['Scordite', 100, 5_000_000]),
+      iskScan(5, ['Veldspar', 8_000, 8_000_000], ['Scordite', 50, 2_500_000]),
     ])!;
-    expect(s.oreNames).toEqual(s.ores.map((o) => o.ore));
+    expect(s.ores.map((o) => o.ore)).toEqual(['Veldspar', 'Scordite']);
     expect(s.oreNames).toEqual(['Scordite', 'Veldspar']);
+  });
+
+  it('keeps the volume order for chart layers when the scan has no ISK', () => {
+    const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500])])!;
+    expect(s.oreNames).toEqual(['Sylvite', 'Bitumens']);
   });
 
   it('lists ores by volume left with rock counts', () => {

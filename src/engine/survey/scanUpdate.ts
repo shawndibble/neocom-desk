@@ -34,3 +34,19 @@ export function classifyScan(
   }
   return 'update';
 }
+
+/**
+ * The field a Survey has shown so far: each ore at its m³ in the newest scan
+ * that showed it. An ore that dropped out of range (or that the scanner skipped)
+ * and then comes back belongs to the same field, so a paste is compared against
+ * this rather than only the latest scan. `scans` run oldest to newest; null
+ * before the first one.
+ */
+export function lastSeenField(scans: readonly (readonly SurveyRock[])[]): SurveyRock[] | null {
+  if (scans.length === 0) return null;
+  const seen = new Map<string, number>();
+  for (const rocks of scans) {
+    for (const [ore, volume] of volumeByOre(rocks)) seen.set(ore, volume);
+  }
+  return [...seen].map(([ore, volume]) => ({ ore, volume }));
+}
