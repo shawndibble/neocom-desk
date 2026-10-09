@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
-import { IskAmount } from '@/components/ui';
+import { IskAmount, Tooltip } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useDoneAtLocal } from './surveyPref';
 
@@ -62,22 +62,23 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
         ) : summary.etaAt === null ? (
           '–'
         ) : (
-          <button
-            type="button"
-            className={inlineLinkClassName}
-            title={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}
-            onClick={() => void setLocal(!local)}
-          >
-            {local
-              ? t('survey.localTime', {
-                  time: new Date(summary.etaAt).toLocaleTimeString(i18n.language, {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  }),
-                })
-              : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
-          </button>
+          <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
+            <button
+              type="button"
+              className={inlineLinkClassName}
+              onClick={() => void setLocal(!local)}
+            >
+              {local
+                ? t('survey.localTime', {
+                    time: new Date(summary.etaAt).toLocaleTimeString(i18n.language, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    }),
+                  })
+                : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
+            </button>
+          </Tooltip>
         )}
       </Tile>
       <Tile label={t('survey.statTimeLeft')}>
