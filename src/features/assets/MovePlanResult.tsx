@@ -1,0 +1,341 @@
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { Button, Disclosure } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import type { MovePlan } from '@/engine/assets/movePlan';
+import {
+  CharacterScopeReadout,
+  type CharacterScopeReadoutProps,
+} from '@/features/character/CharacterScopeReadout';
+import { useSystemName } from '@/features/route/useSolarSystems';
+import { routeToHref } from '@/features/travel/routeSafetyLink';
+import { formatCubicMetres } from '@/lib/volume';
+import { Rail, RailHeading, RailStop } from './MovePlanRail';
+import { pickupHueVar, splitSegments, tripLanes } from './movePlanView';
+
+/** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
+const INLINE_ALTERNATIVES = 3;
+
+export interface PlanState {
+  plan: MovePlan;
+  destinationSystem: number | null;
+  /** The destination station's name, when one was picked. */
+  destinationStation: string | null;
+  /** System of each pickup location, for the Route Safety link's start. */
+  pickupSystems: ReadonlyMap<number, number | null>;
+}
+
+interface PlanResultProps {
+  state: PlanState;
+  scope: CharacterScopeReadoutProps;
+  compareOpen: boolean;
+  onToggleCompare: () => void;
+  onBack: () => void;
+  onDone: () => void;
+  name: (typeId: number) => string;
+  placeLabel: (id: number) => string;
+  /** Palette slot of a pickup location. */
+  hueOf: (locationId: number) => number;
+}
+
+/**
+ * The plan: the suggested hauler and the load split by pickup and trip on top,
+ * then the rail from each Character's pickups to the destination.
+ */
+export function PlanResult({
+  state,
+  scope,
+  compareOpen,
+  onToggleCompare,
+  onBack,
+  onDone,
+  name,
+  placeLabel,
+  hueOf,
+}: PlanResultProps) {
+  const { t } = useTranslation();
+  const { plan, destinationSystem, destinationStation, pickupSystems } = state;
+  const systemName = useSystemName(destinationSystem);
+  if (plan.perCharacter.length === 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="font-medium">{t('assets.movePlan.nothingToMove')}</p>
+        <p className="text-text-dim">{t('assets.movePlan.nothingToMoveHint')}</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="primary" onClick={onBack}>
+            {t('assets.movePlan.back')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  const { totals } = plan;
+  const destinationLabel = destinationStation ?? systemName ?? '';
+  const pickups = plan.perCharacter.flatMap((c) => c.pickups);
+  const segments = splitSegments(pickups.map((p, i) => ({ key: i, m3: p.totalM3 })));
+  const capacity = plan.suggested?.hull.capacityM3 ?? 0;
+  const lanes = tripLanes(totals.totalM3, capacity);
+  const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
+
+  return (
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          {t('assets.movePlan.edit')}
+        </Button>
+        <CharacterScopeReadout {...scope} />
+      </div>
+      {plan.suggested ? (
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
+          <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
+            {plan.suggested.trips}
+            <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
+              {t('assets.movePlan.tripsLabel', { count: plan.suggested.trips })}
+            </small>
+          </div>
+          <p className="m-0 flex flex-wrap items-center gap-2 font-bold">
+            {plan.suggested.hull.name}
+            {plan.suggested.hull.owned && (
+              <span className="text-xs font-semibold text-success">
+                {t('assets.movePlan.youOwnOne')}
+              </span>
+            )}
+          </p>
+          {alternatives.length > 0 && (
+            <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-xs text-text-dim">
+              {alternatives.slice(0, INLINE_ALTERNATIVES).map((o) => (
+                <li key={o.hull.typeId}>
+                  <b className="font-semibold text-text">{o.hull.name}</b>{' '}
+                  {t('assets.movePlan.tripCount', { count: o.trips })}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        totals.totalM3 > 0 && <p className="text-text-dim">{t('assets.movePlan.noHauler')}</p>
+      )}
+      {alternatives.length > INLINE_ALTERNATIVES && (
+        <Disclosure
+          label={t('assets.movePlan.allHaulers')}
+          expanded={compareOpen}
+          onToggle={onToggleCompare}
+        >
+          <ul className="text-text-dim">
+            {plan.comparison.map((o) => (
+              <li key={o.hull.typeId}>
+                {o.hull.name} · {t('assets.movePlan.tripCount', { count: o.trips })}
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
+      {segments.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <div
+            role="img"
+            aria-label={t('assets.movePlan.loadSplit')}
+            className="relative flex h-11 overflow-hidden rounded-xs border border-line"
+          >
+            {segments.map((s) => (
+              <i
+                key={s.key}
+                className="block h-full"
+                style={{
+                  width: `${s.share * 100}%`,
+                  background: pickupHueVar(hueOf(pickups[s.key].locationId)),
+                }}
+              />
+            ))}
+            {lanes.slice(0, -1).map((l) => (
+              <u
+                key={l.trip}
+                aria-hidden="true"
+                className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
+                style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
+              />
+            ))}
+          </div>
+          {lanes.length > 0 && (
+            <div className="flex text-xs text-text-dim" aria-hidden="true">
+              {lanes.map((l) => (
+                <span
+                  key={l.trip}
+                  className="truncate border-l-2 border-line-bright pt-0.5 pl-1.5 whitespace-nowrap"
+                  style={{ width: `${l.share * 100}%` }}
+                >
+                  {t('assets.movePlan.tripLane', { n: l.trip })} · {formatCubicMetres(l.m3)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">
+        <Stat
+          label={t('assets.movePlan.volume')}
+          value={`${formatCubicMetres(totals.totalM3)} m³`}
+        />
+        <Stat label={t('assets.movePlan.stacks')} value={totals.stacks.toLocaleString()} />
+        <Stat
+          label={t('assets.movePlan.characters', { count: totals.characters })}
+          value={String(totals.characters)}
+        />
+        <Stat
+          label={t('assets.movePlan.ships', { count: totals.shipsToFly })}
+          value={String(totals.shipsToFly)}
+        />
+      </dl>
+      <Rail>
+        {plan.perCharacter.map((c) => (
+          <PlanCharacter
+            key={c.characterId}
+            count={c.pickups.length}
+            totalM3={c.totalM3}
+            name={c.name}
+          >
+            {c.pickups.map((p) => (
+              <RailStop key={p.locationId} hue={hueOf(p.locationId)}>
+                <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
+                    <h3 className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
+                      <span className="min-w-0 flex-1 font-bold [overflow-wrap:anywhere]">
+                        {placeLabel(p.locationId)}
+                      </span>
+                      <span className="font-bold tabular-nums">
+                        {formatCubicMetres(p.totalM3)} m³
+                      </span>
+                    </h3>
+                    {destinationSystem !== null && (
+                      <Link
+                        className={`${inlineLinkClassName} text-sm whitespace-nowrap`}
+                        aria-label={t('assets.movePlan.routeSafetyFrom', {
+                          place: placeLabel(p.locationId),
+                        })}
+                        to={routeToHref(destinationSystem, pickupSystems.get(p.locationId) ?? null)}
+                      >
+                        {t('assets.movePlan.routeSafety')}
+                      </Link>
+                    )}
+                  </div>
+                  {totals.totalM3 > 0 && capacity > 0 && (
+                    <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
+                      {t('assets.movePlan.shareOfLoad', {
+                        percent: Math.round((p.totalM3 / totals.totalM3) * 100),
+                        hauls:
+                          p.totalM3 / capacity < 0.05 ? '<0.1' : (p.totalM3 / capacity).toFixed(1),
+                      })}
+                    </p>
+                  )}
+                  <ul className="m-0 flex list-none flex-col p-0">
+                    {p.lines.map((l) => (
+                      <PlanLine
+                        key={l.typeId}
+                        name={name(l.typeId)}
+                        qty={`× ${l.quantity.toLocaleString()}`}
+                        trailing={l.m3 !== null ? `${formatCubicMetres(l.m3)} m³` : null}
+                      />
+                    ))}
+                    {p.unknownVolume.map((u) => (
+                      <PlanLine
+                        key={`unknown-${u.typeId}`}
+                        name={name(u.typeId)}
+                        qty={`× ${u.quantity.toLocaleString()}`}
+                        trailing={t('assets.movePlan.volumeUnknown')}
+                        dim
+                      />
+                    ))}
+                    {p.ships.map((s) => (
+                      <PlanLine
+                        key={s.itemId}
+                        name={name(s.typeId)}
+                        qty={
+                          <span className="font-semibold text-warning">
+                            {t('assets.movePlan.flyIt')}
+                          </span>
+                        }
+                        trailing={null}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              </RailStop>
+            ))}
+          </PlanCharacter>
+        ))}
+        {destinationLabel && (
+          <RailStop destination>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-xs border border-dashed border-accent px-3 py-2.5">
+              <b className="[overflow-wrap:anywhere]">{destinationLabel}</b>
+              <span className="text-text-dim">{t('assets.movePlan.deliverAll')}</span>
+            </div>
+          </RailStop>
+        )}
+      </Rail>
+      <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+        <Button variant="ghost" onClick={onBack}>
+          {t('assets.movePlan.back')}
+        </Button>
+        <Button variant="primary" onClick={onDone}>
+          {t('assets.movePlan.done')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PlanCharacter({
+  name,
+  count,
+  totalM3,
+  children,
+}: {
+  name: string;
+  count: number;
+  totalM3: number;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <RailHeading name={name}>
+        <span className="text-xs font-normal text-text-dim">
+          {t('assets.movePlan.pickupSummary', { count, volume: formatCubicMetres(totalM3) })}
+        </span>
+      </RailHeading>
+      {children}
+    </>
+  );
+}
+
+function PlanLine({
+  name,
+  qty,
+  trailing,
+  dim = false,
+}: {
+  name: string;
+  qty: ReactNode;
+  trailing: string | null;
+  dim?: boolean;
+}) {
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-3 border-t border-line py-1.5 first:border-t-0">
+      <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
+      <span className="text-text-dim tabular-nums">{qty}</span>
+      <span className={`min-w-[5.5em] text-right tabular-nums ${dim ? 'text-text-dim' : ''}`}>
+        {trailing}
+      </span>
+    </li>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col-reverse">
+      <dt className="text-xs tracking-wide text-text-dim uppercase">{label}</dt>
+      <dd className="m-0 text-base font-bold tabular-nums">{value}</dd>
+    </div>
+  );
+}

@@ -1,33 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import {
-  Button,
-  Caret,
-  Checkbox,
-  Disclosure,
-  Modal,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Spinner,
-} from '@/components/ui';
-import {
-  focusRingInsetClassName,
-  inlineLinkClassName,
-  rowInteractiveClassName,
-  tappableRowClassName,
-  touchCheckboxLabelClassName,
-} from '@/components/ui/controlStyles';
+import { Button, FilterChip, Modal, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { planMove, type MoveHull, type MovePlan } from '@/engine/assets/movePlan';
-import {
-  CharacterScopeReadout,
-  type CharacterScopeReadoutProps,
-} from '@/features/character/CharacterScopeReadout';
+import { planMove, type MoveHull } from '@/engine/assets/movePlan';
 import { loadOtherCharactersAssets } from '@/features/character/assets';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -39,10 +15,12 @@ import {
 } from '@/features/fittings/useFittingCatalogue';
 import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
-import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { PickerList } from './MovePlanPicker';
+import { PlanResult, type PlanState } from './MovePlanResult';
 import {
   holdCapacityM3,
   pickerStacks,
@@ -50,6 +28,13 @@ import {
   type MovePlanSource,
   type PickerStack,
 } from './movePlanInput';
+import {
+  pickedTotals,
+  pickupHues,
+  pickupHueVar,
+  shortStationLabels,
+  splitSegments,
+} from './movePlanView';
 
 /** SDE category 6. */
 const SHIP_CATEGORY_ID = 6;
@@ -66,6 +51,10 @@ interface Loaded {
   unitM3: Map<number, number>;
   /** Pickup location name by location id. */
   places: Map<number, string>;
+  /** Solar system of each pickup location (null when it did not resolve). */
+  systems: Map<number, number | null>;
+  /** Palette slot of each pickup location, stable from picker to plan. */
+  hues: Map<number, number>;
 }
 
 function placeName(stack: PickerStack): Promise<string | null> {
@@ -100,21 +89,17 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
     loadTypePackagedVolumes(stackTypeIds),
   ]);
   const places = new Map<number, string>();
+  const systems = new Map<number, number | null>();
   const byPlace = new Map<number, PickerStack>();
   for (const s of stacks) if (!byPlace.has(s.locationId)) byPlace.set(s.locationId, s);
   await Promise.all(
     [...byPlace].map(async ([id, stack]) => {
       places.set(id, (await placeName(stack).catch(() => null)) ?? String(id));
+      systems.set(id, await placeSystem(stack).catch(() => null));
     })
   );
-  return { sources, shipTypeIds, stacks, typeNames, unitM3, places };
-}
-
-interface PlanState {
-  plan: MovePlan;
-  destinationSystem: number | null;
-  /** System of each pickup location, for the Route Safety link's start. */
-  pickupSystems: Map<number, number | null>;
+  const hues = pickupHues(stacks.map((s) => s.locationId));
+  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues };
 }
 
 interface MovePlanModalProps {
@@ -140,6 +125,7 @@ export function MovePlanModal({
   filterControl,
 }: MovePlanModalProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -209,6 +195,27 @@ export function MovePlanModal({
     return [...seen].sort(([, a], [, b]) => a.localeCompare(b));
   }, [loaded]);
 
+  const stationLabels = useMemo(
+    () => shortStationLabels(ownStations.map(([, name]) => name)),
+    [ownStations]
+  );
+
+  const hasDestination = destSystem !== null || destStation !== null;
+
+  /** Pickup locations the destination covers: a station, or every pickup in the picked system. */
+  const atDestination = useMemo(
+    () => coveredLocations(loaded?.systems, destSystem, destStation),
+    [destStation, destSystem, loaded]
+  );
+
+  const totals = useMemo(
+    () =>
+      loaded
+        ? pickedTotals(loaded.stacks, selected, loaded.unitM3, atDestination)
+        : { stacks: 0, ships: 0, m3: 0, byLocation: new Map<number, number>() },
+    [loaded, selected, atDestination]
+  );
+
   const toggle = (keys: readonly string[], on: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -219,7 +226,11 @@ export function MovePlanModal({
       return next;
     });
 
-  const hasDestination = destSystem !== null || destStation !== null;
+  /** Ticks at the destination are kept but ignored, so changing it back restores them. */
+  function chooseDestination(system: number | null, station: number | null) {
+    setDestSystem(system);
+    setDestStation(station);
+  }
 
   async function loadHulls(): Promise<MoveHull[]> {
     const { catalogue, profile } = hullSource.current;
@@ -264,32 +275,26 @@ export function MovePlanModal({
     setPlanFailed(false);
     const mine = session.current;
     try {
-      const chosen = loaded.stacks.filter((s) => selected.has(s.key));
       const destinationSystem =
         destStation !== null
           ? await loadStationSystemId(destStation).catch(() => null)
           : destSystem;
-      const pickupSystems = new Map<number, number | null>();
-      await Promise.all(
-        [...new Map(chosen.map((s) => [s.locationId, s]))].map(async ([id, stack]) => {
-          pickupSystems.set(id, await placeSystem(stack).catch(() => null));
-        })
-      );
-      const destinationIds = new Set<number>();
-      if (destStation !== null) destinationIds.add(destStation);
-      else
-        for (const [id, system] of pickupSystems)
-          if (system !== null && system === destinationSystem) destinationIds.add(id);
-
       const hulls = await loadHulls();
       const plan = planMove({
-        destinationLocationIds: destinationIds,
+        destinationLocationIds: atDestination,
         characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
         unitM3: loaded.unitM3,
         shipTypeIds: loaded.shipTypeIds,
         hulls,
       });
-      if (mine === session.current) setResult({ plan, destinationSystem, pickupSystems });
+      if (mine === session.current)
+        setResult({
+          plan,
+          destinationSystem,
+          destinationStation:
+            destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
+          pickupSystems: loaded.systems,
+        });
     } catch {
       if (mine === session.current) setPlanFailed(true);
     } finally {
@@ -299,9 +304,22 @@ export function MovePlanModal({
 
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
   const placeLabel = (id: number) => loaded?.places.get(id) ?? String(id);
+  const hueOf = (id: number) => loaded?.hues.get(id) ?? 0;
+  const segments = splitSegments([...totals.byLocation].map(([key, m3]) => ({ key, m3 })));
+  const pickedWhat = [
+    totals.stacks > 0 && t('assets.movePlan.pickedStacks', { count: totals.stacks }),
+    totals.ships > 0 && t('assets.movePlan.pickedShips', { count: totals.ships }),
+  ]
+    .filter(Boolean)
+    .join(' + ');
 
   return (
-    <Modal open={open} onClose={onClose} title={t('assets.movePlan.title')} placement="sheet-full">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('assets.movePlan.title')}
+      placement={isPhone ? 'sheet-full' : 'wide'}
+    >
       <div className="flex min-h-full flex-col gap-3 text-sm">
         {open && <HullSource characterId={activeCharacterId} intoRef={hullSource} />}
         {filterControl}
@@ -327,159 +345,126 @@ export function MovePlanModal({
             onDone={onClose}
             name={name}
             placeLabel={placeLabel}
+            hueOf={hueOf}
           />
         ) : (
           <>
-            <section aria-label={t('assets.movePlan.whereTo')} className="flex flex-col gap-2">
-              <h3 className="font-medium">{t('assets.movePlan.whereTo')}</h3>
-              <SolarSystemPicker
-                value={destSystem}
-                onChange={(id) => {
-                  setDestSystem(id);
-                  setDestStation(null);
-                }}
-                ariaLabel={t('assets.movePlan.destinationSystem')}
-                placeholder={t('assets.movePlan.destinationSystem')}
-              />
-              {ownStations.length > 0 && (
-                <Select
-                  value={destStation === null ? '' : String(destStation)}
-                  onValueChange={(v) => {
-                    setDestStation(Number(v));
-                    setDestSystem(null);
-                  }}
-                >
-                  <SelectTrigger aria-label={t('assets.movePlan.destinationStation')}>
-                    <SelectValue placeholder={t('assets.movePlan.destinationStation')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ownStations.map(([id, label]) => (
-                      <SelectItem key={id} value={String(id)}>
-                        {label}
-                      </SelectItem>
+            {/* Pinned on a phone so the destination stays in reach while the list scrolls. */}
+            <section
+              aria-label={t('assets.movePlan.whereTo')}
+              className="sticky -top-3 z-20 -mx-3 bg-panel px-3 pt-3 pb-1 sm:static sm:mx-0 sm:p-0"
+            >
+              <div className="flex flex-col gap-2 rounded-xs border border-accent-dim bg-accent/10 p-3">
+                <h3 className="text-xs font-semibold tracking-wide text-accent uppercase">
+                  {t('assets.movePlan.deliverTo')}
+                </h3>
+                <SolarSystemPicker
+                  value={destSystem}
+                  onChange={(id) => chooseDestination(id, null)}
+                  ariaLabel={t('assets.movePlan.destinationSystem')}
+                  placeholder={t('assets.movePlan.destinationSystem')}
+                  triggerLabel={
+                    destStation !== null
+                      ? (stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
+                        placeLabel(destStation))
+                      : undefined
+                  }
+                />
+                {ownStations.length > 0 && (
+                  <div
+                    role="group"
+                    aria-label={t('assets.movePlan.destinationStation')}
+                    className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 py-1 sm:flex-wrap sm:overflow-visible"
+                  >
+                    <span className="shrink-0 text-xs text-text-dim">
+                      {t('assets.movePlan.yourStations')}
+                    </span>
+                    {ownStations.map(([id, fullName], i) => (
+                      <FilterChip
+                        key={id}
+                        label={stationLabels[i]}
+                        tooltip={stationLabels[i] !== fullName ? fullName : undefined}
+                        selected={destStation === id}
+                        onToggle={() =>
+                          destStation === id
+                            ? chooseDestination(null, null)
+                            : chooseDestination(null, id)
+                        }
+                        className="shrink-0"
+                      />
                     ))}
-                  </SelectContent>
-                </Select>
-              )}
+                  </div>
+                )}
+              </div>
             </section>
             <section aria-label={t('assets.movePlan.whatToMove')} className="flex flex-col gap-2">
-              <h3 className="font-medium">{t('assets.movePlan.whatToMove')}</h3>
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="font-medium">{t('assets.movePlan.whatToMove')}</h3>
+                {collapsed.size > 0 && (
+                  <span className="text-xs text-text-dim">
+                    {t('assets.movePlan.locationFolded')}
+                  </span>
+                )}
+              </div>
               {loaded.stacks.length === 0 && (
                 <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
               )}
-              {/* Bounded: the destination above and the action bar below stay on
-                  screen however many stacks there are. */}
-              <div className="max-h-[min(24rem,45dvh)] overflow-y-auto overscroll-contain rounded-xs border border-line">
-                {[...grouped].map(([characterId, byPlace]) => {
-                  const characterName = loaded.sources.find(
-                    (s) => s.characterId === characterId
-                  )?.name;
-                  const characterKeys = [...byPlace.values()].flatMap((stacks) =>
-                    stacks.map((s) => s.key)
-                  );
-                  return (
-                    <div key={characterId} className="flex flex-col">
-                      <GroupCheckbox
-                        className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-panel-2 px-2 font-medium"
-                        keys={characterKeys}
-                        selected={selected}
-                        onToggle={toggle}
-                        label={t('assets.movePlan.selectAllFor', { character: characterName })}
-                      >
-                        {characterName}
-                      </GroupCheckbox>
-                      {[...byPlace].map(([locationId, stacks]) => {
-                        const keys = stacks.map((s) => s.key);
-                        const groupKey = `${characterId}:${locationId}`;
-                        const isOpen = !collapsed.has(groupKey);
-                        const groupId = `move-plan-group-${groupKey}`;
-                        const picked = keys.filter((k) => selected.has(k)).length;
-                        return (
-                          <div key={locationId} className="flex flex-col border-b border-line">
-                            <div className="flex items-center gap-1 px-2 text-text-dim">
-                              <GroupCheckbox
-                                keys={keys}
-                                selected={selected}
-                                onToggle={toggle}
-                                label={t('assets.movePlan.selectAllAt', {
-                                  place: placeLabel(locationId),
-                                  character: characterName,
-                                })}
-                              />
-                              <button
-                                type="button"
-                                aria-expanded={isOpen}
-                                aria-controls={groupId}
-                                aria-label={t('assets.movePlan.groupToggle', {
-                                  character: characterName,
-                                  place: placeLabel(locationId),
-                                  picked,
-                                  total: keys.length,
-                                })}
-                                onClick={() =>
-                                  setCollapsed((prev) => {
-                                    const next = new Set(prev);
-                                    if (isOpen) next.add(groupKey);
-                                    else next.delete(groupKey);
-                                    return next;
-                                  })
-                                }
-                                className={`${tappableRowClassName} ${rowInteractiveClassName} ${focusRingInsetClassName} flex min-w-0 flex-1 items-center gap-1.5 text-left`}
-                              >
-                                <Caret expanded={isOpen} />
-                                <span className="min-w-0 flex-1 truncate">
-                                  {placeLabel(locationId)}
-                                </span>
-                                <span className="shrink-0 text-xs tabular-nums">
-                                  {t('assets.movePlan.groupCount', {
-                                    picked,
-                                    total: keys.length,
-                                  })}
-                                </span>
-                              </button>
-                            </div>
-                            {isOpen && (
-                              <div id={groupId} className="flex flex-col">
-                                {stacks.map((s) => (
-                                  <label
-                                    key={s.key}
-                                    className={`${tappableRowClassName} flex items-center gap-2 pr-2 pl-8`}
-                                  >
-                                    <Checkbox
-                                      checked={selected.has(s.key)}
-                                      onChange={(e) => toggle([s.key], e.target.checked)}
-                                    />
-                                    <span className="min-w-0 flex-1 truncate">
-                                      {name(s.typeId)}
-                                    </span>
-                                    <span className="text-text-dim tabular-nums">
-                                      × {s.quantity.toLocaleString()}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
+              <PickerList
+                grouped={grouped}
+                characterName={(id) => loaded.sources.find((s) => s.characterId === id)?.name ?? ''}
+                placeLabel={placeLabel}
+                typeName={name}
+                unitM3={loaded.unitM3}
+                hueOf={hueOf}
+                selected={selected}
+                onToggle={toggle}
+                collapsed={collapsed}
+                onToggleCollapsed={(groupKey) =>
+                  setCollapsed((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(groupKey)) next.delete(groupKey);
+                    else next.add(groupKey);
+                    return next;
+                  })
+                }
+                atDestination={atDestination}
+              />
             </section>
             {planFailed && <p className="text-text-dim">{t('assets.movePlan.planFailed')}</p>}
-            {/* Sticky rather than a Modal footer prop: the sheet's body is the
-                scroller (same bar FilterBar's sheet uses). */}
-            <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex items-center gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-              <span className="min-w-0 flex-1 text-xs text-text-dim" aria-live="polite">
-                {t('assets.movePlan.picked', { count: selected.size })}
-              </span>
-              <Button variant="ghost" onClick={onClose}>
+            {/* Sticky rather than a Modal footer prop: the sheet body is the
+                scroller (same bar FilterBar sheet uses). */}
+            <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+              <div className="flex min-w-0 basis-full flex-col gap-1.5 sm:flex-1 sm:basis-0">
+                <div className="flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
+                  {segments.map((s) => (
+                    <i
+                      key={s.key}
+                      className="block h-full"
+                      style={{ width: `${s.share * 100}%`, background: pickupHueVar(hueOf(s.key)) }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs tabular-nums" aria-live="polite">
+                  {totals.stacks + totals.ships === 0
+                    ? t('assets.movePlan.pickedNothing')
+                    : t('assets.movePlan.pickedSummary', {
+                        what: pickedWhat,
+                        volume: formatCubicMetres(totals.m3),
+                      })}
+                </span>
+                {totals.stacks + totals.ships > 0 && !hasDestination && (
+                  <span className="text-xs text-text-dim">
+                    {t('assets.movePlan.pickDestination')}
+                  </span>
+                )}
+              </div>
+              <Button variant="ghost" className="max-sm:flex-1" onClick={onClose}>
                 {t('assets.movePlan.cancel')}
               </Button>
               <Button
                 variant="primary"
-                disabled={selected.size === 0 || !hasDestination || working}
+                className="max-sm:flex-1"
+                disabled={totals.stacks + totals.ships === 0 || !hasDestination || working}
                 loading={working}
                 onClick={() => void showPlan()}
               >
@@ -493,44 +478,16 @@ export function MovePlanModal({
   );
 }
 
-/** Select-all box for a group: ticked when every key is, mixed when some are. */
-function GroupCheckbox({
-  keys,
-  selected,
-  onToggle,
-  label,
-  className,
-  children,
-}: {
-  /** Layout for a label that also holds `children`; without it the label is just the box's 44px target. */
-  className?: string;
-  children?: ReactNode;
-  keys: readonly string[];
-  selected: ReadonlySet<string>;
-  onToggle: (keys: readonly string[], on: boolean) => void;
-  label: string;
-}) {
-  const count = keys.filter((k) => selected.has(k)).length;
-  const all = keys.length > 0 && count === keys.length;
-  return (
-    <label
-      className={
-        className
-          ? `${tappableRowClassName} ${className}`
-          : `${touchCheckboxLabelClassName} ${tappableRowClassName}`
-      }
-    >
-      <Checkbox
-        ref={(el) => {
-          if (el) el.indeterminate = count > 0 && !all;
-        }}
-        checked={all}
-        onChange={(e) => onToggle(keys, e.target.checked)}
-        aria-label={label}
-      />
-      {children}
-    </label>
-  );
+/** Pickup locations a destination covers: one station, or every pickup in the picked system. */
+function coveredLocations(
+  systems: ReadonlyMap<number, number | null> | undefined,
+  system: number | null,
+  station: number | null
+): Set<number> {
+  const ids = new Set<number>();
+  if (station !== null) ids.add(station);
+  else if (system !== null) for (const [id, sys] of systems ?? []) if (sys === system) ids.add(id);
+  return ids;
 }
 
 interface HullSourceData {
@@ -555,149 +512,4 @@ function HullSource({
     intoRef.current = { catalogue, profile };
   }, [intoRef, catalogue, profile]);
   return null;
-}
-
-function PlanResult({
-  state,
-  scope,
-  compareOpen,
-  onToggleCompare,
-  onBack,
-  onDone,
-  name,
-  placeLabel,
-}: {
-  state: PlanState;
-  scope: CharacterScopeReadoutProps;
-  compareOpen: boolean;
-  onToggleCompare: () => void;
-  onBack: () => void;
-  onDone: () => void;
-  name: (typeId: number) => string;
-  placeLabel: (id: number) => string;
-}) {
-  const { t } = useTranslation();
-  const { plan, destinationSystem, pickupSystems } = state;
-  if (plan.perCharacter.length === 0) {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="font-medium">{t('assets.movePlan.nothingToMove')}</p>
-        <p className="text-text-dim">{t('assets.movePlan.nothingToMoveHint')}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onBack}>
-            {t('assets.movePlan.back')}
-          </Button>
-          <Button variant="primary" onClick={onBack}>
-            {t('assets.movePlan.chooseDestination')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  const { totals } = plan;
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          {t('assets.movePlan.edit')}
-        </Button>
-        <CharacterScopeReadout {...scope} />
-      </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
-        <Stat label={t('assets.movePlan.stacks')} value={totals.stacks.toLocaleString()} />
-        <Stat
-          label={t('assets.movePlan.volume')}
-          value={`${formatCubicMetres(totals.totalM3)} m³`}
-        />
-        <Stat label={t('assets.movePlan.characters')} value={String(totals.characters)} />
-        <Stat label={t('assets.movePlan.ships')} value={String(totals.shipsToFly)} />
-        <Stat
-          label={t('assets.movePlan.trips')}
-          value={totals.trips === null ? '—' : String(totals.trips)}
-        />
-      </dl>
-      {plan.suggested ? (
-        <div>
-          <p>
-            {t('assets.movePlan.suggested', {
-              hull: plan.suggested.hull.name,
-              count: plan.suggested.trips,
-            })}
-          </p>
-          <Disclosure
-            label={t('assets.movePlan.compare')}
-            expanded={compareOpen}
-            onToggle={onToggleCompare}
-          >
-            <ul className="text-text-dim">
-              {plan.comparison.map((o) => (
-                <li key={o.hull.typeId}>
-                  {o.hull.name} · {t('assets.movePlan.tripCount', { count: o.trips })}
-                </li>
-              ))}
-            </ul>
-          </Disclosure>
-        </div>
-      ) : (
-        totals.totalM3 > 0 && <p className="text-text-dim">{t('assets.movePlan.noHauler')}</p>
-      )}
-      {plan.perCharacter.map((c) => (
-        <section key={c.characterId} className="flex flex-col gap-2">
-          <h3 className="font-medium">{c.name}</h3>
-          {c.pickups.map((p) => (
-            <div key={p.locationId} className="flex flex-col gap-1">
-              <h4 className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{placeLabel(p.locationId)}</span>
-                <span className="text-text-dim">{formatCubicMetres(p.totalM3)} m³</span>
-                {destinationSystem !== null && (
-                  <Link
-                    className={inlineLinkClassName}
-                    to={routeToHref(destinationSystem, pickupSystems.get(p.locationId) ?? null)}
-                  >
-                    {t('assets.movePlan.routeSafety')}
-                  </Link>
-                )}
-              </h4>
-              <ul className="text-xs text-text-dim">
-                {p.lines.map((l) => (
-                  <li key={l.typeId}>
-                    {l.quantity.toLocaleString()} × {name(l.typeId)}
-                    {l.m3 !== null && ` — ${formatCubicMetres(l.m3)} m³`}
-                  </li>
-                ))}
-                {p.unknownVolume.map((u) => (
-                  <li key={`unknown-${u.typeId}`}>
-                    {u.quantity.toLocaleString()} × {name(u.typeId)} —{' '}
-                    {t('assets.movePlan.volumeUnknown')}
-                  </li>
-                ))}
-                {p.ships.map((s) => (
-                  <li key={s.itemId}>
-                    {name(s.typeId)} — {t('assets.movePlan.flyIt')}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </section>
-      ))}
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onBack}>
-          {t('assets.movePlan.back')}
-        </Button>
-        <Button variant="primary" onClick={onDone}>
-          {t('assets.movePlan.done')}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-text-dim">{label}</dt>
-      <dd className="font-medium">{value}</dd>
-    </div>
-  );
 }
