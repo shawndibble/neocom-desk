@@ -64,6 +64,10 @@ test('Production Runs summary reads in at most two lines and does not clip at 39
   const summary = page.getByText(/logged · .* realized · .* open/);
   await expect(summary).toBeVisible();
 
+  // Row 2: the summary sits beneath the title row, not squeezed beside it.
+  const titleBox = (await page.getByRole('heading', { name: 'Production Runs' }).boundingBox())!;
+  expect((await summary.boundingBox())!.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height - 1);
+
   for (const figure of [null, '-360,150,000', '-1,500,000,150,000']) {
     if (figure) {
       await summary.evaluate((el, text) => {
