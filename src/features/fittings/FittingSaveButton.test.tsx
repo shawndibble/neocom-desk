@@ -106,7 +106,7 @@ describe('FittingSaveButton', () => {
       );
       await user.click(screen.getByRole('button', { name: 'More save options' }));
       expect(await screen.findByRole('menuitem', { name: /^Save to My Fittings/ })).toBeTruthy();
-      expect(screen.getByRole('menuitem', { name: 'Save to EVE' })).toBeTruthy();
+      expect(screen.getByRole('menuitem', { name: 'Save to EVE…' })).toBeTruthy();
       // No copy to make of a Fitting that was never saved.
       expect(screen.queryByRole('menuitem', { name: /Save as new/ })).toBeNull();
     });

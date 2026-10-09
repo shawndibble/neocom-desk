@@ -6,7 +6,15 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import {
+  IconButton,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { summarizeSurvey } from '@/engine/survey/series';
 import { forgetSurvey, useSurveyHistory } from './surveyHistory';
 import { loadSurvey } from './surveyStore';
@@ -82,14 +90,39 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       onOpenChange={setOpen}
     >
       <SelectTrigger size="sm" aria-label={t('survey.historyLabel')} className="w-56 max-w-full">
-        <SelectValue placeholder={t('survey.historyPlaceholder')} />
+        <SelectValue placeholder={t('survey.historyPlaceholder')}>
+          {/* The item's remove button lives in its children, which Radix would copy up here. */}
+          {currentId !== null ? (labels[currentId] ?? t('common.loading')) : undefined}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {history.map((entry) => (
-          <SelectItem key={entry.id} value={entry.id}>
-            {labels[entry.id] ?? t('common.loading')}
-          </SelectItem>
-        ))}
+        {history.map((entry) => {
+          const label = labels[entry.id] ?? t('common.loading');
+          return (
+            <SelectItem key={entry.id} value={entry.id}>
+              <span className="flex items-center justify-between gap-2">
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {/* Radix picks the item on pointer-up / click / key: keep the remove button's own. */}
+                <span
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <IconButton
+                    icon={<Icon.Close />}
+                    label={t('survey.historyRemove', {
+                      name: label,
+                    })}
+                    tooltip={t('survey.historyRemoveShort')}
+                    variant="plain"
+                    size="row"
+                    onClick={() => void forgetSurvey(entry.id)}
+                  />
+                </span>
+              </span>
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

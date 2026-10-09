@@ -283,7 +283,7 @@
       "reauthAction": "Log in again with EVE Online"
     },
     "saveToEve": {
-      "action": "Save to EVE",
+      "action": "Save to EVE…",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
       "needPermission": "Log in again to allow saving Fittings to EVE.",
       "title": "Save to EVE",
@@ -3939,6 +3939,8 @@
     "historyPlaceholder": "Switch survey",
     "historyEntry": "{{ore}} · {{percent}}% mined · {{time}}",
     "historyEmpty": "No scans yet · {{time}}",
+    "historyRemove": "Remove {{name}} from your surveys",
+    "historyRemoveShort": "Remove",
     "notAScan": "That isn't a Survey Scanner copy. Select the rows in the scanner window and copy them.",
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
@@ -9660,7 +9662,6 @@
         "jump": "Jump drive"
       },
       "inUse": "In use",
-      "use": "Use for this leg",
       "useLabel": "Use {{way}} for leg {{number}}",
       "noRoute": "doesn't reach {{to}}",
       "lowsec": "{{count}} lowsec",
