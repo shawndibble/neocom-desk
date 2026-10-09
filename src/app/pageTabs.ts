@@ -16,6 +16,7 @@ import {
   type PageTabs,
 } from '@/lib/pageTabs';
 import { matchPath } from 'react-router-dom';
+import { legacyAssetsLocation } from '@/engine/assetPath';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
@@ -136,7 +137,20 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'lp-store', labelKey: 'loyaltyStore.title' },
 ]);
 
+/**
+ * Assets' Items tab owns the drill-down below it (`/assets/items/<location>/...`,
+ * `PageTab.deep`), so Ships and Move sit beside it. Old links
+ * (`/assets/<location>/...`, `/assets?view=ships`) move via
+ * `PAGE_LEGACY_LOCATIONS`.
+ */
+export const ASSETS_TABS = definePageTabs('/assets', [
+  { id: 'items', labelKey: 'assets.tabs.items', deep: true },
+  { id: 'ships', labelKey: 'assets.tabs.ships' },
+  { id: 'move', labelKey: 'assets.tabs.move' },
+]);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
+  '/assets': ASSETS_TABS,
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
@@ -148,6 +162,19 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/mining': MINING_TABS,
   '/wallet': WALLET_TABS,
   '/travel': TRAVEL_TABS,
+};
+
+/**
+ * A tabbed page's pre-tabs URLs: asked first, by `TabRoute`, about a path that
+ * names no tab; an answer replaces the default-tab redirect.
+ */
+export const PAGE_LEGACY_LOCATIONS: Partial<
+  Record<
+    AppRoutePath,
+    (pathname: string, search: string) => { pathname: string; search: string } | null
+  >
+> = {
+  '/assets': legacyAssetsLocation,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

@@ -110,9 +110,11 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
 
     // The Back pop is a same-document navigation `load` can't see, so on a
     // slow runner it can still be in flight; retry the reload until it lands.
+    // Each attempt gets its own short budget: a reload that hangs behind the
+    // in-flight pop would otherwise eat the whole test timeout in one attempt.
     await expect(async () => {
-      await page.reload();
-    }).toPass();
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 6000 });
+    }).toPass({ timeout: 20_000 });
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,

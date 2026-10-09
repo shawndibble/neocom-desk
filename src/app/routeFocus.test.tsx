@@ -12,7 +12,7 @@ describe('focusKeyFor', () => {
   });
 
   it('treats a splat drill-down as the same page', () => {
-    expect(focusKeyFor('/assets/60003760')).toBe('/assets');
+    expect(focusKeyFor('/assets/items/60003760')).toBe('/assets');
     expect(focusKeyFor('/assets')).toBe('/assets');
     expect(focusKeyFor('/corp/assets/1/2')).toBe(focusKeyFor('/corp/assets'));
   });

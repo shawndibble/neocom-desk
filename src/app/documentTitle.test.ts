@@ -59,7 +59,7 @@ describe('documentTitleFor', () => {
   });
 
   it('covers splat routes', () => {
-    expect(documentTitleFor('/assets/60003760', t)).toBe('Assets — Neocom Desk');
+    expect(documentTitleFor('/assets/items/60003760', t)).toBe('Items — Assets — Neocom Desk');
   });
 
   it('falls back to Page not found for an unknown path', () => {

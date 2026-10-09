@@ -1,5 +1,5 @@
 /**
- * Assets > Tools > Plan a move at 390px (issue #2947): the sheet must not
+ * Assets > Move at 390px (issue #2947): the tab must not
  * scroll sideways and its actions must stay reachable. jsdom has no layout, so
  * only a real browser can check either.
  *
@@ -13,7 +13,7 @@ import { CHARACTER_ID } from './support/fixtureData';
 
 const STATION = 60003760;
 
-test('Plan a move sheet fits a phone and keeps its actions reachable', async ({ page }) => {
+test('Move tab fits a phone and keeps its actions reachable', async ({ page }) => {
   await page.route(`**/characters/${CHARACTER_ID}/assets*`, (route) =>
     route.fulfill({
       status: 200,
@@ -33,11 +33,9 @@ test('Plan a move sheet fits a phone and keeps its actions reachable', async ({ 
   );
   await signInAndGoto(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('./assets');
+  await page.goto('./assets/move');
 
-  await page.getByRole('button', { name: 'Tools' }).click();
-  await page.getByRole('menuitem', { name: 'Plan a move…' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Plan a move' });
+  const dialog = page.getByRole('region', { name: 'Plan a move' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('checkbox').first()).toBeVisible();
 
@@ -55,5 +53,6 @@ test('Plan a move sheet fits a phone and keeps its actions reachable', async ({ 
   await expect(cancel).toBeInViewport();
   await expect(dialog.getByRole('button', { name: 'Show plan' })).toBeInViewport();
   await cancel.click();
+  await expect(page).toHaveURL(/\/assets\/items/);
   await expect(dialog).toBeHidden();
 });

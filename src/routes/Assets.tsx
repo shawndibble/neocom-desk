@@ -34,7 +34,11 @@ import {
   SelectValue,
   Spinner,
   IskInput,
+  Tabs,
 } from '@/components/ui';
+import { usePageTab } from '@/lib/usePageTab';
+import { tabBarTabs } from '@/lib/pageTabs';
+import { ASSETS_TABS } from '@/app/pageTabs';
 import * as Icon from '@/components/ui/icons';
 import type { EsiEndpointId } from '@/esi/registry';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
@@ -47,7 +51,7 @@ import {
   loadOtherCharactersAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
-import { MovePlanModal } from '@/features/assets/MovePlanModal';
+import { MovePlanTab } from '@/features/assets/MovePlanTab';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   fromStoredCharacterFilterValue,
@@ -59,9 +63,9 @@ import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { MyShipsPanel } from '@/features/character/MyShipsPanel';
+import { MyShipsView } from '@/features/character/MyShipsView';
 import { useUrlParams } from '@/lib/useUrlState';
-import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
+import { boolParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -149,8 +153,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
-/** `?view=ships` opens My ships, a slide-in from the Tools menu. */
-const VIEW_PARAM = optionalEnumParam(['ships'] as const);
 
 /**
  * A drill-down href that keeps the page's whole query string: its filters
@@ -667,6 +669,7 @@ export function Assets() {
   // "Where am I" lives in the URL (`/assets/:stationId/*`), not in state, so
   // the browser/Android back button steps up one level instead of leaving the
   // page — the single most important thing about drill-down on a phone.
+  const [tab, setTab] = usePageTab(ASSETS_TABS);
   const wildcard = useParams()['*'] ?? '';
   const { stationId: pathStationId, segments: pathSegments } = useMemo(
     () => parseAssetPath(wildcard),
@@ -692,13 +695,11 @@ export function Assets() {
       q: SEARCH_PARAM,
       all: ALL_ITEMS_PARAM,
       min: MIN_VALUE_PARAM,
-      view: VIEW_PARAM,
       chars: characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
     }),
     [defaultCharacterFilter]
   );
   const [view, setView] = useUrlParams(viewParams);
-  const [movePlanOpen, setMovePlanOpen] = useState(false);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
@@ -796,8 +797,6 @@ export function Assets() {
     resolvedCrossCharacterFilter === 'all' ||
     (crossCharacterCandidates.length > 0 &&
       crossCharacterCandidates.every((c) => shipCharacterIds.includes(c.characterId)));
-  const myShipsOpen = view.view === 'ships';
-  const closeMyShips = () => setView({ view: null });
 
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
@@ -1723,94 +1722,73 @@ export function Assets() {
           }
           actions={
             <>
-              <div className="ml-auto flex items-center gap-1.5">
-                <TableActionsMenu
-                  name={t('assets.title')}
-                  label={t('assets.tools.label')}
-                  triggerText={t('assets.tools.label')}
-                  tableExport={assetsExport}
-                  size="md"
-                >
-                  <DropdownMenuLabel>{t('assets.tools.view')}</DropdownMenuLabel>
-                  <DropdownMenuCheckboxItem
-                    checked={allItemsView}
-                    onCheckedChange={(on) => setView({ all: on })}
+              {tab === 'items' && (
+                <div className="ml-auto flex items-center gap-1.5">
+                  <TableActionsMenu
+                    name={t('assets.title')}
+                    label={t('assets.tools.label')}
+                    triggerText={t('assets.tools.label')}
+                    tableExport={assetsExport}
+                    size="md"
                   >
-                    {t('assets.allItemsToggle')}
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem checked={selectMode} onCheckedChange={toggleSelectMode}>
-                    {t('assets.select.toggle')}
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setView({ view: 'ships' }, { push: true })}>
-                    {t('assets.myShips.title')}
-                    <span className="ml-auto pl-3 text-text-dim">{t('assets.myShips.hint')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setMovePlanOpen(true)}>
-                    {t('assets.movePlan.menuItem')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled={loading} onSelect={refresh}>
-                    {t('assets.refresh')}
-                    {assetsResult && (
-                      <span className="ml-auto pl-3 text-text-dim">
-                        {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
-                      </span>
-                    )}
-                  </DropdownMenuItem>
-                </TableActionsMenu>
-              </div>
+                    <DropdownMenuLabel>{t('assets.tools.view')}</DropdownMenuLabel>
+                    <DropdownMenuCheckboxItem
+                      checked={allItemsView}
+                      onCheckedChange={(on) => setView({ all: on })}
+                    >
+                      {t('assets.allItemsToggle')}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuCheckboxItem
+                      checked={selectMode}
+                      onCheckedChange={toggleSelectMode}
+                    >
+                      {t('assets.select.toggle')}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem disabled={loading} onSelect={refresh}>
+                      {t('assets.refresh')}
+                      {assetsResult && (
+                        <span className="ml-auto pl-3 text-text-dim">
+                          {formatAge(Date.now() - new Date(assetsResult.fetchedAt).getTime(), t)}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  </TableActionsMenu>
+                </div>
+              )}
             </>
           }
         />
-        <MovePlanModal
-          open={movePlanOpen}
-          onClose={() => setMovePlanOpen(false)}
-          characterIds={shipCharacterIds}
-          activeCharacterId={activeCharacterId}
-          filterControl={
-            crossCharacterCandidates.length > 1 ? (
-              <CharacterFilterControl
-                activeCharacterId={activeCharacterId}
-                value={crossCharacterFilter}
-                onChange={(chars: CharacterFilterValue) => setView({ chars })}
-                characterCount={crossCharacterCandidates.length}
-                variant="field"
-              />
-            ) : undefined
-          }
+        <Tabs
+          label={t('assets.title')}
+          value={tab}
+          onChange={(id) => setTab(id as typeof tab)}
+          tabs={tabBarTabs(ASSETS_TABS).map((item) => ({ id: item.id, label: t(item.labelKey) }))}
         />
 
-        <MyShipsPanel
-          open={myShipsOpen}
-          onClose={closeMyShips}
-          characterIds={shipCharacterIds}
-          activeCharacterId={activeCharacterId}
-          filterControl={
-            crossCharacterCandidates.length > 1 ? (
-              <CharacterFilterControl
-                activeCharacterId={activeCharacterId}
-                value={crossCharacterFilter}
-                onChange={(chars: CharacterFilterValue) => setView({ chars })}
-                characterCount={crossCharacterCandidates.length}
-                variant="field"
-              />
-            ) : undefined
-          }
-          onShowAllCharacters={
-            !shipsFilterIsAll && crossCharacterCandidates.length > 1
-              ? () => setView({ chars: 'all' })
-              : undefined
-          }
-          hrefFor={(locationId) => {
-            const params = new URLSearchParams(query);
-            params.delete('view');
-            const rest = params.toString();
-            return assetPathHref(locationId, []) + (rest ? `?${rest}` : '');
-          }}
-          route={assetsRoute}
-        />
+        {tab === 'ships' && (
+          <MyShipsView
+            characterIds={shipCharacterIds}
+            activeCharacterId={activeCharacterId}
+            onShowAllCharacters={
+              !shipsFilterIsAll && crossCharacterCandidates.length > 1
+                ? () => setView({ chars: 'all' })
+                : undefined
+            }
+            hrefFor={(locationId) => assetHref(locationId, [], query)}
+            route={assetsRoute}
+          />
+        )}
 
-        {assetsResult && !assetsNeedsReauth && (
+        {tab === 'move' && (
+          <MovePlanTab
+            onClose={() => setTab('items')}
+            characterIds={shipCharacterIds}
+            activeCharacterId={activeCharacterId}
+          />
+        )}
+
+        {tab === 'items' && assetsResult && !assetsNeedsReauth && (
           <SearchInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1818,7 +1796,7 @@ export function Assets() {
           />
         )}
 
-        {selectMode && (
+        {tab === 'items' && selectMode && (
           <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
             {selectedIds.size > 0 && (
               <span className="text-[0.6875rem] text-text-dim tabular-nums">
@@ -1851,7 +1829,7 @@ export function Assets() {
           </div>
         )}
 
-        {loading && !data ? (
+        {tab !== 'items' ? null : loading && !data ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>
