@@ -70,4 +70,19 @@ describe('SurveyPicker', () => {
       expect(useSurveyHistory.getState().value.map((entry) => entry.id)).toEqual([B])
     );
   });
+
+  it('removes a survey from the history without switching to it', async () => {
+    await noteSurvey(A);
+    await noteSurvey(B);
+    const onPick = vi.fn();
+    render(<SurveyPicker currentId={A} onPick={onPick} />);
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Your surveys' }));
+    const remove = await screen.findAllByRole('button', { name: /^Remove .* from your surveys$/ });
+    expect(remove).toHaveLength(2);
+    await userEvent.click(remove[0]);
+    await waitFor(() =>
+      expect(useSurveyHistory.getState().value.map((entry) => entry.id)).toEqual([A])
+    );
+    expect(onPick).not.toHaveBeenCalled();
+  });
 });

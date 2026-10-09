@@ -3932,6 +3932,8 @@
     "historyPlaceholder": "Switch survey",
     "historyEntry": "{{ore}} · {{percent}}% mined · {{time}}",
     "historyEmpty": "No scans yet · {{time}}",
+    "historyRemove": "Remove {{name}} from your surveys",
+    "historyRemoveShort": "Remove",
     "notAScan": "That isn't a Survey Scanner copy. Select the rows in the scanner window and copy them.",
     "tooLarge": "That scan is too large to store.",
     "saveFailed": "Couldn't save the scan. Try again.",
