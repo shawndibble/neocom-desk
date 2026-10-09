@@ -78,8 +78,8 @@ export interface RouteSafetyWayBridge {
 }
 
 /**
- * One way to fly a leg, with its facts. `pin` is the token Use for this leg
- * writes — `null` for the planner's own pick, which un-pins the leg.
+ * One way to fly a leg, with its facts. `pin` is the token clicking the way's
+ * box writes — `null` for the planner's own pick, which un-pins the leg.
  */
 export interface RouteSafetyWay {
   kind: 'planner' | 'gates' | 'thera' | 'turnur' | 'hole' | 'ansiblex' | 'jump';
