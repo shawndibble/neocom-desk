@@ -373,9 +373,12 @@ export function TargetProfilePicker({
       </StatField>
     );
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-text-dim">{label}</span>
-      {select}
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs md:min-w-[22rem] md:flex-[1_1_0]">
+      {/* The label and its select never part; the summary and Manage wrap beneath if the row is tight. */}
+      <div className="flex items-center gap-x-1.5">
+        <span className="text-text-dim">{label}</span>
+        {select}
+      </div>
       <span className="text-text-dim">{summary}</span>
       {manage}
     </div>

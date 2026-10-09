@@ -133,6 +133,14 @@
   --color-kind-contract-expiry: #f2879f;
   --color-kind-order-expiry: #c9d96a;
   --color-kind-skill-plan: #e0d0a8;
+  /*
+   * Kind of space on a pilot's kill activity and the Local list. Highsec and
+   * lowsec keep success and warning; nullsec and wormhole get their own hues so
+   * nullsec stops reading as the Threat verdict's red. Same values as
+   * kind-calendar-event / kind-skill-training, so the AA ratios in DESIGN.md hold.
+   */
+  --color-space-nullsec: #7e9cfd;
+  --color-space-wormhole: #d8beff;
 
   /*
    * Damage types — a second NOMINAL set, and a deliberate exception to the

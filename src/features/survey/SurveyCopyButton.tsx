@@ -15,6 +15,8 @@ interface SurveyCopyButtonProps {
   onCopyChat: () => void;
   onCopyLink: () => void;
   outcome: CopyOutcome;
+  /** Stretch across the row, for a phone where it sits under the chart. */
+  fill?: boolean;
 }
 
 /**
@@ -23,7 +25,12 @@ interface SurveyCopyButtonProps {
  * pilot who wants the URL without the message around it. The message already
  * carries the link, so the menu holds nothing else.
  */
-export function SurveyCopyButton({ onCopyChat, onCopyLink, outcome }: SurveyCopyButtonProps) {
+export function SurveyCopyButton({
+  onCopyChat,
+  onCopyLink,
+  outcome,
+  fill = false,
+}: SurveyCopyButtonProps) {
   const { t } = useTranslation();
   const label =
     outcome === null
@@ -34,8 +41,12 @@ export function SurveyCopyButton({ onCopyChat, onCopyLink, outcome }: SurveyCopy
           ? t('survey.copiedChat')
           : t('survey.copiedLink');
   return (
-    <div className="flex">
-      <Button variant="primary" onClick={onCopyChat} className="rounded-r-none">
+    <div className={fill ? 'flex w-full' : 'flex'}>
+      <Button
+        variant="primary"
+        onClick={onCopyChat}
+        className={fill ? 'flex-1 rounded-r-none' : 'rounded-r-none'}
+      >
         {label}
       </Button>
       <DropdownMenu>

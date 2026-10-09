@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 
@@ -46,37 +45,33 @@ describe('PilotKillActivity', () => {
     });
   });
 
-  it('puts the kills-per-month toggle above the four space boxes', async () => {
+  it('draws the six-month chart open, with the 30-day counts under it in the same card', async () => {
     renderSection();
     const section = await screen.findByRole('region', { name: 'Where they kill' });
-    const toggle = within(section).getByRole('button', { name: /Kills per month/ });
-    const tiles = within(section).getByText('Highsec').closest('ul') as HTMLElement;
-    expect(toggle.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('keeps the six-month chart folded until it is asked for', async () => {
-    renderSection();
-    const section = await screen.findByRole('region', { name: 'Where they kill' });
-    expect(within(section).queryByRole('img', { name: /Kills per month by space/ })).toBeNull();
-    const toggle = within(section).getByRole('button', { name: /Kills per month/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('labels the chart: a legend for every colour drawn, month names, and the kills per month', async () => {
-    renderSection();
-    const section = await screen.findByRole('region', { name: 'Where they kill' });
-    await userEvent.click(within(section).getByRole('button', { name: /Kills per month/ }));
     const chart = within(section).getByRole('img', { name: /Kills per month by space/ });
-    expect(chart).toBeTruthy();
-    // Blue is wormhole space: say so, and only name colours that appear.
-    const legend = within(section)
-      .getAllByRole('listitem')
-      .map((li) => li.textContent);
-    expect(legend).toContain('Nullsec');
-    expect(legend).toContain('Wormhole');
-    expect(legend).not.toContain('Lowsec');
-    // Month names, not "05".
+    expect(within(section).queryByRole('button', { name: /Kills per month/ })).toBeNull();
+    const tiles = within(section).getByText('Highsec').closest('ul') as HTMLElement;
+    expect(chart.compareDocumentPosition(tiles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(section).getByText('Last 30 days')).toBeInTheDocument();
+  });
+
+  it('labels the chart with month names and the kills in each', async () => {
+    renderSection();
+    const section = await screen.findByRole('region', { name: 'Where they kill' });
+    const chart = within(section).getByRole('img', { name: /Kills per month by space/ });
     expect(chart.getAttribute('aria-label')).toMatch(/[A-Z][a-z]{2}: \d/);
+  });
+
+  it('keys each count to its space by name and colour, and nullsec is not the verdict red', async () => {
+    renderSection();
+    const section = await screen.findByRole('region', { name: 'Where they kill' });
+    const tiles = within(section).getByText('Highsec').closest('ul') as HTMLElement;
+    const nullsec = within(tiles).getByText('Nullsec').closest('li') as HTMLElement;
+    expect(nullsec).toHaveClass('border-t-space-nullsec');
+    expect(within(nullsec).getByText('2')).toHaveClass('text-space-nullsec');
+    expect(section.innerHTML).not.toMatch(/danger/);
+    // A space with no kills in 30 days has no hue.
+    expect(within(tiles).getByText('Highsec').closest('li')).toHaveClass('border-t-line');
   });
 
   it('does not repeat what the rest of the profile already shows', async () => {

@@ -152,7 +152,7 @@ describe('PilotLookupPanel', () => {
     expect(screen.getByText('317')).toBeTruthy();
   });
 
-  it('shows a Threat badge beside the name once the kills and the danger ratio are in', async () => {
+  it('shows the Threat verdict once the kills and the danger ratio are in', async () => {
     const day = 86_400_000;
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
@@ -171,9 +171,11 @@ describe('PilotLookupPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
 
-    const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
-    // "Dangerous" is also the danger meter's high end: the badge is the one in the name row.
-    expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
+    await screen.findByRole('heading', { name: 'Some Pilot' });
+    // "Dangerous" is also the danger meter's high end: the verdict is the one in the Threat band.
+    expect(
+      await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Dangerous')
+    ).toBeTruthy();
     expect(screen.getByText(/12 kills in the last 90 days/)).toBeTruthy();
     expect(screen.getByText('Nullsec hunter')).toBeTruthy();
     expect(screen.getByText(/33% of kills are pods/)).toBeTruthy();
@@ -206,10 +208,10 @@ describe('PilotLookupPanel', () => {
 
     it('is not inactive when they lost a ship in the last 90 days', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(3)] });
-      const heading = await lookUp();
-      const row = heading.parentElement as HTMLElement;
-      expect(await within(row).findByText('Low threat')).toBeTruthy();
-      expect(within(row).queryByText('Inactive')).toBeNull();
+      await lookUp();
+      const band = await screen.findByRole('region', { name: 'Threat' });
+      expect(await within(band).findByText('Low threat')).toBeTruthy();
+      expect(within(band).queryByText('Inactive')).toBeNull();
       expect(
         await screen.findByText(/No kills in the last 90 days. 1 loss in that time/)
       ).toBeTruthy();
@@ -217,13 +219,12 @@ describe('PilotLookupPanel', () => {
 
     it('gives no verdict, and says why, when their losses could not be read', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: false });
-      const heading = await lookUp();
+      await lookUp();
       expect(
         await screen.findByText(/recent losses for this pilot could not be read/)
       ).toBeTruthy();
-      const row = heading.parentElement as HTMLElement;
-      expect(within(row).queryByText('Inactive')).toBeNull();
-      expect(within(row).queryByText('Checking')).toBeNull();
+      expect(screen.queryByText('Inactive')).toBeNull();
+      expect(screen.queryByText('Checking')).toBeNull();
       expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
     });
 
@@ -232,18 +233,18 @@ describe('PilotLookupPanel', () => {
         ok: true,
         entries: [{ killmailId: 5, hash: 'h', side: 'loss', value: null, detail: null }],
       });
-      const heading = await lookUp();
+      await lookUp();
       expect(
         await screen.findByText(/recent losses for this pilot could not be read/)
       ).toBeTruthy();
-      expect(within(heading.parentElement as HTMLElement).queryByText('Inactive')).toBeNull();
+      expect(screen.queryByText('Inactive')).toBeNull();
     });
 
     it('is inactive when their only losses are older than that', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [lossAt(200)] });
-      const heading = await lookUp();
+      await lookUp();
       expect(
-        await within(heading.parentElement as HTMLElement).findByText('Inactive')
+        await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Inactive')
       ).toBeTruthy();
     });
   });
@@ -270,8 +271,10 @@ describe('PilotLookupPanel', () => {
       target: { value: 'some pilot' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
-    const heading = await screen.findByRole('heading', { name: 'Some Pilot' });
-    expect(await within(heading.parentElement as HTMLElement).findByText('Dangerous')).toBeTruthy();
+    await screen.findByRole('heading', { name: 'Some Pilot' });
+    expect(
+      await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Dangerous')
+    ).toBeTruthy();
   });
 
   it('shows no verdict band when the kill history could not be read', async () => {

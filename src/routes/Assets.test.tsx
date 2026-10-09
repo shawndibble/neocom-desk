@@ -1412,7 +1412,7 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
     });
 
-    it('shows the ship class under the name and a summary line', async () => {
+    it('shows the ship class under the name, with sortable columns and a search', async () => {
       server.use(
         http.get('https://esi.evetech.net/universe/groups/25', () =>
           HttpResponse.json({ group_id: 25, name: 'Frigate' })
@@ -1423,7 +1423,21 @@ describe('cross-character search (issue #85)', () => {
       const panel = await openMyShips(user);
 
       expect(await within(panel).findByText('Frigate')).toBeInTheDocument();
-      expect(within(panel).getByText('1 ship across 1 character · nearest first')).toBeVisible();
+      expect(within(panel).queryByText(/ships? across/)).toBeNull();
+      expect(within(panel).getByRole('columnheader', { name: /jumps/i })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      await user.click(within(panel).getByRole('button', { name: /^ship/i }));
+      expect(within(panel).getByRole('columnheader', { name: /^ship/i })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      await user.type(within(panel).getByRole('searchbox', { name: /search ships/i }), 'zzz');
+      expect(await within(panel).findByText('No ships match your search.')).toBeVisible();
+      await user.clear(within(panel).getByRole('searchbox'));
+      await user.type(within(panel).getByRole('searchbox'), 'frig');
+      expect(within(panel).getByText('Frigate')).toBeVisible();
     });
 
     it('a row is one link into the ship’s location', async () => {

@@ -583,11 +583,13 @@ export function SpExtractionCard({ data }: { data: SpExtractionBoardData }) {
           <NumberTile
             label={t('overview.board.extractionNet')}
             value={
-              data.totalSp === null || !price.loaded
-                ? '…'
-                : price.net === null
-                  ? '—'
-                  : formatIskCompact(price.net)
+              data.totalSp === null || !price.loaded ? (
+                '…'
+              ) : price.net === null ? (
+                '—'
+              ) : (
+                <IskAmount value={price.net} decimals={0} />
+              )
             }
             severity="clear"
           />
