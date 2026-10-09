@@ -700,6 +700,13 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const list = (
     <Panel
       title={t('loyaltyStore.title')}
+      meta={
+        ready && (
+          <span className="hidden text-xs text-text-dim tabular-nums md:inline">
+            {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
+          </span>
+        )
+      }
       actions={
         ready &&
         filteredRows.length > 0 && (
@@ -810,7 +817,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           meta={
             <div className="flex flex-wrap items-center gap-2">
               {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-              <CorporationLink id={corporationId}>
+              <CorporationLink id={corporationId} className="text-xs">
                 {t('loyaltyStore.corporationInfo')}
               </CorporationLink>
               <StatChips>
@@ -818,10 +825,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                   label={t('loyaltyStore.yourLp')}
                   value={playerLp.toLocaleString()}
                   tone="accent"
-                />
-                <StatChip
-                  label={t('loyaltyStore.offersShown')}
-                  value={`${filteredRows.length} / ${rows.length}`}
+                  emphasis
                 />
               </StatChips>
             </div>

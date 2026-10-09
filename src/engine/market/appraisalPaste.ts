@@ -108,6 +108,23 @@ export function countPasteLines(text: string): number {
   return text.split(LINE_BREAK).filter((line) => line.trim() !== '').length;
 }
 
+/** Row bounds for the paste box: short pastes shrink it, long ones scroll inside it. */
+const PASTE_BOX_MIN_ROWS = 4;
+const PASTE_BOX_MAX_ROWS = 14;
+/** An empty box keeps the multi-line placeholder fully visible. */
+const PASTE_BOX_EMPTY_ROWS = 6;
+
+/**
+ * How tall the paste box should be for `text`: one spare row past the lines
+ * pasted, clamped so a three-line list does not leave a mostly empty box
+ * pushing the result down, and a long one scrolls rather than grows.
+ */
+export function pasteBoxRows(text: string): number {
+  const lines = countPasteLines(text);
+  if (lines === 0) return PASTE_BOX_EMPTY_ROWS;
+  return Math.min(PASTE_BOX_MAX_ROWS, Math.max(PASTE_BOX_MIN_ROWS, lines + 1));
+}
+
 /** One name on one source line, before same-named rows are merged. */
 interface PasteRow {
   name: string;
