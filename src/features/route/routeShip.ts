@@ -20,6 +20,7 @@ export const useRouteShipTypeId = createLocalSetting<number | null>({
 export interface RouteShipOption {
   typeId: number;
   name: string;
+  groupId: number;
   massKg: number;
 }
 
@@ -46,7 +47,7 @@ function loadMassTables(): Promise<MassTables> {
   tables ??= Promise.all([loadShipMass(), loadWormholeMass()])
     .then(([ships, holeTable]) => ({
       hulls: Object.entries(ships)
-        .map(([id, [name, , massKg]]) => ({ typeId: Number(id), name, massKg }))
+        .map(([id, [name, groupId, massKg]]) => ({ typeId: Number(id), name, groupId, massKg }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       holeTable,
     }))

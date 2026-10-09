@@ -650,56 +650,65 @@ export function Wallet() {
             </>
           )}
 
-          <Panel
-            // Lifts this panel's stacking context over the next one, so the
-            // picker's popover isn't painted under it.
-            className="relative z-10"
-            padded={false}
-            title={t('loyalty.title')}
-            actions={
-              <span className="flex items-center gap-2">
-                {/* Always shown, LP or not (issue #2321): the way into any
+          {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0 ? (
+            // Nothing to list: one muted line instead of an empty panel. The
+            // picker stays as the way into any corp's store (issue #2321).
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-text-dim">
+              <span>{t('loyalty.noneLine')}</span>
+              <LpStorePicker corporationName={null} size="sm" className="w-44" />
+            </div>
+          ) : (
+            <Panel
+              // Lifts this panel's stacking context over the next one, so the
+              // picker's popover isn't painted under it.
+              className="relative z-10"
+              padded={false}
+              title={t('loyalty.title')}
+              actions={
+                <span className="flex items-center gap-2">
+                  {/* Always shown, LP or not (issue #2321): the way into any
                     corp's store for a pilot who holds LP nowhere yet. */}
-                <LpStorePicker corporationName={null} size="sm" className="w-44" />
-                {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
-                  <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
-                )}
-              </span>
-            }
-          >
-            {loyaltyNeedsReauth ? (
-              <div className="p-3">
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterLoyaltyPoints']}
-                  title={t('loyalty.reauthTitle')}
-                  hint={t('loyalty.reauthHint')}
-                  actionLabel={t('loyalty.reauthAction')}
+                  <LpStorePicker corporationName={null} size="sm" className="w-44" />
+                  {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
+                    <TableActionsMenu name={t('loyalty.title')} tableExport={loyaltyExport} />
+                  )}
+                </span>
+              }
+            >
+              {loyaltyNeedsReauth ? (
+                <div className="p-3">
+                  <GrantBanner
+                    characterId={activeCharacterId}
+                    endpoints={['getCharacterLoyaltyPoints']}
+                    title={t('loyalty.reauthTitle')}
+                    hint={t('loyalty.reauthHint')}
+                    actionLabel={t('loyalty.reauthAction')}
+                  />
+                </div>
+              ) : !loyaltyResult || otherLoyalty.length === 0 ? (
+                <CachedEmptyState
+                  result={loyaltyResult}
+                  title={t('loyalty.emptyTitle')}
+                  hint={t('loyalty.emptyHint')}
+                  fetchedTitle={t('loyalty.emptyTitle')}
+                  className="py-8"
                 />
-              </div>
-            ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-              <CachedEmptyState
-                result={loyaltyResult}
-                title={t('loyalty.emptyTitle')}
-                hint={t('loyalty.emptyHint')}
-                fetchedTitle={t('loyalty.emptyFetchedTitle')}
-                className="py-8"
-              />
-            ) : (
-              <DataTable
-                {...loyaltyExport.tableProps}
-                label={t('loyalty.title')}
-                columns={loyaltyColumns}
-                rows={otherLoyalty}
-                rowKey={(entry) => entry.corporation_id}
-                sort={loyaltySortProps.sort}
-                onSortChange={loyaltySortProps.onSortChange}
-                responsive="table"
-                rowClassName={() => 'group'}
-                onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
-              />
-            )}
-          </Panel>
+              ) : (
+                <DataTable
+                  {...loyaltyExport.tableProps}
+                  label={t('loyalty.title')}
+                  columns={loyaltyColumns}
+                  rows={otherLoyalty}
+                  rowKey={(entry) => entry.corporation_id}
+                  sort={loyaltySortProps.sort}
+                  onSortChange={loyaltySortProps.onSortChange}
+                  responsive="table"
+                  rowClassName={() => 'group'}
+                  onRowClick={(entry) => navigate(`/market/lp-store/${entry.corporation_id}`)}
+                />
+              )}
+            </Panel>
+          )}
         </div>
       ) : (
         <Panel

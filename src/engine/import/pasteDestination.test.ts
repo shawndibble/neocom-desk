@@ -24,7 +24,17 @@ const SOURCES: PasteSources = { catalogue: CATALOGUE, hullNames: HULLS, skillByN
 
 const FIT = ['[Rifter, Kite Fit]', '', 'Damage Control II', '', 'Warp Disruptor II'].join('\n');
 
+const SCAN = [
+  'Pyroxeres\t8,016\t2,404 m3\t184,000.00 ISK\t33 km',
+  'Pyroxeres II-Grade\t9,840\t2,952 m3\t221,000.00 ISK\t13 km',
+].join('\n');
+
 describe('pasteDestination', () => {
+  it('sends a Survey Scanner copy to the Survey tab, never the Appraisal', () => {
+    expect(pasteDestination(SCAN, SOURCES)).toBe('survey');
+    expect(pasteDestination('Tritanium\t1000\nPyerite\t500', SOURCES)).toBe('appraisal');
+  });
+
   it('sends an EFT fit of a known hull to Fittings', () => {
     expect(pasteDestination(FIT, SOURCES)).toBe('fitting');
   });
@@ -201,8 +211,9 @@ describe('detectPasteDestination', () => {
     expect(detectPasteDestination('   ', SOURCES, [claims('first', 'match')])).toBeNull();
   });
 
-  it('keeps the shipped order: fit, chat link, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
+  it('keeps the shipped order: survey scan, fit, chat link, D-Scan, blueprint list, skill plan, item list, then Local list', () => {
     expect(PASTE_DETECTORS.map((d) => d.id)).toEqual([
+      'survey',
       'fitting',
       'chatLink',
       'dscan',

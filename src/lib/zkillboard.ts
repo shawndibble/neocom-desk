@@ -8,6 +8,7 @@
  * path segments live in one place instead of as template strings in JSX.
  */
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
+import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
 
 /**
@@ -354,6 +355,80 @@ export async function fetchPilotKillmails(characterId: number): Promise<PilotKil
       .slice(0, PILOT_KILLMAIL_LIMIT);
     pilotKillmailsCache.set(characterId, { at: Date.now(), entries });
     return { ok: true, entries };
+  } catch {
+    return { ok: false };
+  }
+}
+
+const SPACE_BY_LABEL: Record<string, KillSpace> = {
+  'loc:highsec': 'highsec',
+  'loc:lowsec': 'lowsec',
+  'loc:nullsec': 'nullsec',
+  'loc:w-space': 'wormhole',
+};
+
+/**
+ * Reads a `kills/characterID` body into the pilot's kill history: when, in
+ * what kind of space (zKillboard's `loc:` label), the hull that died and the
+ * hull this pilot flew. An entry with no readable time is dropped.
+ */
+export function parseKillHistory(body: unknown, characterId: number): KillRecord[] {
+  if (!Array.isArray(body)) return [];
+  const kills: KillRecord[] = [];
+  for (const entry of body) {
+    if (!isRecord(entry) || typeof entry.killmail_time !== 'string') continue;
+    const timeMs = Date.parse(entry.killmail_time);
+    if (!Number.isFinite(timeMs)) continue;
+    const labels = isRecord(entry.zkb) && Array.isArray(entry.zkb.labels) ? entry.zkb.labels : [];
+    const spaceLabel = labels.find(
+      (label): label is string => typeof label === 'string' && label in SPACE_BY_LABEL
+    );
+    const own = Array.isArray(entry.attackers)
+      ? entry.attackers.find((a) => isRecord(a) && a.character_id === characterId)
+      : undefined;
+    kills.push({
+      timeMs,
+      space: spaceLabel === undefined ? null : SPACE_BY_LABEL[spaceLabel],
+      systemId: finiteOrNull(entry.solar_system_id),
+      victimShipTypeId: isRecord(entry.victim) ? finiteOrNull(entry.victim.ship_type_id) : null,
+      ownShipTypeId: isRecord(own) ? finiteOrNull(own.ship_type_id) : null,
+    });
+  }
+  return kills;
+}
+
+export type PilotKillHistoryResult = { ok: true; kills: KillRecord[] } | { ok: false };
+
+const pilotKillHistoryCache = new Map<number, { at: number; kills: KillRecord[] }>();
+
+/** Test seam: forget every cached kill history. */
+export function resetPilotKillHistoryCache(): void {
+  pilotKillHistoryCache.clear();
+}
+
+/**
+ * A pilot's latest kills (zKillboard's first page, newest first; up to 200),
+ * one request, for the Local list's per-space columns and the modal's chart.
+ * Kills only: losses say little about how dangerous a pilot is. A browser
+ * fetch with no custom headers, as `fetchKillmailHash` (decision
+ * `20260924-195833`). Reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ */
+export async function fetchPilotKillHistory(characterId: number): Promise<PilotKillHistoryResult> {
+  const cached = pilotKillHistoryCache.get(characterId);
+  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) {
+    return { ok: true, kills: cached.kills };
+  }
+  try {
+    const response = await fetch(`https://zkillboard.com/api/kills/characterID/${characterId}/`);
+    if (!response.ok) return { ok: false };
+    const body: unknown = await response.json();
+    if (!Array.isArray(body)) return { ok: false };
+    const kills = parseKillHistory(body, characterId);
+    // Entries that carry no killmail body (hash only) can't be dated: that is a
+    // list we couldn't read, never "no kills".
+    if (body.length > 0 && kills.length === 0) return { ok: false };
+    pilotKillHistoryCache.set(characterId, { at: Date.now(), kills });
+    return { ok: true, kills };
   } catch {
     return { ok: false };
   }

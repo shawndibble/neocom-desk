@@ -54,7 +54,7 @@ import {
   refineBeatsSellAsIs,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { countPasteLines } from '@/engine/market/appraisalPaste';
+import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
 import {
   appraisalSnapshotReuseKey,
   buildAppraisalSnapshot,
@@ -632,7 +632,7 @@ export function AppraisalPanel({
             onSubmitChord={() => {
               if (controller.canAppraise && !loading) controller.appraise();
             }}
-            rows={14}
+            rows={pasteBoxRows(text)}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
             mono
@@ -702,23 +702,18 @@ export function AppraisalPanel({
 
           <div className="flex flex-wrap gap-2">
             <Button
-              size="sm"
+              size="md"
               variant="primary"
+              className="max-sm:w-full"
               onClick={controller.appraise}
               disabled={!controller.canAppraise || loading}
             >
               {t('market.appraisal.appraise')}
             </Button>
-            <Button size="sm" onClick={controller.clear} disabled={text === ''}>
+            <Button size="md" onClick={controller.clear} disabled={text === ''}>
               {t('market.appraisal.clear')}
             </Button>
           </div>
-
-          {recent.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => void setRecent([])}>
-              {t('market.appraisal.clearRecent')}
-            </Button>
-          )}
 
           {unmatched.length > 0 && (
             <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
@@ -738,6 +733,17 @@ export function AppraisalPanel({
               </ul>
             </div>
           )}
+
+          {recent.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="self-start text-text-dim"
+              onClick={() => void setRecent([])}
+            >
+              {t('market.appraisal.clearRecent')}
+            </Button>
+          )}
         </div>
       </Panel>
 
@@ -751,63 +757,68 @@ export function AppraisalPanel({
             ) : undefined
           }
           actions={
-            <>
-              <ColumnPickerMenu
-                available={availableColumns}
-                visible={visibleColumns}
-                columnsById={optionalColumnsById}
-                onToggle={toggleColumn}
-                buttonLabel={t('market.appraisal.columnsButton')}
-                menuTitle={t('market.appraisal.columnsMenuTitle')}
-                size="sm"
-              />
-              <IconButton
-                size="sm"
-                icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
-                label={t('market.appraisal.share')}
-                tooltip={
-                  shareItemCount > MAX_SNAPSHOT_ITEMS
-                    ? t('market.appraisal.shareTooLarge')
-                    : share.status === 'saving'
-                      ? t('market.appraisal.shareSaving')
-                      : share.status === 'failed'
-                        ? t('market.appraisal.shareFailed')
-                        : share.status === 'copied'
-                          ? t('market.appraisal.shareCopied')
-                          : undefined
-                }
-                disabled={
-                  characterId === null ||
-                  !isSyncConfigured() ||
-                  rows.length === 0 ||
-                  shareItemCount > MAX_SNAPSHOT_ITEMS ||
-                  share.status === 'saving'
-                }
-                onClick={() => void handleShare()}
-              />
-              {copied !== null && (
-                <span role="status" className="text-[0.6875rem] text-text-dim">
-                  {t('market.appraisal.copied', {
-                    list: t(`market.appraisal.copyList.${copied.list}`),
-                    count: copied.count,
-                  })}
-                </span>
-              )}
-              <TableActionsMenu name={t('market.appraisal.resultTitle')} tableExport={tableExport}>
-                {COPY_LISTS.map((list) => (
-                  <MenuItem
-                    key={list}
-                    disabled={copyLists[list].count === 0}
-                    onSelect={() => void handleCopy(list)}
-                  >
-                    {t(`market.appraisal.copyList.${list}`)}
-                    {copyLists[list].count > 0 && (
-                      <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
-                    )}
-                  </MenuItem>
-                ))}
-              </TableActionsMenu>
-            </>
+            result === null || failed || rows.length === 0 ? undefined : (
+              <>
+                <ColumnPickerMenu
+                  available={availableColumns}
+                  visible={visibleColumns}
+                  columnsById={optionalColumnsById}
+                  onToggle={toggleColumn}
+                  buttonLabel={t('market.appraisal.columnsButton')}
+                  menuTitle={t('market.appraisal.columnsMenuTitle')}
+                  size="sm"
+                />
+                <IconButton
+                  size="sm"
+                  icon={share.status === 'copied' ? <Icon.Done /> : <Icon.Share />}
+                  label={t('market.appraisal.share')}
+                  tooltip={
+                    shareItemCount > MAX_SNAPSHOT_ITEMS
+                      ? t('market.appraisal.shareTooLarge')
+                      : share.status === 'saving'
+                        ? t('market.appraisal.shareSaving')
+                        : share.status === 'failed'
+                          ? t('market.appraisal.shareFailed')
+                          : share.status === 'copied'
+                            ? t('market.appraisal.shareCopied')
+                            : undefined
+                  }
+                  disabled={
+                    characterId === null ||
+                    !isSyncConfigured() ||
+                    rows.length === 0 ||
+                    shareItemCount > MAX_SNAPSHOT_ITEMS ||
+                    share.status === 'saving'
+                  }
+                  onClick={() => void handleShare()}
+                />
+                {copied !== null && (
+                  <span role="status" className="text-[0.6875rem] text-text-dim">
+                    {t('market.appraisal.copied', {
+                      list: t(`market.appraisal.copyList.${copied.list}`),
+                      count: copied.count,
+                    })}
+                  </span>
+                )}
+                <TableActionsMenu
+                  name={t('market.appraisal.resultTitle')}
+                  tableExport={tableExport}
+                >
+                  {COPY_LISTS.map((list) => (
+                    <MenuItem
+                      key={list}
+                      disabled={copyLists[list].count === 0}
+                      onSelect={() => void handleCopy(list)}
+                    >
+                      {t(`market.appraisal.copyList.${list}`)}
+                      {copyLists[list].count > 0 && (
+                        <span className="ml-auto pl-3 text-text-dim">{copyLists[list].count}</span>
+                      )}
+                    </MenuItem>
+                  ))}
+                </TableActionsMenu>
+              </>
+            )
           }
         >
           {loading && result === null ? (
