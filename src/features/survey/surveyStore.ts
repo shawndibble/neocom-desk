@@ -9,6 +9,10 @@
  * other Share Link. A scan stores the pasted text (the same parser rebuilds
  * the rocks on every reader), the server's clock as its time, and the
  * survey's own expiry so the TTL policy deletes it with the survey.
+ *
+ * The moon tax (who gets it, at what rate) lives the same way, in a create-only
+ * `surveyTax` subcollection: a share can't be rewritten, so each change is a new
+ * doc and the newest one is the tax. Only a signed-in pilot can write one.
  */
 import { addDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore/lite';
 import { generateShareId } from '@/engine/share/shareId';
@@ -21,6 +25,15 @@ import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
 export { MAX_SCAN_TEXT };
 
 export const SURVEY_SCANS_COLLECTION = 'surveyScans';
+export const SURVEY_TAX_COLLECTION = 'surveyTax';
+
+/** Who gets the moon tax on a Survey, and the rate (0 to 100). */
+export interface SurveyTaxShare {
+  name: string;
+  pct: number;
+}
+
+export const MAX_TAX_NAME = 100;
 
 export async function startSurvey(input: {
   characterId: number;
@@ -52,8 +65,28 @@ export async function addSurveyScan(input: {
   });
 }
 
+export async function setSurveyTax(input: {
+  id: string;
+  expiresAt: number;
+  name: string;
+  pct: number;
+}): Promise<void> {
+  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_TAX_COLLECTION), {
+    name: input.name.slice(0, MAX_TAX_NAME),
+    pct: input.pct,
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(input.expiresAt),
+  });
+}
+
 export type LoadSurveyResult =
-  | { ok: true; scans: SurveyScan[]; expiresAt: number; owner: string | null }
+  | {
+      ok: true;
+      scans: SurveyScan[];
+      expiresAt: number;
+      owner: string | null;
+      tax: SurveyTaxShare | null;
+    }
   | { ok: false; reason: 'not-found' | 'failed' };
 
 /** The Character name a survey was started under; null for one stored before owners existed. */
@@ -85,8 +118,32 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
       scans,
       expiresAt: found.share.expiresAt,
       owner: ownerOf(found.share.payload),
+      tax: await loadSurveyTax(id),
     };
   } catch {
     return { ok: false, reason: 'failed' };
+  }
+}
+
+/** The newest tax stored on the survey, or null. A failed read is "none": the scans still load. */
+async function loadSurveyTax(id: string): Promise<SurveyTaxShare | null> {
+  try {
+    const snapshot = await getDocs(
+      collection(getSyncFirestore(), 'shares', id, SURVEY_TAX_COLLECTION)
+    );
+    let newest: { at: number; tax: SurveyTaxShare } | null = null;
+    for (const d of snapshot.docs) {
+      const data = d.data();
+      if (typeof data.name !== 'string' || data.name.trim() === '') continue;
+      if (typeof data.pct !== 'number' || !(data.pct >= 0 && data.pct <= 100)) continue;
+      if (!(data.createdAt instanceof Timestamp)) continue;
+      const at = data.createdAt.toMillis();
+      if (newest === null || at > newest.at) {
+        newest = { at, tax: { name: data.name.trim().slice(0, MAX_TAX_NAME), pct: data.pct } };
+      }
+    }
+    return newest?.tax ?? null;
+  } catch {
+    return null;
   }
 }

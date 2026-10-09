@@ -325,6 +325,30 @@ service cloud.firestore {
             == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
         allow update, delete: if false;
       }
+
+      // A Survey's moon tax (src/features/survey/surveyStore.ts): who gets it and
+      // the rate, one create-only doc per change, the newest one counting. Any
+      // signed-in pilot may write one (the share carries no uid, so the starter
+      // can't be told apart); anyone with the link reads them. Same expiry rule
+      // as a scan, so the TTL policy on `surveyTax` removes it with the survey.
+      match /surveyTax/{taxId} {
+        allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
+        allow create: if request.auth != null
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(['name', 'pct', 'createdAt', 'expiresAt'])
+          && request.resource.data.keys().hasAll(['name', 'pct', 'createdAt', 'expiresAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.pct is number
+          && request.resource.data.pct >= 0
+          && request.resource.data.pct <= 100
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt
+            == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
+        allow update, delete: if false;
+      }
     }
     // Everything else: implicit deny.
   }

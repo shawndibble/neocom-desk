@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { Button, buttonClassName, LogoMark } from '@/components/ui';
+import { Button, buttonClassName, LogoMark, textActionClassName } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 
 /** Where "Open Neocom Desk" lands: the page the share came from, with its content filled in. */
@@ -60,18 +60,18 @@ export function ShareShell({ title, actions, openInApp, children }: ShareShellPr
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-2 text-sm font-semibold tracking-wide">
-          <LogoMark className="size-6" />
+        <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
+          <LogoMark className="size-9" />
           {t('share.brand')}
         </Link>
         {signedOut ? (
           <div className="flex flex-col items-end gap-1 max-sm:w-full max-sm:items-stretch">
-            <Button variant="accent" loading={loggingIn} onClick={logIn}>
+            <Button variant="accent" size="sm" loading={loggingIn} onClick={logIn}>
               {t('share.logIn')}
             </Button>
-            <Button size="sm" onClick={choosePermissions}>
+            <button type="button" className={textActionClassName()} onClick={choosePermissions}>
               {t('share.choosePermissions')}
-            </Button>
+            </button>
             <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
           </div>
         ) : (

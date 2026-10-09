@@ -15,11 +15,16 @@ import { classifyScan } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
 import { isTypingTarget } from '@/lib/shortcuts';
+import { ScanFeedback } from './ScanFeedback';
+import { useScanFeedback } from './useScanFeedback';
+import { MoonTaxReadout } from './MoonTaxRow';
 import { SurveyBoard } from './SurveyBoard';
 import { stashPendingScan } from './pendingScan';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { addSurveyScan, loadSurvey } from './surveyStore';
+import { useHasMoonOre } from './useHasMoonOre';
 import { useSurvey } from './useSurvey';
+import type { SurveyTaxShare } from './surveyStore';
 
 export function SurveyShareScreen({ shareId }: { shareId: string }) {
   const { t } = useTranslation();
@@ -56,16 +61,18 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
     [refresh, shareId]
   );
 
+  const { trackedAdd, busy, error } = useScanFeedback(add);
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
       if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
       const text = event.clipboardData?.getData('text/plain') ?? '';
-      if (parseSurveyScan(text) !== null) void add(text);
+      if (parseSurveyScan(text) !== null) void trackedAdd(text);
     }
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-  }, [add]);
+  }, [trackedAdd]);
 
   return (
     <ShareShell
@@ -95,15 +102,22 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
               {t('survey.differentOnShare')}
             </p>
           )}
+          <ScanFeedback busy={busy} error={error} />
           <SurveyBoard
             scans={state.scans}
             url={shareUrl(shareId)}
             expiresAt={state.expiresAt}
-            onAdd={add}
+            afterPanel={(summary) => <MoonTaxIfMoon tax={state.tax} oreNames={summary.oreNames} />}
             panelTitle={t('survey.sharePanelTitle')}
           />
         </>
       )}
     </ShareShell>
   );
+}
+
+/** The tax line, only when the creator set one and the scans show a moon ore. */
+function MoonTaxIfMoon({ tax, oreNames }: { tax: SurveyTaxShare | null; oreNames: string[] }) {
+  const moon = useHasMoonOre(oreNames);
+  return tax !== null && moon ? <MoonTaxReadout tax={tax} /> : null;
 }

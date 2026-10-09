@@ -1,22 +1,20 @@
 /**
- * The Survey board: a paste box, then one panel with progress, the chart and
- * the headline numbers, then what's left by ore. Shared by the Mining › Survey
+ * The Survey board: one panel with progress, the chart and the headline
+ * numbers, what the caller puts under it (the moon tax), then what's left by ore. Shared by the Mining › Survey
  * tab and the public `/share/<id>` page, so both read and behave the same; the
  * caller supplies the scans and what "add a scan" does.
  *
- * Laid out as the chart-led mockup: the paste bar sits above everything, the
- * percent leads, the legend and charts come next, and the big stat tiles sit
+ * Laid out as the chart-led mockup: the percent leads, the legend and charts come next, and the big stat tiles sit
  * under the chart they summarise.
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, Panel, Spinner, TextArea } from '@/components/ui';
+import { DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { surveyChatMessage, type SurveyMessageLabels } from '@/engine/survey/chatMessage';
 import { priceScans } from '@/engine/survey/pricing';
 import { summarizeSurvey, type SurveyScan, type SurveySummary } from '@/engine/survey/series';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { AddScanResult } from './scanResult';
 import { SurveyCopyButton, type CopyOutcome } from './SurveyCopyButton';
 import { SurveyLegend } from './SurveyLegend';
 import { SurveyOres } from './SurveyOres';
@@ -33,11 +31,12 @@ interface SurveyBoardProps {
   url: string | null;
   /** Epoch ms the link stops working; null until stored. */
   expiresAt: number | null;
-  onAdd: (text: string) => Promise<AddScanResult>;
   /** Quiet controls at the foot of the panel, e.g. "New survey". */
   footerActions?: ReactNode;
   /** A line under the stats about the viewer, e.g. their own share; the public page has none. */
   viewerLine?: (summary: SurveySummary) => ReactNode;
+  /** A section under the panel, before the ores, e.g. the moon tax; gets the same summary. */
+  afterPanel?: (summary: SurveySummary) => ReactNode;
   /** The panel's title; the public page sets one that doesn't repeat its page heading. */
   panelTitle?: string;
 }
@@ -57,66 +56,13 @@ function useCopyOutcome(): [CopyOutcome, (next: CopyOutcome) => void] {
   ];
 }
 
-/**
- * The paste bar takes whatever lands in it and sends it on at once, with no
- * button: a scan is added, and anything else says why it wasn't. The box
- * stays empty (typing does nothing), since its only job is to be pasted into.
- */
-function ScanPasteBox({ onAdd }: { onAdd: SurveyBoardProps['onAdd'] }) {
-  const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<AddScanResult | null>(null);
-
-  async function submit(value: string) {
-    if (value.trim() === '') return;
-    setBusy(true);
-    setError(null);
-    const result = await onAdd(value);
-    setBusy(false);
-    if (result !== 'ok') setError(result);
-  }
-
-  return (
-    <div className="space-y-1">
-      <label className="sr-only" htmlFor="survey-paste">
-        {t('survey.pasteLabel')}
-      </label>
-      <TextArea
-        id="survey-paste"
-        mono
-        rows={1}
-        aria-busy={busy}
-        placeholder={t('survey.pastePlaceholder')}
-        onChange={(event) => {
-          event.currentTarget.value = '';
-        }}
-        onPaste={(event) => {
-          event.preventDefault();
-          void submit(event.clipboardData.getData('text/plain'));
-        }}
-      />
-      <p role="status" className="min-h-4 text-xs text-text-dim">
-        {busy && t('survey.adding')}
-      </p>
-      {error !== null && (
-        <p role="alert" className="text-xs text-danger">
-          {error === 'not-a-scan' && t('survey.notAScan')}
-          {error === 'too-large' && t('survey.tooLarge')}
-          {error === 'refused' && t('survey.refused')}
-          {error === 'failed' && t('survey.saveFailed')}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function SurveyBoard({
   scans,
   url,
   expiresAt,
-  onAdd,
   footerActions,
   viewerLine,
+  afterPanel,
   panelTitle,
 }: SurveyBoardProps) {
   const { t, i18n } = useTranslation();
@@ -163,7 +109,6 @@ export function SurveyBoard({
   if (summary === null) {
     return (
       <div className="space-y-4">
-        <ScanPasteBox onAdd={onAdd} />
         <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
         {footerActions}
       </div>
@@ -172,8 +117,6 @@ export function SurveyBoard({
 
   return (
     <div className="space-y-4">
-      <ScanPasteBox onAdd={onAdd} />
-
       <Panel
         title={panelTitle ?? t('survey.title')}
         meta={
@@ -231,6 +174,8 @@ export function SurveyBoard({
           </div>
         </div>
       </Panel>
+
+      {afterPanel?.(summary)}
 
       {summary.ores.length > 0 && (
         <SurveyOres

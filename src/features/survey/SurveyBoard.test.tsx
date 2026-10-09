@@ -52,20 +52,13 @@ afterEach(() => {
 
 describe('SurveyBoard', () => {
   it('with no scans shows the empty state and a paste box', () => {
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={async () => 'ok'} />);
+    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
     expect(screen.getByText('No survey yet')).toBeTruthy();
     expect(screen.getByLabelText('Survey scan')).toBeTruthy();
   });
 
   it('shows progress, pace and rocks left for two scans', async () => {
-    render(
-      <SurveyBoard
-        scans={SCANS}
-        url={URL}
-        expiresAt={Date.UTC(2026, 9, 15)}
-        onAdd={async () => 'ok'}
-      />
-    );
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
     expect(screen.getByText('13% mined')).toBeTruthy();
     expect(screen.getByText('2 scans')).toBeTruthy();
     expect(screen.getByText('43.3 m³/s')).toBeTruthy();
@@ -82,7 +75,7 @@ describe('SurveyBoard', () => {
     configureClipboard(async (text) => {
       written.push(text);
     });
-    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
     fireEvent.click(screen.getByRole('button', { name: 'Copy chat message' }));
     await waitFor(() => expect(written).toHaveLength(1));
 
@@ -103,7 +96,7 @@ describe('SurveyBoard', () => {
     configureClipboard(async (text) => {
       written.push(text);
     });
-    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+    render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
     const user = userEvent.setup();
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'More copy options' }));
@@ -115,7 +108,7 @@ describe('SurveyBoard', () => {
 
   it('adds a scan pasted into the box without a button press', () => {
     const onAdd = vi.fn(async () => 'ok' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={onAdd} />);
+    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
     fireEvent.paste(screen.getByLabelText('Survey scan'), {
       clipboardData: { getData: () => FIRST },
     });
@@ -124,7 +117,7 @@ describe('SurveyBoard', () => {
 
   it('processes anything pasted into the box at once, and says so when it is not a scan', async () => {
     const onAdd = vi.fn(async () => 'not-a-scan' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={onAdd} />);
+    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
     fireEvent.paste(screen.getByLabelText('Survey scan'), {
       clipboardData: { getData: () => 'hello' },
     });
@@ -134,7 +127,7 @@ describe('SurveyBoard', () => {
 
   it('has no Add scan button, and typing into the box does nothing', () => {
     const onAdd = vi.fn(async () => 'ok' as const);
-    render(<SurveyBoard scans={[]} url={null} expiresAt={null} onAdd={onAdd} />);
+    render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);
     expect(screen.queryByRole('button', { name: 'Add scan' })).toBeNull();
     const box = screen.getByLabelText('Survey scan') as HTMLTextAreaElement;
     fireEvent.change(box, { target: { value: 'typed' } });
@@ -157,7 +150,7 @@ describe('SurveyBoard', () => {
     ];
 
     it('colours each ore bar by its ISK per m3 left, and says what the colours mean', () => {
-      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} />);
       const tierOf = (ore: string) =>
         screen
           .getByText(ore, { selector: 'span' })
@@ -174,24 +167,22 @@ describe('SurveyBoard', () => {
     });
 
     it('shows each ore with its rocks and the ISK left in it', () => {
-      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      render(<SurveyBoard scans={richScans} url={URL} expiresAt={null} />);
       const row = screen.getByText('Scordite', { selector: 'span' }).closest('li');
       expect(row?.textContent).toMatch(/1 rock · 5\.3K m³ · .*570K.* ISK · 100% left/);
     });
 
     it('has one Copy chat message button, in the header on a desktop and under the chart on a phone', () => {
-      const { unmount } = render(
-        <SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />
-      );
+      const { unmount } = render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
       unmount();
       vi.mocked(useIsPhone).mockReturnValue(true);
-      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
     });
 
     it('explains the chart: a swatch per ore, the rate and the projection', () => {
-      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} onAdd={async () => 'ok'} />);
+      render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getByText('Mining rate')).toBeTruthy();
       expect(screen.getByText('Dashed: finish at the current pace')).toBeTruthy();
       expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);

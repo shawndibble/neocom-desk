@@ -518,6 +518,18 @@
       "indexes": []
     },
     {
+      "collectionGroup": "surveyTax",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "surveyTax",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "netWorthSnapshots",
       "fieldPath": "*",
       "ttl": false,
