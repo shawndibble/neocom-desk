@@ -331,7 +331,6 @@
       "droneBay": "Drone bay (m³)",
       "overBy": "Over by {{amount}}",
       "cantUse": "Can't use",
-      "variationsFor": "Variations of {{name}}",
       "drones": "Drones",
       "cargo": "Cargo",
       "rack": {
@@ -1460,7 +1459,7 @@
       "loadAllCompatible": "Into every module that takes it",
       "sameChargeEverywhere": "Load {{name}} into all compatible",
       "copyToAllOfType": "Copy to all of this type",
-      "swapVariant": "Swap for meta variant",
+      "variations": "Variations",
       "copyModule": "Copy module",
       "moveUp": "Move up",
       "moveDown": "Move down",
