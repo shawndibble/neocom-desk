@@ -44,15 +44,16 @@ describe('PilotThreatBand', () => {
     expect(document.body.innerHTML).not.toContain('success');
   });
 
-  it('names the space they hunt in and any other space they use, each toned by the space', () => {
+  it('names the space they hunt in and any other space they use, every chip neutral', () => {
     render(
       <PilotThreatBand verdict={verdict({ alsoSpaces: ['lowsec'] })} gangRatio={null} nowMs={NOW} />
     );
     const [main, also] = chips();
     expect(main.textContent).toBe('Nullsec hunter');
-    expect(main).toHaveClass('text-danger');
+    expect(main).toHaveClass('text-text');
     expect(also.textContent).toBe('Also Lowsec');
-    expect(also).toHaveClass('text-warning');
+    expect(also).toHaveClass('text-text');
+    expect(main.className).not.toMatch(/danger/);
   });
 
   it('adds a chip for gangs, or for mostly solo, only at the ends of the scale', () => {
