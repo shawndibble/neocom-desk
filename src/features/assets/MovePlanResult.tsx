@@ -97,7 +97,7 @@ export function PlanResult({
           <p className="m-0 flex flex-wrap items-center gap-2 font-bold">
             {plan.suggested.hull.name}
             {plan.suggested.hull.owned && (
-              <span className="inline-flex h-[22px] items-center rounded-full border border-success px-2 text-xs font-semibold text-success">
+              <span className="text-xs font-semibold text-success">
                 {t('assets.movePlan.youOwnOne')}
               </span>
             )}

@@ -226,14 +226,10 @@ export function MovePlanModal({
       return next;
     });
 
-  /** Stacks already at the new destination need no moving: their ticks go. */
+  /** Ticks at the destination are kept but ignored, so changing it back restores them. */
   function chooseDestination(system: number | null, station: number | null) {
     setDestSystem(system);
     setDestStation(station);
-    if (!loaded) return;
-    const here = coveredLocations(loaded.systems, system, station);
-    const drop = loaded.stacks.filter((s) => here.has(s.locationId)).map((s) => s.key);
-    if (drop.length > 0) toggle(drop, false);
   }
 
   async function loadHulls(): Promise<MoveHull[]> {

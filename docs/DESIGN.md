@@ -91,13 +91,20 @@ dashed against solid, bars against a line, its own strip.
 
 ### PI Map what-if
 
-| Token                   | Value                                   | Use                                                                                                                                                                                                                                                  |
-| ----------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `map-whatif`            | `#ff79c6`                               | The PI Map's "what if I add a planet" highlight: the products and wires a planet type you do not have would unlock. Always with a "+" marker and words.                                                                                              |
-| `pickup-1` … `pickup-4` | `#6ea8fe` `#b79cff` `#4fd1b5` `#f08fb8` | Plan a move: one hue per pickup location, shared by its rail dot, its slice of the split bar and the picker footer bar. Nominal identity only: the location's name is always written beside it, and slots repeat in order past four. Never a status. |
+| Token        | Value     | Use                                                                                                                                                     |
+| ------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `map-whatif` | `#ff79c6` | The PI Map's "what if I add a planet" highlight: the products and wires a planet type you do not have would unlock. Always with a "+" marker and words. |
 
 One meaning only. It is never a status, never interactive, and never the only signal: the tile
 carries a "+" and the accessible name says "unlocked by a Lava planet".
+
+### Plan a move pickups
+
+| Token                   | Value                                   | Use                                                                                                                                                                                                                              |
+| ----------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pickup-1` … `pickup-4` | `#6ea8fe` `#b79cff` `#4fd1b5` `#f08fb8` | Plan a move: one hue per pickup location, shared by its rail dot, its slice of the split bar and the picker footer bar. Nominal identity only; the location's name is always written beside it. Slots repeat in order past four. |
+
+Never a status, never interactive. A fifth location reuses the first hue, so the name carries the identity.
 
 ### Clock kinds — the one nominal palette
 
@@ -886,6 +893,7 @@ clear when it changes (a different Character).
 | Paired carets in `IconButton`s                       | Pages (previous / next month, a wizard's step back)                                                                                                                                                                                                                                                                                                                       |
 | ⋮                                                    | The row's or table's action menu, only where it holds two or more real actions (⋯ is only the phone nav's More)                                                                                                                                                                                                                                                           |
 | Accent 2px left border                               | Selected                                                                                                                                                                                                                                                                                                                                                                  |
+| Hue on a rail dot and a bar slice                    | Which pickup location a stack, card or share of the load belongs to (Plan a move); the location's name is always beside it, never colour alone                                                                                                                                                                                                                            |
 | `Icon.Pending` (Hourglass)                           | Pending: awaiting an answer (new)                                                                                                                                                                                                                                                                                                                                         |
 | A box sized like a field                             | A control (§6)                                                                                                                                                                                                                                                                                                                                                            |
 | Warning box with a `Button` "Retry"                  | A read failed and nothing is cached: the data is unknown, not empty (PI `EsiDidntAnswer`). Retry re-runs the read                                                                                                                                                                                                                                                         |

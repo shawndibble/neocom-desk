@@ -230,9 +230,7 @@ function StackRow({
           {name}
         </span>
         {here && (
-          <span className="inline-flex h-[22px] items-center rounded-full border border-line-bright px-2 text-xs text-text-dim">
-            {t('assets.movePlan.atDestination')}
-          </span>
+          <span className="text-xs text-text-dim">{t('assets.movePlan.atDestination')}</span>
         )}
       </span>
       <span
