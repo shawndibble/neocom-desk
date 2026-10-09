@@ -87,11 +87,15 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
   // Every scan keeps its dot; the tooltip carries the rest.
   const plotPx = Math.max(0, plotWidth - Y_AXIS_WIDTH - MARGIN.right);
   const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
-  const deltaShown = spacedLabels(
-    rows.map((r) => ({ x: pxAt(r.at), weight: r.delta ?? 0 })),
+  // Before the chart reports a width there is nothing to measure, so show all.
+  const thin = (labels: { x: number; weight: number }[], gap: number) =>
+    plotPx === 0 ? new Set(labels.keys()) : spacedLabels(labels, gap);
+  // The projected finish row sits after the scans and draws no label.
+  const deltaShown = thin(
+    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.delta ?? 0 })),
     DELTA_LABEL_GAP
   );
-  const rateShown = spacedLabels(
+  const rateShown = thin(
     rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
     RATE_LABEL_GAP
   );
