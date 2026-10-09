@@ -14,8 +14,9 @@ import { loadContacts } from '@/features/character/contacts';
 import { resolveNames } from '@/features/character/names';
 import { summarizeKills, type KillRecord, type KillSummary } from '@/engine/pilotList/killActivity';
 import { resolveStanding, type ContactStanding } from '@/engine/pilotList/standing';
+import { needsDangerRatio } from '@/engine/pilotList/threatVerdict';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { fetchPilotKillHistory } from '@/lib/zkillboard';
+import { fetchPilotKillHistory, fetchPilotStats } from '@/lib/zkillboard';
 
 /** zKillboard is a volunteer-run service: keep the fan-out well under ESI's. */
 const ZKILL_CONCURRENCY = 4;
@@ -62,6 +63,14 @@ export type PilotKillsState =
   | { kind: 'unreachable' }
   | { kind: 'ready'; kills: KillRecord[]; summary: KillSummary };
 
+/**
+ * The one number the Threat verdict needs beyond the kills: zKillboard's
+ * all-time danger ratio. Only a pilot with enough recent kills to be dangerous
+ * has it looked up (`needsDangerRatio`), so most rows stay `idle`.
+ */
+export type PilotDangerState =
+  { kind: 'idle' } | { kind: 'loading' } | { kind: 'ready'; ratio: number | null };
+
 export interface PilotListRow {
   /** The name as pasted: also the row's key, so it never changes while the row loads. */
   name: string;
@@ -76,6 +85,7 @@ export interface PilotListRow {
   /** Set when the pilot is in the viewer's own corporation or alliance. */
   ownOrganization: 'corporation' | 'alliance' | null;
   kills: PilotKillsState;
+  danger: PilotDangerState;
 }
 
 export interface LoadPilotListOptions {
@@ -105,6 +115,7 @@ export async function loadPilotList(
     standing: null,
     ownOrganization: null,
     kills: { kind: 'loading' },
+    danger: { kind: 'idle' },
   }));
   onRows(rows);
 
@@ -182,10 +193,19 @@ export async function loadPilotList(
   await mapWithConcurrencyLimit(toLookUp, ZKILL_CONCURRENCY, async (characterId) => {
     if (signal?.aborted) return;
     const result = await fetchPilotKillHistory(characterId).catch(() => ({ ok: false as const }));
+    const now = Date.now();
+    const wantsRatio = result.ok && needsDangerRatio(result.kills, now);
     update(characterId, {
       kills: result.ok
-        ? { kind: 'ready', kills: result.kills, summary: summarizeKills(result.kills, Date.now()) }
+        ? { kind: 'ready', kills: result.kills, summary: summarizeKills(result.kills, now) }
         : { kind: 'unreachable' },
+      danger: wantsRatio ? { kind: 'loading' } : { kind: 'idle' },
+    });
+    if (!wantsRatio) return;
+    // The same slot reads the stats, so a busy pilot never doubles the fan-out.
+    const stats = await fetchPilotStats(characterId).catch(() => ({ kind: 'failed' as const }));
+    update(characterId, {
+      danger: { kind: 'ready', ratio: stats.kind === 'stats' ? stats.stats.dangerRatio : null },
     });
   });
   await orgNames;

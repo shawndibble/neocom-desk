@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   resolveAffiliations: vi.fn(),
   resolveNames: vi.fn(),
   fetchPilotKillHistory: vi.fn(),
+  fetchPilotStats: vi.fn(),
   loadContacts: vi.fn(),
 }));
 vi.mock('@/esi/endpoints', () => ({ postUniverseIds: mocks.postUniverseIds }));
@@ -13,8 +14,13 @@ vi.mock('@/features/character/affiliations', () => ({
 }));
 vi.mock('@/features/character/names', () => ({ resolveNames: mocks.resolveNames }));
 vi.mock('@/features/character/contacts', () => ({ loadContacts: mocks.loadContacts }));
-vi.mock('@/lib/zkillboard', () => ({ fetchPilotKillHistory: mocks.fetchPilotKillHistory }));
+vi.mock('@/lib/zkillboard', () => ({
+  fetchPilotKillHistory: mocks.fetchPilotKillHistory,
+  fetchPilotStats: mocks.fetchPilotStats,
+}));
 
+import { rowThreat } from './rowThreat';
+import { summarizeKills } from '@/engine/pilotList/killActivity';
 import {
   loadPilotList,
   loadViewerContext,
@@ -101,6 +107,63 @@ describe('loadPilotList', () => {
     expect(delta.kills.kind).toBe('skipped');
     expect(mocks.fetchPilotKillHistory).toHaveBeenCalledTimes(1);
     expect(mocks.fetchPilotKillHistory).toHaveBeenCalledWith(2);
+  });
+
+  describe('Threat verdict', () => {
+    const DAY = 24 * HOUR;
+    const busy = Array.from({ length: 12 }, (_, i) => kill((i + 1) * DAY));
+
+    it('looks up stats only for a pilot with enough recent kills to be dangerous', async () => {
+      mocks.fetchPilotKillHistory.mockImplementation((id: number) =>
+        Promise.resolve({ ok: true, kills: id === 1 ? busy : [kill(DAY), kill(2 * DAY)] })
+      );
+      mocks.fetchPilotStats.mockResolvedValue({
+        kind: 'stats',
+        stats: { dangerRatio: 60 },
+      });
+      const [alpha, beta] = await run(['Alpha', 'Beta'], { ...viewer, contacts: new Map() });
+      expect(mocks.fetchPilotStats).toHaveBeenCalledTimes(1);
+      expect(mocks.fetchPilotStats).toHaveBeenCalledWith(1);
+      expect(rowThreat(alpha, Date.now())).toBe('dangerous');
+      expect(rowThreat(beta, Date.now())).toBe('low');
+    });
+
+    it('falls back to active when the stats could not be read', async () => {
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: busy });
+      mocks.fetchPilotStats.mockResolvedValue({ kind: 'failed' });
+      const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
+      expect(rowThreat(alpha, Date.now())).toBe('active');
+    });
+
+    it('has no verdict for a row whose kills are not loaded, and is pending on the ratio', () => {
+      const base = {
+        name: 'X',
+        characterId: 1,
+        notFound: false,
+        corporationId: null,
+        allianceId: null,
+        corporationName: null,
+        allianceName: null,
+        standing: null,
+        ownOrganization: null,
+      } satisfies Partial<PilotListRow>;
+      expect(
+        rowThreat({ ...base, kills: { kind: 'loading' }, danger: { kind: 'idle' } }, Date.now())
+      ).toBeNull();
+      expect(
+        rowThreat({ ...base, kills: { kind: 'skipped' }, danger: { kind: 'idle' } }, Date.now())
+      ).toBeNull();
+      expect(
+        rowThreat(
+          {
+            ...base,
+            kills: { kind: 'ready', kills: busy, summary: summarizeKills(busy, Date.now()) },
+            danger: { kind: 'loading' },
+          },
+          Date.now()
+        )
+      ).toBe('pending');
+    });
   });
 
   it('summarises a ready pilot over the last 30 days', async () => {

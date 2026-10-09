@@ -4441,6 +4441,7 @@
       "save_other": "Save all {{count}} days"
     },
     "valueAffix": "value",
+    "noPriceLabel": "No price",
     "moreActions": "More actions",
     "sections": {
       "open": "Open · {{count}}",
@@ -4737,6 +4738,7 @@
     "title": "Mail",
     "refresh": "Refresh",
     "readingFor": "For {{name}}",
+    "rowOwner": "Mail for {{name}}",
     "emptyTitle": "No mail cached",
     "emptyHint": "Couldn't load this character's mail yet. Try again shortly.",
     "emptyFetchedTitle": "No mail",
@@ -6619,7 +6621,7 @@
     "refresh": "Refresh",
     "emptyTitle": "No loyalty points cached",
     "emptyHint": "Couldn't load this character's loyalty point balances yet. Try again shortly.",
-    "emptyFetchedTitle": "No loyalty points",
+    "noneLine": "Loyalty Points: none ·",
     "corporation": "Corporation",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
@@ -9012,6 +9014,26 @@
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name. Shift+Enter adds another name; Ctrl+Enter looks up the whole list.",
       "searchHintExact": "Type the pilot's full name and press Enter. Shift+Enter adds another name; Ctrl+Enter looks up the whole list. Suggestions need this character's search permission.",
+      "threat": {
+        "label": "Threat",
+        "level": {
+          "dangerous": "Dangerous",
+          "active": "Active",
+          "low": "Low threat",
+          "inactive": "Inactive"
+        },
+        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time danger ratio. Dangerous: {{dangerousKills}} or more recent kills and a danger ratio of {{dangerRatio}} or more. Active: {{activeKills}} or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
+        "inactive": "No kills in the last {{days}} days.",
+        "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}} ago.",
+        "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}} ago.",
+        "summary_other": "{{count}} kills in the last {{days}} days. Last kill {{age}} ago.",
+        "summaryIn_one": "{{count}} kill in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
+        "summaryIn_other": "{{count}} kills in the last {{days}} days, mostly in {{space}}. Last kill {{age}} ago.",
+        "gangs": "{{value}}% in gangs",
+        "pods": "{{value}}% of kills are pods",
+        "pending": "Checking",
+        "dangerUnknown": "zKillboard's danger ratio could not be read, so this may understate the threat."
+      },
       "activity": {
         "title": "Where they kill",
         "failed": "zKillboard couldn't be reached.",
@@ -9144,6 +9166,87 @@
           "1657": "Citadel",
           "4594": "Lancer Dreadnought"
         },
+        "readout": {
+          "readsAs": "Reads as",
+          "reading": {
+            "drop": "Capital drop staging",
+            "scout": "Scouts, or a hunter looking for a target",
+            "mining": "A mining fleet",
+            "gang": "A roaming PvP gang",
+            "mixed": "Mixed traffic, no fleet pattern"
+          },
+          "confidence": { "strong": "Strong reading", "likely": "Likely", "weak": "Weak reading" },
+          "threat": { "clear": "Clear on scan", "watch": "Watch", "dangerous": "Dangerous" },
+          "questions": {
+            "find": "Can it find you",
+            "catch": "Can it catch you",
+            "kill": "Can it kill you",
+            "reinforce": "Can it bring more"
+          },
+          "answer": { "yes": "Yes", "no": "No", "few": "A few", "gang": "A gang" },
+          "ev": {
+            "cyno": "A cyno field is lit on the scan",
+            "blackOps_one": "{{count}} Black Ops on scan",
+            "blackOps_other": "{{count}} Black Ops on scan",
+            "capitals_one": "{{count}} capital on scan",
+            "capitals_other": "{{count}} capitals on scan",
+            "scouts_one": "{{count}} ship, a fast or covert hull",
+            "scouts_other": "{{count}} ships, all fast or covert hulls",
+            "probes_one": "{{count}} combat probe out: someone is scanning for ships",
+            "probes_other": "{{count}} combat probes out: someone is scanning for ships",
+            "miners": "{{count}} of {{total}} ships are miners or boosters",
+            "boosters_one": "{{count}} booster hull, usually boosting",
+            "boosters_other": "{{count}} booster hulls, usually boosting",
+            "fewCombat_one": "{{count}} combat ship, too few to be a defence fleet",
+            "fewCombat_other": "{{count}} combat ships, too few to be a defence fleet",
+            "doctrine": "{{count}} x {{hull}} is the line ({{percent}}% of damage ships)",
+            "together": "{{count}} combat ships inside {{km}} km of each other",
+            "logistics_one": "{{count}} logistics ship keeping them alive",
+            "logistics_other": "{{count}} logistics ships keeping them alive",
+            "tackle": "{{count}} tackle",
+            "hulls": "{{count}} ships across {{hulls}} hulls, no shared doctrine",
+            "spread": "Spread over {{km}} km"
+          },
+          "q": {
+            "find": {
+              "probes_one": "{{count}} combat probe out",
+              "probes_other": "{{count}} combat probes out",
+              "recon_one": "{{count}} recon ship",
+              "recon_other": "{{count}} recon ships",
+              "no": "No probes or recon ships"
+            },
+            "catch": {
+              "yes_one": "{{count}} tackle ship or disruptor",
+              "yes_other": "{{count}} tackle ships or disruptors",
+              "no": "No interdictor, HIC, interceptor or disruptor"
+            },
+            "kill": {
+              "yes_one": "{{count}} cruiser-size or larger damage ship",
+              "yes_other": "{{count}} cruiser-size or larger damage ships",
+              "no": "No damage ships above destroyer size"
+            },
+            "reinforce": {
+              "cyno": "A cyno field is lit",
+              "ships_one": "{{count}} capital or Black Ops",
+              "ships_other": "{{count}} capitals or Black Ops",
+              "no": "No cyno, capital or Black Ops"
+            }
+          },
+          "sig": {
+            "probes_one": "{{count}} combat scanner probe out. Someone in the system is scanning for ships.",
+            "probes_other": "{{count}} combat scanner probes out. Someone in the system is scanning for ships.",
+            "cyno": "A cyno field is lit. Ships can arrive in seconds.",
+            "tackleDamage": "Tackle and damage together: {{tackle}} tackle with {{damage}} damage ships. Anything caught could be held and killed.",
+            "logistics_one": "{{count}} logistics ship. A fleet that expects to take damage.",
+            "logistics_other": "{{count}} logistics ships. A fleet that expects to take damage.",
+            "boosters_one": "{{count}} booster hull: Industrial Command Ships usually boost miners.",
+            "boosters_other": "{{count}} booster hulls: Industrial Command Ships usually boost miners.",
+            "sharedName": "{{count}} ships share the name {{name}}, a hint of one owner.",
+            "scouts": "Scouts often sit one jump ahead of a gang. The neighbouring systems may show more.",
+            "noCyno": "No cyno field on scan."
+          },
+          "caveat": "A clean scan is not an empty system. Cloaked ships and anything past 14.3 AU do not show."
+        },
         "boardLabel": "Fleet by role",
         "legendEntry": "{{count}} ({{percent}}%)",
         "lanesTitle": "Distance from you, by role (km)",
@@ -9192,9 +9295,7 @@
       "losses": "Losses",
       "iskDestroyed": "ISK destroyed",
       "iskLost": "ISK lost",
-      "iskEfficiency": "ISK efficiency",
       "soloKills": "Solo kills",
-      "iskEfficiencyHelp": "ISK destroyed ÷ (ISK destroyed + ISK lost). Above 50% means they kill more value than they lose.",
       "dangerMeter": "Danger",
       "dangerMeterHelp": "zKillboard's danger ratio, 0–100%, as zKillboard states it: snuggly at 0, dangerous at 100.",
       "snuggly": "Snuggly",
@@ -9543,6 +9644,7 @@
       "group": "Route Safety only · your default on this page, can be overridden in the link",
       "enabled": "Route through Thera / Turnur",
       "shipSize": "My ship fits",
+      "sizeFromHull": "Set from {{hull}}",
       "ship": "Ship I am moving",
       "shipNone": "No ship",
       "shipPlaceholder": "Pick a hull to check mass",

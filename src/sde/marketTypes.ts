@@ -44,6 +44,12 @@ export function knownPackagedVolumeOf(
   return typeof volume === 'number' && Number.isFinite(volume) ? volume : null;
 }
 
+/**
+ * public/data/market/systemPositions.json: flat `[id, x, y, z, ...]` in light years,
+ * read by `engine/route/jumpDrive.ts`'s `indexSystemPositions`.
+ */
+export type SystemPositionData = number[];
+
 /** One entry in public/data/market/systems.json. */
 export interface SolarSystemEntry {
   id: number;

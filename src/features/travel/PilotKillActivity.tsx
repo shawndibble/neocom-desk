@@ -3,18 +3,18 @@
  * Character tab): kills in the last 30 days by kind of space and how long ago
  * the latest was, six months of kills by space, and the hulls they killed.
  * The hulls they fly and their latest kills are the sections below it. Kills
- * only: a loss says little about how dangerous a pilot is. Numbers, never verdicts.
+ * only: a loss says little about how dangerous a pilot is. The profile's Threat
+ * verdict (`PilotThreatSummary`) is read from the same kills.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Spinner, TypeIcon } from '@/components/ui';
+import { Button, Disclosure, Spinner, TypeIcon } from '@/components/ui';
 import {
   ageTone,
   KILL_SPACES,
   monthlyBySpace,
   summarizeKills,
   topShips,
-  type KillRecord,
 } from '@/engine/pilotList/killActivity';
 import { resolveStanding } from '@/engine/pilotList/standing';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -22,11 +22,11 @@ import { ItemInfoLink } from '@/features/entities';
 import { formatAge } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { useNow } from '@/lib/useNow';
-import { fetchPilotKillHistory } from '@/lib/zkillboard';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadViewerContext, type ViewerContext } from './pilotListData';
 import { PilotStandingTag } from './PilotStandingTag';
 import { SPACE_BAR, SPACE_TEXT } from './pilotListStyles';
+import { usePilotKillHistory, type PilotKillHistoryState } from './usePilotKillHistory';
 
 /** Hulls listed under "Ships they killed". Their own hulls and latest kills are already on this profile. */
 const HULLS_SHOWN = 5;
@@ -40,25 +40,26 @@ function monthName(key: string): string {
   });
 }
 
-type HistoryState =
-  { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; kills: KillRecord[] };
-
+/**
+ * The self-fetching form, for a caller with no other use for the kills.
+ * `PilotProfileView` fetches once itself (the verdict reads the same kills)
+ * and draws `PilotKillActivityView` directly.
+ */
 export function PilotKillActivity({ characterId }: { characterId: number }) {
-  const { t } = useTranslation();
-  const [history, setHistory] = useState<HistoryState>({ kind: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-  const [hullNames, setHullNames] = useState<Map<number, string>>(new Map());
+  const { history, retry } = usePilotKillHistory(characterId);
+  return <PilotKillActivityView history={history} onRetry={retry} />;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchPilotKillHistory(characterId).then((result) => {
-      if (!cancelled)
-        setHistory(result.ok ? { kind: 'ready', kills: result.kills } : { kind: 'failed' });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, attempt]);
+export function PilotKillActivityView({
+  history,
+  onRetry,
+}: {
+  history: PilotKillHistoryState;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  const [hullNames, setHullNames] = useState<Map<number, string>>(new Map());
+  const [chartOpen, setChartOpen] = useState(false);
 
   const kills = history.kind === 'ready' ? history.kills : null;
   const now = useNow();
@@ -112,13 +113,7 @@ export function PilotKillActivity({ characterId }: { characterId: number }) {
         {heading}
         <p className="flex flex-wrap items-center gap-3 text-sm text-text-dim">
           {t('travel.pilot.activity.failed')}
-          <Button
-            size="sm"
-            onClick={() => {
-              setHistory({ kind: 'loading' });
-              setAttempt((n) => n + 1);
-            }}
-          >
+          <Button size="sm" onClick={onRetry}>
             {t('travel.pilot.retry')}
           </Button>
         </p>
@@ -185,58 +180,67 @@ export function PilotKillActivity({ characterId }: { characterId: number }) {
       </ul>
       <p className="text-[0.6875rem] text-text-dim">{t('travel.pilot.activity.window')}</p>
 
-      <div>
-        <h4 className="mb-1 text-xs text-text-dim">{t('travel.pilot.activity.chart')}</h4>
-        <div
-          role="img"
-          aria-label={t('travel.pilot.activity.chartLabel', {
-            summary: months.map((m) => `${monthName(m.key)}: ${monthTotal(m)}`).join(', '),
-          })}
-          className="space-y-1"
-        >
+      <Disclosure
+        label={t('travel.pilot.activity.chart')}
+        expanded={chartOpen}
+        onToggle={() => setChartOpen((open) => !open)}
+        className="rounded-xs border border-line"
+      >
+        <div className="p-3">
           <div
-            aria-hidden
-            className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim tabular-nums"
+            role="img"
+            aria-label={t('travel.pilot.activity.chartLabel', {
+              summary: months.map((m) => `${monthName(m.key)}: ${monthTotal(m)}`).join(', '),
+            })}
+            className="space-y-1"
           >
-            {months.map((m) => (
-              <span key={m.key} className={monthTotal(m) > 0 ? 'text-text' : undefined}>
-                {monthTotal(m)}
-              </span>
-            ))}
+            <div
+              aria-hidden
+              className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim tabular-nums"
+            >
+              {months.map((m) => (
+                <span key={m.key} className={monthTotal(m) > 0 ? 'text-text' : undefined}>
+                  {monthTotal(m)}
+                </span>
+              ))}
+            </div>
+            <div
+              aria-hidden
+              className="grid h-20 grid-cols-6 items-end gap-1.5 border-b border-line"
+            >
+              {months.map((m) => (
+                <div key={m.key} className="flex h-full min-w-0 flex-col-reverse">
+                  {KILL_SPACES.map((space) =>
+                    m[space] > 0 ? (
+                      <span
+                        key={space}
+                        className={SPACE_BAR[space]}
+                        style={{ height: `${(m[space] / tallest) * 100}%` }}
+                      />
+                    ) : null
+                  )}
+                </div>
+              ))}
+            </div>
+            <div
+              aria-hidden
+              className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim"
+            >
+              {months.map((m) => (
+                <span key={m.key}>{monthName(m.key)}</span>
+              ))}
+            </div>
           </div>
-          <div aria-hidden className="grid h-20 grid-cols-6 items-end gap-1.5 border-b border-line">
-            {months.map((m) => (
-              <div key={m.key} className="flex h-full min-w-0 flex-col-reverse">
-                {KILL_SPACES.map((space) =>
-                  m[space] > 0 ? (
-                    <span
-                      key={space}
-                      className={SPACE_BAR[space]}
-                      style={{ height: `${(m[space] / tallest) * 100}%` }}
-                    />
-                  ) : null
-                )}
-              </div>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-dim">
+            {chartSpaces.map((space) => (
+              <li key={space} className="flex items-center gap-1.5">
+                <span aria-hidden className={cx('size-2.5', SPACE_BAR[space])} />
+                {t(`common.spaceOption.${space}`)}
+              </li>
             ))}
-          </div>
-          <div
-            aria-hidden
-            className="grid grid-cols-6 gap-1.5 text-center text-[0.6875rem] text-text-dim"
-          >
-            {months.map((m) => (
-              <span key={m.key}>{monthName(m.key)}</span>
-            ))}
-          </div>
+          </ul>
         </div>
-        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-dim">
-          {chartSpaces.map((space) => (
-            <li key={space} className="flex items-center gap-1.5">
-              <span aria-hidden className={cx('size-2.5', SPACE_BAR[space])} />
-              {t(`common.spaceOption.${space}`)}
-            </li>
-          ))}
-        </ul>
-      </div>
+      </Disclosure>
 
       <HullList title={t('travel.pilot.activity.killed')} ships={view.killed} name={hull} />
       <p className="text-[0.6875rem] text-text-dim">
