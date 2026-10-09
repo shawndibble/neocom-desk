@@ -64,10 +64,16 @@ describe('ZkillStatsSection', () => {
     expect(screen.getByText('30')).toHaveClass('text-isk-neg');
   });
 
-  it('explains ISK efficiency behind a help button', () => {
+  it('leaves ISK efficiency out: the danger ratio already is kills against losses', () => {
     render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} />);
-    expect(screen.getByRole('button', { name: 'About ISK efficiency' })).toBeInTheDocument();
-    expect(screen.getByText('90.0%')).toBeInTheDocument();
+    expect(screen.queryByText('ISK efficiency')).toBeNull();
+    expect(screen.queryByText('90.0%')).toBeNull();
+  });
+
+  it('leaves the meters to the caller when it draws them above', () => {
+    render(<ZkillStatsSection stats={{ kind: 'stats', stats: base }} metersAbove />);
+    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.getByText('120')).toBeInTheDocument();
   });
 });
 
