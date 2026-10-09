@@ -87,7 +87,9 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByText('Edit items or destination')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.queryByText('Edit items or destination')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1);
     const links = screen.getAllByRole('link', { name: /^Route Safety/ });
     expect(links).toHaveLength(1);
     expect(links[0].getAttribute('href')).toContain(String(SYSTEM_JITA));
@@ -121,7 +123,7 @@ describe('MovePlanTab', () => {
     expect(amarr.getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByText('Edit items or destination')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Load split by pickup and trip' })).toBeTruthy();
     expect(screen.getByText('Deliver everything here')).toBeTruthy();
   });

@@ -61,6 +61,18 @@ export interface PickedTotals {
   byLocation: Map<number, number>;
 }
 
+/** A location's stacks, biggest packaged haul first, then by item name. */
+export function sortStacksByVolume(
+  stacks: readonly PickerStack[],
+  unitM3: ReadonlyMap<number, number>,
+  typeName: (typeId: number) => string
+): PickerStack[] {
+  const m3 = (s: PickerStack) => s.quantity * (unitM3.get(s.typeId) ?? 0);
+  return [...stacks].sort(
+    (a, b) => m3(b) - m3(a) || typeName(a.typeId).localeCompare(typeName(b.typeId))
+  );
+}
+
 /** What the picker's footer shows: ticks at a destination location do not count. */
 export function pickedTotals(
   stacks: readonly PickerStack[],
