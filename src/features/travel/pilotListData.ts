@@ -210,7 +210,7 @@ export async function loadPilotList(
   const toLookUp = rows
     .filter((row) => row.characterId !== null && row.kills.kind === 'loading')
     .sort((a, b) => Number(isKnownBad(a)) - Number(isKnownBad(b)))
-    .map((row) => row.characterId as number);
+    .flatMap((row) => (row.characterId === null ? [] : [row.characterId]));
   await mapWithConcurrencyLimit(toLookUp, ZKILL_CONCURRENCY, async (characterId) => {
     if (signal?.aborted) return;
     const result = await fetchPilotKillHistory(characterId).catch(() => ({ ok: false as const }));

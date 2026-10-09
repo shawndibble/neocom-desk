@@ -112,10 +112,14 @@ describe('loadPilotList', () => {
   });
 
   it('asks zKillboard about unknown and neutral pilots before red and orange contacts', async () => {
-    // Beta is an orange contact (already known to be bad); Alpha has no standing.
-    // Pasted order is Beta first, but the unknown is the one worth waiting on.
-    await run(['Beta', 'Alpha']);
-    expect(mocks.fetchPilotKillHistory.mock.calls.map(([id]) => id)).toEqual([1, 2]);
+    // Alpha is red and Beta orange (both already known to be bad); Delta has no
+    // standing. Pasted order is bad news first, but the unknown is worth waiting on.
+    const contacts = new Map([
+      [1, -10],
+      [11, -5],
+    ]);
+    await run(['Alpha', 'Beta', 'Delta'], { ...viewer, contacts });
+    expect(mocks.fetchPilotKillHistory.mock.calls.map(([id]) => id)).toEqual([4, 1, 2]);
   });
 
   describe('Threat verdict', () => {
