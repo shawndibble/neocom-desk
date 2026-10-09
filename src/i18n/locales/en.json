@@ -9134,7 +9134,7 @@
       "pickTitle": "Look up a pilot by name",
       "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once.",
       "searchLabel": "Pilot",
-      "searchPlaceholder": "Pilot name",
+      "searchPlaceholder": "Pilot name, Local, or D-Scan",
       "suggestionsLabel": "Matching pilots",
       "lookUp": "Look up",
       "searchHintSuggest": "Type at least 3 characters for suggestions, or press Enter to look up an exact name. Shift+Enter adds another name; Ctrl+Enter looks up the whole list.",
@@ -9187,8 +9187,6 @@
       "list": {
         "tokenLocal_one": "{{count}} name, Local list",
         "tokenLocal_other": "{{count}} names, Local list",
-        "tokenDscan_one": "{{count}} line, D-Scan",
-        "tokenDscan_other": "{{count}} lines, D-Scan",
         "clear": "Clear",
         "pilot": "Pilot",
         "standing": "Your standing",
@@ -9237,9 +9235,12 @@
         "ownShip": {
           "label": "Your ship",
           "placeholder": "Type your ship, e.g. Hurricane",
-          "fromCharacter": "Your ship: {{name}} (from your character)",
+          "fromCharacter": "from your character",
           "useCurrent": "Use my current ship",
-          "clear": "Clear"
+          "clear": "Clear",
+          "editLabel": "Your ship: {{name}}, change",
+          "notSet": "Not set",
+          "unsetNote": "Counting cruiser-size and larger damage ships."
         },
         "role": {
           "capitals": "Capitals",
@@ -9383,8 +9384,6 @@
             "danger": "Danger",
             "busy": "Busy"
           },
-          "readFor": "Read for your {{ship}}",
-          "readForUnknown": "Your ship is not set: counting cruiser-size and larger damage ships",
           "headline": {
             "first": {
               "kill_one": "One ship can hurt you",

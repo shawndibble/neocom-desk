@@ -96,7 +96,7 @@ describe('FleetBoard', () => {
     const answer = await screen.findByTestId('dscan-answer');
     expect(answer.getAttribute('data-level')).toBe('watch');
     expect(answer.textContent).toContain('One ship can hurt you, and one can find you.');
-    expect(answer.textContent).toContain('Your ship is not set');
+    expect(answer.textContent).toContain('Counting cruiser-size and larger damage ships.');
     const watch = screen.getByRole('region', { name: /Watch these/ });
     const items = within(watch).getAllByRole('listitem');
     expect(items).toHaveLength(2);
@@ -111,7 +111,7 @@ describe('FleetBoard', () => {
     await db.settings.put({ key: 'dscan.ownShip', value: 5 });
     render(<FleetBoard rows={[row(1, 12), row(4, 14)]} />);
     const answer = await screen.findByTestId('dscan-answer');
-    await waitFor(() => expect(answer.textContent).toContain('Read for your Iteron V'));
+    await within(answer).findByRole('button', { name: 'Your ship: Iteron V, change' });
     expect(answer.textContent).toContain('2 ships can hurt you.');
   });
 

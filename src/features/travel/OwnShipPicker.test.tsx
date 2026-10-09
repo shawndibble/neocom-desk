@@ -16,15 +16,28 @@ import { OwnShipPicker } from './OwnShipPicker';
 
 afterEach(cleanup);
 
+/** Opens the field the way a pilot does: by pressing the ship's name. */
+async function openField(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: /^Your ship:/ }));
+  return screen.getByRole('combobox', { name: 'Your ship' });
+}
+
 describe('OwnShipPicker', () => {
-  it('shows suggestions while typing and picks one with arrows and Enter', async () => {
+  it('reads as text first: the name, or "Not set" with what that means', async () => {
+    render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={vi.fn()} />);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Your ship: Not set, change' })).toBeVisible();
+    expect(screen.getByText(/cruiser-size and larger/)).toBeVisible();
+  });
+
+  it('opens into a field on click, shows suggestions, and picks one with arrows and Enter', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
-    const input = screen.getByRole('combobox', { name: 'Your ship' });
+    const input = await openField(user);
+    expect(input).toHaveFocus();
     expect(input).toHaveAttribute('placeholder', 'Type your ship, e.g. Hurricane');
     expect(input).toHaveAttribute('aria-expanded', 'false');
-    await screen.findByRole('combobox');
     await user.type(input, 'hurr');
     const options = await screen.findAllByRole('option');
     expect(options.map((o) => o.textContent)).toEqual(['Hurricane', 'Hurricane Fleet Issue']);
@@ -34,33 +47,35 @@ describe('OwnShipPicker', () => {
     await user.keyboard('{Enter}');
     expect(onChange).toHaveBeenCalledWith(33153);
     expect(screen.queryByRole('option')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
   it('picks a suggestion with a click', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
-    await user.type(screen.getByRole('combobox'), 'rif');
+    await user.type(await openField(user), 'rif');
     await user.click(await screen.findByRole('option', { name: 'Rifter' }));
     expect(onChange).toHaveBeenCalledWith(587);
   });
 
-  it('closes on Escape without picking', async () => {
+  it('closes on Escape without picking, back to the text', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<OwnShipPicker typeId={null} autoTypeId={null} onChange={onChange} />);
-    await user.type(screen.getByRole('combobox'), 'hurr');
+    await user.type(await openField(user), 'hurr');
     await screen.findAllByRole('option');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('option')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('shows the manual pick and Clear removes it', async () => {
+  it('shows the manual pick as text and Clear removes it', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<OwnShipPicker typeId={587} autoTypeId={null} onChange={onChange} />);
-    expect(await screen.findByDisplayValue('Rifter')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Your ship: Rifter, change' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onChange).toHaveBeenCalledWith(null);
   });
@@ -74,11 +89,12 @@ describe('OwnShipPicker', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
   });
 
-  it('names the character ship in the placeholder when nothing is picked by hand', async () => {
+  it('shows the character ship, and says it comes from the character, when nothing is picked by hand', async () => {
     render(<OwnShipPicker typeId={null} autoTypeId={24702} onChange={vi.fn()} />);
     expect(
-      await screen.findByPlaceholderText('Your ship: Hurricane (from your character)')
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button')).toBeNull();
+      await screen.findByRole('button', { name: 'Your ship: Hurricane, change' })
+    ).toBeVisible();
+    expect(screen.getByText('from your character')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
   });
 });

@@ -61,9 +61,7 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
   return paste.kind === 'local' ? (
     <LocalList key={paste.names.join('|')} paste={paste} />
   ) : (
-    <Panel className="space-y-4">
-      <FleetBoard rows={paste.rows} trackHistory />
-    </Panel>
+    <FleetBoard rows={paste.rows} trackHistory />
   );
 }
 

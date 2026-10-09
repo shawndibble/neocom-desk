@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel, StatChip, StatChips } from '@/components/ui';
+import { EmptyState, StatChip, StatChips } from '@/components/ui';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import { FleetBoard } from './FleetBoard';
@@ -43,9 +43,7 @@ export function DscanShareScreen({
               value={new Date(expiresAt).toLocaleString()}
             />
           </StatChips>
-          <Panel>
-            <FleetBoard rows={state.rows} />
-          </Panel>
+          <FleetBoard rows={state.rows} />
         </>
       )}
     </ShareShell>
