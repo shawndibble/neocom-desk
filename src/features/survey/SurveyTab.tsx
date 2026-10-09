@@ -18,7 +18,7 @@ import { Button, EmptyState, PageHeader, textActionClassName } from '@/component
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { classifyScan } from '@/engine/survey/scanUpdate';
+import { classifyScan, lastSeenField } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SurveyScanState } from '@/lib/shortcuts';
@@ -105,7 +105,10 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           const sameField =
             choice === 'existing' ||
             latest === undefined ||
-            classifyScan(latest.rocks, parseSurveyScan(text) ?? []) === 'update';
+            classifyScan(
+              lastSeenField(found.scans.map((scan) => scan.rocks)),
+              parseSurveyScan(text) ?? []
+            ) === 'update';
           if (!sameField) {
             const names = (await db.characters.toArray()).map((c) => c.name);
             if (!ownsSurvey(found.owner, names)) return await startWith(text);

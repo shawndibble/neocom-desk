@@ -1023,8 +1023,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   creation. Anyone holding the link can add a scan with no sign-in, which is
   how a Survey carries on after the pilot who started it has left. It names its
   owner, the starting Character, so the app can tell the owner from someone who
-  opened the link. A pasted scan that only shrinks the latest one (no new ore,
-  none with more m³) is an update of the Survey; any other scan is a different
+  opened the link. A pasted scan that only shrinks the field the Survey has shown (each
+  ore as of the newest scan that had it; no new ore, none with more m³) is an
+  update of the Survey, even if an ore dropped out of the latest scan; any other scan is a different
   field. Shown on the Mining › Survey tab and on the public page of its link.
 - **Survey Scan**: One copy of the in-game Survey Scanner results: a row per
   rock (ore, units, volume in m³, ISK value, distance), pasted as text. Stored
