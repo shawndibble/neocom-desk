@@ -24,7 +24,7 @@ import type { SurveyScanState } from '@/lib/shortcuts';
 import { SurveyBoard } from './SurveyBoard';
 import { SurveyPicker } from './SurveyPicker';
 import { YourShareRow } from './YourShareRow';
-import { takePendingScan } from './pendingScan';
+import { stashPendingScan, takePendingScan } from './pendingScan';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
@@ -149,7 +149,12 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
   useEffect(() => {
     if (!hydrated || characterId === null) return;
     const pending = takePendingScan();
-    if (pending !== null) void addRef.current(pending, 'new');
+    if (pending === null) return;
+    // Put back if it didn't land (no session yet right after login, offline):
+    // the pilot's next visit tries again instead of losing the paste.
+    void addRef.current(pending, 'new').then((result) => {
+      if (result !== 'ok') stashPendingScan(pending);
+    });
   }, [hydrated, characterId]);
 
   const scans = useMemo(() => (state.status === 'ready' ? state.scans : []), [state]);

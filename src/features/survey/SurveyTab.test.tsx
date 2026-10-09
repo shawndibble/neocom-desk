@@ -5,7 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { stashPendingScan } from './pendingScan';
+import { stashPendingScan, takePendingScan } from './pendingScan';
 import { useSurveyHistory } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 
@@ -180,6 +180,14 @@ describe('SurveyTab', () => {
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
     expect(localStorage.length).toBe(0);
+  });
+
+  it('keeps the held scan for the next visit when starting the survey fails', async () => {
+    startSurvey.mockRejectedValue(new Error('no session yet'));
+    stashPendingScan(DIFFERENT);
+    renderTab();
+    await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(takePendingScan()).toBe(DIFFERENT));
   });
 
   it('starts a new survey when the tracked one has expired', async () => {
