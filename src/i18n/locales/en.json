@@ -4008,7 +4008,7 @@
     "legendProjection": "Dashed: finish at the current pace",
     "sharePanelTitle": "Field progress",
     "shareTitle": "Mining Survey",
-    "shareHint": "Paste a Survey Scanner copy anywhere on this page to add a scan. Anyone with this link can. The page updates every 20 seconds.",
+    "shareHint": "Paste a Survey Scanner copy anywhere on this page to add a scan. Anyone with this link can. The page updates every 60 seconds.",
     "gone": "This survey has expired",
     "goneHint": "A survey link works for 7 days.",
     "message": {

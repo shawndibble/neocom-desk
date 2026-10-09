@@ -77,6 +77,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   return (
     <ShareShell
       title={t('survey.shareTitle')}
+      hideTitle
       openInApp={
         state.status === 'ready'
           ? { path: diverted ? '/mining/survey' : `/mining/survey?survey=${shareId}` }
