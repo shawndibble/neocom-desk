@@ -113,7 +113,7 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
               role="option"
               aria-selected={index === highlight}
               className={cx(
-                'flex min-h-11 cursor-pointer items-center border-l-2 px-3 text-sm md:min-h-8',
+                'flex min-h-11 cursor-pointer items-center border-l-2 px-3 text-sm md:min-h-7 touch:min-h-11',
                 index === highlight
                   ? 'border-accent bg-panel-2 font-semibold'
                   : 'border-transparent hover:bg-panel-2'
