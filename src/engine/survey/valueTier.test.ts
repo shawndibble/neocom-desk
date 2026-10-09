@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { oreValueTiers, valuePerM3 } from './valueTier';
+import { oreValueTiers, sortByValuePerM3, valuePerM3 } from './valueTier';
 
 const ore = (name: string, volume: number, isk: number) => ({
   ore: name,
@@ -50,5 +50,23 @@ describe('oreValueTiers', () => {
     expect(oreValueTiers([ore('Real', 1000, 50_000), mined]).get('Gone')).toBe('gray');
     const noIsk = oreValueTiers([ore('A', 1000, 0), ore('B', 500, 0)]);
     expect([...noIsk.values()]).toEqual(['gray', 'gray']);
+  });
+});
+
+describe('sortByValuePerM3', () => {
+  it('puts the richest ore per m3 first, not the biggest total, and mined-out ores last', () => {
+    const gone = { ore: 'Gone', rocks: 0, volume: 0, isk: 0, startVolume: 500 };
+    const sorted = sortByValuePerM3([
+      gone,
+      ore('Big poor', 100_000, 3_000_000), // 30/m3
+      ore('Small rich', 1000, 90_000), // 90/m3
+      ore('Mid', 1000, 50_000), // 50/m3
+    ]);
+    expect(sorted.map((o) => o.ore)).toEqual(['Small rich', 'Mid', 'Big poor', 'Gone']);
+  });
+
+  it('keeps the given order when no ore carries a value', () => {
+    const sorted = sortByValuePerM3([ore('A', 1000, 0), ore('B', 500, 0)]);
+    expect(sorted.map((o) => o.ore)).toEqual(['A', 'B']);
   });
 });
