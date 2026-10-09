@@ -17,10 +17,11 @@
  * the link sees it.
  */
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Panel, TextInput } from '@/components/ui';
+import { Button, buttonClassName, Panel, TextInput } from '@/components/ui';
+import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
@@ -202,16 +203,27 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   );
 }
 
-/** The public page's read-only line: the rate and who gets it, as the creator set them. */
+/** The public page's read-only line: the rate and who gets it, as the creator set them, and a way into the Tax tab. */
 export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
   const { t } = useTranslation();
   return (
     <Panel title={t('survey.moonTax.label')}>
-      <p className="flex flex-wrap items-baseline gap-x-2 text-xl font-semibold">
-        <span className="tabular-nums">{tax.pct}%</span>
-        <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
-        <span className="min-w-0 text-accent [overflow-wrap:anywhere]">{tax.name}</span>
-      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
+          <span className="tabular-nums">{tax.pct}%</span>
+          <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
+        </p>
+        {/* The Tax tab sits behind the login gate, so a logged-out visitor is sent to log in first. */}
+        <Link
+          to={MINING_TAX_HREF}
+          // Stashed so a logged-out visitor, sent to log in by the gate, lands back on the Tax tab.
+          onClick={() => setLoginReturnTo(MINING_TAX_HREF)}
+          className={buttonClassName({ size: 'sm', className: 'touch:min-h-11 sm:ml-auto' })}
+        >
+          {t('survey.moonTax.manage')}
+        </Link>
+      </div>
     </Panel>
   );
 }
