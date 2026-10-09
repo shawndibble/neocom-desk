@@ -144,5 +144,23 @@ test.describe('corp ops board — 320px width', () => {
       scrollWidth,
       `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest: ${offenders.join(', ')}`
     ).toBeLessThanOrEqual(clientWidth);
+
+    // Empty cards stay (so "nothing due" differs from "cannot read") but are
+    // one quiet line: shorter than the fuel card holding a single row.
+    for (const width of [390, 1024, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      const height = (title: string) =>
+        page
+          .getByRole('heading', { name: title })
+          .locator('xpath=ancestor::section[1]')
+          .evaluate((el) => el.getBoundingClientRect().height);
+      const withRow = await height('Fuel');
+      expect(await height('Moon chunks'), `moons at ${width}`).toBeLessThan(withRow);
+      expect(await height('Structure timers'), `timers at ${width}`).toBeLessThan(withRow);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        `no overflow at ${width}`
+      ).toBe(true);
+    }
   });
 });
