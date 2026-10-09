@@ -5,6 +5,7 @@ import {
   pickupHues,
   shortStationLabels,
   splitSegments,
+  sortStacksByVolume,
   tripLanes,
 } from './movePlanView';
 import type { PickerStack } from './movePlanInput';
@@ -113,5 +114,34 @@ describe('shortStationLabels', () => {
       'Hek VIII - Moon 12 - Boundless Creation Factory',
       'Hek VIII - Moon 4 - Krusual Tribe Bureau',
     ]);
+  });
+});
+
+describe('sortStacksByVolume', () => {
+  const unitM3 = new Map([
+    [1, 0.01],
+    [2, 1],
+    [3, 1],
+  ]);
+  const names = new Map([
+    [1, 'Tritanium'],
+    [2, 'Mexallon'],
+    [3, 'Pyerite'],
+  ]);
+  const name = (id: number) => names.get(id) ?? '';
+
+  it('puts the biggest packaged volume first', () => {
+    const out = sortStacksByVolume(
+      [stack('a', 1, 2, 5), stack('b', 1, 1, 20000), stack('c', 1, 3, 100)],
+      unitM3,
+      name
+    );
+    expect(out.map((s) => s.key)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('breaks equal volumes by item name and does not mutate the input', () => {
+    const input = [stack('p', 1, 3, 10), stack('m', 1, 2, 10)];
+    expect(sortStacksByVolume(input, unitM3, name).map((s) => s.key)).toEqual(['m', 'p']);
+    expect(input.map((s) => s.key)).toEqual(['p', 'm']);
   });
 });

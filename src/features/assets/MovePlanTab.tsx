@@ -33,6 +33,7 @@ import {
   pickupHueVar,
   shortStationLabels,
   splitSegments,
+  sortStacksByVolume,
 } from './movePlanView';
 
 /** SDE category 6. */
@@ -176,6 +177,11 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
       byPlace.set(s.locationId, [...(byPlace.get(s.locationId) ?? []), s]);
       out.set(s.characterId, byPlace);
     }
+    if (!loaded) return out;
+    const nameOf = (typeId: number) => loaded.typeNames.get(typeId) ?? '';
+    for (const byPlace of out.values())
+      for (const [locationId, stacks] of byPlace)
+        byPlace.set(locationId, sortStacksByVolume(stacks, loaded.unitM3, nameOf));
     return out;
   }, [loaded]);
 

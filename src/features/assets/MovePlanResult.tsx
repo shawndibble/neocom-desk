@@ -81,9 +81,6 @@ export function PlanResult({
   return (
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          {t('assets.movePlan.edit')}
-        </Button>
         <CharacterScopeReadout {...scope} />
       </div>
       {plan.suggested ? (
@@ -165,7 +162,7 @@ export function PlanResult({
                   className="truncate border-l-2 border-line-bright pt-0.5 pl-1.5 whitespace-nowrap"
                   style={{ width: `${l.share * 100}%` }}
                 >
-                  {t('assets.movePlan.tripLane', { n: l.trip })} · {formatCubicMetres(l.m3)}
+                  {t('assets.movePlan.tripLane', { n: l.trip })} · {formatCubicMetres(l.m3)} m³
                 </span>
               ))}
             </div>
