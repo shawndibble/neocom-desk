@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
@@ -13,6 +13,14 @@ vi.mock('@/sde/loadSde', () => ({
   loadGroupCategories: async () => ({ '543': 6, '941': 6, '100': 18 }),
 }));
 
+vi.mock('@/market/prices', () => ({
+  getHubPrices: async (_hub: unknown, ids: number[]) =>
+    new Map(
+      ids.filter((id) => id !== 28606).map((id) => [id, { sellMin: 100_000_000, buyMax: null }])
+    ),
+}));
+
+import { db } from '@/db';
 import { PINNED_GROUP_IDS } from '@/engine/pilotList/dscanRoles';
 import { FleetBoard } from './FleetBoard';
 
@@ -31,6 +39,9 @@ const ROWS = [
   row(2175, 400),
 ];
 
+beforeEach(async () => {
+  await db.settings.clear();
+});
 afterEach(cleanup);
 
 describe('FleetBoard', () => {
@@ -77,5 +88,43 @@ describe('group sub-labels', () => {
     const { default: en } = await import('@/i18n/locales/en.json');
     const labels = en.travel.pilot.dscan.group as Record<string, string>;
     expect(PINNED_GROUP_IDS.filter((id) => labels[String(id)] === undefined)).toEqual([]);
+  });
+
+  it('prices hulls and never shows 0 for a hull with no price', async () => {
+    render(<FleetBoard rows={ROWS} />);
+    const worth = await screen.findByRole('region', { name: /Worth on the scan/ });
+    expect(await within(worth).findAllByText('300M ISK')).toHaveLength(2);
+    expect(worth.textContent).toContain('1 × Orca');
+    expect(worth.textContent).toContain('price unavailable');
+    expect(worth.textContent).toContain('Total');
+    expect(worth.textContent).toContain('1 ship has no price');
+  });
+
+  it('diffs against the last stored scan and keeps only that one', async () => {
+    await db.settings.put({
+      key: 'dscan.lastScan',
+      value: [
+        { typeId: 22548, count: 1 },
+        { typeId: 28606, count: 2 },
+      ],
+    });
+    render(<FleetBoard rows={ROWS} trackHistory />);
+    const since = await screen.findByRole('region', { name: /Since your last scan/ });
+    expect(await within(since).findByText('+2')).toBeTruthy();
+    expect(since.textContent).toContain('Mackinaw');
+    expect(within(since).getByText('-1')).toBeTruthy();
+    await waitFor(async () => {
+      const stored = await db.settings.get('dscan.lastScan');
+      expect(stored?.value).toContainEqual({ typeId: 22548, count: 3 });
+    });
+  });
+
+  it('says so when there is no earlier scan, and a Shared D-Scan shows no diff', async () => {
+    const first = render(<FleetBoard rows={ROWS} trackHistory />);
+    expect(await screen.findByText(/No earlier scan stored/)).toBeTruthy();
+    first.unmount();
+    render(<FleetBoard rows={ROWS} />);
+    await screen.findByRole('region', { name: /Worth on the scan/ });
+    expect(screen.queryByRole('region', { name: /Since your last scan/ })).toBeNull();
   });
 });

@@ -14,8 +14,10 @@ import {
 } from '@/engine/pilotList/dscanRoles';
 import type { DscanRow } from '@/engine/pilotList/parsePilotPaste';
 import { buildReadout, type Readout } from '@/engine/pilotList/dscanReadout';
+import type { HullCount } from '@/engine/pilotList/dscanWorth';
 import { cx } from '@/lib/cx';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { DscanMeta } from './DscanMeta';
 import { DscanReadout } from './DscanReadout';
 
 /**
@@ -46,6 +48,13 @@ function formatRange(hull: FleetHull): string | null {
   return min === max ? formatKm(hull.minKm) : `${formatKm(hull.minKm)} – ${formatKm(hull.maxKm)}`;
 }
 
+/** Ships only: drones and structures are not hulls anyone flies, so they stay out of worth and diff. */
+function shipHulls(board: FleetBoardData): HullCount[] {
+  return board.roles
+    .filter((r) => r.role !== 'drones' && r.role !== 'structures')
+    .flatMap((r) => r.hulls.map(({ typeId, count }) => ({ typeId, count })));
+}
+
 interface Loaded {
   board: FleetBoardData;
   names: ReadonlyMap<number, string>;
@@ -58,7 +67,14 @@ interface Loaded {
  * Shared by the live Pilot Lookup view and a Shared D-Scan, so both group the
  * same way.
  */
-export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
+export function FleetBoard({
+  rows,
+  trackHistory = false,
+}: {
+  rows: readonly DscanRow[];
+  /** Compare with, and then store as, this device's last scan. The live paste only. */
+  trackHistory?: boolean;
+}) {
   const { t } = useTranslation();
   const [loaded, setLoaded] = useState<Loaded>();
   const [expanded, setExpanded] = useState(false);
@@ -115,6 +131,7 @@ export function FleetBoard({ rows }: { rows: readonly DscanRow[] }) {
   return (
     <div className="space-y-4">
       {readout !== null && <DscanReadout readout={readout} />}
+      <DscanMeta hulls={shipHulls(board)} names={names} trackHistory={trackHistory} />
       <div>
         <button
           type="button"

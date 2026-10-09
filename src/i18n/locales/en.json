@@ -9327,6 +9327,21 @@
           },
           "caveat": "A clean scan is not an empty system. Cloaked ships and anything past 14.3 AU do not show."
         },
+        "worth": {
+          "title": "Worth on the scan, hulls only",
+          "total": "Total",
+          "isk": "{{amount}} ISK",
+          "noPrice": "price unavailable",
+          "unpriced_one": "1 ship has no price and is left out.",
+          "unpriced_other": "{{count}} ships have no price and are left out.",
+          "note": "Fittings and cargo cannot be seen. Lowest sell price at {{hub}}."
+        },
+        "since": {
+          "title": "Since your last scan on this device",
+          "none": "No earlier scan stored. Paste another to see who arrived or left.",
+          "unchanged": "Same hulls as your last scan.",
+          "note": "Stored locally, last scan only."
+        },
         "boardLabel": "Fleet by role",
         "legendEntry": "{{count}} ({{percent}}%)",
         "lanesTitle": "Distance from you, by role (km)",

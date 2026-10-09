@@ -61,7 +61,7 @@ export function PilotListView({ paste }: { paste: PilotPaste }) {
     <LocalList key={paste.names.join('|')} paste={paste} />
   ) : (
     <Panel className="space-y-4">
-      <FleetBoard rows={paste.rows} />
+      <FleetBoard rows={paste.rows} trackHistory />
     </Panel>
   );
 }
