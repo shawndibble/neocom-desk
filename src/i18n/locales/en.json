@@ -3954,6 +3954,7 @@
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
     "copyChat": "Copy chat message",
+    "chatMessage": "Chat message",
     "copiedChat": "Copied",
     "copyFailed": "Couldn't copy",
     "copyLink": "Copy link",
