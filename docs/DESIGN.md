@@ -1021,7 +1021,7 @@ Rows:
 
 Three tiers decide how a page-header or toolbar control is labelled:
 
-1. **Scope and mode controls** (Character scope, a series/layer picker, a view toggle) always carry a visible text label at every width; truncate it rather than drop it.
+1. **Scope and mode controls** (a series/layer picker, a view toggle) carry a visible text label at every width; truncate it rather than drop it. The Character scope trigger is the exception: icon-only below `md` (portrait or `AllCharacters` glyph), text from `md` up, and its menu names the options.
 2. **Frequent actions** (Columns, filter, export) show icon + text from `md` up (`IconButton visibleLabel`, or the `showLabel` / `triggerLabel` opt-ins on `ColumnPickerMenu`, `TableActionsMenu`, `FilterBar`) and stay the conventional icon below `md`.
 3. **Rare actions** share one ⋮ "More actions" menu with text items (only with two or more real actions). Refresh stays a standalone icon beside the `DataAgeBadge`.
 

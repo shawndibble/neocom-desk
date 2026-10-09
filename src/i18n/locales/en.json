@@ -3367,8 +3367,6 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
-      "allShort": "All · {{count}}",
-      "allShortNoCount": "All",
       "unreadFor": "{{name}} · {{count}} unread"
     }
   },
