@@ -3,6 +3,7 @@
  * how fast, and when it will be gone. Pure — the scans arrive already parsed
  * (and, for a shared Survey, already fetched); nothing here reads a clock.
  */
+import { sortByValuePerM3 } from './valueTier';
 
 export interface SurveyRock {
   /** Ore name as the scanner printed it, e.g. "Glistening Sylvite". */
@@ -215,7 +216,8 @@ export function summarizeSurvey(input: readonly SurveyScan[]): SurveySummary | n
     ores,
     intervals,
     points,
-    oreNames: ores.map((o) => o.ore),
+    // The chart's layer order: richest per m³ first, as the ore bars list them.
+    oreNames: (hasIsk ? sortByValuePerM3(ores) : ores).map((o) => o.ore),
     pace,
     etaAt,
     finished,
