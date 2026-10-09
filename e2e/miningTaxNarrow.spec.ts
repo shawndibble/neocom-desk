@@ -810,7 +810,7 @@ test.describe('Mining Tax ledger — Needs Review status hint (#3122)', () => {
       await expect(pill).toBeVisible();
       const pillBox = (await pill.boundingBox())!;
       expect(pillBox.height).toBeLessThan(24);
-      const cell = page.getByRole('cell').filter({ has: pill });
+      const cell = page.getByRole('table').getByRole('cell').filter({ hasText: 'Needs Review' });
       const cellBox = (await cell.boundingBox())!;
       expect(cellBox.x + cellBox.width).toBeLessThanOrEqual(viewport.width);
       expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(cellBox.x + cellBox.width + 1);
