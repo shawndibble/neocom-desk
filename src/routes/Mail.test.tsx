@@ -1045,9 +1045,12 @@ describe('Mail', () => {
       // 08-03 (Pilot Two) sits above 08-02 (Pilot One).
       expect(second.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(
-        within(second.closest('li') as HTMLElement).getByText('Pilot Two')
+        within(second.closest('li') as HTMLElement).getByRole('img', { name: 'Mail for Pilot Two' })
       ).toBeInTheDocument();
-      expect(within(first.closest('li') as HTMLElement).getByText('Pilot One')).toBeInTheDocument();
+      expect(
+        within(first.closest('li') as HTMLElement).getByRole('img', { name: 'Mail for Pilot One' })
+      ).toBeInTheDocument();
+      expect(within(second.closest('li') as HTMLElement).queryByText('Pilot Two')).toBeNull();
     });
 
     it('sums each folder chip across Characters and lists unread per Character in the menu', async () => {
@@ -1130,6 +1133,7 @@ describe('Mail', () => {
       const row = (await screen.findByText('Fleet up!')).closest('li') as HTMLElement;
       expect(screen.queryByRole('button', { name: /characters/i })).not.toBeInTheDocument();
       expect(within(row).queryByText('Pilot One')).not.toBeInTheDocument();
+      expect(within(row).queryByRole('img')).not.toBeInTheDocument();
     });
   });
 });

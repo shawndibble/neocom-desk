@@ -330,6 +330,26 @@ describe('ProductionLogPanel', () => {
     expect(totalsGrid).not.toContainElement(table);
   });
 
+  it('shows one coverage line in the realized-profit hero and keeps the unlogged-jobs caveat behind an info tooltip', async () => {
+    await addRun({ id: 'run-1' });
+    await addRun({ id: 'run-2' });
+
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: Wrapper }
+    );
+
+    await runsTable();
+    expect(screen.getByText('2 logged runs · 1 items')).toBeInTheDocument();
+    expect(screen.queryByText(/across every Build Plan/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/haven't logged yet/)).not.toBeInTheDocument();
+
+    const info = screen.getByRole('button', { name: 'About total realized profit' });
+    fireEvent.touchStart(info);
+    fireEvent.touchEnd(info);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/haven't logged yet are not counted/);
+  });
+
   it('shows a profit-history chart once runs span at least two distinct days, and hides it again once the date filter narrows to one day', async () => {
     const old = Date.parse('2026-01-01T00:00:00Z');
     const recent = Date.parse('2026-08-15T00:00:00Z');

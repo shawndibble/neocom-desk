@@ -9,6 +9,7 @@ import type {
   MarketGroupNode,
   MarketTypeEntry,
   SolarSystemEntry,
+  SystemPositionData,
   JumpGraphData,
   NpcStationEntry,
   MarketRegionEntry,
@@ -39,6 +40,8 @@ function cached<T>(file: string): () => Promise<T> {
 export const loadMarketGroups = cached<MarketGroupNode[]>('groups.json');
 export const loadMarketTypes = cached<MarketTypeEntry[]>('types.json');
 export const loadSolarSystems = cached<SolarSystemEntry[]>('systems.json');
+/** Every system's map position in light years, for jump-drive range (issue #2862). */
+export const loadSystemPositions = cached<SystemPositionData>('systemPositions.json');
 export const loadNpcStations = cached<NpcStationEntry[]>('stations.json');
 export const loadSolarSystemJumps = cached<JumpGraphData>('jumps.json');
 export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');

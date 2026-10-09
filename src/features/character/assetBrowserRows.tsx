@@ -388,6 +388,21 @@ interface ItemRowProps {
 }
 
 /**
+ * An item's estimated value. Exactly 0 means "no estimate" (an unpriced type or
+ * a blueprint copy without a valuation), so it reads as a dim dash with a
+ * screen-reader "No estimate" rather than a green "0".
+ */
+function ValueFigure({ value, t }: { value: number; t: Translate }) {
+  if (value !== 0) return <IskAmount value={value} decimals={0} />;
+  return (
+    <>
+      <span aria-hidden="true">{t('assets.unknownValue')}</span>
+      <span className="sr-only">{t('assets.noEstimate')}</span>
+    </>
+  );
+}
+
+/**
  * A leaf asset: name, then quantity/volume/value on one wrapping metadata
  * line. The fixed-width three-column layout this replaces (`Assets.tsx`'s
  * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
@@ -461,8 +476,13 @@ export function ItemRow({
               <span aria-hidden="true" className="md:hidden">
                 ·
               </span>
-              <span className={cx('text-isk-pos', ITEM_VALUE_CELL)}>
-                <IskAmount value={estimatedValue} decimals={0} />
+              <span
+                className={cx(
+                  estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos',
+                  ITEM_VALUE_CELL
+                )}
+              >
+                <ValueFigure value={estimatedValue} t={t} />
               </span>
             </span>
           </span>
@@ -533,8 +553,13 @@ export function SearchResultRow({
               <SecurityValue security={security} />
               <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
             </span>
-            <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
-              <IskAmount value={estimatedValue} decimals={0} />
+            <span
+              className={cx(
+                'shrink-0 text-[0.6875rem] tabular-nums',
+                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+              )}
+            >
+              <ValueFigure value={estimatedValue} t={t} />
             </span>
           </span>
         </span>
