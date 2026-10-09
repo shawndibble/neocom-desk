@@ -1,8 +1,9 @@
 /**
- * One pilot's profile as Pilot Lookup shows it (issue #2331): identity, the
- * zKillboard stats, the ships they kill in most, and their recent kills and
- * losses. Shared with `PublicInfoModal`'s Character tab, which lazy-loads it —
- * so both places show a character the same way.
+ * One pilot's profile as Pilot Lookup shows it (issue #2331): a compact
+ * identity header with the Threat badge, the verdict band, the three meters,
+ * where they kill, the ships they fly and kill, their all-time figures, and
+ * their recent kills and losses. Shared with `PublicInfoModal`'s Character tab,
+ * which lazy-loads it — so both places show a character the same way.
  *
  * Takes an already-loaded `PilotProfile`; each caller owns its own loading
  * and failure states. Where a corporation or alliance link goes is the
@@ -19,7 +20,8 @@ import { needsDangerRatio, threatVerdict } from '@/engine/pilotList/threatVerdic
 import { useNow } from '@/lib/useNow';
 import { characterZkillUrl, fetchPilotStats, type PilotStatsResult } from '@/lib/zkillboard';
 import { PilotKillActivityView, PilotStandingLine } from './PilotKillActivity';
-import { PilotThreatSummary } from './PilotThreatSummary';
+import { PilotShips } from './PilotShips';
+import { PilotThreatBand } from './PilotThreatBand';
 import { ThreatBadge } from './ThreatBadge';
 import { usePilotKillHistory } from './usePilotKillHistory';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
@@ -87,7 +89,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
         threat={threat && <ThreatBadge level={threat.pending ? 'pending' : threat.verdict.level} />}
       />
       {threat && !threat.pending && (
-        <PilotThreatSummary
+        <PilotThreatBand
           verdict={threat.verdict}
           gangRatio={pilotStats?.gangRatio ?? null}
           nowMs={now}
@@ -100,7 +102,11 @@ export function PilotProfileView(props: PilotProfileViewProps) {
       />
       {pilotStats && <ZkillRatioMeters stats={pilotStats} />}
       <PilotKillActivityView history={history} onRetry={retryHistory} />
-      <ZkillStatsSection stats={stats} onRetry={retryStats} metersAbove />
+      <PilotShips
+        kills={history.kind === 'ready' ? history.kills : null}
+        flown={pilotStats?.topShips ?? null}
+      />
+      <ZkillStatsSection stats={stats} onRetry={retryStats} />
       <PilotKillmailsSection characterId={characterId} />
     </div>
   );
@@ -110,10 +116,12 @@ export default PilotProfileView;
 
 /**
  * The Corporation and Alliance links are this page's only way into those orgs,
- * two rows 2px apart: a 44px hit area on a phone, no overhang to overlap (#2520).
+ * side by side on one line: a 44px hit area on a phone, no overhang to overlap
+ * when the two wrap onto separate rows (#2520).
  */
 const identityLinkClassName = 'inline-flex min-h-11 items-center md:min-h-0';
 
+/** The compact header: the portrait, then name and badge, corporation and alliance, and a facts line. */
 function PilotIdentity({
   profile,
   onOpenCorporation,
@@ -130,71 +138,77 @@ function PilotIdentity({
     profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId });
   const allianceLabel = (id: number) => profile.allianceName ?? t('travel.pilot.unnamed', { id });
   return (
-    <div className="flex flex-wrap items-start gap-4">
+    <div className="flex items-start gap-3">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
-      <div className="min-w-0 space-y-1">
+      <div className="min-w-0 space-y-0.5">
         {(!hideName || threat) && (
           <div className="flex flex-wrap items-center gap-2">
             {!hideName && <h2 className="text-lg font-semibold text-text">{profile.name}</h2>}
             {threat}
           </div>
         )}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
-          <dt className="text-text-dim">{t('travel.pilot.corporation')}</dt>
-          <dd>
-            {onOpenCorporation ? (
-              <button
-                type="button"
-                className={entityLinkClassName(identityLinkClassName)}
-                onClick={() => onOpenCorporation(profile.corporationId)}
-              >
-                {corporationLabel}
-              </button>
-            ) : (
-              <CorporationLink id={profile.corporationId} className={identityLinkClassName}>
-                {corporationLabel}
-              </CorporationLink>
-            )}
-          </dd>
-          <dt className="text-text-dim">{t('travel.pilot.alliance')}</dt>
-          <dd>
-            {allianceId === null ? (
-              t('travel.pilot.noAlliance')
-            ) : onOpenAlliance ? (
-              <button
-                type="button"
-                className={entityLinkClassName(identityLinkClassName)}
-                onClick={() => onOpenAlliance(allianceId)}
-              >
-                {allianceLabel(allianceId)}
-              </button>
-            ) : (
-              <AllianceLink id={allianceId} className={identityLinkClassName}>
-                {allianceLabel(allianceId)}
-              </AllianceLink>
-            )}
-          </dd>
-          <dt className="text-text-dim">{t('travel.pilot.securityStatus')}</dt>
-          <dd className="tabular-nums">
-            {profile.securityStatus === null
-              ? t('common.unknown')
-              : profile.securityStatus.toFixed(1)}
-          </dd>
-          <dt className="text-text-dim">{t('travel.pilot.age')}</dt>
-          <dd>
-            {age === null
-              ? t('common.unknown')
-              : t('travel.pilot.ageValue', {
-                  years: t('travel.pilot.years', { count: age.years }),
-                  days: t('travel.pilot.days', { count: age.days }),
-                })}
-          </dd>
-        </dl>
-        <div className="flex flex-wrap gap-3 pt-1 text-sm">
-          <ExternalLink href={characterZkillUrl(profile.characterId)}>
+        <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+          <span className="sr-only">{t('travel.pilot.corporation')}: </span>
+          {onOpenCorporation ? (
+            <button
+              type="button"
+              className={entityLinkClassName(identityLinkClassName)}
+              onClick={() => onOpenCorporation(profile.corporationId)}
+            >
+              {corporationLabel}
+            </button>
+          ) : (
+            <CorporationLink id={profile.corporationId} className={identityLinkClassName}>
+              {corporationLabel}
+            </CorporationLink>
+          )}
+          <span aria-hidden className="text-text-dim">
+            ·
+          </span>
+          <span className="sr-only">{t('travel.pilot.alliance')}: </span>
+          {allianceId === null ? (
+            <span className="text-text-dim">{t('travel.pilot.noAlliance')}</span>
+          ) : onOpenAlliance ? (
+            <button
+              type="button"
+              className={entityLinkClassName(identityLinkClassName)}
+              onClick={() => onOpenAlliance(allianceId)}
+            >
+              {allianceLabel(allianceId)}
+            </button>
+          ) : (
+            <AllianceLink id={allianceId} className={identityLinkClassName}>
+              {allianceLabel(allianceId)}
+            </AllianceLink>
+          )}
+        </p>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim">
+          <span>
+            {t('travel.pilot.securityStatus')}{' '}
+            <b className="font-medium text-text tabular-nums">
+              {profile.securityStatus === null
+                ? t('common.unknown')
+                : profile.securityStatus.toFixed(1)}
+            </b>
+          </span>
+          <span>
+            {t('travel.pilot.age')}{' '}
+            <b className="font-medium text-text">
+              {age === null
+                ? t('common.unknown')
+                : t('travel.pilot.ageValue', {
+                    years: t('travel.pilot.years', { count: age.years }),
+                    days: t('travel.pilot.days', { count: age.days }),
+                  })}
+            </b>
+          </span>
+          <ExternalLink
+            href={characterZkillUrl(profile.characterId)}
+            className="inline-flex min-h-11 items-center md:min-h-0"
+          >
             {t('travel.pilot.zkillboard')}
           </ExternalLink>
-        </div>
+        </p>
       </div>
     </div>
   );

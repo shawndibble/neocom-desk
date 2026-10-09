@@ -9,14 +9,7 @@
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import type { ThreatLevel } from '@/engine/pilotList/threatVerdict';
-
-const LEVEL_CLASS: Record<ThreatLevel | 'pending', string> = {
-  dangerous: 'border-danger/60 bg-danger/10 text-danger',
-  active: 'border-warning/60 bg-warning/10 text-warning',
-  low: 'border-line-bright bg-panel-2 text-text',
-  inactive: 'border-line bg-transparent text-text-dim',
-  pending: 'border-line bg-transparent text-text-dim',
-};
+import { THREAT_LEVEL_TONE, THREAT_PILL_CLASS } from './threatTone';
 
 export function ThreatBadge({
   level,
@@ -30,7 +23,7 @@ export function ThreatBadge({
     <span
       className={cx(
         'inline-flex shrink-0 items-center rounded-xs border px-1.5 py-px text-[0.6875rem] leading-4 font-semibold tracking-widest whitespace-nowrap uppercase',
-        LEVEL_CLASS[level],
+        THREAT_PILL_CLASS[THREAT_LEVEL_TONE[level]],
         className
       )}
     >
