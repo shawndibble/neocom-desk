@@ -793,6 +793,12 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   with a hover underline; it goes to its entity type's default unless the
   page records an override (§6c "Entities").
   `textActionClassName` stays the recipe for uppercase text actions.
+- **A control that opens a modal or navigates is a `Button`.** A text action
+  (`textActionClassName`) is not for it. One exception: when the view already
+  has a primary `Button` and this is a secondary action off that primary (the
+  "Choose permissions…" under "Log in"), the secondary may be a text action,
+  so the two don't read as a pair of competing boxes. It stays a `<button>`
+  (or a `Link` for navigation), never a bare accent word.
   `inlineLinkClassName.test.ts` fails on a hand-rolled `text-accent underline`.
 - Status colors carry meaning; never use them decoratively. ISK amounts use
   `isk-pos`/`isk-neg`, not success/danger.
@@ -933,14 +939,14 @@ No typed arrow (`→` `↗` `›`) ends a link label; leaving the app is `Icon.E
 
 Retired meanings, each with its replacement:
 
-| Retired                                               | Use instead                                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Dashed underline to mark an editable value            | The pencil                                                                       |
-| Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                            |
-| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                   |
-| Accent left bar for "loaded" or "in use"              | A status word                                                                    |
-| A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text |
-| `textActionClassName` that navigates or opens a modal | It performs an action; navigation is a link or a row                             |
+| Retired                                               | Use instead                                                                             |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Dashed underline to mark an editable value            | The pencil                                                                              |
+| Bare `CaretLeft` for "back to the parent"             | A labelled breadcrumb                                                                   |
+| ⓘ as a static status glyph (`Icon.Tip`)               | `WarningCircle` or `Lightbulb`                                                          |
+| Accent left bar for "loaded" or "in use"              | A status word                                                                           |
+| A gear that navigates                                 | The gear opens _this page's_ settings modal; link to Settings with labelled text        |
+| `textActionClassName` that navigates or opens a modal | A `Button`; a secondary action beside an existing primary `Button` may be a text action |
 
 ### Scope readout
 

@@ -5,14 +5,20 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SurveyScan } from '@/engine/survey/series';
-import { loadSurvey, type LoadSurveyResult } from './surveyStore';
+import { loadSurvey, type LoadSurveyResult, type SurveyTaxShare } from './surveyStore';
 
 export const SURVEY_POLL_MS = 60_000;
 
 export type SurveyLoadState =
   | { status: 'none' }
   | { status: 'loading' }
-  | { status: 'ready'; scans: SurveyScan[]; expiresAt: number; owner: string | null }
+  | {
+      status: 'ready';
+      scans: SurveyScan[];
+      expiresAt: number;
+      owner: string | null;
+      tax: SurveyTaxShare | null;
+    }
   | { status: 'gone' }
   | { status: 'failed' };
 
@@ -31,6 +37,8 @@ function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
     if (
       result.ok &&
       result.expiresAt === before.expiresAt &&
+      result.tax?.name === before.tax?.name &&
+      result.tax?.pct === before.tax?.pct &&
       result.scans.length === before.scans.length &&
       result.scans.every((scan, i) => scan.at === before.scans[i].at)
     ) {
@@ -81,6 +89,7 @@ export function useSurvey(id: string | null): {
         scans: result.scans,
         expiresAt: result.expiresAt,
         owner: result.owner,
+        tax: result.tax,
       };
     }
     return { status: result.reason === 'not-found' ? 'gone' : 'failed' };

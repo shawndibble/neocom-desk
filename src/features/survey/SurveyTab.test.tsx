@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
+import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
@@ -18,6 +19,14 @@ vi.mock('./surveyStore', () => ({ startSurvey, addSurveyScan, loadSurvey }));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/share/${id}`,
 }));
+// The moon tax has its own test; here only who sees it editable matters.
+vi.mock('./useHasMoonOre', () => ({ useHasMoonOre: () => true }));
+vi.mock('./MoonTaxRow', () => ({
+  MoonTaxRow: () => <div data-testid="tax-edit" />,
+  MoonTaxReadout: ({ tax }: { tax: { name: string } }) => (
+    <div data-testid="tax-readout">{tax.name}</div>
+  ),
+}));
 // Its own test covers the ledger read; here it would reach for ESI.
 vi.mock('./YourShareRow', () => ({ YourShareRow: () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
@@ -33,9 +42,25 @@ const DIFFERENT = 'Blue Ice\t10\t1,000 m3\t1.00 ISK\t5 km';
 const ID = 'abc123XYZ';
 const EXPIRES = Date.UTC(2026, 9, 15);
 
+const nav: { go: NavigateFunction } = { go: () => undefined };
+function Grab() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    nav.go = navigate;
+  }, [navigate]);
+  return null;
+}
+/** A paste anywhere in the app: `GlobalPasteRouter` sends the text here in the route state. */
+function pasteInApp(text: string) {
+  act(() => {
+    void nav.go('/mining/survey', { state: { surveyScanText: text } });
+  });
+}
+
 function renderTab(entry: string | { pathname: string; state: unknown } = '/mining/survey') {
   return render(
     <MemoryRouter initialEntries={[entry]}>
+      <Grab />
       <SurveyTab tabBar={<div />} />
     </MemoryRouter>
   );
@@ -55,6 +80,7 @@ beforeEach(async () => {
     ok: true,
     expiresAt: EXPIRES,
     owner: 'Shawn Dibble',
+    tax: null,
     scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
   });
   localStorage.clear();
@@ -72,9 +98,7 @@ describe('SurveyTab', () => {
   it('pasting something that is not a scan says so and starts no survey', async () => {
     renderTab();
     await screen.findByText('No survey yet');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => 'Tritanium\t100' },
-    });
+    pasteInApp('Tritanium\t100');
     expect((await screen.findByRole('alert')).textContent).toContain("isn't a Survey Scanner copy");
     expect(startSurvey).not.toHaveBeenCalled();
     expect(addSurveyScan).not.toHaveBeenCalled();
@@ -83,9 +107,7 @@ describe('SurveyTab', () => {
   it('starts a survey on the first pasted scan, then adds the scan to it', async () => {
     renderTab();
     await screen.findByText('No survey yet');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => SCAN },
-    });
+    pasteInApp(SCAN);
     await screen.findByText('0% mined');
     // The survey renders from `loadSurvey` before the paste's add settles; wait for it so it can't leak into the next test.
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
@@ -98,9 +120,7 @@ describe('SurveyTab', () => {
     await useCurrentSurveyId.getState().setValue(ID);
     renderTab();
     await screen.findByText('0% mined');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => SCAN },
-    });
+    pasteInApp(SCAN);
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(startSurvey).not.toHaveBeenCalled();
   });
@@ -115,9 +135,7 @@ describe('SurveyTab', () => {
     await useCurrentSurveyId.getState().setValue(ID);
     renderTab();
     await screen.findByText('0% mined');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => SHRUNK },
-    });
+    pasteInApp(SHRUNK);
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: SHRUNK, expiresAt: EXPIRES });
     expect(startSurvey).not.toHaveBeenCalled();
@@ -128,9 +146,7 @@ describe('SurveyTab', () => {
     await useCurrentSurveyId.getState().setValue(ID);
     renderTab();
     await screen.findByText('0% mined');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => DIFFERENT },
-    });
+    pasteInApp(DIFFERENT);
     await screen.findByRole('group', { name: /different field/i });
     expect(addSurveyScan).not.toHaveBeenCalled();
     expect(startSurvey).not.toHaveBeenCalled();
@@ -147,9 +163,7 @@ describe('SurveyTab', () => {
     await useCurrentSurveyId.getState().setValue(ID);
     renderTab();
     await screen.findByText('0% mined');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => DIFFERENT },
-    });
+    pasteInApp(DIFFERENT);
     fireEvent.click(await screen.findByRole('button', { name: 'Add to existing survey' }));
     await waitFor(() => expect(addSurveyScan).toHaveBeenCalledTimes(1));
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
@@ -161,14 +175,13 @@ describe('SurveyTab', () => {
       ok: true,
       expiresAt: EXPIRES,
       owner: 'Someone Else',
+      tax: null,
       scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
     });
     await useCurrentSurveyId.getState().setValue('other1234');
     renderTab();
     await screen.findByText('0% mined');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => DIFFERENT },
-    });
+    pasteInApp(DIFFERENT);
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('group', { name: /different field/i })).toBeNull();
     expect(addSurveyScan).toHaveBeenCalledWith({ id: ID, text: DIFFERENT, expiresAt: EXPIRES });
@@ -196,10 +209,29 @@ describe('SurveyTab', () => {
     loadSurvey.mockResolvedValueOnce({ ok: false, reason: 'not-found' });
     renderTab();
     await screen.findByText('This survey has expired');
-    fireEvent.paste(screen.getByLabelText('Survey scan'), {
-      clipboardData: { getData: () => SCAN },
-    });
+    pasteInApp(SCAN);
     await waitFor(() => expect(startSurvey).toHaveBeenCalledTimes(1));
     expect(useCurrentSurveyId.getState().value).toBe(ID);
+  });
+
+  it("lets the survey's owner edit the moon tax", async () => {
+    await useCurrentSurveyId.getState().setValue(ID);
+    renderTab();
+    await screen.findByTestId('tax-edit');
+    expect(screen.queryByTestId('tax-readout')).toBeNull();
+  });
+
+  it("shows another pilot's survey tax read-only, so theirs can't overwrite it", async () => {
+    loadSurvey.mockResolvedValue({
+      ok: true,
+      expiresAt: EXPIRES,
+      owner: 'Someone Else',
+      tax: { name: 'Moon Corp', pct: 8 },
+      scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
+    });
+    await useCurrentSurveyId.getState().setValue(ID);
+    renderTab();
+    expect((await screen.findByTestId('tax-readout')).textContent).toBe('Moon Corp');
+    expect(screen.queryByTestId('tax-edit')).toBeNull();
   });
 });

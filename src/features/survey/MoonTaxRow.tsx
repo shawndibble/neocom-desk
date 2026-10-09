@@ -1,22 +1,46 @@
 /**
  * Moon ore is taxed by whoever owns the moon, so a Survey that shows any asks
- * who and at what rate, and hands both to the Moon Mining Tax tab: the name
- * completes from the pilot's Payees (and fills in that Payee's rate), and the
- * link opens the Tax tab filtered to them, where the ledger shows what is
- * owed once the ore is in it. Shown on the creator's Survey tab only; the
- * public page has no pilot to tax.
+ * who and at what rate, and hands both to the Moon Mining Tax tab. It sits in
+ * its own panel under Field progress and reads as one line of text, "8% to
+ * Moon Corp"; clicking the rate or the name turns just that part into a field
+ * (Enter or leaving it saves). The name completes from the pilot's Payees (and
+ * fills in that Payee's rate), and the link opens the Tax tab, where the ledger
+ * shows what is owed once the ore is in it.
+ *
+ * Shown on the creator's Survey tab only; the public page shows the same line
+ * read-only (`MoonTaxReadout`). Once the pilot is done editing, a complete
+ * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
+ * the link sees it.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import { loadPayees } from '@/features/miningTax/payees';
 import { ensurePayee, findPayeeByName, MINING_TAX_HREF, parseTaxPct } from './moonTaxPayee';
+import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 import { useSurveyTax } from './surveyTaxPref';
 
-export function MoonTaxRow({ characterId }: { characterId: number }) {
+// Accent text is clickable and the faint pencil after it says "edit in place" (DESIGN.md §6c);
+// `touch:min-h-11` keeps the phone target at 44px.
+const editClassName =
+  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11';
+
+function Pencil() {
+  return <Icon.Rename aria-hidden className="size-[0.6em] shrink-0 text-text-dim" />;
+}
+
+/** The stored survey this row publishes its tax to, and what is already stored there. */
+export interface TaxSurvey {
+  id: string;
+  expiresAt: number;
+  published: SurveyTaxShare | null;
+}
+
+export function MoonTaxRow({ characterId, survey }: { characterId: number; survey?: TaxSurvey }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const listId = useId();
@@ -29,17 +53,35 @@ export function MoonTaxRow({ characterId }: { characterId: number }) {
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? [];
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [editing, setEditing] = useState<'name' | 'pct' | null>(null);
   const inFlight = useRef(false);
 
   const pct = parseTaxPct(saved.pct);
-  const ready = saved.name.trim() !== '' && pct !== null;
+  const name = saved.name.trim();
+  const ready = name !== '' && pct !== null;
 
-  function changeName(name: string) {
+  // Stored on the survey once editing stops. Best effort: a failed write is
+  // not retried until the name or rate changes, and the local line is unaffected.
+  const sent = useRef('');
+  const surveyId = survey?.id;
+  const surveyExpires = survey?.expiresAt;
+  const published = survey?.published;
+  useEffect(() => {
+    if (surveyId === undefined || surveyExpires === undefined) return;
+    if (editing !== null || pct === null || name === '') return;
+    if (published?.name === name && published.pct === pct) return;
+    const key = `${surveyId}|${name}|${pct}`;
+    if (sent.current === key) return;
+    sent.current = key;
+    void setSurveyTax({ id: surveyId, expiresAt: surveyExpires, name, pct }).catch(() => undefined);
+  }, [surveyId, surveyExpires, published, editing, name, pct]);
+
+  function changeName(next: string) {
     // Picking a known Payee brings its rate along; typing a new name keeps the rate.
     // Only when the name has just become a known Payee, so a rate typed after is kept.
-    const known = findPayeeByName(payees, name);
+    const known = findPayeeByName(payees, next);
     const fill = known !== undefined && known !== findPayeeByName(payees, saved.name);
-    void setSaved({ name, pct: fill ? String(known.defaultTaxPct) : saved.pct });
+    void setSaved({ name: next, pct: fill ? String(known.defaultTaxPct) : saved.pct });
   }
 
   async function openTax() {
@@ -59,50 +101,105 @@ export function MoonTaxRow({ characterId }: { characterId: number }) {
     }
   }
 
+  const stopEditing = {
+    onBlur: () => setEditing(null),
+    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter' || event.key === 'Escape') setEditing(null);
+    },
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-      <span className="w-full text-text-dim sm:w-auto">{t('survey.moonTax.label')}</span>
-      <label htmlFor={`${listId}-name`} className="sr-only">
-        {t('survey.moonTax.payee')}
-      </label>
-      <TextInput
-        id={`${listId}-name`}
-        size="sm"
-        list={listId}
-        className="w-full sm:w-48"
-        value={saved.name}
-        placeholder={t('survey.moonTax.payeePlaceholder')}
-        onChange={(event) => changeName(event.target.value)}
-      />
-      <datalist id={listId}>
-        {payees.map((p) => (
-          <option key={p.id} value={p.name} />
-        ))}
-      </datalist>
-      <label htmlFor={`${listId}-pct`} className="sr-only">
-        {t('survey.moonTax.rate')}
-      </label>
-      <span className="flex items-center gap-1">
-        <TextInput
-          id={`${listId}-pct`}
+    <Panel title={t('survey.moonTax.label')}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold">
+          {editing === 'pct' ? (
+            <span className="flex items-center gap-1">
+              <TextInput
+                autoFocus
+                size="sm"
+                inputMode="decimal"
+                aria-label={t('survey.moonTax.rate')}
+                className="w-16 tabular-nums"
+                value={saved.pct}
+                placeholder="0"
+                aria-invalid={saved.pct !== '' && pct === null}
+                onChange={(event) => void setSaved({ ...saved, pct: event.target.value })}
+                {...stopEditing}
+              />
+              <span className="text-text-dim">%</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={`${editClassName} tabular-nums`}
+              aria-label={`${t('survey.moonTax.rate')}: ${saved.pct}%`}
+              onClick={() => setEditing('pct')}
+            >
+              {saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`}
+              <Pencil />
+            </button>
+          )}
+          <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
+          {editing === 'name' ? (
+            <>
+              <TextInput
+                autoFocus
+                size="sm"
+                list={listId}
+                aria-label={t('survey.moonTax.payee')}
+                className="w-56 max-w-full"
+                value={saved.name}
+                placeholder={t('survey.moonTax.payeePlaceholder')}
+                onChange={(event) => changeName(event.target.value)}
+                {...stopEditing}
+              />
+              <datalist id={listId}>
+                {payees.map((p) => (
+                  <option key={p.id} value={p.name} />
+                ))}
+              </datalist>
+            </>
+          ) : (
+            <button
+              type="button"
+              className={`${editClassName} min-w-0 [overflow-wrap:anywhere]`}
+              aria-label={`${t('survey.moonTax.payee')}: ${saved.name}`}
+              onClick={() => setEditing('name')}
+            >
+              {name === '' ? t('survey.moonTax.set') : saved.name}
+              <Pencil />
+            </button>
+          )}
+        </div>
+        <Button
           size="sm"
-          inputMode="decimal"
-          className="w-16 tabular-nums"
-          value={saved.pct}
-          placeholder="0"
-          aria-invalid={saved.pct !== '' && pct === null}
-          onChange={(event) => void setSaved({ ...saved, pct: event.target.value })}
-        />
-        <span className="text-text-dim">%</span>
-      </span>
-      <Button size="sm" disabled={!ready} loading={busy} onClick={() => void openTax()}>
-        {t('survey.moonTax.open')}
-      </Button>
-      {failed && (
-        <span role="alert" className="text-xs text-danger">
-          {t('survey.moonTax.failed')}
-        </span>
-      )}
-    </div>
+          className="sm:ml-auto"
+          disabled={!ready}
+          loading={busy}
+          onClick={() => void openTax()}
+        >
+          {t('survey.moonTax.open')}
+        </Button>
+        {failed && (
+          <span role="alert" className="w-full text-xs text-danger">
+            {t('survey.moonTax.failed')}
+          </span>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+/** The public page's read-only line: the rate and who gets it, as the creator set them. */
+export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
+  const { t } = useTranslation();
+  return (
+    <Panel title={t('survey.moonTax.label')}>
+      <p className="flex flex-wrap items-baseline gap-x-2 text-xl font-semibold">
+        <span className="tabular-nums">{tax.pct}%</span>
+        <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
+        <span className="min-w-0 text-accent [overflow-wrap:anywhere]">{tax.name}</span>
+      </p>
+    </Panel>
   );
 }

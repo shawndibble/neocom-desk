@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addSurveyScan, loadSurvey, MAX_SCAN_TEXT, startSurvey } from './surveyStore';
+import { addSurveyScan, loadSurvey, MAX_SCAN_TEXT, setSurveyTax, startSurvey } from './surveyStore';
 
 const { addDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() => {
   class FakeTimestamp {
@@ -105,6 +105,7 @@ describe('loadSurvey', () => {
       ok: true,
       expiresAt: EXPIRES,
       owner: null,
+      tax: null,
       scans: [
         { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
         { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
@@ -162,5 +163,47 @@ describe('loadSurvey', () => {
     });
     getDocs.mockRejectedValue(new Error('offline'));
     expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+  });
+});
+
+describe('moon tax', () => {
+  it('stores each change as a new doc on the survey, expiring with it', async () => {
+    await setSurveyTax({ id: 'abc123XYZ', expiresAt: EXPIRES, name: 'Moon Corp', pct: 8 });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyTax' },
+      {
+        name: 'Moon Corp',
+        pct: 8,
+        createdAt: 'SERVER_TIME',
+        expiresAt: FakeTimestamp.fromMillis(EXPIRES),
+      }
+    );
+  });
+
+  it('loads the newest valid tax with the survey, and none when there is none', async () => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    const tax = (name: unknown, pct: unknown, at: number) => ({
+      data: () => ({ name, pct, createdAt: FakeTimestamp.fromMillis(at) }),
+    });
+    getDocs.mockImplementation(async (ref: { path: string }) =>
+      ref.path.endsWith('surveyTax')
+        ? {
+            docs: [
+              tax('Old Corp', 5, 1000),
+              tax('Moon Corp', 12, 3000),
+              tax('Bad', 150, 4000),
+              tax('', 3, 5000),
+            ],
+          }
+        : { docs: [] }
+    );
+    const result = await loadSurvey('abc123XYZ');
+    expect(result).toMatchObject({ ok: true, tax: { name: 'Moon Corp', pct: 12 } });
+
+    getDocs.mockResolvedValue({ docs: [] });
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ ok: true, tax: null });
   });
 });
