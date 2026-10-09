@@ -4556,6 +4556,7 @@
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
+    "noEstimate": "No estimate",
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
