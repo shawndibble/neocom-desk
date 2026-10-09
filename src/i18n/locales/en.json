@@ -283,7 +283,7 @@
       "reauthAction": "Log in again with EVE Online"
     },
     "saveToEve": {
-      "action": "Save to EVE",
+      "action": "Save to EVE…",
       "needCharacter": "Log in with a Character to save Fittings to EVE.",
       "needPermission": "Log in again to allow saving Fittings to EVE.",
       "title": "Save to EVE",
