@@ -11,6 +11,7 @@
  * Pure: the SDE lookups come in as `infoOf` and `nameOf`.
  */
 import { roleOfType, type DscanRole, type DscanTypeInfo } from './dscanRoles';
+import { formatDistanceKm } from './formatDistanceKm';
 import type { DscanRow } from './parsePilotPaste';
 
 export type ReadingId = 'drop' | 'scout' | 'mining' | 'gang' | 'mixed';
@@ -206,7 +207,9 @@ export function buildReadout(
       );
     }
     if (combatSpread !== null) {
-      evidence.push(line('ev.together', { count: combat.length, km: Math.round(combatSpread) }));
+      evidence.push(
+        line('ev.together', { count: combat.length, distance: formatDistanceKm(combatSpread) })
+      );
     }
     if (logistics > 0) evidence.push(line('ev.logistics', { count: logistics }));
     if (tackle > 0) evidence.push(line('ev.tackle', { count: tackle }));
@@ -214,7 +217,9 @@ export function buildReadout(
     reading = 'mixed';
     evidence.push(line('ev.hulls', { count: n, hulls: new Set(ships.map((s) => s.typeId)).size }));
     if (allKm.length > 1) {
-      evidence.push(line('ev.spread', { km: Math.round(Math.max(...allKm) - Math.min(...allKm)) }));
+      evidence.push(
+        line('ev.spread', { distance: formatDistanceKm(Math.max(...allKm) - Math.min(...allKm)) })
+      );
     }
   }
   const confidence: Confidence =
