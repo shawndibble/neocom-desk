@@ -18,6 +18,7 @@ import { fitTypeIds } from './lib/fitTypeIds.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeTypeNames, namesMissingFrom } from './lib/typeNames.mjs';
 import { WORMHOLE_GROUP_ID, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
+import { bakeSystemPositions } from './lib/systemPositions.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1855,6 +1856,7 @@ async function main() {
   // synthetic (near-origin) position — see SYNTHETIC_POSITION_MAX_M.
   const solarSystems = [];
   const regionAllSystemsSynthetic = new Map();
+  const systemMetres = [];
   {
     const rows = raw['mapSolarSystems.csv'];
     const h = indexHeader(rows);
@@ -1870,6 +1872,7 @@ async function main() {
       const x = num(r[h.x]) ?? 0;
       const y = num(r[h.y]) ?? 0;
       const z = num(r[h.z]) ?? 0;
+      systemMetres.push({ id: Number(r[h.solarSystemID]), x, y, z });
       const synthetic = Math.hypot(x, y, z) < SYNTHETIC_POSITION_MAX_M;
       regionAllSystemsSynthetic.set(
         regionId,
@@ -2189,6 +2192,7 @@ async function main() {
     ['groups.json', marketGroups],
     ['types.json', marketTypes],
     ['systems.json', solarSystems],
+    ['systemPositions.json', bakeSystemPositions(systemMetres)],
     ['stations.json', npcStations],
     ['jumps.json', solarSystemJumps],
     ['regions.json', marketRegions],

@@ -40,6 +40,7 @@ import {
 } from '@/components/ui';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { WORMHOLE_SHIP_SIZES } from '@/engine/route/theraConnections';
+import { wormholeSizeForShipGroup } from '@/engine/route/hullWormholeSize';
 import {
   MAX_ROUTE_HOLE_MIN_LIFE,
   MIN_ROUTE_HOLE_MIN_LIFE,
@@ -141,6 +142,8 @@ export function RouteHoleFields({
   const { enabled, settings } = query;
   const { hulls } = useRouteShipMass();
   const shipTypeId = useRouteShipTypeId((state) => state.value);
+  // Set when a hull choice filled the size; any edit of the size drops it (issue #2850).
+  const [sizeHull, setSizeHull] = useState<string | null>(null);
   return (
     <section
       className={
@@ -156,7 +159,14 @@ export function RouteHoleFields({
         {t('travel.holes.enabled')}
       </label>
       <div className="space-y-1.5">
-        <p className="font-semibold">{t('travel.holes.shipSize')}</p>
+        <p className="font-semibold">
+          {t('travel.holes.shipSize')}
+          {sizeHull !== null && (
+            <span className="ml-2 font-normal text-text-dim">
+              {t('travel.holes.sizeFromHull', { hull: sizeHull })}
+            </span>
+          )}
+        </p>
         <SegmentedControl
           label={t('travel.holes.shipSize')}
           options={WORMHOLE_SHIP_SIZES.map((value) => ({
@@ -164,7 +174,10 @@ export function RouteHoleFields({
             label: t(`travel.thera.fits.${value}`),
           }))}
           value={settings.shipSize}
-          onChange={(value) => onChange({ field: 'shipSize', value })}
+          onChange={(value) => {
+            setSizeHull(null);
+            onChange({ field: 'shipSize', value });
+          }}
           size="sm"
           fill
           uppercase={false}
@@ -174,9 +187,17 @@ export function RouteHoleFields({
         <p className="font-semibold">{t('travel.holes.ship')}</p>
         <Select
           value={shipTypeId === null ? NO_SHIP : String(shipTypeId)}
-          onValueChange={(value) =>
-            void useRouteShipTypeId.getState().setValue(value === NO_SHIP ? null : Number(value))
-          }
+          onValueChange={(value) => {
+            const hull =
+              value === NO_SHIP ? undefined : hulls.find((h) => String(h.typeId) === value);
+            void useRouteShipTypeId.getState().setValue(hull?.typeId ?? null);
+            // A hull the map names sets the size; clearing or an unmapped hull leaves it alone.
+            const size = hull && wormholeSizeForShipGroup(hull.groupId);
+            if (hull && size) {
+              onChange({ field: 'shipSize', value: size });
+              setSizeHull(hull.name);
+            }
+          }}
         >
           <SelectTrigger size="sm" aria-label={t('travel.holes.ship')}>
             <SelectValue placeholder={t('travel.holes.shipPlaceholder')} />

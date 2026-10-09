@@ -16,6 +16,7 @@ import { FittingShareView } from './FittingShared';
 import { parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
 import { DscanShareScreen, type DscanShareState } from '@/features/travel/DscanShareScreen';
 import { sharedDscanOpenInApp } from '@/features/travel/sharedDscanSeed';
+import { SurveyShareScreen } from '@/features/survey/SurveyShareScreen';
 
 type LoadState = { shareId: string; result: LoadShareResult } | null;
 
@@ -81,6 +82,8 @@ export function SharedLink() {
           />
         );
       }
+      case 'survey':
+        return <SurveyShareScreen shareId={shareId} />;
       case 'fitting':
         // Signed in, this redirects straight into the editor on the code; a
         // malformed payload reads as an empty code, and so an invalid link.
