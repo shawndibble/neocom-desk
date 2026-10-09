@@ -9029,9 +9029,11 @@
           "low": "Low threat",
           "inactive": "Inactive"
         },
-        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time danger ratio. Dangerous: {{dangerousKills}} or more recent kills and a danger ratio of {{dangerRatio}} or more. Active: {{activeKills}} or more recent kills. Low threat: fewer. Inactive: none. Losses are not counted, and low threat never means safe.",
+        "help": "Read from their kills in the last {{days}} days and zKillboard's all-time ratios. Dangerous: {{dangerousKills}} or more recent kills and either a danger ratio of {{dangerRatio}} or more, or {{killerRatio}}% or more of their kills and losses being kills. Active: {{activeKills}} or more recent kills. Low threat: fewer, or no kills but a ship lost in that time. Inactive: neither. Low threat never means safe.",
         "inactive": "No kills in the last {{days}} days.",
         "inactiveLast": "No kills in the last {{days}} days. Last kill {{age}}.",
+        "lossesOnly_one": "No kills in the last {{days}} days. {{count}} loss in that time, the latest {{age}}.",
+        "lossesOnly_other": "No kills in the last {{days}} days. {{count}} losses in that time, the latest {{age}}.",
         "summary_one": "{{count}} kill in the last {{days}} days. Last kill {{age}}.",
         "summary_other": "{{count}} kills in the last {{days}} days. Last kill {{age}}.",
         "gangs": "{{value}}% in gangs",

@@ -15,7 +15,9 @@ function verdict(over: Partial<ThreatVerdict> = {}): ThreatVerdict {
     mainSpace: 'nullsec',
     alsoSpaces: [],
     podShare: 0.1,
-    dangerKnown: true,
+    recentLosses: 0,
+    lastLossMs: null,
+    ratiosKnown: true,
     ...over,
   };
 }
@@ -87,7 +89,7 @@ describe('PilotThreatBand', () => {
   it('says so when the danger ratio could not be read for a pilot busy enough to be dangerous', () => {
     render(
       <PilotThreatBand
-        verdict={verdict({ level: 'active', dangerKnown: false })}
+        verdict={verdict({ level: 'active', ratiosKnown: false })}
         gangRatio={null}
         nowMs={NOW}
       />
@@ -98,12 +100,32 @@ describe('PilotThreatBand', () => {
   it('stays quiet about the ratio for a pilot who could not be dangerous anyway', () => {
     render(
       <PilotThreatBand
-        verdict={verdict({ level: 'active', dangerKnown: false, recentKills: 4 })}
+        verdict={verdict({ level: 'active', ratiosKnown: false, recentKills: 4 })}
         gangRatio={null}
         nowMs={NOW}
       />
     );
     expect(screen.queryByText(/danger ratio could not be read/)).toBeNull();
+  });
+
+  it('says a pilot with no kills but a recent loss lost a ship, and when', () => {
+    render(
+      <PilotThreatBand
+        verdict={verdict({
+          level: 'low',
+          recentKills: 0,
+          mainSpace: null,
+          podShare: null,
+          recentLosses: 2,
+          lastLossMs: NOW - 3 * DAY,
+        })}
+        gangRatio={null}
+        nowMs={NOW}
+      />
+    );
+    expect(
+      screen.getByText(/No kills in the last 90 days. 2 losses in that time, the latest 3d ago/)
+    ).toBeTruthy();
   });
 
   it('reads an inactive pilot with no chips', () => {

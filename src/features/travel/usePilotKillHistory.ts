@@ -1,8 +1,9 @@
 /**
  * A pilot's dated kills (zKillboard's latest 200), loaded once for everything
  * on a profile that reads them: the Threat verdict, "Where they kill" and the
- * hulls they killed. Two components each fetching would double the request,
- * because `fetchPilotKillHistory` only caches an answer once it arrives.
+ * hulls they killed. One owner holds the loading, failed and ready state for all
+ * of them; the request itself is shared with Recent kills and losses by
+ * `fetchPilotList`, so nothing is asked for twice either way.
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { KillRecord } from '@/engine/pilotList/killActivity';

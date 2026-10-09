@@ -12,10 +12,12 @@ import type { PilotListRow } from './pilotListData';
  */
 export function rowThreat(row: PilotListRow, nowMs: number): ThreatLevel | 'pending' | null {
   if (row.kills.kind !== 'ready') return null;
-  if (row.danger.kind === 'loading') return 'pending';
+  if (row.extras.kind === 'loading') return 'pending';
   return threatVerdict({
     kills: row.kills.kills,
-    dangerRatio: row.danger.kind === 'ready' ? row.danger.ratio : null,
+    dangerRatio: row.extras.kind === 'ready' ? row.extras.dangerRatio : null,
+    killerRatio: row.extras.kind === 'ready' ? row.extras.killerRatio : null,
+    lossTimesMs: row.extras.kind === 'ready' ? row.extras.lossTimesMs : null,
     nowMs,
   }).level;
 }

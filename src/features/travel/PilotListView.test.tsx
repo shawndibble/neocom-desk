@@ -57,7 +57,7 @@ function row(name: string, over: Partial<PilotListRow> = {}): PilotListRow {
     standing: null,
     ownOrganization: null,
     kills: { kind: 'skipped' },
-    danger: { kind: 'idle' },
+    extras: { kind: 'idle' },
     ...over,
   };
 }

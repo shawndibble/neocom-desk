@@ -315,21 +315,56 @@ export function parsePilotKillmails(body: unknown, side: PilotKillmail['side']):
   return entries;
 }
 
-const pilotKillmailsCache = new Map<number, { at: number; entries: PilotKillmail[] }>();
+type PilotListPath = 'kills' | 'losses';
+
+const pilotListCache = new Map<string, { at: number; body: Promise<unknown[] | null> }>();
 
 /** Test seam: forget every cached pilot's kills and losses. */
 export function resetPilotKillmailsCache(): void {
-  pilotKillmailsCache.clear();
+  pilotListCache.clear();
+}
+
+/**
+ * One pilot's `kills/` or `losses/` list as zKillboard sent it (first page,
+ * newest first), asked for once however many readers want it: the kill history,
+ * the Threat verdict's loss dates and Recent kills and losses all read the
+ * same list, and the kills list is one URL for the first and the last. The
+ * promise itself is cached, so two readers asking at once share one request,
+ * and an answer is reused for `PILOT_STATS_CACHE_MS`. A failure, or a body
+ * that is not a list, is never kept: the next reader asks again.
+ */
+function fetchPilotList(characterId: number, path: PilotListPath): Promise<unknown[] | null> {
+  const key = `${path}/${characterId}`;
+  const cached = pilotListCache.get(key);
+  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) return cached.body;
+  const body: Promise<unknown[] | null> = fetch(
+    `https://zkillboard.com/api/${path}/characterID/${characterId}/`
+  )
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const parsed: unknown = await response.json();
+      return Array.isArray(parsed) ? parsed : null;
+    })
+    .catch(() => null);
+  const entry = { at: Date.now(), body };
+  pilotListCache.set(key, entry);
+  void body.then((list) => {
+    if (list === null && pilotListCache.get(key) === entry) pilotListCache.delete(key);
+  });
+  return body;
+}
+
+/** Drops one cached list, for a body that parsed as a list but could not be read. */
+function forgetPilotList(characterId: number, path: PilotListPath): void {
+  pilotListCache.delete(`${path}/${characterId}`);
 }
 
 async function fetchPilotSide(
   characterId: number,
   side: PilotKillmail['side']
 ): Promise<PilotKillmail[] | null> {
-  const path = side === 'kill' ? 'kills' : 'losses';
-  const response = await fetch(`https://zkillboard.com/api/${path}/characterID/${characterId}/`);
-  if (!response.ok) return null;
-  return parsePilotKillmails(await response.json(), side);
+  const body = await fetchPilotList(characterId, side === 'kill' ? 'kills' : 'losses');
+  return body === null ? null : parsePilotKillmails(body, side);
 }
 
 /**
@@ -337,13 +372,10 @@ async function fetchPilotSide(
  * rise with time), for Pilot Lookup. A browser fetch with no custom headers,
  * as `fetchKillmailHash` (scope decision `20260924-195833`). Either list
  * failing fails the whole answer — kills alone would misstate the record.
- * Answers are reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ * Both lists come through `fetchPilotList`, shared with the kill history and
+ * the Threat verdict.
  */
 export async function fetchPilotKillmails(characterId: number): Promise<PilotKillmailsResult> {
-  const cached = pilotKillmailsCache.get(characterId);
-  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) {
-    return { ok: true, entries: cached.entries };
-  }
   try {
     const [kills, losses] = await Promise.all([
       fetchPilotSide(characterId, 'kill'),
@@ -353,7 +385,6 @@ export async function fetchPilotKillmails(characterId: number): Promise<PilotKil
     const entries = [...kills, ...losses]
       .sort((a, b) => b.killmailId - a.killmailId)
       .slice(0, PILOT_KILLMAIL_LIMIT);
-    pilotKillmailsCache.set(characterId, { at: Date.now(), entries });
     return { ok: true, entries };
   } catch {
     return { ok: false };
@@ -399,39 +430,30 @@ export function parseKillHistory(body: unknown, characterId: number): KillRecord
 
 export type PilotKillHistoryResult = { ok: true; kills: KillRecord[] } | { ok: false };
 
-const pilotKillHistoryCache = new Map<number, { at: number; kills: KillRecord[] }>();
-
-/** Test seam: forget every cached kill history. */
+/** Test seam: forget every cached kill history (and the lists beside it). */
 export function resetPilotKillHistoryCache(): void {
-  pilotKillHistoryCache.clear();
+  pilotListCache.clear();
 }
 
 /**
  * A pilot's latest kills (zKillboard's first page, newest first; up to 200),
- * one request, for the Local list's per-space columns and the modal's chart.
- * Kills only: losses say little about how dangerous a pilot is. A browser
- * fetch with no custom headers, as `fetchKillmailHash` (decision
- * `20260924-195833`). Reused for `PILOT_STATS_CACHE_MS`; a failure never is.
+ * for the Local list's per-space columns, the modal's chart and the Threat
+ * verdict. Kills only: the verdict reads a pilot's losses separately and only
+ * when it must. A browser fetch with no custom headers, as `fetchKillmailHash`
+ * (decision `20260924-195833`). The request is shared with Recent kills and
+ * losses (`fetchPilotList`); a failure is never reused.
  */
 export async function fetchPilotKillHistory(characterId: number): Promise<PilotKillHistoryResult> {
-  const cached = pilotKillHistoryCache.get(characterId);
-  if (cached && Date.now() - cached.at < PILOT_STATS_CACHE_MS) {
-    return { ok: true, kills: cached.kills };
-  }
-  try {
-    const response = await fetch(`https://zkillboard.com/api/kills/characterID/${characterId}/`);
-    if (!response.ok) return { ok: false };
-    const body: unknown = await response.json();
-    if (!Array.isArray(body)) return { ok: false };
-    const kills = parseKillHistory(body, characterId);
-    // Entries that carry no killmail body (hash only) can't be dated: that is a
-    // list we couldn't read, never "no kills".
-    if (body.length > 0 && kills.length === 0) return { ok: false };
-    pilotKillHistoryCache.set(characterId, { at: Date.now(), kills });
-    return { ok: true, kills };
-  } catch {
+  const body = await fetchPilotList(characterId, 'kills');
+  if (body === null) return { ok: false };
+  const kills = parseKillHistory(body, characterId);
+  // Entries that carry no killmail body (hash only) can't be dated: that is a
+  // list we couldn't read, never "no kills".
+  if (body.length > 0 && kills.length === 0) {
+    forgetPilotList(characterId, 'kills');
     return { ok: false };
   }
+  return { ok: true, kills };
 }
 
 /** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
