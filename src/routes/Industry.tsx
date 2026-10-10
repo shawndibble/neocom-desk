@@ -705,7 +705,7 @@ export function Industry() {
           }
         />
 
-        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab}>
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId={tab} className="space-y-4">
           {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />

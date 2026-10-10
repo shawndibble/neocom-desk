@@ -127,7 +127,7 @@ export function IndustryPlanPage() {
             Rollups. `pricingInputs.hydrated` resolves quickly and can never
             hang (`buildPlanPricingInputs.ts`'s own doc comment), so this
             never becomes a real wait. */}
-        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans">
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
           {!catalog || !pricingInputs.hydrated ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />

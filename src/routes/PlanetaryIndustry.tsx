@@ -223,7 +223,7 @@ export function PlanetaryIndustry() {
           eveTime={tab === 'colonies'}
         />
 
-        <TabPanel tabsId={tabsId} tabId={tab}>
+        <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
           {tab === 'map' ? (
             <PiMapTab characterId={activeCharacterId} />
           ) : tab === 'plan' ? (

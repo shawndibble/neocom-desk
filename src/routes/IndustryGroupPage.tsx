@@ -169,7 +169,7 @@ export function IndustryGroupPage() {
           blueprintsNeedsReauth={blueprintsNeedsReauth}
         />
 
-        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans">
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
           {!catalog ? (
             <div className="flex justify-center py-16">
               <Spinner label={t('common.loading')} />

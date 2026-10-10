@@ -744,7 +744,7 @@ export function Contracts() {
         label={t('contracts.tabsLabel')}
       />
 
-      <TabPanel tabsId={tabsId} tabId={tabId}>
+      <TabPanel tabsId={tabsId} tabId={tabId} className="space-y-2 sm:space-y-4">
         {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}

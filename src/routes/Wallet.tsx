@@ -544,7 +544,7 @@ export function Wallet() {
         ]}
       />
 
-      <TabPanel tabsId={tabsId} tabId={tab}>
+      <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
         {loading && !data ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
