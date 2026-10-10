@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import '@/i18n';
@@ -49,5 +50,27 @@ describe('StructureFeesList', () => {
     fireEvent.click(screen.getByRole('button', { name: /Remove fee for/ }));
     await waitFor(() => expect(useStructureFees.getState().value).toEqual({}));
     expect(screen.queryByText(/Unknown Structure/)).toBeNull();
+  });
+
+  it('hands focus to a neighbouring Remove, then the panel heading, as fees go (issue #3365)', async () => {
+    await db.settings.put({
+      key: SYNCED_STRUCTURE_FEES_KEY,
+      value: { 1000000000001: 2.5, 1000000000002: 3 },
+    });
+    const heading = createRef<HTMLHeadingElement>();
+    render(
+      <>
+        <h2 ref={heading} tabIndex={-1}>
+          Market
+        </h2>
+        <StructureFeesList panelHeading={heading} />
+      </>
+    );
+    const first = await screen.findByRole('button', { name: /Remove fee for .*#1000000000001/ });
+    fireEvent.click(first);
+    const last = await screen.findByRole('button', { name: /Remove fee for .*#1000000000002/ });
+    await waitFor(() => expect(document.activeElement).toBe(last));
+    fireEvent.click(last);
+    await waitFor(() => expect(document.activeElement).toBe(heading.current));
   });
 });
