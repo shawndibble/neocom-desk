@@ -795,6 +795,15 @@ export function Clones() {
                   options={CLONES_SORTS.map((value) => ({
                     value,
                     label: t(`clones.sort.${value}`),
+                    ...(value === 'training' && !showTraining
+                      ? {
+                          disabled: true,
+                          disabledReason:
+                            verdictCard?.kind === 'note'
+                              ? verdictCard.message
+                              : t('clones.verdict.noteQueue'),
+                        }
+                      : {}),
                   }))}
                 />
               </div>
