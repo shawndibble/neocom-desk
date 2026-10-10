@@ -4881,6 +4881,7 @@
       "sellRawHint": "{{hub}} buy price, less sales tax",
       "refineCard": "Refine, then sell",
       "refineHint": "{{efficiency}}% yield, {{facility}}; minerals sold at the buy price, less sales tax",
+      "suggested": "Suggested",
       "useInPlanCard": "Use in plan",
       "useInPlanHint": "Minerals it covers in {{plan}}, valued at what the plan would otherwise pay",
       "useInPlanNone": "No plan still has to buy these minerals",
