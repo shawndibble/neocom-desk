@@ -12,6 +12,7 @@ import {
   IconButton,
   Panel,
   Spinner,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { markPlanDeleted, scheduleSync } from '@/sync';
@@ -143,11 +144,9 @@ export function PlanListPane({
     navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [certifiedOpen, setCertifiedOpen] = useState(false);
-  // Set by the menu item; the dialog opens once the menu has handed focus back
-  // to its trigger, so the native <dialog> restores focus there on close
-  // rather than to a menu item that has already unmounted.
-  const openCertifiedAfterMenu = useRef(false);
+  const newPlanMenu = useOpenAfterMenu();
 
   // Named after the certified plan already, so no rename-on-arrival flag.
   async function handleCreateFromCertified(
@@ -220,6 +219,7 @@ export function PlanListPane({
     <Panel
       className={className}
       title={t('plans.title')}
+      headingRef={headingRef}
       actions={
         // A split button: "New plan" stays one click for a blank plan, and the
         // caret holds the other starting points without costing the sidebar's
@@ -236,20 +236,8 @@ export function PlanListPane({
                 label={t('plans.newPlanOptions')}
               />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onCloseAutoFocus={() => {
-                if (openCertifiedAfterMenu.current) {
-                  openCertifiedAfterMenu.current = false;
-                  setCertifiedOpen(true);
-                }
-              }}
-            >
-              <DropdownMenuItem
-                onSelect={() => {
-                  openCertifiedAfterMenu.current = true;
-                }}
-              >
+            <DropdownMenuContent align="end" onCloseAutoFocus={newPlanMenu.onCloseAutoFocus}>
+              <DropdownMenuItem onSelect={() => newPlanMenu.run(() => setCertifiedOpen(true))}>
                 {t('plans.fromCertifiedItem')}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -298,6 +286,7 @@ export function PlanListPane({
           </div>
         ) : (
           <PlanList
+            headingRef={headingRef}
             plans={plans}
             stats={stats}
             activePlanId={activePlanId}
@@ -307,7 +296,7 @@ export function PlanListPane({
             onDuplicate={(id) => void handleDuplicate(id)}
             otherCharacters={otherCharacters}
             onCopyToCharacter={(id, characterId) => void handleCopyToCharacter(id, characterId)}
-            onDelete={(id) => void handleDelete(id)}
+            onDelete={handleDelete}
             onRename={(id, name) => void handleRename(id, name)}
           />
         )}

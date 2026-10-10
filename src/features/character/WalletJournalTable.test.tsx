@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -24,7 +24,13 @@ const journal: WalletJournalEntry[] = [
   },
 ];
 
-function Harness({ rows = journal }: { rows?: WalletJournalEntry[] }) {
+function Harness({
+  filter = EMPTY_WALLET_JOURNAL_FILTER,
+  rows = journal,
+}: {
+  filter?: typeof EMPTY_WALLET_JOURNAL_FILTER;
+  rows?: WalletJournalEntry[];
+}) {
   const journalColumns = useJournalColumnsBuilder()(
     () => undefined,
     () => ''
@@ -37,7 +43,7 @@ function Harness({ rows = journal }: { rows?: WalletJournalEntry[] }) {
   return (
     <MemoryRouter>
       <JournalTable
-        filter={EMPTY_WALLET_JOURNAL_FILTER}
+        filter={filter}
         onFilterChange={() => {}}
         refTypeOptions={['bounty_prize', 'market_escrow']}
         filteredJournal={rows}
@@ -163,5 +169,22 @@ describe('JournalTable breakdown panel', () => {
     expect(breakdownTable()).not.toBeInTheDocument();
     expect(await toggle()).toHaveAttribute('aria-expanded', 'false');
     expect(breakdownTable()).not.toBeInTheDocument();
+  });
+});
+
+describe('JournalTable filtered summary status', () => {
+  const statusRegion = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>('[role=status].sr-only');
+
+  it('is an empty live region while no filter is set', () => {
+    const { container } = render(<Harness />);
+    expect(statusRegion(container)).toBeEmptyDOMElement();
+  });
+
+  it('holds the plain-text summary once a filter is set', async () => {
+    const { container } = render(
+      <Harness filter={{ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'x' }} />
+    );
+    await waitFor(() => expect(statusRegion(container)).toHaveTextContent(/2 entries · net /));
   });
 });

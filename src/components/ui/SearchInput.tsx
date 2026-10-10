@@ -6,6 +6,8 @@ import { controlHeightClassName, fieldBaseClassName } from './controlStyles';
 interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'type'> {
   /** Wrapper class — put width/layout here; the field always fills it. */
   className?: string;
+  /** The `<input>` itself — for what only the focused element can carry (e.g. `scroll-mt-*`). */
+  inputClassName?: string;
 }
 
 /**
@@ -19,7 +21,7 @@ interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
  * it heads, and there is no panel where it should be the compact one.
  */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
-  { className = '', ...rest },
+  { className = '', inputClassName, ...rest },
   ref
 ) {
   return (
@@ -31,7 +33,12 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
       <input
         ref={ref}
         type="search"
-        className={cx(fieldBaseClassName, controlHeightClassName.md, 'w-full pr-3 pl-10 text-sm')}
+        className={cx(
+          fieldBaseClassName,
+          controlHeightClassName.md,
+          'w-full pr-3 pl-10 text-sm',
+          inputClassName
+        )}
         {...rest}
       />
     </div>

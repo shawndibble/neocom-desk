@@ -9,7 +9,7 @@
  * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
  * rule every other categorical series follows, so no new palette.
  */
-import { useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -25,6 +25,7 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
@@ -32,6 +33,13 @@ import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { SurveyScanNode } from './SurveyScanNode';
 import { oreTone } from './surveyTones';
+
+interface ScanTableRow {
+  at: number;
+  total: number;
+  mined: number | null;
+  byOre: Record<string, number>;
+}
 
 /** Left edge shared by both charts so their time axes line up. */
 const Y_AXIS_WIDTH = 52;
@@ -129,6 +137,54 @@ export function SurveyCharts({
       tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
       hide={hide}
     />
+  );
+
+  const scanRows = useMemo<ScanTableRow[]>(
+    () =>
+      summary.points.map((p, i) => ({
+        at: p.at,
+        total: p.total,
+        mined: i > 0 ? summary.intervals[i - 1].mined : null,
+        byOre: p.byOre,
+      })),
+    [summary]
+  );
+  const volumeColumns = useMemo<DataTableColumn<ScanTableRow>[]>(
+    () => [
+      {
+        id: 'at',
+        header: t('survey.chartScan'),
+        render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
+      },
+      {
+        id: 'total',
+        header: t('survey.chartTotal'),
+        render: (r) => `${r.total.toLocaleString()} m³`,
+      },
+      {
+        id: 'mined',
+        header: t('survey.tableMined'),
+        render: (r) => (r.mined === null ? '' : `${r.mined.toLocaleString()} m³`),
+      },
+      ...summary.oreNames.map((ore) => ({
+        id: `ore:${ore}`,
+        header: ore,
+        render: (r: ScanTableRow) => `${(r.byOre[ore] ?? 0).toLocaleString()} m³`,
+      })),
+    ],
+    [summary.oreNames, t]
+  );
+  const rateColumns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
+    () => [
+      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
+      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      {
+        id: 'rate',
+        header: t('survey.tableRate'),
+        render: (i) => `${Math.round(i.rate).toLocaleString()} m³/s`,
+      },
+    ],
+    [t]
   );
 
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
@@ -277,6 +333,16 @@ export function SurveyCharts({
       <figure aria-label={t('survey.chartVolume')} className="m-0">
         {plot}
         <figcaption className="sr-only">{t('survey.chartVolume')}</figcaption>
+        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+        <div className="sr-only">
+          <DataTable
+            columns={volumeColumns}
+            responsive="table"
+            rows={scanRows}
+            rowKey={(r) => r.at}
+            label={t('survey.chartVolume')}
+          />
+        </div>
       </figure>
 
       {rateSteps.length > 0 && (
@@ -338,6 +404,15 @@ export function SurveyCharts({
             </ResponsiveContainer>
           </div>
           <figcaption className="sr-only">{t('survey.chartRate')}</figcaption>
+          <div className="sr-only">
+            <DataTable
+              columns={rateColumns}
+              responsive="table"
+              rows={summary.intervals}
+              rowKey={(i) => i.from}
+              label={t('survey.chartRate')}
+            />
+          </div>
         </figure>
       )}
     </div>

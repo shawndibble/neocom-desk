@@ -17,7 +17,11 @@ import { isProjectedKind } from '@/engine/character/board';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { KIND_LABEL } from './calendarKindLabels';
 
-export function useDayLoadLabel(): (date: Date, load: DayLoad | undefined) => string {
+export function useDayLoadLabel(): (
+  date: Date,
+  load: DayLoad | undefined,
+  isToday?: boolean
+) => string {
   const { t, i18n } = useTranslation();
 
   // Both formatters are built once per language rather than per cell: a month
@@ -32,19 +36,27 @@ export function useDayLoadLabel(): (date: Date, load: DayLoad | undefined) => st
     // Planets" is a sentence where "Industry jobs, & Planets" is not.
     const kindList = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' });
 
-    return (date, load) =>
-      load
-        ? t('calendar.map.dayWithLoad', {
-            date: fullDate.format(date),
-            count: load.count,
-            kinds: kindList.format(
-              load.kinds.map((kind) =>
-                isProjectedKind(kind)
-                  ? t('calendar.projectedKind', { kind: t(KIND_LABEL[kind]) })
-                  : t(KIND_LABEL[kind])
-              )
-            ),
-          })
-        : t('calendar.map.dayEmpty', { date: fullDate.format(date) });
+    // "Today, Friday 9 October — …": the ticker draws the word "Today" in place
+    // of the weekday, so the name has to start with it (WCAG 2.5.3).
+    const withToday = (text: string, isToday: boolean | undefined) =>
+      isToday ? t('calendar.map.todayPrefix', { label: text }) : text;
+
+    return (date, load, isToday) =>
+      withToday(
+        load
+          ? t('calendar.map.dayWithLoad', {
+              date: fullDate.format(date),
+              count: load.count,
+              kinds: kindList.format(
+                load.kinds.map((kind) =>
+                  isProjectedKind(kind)
+                    ? t('calendar.projectedKind', { kind: t(KIND_LABEL[kind]) })
+                    : t(KIND_LABEL[kind])
+                )
+              ),
+            })
+          : t('calendar.map.dayEmpty', { date: fullDate.format(date) }),
+        isToday
+      );
   }, [t, i18n.language]);
 }

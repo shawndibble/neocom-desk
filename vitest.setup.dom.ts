@@ -15,14 +15,7 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { configure } from '@testing-library/react';
-import { afterAll, vi } from 'vitest';
-
-/**
- * The rail's first-run question is a modal over the whole page, which would
- * cover every test that renders a signed-in `App`. Its own test file calls
- * `vi.unmock` to get the real one.
- */
-vi.mock('@/app/NavSetupQuestion', () => ({ NavSetupQuestion: () => null }));
+import { afterAll } from 'vitest';
 
 /**
  * Default is 1000ms. Under the CPU contention of several `/next-ticket`

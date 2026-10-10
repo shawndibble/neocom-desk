@@ -12,14 +12,18 @@ describe('StartPlanButton', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Plan' }));
     const busy = screen.getByRole('button', { name: 'Starting…' });
-    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).not.toBeDisabled();
     await userEvent.click(busy);
     expect(onStart).toHaveBeenCalledTimes(1);
 
     // Navigating away: stays busy until the page it leaves unmounts.
     finish(true);
     await Promise.resolve();
-    expect(screen.getByRole('button', { name: 'Starting…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Starting…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 
   it('comes back when no plan was started', async () => {

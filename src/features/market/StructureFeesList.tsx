@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { structureBrokerPct } from '@/engine/market/structureFee';
 import { useStructureFees, withoutStructureFee } from './structureFees';
 
@@ -9,13 +10,21 @@ import { useStructureFees, withoutStructureFee } from './structureFees';
  * nothing until one exists (issue #2911) — the field itself lives on the Order
  * detail, so this is only where a fee is reviewed or removed.
  */
-export function StructureFeesList() {
+export function StructureFeesList({
+  panelHeading,
+}: {
+  /** Where focus lands when the last fee goes and this section unmounts. */
+  panelHeading?: RefObject<HTMLElement | null>;
+}) {
   const { t } = useTranslation();
   const fees = useStructureFees((state) => state.value);
   const setFees = useStructureFees((state) => state.setValue);
   useEffect(() => {
     void useStructureFees.getState().hydrate();
   }, []);
+
+  const removeRefs = useRef(new Map<string, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
 
   const entries = Object.entries(fees);
   if (entries.length === 0) return null;
@@ -26,7 +35,7 @@ export function StructureFeesList() {
       </h3>
       <p className="text-text-dim">{t('market.structureFee.settingsHelp')}</p>
       <ul className="divide-y divide-line">
-        {entries.map(([id, pct]) => {
+        {entries.map(([id, pct], index) => {
           const name = `${t('market.unknownStructure')} #${id}`;
           return (
             <li key={id} className="flex items-center justify-between gap-3 py-1.5">
@@ -39,8 +48,18 @@ export function StructureFeesList() {
               <Button
                 size="sm"
                 variant="ghost"
+                ref={(el) => {
+                  if (el) removeRefs.current.set(id, el);
+                  else removeRefs.current.delete(id);
+                }}
                 aria-label={t('market.structureFee.remove', { name })}
-                onClick={() => void setFees(withoutStructureFee(fees, Number(id)))}
+                onClick={() => {
+                  const near = [entries[index + 1]?.[0], entries[index - 1]?.[0]].map(
+                    (key) => () => (key === undefined ? null : removeRefs.current.get(key))
+                  );
+                  focusAfterCommit(...near, panelHeading);
+                  void setFees(withoutStructureFee(fees, Number(id)));
+                }}
               >
                 {t('market.structureFee.removeButton')}
               </Button>

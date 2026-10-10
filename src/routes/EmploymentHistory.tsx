@@ -178,7 +178,7 @@ export function EmploymentHistory() {
               icon={<Icon.Refresh />}
               label={t('employmentHistory.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
             <TableActionsMenu name={t('employmentHistory.title')} tableExport={historyExport} />
           </span>

@@ -30,6 +30,7 @@ import {
   selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { buildQuickbarAnnouncements } from './quickbarAnnouncer';
 import { formatIskCompact } from '@/lib/isk';
 import { PriceAlertForm } from './PriceAlertForm';
 import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
@@ -177,7 +178,15 @@ export function QuickbarList({
       {items.length === 0 ? (
         <p className="pt-1 text-xs text-text-dim">{t('market.quickbar.empty')}</p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          accessibility={{
+            announcements: buildQuickbarAnnouncements(items, t),
+            screenReaderInstructions: { draggable: t('market.quickbar.drag.instructions') },
+          }}
+        >
           <SortableContext
             items={items.map((i) => i.typeId)}
             strategy={verticalListSortingStrategy}

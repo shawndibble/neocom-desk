@@ -557,7 +557,12 @@ function SlotTile({
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
   const label = module
     ? [
-        t('fittings.ring.slotFitted', { rack: rackLabel, index, state }),
+        t('fittings.ring.slotFitted', {
+          rack: rackLabel,
+          index,
+          name: nameOf(module.typeId),
+          state,
+        }),
         hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Label`) : null,
         cantUse ? t('fittings.list.cantUse') : null,
       ]
