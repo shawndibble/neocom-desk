@@ -137,7 +137,6 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
     const box = (await header.boundingBox())!;
     return box.y + box.height;
   };
-  const insideHeader = (el: Element | null, h: Element) => !!el && h.contains(el);
 
   let checked = 0;
   const visit = async (key: string, steps: number) => {
@@ -163,7 +162,6 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
       checked += 1;
     }
   };
-  void insideHeader;
 
   // Backwards through the entry list and up into the toolbar (Columns, Group by, Add skill)...
   await visit('Shift+Tab', 90);
