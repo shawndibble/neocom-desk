@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 
@@ -17,7 +17,7 @@ vi.mock('@/stores/activeCharacter', () => ({
     select({ activeCharacterId: 1 }),
 }));
 
-import { PilotKillActivity } from './PilotKillActivity';
+import { PilotKillActivity, PilotKillActivityView } from './PilotKillActivity';
 
 const DAY = 86_400_000;
 const kill = (agoMs: number, space: 'highsec' | 'lowsec' | 'nullsec' | 'wormhole') => ({
@@ -82,5 +82,28 @@ describe('PilotKillActivity', () => {
     // The hulls they kill moved to the ships row, beside the ones they fly.
     expect(screen.queryByText('Ships they killed')).toBeNull();
     expect(screen.queryByText('Kills most')).toBeNull();
+  });
+});
+
+describe('PilotKillActivityView retry focus', () => {
+  it('keeps focus inside the section from Retry through loading', () => {
+    const onRetry = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <PilotKillActivityView history={{ kind: 'failed' }} onRetry={onRetry} />
+      </MemoryRouter>
+    );
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    act(() => retry.click());
+    expect(onRetry).toHaveBeenCalled();
+    rerender(
+      <MemoryRouter>
+        <PilotKillActivityView history={{ kind: 'loading' }} onRetry={onRetry} />
+      </MemoryRouter>
+    );
+    const active = document.activeElement;
+    expect(active).not.toBe(document.body);
+    expect(active?.closest('section')).not.toBeNull();
   });
 });
