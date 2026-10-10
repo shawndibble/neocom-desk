@@ -524,6 +524,36 @@ describe('Contacts row click', () => {
   });
 });
 
+describe('Contacts keyboard access (issue #3396)', () => {
+  it('makes a faction row no tab stop, while a character row stays one', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([
+          { contact_id: 500001, contact_type: 'faction', standing: 5 },
+          contactsPayload[0],
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Good Friend');
+    const rows = Array.from(document.querySelectorAll('main tbody tr'));
+    const faction = rows.find((r) => r.getAttribute('data-row-key') === '500001');
+    const character = rows.find((r) => r.getAttribute('data-row-key') === '1001');
+    expect(faction).toBeDefined();
+    expect(faction).not.toHaveAttribute('tabindex');
+    expect(character).toHaveAttribute('tabindex', '0');
+  });
+
+  it('selects "This character" on /contacts/across with a single Character', async () => {
+    window.history.pushState({}, '', '/contacts/across');
+    render(<App />);
+    await screen.findByText('Good Friend');
+    const tab = await screen.findByRole('tab', { name: /this character/i });
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(tab).toHaveAttribute('tabindex', '0');
+  });
+});
+
 describe('Contacts standing filter chips (issue #403)', () => {
   it('stay visible through a manual refresh instead of disappearing', async () => {
     render(<App />);
