@@ -148,6 +148,7 @@ import {
   buildMergedRows,
   placeBandHeaders,
   pinnedInProgressEntry,
+  type MergedRow,
 } from './queueRows';
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
@@ -381,6 +382,8 @@ export function PlanEditor({
   const focusAfterCommit = useFocusAfterCommit();
   // Worked out when the confirm opens, while the row's neighbours are known.
   const removeFocusRef = useRef<readonly FocusCandidate[]>([]);
+  // A ref keeps `requestRemoveEntry` stable, so memoized rows don't re-render on every recompute.
+  const mergedRowsRef = useRef<readonly MergedRow[]>([]);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -784,6 +787,9 @@ export function PlanEditor({
     () => buildMergedRows(plan.entries, plan.markers, entryQueue, rows),
     [plan.entries, plan.markers, entryQueue, rows]
   );
+  useEffect(() => {
+    mergedRowsRef.current = mergedRows;
+  });
   const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
     if (groupingMode === 'attributePair') {
       const placed = placeBandHeaders(
@@ -1404,17 +1410,14 @@ export function PlanEditor({
   );
 
   /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
-  const requestRemoveEntry = useCallback(
-    (skillTypeID: number, targetLevel: number) => {
-      removeFocusRef.current = neighbourFocusCandidates(
-        mergedRows,
-        `${skillTypeID}-${targetLevel}`,
-        entriesHeadingRef
-      );
-      setRemovingEntry({ skillTypeID, targetLevel });
-    },
-    [mergedRows]
-  );
+  const requestRemoveEntry = useCallback((skillTypeID: number, targetLevel: number) => {
+    removeFocusRef.current = neighbourFocusCandidates(
+      mergedRowsRef.current,
+      `${skillTypeID}-${targetLevel}`,
+      entriesHeadingRef
+    );
+    setRemovingEntry({ skillTypeID, targetLevel });
+  }, []);
 
   /** The confirm Modal's Remove button: the removal `onRemove` used to do inline before #408. */
   const confirmRemoveEntry = useCallback(() => {

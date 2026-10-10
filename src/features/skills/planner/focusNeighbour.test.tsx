@@ -50,4 +50,22 @@ describe('neighbourFocusCandidates', () => {
     document.body.append(heading);
     expect(firstConnected(neighbourFocusCandidates(rows, 'a', heading))).toBe(heading);
   });
+
+  it('skips prereq rows, and other markers when a marker goes', () => {
+    const heading = document.createElement('h2');
+    document.body.append(heading);
+    const [prereq, , entry] = mountHandles('p', 'm2', 'e');
+    const withPrereq = [
+      { id: 'e', kind: 'entry' },
+      { id: 'p', kind: 'prereq' },
+    ];
+    expect(firstConnected(neighbourFocusCandidates(withPrereq, 'e', heading))).toBe(heading);
+    prereq.remove();
+    const markers = [
+      { id: 'm1', kind: 'marker' },
+      { id: 'm2', kind: 'marker' },
+      { id: 'e', kind: 'entry' },
+    ];
+    expect(firstConnected(neighbourFocusCandidates(markers, 'm1', heading))).toBe(entry);
+  });
 });

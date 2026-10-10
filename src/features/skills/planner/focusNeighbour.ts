@@ -16,13 +16,19 @@ export function planRowHandle(rowId: string): HTMLElement | null {
  * Where focus goes when a row is removed: each row after it, then each row
  * before it (nearest first), then `fallback` (the "Your entries" heading).
  * Getters, so a row that goes in the same update is skipped at focus time.
+ * Prereq rows are skipped (the removed entry's own go with it), and so are
+ * other markers when a marker goes (their ids shift as the list reindexes).
  */
 export function neighbourFocusCandidates(
-  rows: readonly { id: string }[],
+  rows: readonly { id: string; kind?: string }[],
   rowId: string,
   fallback: FocusCandidate
 ): FocusCandidate[] {
   const index = rows.findIndex((row) => row.id === rowId);
+  const removedKind = rows[index]?.kind;
   const around = index < 0 ? [] : [...rows.slice(index + 1), ...rows.slice(0, index).reverse()];
-  return [...around.map((row) => () => planRowHandle(row.id)), fallback];
+  const stable = around.filter(
+    (row) => row.kind !== 'prereq' && !(removedKind === 'marker' && row.kind === 'marker')
+  );
+  return [...stable.map((row) => () => planRowHandle(row.id)), fallback];
 }

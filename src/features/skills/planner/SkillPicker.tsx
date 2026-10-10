@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, FilterChip, SearchInput } from '@/components/ui';
+import { PLAN_HANDLE_ATTR } from './focusNeighbour';
 import {
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -207,7 +208,9 @@ export function SkillPicker({
                 const row = document.getElementById(jumpTargetId);
                 row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 // Focus moves with the view; the handle, not the <li>, so no row ring.
-                row?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+                row
+                  ?.querySelector<HTMLElement>(`[${PLAN_HANDLE_ATTR}]`)
+                  ?.focus({ preventScroll: true });
               }}
             >
               {t('plans.jumpToAdded')}

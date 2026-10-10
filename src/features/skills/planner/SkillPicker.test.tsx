@@ -185,7 +185,7 @@ describe('SkillPicker', () => {
       <>
         <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
         <div id="plan-entry-1-3">
-          <button type="button">Reorder Frigate III</button>
+          <button type="button" aria-label="Reorder Frigate III" data-plan-handle="1-3" />
         </div>
       </>
     );
