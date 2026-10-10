@@ -170,6 +170,43 @@ describe('BuildPlanList', () => {
     expect(within(tip).getByRole('row', { name: /Build/ })).toHaveTextContent('1,000,000 ISK');
     expect(within(tip).getByRole('row', { name: /Buy/ })).toHaveTextContent('1,500,000 ISK');
   });
+
+  it('labels each figure and gives the verdict tag its costs as an accessible name (#3344)', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            [
+              'a',
+              {
+                profit: -125_200,
+                verdict: 'build',
+                buildCost: 1_000_000,
+                buyCost: 1_500_000,
+                runs: 1,
+              },
+            ],
+          ])
+        }
+      />
+    );
+
+    const row = screen.getByText('Merlin run').closest('li') as HTMLElement;
+    for (const label of ['Profit', 'ISK/h', 'Margin', 'Verdict', 'Runs']) {
+      expect(within(row).getByText(`${label}:`, { selector: '.sr-only' })).toBeInTheDocument();
+    }
+    expect(within(row).getByRole('img', { name: /build.*1,000,000 ISK.*buy.*1,500,000 ISK/i }));
+  });
 });
 
 describe('BuildPlanList: compare mode (#453)', () => {
