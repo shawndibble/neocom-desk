@@ -42,7 +42,12 @@ function contractAt(locationId: number): Contract {
 
 const calls = { station: 0, structure: 0, items: 0 };
 
-const server = setupServer();
+// The System row's name lookup — not what these tests count; `openAndClose` waits on its link.
+const server = setupServer(
+  http.get(`${ESI_BASE_URL}/universe/systems/30000142`, () =>
+    HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9 })
+  )
+);
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
@@ -79,9 +84,11 @@ afterEach(() => {
 afterAll(() => server.close());
 
 /**
- * Waits for BOTH loaders to settle before unmounting: the item lines land
+ * Waits for every loader to settle before unmounting: the item lines land
  * first once they are cached, and closing on that alone would leave the
- * location chain still in flight and the request counts short.
+ * location chain still in flight and the request counts short. A resolved
+ * location also waits for its System link, or the system lookup would still be
+ * running into the next test (against a cleared cache) and count there.
  */
 async function openAndClose(contract: Contract, locationText: string) {
   const view = render(
@@ -96,6 +103,7 @@ async function openAndClose(contract: Contract, locationText: string) {
   );
   await screen.findByText('Tritanium');
   await screen.findByText(locationText);
+  if (!locationText.startsWith('#')) await screen.findByRole('link', { name: 'Jita' });
   view.unmount();
 }
 

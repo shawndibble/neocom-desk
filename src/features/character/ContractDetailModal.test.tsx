@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -99,7 +99,17 @@ function renderModal(props: ContractDetailModalProps) {
   );
 }
 
-const server = setupServer();
+/** A solar system the System row can name; any other id declines, which hides the row. */
+const SYSTEM_NAMES: Record<string, string> = { '30000142': 'Jita', '30002187': 'Amarr' };
+
+const server = setupServer(
+  http.get(`${ESI_BASE_URL}/universe/systems/:id`, ({ params }) => {
+    const name = SYSTEM_NAMES[String(params.id)];
+    return name
+      ? HttpResponse.json({ system_id: Number(params.id), name, security_status: 0.9 })
+      : new HttpResponse(null, { status: 404 });
+  })
+);
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
@@ -112,6 +122,91 @@ afterEach(() => {
   configureEsi({ getToken: null });
 });
 afterAll(() => server.close());
+
+/**
+ * Issue #3525: the own-contract modal is the only place an own contract's
+ * place appears, so its system links to Route Safety like the Public and
+ * Courier modals' do. The station itself stays plain (§6c: Station is not
+ * clickable).
+ */
+describe('ContractDetailModal System rows', () => {
+  const JITA_STATION = 60003760;
+  const AMARR_STATION = 60008494;
+
+  function stationHandler(stationId: number, name: string, systemId: number) {
+    return http.get(`${ESI_BASE_URL}/universe/stations/${stationId}`, () =>
+      HttpResponse.json({ station_id: stationId, name, type_id: 1, system_id: systemId })
+    );
+  }
+
+  it('links the start location system to Route Safety for an NPC-station contract', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    const link = await screen.findByRole('link', { name: 'Jita' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('30000142'));
+    expect(screen.getAllByRole('link', { name: /^(Jita|Amarr)$/ })).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Jita IV - Moon 4' })).toBeNull();
+    expect(screen.getByText('Jita IV - Moon 4')).toBeInTheDocument();
+  });
+
+  it('links both endpoint systems on a courier contract', async () => {
+    server.use(
+      stationHandler(JITA_STATION, 'Jita IV - Moon 4', 30000142),
+      stationHandler(AMARR_STATION, 'Amarr VIII (Oris) - Emperor Family Academy', 30002187)
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: { ...COURIER, start_location_id: JITA_STATION, end_location_id: AMARR_STATION },
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findByRole('link', { name: 'Jita' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('30000142')
+    );
+    expect(await screen.findByRole('link', { name: 'Amarr' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('30002187')
+    );
+    expect(screen.queryByRole('link', { name: /Emperor Family Academy/ })).toBeNull();
+  });
+
+  it('hides the System row when the system cannot be resolved', async () => {
+    let systemAsked = false;
+    server.use(
+      stationHandler(JITA_STATION, 'Somewhere Station', 30009999),
+      http.get(`${ESI_BASE_URL}/universe/systems/30009999`, () => {
+        systemAsked = true;
+        return new HttpResponse(null, { status: 404 });
+      }),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(await screen.findByText('Somewhere Station')).toBeInTheDocument();
+    // Let the system lookup settle before asserting the row never appeared.
+    await waitFor(() => expect(systemAsked).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText('System')).toBeNull();
+    expect(screen.queryByText('#30009999')).toBeNull();
+  });
+});
 
 describe('ContractDetailModal', () => {
   it('renders the summary fields immediately from the contract prop, no fetch needed', () => {
