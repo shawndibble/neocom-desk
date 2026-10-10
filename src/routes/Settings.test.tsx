@@ -1975,4 +1975,17 @@ describe('Settings — review follow-ups', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /data credit/i })).not.toBeInTheDocument();
   });
+
+  it('gives both backup password inputs a visible <label for>', async () => {
+    window.history.pushState({}, '', '/settings/dataAge');
+    const { container } = render(<App />);
+
+    await screen.findByRole('button', { name: /clear cached esi data/i });
+    const inputs = screen.getAllByLabelText('Password');
+    expect(inputs).toHaveLength(2);
+    for (const input of inputs) {
+      expect(input.id).not.toBe('');
+      expect(container.querySelector(`label[for="${input.id}"]`)).toBeInTheDocument();
+    }
+  });
 });
