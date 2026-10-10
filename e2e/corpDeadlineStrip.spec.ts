@@ -135,7 +135,7 @@ async function widestLabelOverflow(page: Page) {
 async function stripOverflowsPanel(page: Page) {
   return page.evaluate(() => {
     const strip = document.querySelector('[role="img"][aria-label^="Deadlines per day"]');
-    const panel = strip?.parentElement;
+    const panel = strip?.closest('section');
     if (!strip || !panel) return null;
     const s = strip.getBoundingClientRect();
     const p = panel.getBoundingClientRect();

@@ -9003,8 +9003,6 @@
       "strip": {
         "title": "Deadlines per day — next {{days}} days",
         "today": "Today",
-        "footnote_one": "{{count}} clock falls due on or before {{until}}.",
-        "footnote_other": "{{count}} clocks fall due on or before {{until}}.",
         "describe": "Deadlines per day for the next {{days}} days: {{detail}}.",
         "describeEmpty": "Nothing falls due in the next {{days}} days.",
         "describeDay": "{{day}}, {{count}} due, worst {{severity}}"
