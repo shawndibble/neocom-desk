@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Radio, TextInput } from '@/components/ui';
+import { Button, Modal, Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -74,7 +74,7 @@ export function LinkTransactionDialog({
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkTransactionHint')}</p>
 
-        <TextInput
+        <SearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t('miningTax.linkTransactionSearchPlaceholder')}
