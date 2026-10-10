@@ -95,7 +95,7 @@ describe('summarizeSurvey', () => {
     expect(s.oreNames).toEqual(['A', 'B']);
   });
 
-  it('puts the biggest ISK first when the scan carries it, with the value of each ore', () => {
+  it('falls back to the biggest ISK first when no ore has a unit price, with the value of each ore', () => {
     // Veldspar 20 rocks worth 10M, Scordite 5 rocks worth 25M, Pyroxeres 15 rocks worth 12M.
     const rocks = (ore: string, count: number, each: number): [string, number, number][] =>
       Array.from({ length: count }, () => [ore, 100, each]);
@@ -114,16 +114,6 @@ describe('summarizeSurvey', () => {
     ]);
   });
 
-  it('orders chart layers like the ore bars: richest per m³ first, not most ISK left', () => {
-    // Veldspar holds more ISK in total but Scordite is richer per m³.
-    const s = summarizeSurvey([
-      iskScan(0, ['Veldspar', 9_000, 9_000_000], ['Scordite', 100, 5_000_000]),
-      iskScan(5, ['Veldspar', 8_000, 8_000_000], ['Scordite', 50, 2_500_000]),
-    ])!;
-    expect(s.ores.map((o) => o.ore)).toEqual(['Veldspar', 'Scordite']);
-    expect(s.oreNames).toEqual(['Scordite', 'Veldspar']);
-  });
-
   it('keeps the volume order for chart layers when the scan has no ISK', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500])])!;
     expect(s.oreNames).toEqual(['Sylvite', 'Bitumens']);
@@ -132,8 +122,8 @@ describe('summarizeSurvey', () => {
   it('lists ores by volume left with rock counts', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500], ['Sylvite', 300])])!;
     expect(s.ores).toEqual([
-      { ore: 'Sylvite', rocks: 2, volume: 800, isk: 0, startVolume: 800, iskPerM3: null },
-      { ore: 'Bitumens', rocks: 1, volume: 50, isk: 0, startVolume: 50, iskPerM3: null },
+      { ore: 'Sylvite', rocks: 2, volume: 800, isk: 0, startVolume: 800, unitPrice: null },
+      { ore: 'Bitumens', rocks: 1, volume: 50, isk: 0, startVolume: 50, unitPrice: null },
     ]);
     expect(s.rocksLeft).toBe(3);
   });
@@ -144,10 +134,10 @@ describe('summarizeSurvey', () => {
       scan(5, ['A', 250], ['B', 300], ['D', 100]),
     ])!;
     expect(s.ores).toEqual([
-      { ore: 'B', rocks: 1, volume: 300, isk: 0, startVolume: 300, iskPerM3: null },
-      { ore: 'A', rocks: 1, volume: 250, isk: 0, startVolume: 500, iskPerM3: null },
-      { ore: 'D', rocks: 1, volume: 100, isk: 0, startVolume: 100, iskPerM3: null },
-      { ore: 'C', rocks: 0, volume: 0, isk: 0, startVolume: 200, iskPerM3: null },
+      { ore: 'B', rocks: 1, volume: 300, isk: 0, startVolume: 300, unitPrice: null },
+      { ore: 'A', rocks: 1, volume: 250, isk: 0, startVolume: 500, unitPrice: null },
+      { ore: 'D', rocks: 1, volume: 100, isk: 0, startVolume: 100, unitPrice: null },
+      { ore: 'C', rocks: 0, volume: 0, isk: 0, startVolume: 200, unitPrice: null },
     ]);
   });
 
@@ -199,13 +189,41 @@ describe('summarizeSurvey', () => {
     expect(done.elapsedMs).toBe(5 * MIN);
   });
 
-  it('keeps a mined-out ore in the richest-per-m3 order by its last priced scan', () => {
-    const s = summarizeSurvey([
-      iskScan(0, ['Rich', 1000, 90_000], ['Mid', 1000, 70_000], ['Poor', 1000, 50_000]),
-      iskScan(5, ['Poor', 500, 25_000], ['Mid', 400, 28_000]),
-      iskScan(10, ['Poor', 100, 5_000]),
-    ])!;
-    expect(s.ores.find((o) => o.ore === 'Rich')).toMatchObject({ rocks: 0, iskPerM3: 90 });
-    expect(s.oreNames).toEqual(['Rich', 'Mid', 'Poor']);
+  it('sorts ores and chart layers by market unit price, whatever volume or ISK is in the scans, a mined-out ore keeping its place', () => {
+    const prices = new Map([
+      ['Veldspar', 20],
+      ['Scordite', 90],
+      ['Pyroxeres', 40],
+      ['Gone', 60],
+    ]);
+    const s = summarizeSurvey(
+      [
+        scan(0, ['Veldspar', 100_000], ['Scordite', 10], ['Pyroxeres', 5_000], ['Gone', 800]),
+        scan(5, ['Veldspar', 90_000], ['Scordite', 10], ['Pyroxeres', 5_000]),
+      ],
+      prices
+    )!;
+    expect(s.oreNames).toEqual(['Scordite', 'Gone', 'Pyroxeres', 'Veldspar']);
+    expect(s.ores.map((o) => o.ore)).toEqual(s.oreNames);
+    expect(s.ores.find((o) => o.ore === 'Gone')).toMatchObject({ rocks: 0, unitPrice: 60 });
+  });
+
+  it('orders ores at one price by name, not by how much is in the paste', () => {
+    const s = summarizeSurvey(
+      [scan(0, ['Veldspar', 5_000], ['Scordite', 10])],
+      new Map([
+        ['Veldspar', 20],
+        ['Scordite', 20],
+      ])
+    )!;
+    expect(s.oreNames).toEqual(['Scordite', 'Veldspar']);
+  });
+
+  it('puts an ore with no price after every priced ore', () => {
+    const s = summarizeSurvey(
+      [scan(0, ['Odd', 1_000_000], ['Veldspar', 10])],
+      new Map([['Veldspar', 20]])
+    )!;
+    expect(s.oreNames).toEqual(['Veldspar', 'Odd']);
   });
 });
