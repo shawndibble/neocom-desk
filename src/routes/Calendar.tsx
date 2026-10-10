@@ -408,7 +408,7 @@ export function Calendar() {
               icon={<Icon.Refresh />}
               label={t('calendar.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
           </>
         }

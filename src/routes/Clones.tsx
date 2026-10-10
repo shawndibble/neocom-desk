@@ -743,7 +743,7 @@ export function Clones() {
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
             <TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />
           </span>
