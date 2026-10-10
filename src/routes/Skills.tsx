@@ -14,6 +14,7 @@ import {
   StatChip,
   StatChips,
   IconButton,
+  LiveStatus,
   Tooltip,
 } from '@/components/ui';
 import {
@@ -165,6 +166,8 @@ async function loadSkillsSnapshot(
 }
 
 const GROUP_SEARCH_PARAM = textParam();
+/** Pause before the match count is announced to a screen reader. */
+const SEARCH_ANNOUNCE_DEBOUNCE_MS = 250;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -312,6 +315,19 @@ export function Skills() {
   // and clearing the search restores the prior collapse state exactly (same
   // approach as the Assets tree's search/expand interaction).
   const searching = filterResult !== null;
+  const matchCount = filterResult
+    ? [...filterResult.matchedSkillsByGroup.values()].reduce(
+        (sum, skills) => sum + skills.length,
+        0
+      )
+    : null;
+  // Filtering is per keystroke; the announcement waits out a pause so a screen
+  // reader is not read every intermediate count.
+  const [announcedCount, setAnnouncedCount] = useState<number | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => setAnnouncedCount(matchCount), SEARCH_ANNOUNCE_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [matchCount]);
 
   function toggleGroup(groupName: string) {
     if (searching) return;
@@ -486,6 +502,13 @@ export function Skills() {
                 placeholder={t('skills.searchPlaceholder')}
                 className="min-w-48 flex-1"
               />
+              <LiveStatus>
+                {announcedCount === null
+                  ? null
+                  : announcedCount === 0
+                    ? t('skills.noResults')
+                    : t('skills.searchResultCount', { count: announcedCount })}
+              </LiveStatus>
               {/* `md`, not `sm`: these sit on the search box's own line, and the
                   shared control scale is what keeps the three the same height. */}
               <IconButton
