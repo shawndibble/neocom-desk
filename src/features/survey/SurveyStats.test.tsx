@@ -21,8 +21,11 @@ describe('SurveyStats Done at', () => {
     render(<SurveyStats summary={summary} />);
     const button = screen.getByRole('button', { name: /EVE$/ });
     fireEvent.click(button);
-    await waitFor(() => expect(screen.getByRole('button', { name: /local$/ })).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: /local$/ }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /EVE$/ })).toBeNull());
+    const local = screen.getByRole('button');
+    expect(local.textContent).not.toMatch(/local/i);
+    expect(local.className).not.toMatch(/underline/);
+    fireEvent.click(local);
     await waitFor(() => expect(screen.getByRole('button', { name: /EVE$/ })).toBeTruthy());
   });
 });
