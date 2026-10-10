@@ -29,3 +29,25 @@ describe('SurveyStats Done at', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /EVE$/ })).toBeTruthy());
   });
 });
+
+describe('SurveyStats cleared field', () => {
+  const clearedAfter = (ms: number) =>
+    summarizeSurvey([
+      { at: T0, rocks: [{ ore: 'Veldspar', volume: 2000 }] },
+      { at: T0 + ms, rocks: [] },
+    ])!;
+
+  it('swaps the left tiles for the total mining time, without days or hours it did not take', () => {
+    render(<SurveyStats summary={clearedAfter(25 * 60_000)} />);
+    expect(screen.getByText('Total time')).toBeTruthy();
+    expect(screen.getByText('25m')).toBeTruthy();
+    for (const label of ['m³ left', 'Time left', 'Rocks left', 'ISK left']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+  });
+
+  it('adds hours past an hour and days past a day', () => {
+    render(<SurveyStats summary={clearedAfter(26 * 3_600_000 + 5 * 60_000)} />);
+    expect(screen.getByText('1d 2h 5m')).toBeTruthy();
+  });
+});
