@@ -26,6 +26,7 @@ import { cx } from '@/lib/cx';
 import { HintText } from '@/components/ui/HintText';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { SPACE_KINDS } from '@/engine/space';
+import { SELL_OUTLIER_FACTOR } from '@/engine/market/orderBookDepth';
 import { securityStatusColor } from '@/engine/securityStatus';
 import type { CurrentSystemState } from '@/features/route/currentSystem';
 import { CurrentSystemPicker, JumpRangeSelect } from '@/features/route/JumpRangeControls';
@@ -125,6 +126,13 @@ function BrowserFilterFields({
           onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
         />
       )}
+      {/* Any scope: a one-station Hub book can carry bait as well. */}
+      <FilterChip
+        label={t('market.filterHideBait')}
+        tooltip={t('market.filterHideBaitHint', { times: SELL_OUTLIER_FACTOR })}
+        selected={draft.hideBait}
+        onToggle={() => setDraft({ ...draft, hideBait: !draft.hideBait })}
+      />
     </>
   );
 }

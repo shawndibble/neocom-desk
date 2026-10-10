@@ -1,6 +1,6 @@
 /**
  * The Order Book filter bar's (Jump Range/Security/Min quantity/NPC stations
- * only) device-local remembered default — the URL states the live values
+ * only/Hide bait sells) device-local remembered default — the URL states the live values
  * (ADR 0015, `useOrderBookOrchestration.ts`'s `BROWSER_FILTER_PARAMS`); this
  * is the persisted fallback behind it, like `locationMode.ts`'s Location Mode,
  * so a filter set once survives a reload or a fresh visit with no matching
@@ -19,6 +19,7 @@ export interface BrowserFilterSettingValue {
   sec: ReadonlySet<SpaceKind>;
   minQty: number;
   npcOnly: boolean;
+  hideBait: boolean;
 }
 
 export const DEFAULT_BROWSER_FILTER_SETTING: BrowserFilterSettingValue = {
@@ -26,9 +27,13 @@ export const DEFAULT_BROWSER_FILTER_SETTING: BrowserFilterSettingValue = {
   sec: new Set(SPACE_KINDS),
   minQty: 0,
   npcOnly: false,
+  hideBait: false,
 };
 
-function isBrowserFilterSettingValue(raw: unknown): raw is BrowserFilterSettingValue {
+/** `hideBait` came later, so a value stored before it reads as off rather than resetting every filter. */
+function isBrowserFilterSettingValue(
+  raw: unknown
+): raw is Omit<BrowserFilterSettingValue, 'hideBait'> & { hideBait?: boolean } {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
   return (
@@ -39,12 +44,14 @@ function isBrowserFilterSettingValue(raw: unknown): raw is BrowserFilterSettingV
     typeof r.minQty === 'number' &&
     Number.isInteger(r.minQty) &&
     r.minQty >= 0 &&
-    typeof r.npcOnly === 'boolean'
+    typeof r.npcOnly === 'boolean' &&
+    (r.hideBait === undefined || typeof r.hideBait === 'boolean')
   );
 }
 
 export const useBrowserFilterSetting = createLocalSetting<BrowserFilterSettingValue>({
   key: BROWSER_FILTER_SETTING_KEY,
   defaultValue: DEFAULT_BROWSER_FILTER_SETTING,
-  parse: (raw) => (isBrowserFilterSettingValue(raw) ? raw : null),
+  parse: (raw) =>
+    isBrowserFilterSettingValue(raw) ? { ...raw, hideBait: raw.hideBait ?? false } : null,
 });

@@ -7262,6 +7262,8 @@
     "filterMinQuantity": "Min quantity",
     "filterSecurity": "Security",
     "filterNpcOnly": "NPC stations only",
+    "filterHideBait": "Hide bait sells",
+    "filterHideBaitHint": "Hides sell orders asking {{times}} times the best sell or more, the ones flagged as likely bait. Depth, best prices and CSV export still count them.",
     "globalMarketNote": "Reading from {{regionName}} — this item trades in a market region of its own, not the one picked above.",
     "refresh": "Refresh",
     "searchLabel": "Search items",
@@ -8129,7 +8131,9 @@
       "sell_one": "{{count}} order · lowest {{price}}",
       "sell_other": "{{count}} orders · lowest {{price}}",
       "buy_one": "{{count}} order · highest {{price}}",
-      "buy_other": "{{count}} orders · highest {{price}}"
+      "buy_other": "{{count}} orders · highest {{price}}",
+      "baitHidden_one": "{{count}} bait sell hidden",
+      "baitHidden_other": "{{count}} bait sells hidden"
     },
     "itemSkills": {
       "trained": "{{trained}} of {{count}} trained",
