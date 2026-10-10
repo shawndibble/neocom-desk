@@ -1837,6 +1837,7 @@
     "csvSp": "Skill points",
     "inspector": {
       "addToPlan": "Add to Skill Plan",
+      "shownAnnouncement": "Details for {{name}} shown above the list",
       "maxLevel": "Already at level 5",
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",

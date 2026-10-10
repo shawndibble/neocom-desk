@@ -651,6 +651,30 @@ describe('Skills', () => {
     expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
   });
 
+  it('announces the inspector without moving focus, and returns focus to the row on Close', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
+    frigateRow.focus();
+    fireEvent.click(frigateRow);
+    expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
+    expect(frigateRow).toHaveFocus();
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((el) => /details for frigate/i.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
+
+    const close = screen.getByRole('button', { name: /^Close$/ });
+    close.focus();
+    fireEvent.click(close);
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Frigate/ })).toHaveFocus());
+    expect(screen.queryByText(/details for frigate/i)).not.toBeInTheDocument();
+  });
+
   it('starts every group collapsed, expands on header click, and collapses again on a second click', async () => {
     render(<App />);
 
