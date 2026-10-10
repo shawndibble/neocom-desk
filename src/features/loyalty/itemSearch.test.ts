@@ -130,3 +130,39 @@ describe('searchLpStores', () => {
     expect(search('  ')).toEqual({ groups: [], corporations: [], totalItemMatches: 0 });
   });
 });
+
+describe('searchLpStores corporation matches', () => {
+  const names = new Map([
+    [1000120, 'Federal Navy Academy'],
+    [1000121, 'Federation Navy'],
+    [1000122, 'Deep Core Mining'],
+  ]);
+  const find = (query: string, stores: LpSnapshotStore[] = []) =>
+    searchLpStores({
+      stores,
+      corporationNames: names,
+      itemNames: new Map(),
+      query,
+      jumps: null,
+    }).corporations.map((corp) => corp.corporationName);
+
+  it('finds a store by part of its name, case-insensitively', () => {
+    expect(find('fed')).toEqual(['Federal Navy Academy', 'Federation Navy']);
+  });
+
+  it('matches corporations with no snapshot at all, without a distance', () => {
+    const [hit] = searchLpStores({
+      stores: [],
+      corporationNames: names,
+      itemNames: new Map(),
+      query: 'deep',
+      jumps: null,
+    }).corporations;
+    expect(hit).toEqual({
+      corporationId: 1000122,
+      corporationName: 'Deep Core Mining',
+      nearestSystemId: null,
+      jumps: null,
+    });
+  });
+});
