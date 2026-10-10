@@ -307,7 +307,6 @@ const RailNavBody = memo(function RailNavBody({
                         to={page.path}
                         label={label}
                         locked={page.gating === 'scope' && locked.has(page.path)}
-                        badge={page.path === '/alerts' ? unreadAlerts : undefined}
                         className="flex-1"
                       />
                       <IconButton

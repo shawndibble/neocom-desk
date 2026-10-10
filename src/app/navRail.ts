@@ -133,11 +133,12 @@ export const NAV_ACTIVITIES = [
   { id: 'trading', paths: ['/contracts'] },
   { id: 'industry', paths: [] },
   { id: 'social', paths: ['/mail', '/calendar', '/contacts'] },
-  { id: 'intel', paths: ['/alerts', '/pilot-lookup'] },
 ] as const satisfies readonly { id: string; paths: readonly string[] }[];
 
 function hiddenExcept(shown: ReadonlySet<string>): string[] {
+  // A page with no rail row (the Alerts bell's) has nothing to fold away.
   return (NAV_PAGES as readonly NavPage[])
+    .filter((page) => page.inRail !== false)
     .map((page) => page.path as string)
     .filter((path) => canHide(path) && !shown.has(path));
 }

@@ -119,7 +119,7 @@ describe('the default rail', () => {
     const hidden = defaultHiddenNav();
     for (const path of DEFAULT_SHOWN_NAV) expect(hidden).not.toContain(path);
     expect(hidden).toEqual(
-      expect.arrayContaining(['/alerts', '/mining', '/planetary-industry', '/contracts', '/mail'])
+      expect.arrayContaining(['/mining', '/planetary-industry', '/contracts', '/mail'])
     );
     expect(hidden.every((path) => canHide(path))).toBe(true);
   });

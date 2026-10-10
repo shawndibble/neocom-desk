@@ -11,7 +11,6 @@ const ACTIVITY_LABELS = {
   trading: 'nav.setup.activity.trading',
   industry: 'nav.setup.activity.industry',
   social: 'nav.setup.activity.social',
-  intel: 'nav.setup.activity.intel',
 } as const satisfies Record<(typeof NAV_ACTIVITIES)[number]['id'], string>;
 
 /**
