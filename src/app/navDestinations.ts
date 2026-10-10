@@ -64,7 +64,7 @@ export interface NavPage {
    * has a permanent row in the More sheet. Both keep their sheet rows.
    */
   readonly mobileTab: boolean;
-  /** `false` leaves the page out of `railGroups()`: reached by a header control, Ctrl K or the phone bar instead. */
+  /** `false` leaves the page out of `railGroups()`: reached by a header control or Ctrl K instead. */
   readonly inRail?: false;
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
@@ -114,16 +114,15 @@ export const NAV_PAGES = [
     ],
   },
   /*
-   * No rail row: the bell in every page header (`AlertsBell`) is the way in, and
-   * Ctrl K and the phone's bar and sheet still list it (scope decision
-   * `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`).
+   * No rail row, no phone tab or sheet row: the bell in every page header
+   * (`AlertsBell`) is the way in, and Ctrl K still lists it.
    */
   {
     path: '/alerts',
     labelKey: 'nav.alerts',
     group: 'primary',
     gating: 'scope',
-    mobileTab: true,
+    mobileTab: false,
     inRail: false,
   },
   /*
@@ -320,15 +319,13 @@ export interface RailGroup {
 
 /**
  * The desktop rail's scrolling groups, in order; the footer is placed by hand.
- * `withRailless` keeps the pages the rail leaves out (`inRail: false`), which
- * the phone's More sheet still lists.
  */
-export function railGroups(withRailless = false): RailGroup[] {
+export function railGroups(): RailGroup[] {
   return NAV_GROUPS.filter((group) => group.id !== 'footer').map((group) => ({
     id: group.id,
     labelKey: group.labelKey,
     pages: NAV_PAGES.filter(
-      (page) => group.id === page.group && (withRailless || (page as NavPage).inRail !== false)
+      (page) => group.id === page.group && (page as NavPage).inRail !== false
     ),
   }));
 }

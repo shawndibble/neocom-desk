@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { ALERT_CHARACTER_PARAM } from '@/lib/alertCharacterParam';
 import { parsePositiveInt } from '@/engine/market/urlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 
 const STATUS_MS = 5000;
 
@@ -64,10 +65,15 @@ export function AlertCharacterSwitch() {
     return () => clearTimeout(timer);
   }, [switchedTo]);
 
-  if (switchedTo === null) return null;
+  // The region stays mounted (empty) so the text is announced when it fills;
+  // the visible note carries no role, or it would be read twice.
+  const message = switchedTo === null ? null : t('alerts.switchedTo', { name: switchedTo });
   return (
-    <p role="status" className="mb-4 rounded-xs border border-line bg-panel px-3 py-1 text-xs">
-      {t('alerts.switchedTo', { name: switchedTo })}
-    </p>
+    <>
+      <LiveStatus>{message}</LiveStatus>
+      {message !== null && (
+        <p className="mb-4 rounded-xs border border-line bg-panel px-3 py-1 text-xs">{message}</p>
+      )}
+    </>
   );
 }

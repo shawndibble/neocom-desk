@@ -111,8 +111,8 @@ const ORDER_BOOK_FIGURE = { charRem: 0.36, paddingRem: 2.5 } as const;
  */
 const ORDER_BOOK_FIXED_REM = 2.5 + 2.75 + 0.25;
 
-/** `BaitFlag`'s icon and its margin, beside a flagged price. */
-const ORDER_BOOK_BAIT_FLAG_REM = 1.25;
+/** `BaitFlag`'s or `MyOrderMark`'s icon and its margin, beside a price. */
+const ORDER_BOOK_PRICE_GLYPH_REM = 1.25;
 
 /** How long the widest Price and Quantity on screen are, as formatted. */
 export interface OrderBookFigureChars {
@@ -120,6 +120,8 @@ export interface OrderBookFigureChars {
   quantityChars: number;
   /** Some sell order on screen carries `BaitFlag` beside its price. */
   baitFlag: boolean;
+  /** Some order on screen is the pilot's own, with `MyOrderMark` beside its price. */
+  myOrder: boolean;
 }
 
 function figureRem(headerRem: number, chars: number, extraRem = 0): number {
@@ -139,7 +141,7 @@ function figureRem(headerRem: number, chars: number, extraRem = 0): number {
  */
 export function orderBookWidthsRem(
   visible: readonly MarketOrderColumnId[],
-  { priceChars, quantityChars, baitFlag }: OrderBookFigureChars
+  { priceChars, quantityChars, baitFlag, myOrder }: OrderBookFigureChars
 ): { roomy: number; cards: number } {
   let rest = ORDER_BOOK_FIXED_REM;
   for (const id of visible) {
@@ -149,7 +151,7 @@ export function orderBookWidthsRem(
         ? figureRem(
             ORDER_BOOK_COLUMN_REM.price,
             priceChars,
-            baitFlag ? ORDER_BOOK_BAIT_FLAG_REM : 0
+            (baitFlag ? ORDER_BOOK_PRICE_GLYPH_REM : 0) + (myOrder ? ORDER_BOOK_PRICE_GLYPH_REM : 0)
           )
         : id === 'quantity'
           ? figureRem(ORDER_BOOK_COLUMN_REM.quantity, quantityChars)
@@ -164,19 +166,23 @@ export function orderBookWidthsRem(
 
 /**
  * The widest Price and Quantity among the rows on screen, in characters as
- * the table prints them, and whether any price carries `BaitFlag`.
+ * the table prints them, and whether any price carries `BaitFlag` or
+ * `MyOrderMark`.
  */
 export function orderBookFigureChars(
   rows: readonly RegionOrder[],
-  bestSell: number | null
+  bestSell: number | null,
+  myOrderIds: ReadonlySet<number> = new Set()
 ): OrderBookFigureChars {
   let priceChars = 0;
   let quantityChars = 0;
   let baitFlag = false;
+  let myOrder = false;
   for (const order of rows) {
     priceChars = Math.max(priceChars, formatMarketIsk(order.price).length);
     quantityChars = Math.max(quantityChars, formatVolume(order.volume_remain).length);
     if (!order.is_buy_order && sellOutlierMultiple(order.price, bestSell) !== null) baitFlag = true;
+    if (myOrderIds.has(order.order_id)) myOrder = true;
   }
-  return { priceChars, quantityChars, baitFlag };
+  return { priceChars, quantityChars, baitFlag, myOrder };
 }

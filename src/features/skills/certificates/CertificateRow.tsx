@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -8,6 +9,7 @@ import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { formatCountdown } from '@/lib/duration';
 import { cx } from '@/lib/cx';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { ELITE, type CertificateRow as Row, type CertificateTime } from './certificatesModel';
 
 const GRADES = [1, 2, 3, 4, 5] as const;
@@ -72,6 +74,8 @@ export function CertificateRow({
   onAdd,
 }: CertificateRowProps) {
   const { t } = useTranslation();
+  const focusAfterCommit = useFocusAfterCommit();
+  const expanderRef = useRef<HTMLButtonElement>(null);
   const { certificate, grade, next, unplanned, alphaCapped, alphaReach } = row;
   const elite = grade === ELITE;
   const nextGrade = elite ? '' : t(`skills.certificates.grade.${grade + 1}`);
@@ -91,7 +95,18 @@ export function CertificateRow({
     action = <span className="text-text-dim">{t('skills.certificates.inPlan')}</span>;
   } else {
     action = (
-      <Button size="sm" onClick={onAdd ?? undefined} disabled={!onAdd}>
+      <Button
+        size="sm"
+        disabled={!onAdd}
+        onClick={
+          onAdd
+            ? () => {
+                onAdd();
+                focusAfterCommit(expanderRef);
+              }
+            : undefined
+        }
+      >
         {t('skills.certificates.add', { grade: nextGrade })}
       </Button>
     );
@@ -102,6 +117,7 @@ export function CertificateRow({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-3 py-2 sm:grid-cols-[minmax(0,1.3fr)_auto_minmax(0,1.4fr)_12rem]">
         {/* Every row opens, Elite included: the description is there for all. */}
         <button
+          ref={expanderRef}
           type="button"
           aria-expanded={expanded}
           aria-controls={panelId}

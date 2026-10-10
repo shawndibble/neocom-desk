@@ -1,4 +1,6 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { Button } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { PlanEntry } from '@/engine/types';
@@ -36,6 +38,9 @@ export function AddToPlanBar({
   onUndo,
 }: AddToPlanBarProps) {
   const { t } = useTranslation();
+  const focusAfterCommit = useFocusAfterCommit();
+  const addRef = useRef<HTMLButtonElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
   if (target.plans === undefined) return null;
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
@@ -45,14 +50,30 @@ export function AddToPlanBar({
             count: added.entries.length,
             plan: added.planName,
           })}
-          <button type="button" className={inlineLinkClassName} onClick={onUndo}>
+          <button
+            type="button"
+            className={inlineLinkClassName}
+            ref={undoRef}
+            onClick={() => {
+              onUndo();
+              focusAfterCommit(addRef);
+            }}
+          >
             {t('skills.fitCheck.addedToastUndo')}
           </button>
         </span>
       )}
       <TargetPlanPicker target={target} />
       {unplannedCount > 0 && (
-        <Button size="sm" variant="primary" onClick={onAdd}>
+        <Button
+          ref={addRef}
+          size="sm"
+          variant="primary"
+          onClick={() => {
+            onAdd();
+            focusAfterCommit(undoRef);
+          }}
+        >
           {target.plans.length === 0
             ? t('skills.fitCheck.createPlanAndAdd')
             : (addLabel ?? t('skills.fitCheck.addAllToPlan'))}

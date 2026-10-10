@@ -6,7 +6,7 @@
  * matters — otherwise a second row would inherit whatever the first one was
  * mid-typing.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 
@@ -21,6 +21,8 @@ interface MilestoneModalProps {
 export function MilestoneModal({ open, initialName, onClose, onSave }: MilestoneModalProps) {
   const { t } = useTranslation();
   const isRename = initialName !== undefined;
+  // Not `autoFocus`: that would focus the field before the Modal notes which element to give focus back to.
+  const nameRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(initialName ?? '');
   // Adjusted during render (react.dev "Adjusting state when a prop changes"),
   // like RemapMarkerModal's own `wasOpen` — an effect would commit the stale
@@ -43,11 +45,12 @@ export function MilestoneModal({ open, initialName, onClose, onSave }: Milestone
     <Modal
       open={open}
       onClose={onClose}
+      initialFocusRef={nameRef}
       title={isRename ? t('plans.milestone.renameTitle') : t('plans.milestone.addTitle')}
     >
       <div className="space-y-3 text-xs">
         <TextInput
-          autoFocus
+          ref={nameRef}
           size="sm"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

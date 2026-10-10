@@ -77,7 +77,8 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'date',
         header: t('wallet.date'),
-        className: 'whitespace-nowrap text-text-dim',
+        className: 'whitespace-nowrap text-text-dim max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
         // Date over time on a phone, freeing width for Description; one line from `sm` up.
         render: (entry) => {
           const { date, time } = splitTimestamp(new Date(entry.date), timeZone);
@@ -95,16 +96,18 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'refType',
         header: t('wallet.refType'),
-        className: 'whitespace-nowrap',
+        // Wraps onto two lines on a phone so Amount stays on screen; one line from `sm` up.
+        className: 'max-sm:px-1 sm:whitespace-nowrap',
+        headerClassName: 'max-sm:px-1',
         render: (entry) => humanizeRefType(entry.ref_type),
         sortValue: (entry) => humanizeRefType(entry.ref_type),
       },
       {
         id: 'description',
         header: t('wallet.description'),
-        // Wraps in its cell on a phone, where the table scrolls sideways rather than stretch.
-        className:
-          'max-sm:min-w-40 max-sm:max-w-64 max-sm:whitespace-normal [overflow-wrap:anywhere]',
+        // Wraps in its cell on a phone, capped so Amount stays inside the viewport.
+        className: 'max-sm:max-w-40 max-sm:whitespace-normal max-sm:px-1 [overflow-wrap:anywhere]',
+        headerClassName: 'max-sm:px-1',
         render: (entry) => {
           const transaction = linkFor(entry);
           return (
@@ -122,7 +125,8 @@ export function useJournalColumnsBuilder(): (
         id: 'amount',
         header: t('wallet.amount'),
         align: 'right',
-        className: 'tabular-nums',
+        className: 'tabular-nums max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
         cellClassName: (entry) => (entry.amount !== undefined ? iskToneClass(entry.amount) : ''),
         render: (entry) =>
           entry.amount !== undefined ? formatIsk(entry.amount, 2) : t('common.unknown'),

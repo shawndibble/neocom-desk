@@ -33,16 +33,28 @@ function renderAt(path: string) {
 describe('FittingCompare', () => {
   it('shows a remove control for a slot that failed to decode', async () => {
     renderAt('/ships/fittings/compare?f=not-a-real-code');
-    const removeButton = await screen.findByRole('button', { name: 'Remove' });
+    const removeButton = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     expect(removeButton.className).toContain('text-danger');
   });
 
   it('removes an error-only slot via its own Remove control', async () => {
     const user = userEvent.setup();
     renderAt('/ships/fittings/compare?f=not-a-real-code');
-    const removeButton = await screen.findByRole('button', { name: 'Remove' });
+    const removeButton = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     await user.click(removeButton);
     expect(await screen.findByText('Add a Fitting to start comparing.')).toBeInTheDocument();
+  });
+
+  it('moves focus on after Remove takes its column: the next Remove, then Compare with…', async () => {
+    const user = userEvent.setup();
+    renderAt('/ships/fittings/compare?f=bad-one&f=bad-two');
+    const [first] = await screen.findAllByRole('button', { name: /^Remove .* from comparison$/ });
+    await user.click(first);
+    const remaining = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
+    await vi.waitFor(() => expect(remaining).toHaveFocus());
+    await user.click(remaining);
+    const add = (await screen.findAllByRole('button', { name: 'Compare with…' }))[0];
+    await vi.waitFor(() => expect(add).toHaveFocus());
   });
 
   it('caps the page content at the shared max-w-6xl width', async () => {

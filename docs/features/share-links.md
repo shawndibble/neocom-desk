@@ -36,7 +36,7 @@ See also: `entities-share.md` (another author; key format, 7-day TTL and in-memo
 
 **Shared Appraisal**: StatChips hub at {percent}%, Sell total (accent), Buy total, volume, Generated, Expires. Columns Quantity, Item (sticky), Buy each, Sell each (phone hidden), Buy total, Sell total, Volume (phone hidden); sortable; missing price = dash; each-prices exact, totals `IskAmount`. Export CSV/XLSX/copy (`surface: 'appraisal-shared'`) only with rows. Invalid: "This link isn't valid". "Open Neocom Desk" -> `/market/appraisal?hub=<id>&<price percent param>&share=<id>` (`sharedAppraisalOpenInApp`); `useSharedAppraisalSeed` reads `?share=` once, strips it (replace), re-reads the share and pastes its text into the tab; a dead share seeds nothing.
 
-**Shared Fitting**: warning banner "Shown at every skill level V, with no clone"; fitting's own implants if any; viewer's own damage profile. Content: ship icon/name, `FittingRing`, `FittingStatsSections` (abyssal weather picker, retry), `FittingModuleList`. Buttons "Open in Neocom Desk" (to `/login`, stashing the editor path) and "Copy Fitting" (EFT; "Copied"/"Couldn't copy" for 2 s). "This link expires {date}" only via a stored link. Does not use `ShareShell`.
+**Shared Fitting**: warning banner "Shown at every skill level V, with no clone"; fitting's own implants if any; viewer's own damage profile. Content: ship icon/name, `FittingRing`, `FittingStatsSections` (abyssal weather picker, retry), `FittingModuleList`. Renders in `ShareShell` (`openInApp` = the editor path), so the brand and "Log in" + "Choose permissions…" sit at the top; no entry link at the foot. "Copy Fitting" (primary, header actions slot; EFT; "Copied"/"Couldn't copy" for 2 s). An "Expires" StatChip only via a stored link.
 
 ## Persistence and sync
 
@@ -82,7 +82,7 @@ No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading s
 - Only two share types; unknown ones show a generic message.
 - Reuse is per session; a reload or another device mints a second doc for identical content.
 - No revoke or list of own links.
-- `FittingShareView` duplicates `ShareShell`'s frame; permanent `/share/fitting?f=` embeds the fitting in the URL (capped) and never expires.
+- Permanent `/share/fitting?f=` embeds the fitting in the URL (capped) and never expires.
 
 ## Improvement ideas
 

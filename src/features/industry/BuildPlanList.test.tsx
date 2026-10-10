@@ -170,6 +170,43 @@ describe('BuildPlanList', () => {
     expect(within(tip).getByRole('row', { name: /Build/ })).toHaveTextContent('1,000,000 ISK');
     expect(within(tip).getByRole('row', { name: /Buy/ })).toHaveTextContent('1,500,000 ISK');
   });
+
+  it('labels each figure and gives the verdict tag its costs as an accessible name (#3344)', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            [
+              'a',
+              {
+                profit: -125_200,
+                verdict: 'build',
+                buildCost: 1_000_000,
+                buyCost: 1_500_000,
+                runs: 1,
+              },
+            ],
+          ])
+        }
+      />
+    );
+
+    const row = screen.getByText('Merlin run').closest('li') as HTMLElement;
+    for (const label of ['Profit', 'ISK/h', 'Margin', 'Verdict', 'Runs']) {
+      expect(within(row).getByText(`${label}:`, { selector: '.sr-only' })).toBeInTheDocument();
+    }
+    expect(within(row).getByRole('img', { name: /build.*1,000,000 ISK.*buy.*1,500,000 ISK/i }));
+  });
 });
 
 describe('BuildPlanList: compare mode (#453)', () => {
@@ -860,5 +897,77 @@ describe('BuildPlanList sort and owned tag', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
     const result = await screen.findByRole('button', { name: /Rifter/ });
     expect(within(result).queryByText('Owned')).not.toBeInTheDocument();
+  });
+});
+
+describe('BuildPlanList: "Fix location" figures (#3348)', () => {
+  const PLANS = [plan({ id: 'a', name: 'Merlin run' }), plan({ id: 'b', name: 'Astero' })];
+  const stat = (verdict: 'build' | 'fixLocation', profit: number) => ({
+    profit,
+    verdict,
+    runs: 1,
+    iskPerHour: 5,
+    marginPct: 10,
+  });
+
+  function renderStats(statsByPlanId: React.ComponentProps<typeof BuildPlanList>['statsByPlanId']) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={statsByPlanId}
+      />
+    );
+  }
+
+  const rowOf = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+  const cellOf = (row: HTMLElement, label: string) =>
+    within(row).getByText(`${label}:`, { selector: '.sr-only' }).parentElement as HTMLElement;
+
+  it('shows readable dim figures and a warning glyph, never opacity', () => {
+    renderStats(
+      new Map([
+        ['a', stat('fixLocation', 125_000)],
+        ['b', stat('build', 300_000)],
+      ])
+    );
+
+    const row = rowOf('Merlin run');
+    for (const label of ['Profit', 'ISK/h', 'Margin']) {
+      expect(cellOf(row, label)).not.toHaveClass('opacity-50');
+    }
+    expect(cellOf(row, 'Profit').querySelector('.text-text-dim')).not.toBeNull();
+    expect(cellOf(row, 'Profit').querySelector('svg')).not.toBeNull();
+    expect(
+      within(row).getByRole('img', { name: "Profit isn't real until the build location is fixed" })
+    ).toBeInTheDocument();
+    expect(within(row).getAllByText('Fix location').length).toBeGreaterThan(0);
+
+    expect(cellOf(rowOf('Astero'), 'Profit').querySelector('svg')).toBeNull();
+  });
+
+  it('sorts "Fix location" plans last by profit, in either direction', async () => {
+    const user = userEvent.setup();
+    renderStats(
+      new Map([
+        ['a', stat('fixLocation', 900_000)],
+        ['b', stat('build', 300_000)],
+      ])
+    );
+    const order = () =>
+      screen.getAllByRole('button', { name: /^(Merlin run|Astero)$/ }).map((b) => b.textContent);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Astero', 'Merlin run']);
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted descending' }));
+    expect(order()).toEqual(['Astero', 'Merlin run']);
   });
 });

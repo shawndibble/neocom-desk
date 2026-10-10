@@ -573,6 +573,13 @@ describe('search in the URL (issue #1306)', () => {
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets/7'));
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
+
+  it('puts focus back on the search box when Clear search removes itself (WCAG 2.4.3)', async () => {
+    renderAssets('/corp/assets/7?q=tri');
+    await screen.findByText('Tritanium');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Clear search' }));
+    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
+  });
 });
 
 describe('URL drill-down (issue #779)', () => {

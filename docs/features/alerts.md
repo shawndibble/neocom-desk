@@ -1,6 +1,6 @@
 # Alerts and notifications
 
-Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device has fired, device-wide, grouped by type. Distinct from Settings > Notifications (`src/features/notifications/NotificationsPanel.tsx`), which holds preferences. UNGATED (`src/app/routeScopes.ts:89`): Dexie only; rows were written by the Foreground Poller or a Web Push. Primary nav group, mobile tab (`navDestinations.ts:126`); global shortcut `A`.
+Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device has fired, device-wide, grouped by type. Distinct from Settings > Notifications (`src/features/notifications/NotificationsPanel.tsx`), which holds preferences. UNGATED (`src/app/routeScopes.ts:89`): Dexie only; rows were written by the Foreground Poller or a Web Push. Primary nav group but no rail row and no phone tab (`navDestinations.ts:126`); reached from the header bell and Ctrl K; global shortcut `A`.
 
 | Feature                                                           | Where                                                |
 | ----------------------------------------------------------------- | ---------------------------------------------------- |

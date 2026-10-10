@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, RowCaret, SearchInput, Spinner, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  focusRingInsetClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { findShips, type OwnedAsset, type ShipRow } from '@/engine/myShips';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -365,7 +369,7 @@ export function MyShipsView({
                     <button
                       type="button"
                       onClick={() => toggleSort(column)}
-                      className="inline-flex items-center gap-1 tracking-widest uppercase hover:text-text"
+                      className={`inline-flex items-center gap-1 tracking-widest uppercase hover:text-text ${focusRingClassName}`}
                     >
                       {t(`assets.myShips.columns.${column}`)}
                       <SortGlyph
@@ -394,10 +398,9 @@ export function MyShipsView({
                 .filter(Boolean)
                 .join(' › ');
               return (
-                <Link
+                <div
                   key={row.itemId}
                   role="row"
-                  to={hrefFor(row.locationId)}
                   className={`${ROW_GRID} group relative border-b border-line px-3 py-2 hover:bg-panel-2 ${tappableRowClassName}`}
                 >
                   <span
@@ -406,10 +409,13 @@ export function MyShipsView({
                   >
                     <TypeIcon typeId={row.typeId} size={32} width={24} height={24} />
                     <span className="min-w-0 break-words">
-                      <span className="font-semibold text-accent">
+                      <Link
+                        to={hrefFor(row.locationId)}
+                        className={`font-semibold text-accent after:absolute after:inset-0 ${focusRingInsetClassName}`}
+                      >
                         {state.data.typeNames.get(row.typeId) ??
                           t('assets.myShips.unknownType', { id: row.typeId })}
-                      </span>
+                      </Link>
                       {shipClass && (
                         <span className="text-xs text-text-dim max-sm:ml-2 sm:block">
                           {shipClass}
@@ -450,7 +456,7 @@ export function MyShipsView({
                   <span className="flex max-sm:absolute max-sm:top-3 max-sm:right-3">
                     <RowCaret />
                   </span>
-                </Link>
+                </div>
               );
             })}
           </div>

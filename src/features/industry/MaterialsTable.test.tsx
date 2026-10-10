@@ -467,6 +467,15 @@ describe('MaterialsTable on a phone', () => {
     window.matchMedia = realMatchMedia;
   });
 
+  it('shows a zero Have in the dim tone, not the faint decoration token (#3348)', () => {
+    render(<Harness initial={{ 34: { ownedQuantity: 0 } }} />);
+
+    const row = screen.getByText('Tritanium').closest('li')!;
+    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    expect(have).toHaveClass('text-text-dim');
+    expect(have).not.toHaveClass('text-text-faint');
+  });
+
   it('renders a ledger: the column header once per section, plain numbers on each row', () => {
     render(<Harness initial={{ 34: { ownedQuantity: 400 } }} />);
 

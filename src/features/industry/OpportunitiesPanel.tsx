@@ -701,7 +701,7 @@ export function OpportunitiesPanel({
       )}
       {manualRefreshOnly && (
         <>
-          <Button size="sm" onClick={refresh} disabled={loading}>
+          <Button size="sm" onClick={refresh} aria-disabled={loading || undefined}>
             {t('industry.opportunitiesRefresh')}
           </Button>
           <span className="text-xs text-text-dim max-md:sr-only">

@@ -286,6 +286,29 @@ describe('CompareDrawer', () => {
     expect(region.style.height).not.toBe('80vh');
   });
 
+  it('publishes its clearance and bottom space on the root, and removes both on unmount (WCAG 2.4.11)', async () => {
+    const user = userEvent.setup();
+    const rootStyle = document.documentElement.style;
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    const { unmount } = renderDrawer();
+    expect(rootStyle.getPropertyValue('--compare-drawer-clearance')).not.toBe('');
+    // Normal state: the page reserves everything the bar covers.
+    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toBe(
+      'var(--compare-drawer-clearance, 0px)'
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    await user.click(await screen.findByRole('button', { name: 'Expand' }));
+    // Expand covers the page: real space shrinks to the handle, not 80vh.
+    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toMatch(
+      /^calc\(\d+(\.\d+)?px \+ 0\.75rem\)$/
+    );
+
+    unmount();
+    expect(rootStyle.getPropertyValue('--compare-drawer-clearance')).toBe('');
+    expect(rootStyle.getPropertyValue('--compare-drawer-space')).toBe('');
+  });
+
   it('resizes on drag without disturbing the drawer’s open state', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A] }));
@@ -438,6 +461,42 @@ describe('CompareDrawer', () => {
       await user.click(await screen.findByRole('menuitem', { name: 'Clear all' }));
 
       expect(useCompareSet.getState().items).toEqual([]);
+    });
+
+    it('moves focus to the heading when the handle opens it, with the page behind inert until close', async () => {
+      narrowState.narrow = true;
+      const user = userEvent.setup();
+      act(() => useCompareSet.setState({ items: [ITEM_A] }));
+      const { container } = renderDrawer();
+      await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+      const region = await screen.findByRole('region', { name: 'Compare' });
+
+      expect(document.activeElement).toBe(
+        within(region).getByRole('heading', { name: 'Compare (1)' })
+      );
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+      expect(container.parentElement?.querySelector('[inert]')).not.toBeNull();
+
+      await user.click(within(region).getByRole('button', { name: 'Close' }));
+
+      expect(document.querySelector('[inert]')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Compare (1)' })).toHaveFocus();
+    });
+
+    it('a sheet opened from a Variations "Compare" click takes focus, so Escape closes it', async () => {
+      narrowState.narrow = true;
+      const user = userEvent.setup();
+      act(() => {
+        useCompareSet.setState({ items: [ITEM_A] });
+        useCompareSet.getState().openIn('prices');
+      });
+      renderDrawer();
+      const region = await screen.findByRole('region', { name: 'Compare' });
+      expect(region.contains(document.activeElement)).toBe(true);
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('region')).not.toBeInTheDocument();
     });
   });
 });

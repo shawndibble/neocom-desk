@@ -4,7 +4,7 @@
  * Bigger than a `StatChip` on purpose: these are what the pilot reads at a
  * glance and says in fleet chat, not small counts beside a title.
  */
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { formatDuration as formatTotalTime } from '@/lib/duration';
@@ -12,7 +12,7 @@ import type { SurveySummary } from '@/engine/survey/series';
 import { IskAmount, Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { formatLocalClock } from './localClock';
-import { useDoneAtLocal } from './surveyPref';
+import { useDoneAtClock, useDoneAtOverride } from './surveyPref';
 
 // Accent says it's pressable; no underline, since that reads as a link to
 // somewhere. The tooltip names what a press does.
@@ -53,10 +53,17 @@ function shortVolume(value: number, locale: string): string {
 
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const { t, i18n } = useTranslation();
-  const local = useDoneAtLocal((state) => state.value);
-  const setLocal = useDoneAtLocal((state) => state.setValue);
+  const clock = useDoneAtClock();
+  const local = clock === 'local';
+  const hydrateClock = useDoneAtOverride((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateClock();
+  }, [hydrateClock]);
+  const setClock = useDoneAtOverride((state) => state.setValue);
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
+  // Once the field is cleared, the time it was marked cleared; until then, the estimate.
+  const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
   // One row when the board is wide enough, else rows of three: never 4 + 2 or
   // 5 + 1. A finished survey has three tiles, so it is a single row at any width.
   const tileCount = summary.finished ? 3 : summary.iskLeft === null ? 5 : 6;
@@ -70,20 +77,18 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
         )}
         <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
         <Tile label={t('survey.statDone')} emphasis>
-          {summary.finished ? (
-            t('survey.finished')
-          ) : summary.etaAt === null ? (
+          {doneAt === null || clock === null ? (
             '–'
           ) : (
             <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
               <button
                 type="button"
                 className={toggleClassName}
-                onClick={() => void setLocal(!local)}
+                onClick={() => void setClock(local ? 'eve' : 'local')}
               >
                 {local
-                  ? formatLocalClock(summary.etaAt)
-                  : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
+                  ? formatLocalClock(doneAt)
+                  : t('survey.eveTime', { time: formatEveClock(doneAt) })}
               </button>
             </Tooltip>
           )}

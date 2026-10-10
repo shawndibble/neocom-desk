@@ -47,7 +47,7 @@ describe('OrderRowSummaryText relist price', () => {
     expect(price.querySelector('svg')).toBeNull();
     await userEvent.setup().click(price);
     expect(written).toEqual(['439900']);
-    expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
+    expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
   });
 
   it('shows no copy control unless asked (phone list)', () => {

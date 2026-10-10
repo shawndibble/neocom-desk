@@ -233,14 +233,18 @@ function FilterTrigger({
   activeCount,
   expanded,
   haspopup,
+  controls,
   onClick,
   size,
   showLabel,
 }: {
   activeCount: number;
-  /** All three omitted for a `PopoverTrigger` child, which Radix wires itself. */
+  /** All of these omitted for a `PopoverTrigger` child, which Radix wires itself. */
   expanded?: boolean;
+  /** Omitted for an inline toggle: it reveals a group, not a menu or dialog. */
   haspopup?: 'dialog' | 'true';
+  /** Id of the inline panel this button reveals. */
+  controls?: string;
   onClick?: () => void;
   size?: ComponentProps<typeof IconButton>['size'];
   showLabel?: boolean;
@@ -257,7 +261,12 @@ function FilterTrigger({
       // Spread, not passed as `undefined`: `asChild` merges the trigger's own
       // aria-expanded/onClick under the child's, so an explicit undefined
       // would erase them.
-      {...(onClick && { 'aria-haspopup': haspopup, 'aria-expanded': expanded, onClick })}
+      {...(onClick && {
+        ...(haspopup && { 'aria-haspopup': haspopup }),
+        'aria-expanded': expanded,
+        'aria-controls': controls,
+        onClick,
+      })}
     />
   );
   return (
@@ -308,6 +317,7 @@ function CollapsibleFilterRow({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const groupId = useId();
   return (
     <div className={cx('flex flex-col gap-2', className)}>
       <div
@@ -320,7 +330,7 @@ function CollapsibleFilterRow({
         <FilterTrigger
           activeCount={activeCount}
           expanded={open}
-          haspopup="true"
+          controls={open ? groupId : undefined}
           size={triggerSize}
           showLabel={triggerLabel}
           onClick={() => setOpen((was) => !was)}
@@ -328,6 +338,7 @@ function CollapsibleFilterRow({
       </div>
       {open && (
         <div
+          id={groupId}
           className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 p-2"
           aria-label={title ?? t('filters.title')}
           role="group"

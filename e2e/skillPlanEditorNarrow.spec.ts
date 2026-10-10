@@ -159,7 +159,7 @@ test('the entry priority pill is a full sm-tier tap target (36px) at 390px', asy
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  const pill = page.getByRole('button', { name: /^Priority for / });
+  const pill = page.getByRole('button', { name: /priority, /i });
   await expect(pill).toBeVisible();
 
   const box = await pill.evaluate((el) => {
@@ -184,7 +184,7 @@ test('the entry priority pill keeps its pointer-sized box at and above md (1280p
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(DESKTOP);
 
-  const pill = page.getByRole('button', { name: /^Priority for / });
+  const pill = page.getByRole('button', { name: /priority, /i });
   await expect(pill).toBeVisible();
 
   // The desktop row lays the pill out inline beside `sm`-tier controls, so a
@@ -214,7 +214,7 @@ test('adds a second accelerator on a phone, with a full sm-tier remove control (
   await addAccelerator.click();
   await addAccelerator.click();
 
-  const removeButtons = page.getByRole('button', { name: 'Remove accelerator' });
+  const removeButtons = page.getByRole('button', { name: /^Remove accelerator [0-9]/ });
   await expect(removeButtons).toHaveCount(2);
 
   const height = await removeButtons.first().evaluate((el) => el.getBoundingClientRect().height);
