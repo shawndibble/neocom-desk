@@ -37,6 +37,12 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
+import {
+  firstConnected,
+  useFocusAfterCommit,
+  type FocusCandidate,
+} from '@/lib/useFocusAfterCommit';
+import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
@@ -142,6 +148,7 @@ import {
   buildMergedRows,
   placeBandHeaders,
   pinnedInProgressEntry,
+  type MergedRow,
 } from './queueRows';
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
@@ -238,7 +245,7 @@ interface PlanEditorProps {
    * render rather than throwing.
    */
   headerActionsContainer?: HTMLElement | null;
-  onUpdate: (patch: PlanPatch) => void;
+  onUpdate: (patch: PlanPatch) => void | Promise<void>;
 }
 
 const NO_QUEUE: readonly SkillQueueEntry[] = [];
@@ -370,6 +377,13 @@ export function PlanEditor({
     skillTypeID: number;
     targetLevel: number;
   } | null>(null);
+  // Focus after a remove goes to a neighbour row, else this heading (WCAG 2.4.3).
+  const entriesHeadingRef = useRef<HTMLHeadingElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
+  // Worked out when the confirm opens, while the row's neighbours are known.
+  const removeFocusRef = useRef<readonly FocusCandidate[]>([]);
+  // A ref keeps `requestRemoveEntry` stable, so memoized rows don't re-render on every recompute.
+  const mergedRowsRef = useRef<readonly MergedRow[]>([]);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -457,8 +471,9 @@ export function PlanEditor({
     () => normalizeWhatIfSelection(plan.whatIfImplants),
     [plan.whatIfImplants]
   );
-  const setWhatIf = (selection: WhatIfImplantSelection): void =>
-    onUpdate({ whatIfImplants: selection });
+  const setWhatIf = (selection: WhatIfImplantSelection): void => {
+    void onUpdate({ whatIfImplants: selection });
+  };
   const jumpClones = useJumpCloneImplantSets(characterId);
   const matchedCloneId = matchingCloneId(whatIf, implants, jumpClones);
   const effectiveImplants = useMemo(() => whatIfImplants(whatIf, implants), [whatIf, implants]);
@@ -772,6 +787,9 @@ export function PlanEditor({
     () => buildMergedRows(plan.entries, plan.markers, entryQueue, rows),
     [plan.entries, plan.markers, entryQueue, rows]
   );
+  useEffect(() => {
+    mergedRowsRef.current = mergedRows;
+  });
   const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
     if (groupingMode === 'attributePair') {
       const placed = placeBandHeaders(
@@ -1382,13 +1400,22 @@ export function PlanEditor({
       setDropError(null);
       onUpdate(patch);
       const row = mergedRows.find((r) => r.id === rowId);
-      if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
+      if (row?.kind === 'prereq') {
+        confirmPromotion(row.step.skillTypeID, row.step.level);
+        // The prereq row becomes an entry row with this id, once the update lands.
+        focusAfterCommit(() => planRowHandle(`${row.step.skillTypeID}-${row.step.level}`));
+      }
     },
-    [editable, mergedRows, onUpdate, confirmPromotion, setDropError]
+    [editable, mergedRows, onUpdate, confirmPromotion, setDropError, focusAfterCommit]
   );
 
   /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
   const requestRemoveEntry = useCallback((skillTypeID: number, targetLevel: number) => {
+    removeFocusRef.current = neighbourFocusCandidates(
+      mergedRowsRef.current,
+      `${skillTypeID}-${targetLevel}`,
+      entriesHeadingRef
+    );
     setRemovingEntry({ skillTypeID, targetLevel });
   }, []);
 
@@ -1396,13 +1423,23 @@ export function PlanEditor({
   const confirmRemoveEntry = useCallback(() => {
     if (removingEntry === null) return;
     const { skillTypeID, targetLevel } = removingEntry;
-    onUpdate(removeEntry(editable, skillTypeID, targetLevel));
+    const landing = removeFocusRef.current;
+    const saved = onUpdate(removeEntry(editable, skillTypeID, targetLevel));
     setRemovingEntry(null);
-  }, [removingEntry, editable, onUpdate]);
+    // The save is async, so the row can outlive the dialog: once it has
+    // landed, move focus again (the dialog hands it back to the gone ⋮).
+    void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
+  }, [removingEntry, editable, onUpdate, focusAfterCommit]);
 
   const handleRemoveMarker = useCallback(
-    (markerIndex: number) => onUpdate(removeRemapMarker(editable, markerIndex)),
-    [editable, onUpdate]
+    (markerIndex: number) => {
+      const marker = mergedRows.find((r) => r.kind === 'marker' && r.markerIndex === markerIndex);
+      onUpdate(removeRemapMarker(editable, markerIndex));
+      focusAfterCommit(
+        ...neighbourFocusCandidates(mergedRows, marker?.id ?? '', entriesHeadingRef)
+      );
+    },
+    [editable, mergedRows, onUpdate, focusAfterCommit]
   );
 
   const handleSetPriority = useCallback(
@@ -2136,7 +2173,10 @@ export function PlanEditor({
                 <IconButton
                   icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
                   label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
-                  onClick={() => handleRemoveMilestone(status.milestone.id)}
+                  onClick={() => {
+                    handleRemoveMilestone(status.milestone.id);
+                    focusAfterCommit(entriesHeadingRef);
+                  }}
                   size="sm"
                   tone="danger"
                 />
@@ -2151,7 +2191,7 @@ export function PlanEditor({
 
         {!isDesktop && toolsPane}
 
-        <Panel title={t('plans.yourEntries')}>
+        <Panel title={t('plans.yourEntries')} headingRef={entriesHeadingRef}>
           <div className="space-y-3">
             <LiveQueueLead
               projection={queueProjection}
@@ -2541,6 +2581,7 @@ export function PlanEditor({
         open={removingEntry !== null}
         onClose={() => setRemovingEntry(null)}
         title={t('plans.removeEntryConfirmTitle')}
+        returnFocusFallback={() => firstConnected(removeFocusRef.current)}
       >
         <p className="text-xs text-text-dim">
           {t('plans.removeEntryConfirm', {

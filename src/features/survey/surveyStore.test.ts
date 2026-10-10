@@ -3,8 +3,11 @@ import {
   addSurveyScan,
   finishSurvey,
   loadSurvey,
+  MAX_LOCATION_NAME,
   MAX_SCAN_BY,
   MAX_SCAN_TEXT,
+  MAX_SURVEY_NOTES,
+  setSurveyInfo,
   setSurveyScanIgnored,
   setSurveyTax,
   startSurvey,
@@ -125,7 +128,10 @@ describe('loadSurvey', () => {
       ok: true,
       share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
     });
-    getDocs.mockResolvedValue(docs({ text: ROW(10, 4), at: 2000 }, { text: ROW(10, 5), at: 1000 }));
+    const scans = docs({ text: ROW(10, 4), at: 2000 }, { text: ROW(10, 5), at: 1000 });
+    getDocs.mockImplementation(async (ref: { path: string }) =>
+      ref.path.endsWith('surveyScans') ? scans : { docs: [] }
+    );
     const result = await loadSurvey('abc123XYZ');
     expect(getDocs).toHaveBeenCalledWith({ path: 'shares/abc123XYZ/surveyScans' });
     expect(result).toEqual({
@@ -133,6 +139,7 @@ describe('loadSurvey', () => {
       expiresAt: EXPIRES,
       owner: null,
       tax: null,
+      info: null,
       ignored: new Set(),
       scans: [
         { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
@@ -250,6 +257,95 @@ describe('moon tax', () => {
 
     getDocs.mockResolvedValue({ docs: [] });
     expect(await loadSurvey('abc123XYZ')).toMatchObject({ ok: true, tax: null });
+  });
+});
+
+describe('location and notes', () => {
+  it('stores the whole current info as a new doc, expiring with the survey', async () => {
+    await setSurveyInfo({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      location: { id: 60003760, name: 'Jita IV - Moon 4' },
+      notes: 'Dock at the refinery.',
+    });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyInfo' },
+      {
+        locationId: 60003760,
+        locationName: 'Jita IV - Moon 4',
+        notes: 'Dock at the refinery.',
+        createdAt: 'SERVER_TIME',
+        expiresAt: FakeTimestamp.fromMillis(EXPIRES),
+      }
+    );
+  });
+
+  it('leaves out what is empty, so clearing a field stores its absence', async () => {
+    await setSurveyInfo({ id: 'abc123XYZ', expiresAt: EXPIRES, location: null, notes: '  ' });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyInfo' },
+      { createdAt: 'SERVER_TIME', expiresAt: FakeTimestamp.fromMillis(EXPIRES) }
+    );
+  });
+
+  it('caps the notes and the location name at what the rules accept', async () => {
+    await setSurveyInfo({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      location: { id: 30000142, name: 'x'.repeat(MAX_LOCATION_NAME + 20) },
+      notes: 'n'.repeat(MAX_SURVEY_NOTES + 20),
+    });
+    const data = addDoc.mock.calls[0][1] as { locationName: string; notes: string };
+    expect(data.locationName).toHaveLength(MAX_LOCATION_NAME);
+    expect(data.notes).toHaveLength(MAX_SURVEY_NOTES);
+  });
+
+  const info = (data: Record<string, unknown>, at: number) => ({
+    data: () => ({ ...data, createdAt: FakeTimestamp.fromMillis(at) }),
+  });
+  const withInfo = (docs: unknown[]) => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockImplementation(async (ref: { path: string }) => ({
+      docs: ref.path.endsWith('surveyInfo') ? docs : [],
+    }));
+  };
+
+  it('loads the newest valid info with the survey', async () => {
+    withInfo([
+      info({ locationId: 1, locationName: 'Old', notes: 'old' }, 1000),
+      info({ locationId: 30000142, locationName: 'Jita', notes: 'Fleet on Mining.' }, 3000),
+      info({ locationId: -5, locationName: 'Bad' }, 4000),
+    ]);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({
+      ok: true,
+      info: { location: { id: 30000142, name: 'Jita' }, notes: 'Fleet on Mining.' },
+    });
+  });
+
+  it('reads a doc with only notes as no location, and an emptied doc as nothing set', async () => {
+    withInfo([info({ notes: 'Just notes' }, 1000)]);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({
+      info: { location: null, notes: 'Just notes' },
+    });
+    withInfo([info({ notes: 'Just notes' }, 1000), info({}, 2000)]);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ info: { location: null, notes: '' } });
+  });
+
+  it('is null when nothing was stored, or the read fails', async () => {
+    withInfo([]);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ ok: true, info: null });
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockImplementation(async (ref: { path: string }) => {
+      if (ref.path.endsWith('surveyInfo')) throw new Error('permission-denied');
+      return { docs: [] };
+    });
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ ok: true, info: null });
   });
 });
 

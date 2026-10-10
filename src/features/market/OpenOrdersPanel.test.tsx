@@ -925,7 +925,9 @@ describe('OpenOrdersPanel', () => {
       expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
       // The same count reaches screen readers through the status region (issue #3354).
       await waitFor(() =>
-        expect(screen.getByRole('status')).toHaveTextContent('2 of 3 orders match')
+        expect(
+          screen.getAllByRole('status').some((el) => el.textContent === '2 of 3 orders match')
+        ).toBe(true)
       );
 
       // Anchored to the chip's own accessible name (label + count), not the

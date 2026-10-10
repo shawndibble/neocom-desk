@@ -74,8 +74,7 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
   await subNav.getByRole('link', { name: 'Employment' }).click();
 
   await expect(historyTable.getByText('Past Corp')).toBeVisible();
-  // The shell's always-mounted notice regions are empty; a spinner has text.
-  await expect(page.getByRole('status').filter({ hasText: /\S/ })).toHaveCount(0);
+  await expect(page.getByRole('status', { name: 'Loading' })).toHaveCount(0);
 
   // Released before the test ends so the held request cannot outlive it.
   release();
