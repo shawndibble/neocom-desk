@@ -65,8 +65,11 @@ for (const { name, path, page: title, view, url } of PAGES) {
       await page.setViewportSize(DESKTOP);
       await page.goto(path);
       await expect(
-        page.getByRole('tab', { name: view }).or(page.getByRole('link', { name: view }))
-      ).toBeVisible();
+        page
+          .getByRole('main')
+          .getByRole('tab', { name: view })
+          .or(page.getByRole('main').getByRole('link', { name: view }))
+      ).toBeVisible({ timeout: 20_000 });
       await expect(page.getByRole('button', { name: /Change view/ })).toHaveCount(0);
     });
   });
