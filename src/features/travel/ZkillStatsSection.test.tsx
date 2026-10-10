@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PilotStats } from '@/lib/zkillboard';
@@ -159,5 +159,19 @@ describe('ZkillTopShips', () => {
     expect(within(items[0]).getByText('612 kills')).toBeInTheDocument();
     expect(within(items[1]).getByText('Sabre')).toBeInTheDocument();
     expect(within(items[1]).getByText('306 kills')).toBeInTheDocument();
+  });
+});
+
+describe('ZkillStatsSection retry focus', () => {
+  it('keeps focus in the section from Retry through loading', () => {
+    const { rerender } = render(
+      <ZkillStatsSection stats={{ kind: 'failed' }} onRetry={() => {}} />
+    );
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    act(() => retry.click());
+    rerender(<ZkillStatsSection stats={null} onRetry={() => {}} />);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toHaveAttribute('tabindex', '-1');
   });
 });

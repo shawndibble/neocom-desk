@@ -101,4 +101,28 @@ describe('SegmentedControl states', () => {
     await userEvent.click(screen.getByRole('button', { name: 'B' }));
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('explains a disabled segment in a tooltip, stays focusable, and never shows it pressed', async () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="View"
+        options={[
+          { value: 'a', label: 'A', disabled: true, disabledReason: 'No data yet' },
+          { value: 'b', label: 'B' },
+        ]}
+        value="a"
+        onChange={onChange}
+      />
+    );
+    const a = screen.getByRole('button', { name: 'A' });
+    expect(a).toHaveAttribute('aria-disabled', 'true');
+    expect(a).not.toBeDisabled();
+    expect(a).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'B' })).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.hover(a);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('No data yet');
+    await userEvent.click(a);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

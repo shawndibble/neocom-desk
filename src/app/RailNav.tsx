@@ -1,4 +1,5 @@
-import { Fragment, memo, useCallback, useId, useMemo, useState } from 'react';
+import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Tooltip } from '@/components/ui';
@@ -116,7 +117,7 @@ const RailPage = memo(function RailPage({
           to={page.path}
           label={label}
           locked={locked}
-          className={cx('flex-1', pageHidden && 'line-through opacity-60')}
+          className={cx('flex-1', editing && pageHidden && 'line-through')}
         />
         {shownViews.length > 0 && (
           <IconButton
@@ -150,7 +151,7 @@ const RailPage = memo(function RailPage({
                   active
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text-dim hover:text-text active:bg-panel-2',
-                  viewHidden && 'line-through opacity-60'
+                  editing && viewHidden && 'line-through'
                 )}
               >
                 <span className="min-w-0 truncate">{view.label}</span>
@@ -212,6 +213,10 @@ const RailNavBody = memo(function RailNavBody({
   const hiddenList = useHiddenNav((state) => state.value);
   const hidden = useMemo(() => new Set(hiddenList), [hiddenList]);
   const [editing, setEditing] = useState(false);
+  // Each button only exists in one mode, so pressing it unmounts it: hand focus to its counterpart.
+  const focusAfterCommit = useFocusAfterCommit();
+  const doneRef = useRef<HTMLButtonElement>(null);
+  const editRef = useRef<HTMLButtonElement>(null);
 
   // The one open section. Arriving on a new page resets it to that page,
   // which is what closes a section opened only to look inside.
@@ -251,7 +256,15 @@ const RailNavBody = memo(function RailNavBody({
         {editing && (
           <div className="mb-1 rounded-xs border border-accent-dim bg-panel-2 p-2 text-xs text-text">
             <p>{t('nav.editHint')}</p>
-            <Button size="sm" className="mt-2" onClick={() => setEditing(false)}>
+            <Button
+              ref={doneRef}
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                setEditing(false);
+                focusAfterCommit(editRef);
+              }}
+            >
               {t('nav.editDone')}
             </Button>
           </div>
@@ -314,7 +327,7 @@ const RailNavBody = memo(function RailNavBody({
                 {morePages.map((page) => {
                   const label = t(page.labelKey);
                   return (
-                    <li key={page.path} className="flex items-center gap-0.5 opacity-60">
+                    <li key={page.path} className="flex items-center gap-0.5">
                       <NavItem
                         to={page.path}
                         label={label}
@@ -337,8 +350,12 @@ const RailNavBody = memo(function RailNavBody({
         )}
         {!editing && (
           <button
+            ref={editRef}
             type="button"
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setEditing(true);
+              focusAfterCommit(doneRef);
+            }}
             className={cx(
               'mt-3 flex min-h-7 items-center gap-1.5 rounded-xs px-2 text-left text-[0.6875rem] text-text-dim hover:text-text',
               rowInteractiveClassName,

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { SyncStatus } from '@/sync';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { syncDisplayState } from './syncStatus';
 
 interface SyncErrorNoteProps {
@@ -15,16 +16,20 @@ interface SyncErrorNoteProps {
  * carrying its own `mb-4` so the absent case takes no space (as
  * `AuthFailureNotice` does).
  *
- * `role="status"`: it surfaces mid-session off a background event, so without
- * a live region a screen reader is never told — the form the planner's and
- * Settings' confirmations already use.
+ * It surfaces mid-session off a background event, so a screen reader needs a
+ * live region: an always-mounted `LiveStatus` is filled when the error appears
+ * (a region inserted together with its text is not reliably announced). The
+ * visible `<p>` carries no role, so the text is not read twice.
  */
 export function SyncErrorNote({ status, online }: SyncErrorNoteProps) {
   const { t } = useTranslation();
-  if (syncDisplayState(status, online) !== 'error') return null;
+  const failed = syncDisplayState(status, online) === 'error';
   return (
-    <p role="status" aria-live="polite" className="mb-4 text-[0.6875rem] text-danger uppercase">
-      {t('sync.errorNote')}
-    </p>
+    <>
+      <LiveStatus>{failed && t('sync.errorNote')}</LiveStatus>
+      {failed && (
+        <p className="mb-4 text-[0.6875rem] text-danger uppercase">{t('sync.errorNote')}</p>
+      )}
+    </>
   );
 }
