@@ -9,6 +9,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { reactErrorHandler } from '@sentry/react';
 import { App } from './app/App';
+import { installInputModality } from './app/inputModality';
 import { installTranslateGuard } from './app/translateGuard';
 import { recoverFromStaleBuild } from './app/staleBuildRecovery';
 import './i18n';
@@ -28,6 +29,7 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 installTranslateGuard();
+installInputModality();
 
 // React 19 reports render errors through these three root hooks rather than
 // through `window.onerror`: `onCaughtError` fires for anything `ErrorBoundary`

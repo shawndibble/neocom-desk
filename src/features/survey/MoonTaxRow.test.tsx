@@ -90,13 +90,13 @@ describe('MoonTaxRow', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /tax rate/i }).textContent).toBe('8%')
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Mining Tax' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
   });
 
   it('stays disabled until there is a name and a rate from 0 to 100, then creates the Payee', async () => {
     renderRow();
-    const open = screen.getByRole('button', { name: 'Open in Mining Tax' });
+    const open = screen.getByRole('button', { name: 'Manage Taxes' });
     expect((open as HTMLButtonElement).disabled).toBe(true);
     edit(/who gets the tax/i);
     type('Who gets the tax', 'New Corp');
@@ -162,7 +162,7 @@ describe('MoonTaxReadout', () => {
     expect(screen.getByText('8%')).toBeTruthy();
     expect(screen.getByText('Moon Corp').className).not.toContain('text-accent');
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Manage moon taxes' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Manage Taxes' }).getAttribute('href')).toBe(
       '/mining/tax'
     );
   });

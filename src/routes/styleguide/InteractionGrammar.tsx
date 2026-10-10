@@ -27,6 +27,7 @@ import {
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
 import {
+  activeOptionClassName,
   focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -301,6 +302,16 @@ export function InteractionGrammar() {
               <a href="#" className={inlineLinkClassName}>
                 {k('samples.inlineLink')}
               </a>
+            </Cue>
+            <Cue rule={k('rules.stateHighlighted')} note={k('notes.highlighted')}>
+              <span
+                className={cx(
+                  'rounded-xs bg-panel-2 px-2 py-1.5 text-sm text-text',
+                  activeOptionClassName
+                )}
+              >
+                {k('samples.option')}
+              </span>
             </Cue>
             <Cue rule={k('rules.stateDisabled')} note={k('notes.disabled')}>
               <Button disabled>{k('samples.disabled')}</Button>

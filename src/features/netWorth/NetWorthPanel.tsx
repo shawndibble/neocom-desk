@@ -115,6 +115,7 @@ function LayerPicker({
   const selected = useMemo(() => new Set(shown), [shown]);
   return (
     <MultiSelect
+      label={t('wallet.netWorth.layersNoun')}
       trigger={
         <Button
           size="md"

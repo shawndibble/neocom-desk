@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, ReauthBanner } from '@/components/ui';
-import { useAuthFailure } from '@/stores/authFailure';
+import { Button, LiveStatus, ReauthBanner } from '@/components/ui';
+import { useAuthFailure, type AuthFailure } from '@/stores/authFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
@@ -119,19 +119,42 @@ export function AuthFailureNotice() {
 
   const { pathname } = useLocation();
 
-  if (failure?.kind !== 'request' || failure.characterId !== activeCharacterId) return null;
   // The page shows its own banner for this refusal; two login buttons would stack.
-  if (pageOwnsReauth(pathname, failure.endpointId)) return null;
+  const shown =
+    failure?.kind === 'request' &&
+    failure.characterId === activeCharacterId &&
+    !pageOwnsReauth(pathname, failure.endpointId)
+      ? failure
+      : null;
+  const hint = character
+    ? t('reauth.staleGrantHintNamed', { character: character.name })
+    : t('reauth.staleGrantHint');
 
+  // The region stays mounted (empty) and fills when the notice appears. The
+  // visible block holds buttons, so it is neither `aria-hidden` nor a live region.
   return (
-    <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
+    <>
+      <LiveStatus>{shown && `${t('reauth.staleGrantTitle')}. ${hint}`}</LiveStatus>
+      {shown && <AuthFailureBlock failure={shown} hint={hint} onDismiss={dismiss} />}
+    </>
+  );
+}
+
+function AuthFailureBlock({
+  failure,
+  hint,
+  onDismiss,
+}: {
+  failure: Pick<AuthFailure, 'characterId' | 'endpointId'>;
+  hint: string;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
       <ReauthBanner
         title={t('reauth.staleGrantTitle')}
-        hint={
-          character
-            ? t('reauth.staleGrantHintNamed', { character: character.name })
-            : t('reauth.staleGrantHint')
-        }
+        hint={hint}
         actionLabel={t('reauth.staleGrantAction')}
         // The Permission behind the refused request, when it is known. A
         // refusal for a scope the grant never held (a mail send on a token that
@@ -148,7 +171,7 @@ export function AuthFailureNotice() {
         variant="ghost"
       />
       <div className="pb-2">
-        <Button size="sm" onClick={dismiss}>
+        <Button size="sm" onClick={onDismiss}>
           {t('reauth.dismiss')}
         </Button>
       </div>

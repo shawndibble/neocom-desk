@@ -358,6 +358,35 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // A Survey's location and notes (src/features/survey/surveyStore.ts): where
+      // the fleet is mining (a solar system, station or structure id, with its
+      // name, since a visitor can't resolve one) and the starter's notes. One
+      // create-only doc per change carrying the whole current info, the newest
+      // counting; a field left out is cleared. Same sign-in, owner and expiry
+      // rules as the moon tax. The client caps by characters (MAX_LOCATION_NAME, MAX_SURVEY_NOTES); these allow 4x that so multibyte text is never refused.
+      match /surveyInfo/{infoId} {
+        allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
+        allow create: if request.auth != null
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(['locationId', 'locationName', 'notes', 'createdAt', 'expiresAt'])
+          && request.resource.data.keys().hasAll(['createdAt', 'expiresAt'])
+          && ('locationId' in request.resource.data) == ('locationName' in request.resource.data)
+          && (!('locationId' in request.resource.data)
+            || (request.resource.data.locationId is int
+              && request.resource.data.locationId > 0
+              && request.resource.data.locationName is string
+              && request.resource.data.locationName.size() > 0
+              && request.resource.data.locationName.size() <= 480))
+          && (!('notes' in request.resource.data)
+            || (request.resource.data.notes is string
+              && request.resource.data.notes.size() <= 4000))
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt
+            == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
+        allow update, delete: if false;
+      }
+
       // A Survey's ignored scans (src/features/survey/surveyStore.ts): the
       // owner sets a bad paste aside, and the survey's totals then leave it
       // out. One create-only doc per change, the newest for a `scanId`
