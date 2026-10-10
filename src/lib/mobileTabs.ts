@@ -45,9 +45,9 @@ export const MOBILE_TAB_COUNT = 4;
 /** What the bar held before it was settable, so nobody's phone moves unasked. */
 export const DEFAULT_MOBILE_TABS: readonly MobileTabPath[] = [
   '/overview',
-  '/alerts',
   '/skills',
   '/industry',
+  '/market',
 ];
 
 /** `nav.*` i18n key per path — the one name each destination goes by, read by the rail, the bar, the sheet and the picker. */

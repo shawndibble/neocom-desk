@@ -414,7 +414,6 @@ export const Layout = memo(function Layout() {
               to={path}
               label={t(NAV_LABEL_KEYS[path])}
               locked={locked.has(path)}
-              badge={path === '/alerts' ? unreadAlerts : undefined}
               presentation="tab"
             />
           ))}
@@ -453,7 +452,6 @@ export const Layout = memo(function Layout() {
             onClose={() => setMoreOpen(false)}
             locked={locked}
             tabs={tabs}
-            unreadAlerts={unreadAlerts}
             renderCharacterLink={(originPath) => (
               <CharacterFooterLink
                 activeCharacter={activeCharacter}
