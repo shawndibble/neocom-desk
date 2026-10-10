@@ -7,12 +7,12 @@ import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
 import {
-  Button,
   EveSsoButton,
   DataAgeBadge,
   LogoMark,
   Modal,
   Panel,
+  plainTextActionClassName,
   SEVERITY_TEXT,
   SeverityIcon,
   StatChip,
@@ -681,9 +681,9 @@ const FOOTER_LINK = cx(
 function CustomizeLink({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
   return (
-    <Button size="sm" onClick={onClick}>
+    <button type="button" className={plainTextActionClassName()} onClick={onClick}>
       {t('permissions.customize.linkLabel')}
-    </Button>
+    </button>
   );
 }
 

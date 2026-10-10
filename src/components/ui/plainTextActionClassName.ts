@@ -10,11 +10,12 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
  * uppercase header action (`textActionClassName`).
  *
  * Like `textActionClassName`, a class helper so it lands on a `<button>` and a
- * router `Link` alike; `min-h-11` is the 44px touch tier below `md`.
+ * router `Link` alike. It carries no `min-h-11`: it sits right under the login
+ * image, and a 44px box would push it away from the button it belongs to.
  */
 export function plainTextActionClassName(extra = ''): string {
   return cx(
-    'inline-flex min-h-11 items-center rounded-xs text-xs font-medium text-text underline decoration-1 underline-offset-2 hover:decoration-2 active:text-text/75 md:min-h-0',
+    'inline-flex items-center rounded-xs text-xs font-medium text-text underline decoration-1 underline-offset-2 hover:decoration-2 active:text-text/75',
     interactiveClassName,
     focusRingClassName,
     disabledClassName,
