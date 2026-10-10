@@ -244,7 +244,7 @@ export function ImportClipboardDialog({
 
         {preview && (
           <div className="space-y-2 border-t border-line pt-2 text-xs">
-            <p className="font-semibold text-text-dim uppercase">
+            <p className="text-xs font-semibold tracking-widest text-text-dim uppercase">
               {t(IMPORT_MODE_KEYS[preview.mode])}
               {preview.planName ? ` — ${preview.planName}` : ''}
             </p>
@@ -254,7 +254,7 @@ export function ImportClipboardDialog({
             ) : (
               <>
                 <div>
-                  <p className="font-semibold text-text-dim uppercase">
+                  <p className="text-xs font-semibold tracking-widest text-text-dim uppercase">
                     {t('plans.importPreview')}
                   </p>
                   {preview.entries.length === 0 ? (
@@ -285,7 +285,7 @@ export function ImportClipboardDialog({
 
                 {preview.warnings.length > 0 && (
                   <div>
-                    <p className="font-semibold text-warning uppercase">
+                    <p className="text-xs font-semibold tracking-widest text-warning uppercase">
                       {t('plans.importWarnings')}
                     </p>
                     <ul className="mt-1">
@@ -298,7 +298,9 @@ export function ImportClipboardDialog({
 
                 {preview.errors.length > 0 && (
                   <div>
-                    <p className="font-semibold text-danger uppercase">{t('plans.importErrors')}</p>
+                    <p className="text-xs font-semibold tracking-widest text-danger uppercase">
+                      {t('plans.importErrors')}
+                    </p>
                     <ul className="mt-1">
                       {preview.errors.map((err) => (
                         <li key={`${err.line}-${err.text}`}>

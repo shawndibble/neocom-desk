@@ -24,7 +24,7 @@ interface FittingLoadCardProps {
 function WarningList({ title, lines }: { title: string; lines: string[] }) {
   return (
     <div className="rounded-xs border border-line bg-panel-2 p-2">
-      <p className="mb-1 text-xs font-semibold text-text-dim uppercase">{title}</p>
+      <p className="mb-1 text-xs font-semibold tracking-widest text-text-dim uppercase">{title}</p>
       <ul className="space-y-1 text-xs text-text-dim">
         {lines.map((line, index) => (
           <li key={index}>{line}</li>
@@ -199,7 +199,7 @@ export function FittingLoadCard({
 
           {xmlList && (
             <div className="rounded-xs border border-line bg-panel-2 p-2">
-              <p className="mb-1 text-xs font-semibold text-text-dim uppercase">
+              <p className="mb-1 text-xs font-semibold tracking-widest text-text-dim uppercase">
                 {t('fittings.load.xml.listTitle')}
               </p>
               <p className="mb-2 text-xs text-text-dim">{t('fittings.load.xml.listNotSaved')}</p>
