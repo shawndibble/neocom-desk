@@ -10370,6 +10370,14 @@
       "status": "Status",
       "remove": "Remove from list"
     },
+    "dialog": {
+      "menuItem": "Set stock target…",
+      "title": "Stock target for {{name}}",
+      "list": "Stock list",
+      "newList": "New list…",
+      "quantity": "Keep on hand",
+      "remove": "Remove from list"
+    },
     "builder": {
       "canBuild": "You can build now · {{count}}",
       "canBuildLabel": "Short items you hold a blueprint for",
