@@ -44,13 +44,13 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-fittings.read_fittings.v1': 'in-game fittings',
 };
 
-/** The Base Grant scopes that are writes, not reads — their disclosure goes in its own fine-print line, not the "read-only access" sentence, which it would otherwise contradict. */
+/** The Base Grant scopes that are writes, not reads — their disclosure goes in the "Five writes" trust card, not the read sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
-  'esi-mail.organize_mail.v1': 'marks it read in EVE',
-  'esi-calendar.respond_calendar_events.v1': 'sends that response to EVE',
-  'esi-mail.send_mail.v1': 'sends it through your EVE account',
-  'esi-fittings.write_fittings.v1': 'creates or replaces your in-game fitting',
-  'esi-ui.write_waypoint.v1': 'autopilot waypoints in the EVE client',
+  'esi-mail.organize_mail.v1': 'flags it as read in EVE',
+  'esi-calendar.respond_calendar_events.v1': 'sends your response',
+  'esi-mail.send_mail.v1': 'goes out through your account',
+  'esi-fittings.write_fittings.v1': 'recreates it on the game',
+  'esi-ui.write_waypoint.v1': 'replaces your autopilot waypoints in the client',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = {
@@ -147,11 +147,11 @@ describe('Login', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows real screenshots, each with alt text, lazily loaded', async () => {
+  it('shows screenshots, each with alt text, lazily loaded', async () => {
     renderLogin();
     const gallery = within(await screen.findByRole('region', { name: /see it in action/i }));
     const images = gallery.getAllByRole('img');
-    expect(images).toHaveLength(9);
+    expect(images).toHaveLength(10);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -197,8 +197,9 @@ describe('Login', () => {
       'Clones',
       'Industry',
       'Market',
-      'Market Orders',
-      'Wallet & LP',
+      'Open Orders',
+      'Wallet',
+      'Travel',
       'Assets',
       'Planetary Industry',
       'Mining',
@@ -235,14 +236,14 @@ describe('Login', () => {
     for (const label of ['Next deadline', 'Training now', 'Wallet']) {
       expect(preview.getByText(label)).toBeInTheDocument();
     }
-    expect(preview.getByText('4 colonies end together')).toBeInTheDocument();
+    expect(preview.getByText('Next industry job finishes')).toBeInTheDocument();
 
     // Open orders: counts, not rows — the one rule the redesign turns on.
     expect(preview.getByText('Open orders')).toBeInTheDocument();
-    expect(preview.getByText('27 need work')).toBeInTheDocument();
+    expect(preview.getByText('26 need work')).toBeInTheDocument();
     for (const [count, label] of [
-      ['21', 'Undercut'],
-      ['4', 'Outbid'],
+      ['19', 'Undercut'],
+      ['5', 'Outbid'],
       ['2', 'Relist'],
     ]) {
       expect(preview.getByText(label)).toBeInTheDocument();
@@ -251,7 +252,7 @@ describe('Login', () => {
 
     // Alerts are folded to a line rather than given a card, as on a phone.
     expect(preview.getByText('Alerts')).toBeInTheDocument();
-    expect(preview.getByText('70 unread')).toBeInTheDocument();
+    expect(preview.getByText('13 unread')).toBeInTheDocument();
   });
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
@@ -290,6 +291,17 @@ describe('Login', () => {
     }
   });
 
+  it('links the permissions note to the privacy policy', async () => {
+    renderLogin();
+    const trust = within(
+      await screen.findByRole('region', { name: /it writes only when you act/i })
+    );
+    expect(trust.getByRole('link', { name: /privacy policy/i })).toHaveAttribute(
+      'href',
+      '/privacy.html'
+    );
+  });
+
   it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
     const { container } = renderLogin();
     await screen.findByRole('group', { name: /logged-in view/i });
@@ -298,7 +310,7 @@ describe('Login', () => {
     );
   });
 
-  it('discloses each write scope in its own fine-print line, not the read sentence', async () => {
+  it('discloses each write scope in the trust card, not the read sentence', async () => {
     renderLogin();
     await screen.findByRole('heading', { name: /it writes only when you act/i });
 

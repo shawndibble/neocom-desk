@@ -3201,8 +3201,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
-    "writeExceptions": "It also asks for five permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client; and setting a route's waypoints in game replaces your autopilot waypoints in the EVE client. Nothing else in the app writes to EVE.",
+    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, the ship you are flying, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
     "eyebrow": "Free · Open source · Runs on your device",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — logged-in view",
@@ -3236,10 +3235,14 @@
       }
     },
     "screenshotsHeading": "See it in action",
-    "screenshotsLead": "Real screens from a real pilot. The same app runs on a desktop or installed on your phone.",
+    "screenshotsLead": "Screens from the app, filled with sample data. The same app runs on a desktop or installed on your phone.",
     "screenshotsPhoneHeading": "On your phone",
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
+      "overview": {
+        "alt": "A character’s Overview board on a desktop: next deadline, training, wallet, open orders, mining tax, contracts, industry jobs and what is coming up, beside the alerts column.",
+        "caption": "One board for what needs you next"
+      },
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
         "caption": "Every order explains what it is losing to"
@@ -3249,11 +3252,11 @@
         "caption": "Build plans with profit after fees"
       },
       "lpStore": {
-        "alt": "The CONCORD loyalty store ranked by ISK per LP, with one offer’s net profit broken down.",
+        "alt": "A faction loyalty store ranked by ISK per LP, with one offer’s net profit broken down.",
         "caption": "LP offers ranked by ISK per LP"
       },
       "calendar": {
-        "alt": "The in-game calendar by month, beside a list of upcoming events and their RSVP state.",
+        "alt": "The in-game calendar by month, beside a list of what is coming up: events, industry jobs and skill queue finishes.",
         "caption": "The in-game calendar, outside the game"
       },
       "contracts": {
@@ -3322,7 +3325,7 @@
       },
       "miningTax": {
         "name": "Mining",
-        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching. A Survey tab turns pasted Survey Scanner results into field progress, pace and a finish time you can share with your fleet by link.",
         "tag": "Ledger"
       },
       "planetary": {
@@ -3330,24 +3333,29 @@
         "desc": "Colonies, extraction timers and idle warnings, a chain planner that fits pins against CPU and powergrid, and a planner that shows what each colony could earn by tuning or rebuilding it.",
         "tag": "Planning"
       },
+      "travel": {
+        "name": "Travel",
+        "desc": "Route Safety lists every system on a stargate route with its security, region and the last hour of jumps and kills, and can route through Thera or Turnur, jump bridges or a jump drive. Pilot Lookup sizes up a pilot, a Local list or a D-Scan from zKillboard.",
+        "tag": "No grant needed"
+      },
       "market": {
         "name": "Market",
-        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, an appraisal of pasted items or fits net of fees, and Hauling Opportunities ranking routes by expected profit. Built on public price data, so it works whatever you did or didn't grant.",
+        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, an appraisal of pasted items or fits net of fees, Hauling Opportunities ranking routes by expected profit, and an LP Store that ranks offers by what they are worth at your hub. Built on public price data, so it works whatever you did or didn’t grant.",
         "tag": "No scope needed"
       },
       "orders": {
-        "name": "Market Orders",
+        "name": "Open Orders",
         "desc": "Your open orders grouped by what is wrong with them, with the relist floor, the undercut that caused it, and the better exits — for every character at once.",
         "tag": "Trading"
       },
       "walletOrders": {
-        "name": "Wallet & LP",
-        "desc": "Balance, journal and transaction history, plus a loyalty store that ranks offers by what they are worth at your hub.",
+        "name": "Wallet",
+        "desc": "Your balance charted over time, the journal behind it, and your loyalty point totals by corporation. Fills and the LP Store live under Market.",
         "tag": "Read-only"
       },
       "assets": {
         "name": "Assets",
-        "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names.",
+        "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names, and a Move tab that plans a haul of what you pick.",
         "tag": "Read-only"
       },
       "contracts": {
@@ -3387,11 +3395,11 @@
     },
     "bottomCtaHeading": "Undock into your dashboard.",
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
-    "footerOffline": "Installable PWA",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",
-    "footerDiscord": "Discord"
+    "footerDiscord": "Discord",
+    "permissionsPrivacy": "How your data is stored and deleted:"
   },
   "callback": {
     "completing": "Completing login…",

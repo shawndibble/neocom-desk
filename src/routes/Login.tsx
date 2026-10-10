@@ -20,7 +20,11 @@ import {
 } from '@/components/ui';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  inlineLinkClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
   AllCharacters,
@@ -34,6 +38,7 @@ import {
   MailInbox,
   Market,
   MoonMining,
+  NavTravel,
   Notifications,
   Offline,
   OpenSource,
@@ -120,6 +125,7 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
       { icon: Ships, key: 'ships' },
       { icon: MoonMining, key: 'miningTax' },
       { icon: Planetary, key: 'planetary' },
+      { icon: NavTravel, key: 'travel' },
     ],
   },
   {
@@ -164,6 +170,7 @@ function screenshotSrc(shot: Screenshot): string {
 }
 
 const DESKTOP_SCREENSHOTS: Screenshot[] = [
+  { file: 'desktop-overview', key: 'overview', size: DESKTOP_SIZE },
   { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
   { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
   { file: 'desktop-lp-store', key: 'lpStore', size: DESKTOP_SIZE },
@@ -193,9 +200,9 @@ const TRUST: LandingRow[] = [
 /**
  * Sample values for the hero preview only — never real character data.
  *
- * The figures are the approved board mockup's own (`design/overview-triage`,
- * tagged), so the landing page and the design that shipped tell one story: a
- * reset run as the next deadline, 27 orders needing work, 70 unread alerts.
+ * The figures are the gallery's own Overview capture (`desktop-overview`), so
+ * the hero and the screenshots tell one story: an industry job finishing in
+ * 1h 59m as the next deadline, 26 orders needing work, 13 unread alerts.
  */
 const PREVIEW = {
   name: 'Aurelia Vex',
@@ -206,21 +213,20 @@ const PREVIEW = {
   // line names the skill alone (Overview.tsx reads catalog skill names,
   // never a level-suffixed one) — matching that exactly, not just its shape.
   trainingSkill: 'Gunnery',
-  /** The soonest clock on the board. A colony reset run, as on the mockup. */
-  deadlineSeconds: 3 * 3600 + 12 * 60,
-  deadlineColonies: 4,
+  /** The soonest clock on the board: the next industry job to finish, as in the capture. */
+  deadlineSeconds: 3600 + 59 * 60,
   trainingSeconds: 86_400 + 4 * 3600 + 20 * 60,
   queued: 6,
   orders: {
-    needWork: 27,
-    undercut: 21,
-    outbid: 4,
+    needWork: 26,
+    undercut: 19,
+    outbid: 5,
     relist: 2,
-    belowFloor: 2,
+    belowFloor: 1,
     used: 24,
     slots: 41,
   },
-  alerts: 70,
+  alerts: 13,
 };
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
@@ -368,9 +374,7 @@ export function Login() {
                     >
                       {formatCountdown(PREVIEW.deadlineSeconds)}
                     </p>
-                    <p className="truncate text-xs text-text-dim">
-                      {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
-                    </p>
+                    <p className="truncate text-xs text-text-dim">{t('overview.board.nextJob')}</p>
                   </PreviewCell>
 
                   <PreviewCell label={t('overview.board.trainingNow')}>
@@ -564,7 +568,12 @@ export function Login() {
           wall of 11px text nobody read.
         */}
           <p className="mt-6 max-w-3xl text-sm text-text-dim">{t('login.permissionsHint')}</p>
-          <p className="mt-2 max-w-3xl text-sm text-text-dim">{t('login.writeExceptions')}</p>
+          <p className="mt-2 max-w-3xl text-sm text-text-dim">
+            {t('login.permissionsPrivacy')}{' '}
+            <a href="/privacy.html" className={inlineLinkClassName}>
+              {t('login.footerPrivacy')}
+            </a>
+          </p>
         </LandingSection>
 
         <section className="border-t border-line px-6 py-14 text-center">
@@ -585,7 +594,6 @@ export function Login() {
       </main>
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
-        <span>{t('login.footerOffline')}</span>
         <ExternalLink href={REPO_URL} variant="quiet">
           {t('login.footerOpenSource')}
         </ExternalLink>
