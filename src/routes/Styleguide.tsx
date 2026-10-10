@@ -37,7 +37,9 @@ import {
   Spinner,
   StatChip,
   StatChips,
+  TabPanel,
   Tabs,
+  useTabsId,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -160,6 +162,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function Styleguide() {
   const { t } = useTranslation();
   const [tab, setTab] = useState('open');
+  const tabsId = useTabsId();
   const [chip, setChip] = useState<string | null>('skills');
   const [barFilter, setBarFilter] = useState({
     text: '',
@@ -289,6 +292,7 @@ export function Styleguide() {
       <Section title="Tabs">
         <Panel padded={false}>
           <Tabs
+            tabsId={tabsId}
             label="Orders"
             tabs={[
               { id: 'open', label: 'Open orders' },
@@ -299,7 +303,9 @@ export function Styleguide() {
             onChange={setTab}
             className="px-2"
           />
-          <p className="p-3 text-sm text-text-dim">Active tab: {tab}</p>
+          <TabPanel tabsId={tabsId} tabId={tab}>
+            <p className="p-3 text-sm text-text-dim">Active tab: {tab}</p>
+          </TabPanel>
         </Panel>
       </Section>
 

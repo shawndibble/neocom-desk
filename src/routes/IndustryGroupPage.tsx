@@ -3,10 +3,14 @@ import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
-import { Spinner, Toast, useTimedToast } from '@/components/ui';
+import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
-import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
+import {
+  INDUSTRY_TABS_ID,
+  industryTabHref,
+  type IndustryTab,
+} from '@/features/industry/industryTabs';
 import {
   buildGroupsFor,
   withGroupAutoBuildDefault,
@@ -165,28 +169,30 @@ export function IndustryGroupPage() {
           blueprintsNeedsReauth={blueprintsNeedsReauth}
         />
 
-        {!catalog ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : (
-          <BuildGroupPanel
-            key={group.id}
-            group={group}
-            plans={plans}
-            catalog={catalog}
-            pi={pi}
-            ownedBlueprints={ownedBlueprints}
-            modifiers={modifiers}
-            pricingInputs={pricingInputs}
-            ownedStockSnapshot={ownedStockSnapshot}
-            onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
-            onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
-            onAutoBuild={(options) => handleAutoBuildGroup(options)}
-            onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
-            onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
-          />
-        )}
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans">
+          {!catalog ? (
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : (
+            <BuildGroupPanel
+              key={group.id}
+              group={group}
+              plans={plans}
+              catalog={catalog}
+              pi={pi}
+              ownedBlueprints={ownedBlueprints}
+              modifiers={modifiers}
+              pricingInputs={pricingInputs}
+              ownedStockSnapshot={ownedStockSnapshot}
+              onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
+              onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
+              onAutoBuild={(options) => handleAutoBuildGroup(options)}
+              onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
+              onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+            />
+          )}
+        </TabPanel>
       </div>
       {pasteNote && <Toast message={pasteNote} />}
     </ItemActionsProvider>
