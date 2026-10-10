@@ -2351,7 +2351,8 @@
       "move": "Move reactions to {{system}} (lowsec)",
       "chooseLocation": "Choose location…",
       "setupRule": "Reactions can't run in highsec. The plan's profit is struck through until this is lowsec or nullsec.",
-      "fixLocationTag": "Fix location"
+      "fixLocationTag": "Fix location",
+      "profitNotReal": "Profit isn't real until the build location is fixed"
     },
     "reactionLocationNotSet": "No reaction location set",
     "ownedStockScopeLabel": "Owned Material Source",
