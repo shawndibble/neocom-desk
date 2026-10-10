@@ -603,9 +603,10 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
+    // A Toast renders its text twice (visible copy + live region, filled a tick later).
     expect(
-      await screen.findByText('1 blueprint left out — buy it by contract')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('1 blueprint left out — buy it by contract')).length
+    ).toBeGreaterThan(0);
   });
 
   it('surfaces a denied clipboard instead of failing silently', async () => {

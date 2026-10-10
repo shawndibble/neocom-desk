@@ -769,9 +769,11 @@ describe('Characters', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Remove' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
+    // A Toast renders its text twice (visible copy + live region, filled a tick later).
     expect(
-      await screen.findByText('Could not remove Pilot One. Nothing was deleted — try again.')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('Could not remove Pilot One. Nothing was deleted — try again.'))
+        .length
+    ).toBeGreaterThan(0);
     expect(screen.getByText('Pilot One')).toBeInTheDocument();
   });
 
