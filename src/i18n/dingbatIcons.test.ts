@@ -34,11 +34,11 @@ describe('typed dingbats', () => {
     expect(bad).toEqual([]);
   });
 
-  it('en.json strings never carry a typed ✓ (outside Planetary Industry)', () => {
+  it('en.json strings never carry a typed ✓ ● ▲ (outside Planetary Industry)', () => {
     const all: [string, string][] = [];
     collectStrings(en, '', all);
     const bad = all
-      .filter(([p, v]) => v.includes('✓') && !p.startsWith('piColonies.'))
+      .filter(([p, v]) => (v.includes('✓') || /[●▲]/.test(v)) && !p.startsWith('piColonies.'))
       .map(([p]) => p);
     expect(bad).toEqual([]);
   });
