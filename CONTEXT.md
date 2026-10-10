@@ -1027,6 +1027,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   ore as of the newest scan that had it; no new ore, none with more m³) is an
   update of the Survey, even if an ore dropped out of the latest scan; any other scan is a different
   field. Shown on the Mining › Survey tab and on the public page of its link.
+- **Cleared marker** (also: mark field cleared): The scan with no rocks that ends a
+  Survey, stored by a button because the scanner has nothing to copy once the last
+  rock is gone. Who may press it: scope decision `20261009-233623-survey-the-field-is-marked-cleared-by-a`.
 - **Removed scan** (also: ignored scan): A Survey Scan its owner has set aside as
   a bad paste. It stays stored and listed, but the Survey's totals, chart and
   same-field check leave it out, and the owner can restore it.

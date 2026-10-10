@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { PageHeader, Spinner } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import type { SkillPlanImportState } from '@/lib/shortcuts';
 import { newPlan } from '@/features/skills/planner/newPlan';
+import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributesPane } from '@/features/skills/planner/AttributesPane';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
@@ -102,7 +103,7 @@ export function SkillPlans() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title={t('nav.skills')} />
+      <SkillsPageHeader />
       <SkillsSubNav />
 
       {/* `lg:items-start`: grid items stretch to the row's height by

@@ -793,7 +793,7 @@ describe('PlanEditor tools pane', () => {
         attributes: LEGAL_ATTRIBUTES,
       });
 
-      await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+      await user.click(screen.getByRole('button', { name: 'Remap marker 1' }));
       const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
       expect(within(dialog).getByLabelText('Perception')).toHaveValue(27);
 
@@ -827,7 +827,7 @@ describe('PlanEditor tools pane', () => {
         attributes: LEGAL_ATTRIBUTES,
       });
 
-      await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+      await user.click(screen.getByRole('button', { name: 'Remap marker 1' }));
       const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
       expect(within(dialog).queryByRole('button', { name: 'Clear override' })).toBeNull();
 
@@ -1592,7 +1592,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('12');
     expect(screen.getByText(/\+12 cerebral accelerator/i)).toBeInTheDocument();
   });
@@ -1755,7 +1755,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
     expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('2');
     expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('5');
@@ -1865,7 +1865,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     // The unticked legacy row reads as no row at all, and the detected
     // accelerator still does not prefill over that answer.
-    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
     expect(screen.queryByLabelText('Bonus')).toBeNull();
   });
 });
@@ -1885,7 +1885,7 @@ describe('a character with no accelerator', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
@@ -1909,7 +1909,7 @@ describe('an attribute sheet nothing explains', () => {
     expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.
-    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator 1' })).toBeNull();
   });
 });
 

@@ -521,8 +521,9 @@ describe('ItemDetailModal', () => {
       </MemoryRouter>
     );
 
-    const chip = await screen.findByRole('button', { name: '12,000 m' });
+    const chip = await screen.findByRole('button', { name: /^12,000 m.*skills that change/ });
     await user.click(chip);
+    expect(await screen.findByRole('dialog', { name: /skills that change/ })).toBeInTheDocument();
 
     const skillLine = await screen.findByText('Sharpshooter: +5% per level');
     const popoverContent = skillLine.closest('div') as HTMLElement;
@@ -752,10 +753,17 @@ describe('ItemDetailModal best sell/buy price', () => {
       </MemoryRouter>
     );
 
-    const sell = await screen.findByRole('link', {
-      name: 'Best sell 450,000 ISK — open in Market',
-    });
-    const buy = screen.getByRole('link', { name: 'Best buy 420,000 ISK — open in Market' });
+    const sell = await screen.findByRole('link', { name: /best sell/i });
+    const buy = screen.getByRole('link', { name: /best buy/i });
+    // The visible compact figure leads the name, and there is no nested tab stop.
+    expect(sell.textContent?.startsWith('450K')).toBe(true);
+    expect(sell).toHaveAccessibleName(/^450K Best sell 450,000 ISK — open in Market$/);
+    expect(buy).toHaveAccessibleName(/^420K Best buy 420,000 ISK — open in Market$/);
+    expect(sell.querySelector('[tabindex]')).toBeNull();
+    expect(buy.querySelector('[tabindex]')).toBeNull();
+    // Focusing the link reveals the exact figure in a tooltip.
+    sell.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('450,000 ISK');
     expect(sell.getAttribute('href')).toMatch(new RegExp(`^/market/browser\\?.*type=${TYPE_ID}`));
     expect(sell.getAttribute('href')).toContain('hub=amarr');
     expect(buy.getAttribute('href')).toBe(sell.getAttribute('href'));

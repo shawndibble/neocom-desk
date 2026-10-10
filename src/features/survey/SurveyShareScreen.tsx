@@ -26,7 +26,7 @@ import { stashPendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
-import { addSurveyScan, loadSurvey } from './surveyStore';
+import { addSurveyScan, finishSurvey, loadSurvey } from './surveyStore';
 import { useHasMoonOre } from './useHasMoonOre';
 import { useSurvey } from './useSurvey';
 import type { SurveyTaxShare } from './surveyStore';
@@ -91,6 +91,22 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
 
   const { trackedAdd, busy, error } = useScanFeedback(add);
 
+  // No `owned` here: the public page only offers it once the field is nearly done.
+  const finish = useCallback(async (): Promise<boolean> => {
+    if (state.status !== 'ready') return false;
+    try {
+      await finishSurvey({
+        id: shareId,
+        expiresAt: state.expiresAt,
+        by: await submitterName(characterId),
+      });
+      await refresh();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [characterId, refresh, shareId, state]);
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
@@ -146,6 +162,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
           <SurveyBoard
             scans={state.scans}
             ignored={state.ignored}
+            onFinish={finish}
             url={shareUrl(shareId)}
             expiresAt={state.expiresAt}
             afterPanel={(summary) => <MoonTaxIfMoon tax={state.tax} oreNames={summary.oreNames} />}

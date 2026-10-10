@@ -65,7 +65,7 @@ interface SeedPayload {
     expiresAt: number;
     scopes: string[];
   };
-  setting: { key: string; value: number };
+  settings: readonly { key: string; value: unknown }[];
 }
 
 /**
@@ -106,7 +106,11 @@ export async function signInAndGoto(
       expiresAt: EXP_SECONDS * 1000,
       scopes: [...scopes],
     },
-    setting: { key: ACTIVE_CHARACTER_KEY, value: CHARACTER_ID },
+    settings: [
+      { key: ACTIVE_CHARACTER_KEY, value: CHARACTER_ID },
+      // Nothing hidden, so specs find every page.
+      { key: 'sync.navHidden', value: [] },
+    ],
   };
 
   await page.evaluate(async (seed: SeedPayload) => {
@@ -124,7 +128,7 @@ export async function signInAndGoto(
       const tx = database.transaction(Object.keys(seed.stores), 'readwrite');
       tx.objectStore('characters').put(seed.character);
       tx.objectStore('tokens').put(seed.token);
-      tx.objectStore('settings').put(seed.setting);
+      for (const setting of seed.settings) tx.objectStore('settings').put(setting);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });

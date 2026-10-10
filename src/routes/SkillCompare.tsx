@@ -11,7 +11,6 @@ import {
   FilterChip,
   IconButton,
   Modal,
-  PageHeader,
   Spinner,
   TextInput,
   type DataTableColumn,
@@ -26,6 +25,7 @@ import {
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SkillLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
+import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -397,8 +397,7 @@ export function SkillCompare() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('nav.skills')}
+      <SkillsPageHeader
         meta={oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
         actions={
           <>

@@ -276,7 +276,7 @@ export function Login() {
   }
 
   return (
-    <main className="bg-bg text-text">
+    <div className="bg-bg text-text">
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-6 py-4">
           <LogoMark className="size-7" />
@@ -284,65 +284,66 @@ export function Login() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center">
-        <div>
-          <p className="text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
-            {t('login.eyebrow')}
-          </p>
-          <h1 className="mt-3 text-3xl leading-tight font-semibold text-balance sm:text-4xl">
-            {t('login.heading')}
-          </h1>
-          <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
-          <div className="mt-7 flex flex-col items-start gap-3">
-            <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
-            <CustomizeLink onClick={() => setCustomizing(true)} />
+      <main>
+        <section className="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="text-[0.6875rem] font-bold tracking-[0.14em] text-accent uppercase">
+              {t('login.eyebrow')}
+            </p>
+            <h1 className="mt-3 text-3xl leading-tight font-semibold text-balance sm:text-4xl">
+              {t('login.heading')}
+            </h1>
+            <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
+            <div className="mt-7 flex flex-col items-start gap-3">
+              <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+              <CustomizeLink onClick={() => setCustomizing(true)} />
+            </div>
           </div>
-        </div>
 
-        <div
-          role="group"
-          aria-labelledby="login-preview-label"
-          className="relative rounded-xs border border-line bg-panel/85 p-4 shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm"
-        >
-          <span
-            id="login-preview-label"
-            className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase"
+          <div
+            role="group"
+            aria-labelledby="login-preview-label"
+            className="relative rounded-xs border border-line bg-panel/85 p-4 shadow-[0_0_60px_-20px_rgba(87,199,244,0.25)] backdrop-blur-sm"
           >
-            {t('login.previewLabel')}
-          </span>
+            <span
+              id="login-preview-label"
+              className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase"
+            >
+              {t('login.previewLabel')}
+            </span>
 
-          <div className="flex flex-wrap items-center gap-3 border-b border-line pb-3">
-            <div
-              aria-hidden="true"
-              className={`${characterAvatarBoxClassName('lg')} border-line bg-panel-2`}
-            />
-            <div className="min-w-0 flex-1 basis-48">
-              <p className="truncate text-sm font-semibold tracking-widest uppercase">
-                {PREVIEW.name}
-              </p>
-              <p className="truncate text-xs text-text-dim">{t('login.previewCorp')}</p>
+            <div className="flex flex-wrap items-center gap-3 border-b border-line pb-3">
+              <div
+                aria-hidden="true"
+                className={`${characterAvatarBoxClassName('lg')} border-line bg-panel-2`}
+              />
+              <div className="min-w-0 flex-1 basis-48">
+                <p className="truncate text-sm font-semibold tracking-widest uppercase">
+                  {PREVIEW.name}
+                </p>
+                <p className="truncate text-xs text-text-dim">{t('login.previewCorp')}</p>
+              </div>
+              <StatChips>
+                <StatChip label={t('skills.totalSp')} value={PREVIEW.totalSp} />
+                <StatChip label={t('skills.unallocatedSp')} value={PREVIEW.unallocatedSp} />
+              </StatChips>
             </div>
-            <StatChips>
-              <StatChip label={t('skills.totalSp')} value={PREVIEW.totalSp} />
-              <StatChip label={t('skills.unallocatedSp')} value={PREVIEW.unallocatedSp} />
-            </StatChips>
-          </div>
 
-          <div className={`${tabScrollerClassName} mt-3`}>
-            <div className={tabListClassName}>
-              <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
-                {t('nav.overview')}
-              </span>
-              <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-                {t('nav.clones')}
-              </span>
-              <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-                {t('nav.employmentHistory')}
-              </span>
+            <div className={`${tabScrollerClassName} mt-3`}>
+              <div className={tabListClassName}>
+                <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
+                  {t('nav.overview')}
+                </span>
+                <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
+                  {t('nav.clones')}
+                </span>
+                <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
+                  {t('nav.employmentHistory')}
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/*
+            {/*
             The board at the width this column has: the summary strip, one full
             card, and alerts folded to a single line. That is the phone board's
             own shape rather than an invention — `Overview.tsx` folds the alerts
@@ -358,220 +359,225 @@ export function Login() {
             string `overview.queue`. Sharing the board's keys is what makes that
             failure impossible rather than merely fixed once.
           */}
-          <div className="mt-3 flex flex-col gap-2">
-            <div className="rounded-xs border border-line bg-panel-2/50 p-3">
-              <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-                <PreviewCell label={t('overview.board.nextDeadline')}>
-                  <p
-                    className={`text-3xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
-                  >
-                    {formatCountdown(PREVIEW.deadlineSeconds)}
-                  </p>
-                  <p className="truncate text-xs text-text-dim">
-                    {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
-                  </p>
-                </PreviewCell>
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="rounded-xs border border-line bg-panel-2/50 p-3">
+                <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                  <PreviewCell label={t('overview.board.nextDeadline')}>
+                    <p
+                      className={`text-3xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
+                    >
+                      {formatCountdown(PREVIEW.deadlineSeconds)}
+                    </p>
+                    <p className="truncate text-xs text-text-dim">
+                      {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
+                    </p>
+                  </PreviewCell>
 
-                <PreviewCell label={t('overview.board.trainingNow')}>
-                  <p className="text-sm font-medium">{PREVIEW.trainingSkill}</p>
-                  <p className="truncate text-xs text-text-dim">
-                    {t('overview.timeLeft', {
-                      duration: formatCountdown(PREVIEW.trainingSeconds),
-                    })}
-                    {' · '}
-                    {t('overview.board.queued', { count: PREVIEW.queued })}
-                  </p>
-                </PreviewCell>
+                  <PreviewCell label={t('overview.board.trainingNow')}>
+                    <p className="text-sm font-medium">{PREVIEW.trainingSkill}</p>
+                    <p className="truncate text-xs text-text-dim">
+                      {t('overview.timeLeft', {
+                        duration: formatCountdown(PREVIEW.trainingSeconds),
+                      })}
+                      {' · '}
+                      {t('overview.board.queued', { count: PREVIEW.queued })}
+                    </p>
+                  </PreviewCell>
 
-                <PreviewCell label={t('overview.wallet')}>
-                  <p className="text-sm font-medium tabular-nums text-isk-pos">
-                    {formatIsk(PREVIEW.wallet, 2)} {t('overview.isk')}
-                  </p>
-                </PreviewCell>
+                  <PreviewCell label={t('overview.wallet')}>
+                    <p className="text-sm font-medium tabular-nums text-isk-pos">
+                      {formatIsk(PREVIEW.wallet, 2)} {t('overview.isk')}
+                    </p>
+                  </PreviewCell>
 
-                <span className="ml-auto shrink-0">
-                  <DataAgeBadge date={previewFetchedAt} />
-                </span>
+                  <span className="ml-auto shrink-0">
+                    <DataAgeBadge date={previewFetchedAt} />
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <Panel
-              title={t('overview.board.orders')}
-              meta={
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
-                </span>
-              }
-              padded={false}
-            >
-              <div className="flex gap-2 p-3">
-                <PreviewTile
-                  label={t('overview.board.undercut')}
-                  value={PREVIEW.orders.undercut}
-                  severity="warning"
-                />
-                <PreviewTile
-                  label={t('overview.board.outbid')}
-                  value={PREVIEW.orders.outbid}
-                  severity="warning"
-                />
-                <PreviewTile
-                  label={t('overview.board.relist')}
-                  value={PREVIEW.orders.relist}
-                  severity="watch"
-                />
-              </div>
-              {/* Below-floor keeps the danger tone it carries on the real card:
+              <Panel
+                title={t('overview.board.orders')}
+                meta={
+                  <span className="text-[0.6875rem] text-text-dim">
+                    {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
+                  </span>
+                }
+                padded={false}
+              >
+                <div className="flex gap-2 p-3">
+                  <PreviewTile
+                    label={t('overview.board.undercut')}
+                    value={PREVIEW.orders.undercut}
+                    severity="warning"
+                  />
+                  <PreviewTile
+                    label={t('overview.board.outbid')}
+                    value={PREVIEW.orders.outbid}
+                    severity="warning"
+                  />
+                  <PreviewTile
+                    label={t('overview.board.relist')}
+                    value={PREVIEW.orders.relist}
+                    severity="watch"
+                  />
+                </div>
+                {/* Below-floor keeps the danger tone it carries on the real card:
                   it is the one order problem losing ISK now rather than losing
                   the sale. */}
-              <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                <span className="text-danger">
-                  {t('overview.board.belowFloor', { count: PREVIEW.orders.belowFloor })}
-                </span>
-                {` · ${t('overview.board.slotsUsed', {
-                  used: PREVIEW.orders.used,
-                  total: PREVIEW.orders.slots,
-                })}`}
-              </p>
-            </Panel>
+                <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  <span className="text-danger">
+                    {t('overview.board.belowFloor', { count: PREVIEW.orders.belowFloor })}
+                  </span>
+                  {` · ${t('overview.board.slotsUsed', {
+                    used: PREVIEW.orders.used,
+                    total: PREVIEW.orders.slots,
+                  })}`}
+                </p>
+              </Panel>
 
-            <Panel padded={false}>
-              <div className="flex items-center gap-2 px-3 py-2">
-                <SeverityIcon severity="warning" />
-                <span className="min-w-0 flex-1 truncate text-xs">
-                  {t('overview.board.alerts')}
-                </span>
-                <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {t('overview.board.alertsUnread', { count: PREVIEW.alerts })}
-                </span>
-              </div>
-            </Panel>
+              <Panel padded={false}>
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <SeverityIcon severity="warning" />
+                  <span className="min-w-0 flex-1 truncate text-xs">
+                    {t('overview.board.alerts')}
+                  </span>
+                  <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">
+                    {t('overview.board.alertsUnread', { count: PREVIEW.alerts })}
+                  </span>
+                </div>
+              </Panel>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <LandingSection id="login-answers" heading={t('login.answersHeading')}>
-        <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {ANSWERS.map(({ icon: Icon, key }) => (
-            // Untitled Panels: `Panel`'s own `title` is the uppercase
-            // micro-heading, and a question is the one heading on this page
-            // that has to read at body size to be worth asking.
-            <Panel key={key}>
-              <div className="flex items-start gap-3">
-                <Icon size={ICON_SIZE.lg} className="mt-0.5 shrink-0 text-accent" />
-                <h3 className="text-base font-semibold text-balance">
-                  {t(`login.answers.${key}.question`)}
-                </h3>
-              </div>
-              <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
-            </Panel>
-          ))}
-        </div>
-      </LandingSection>
+        <LandingSection id="login-answers" heading={t('login.answersHeading')}>
+          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {ANSWERS.map(({ icon: Icon, key }) => (
+              // Untitled Panels: `Panel`'s own `title` is the uppercase
+              // micro-heading, and a question is the one heading on this page
+              // that has to read at body size to be worth asking.
+              <Panel key={key}>
+                <div className="flex items-start gap-3">
+                  <Icon
+                    size={ICON_SIZE.lg}
+                    aria-hidden="true"
+                    className="mt-0.5 shrink-0 text-accent"
+                  />
+                  <h3 className="text-base font-semibold text-balance">
+                    {t(`login.answers.${key}.question`)}
+                  </h3>
+                </div>
+                <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
+              </Panel>
+            ))}
+          </div>
+        </LandingSection>
 
-      <LandingSection id="login-screenshots" heading={t('login.screenshotsHeading')}>
-        <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.screenshotsLead')}</p>
-        {/*
+        <LandingSection id="login-screenshots" heading={t('login.screenshotsHeading')}>
+          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.screenshotsLead')}</p>
+          {/*
           A scroll-snap strip rather than a grid: five 16:9 captures side by
           side would each be too small to read, and stacked they would be the
           longest section on the page. The strip scrolls inside itself, so the
           page never scrolls sideways at phone width.
         */}
-        <ul className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
-          {DESKTOP_SCREENSHOTS.map((shot) => (
-            <li key={shot.key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
-              <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
-            </li>
-          ))}
-        </ul>
-        <h3 className="mt-10 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('login.screenshotsPhoneHeading')}
-        </h3>
-        <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {PHONE_SCREENSHOTS.map((shot) => (
-            <li key={shot.key}>
-              <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
-            </li>
-          ))}
-        </ul>
-        <Modal
-          open={zoomed !== null}
-          onClose={() => setZoomed(null)}
-          title={zoomed ? t(`login.screenshots.${zoomed.key}.caption`) : ''}
-          placement="media"
-        >
-          {zoomed && (
-            <img
-              src={screenshotSrc(zoomed)}
-              alt={t(`login.screenshots.${zoomed.key}.alt`)}
-              width={zoomed.size.width}
-              height={zoomed.size.height}
-              className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
-            />
-          )}
-        </Modal>
-      </LandingSection>
+          <ul className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
+            {DESKTOP_SCREENSHOTS.map((shot) => (
+              <li key={shot.key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
+                <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
+              </li>
+            ))}
+          </ul>
+          <h3 className="mt-10 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('login.screenshotsPhoneHeading')}
+          </h3>
+          <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {PHONE_SCREENSHOTS.map((shot) => (
+              <li key={shot.key}>
+                <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
+              </li>
+            ))}
+          </ul>
+          <Modal
+            open={zoomed !== null}
+            onClose={() => setZoomed(null)}
+            title={zoomed ? t(`login.screenshots.${zoomed.key}.caption`) : ''}
+            placement="media"
+          >
+            {zoomed && (
+              <img
+                src={screenshotSrc(zoomed)}
+                alt={t(`login.screenshots.${zoomed.key}.alt`)}
+                width={zoomed.size.width}
+                height={zoomed.size.height}
+                className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
+              />
+            )}
+          </Modal>
+        </LandingSection>
 
-      <LandingSection id="login-features" heading={t('login.featuresHeading')}>
-        {FEATURE_GROUPS.map(({ group, items }) => (
-          <div key={group} className="mt-6">
-            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t(`login.featureGroups.${group}`)}
-            </h3>
-            <div className="mt-2 border-t border-line">
-              {items.map(({ icon: Icon, key }) => (
-                <div
-                  key={key}
-                  className="flex flex-wrap items-center gap-4 border-b border-line py-4"
-                >
-                  <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
-                  <span className="w-44 shrink-0 text-sm font-semibold">
-                    {t(`login.features.${key}.name`)}
-                  </span>
-                  <span className="flex-1 basis-64 text-sm text-text-dim">
-                    {t(`login.features.${key}.desc`)}
-                  </span>
-                  <span className="rounded-xs bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
-                    {t(`login.features.${key}.tag`)}
-                  </span>
-                </div>
-              ))}
+        <LandingSection id="login-features" heading={t('login.featuresHeading')}>
+          {FEATURE_GROUPS.map(({ group, items }) => (
+            <div key={group} className="mt-6">
+              <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t(`login.featureGroups.${group}`)}
+              </h3>
+              <div className="mt-2 border-t border-line">
+                {items.map(({ icon: Icon, key }) => (
+                  <div
+                    key={key}
+                    className="flex flex-wrap items-center gap-4 border-b border-line py-4"
+                  >
+                    <Icon size={ICON_SIZE.lg} aria-hidden="true" className="shrink-0 text-accent" />
+                    <span className="w-44 shrink-0 text-sm font-semibold">
+                      {t(`login.features.${key}.name`)}
+                    </span>
+                    <span className="flex-1 basis-64 text-sm text-text-dim">
+                      {t(`login.features.${key}.desc`)}
+                    </span>
+                    <span className="rounded-xs bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
+                      {t(`login.features.${key}.tag`)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </LandingSection>
-
-      <LandingSection id="login-trust" heading={t('login.trustHeading')}>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {TRUST.map(({ icon: Icon, key }) => (
-            <Panel key={key}>
-              <Icon size={ICON_SIZE.lg} className="text-accent" />
-              <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
-              <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
-            </Panel>
           ))}
-        </div>
-        {/*
+        </LandingSection>
+
+        <LandingSection id="login-trust" heading={t('login.trustHeading')}>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TRUST.map(({ icon: Icon, key }) => (
+              <Panel key={key}>
+                <Icon size={ICON_SIZE.lg} aria-hidden="true" className="text-accent" />
+                <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
+                <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
+              </Panel>
+            ))}
+          </div>
+          {/*
           The full scope enumeration sits here rather than beside the hero
           button: it is what a hesitant reader wants *after* the trust points
           and immediately before the closing CTA, and at hero size it was a
           wall of 11px text nobody read.
         */}
-        <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
-        <p className="mt-2 max-w-4xl text-xs text-text-dim">{t('login.writeExceptions')}</p>
-      </LandingSection>
+          <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
+          <p className="mt-2 max-w-4xl text-xs text-text-dim">{t('login.writeExceptions')}</p>
+        </LandingSection>
 
-      <section className="border-t border-line px-6 py-14 text-center">
-        <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
-        <div className="mt-6 flex flex-col items-center gap-3">
-          <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
-          <CustomizeLink onClick={() => setCustomizing(true)} />
-        </div>
-      </section>
+        <section className="border-t border-line px-6 py-14 text-center">
+          <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+            <CustomizeLink onClick={() => setCustomizing(true)} />
+          </div>
+        </section>
 
-      <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
+        <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
+      </main>
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
         <span>{t('login.footerOffline')}</span>
@@ -588,7 +594,7 @@ export function Login() {
           {t('login.footerDiscord')}
         </ExternalLink>
       </footer>
-    </main>
+    </div>
   );
 }
 

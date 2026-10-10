@@ -23,6 +23,14 @@ describe('IndustrySettingsForm', () => {
     expect(screen.getByRole('checkbox', { name: /blueprint cost/ })).toBeInTheDocument();
   });
 
+  it('describes Assumed ME by its note', async () => {
+    render(<IndustrySettingsForm />);
+
+    expect(
+      await screen.findByRole('spinbutton', { name: /Assumed ME/ })
+    ).toHaveAccessibleDescription(/quoted at this ME/);
+  });
+
   it('shows only assumed ME for Opportunities, the one input it prices with', async () => {
     render(<IndustrySettingsForm onlyAssumedMe />);
 

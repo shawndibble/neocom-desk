@@ -17,7 +17,7 @@
 import { addDoc, collection, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore/lite';
 import { generateShareId } from '@/engine/share/shareId';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import type { SurveyScan } from '@/engine/survey/series';
+import type { SurveyRock, SurveyScan } from '@/engine/survey/series';
 import { loadShare, saveShare, shareUrl } from '@/features/share/shareStore';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
@@ -73,6 +73,29 @@ export async function addSurveyScan(input: {
   });
 }
 
+/**
+ * Marks the field cleared. The scanner has nothing to copy once the last rock is
+ * gone, so no paste can say so: this stores a scan with no text, flagged
+ * `cleared`, which every reader loads as a scan with no rocks. Like any scan it
+ * can be set aside by the owner, which puts the survey back to mining.
+ */
+export async function finishSurvey(input: {
+  id: string;
+  /** The survey's own expiry, as `loadSurvey` or `startSurvey` returned it. */
+  expiresAt: number;
+  /** The Character name of whoever marked it, or none for an anonymous visitor. */
+  by?: string | null;
+}): Promise<void> {
+  const by = input.by?.trim().slice(0, MAX_SCAN_BY) ?? '';
+  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_SCANS_COLLECTION), {
+    text: '',
+    cleared: true,
+    ...(by === '' ? {} : { by }),
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(input.expiresAt),
+  });
+}
+
 export async function setSurveyTax(input: {
   id: string;
   expiresAt: number;
@@ -118,6 +141,11 @@ export type LoadSurveyResult =
     }
   | { ok: false; reason: 'not-found' | 'failed' };
 
+/** A stored scan's rocks, or null when its text is not a scan. */
+function parseScanDoc(text: unknown): SurveyRock[] | null {
+  return typeof text === 'string' ? parseSurveyScan(text) : null;
+}
+
 /** The Character name a survey was started under; null for one stored before owners existed. */
 function ownerOf(payload: unknown): string | null {
   if (typeof payload !== 'object' || payload === null) return null;
@@ -137,7 +165,7 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
     const scans: SurveyScan[] = [];
     for (const d of snapshot.docs) {
       const data = d.data();
-      const rocks = typeof data.text === 'string' ? parseSurveyScan(data.text) : null;
+      const rocks = data.cleared === true ? [] : parseScanDoc(data.text);
       if (rocks === null || !(data.createdAt instanceof Timestamp)) continue;
       const by = typeof data.by === 'string' && data.by.trim() !== '' ? data.by.trim() : undefined;
       scans.push({

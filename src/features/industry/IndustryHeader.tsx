@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { PageHeader, Panel, Tabs } from '@/components/ui';
+import { PageHeader, Panel, Tabs, usesViewPicker } from '@/components/ui';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { GrantBanner } from '@/app/GrantNote';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
-import { industryTabs, type IndustryTab } from './industryTabs';
+import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
 
 export interface IndustryHeaderProps {
   activeCharacterId: number;
@@ -73,9 +74,17 @@ export function IndustryHeader({
   meta,
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
+  const tabs = industryTabs(t);
+  const isPhone = useIsPhone();
+  const onChange = (id: string) => onTabChange(id as IndustryTab);
   return (
     <>
-      <PageHeader title={t('nav.industry')} meta={meta} actions={tabSettings(activeTab, t)} />
+      <PageHeader
+        title={t('nav.industry')}
+        meta={meta}
+        actions={tabSettings(activeTab, t)}
+        views={{ tabs, value: activeTab, onChange }}
+      />
       <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (
@@ -90,13 +99,16 @@ export function IndustryHeader({
         </Panel>
       )}
 
-      <Tabs
-        label={t('nav.industry')}
-        value={activeTab}
-        onChange={(id) => onTabChange(id as IndustryTab)}
-        tabs={industryTabs(t)}
-        activation={tabsActivation}
-      />
+      {!usesViewPicker(tabs.length, isPhone) && (
+        <Tabs
+          tabsId={INDUSTRY_TABS_ID}
+          label={t('nav.industry')}
+          value={activeTab}
+          onChange={onChange}
+          tabs={tabs}
+          activation={tabsActivation}
+        />
+      )}
     </>
   );
 }

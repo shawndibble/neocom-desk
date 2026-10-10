@@ -1,5 +1,5 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -20,9 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  TabPanel,
   Tabs,
   Toast,
   TypeIcon,
+  useTabPanelProps,
+  useTabsId,
+  usesViewPicker,
+  type PageViews,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -285,6 +290,32 @@ function MarketGroupTree({
  * 12). The catalogue (groups/types/systems/stations/regions) is lazy-loaded,
  * not precached (CONTEXT.md round 10) — most installs never open /market.
  */
+/**
+ * The Market view's tab panel. On a phone the view picker replaces the strip,
+ * so there is no tab to label the region by; it stays a plain container then
+ * (same element either way, so the page does not remount across the breakpoint).
+ */
+function MarketViewPanel({
+  tabsId,
+  tabId,
+  labelled,
+  children,
+}: {
+  tabsId: string;
+  tabId: string;
+  labelled: boolean;
+  children: ReactNode;
+}) {
+  const { className, ...panel } = useTabPanelProps(tabsId, tabId);
+  return labelled ? (
+    <div {...panel} className={className}>
+      {children}
+    </div>
+  ) : (
+    <div>{children}</div>
+  );
+}
+
 export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -304,6 +335,27 @@ export function Market() {
     setTab(next);
     setExpandCompareOnAppraisal(expandCompare);
   }
+  const isPhone = useIsPhone();
+  const viewsTabsId = useTabsId();
+  const itemTabsId = useTabsId();
+  // Market's full view list: a strip on desktop, the title-row picker on a phone.
+  const marketViews: PageViews = {
+    value: isHistoryView(tab) ? 'history' : tab,
+    // Clicking History while already inside it would otherwise throw away
+    // the chosen view and snap back to the orders one.
+    onChange: (id) => {
+      if (id === 'history' && isHistoryView(tab)) return;
+      changeTab(id as MarketTab);
+    },
+    tabs: [
+      { id: 'browser', label: t('market.sections.browser') },
+      { id: 'orders', label: t('market.sections.openOrders') },
+      { id: 'history', label: t('market.sections.history') },
+      { id: 'appraisal', label: t('market.sections.appraisal') },
+      { id: 'hauling', label: t('market.sections.hauling') },
+      { id: 'lp-store', label: t('loyaltyStore.title') },
+    ],
+  };
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.
@@ -620,7 +672,6 @@ export function Market() {
   // and a desktop whose finder column leaves the book too narrow for the
   // columns the pilot has picked and the figures on screen, both get the
   // card. Short of that, Location narrows first, so fewer widths need cards.
-  const isPhone = useIsPhone();
   const bookBestSell = loadedView?.summary.bestSell ?? null;
   // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
@@ -760,6 +811,7 @@ export function Market() {
 
   const itemTabs = (
     <Tabs
+      tabsId={itemTabsId}
       tabs={[
         { id: 'orders', label: t('market.tabOrders') },
         {
@@ -786,6 +838,7 @@ export function Market() {
         {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}
+          views={marketViews}
           actions={
             usesHubPicker(tab) ? (
               <>
@@ -869,472 +922,473 @@ export function Market() {
           }
         />
 
-        <Tabs
-          label={t('market.title')}
-          value={isHistoryView(tab) ? 'history' : tab}
-          // Clicking History while already inside it would otherwise throw away
-          // the chosen view and snap back to the orders one.
-          onChange={(id) => {
-            if (id === 'history' && isHistoryView(tab)) return;
-            changeTab(id as MarketTab);
-          }}
-          tabs={[
-            { id: 'browser', label: t('market.sections.browser') },
-            { id: 'orders', label: t('market.sections.openOrders') },
-            { id: 'history', label: t('market.sections.history') },
-            { id: 'appraisal', label: t('market.sections.appraisal') },
-            { id: 'hauling', label: t('market.sections.hauling') },
-            { id: 'lp-store', label: t('loyaltyStore.title') },
-          ]}
-        />
-
-        {tab === 'orders' && <OpenOrdersPanel />}
-
-        {tab === 'history' && (
-          <OrderHistoryPanel
-            onViewChange={(view) =>
-              changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-            }
-          />
-        )}
-        {tab === 'history/transactions' && (
-          <TransactionsPanel
-            onViewChange={(view) =>
-              changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-            }
+        {!usesViewPicker(marketViews.tabs.length, isPhone) && (
+          <Tabs
+            tabsId={viewsTabsId}
+            label={t('market.title')}
+            value={marketViews.value}
+            onChange={marketViews.onChange}
+            tabs={[...marketViews.tabs]}
           />
         )}
 
-        {/* The list itself lives in `useAppraisal` at route level, so switching
+        <MarketViewPanel
+          tabsId={viewsTabsId}
+          tabId={marketViews.value}
+          labelled={!usesViewPicker(marketViews.tabs.length, isPhone)}
+        >
+          {tab === 'orders' && <OpenOrdersPanel />}
+
+          {tab === 'history' && (
+            <OrderHistoryPanel
+              onViewChange={(view) =>
+                changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+              }
+            />
+          )}
+          {tab === 'history/transactions' && (
+            <TransactionsPanel
+              onViewChange={(view) =>
+                changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+              }
+            />
+          )}
+
+          {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}
-        {tab === 'appraisal' && (
-          <AppraisalPanel
-            controller={appraisal}
-            pricePercent={pricePercent}
-            onPricePercentChange={handlePricePercentChange}
-            hub={effectiveHub}
-            standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
-            characterId={activeCharacterId}
-            defaultCompareExpanded={expandCompareOnAppraisal}
-          />
-        )}
+          {tab === 'appraisal' && (
+            <AppraisalPanel
+              controller={appraisal}
+              pricePercent={pricePercent}
+              onPricePercentChange={handlePricePercentChange}
+              hub={effectiveHub}
+              standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+              characterId={activeCharacterId}
+              defaultCompareExpanded={expandCompareOnAppraisal}
+            />
+          )}
 
-        {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
+          {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
 
-        {tab === 'browser' && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
-            <Panel
-              ref={finderPanelRef}
-              // Sticky beside a long order book, so the search stays in reach
-              // while the book scrolls.
-              fill
-              className={
-                isDesktop || selectedTypeId === null
-                  ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col'
-                  : 'hidden'
-              }
-            >
-              <BrowserFilterBar
-                {...browserFilterBarProps}
-                search={
-                  <SearchInput
-                    ref={searchInputRef}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={t('market.searchPlaceholder')}
-                    aria-label={t('market.searchLabel')}
-                    className="min-w-0 flex-1"
-                  />
+          {tab === 'browser' && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
+              <Panel
+                ref={finderPanelRef}
+                // Sticky beside a long order book, so the search stays in reach
+                // while the book scrolls.
+                fill
+                className={
+                  isDesktop || selectedTypeId === null
+                    ? 'lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-2rem)] lg:flex-col'
+                    : 'hidden'
                 }
-              />
-
-              {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
-                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
-                  {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
-                </p>
-              )}
-
-              {filterResult?.fuzzy && (
-                <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
-                  {t('market.searchFuzzy')}
-                </p>
-              )}
-
-              {filterResult?.capped && (
-                <p className="shrink-0 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t('market.searchCapped', {
-                    limit: MARKET_TREE_MATCH_LIMIT,
-                    total: filterResult.totalMatches,
-                  })}
-                </p>
-              )}
-
-              {catalogueError ? (
-                <EmptyState
-                  title={t('market.loadFailedTitle')}
-                  hint={t('market.loadFailedHint')}
-                  className="py-8"
+              >
+                <BrowserFilterBar
+                  {...browserFilterBarProps}
+                  search={
+                    <SearchInput
+                      ref={searchInputRef}
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder={t('market.searchPlaceholder')}
+                      aria-label={t('market.searchLabel')}
+                      className="min-w-0 flex-1"
+                    />
+                  }
                 />
-              ) : catalogueLoading ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              ) : filterResult &&
-                filterResult.visibleGroupIds.size === 0 &&
-                !filterResult.bestMatch ? (
-                <EmptyState title={t('market.noResults')} className="py-8" />
-              ) : (
-                <div className="mt-3 flex min-h-0 flex-col border-t border-line pt-2 lg:flex-1">
-                  <MarketGroupTree
-                    groups={groups ?? []}
-                    childrenByParent={childrenByParent}
-                    typesByGroup={typesByGroup}
-                    filterResult={filterResult}
-                    expandedIds={expandedIds}
-                    searchCollapsedIds={searchCollapsedIds}
-                    searchCategories={searchCategories}
-                    onToggle={handleToggle}
-                    onSelect={handleSelectItem}
-                    selectedTypeId={selectedTypeId}
+
+                {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
+                  <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
+                    {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
+                  </p>
+                )}
+
+                {filterResult?.fuzzy && (
+                  <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
+                    {t('market.searchFuzzy')}
+                  </p>
+                )}
+
+                {filterResult?.capped && (
+                  <p className="shrink-0 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t('market.searchCapped', {
+                      limit: MARKET_TREE_MATCH_LIMIT,
+                      total: filterResult.totalMatches,
+                    })}
+                  </p>
+                )}
+
+                {catalogueError ? (
+                  <EmptyState
+                    title={t('market.loadFailedTitle')}
+                    hint={t('market.loadFailedHint')}
+                    className="py-8"
                   />
-                </div>
-              )}
+                ) : catalogueLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner label={t('common.loading')} />
+                  </div>
+                ) : filterResult &&
+                  filterResult.visibleGroupIds.size === 0 &&
+                  !filterResult.bestMatch ? (
+                  <EmptyState title={t('market.noResults')} className="py-8" />
+                ) : (
+                  <div className="mt-3 flex min-h-0 flex-col border-t border-line pt-2 lg:flex-1">
+                    <MarketGroupTree
+                      groups={groups ?? []}
+                      childrenByParent={childrenByParent}
+                      typesByGroup={typesByGroup}
+                      filterResult={filterResult}
+                      expandedIds={expandedIds}
+                      searchCollapsedIds={searchCollapsedIds}
+                      searchCategories={searchCategories}
+                      onToggle={handleToggle}
+                      onSelect={handleSelectItem}
+                      selectedTypeId={selectedTypeId}
+                    />
+                  </div>
+                )}
 
-              <QuickbarList
-                items={quickbarItems}
-                selectedTypeId={selectedTypeId}
-                onSelect={handleSelectItem}
-                onRemove={handleRemoveFromQuickbar}
-                onReorder={handleReorderQuickbar}
-                onSetTarget={handleSetQuickbarTarget}
-                onViewInAppraisal={handleViewQuickbarInAppraisal}
-              />
-            </Panel>
+                <QuickbarList
+                  items={quickbarItems}
+                  selectedTypeId={selectedTypeId}
+                  onSelect={handleSelectItem}
+                  onRemove={handleRemoveFromQuickbar}
+                  onReorder={handleReorderQuickbar}
+                  onSetTarget={handleSetQuickbarTarget}
+                  onViewInAppraisal={handleViewQuickbarInAppraisal}
+                />
+              </Panel>
 
-            <Panel
-              // `min-w-0`: a grid track doesn't shrink a child below its own
-              // intrinsic content width by default — a wide table row here
-              // was forcing the whole page to scroll sideways.
-              className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
-              title={selectedItem?.name}
-              headingRef={itemHeadingRef}
-              meta={
-                selectedItem &&
-                selectedTypeId !== null && (
-                  <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
-                    <IconButton
-                      size="md"
-                      icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
-                      label={t(
-                        selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
-                        {
-                          name: selectedItem.name,
+              <Panel
+                // `min-w-0`: a grid track doesn't shrink a child below its own
+                // intrinsic content width by default — a wide table row here
+                // was forcing the whole page to scroll sideways.
+                className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
+                title={selectedItem?.name}
+                headingRef={itemHeadingRef}
+                meta={
+                  selectedItem &&
+                  selectedTypeId !== null && (
+                    <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
+                      <IconButton
+                        size="md"
+                        icon={<Icon.Pin weight={selectedPinned ? 'fill' : 'light'} />}
+                        label={t(
+                          selectedPinned ? 'market.quickbar.removeItem' : 'market.quickbar.addItem',
+                          {
+                            name: selectedItem.name,
+                          }
+                        )}
+                        tooltip={
+                          activeCharacterId === null
+                            ? t('market.contextMenu.quickbarNoCharacter')
+                            : undefined
                         }
-                      )}
-                      tooltip={
-                        activeCharacterId === null
-                          ? t('market.contextMenu.quickbarNoCharacter')
-                          : undefined
-                      }
-                      pressed={selectedPinned}
-                      aria-disabled={activeCharacterId === null || undefined}
-                      openOnTap={activeCharacterId === null}
-                      className="aria-disabled:cursor-default aria-disabled:opacity-40"
-                      onClick={() => {
-                        if (activeCharacterId === null) return;
-                        if (selectedPinned) handleRemoveFromQuickbar(selectedTypeId);
-                        else itemActions.actions.addToQuickbar(selectedTypeId, selectedItem.name);
-                      }}
-                    />
-                    <IconButton
-                      size="md"
-                      icon={<Icon.Compare />}
-                      label={t(
-                        selectedInCompare ? 'market.compare.removeItem' : 'market.compare.addItem',
-                        { name: selectedItem.name }
-                      )}
-                      pressed={selectedInCompare}
-                      onClick={() =>
-                        selectedInCompare
-                          ? removeFromCompare(selectedTypeId)
-                          : addToCompare({ typeId: selectedTypeId, itemName: selectedItem.name })
-                      }
-                    />
-                    <ItemPriceAlertBell
-                      typeId={selectedTypeId}
-                      name={selectedItem.name}
-                      item={quickbarItems.find((i) => i.typeId === selectedTypeId)}
-                      disabled={activeCharacterId === null}
-                      onPin={handlePinWithTarget}
-                    />
-                    <IconButton
-                      size="md"
-                      icon={<Icon.Info />}
-                      label={t('market.contextMenu.showInfo')}
-                      onClick={() =>
-                        itemActions.actions.showInfo(selectedTypeId, selectedItem.name)
-                      }
-                    />
-                  </span>
-                )
-              }
-              padded={false}
-              leading={itemPanelLeading}
-            >
-              {selectedTypeId === null ? (
-                <EmptyState
-                  title={t('market.selectPromptTitle')}
-                  hint={t('market.selectPromptHint')}
-                  className="px-3 py-8"
-                />
-              ) : (
-                <div className="space-y-3 px-3 pt-2 pb-3">
-                  <ItemSkillsDisclosure
-                    typeId={selectedTypeId}
-                    itemSkills={itemSkills}
-                    trainedSkills={trainedSkills}
-                    targetPlan={targetPlan}
-                    hasCharacter={activeCharacterId !== null}
-                    itemName={selectedItem?.name ?? ''}
-                  />
-                  {/* Above every tab: Variations and Price History are readers
-                      its note names. */}
-                  <OrderBookScopeBar
-                    scope={bookScope}
-                    filterValue={browserFilterValue}
-                    onFilterChange={handleBrowserFiltersChange}
-                    activeCount={activeFilterCount}
-                    regionMode={regionMode}
-                    scopeLabel={scopeLabel}
-                    currentSystem={currentSystem}
-                    note={scopeNote}
-                  />
-                  {itemTabs}
-                  {itemTab === 'history' ? (
-                    resolvedRegion && (
-                      <PriceHistoryPanel
-                        regionId={resolvedRegion.regionId}
+                        pressed={selectedPinned}
+                        aria-disabled={activeCharacterId === null || undefined}
+                        openOnTap={activeCharacterId === null}
+                        className="aria-disabled:cursor-default aria-disabled:opacity-40"
+                        onClick={() => {
+                          if (activeCharacterId === null) return;
+                          if (selectedPinned) handleRemoveFromQuickbar(selectedTypeId);
+                          else itemActions.actions.addToQuickbar(selectedTypeId, selectedItem.name);
+                        }}
+                      />
+                      <IconButton
+                        size="md"
+                        icon={<Icon.Compare />}
+                        label={t(
+                          selectedInCompare
+                            ? 'market.compare.removeItem'
+                            : 'market.compare.addItem',
+                          { name: selectedItem.name }
+                        )}
+                        pressed={selectedInCompare}
+                        onClick={() =>
+                          selectedInCompare
+                            ? removeFromCompare(selectedTypeId)
+                            : addToCompare({ typeId: selectedTypeId, itemName: selectedItem.name })
+                        }
+                      />
+                      <ItemPriceAlertBell
                         typeId={selectedTypeId}
-                        itemName={selectedItem?.name ?? ''}
+                        name={selectedItem.name}
+                        item={quickbarItems.find((i) => i.typeId === selectedTypeId)}
+                        disabled={activeCharacterId === null}
+                        onPin={handlePinWithTarget}
                       />
-                    )
-                  ) : itemTab === 'variations' ? (
-                    variationsResult && variationsResult.rows.length > 0 ? (
-                      <VariationsTable
-                        rows={variationsResult.rows}
-                        prices={variationPrices}
-                        onSelect={handleSelectItem}
-                        onCompare={handleCompareVariations}
-                        selfName={selectedItem?.name ?? ''}
-                        selfSummary={headerScopeSummary}
-                        scopeName={priceScopeName}
+                      <IconButton
+                        size="md"
+                        icon={<Icon.Info />}
+                        label={t('market.contextMenu.showInfo')}
+                        onClick={() =>
+                          itemActions.actions.showInfo(selectedTypeId, selectedItem.name)
+                        }
                       />
-                    ) : (
-                      <EmptyState title={t('market.variations.none')} className="py-8" />
-                    )
-                  ) : orderBookLoading &&
-                    !regionsUnavailable &&
-                    (!orderBookView || orderBookFailed) ? (
-                    <div className="flex justify-center py-8">
-                      <Spinner label={t('common.loading')} />
-                    </div>
-                  ) : orderBookFailed ? (
-                    // Not the empty book: ESI didn't answer (a 420, or the Error
-                    // Budget declining to send), which says nothing about who
-                    // trades the item — so no "nobody is selling" copy and no
-                    // blueprint BPC hint, just the failure and a way to retry.
-                    <EmptyState
-                      title={t('market.orderBookFailedTitle')}
-                      hint={t('market.orderBookFailedHint')}
-                      className="py-8"
-                      action={
-                        <Button size="sm" onClick={handleRefresh}>
-                          {t('market.orderBookFailedRetry')}
-                        </Button>
-                      }
+                    </span>
+                  )
+                }
+                padded={false}
+                leading={itemPanelLeading}
+              >
+                {selectedTypeId === null ? (
+                  <EmptyState
+                    title={t('market.selectPromptTitle')}
+                    hint={t('market.selectPromptHint')}
+                    className="px-3 py-8"
+                  />
+                ) : (
+                  <div className="space-y-3 px-3 pt-2 pb-3">
+                    <ItemSkillsDisclosure
+                      typeId={selectedTypeId}
+                      itemSkills={itemSkills}
+                      trainedSkills={trainedSkills}
+                      targetPlan={targetPlan}
+                      hasCharacter={activeCharacterId !== null}
+                      itemName={selectedItem?.name ?? ''}
                     />
-                  ) : (
-                    <div ref={orderBookRef} className="space-y-3">
-                      {resolvedRegion?.override && (
-                        <p className="m-0 text-[0.6875rem] text-text-dim">
-                          {t('market.globalMarketNote', {
-                            regionName: resolvedRegion.override.regionName,
-                          })}
-                        </p>
-                      )}
-                      {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
-                      {(jumpNoteShown || failedRegionCount > 0) && (
-                        <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
-                          {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
-                          {failedRegionCount > 0 && (
-                            <p role="status" className="text-warning">
-                              {t('market.regionsFailed', { count: failedRegionCount })}
-                            </p>
-                          )}
+                    {/* Above every tab: Variations and Price History are readers
+                      its note names. */}
+                    <OrderBookScopeBar
+                      scope={bookScope}
+                      filterValue={browserFilterValue}
+                      onFilterChange={handleBrowserFiltersChange}
+                      activeCount={activeFilterCount}
+                      regionMode={regionMode}
+                      scopeLabel={scopeLabel}
+                      currentSystem={currentSystem}
+                      note={scopeNote}
+                    />
+                    {itemTabs}
+                    <TabPanel tabsId={itemTabsId} tabId={itemTab}>
+                      {itemTab === 'history' ? (
+                        resolvedRegion && (
+                          <PriceHistoryPanel
+                            regionId={resolvedRegion.regionId}
+                            typeId={selectedTypeId}
+                            itemName={selectedItem?.name ?? ''}
+                          />
+                        )
+                      ) : itemTab === 'variations' ? (
+                        variationsResult && variationsResult.rows.length > 0 ? (
+                          <VariationsTable
+                            rows={variationsResult.rows}
+                            prices={variationPrices}
+                            onSelect={handleSelectItem}
+                            onCompare={handleCompareVariations}
+                            selfName={selectedItem?.name ?? ''}
+                            selfSummary={headerScopeSummary}
+                            scopeName={priceScopeName}
+                          />
+                        ) : (
+                          <EmptyState title={t('market.variations.none')} className="py-8" />
+                        )
+                      ) : orderBookLoading &&
+                        !regionsUnavailable &&
+                        (!orderBookView || orderBookFailed) ? (
+                        <div className="flex justify-center py-8">
+                          <Spinner label={t('common.loading')} />
                         </div>
-                      )}
-                      {stationFilter !== null && (
-                        <div className="flex items-center justify-between gap-2 text-xs text-text-dim">
-                          <span>
-                            {t('market.stationFilterActive', {
-                              station: stationFilterLabel ?? t('market.unknownStructure'),
-                            })}
-                          </span>
-                          <Button size="sm" onClick={() => setStationFilter(null)}>
-                            {t('market.clearStationFilter')}
-                          </Button>
-                        </div>
-                      )}
-                      {rangeAcross && stationFilter === null && (
-                        <HubComparisonLine
-                          placeName={priceScopeName}
-                          summary={headerScopeSummary}
-                          inRangeBestSell={loadedView?.summary.bestSell ?? null}
-                          inRangeBestBuy={loadedView?.summary.bestBuy ?? null}
-                          jumps={
-                            effectiveLocation.mode === 'hub'
-                              ? (knownJumps?.get(effectiveHub.systemId) ?? null)
-                              : null
-                          }
-                          stationId={
-                            effectiveLocation.mode === 'hub' ? effectiveHub.stationId : null
-                          }
-                          stationName={
-                            effectiveLocation.mode === 'hub'
-                              ? (npcStationMap.get(effectiveHub.stationId)?.name ?? null)
-                              : null
-                          }
-                          onView={() =>
-                            handleBrowserFiltersChange({
-                              ...browserFilterValue,
-                              jumps: DEFAULT_JUMP_RANGE,
-                            })
+                      ) : orderBookFailed ? (
+                        // Not the empty book: ESI didn't answer (a 420, or the Error
+                        // Budget declining to send), which says nothing about who
+                        // trades the item — so no "nobody is selling" copy and no
+                        // blueprint BPC hint, just the failure and a way to retry.
+                        <EmptyState
+                          title={t('market.orderBookFailedTitle')}
+                          hint={t('market.orderBookFailedHint')}
+                          className="py-8"
+                          action={
+                            <Button size="sm" onClick={handleRefresh}>
+                              {t('market.orderBookFailedRetry')}
+                            </Button>
                           }
                         />
-                      )}
-                      <OrderBookSummaryStrip
-                        bestSell={loadedView?.summary.bestSell ?? null}
-                        bestBuy={loadedView?.summary.bestBuy ?? null}
-                      />
-                      <BookSideToggle
-                        side={phoneSide}
-                        onChange={setPhoneSide}
-                        sellCount={sortedSell.length}
-                        buyCount={sortedBuy.length}
-                        bestSell={loadedView?.summary.bestSell ?? null}
-                        bestBuy={loadedView?.summary.bestBuy ?? null}
-                      />
-                      <OrderSideCard
-                        side="sell"
-                        rows={sellRows}
-                        total={sortedSell.length}
-                        best={loadedView?.summary.bestSell ?? null}
-                        columns={baseColumns}
-                        availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
-                        visibleColumns={visibleOrderColumns}
-                        columnsById={orderColumnsById}
-                        onToggleColumn={toggleOrderColumn}
-                        tableExport={sellExport}
-                        hiddenOnPhone={phoneSide !== 'sell'}
-                        cards={orderCards}
-                        onShowAll={
-                          !sellShowAll && sortedSell.length > ROW_CAP
-                            ? () => setSellShowAll(true)
-                            : null
-                        }
-                        rowContextMenu={orderRowContextMenu}
-                        rowClassName={orderRowClassName}
-                        renderDetail={(o) => (
-                          <OrderRowDetail
-                            order={o}
+                      ) : (
+                        <div ref={orderBookRef} className="space-y-3">
+                          {resolvedRegion?.override && (
+                            <p className="m-0 text-[0.6875rem] text-text-dim">
+                              {t('market.globalMarketNote', {
+                                regionName: resolvedRegion.override.regionName,
+                              })}
+                            </p>
+                          )}
+                          {/* In the book, not the finder's funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                          {(jumpNoteShown || failedRegionCount > 0) && (
+                            <div className="flex flex-col items-end gap-1 text-xs text-text-dim">
+                              {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
+                              {failedRegionCount > 0 && (
+                                <p role="status" className="text-warning">
+                                  {t('market.regionsFailed', { count: failedRegionCount })}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {stationFilter !== null && (
+                            <div className="flex items-center justify-between gap-2 text-xs text-text-dim">
+                              <span>
+                                {t('market.stationFilterActive', {
+                                  station: stationFilterLabel ?? t('market.unknownStructure'),
+                                })}
+                              </span>
+                              <Button size="sm" onClick={() => setStationFilter(null)}>
+                                {t('market.clearStationFilter')}
+                              </Button>
+                            </div>
+                          )}
+                          {rangeAcross && stationFilter === null && (
+                            <HubComparisonLine
+                              placeName={priceScopeName}
+                              summary={headerScopeSummary}
+                              inRangeBestSell={loadedView?.summary.bestSell ?? null}
+                              inRangeBestBuy={loadedView?.summary.bestBuy ?? null}
+                              jumps={
+                                effectiveLocation.mode === 'hub'
+                                  ? (knownJumps?.get(effectiveHub.systemId) ?? null)
+                                  : null
+                              }
+                              stationId={
+                                effectiveLocation.mode === 'hub' ? effectiveHub.stationId : null
+                              }
+                              stationName={
+                                effectiveLocation.mode === 'hub'
+                                  ? (npcStationMap.get(effectiveHub.stationId)?.name ?? null)
+                                  : null
+                              }
+                              onView={() =>
+                                handleBrowserFiltersChange({
+                                  ...browserFilterValue,
+                                  jumps: DEFAULT_JUMP_RANGE,
+                                })
+                              }
+                            />
+                          )}
+                          <OrderBookSummaryStrip
+                            bestSell={loadedView?.summary.bestSell ?? null}
+                            bestBuy={loadedView?.summary.bestBuy ?? null}
+                          />
+                          <BookSideToggle
+                            side={phoneSide}
+                            onChange={setPhoneSide}
+                            sellCount={sortedSell.length}
+                            buyCount={sortedBuy.length}
+                            bestSell={loadedView?.summary.bestSell ?? null}
+                            bestBuy={loadedView?.summary.bestBuy ?? null}
+                          />
+                          <OrderSideCard
+                            side="sell"
+                            rows={sellRows}
+                            total={sortedSell.length}
                             best={loadedView?.summary.bestSell ?? null}
-                            depth={depthByOrder.get(o.order_id)}
-                            npcStations={npcStationMap}
-                            solarSystems={solarSystemMap}
-                            hiddenColumns={sellHiddenColumns}
-                            orderColumnsById={orderColumnsById}
-                            onFilterToStation={stationFilter === null ? setStationFilter : null}
-                          />
-                        )}
-                        empty={
-                          <EmptyState
-                            title={t('market.emptySellTitle')}
-                            hint={
-                              stationFilter !== null
-                                ? t('market.emptyFilteredHint')
-                                : filtersNarrowBook
-                                  ? t('market.emptyFiltersHint')
-                                  : selectedIsBlueprint
-                                    ? t('market.emptySellBlueprintHint')
-                                    : t('market.emptySellHint')
+                            columns={baseColumns}
+                            availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
+                            visibleColumns={visibleOrderColumns}
+                            columnsById={orderColumnsById}
+                            onToggleColumn={toggleOrderColumn}
+                            tableExport={sellExport}
+                            hiddenOnPhone={phoneSide !== 'sell'}
+                            cards={orderCards}
+                            onShowAll={
+                              !sellShowAll && sortedSell.length > ROW_CAP
+                                ? () => setSellShowAll(true)
+                                : null
                             }
-                            className="py-6"
-                            action={
-                              selectedIsBlueprint && !filtersNarrowBook ? (
-                                <Link
-                                  to={bpcSourcingHref(selectedTypeId)}
-                                  className={buttonClassName({ size: 'sm' })}
-                                >
-                                  {t('market.searchBpcContracts')}
-                                </Link>
-                              ) : undefined
+                            rowContextMenu={orderRowContextMenu}
+                            rowClassName={orderRowClassName}
+                            renderDetail={(o) => (
+                              <OrderRowDetail
+                                order={o}
+                                best={loadedView?.summary.bestSell ?? null}
+                                depth={depthByOrder.get(o.order_id)}
+                                npcStations={npcStationMap}
+                                solarSystems={solarSystemMap}
+                                hiddenColumns={sellHiddenColumns}
+                                orderColumnsById={orderColumnsById}
+                                onFilterToStation={stationFilter === null ? setStationFilter : null}
+                              />
+                            )}
+                            empty={
+                              <EmptyState
+                                title={t('market.emptySellTitle')}
+                                hint={
+                                  stationFilter !== null
+                                    ? t('market.emptyFilteredHint')
+                                    : filtersNarrowBook
+                                      ? t('market.emptyFiltersHint')
+                                      : selectedIsBlueprint
+                                        ? t('market.emptySellBlueprintHint')
+                                        : t('market.emptySellHint')
+                                }
+                                className="py-6"
+                                action={
+                                  selectedIsBlueprint && !filtersNarrowBook ? (
+                                    <Link
+                                      to={bpcSourcingHref(selectedTypeId)}
+                                      className={buttonClassName({ size: 'sm' })}
+                                    >
+                                      {t('market.searchBpcContracts')}
+                                    </Link>
+                                  ) : undefined
+                                }
+                              />
                             }
                           />
-                        }
-                      />
-                      <OrderSideCard
-                        side="buy"
-                        rows={buyRows}
-                        total={sortedBuy.length}
-                        best={loadedView?.summary.bestBuy ?? null}
-                        columns={buyColumns}
-                        availableColumns={pickableColumns(BUY_ORDER_COLUMN_IDS)}
-                        visibleColumns={visibleOrderColumns}
-                        columnsById={orderColumnsById}
-                        onToggleColumn={toggleOrderColumn}
-                        tableExport={buyExport}
-                        hiddenOnPhone={phoneSide !== 'buy'}
-                        cards={orderCards}
-                        onShowAll={
-                          !buyShowAll && sortedBuy.length > ROW_CAP
-                            ? () => setBuyShowAll(true)
-                            : null
-                        }
-                        rowContextMenu={orderRowContextMenu}
-                        rowClassName={orderRowClassName}
-                        renderDetail={(o) => (
-                          <OrderRowDetail
-                            order={o}
+                          <OrderSideCard
+                            side="buy"
+                            rows={buyRows}
+                            total={sortedBuy.length}
                             best={loadedView?.summary.bestBuy ?? null}
-                            depth={depthByOrder.get(o.order_id)}
-                            npcStations={npcStationMap}
-                            solarSystems={solarSystemMap}
-                            hiddenColumns={buyHiddenColumns}
-                            orderColumnsById={orderColumnsById}
-                            onFilterToStation={stationFilter === null ? setStationFilter : null}
-                          />
-                        )}
-                        empty={
-                          <EmptyState
-                            title={t('market.emptyBuyTitle')}
-                            hint={
-                              stationFilter !== null
-                                ? t('market.emptyFilteredHint')
-                                : filtersNarrowBook
-                                  ? t('market.emptyFiltersHint')
-                                  : t('market.emptyBuyHint')
+                            columns={buyColumns}
+                            availableColumns={pickableColumns(BUY_ORDER_COLUMN_IDS)}
+                            visibleColumns={visibleOrderColumns}
+                            columnsById={orderColumnsById}
+                            onToggleColumn={toggleOrderColumn}
+                            tableExport={buyExport}
+                            hiddenOnPhone={phoneSide !== 'buy'}
+                            cards={orderCards}
+                            onShowAll={
+                              !buyShowAll && sortedBuy.length > ROW_CAP
+                                ? () => setBuyShowAll(true)
+                                : null
                             }
-                            className="py-6"
+                            rowContextMenu={orderRowContextMenu}
+                            rowClassName={orderRowClassName}
+                            renderDetail={(o) => (
+                              <OrderRowDetail
+                                order={o}
+                                best={loadedView?.summary.bestBuy ?? null}
+                                depth={depthByOrder.get(o.order_id)}
+                                npcStations={npcStationMap}
+                                solarSystems={solarSystemMap}
+                                hiddenColumns={buyHiddenColumns}
+                                orderColumnsById={orderColumnsById}
+                                onFilterToStation={stationFilter === null ? setStationFilter : null}
+                              />
+                            )}
+                            empty={
+                              <EmptyState
+                                title={t('market.emptyBuyTitle')}
+                                hint={
+                                  stationFilter !== null
+                                    ? t('market.emptyFilteredHint')
+                                    : filtersNarrowBook
+                                      ? t('market.emptyFiltersHint')
+                                      : t('market.emptyBuyHint')
+                                }
+                                className="py-6"
+                              />
+                            }
                           />
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </Panel>
-          </div>
-        )}
+                        </div>
+                      )}
+                    </TabPanel>
+                  </div>
+                )}
+              </Panel>
+            </div>
+          )}
+        </MarketViewPanel>
 
         {compareCount > 0 && (
           <CompareDrawer

@@ -11,6 +11,7 @@ import {
   Spinner,
   StandingIcon,
   type DataTableColumn,
+  TabPanel,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -33,10 +34,13 @@ const FEE_OWNERS = feeOwnerIds();
 export function ContactsStandings({
   characterId,
   tabBar,
+  tabsId,
 }: {
   characterId: number;
   /** The page's tab strip, placed between the header and the body like the other tabs. */
   tabBar: ReactNode;
+  /** The id base the tab strip was built with, so the body is its tab panel. */
+  tabsId: string;
 }) {
   const { t } = useTranslation();
   const lacksScope = useCharacterLacksEndpoints(characterId, ['getCharacterStandings']);
@@ -218,7 +222,9 @@ export function ContactsStandings({
         }
       />
       {tabBar}
-      {content}
+      <TabPanel tabsId={tabsId} tabId="standings">
+        {content}
+      </TabPanel>
     </>
   );
 }

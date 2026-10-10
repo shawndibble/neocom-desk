@@ -14,7 +14,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, EmptyState, PageHeader, textActionClassName } from '@/components/ui';
+import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
 import { countedScans } from '@/engine/survey/series';
@@ -39,6 +39,7 @@ import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 import {
   addSurveyScan,
+  finishSurvey,
   loadSurvey,
   setSurveyScanIgnored,
   startSurvey,
@@ -49,12 +50,14 @@ import { useSurvey } from './useSurvey';
 interface SurveyTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
+  /** The id base the tab bar was built with, so the body is its tab panel. */
+  tabsId: string;
 }
 
 /** Where a scan goes when the pilot has chosen: a new survey, or the one in view. */
 type ScanTarget = 'new' | 'existing';
 
-export function SurveyTab({ tabBar }: SurveyTabProps) {
+export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -229,6 +232,20 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
     },
     [currentId, state, refresh]
   );
+  const finish = useCallback(async (): Promise<boolean> => {
+    if (currentId === null || state.status !== 'ready') return false;
+    try {
+      await finishSurvey({
+        id: currentId,
+        expiresAt: state.expiresAt,
+        by: await submitterName(characterId),
+      });
+      await refresh();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [currentId, state, characterId, refresh]);
   const expiresAt = state.status === 'ready' ? state.expiresAt : null;
 
   return (
@@ -238,80 +255,86 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
         actions={<SurveyPicker currentId={currentId} onPick={(id) => void setCurrentId(id)} />}
       />
       {tabBar}
-      {state.status === 'loading' ? null : (
-        <>
-          {state.status === 'failed' && (
-            <p role="alert" className="text-xs text-warning">
-              {t('survey.loadFailed')}
-            </p>
-          )}
-          {state.status === 'gone' && (
-            <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-6" />
-          )}
-          {asking !== null && asking.forId === currentId && (
-            <div
-              role="group"
-              aria-label={t('survey.differentField')}
-              className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel/85 p-3"
-            >
-              <p className="mr-auto text-sm">{t('survey.differentField')}</p>
-              <Button variant="primary" size="sm" onClick={() => void answer('new')}>
-                {t('survey.createNew')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => void answer('existing')}>
-                {t('survey.addToExisting')}
-              </Button>
-            </div>
-          )}
-          {checking !== null && checking.forId === currentId && (
-            <ExpandedCheck
-              ores={checking.ores}
-              onConfirm={confirmExpanded}
-              onCancel={() => setChecking(null)}
+      <TabPanel tabsId={tabsId} tabId="survey" className="space-y-4">
+        {state.status === 'loading' ? null : (
+          <>
+            {state.status === 'failed' && (
+              <p role="alert" className="text-xs text-warning">
+                {t('survey.loadFailed')}
+              </p>
+            )}
+            {state.status === 'gone' && (
+              <EmptyState title={t('survey.gone')} hint={t('survey.goneHint')} className="py-6" />
+            )}
+            {asking !== null && asking.forId === currentId && (
+              <div
+                role="group"
+                aria-label={t('survey.differentField')}
+                className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel/85 p-3"
+              >
+                <p className="mr-auto text-sm">{t('survey.differentField')}</p>
+                <Button variant="primary" size="sm" onClick={() => void answer('new')}>
+                  {t('survey.createNew')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => void answer('existing')}>
+                  {t('survey.addToExisting')}
+                </Button>
+              </div>
+            )}
+            {checking !== null && checking.forId === currentId && (
+              <ExpandedCheck
+                ores={checking.ores}
+                onConfirm={confirmExpanded}
+                onCancel={() => setChecking(null)}
+              />
+            )}
+            <ScanFeedback busy={busy} error={error} />
+            {ignoreFailed && (
+              <p role="alert" className="text-sm text-danger">
+                {t('survey.scanList.removeFailed')}
+              </p>
+            )}
+            <SurveyBoard
+              scans={scans}
+              ignored={state.status === 'ready' ? state.ignored : undefined}
+              onSetIgnored={
+                owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
+              }
+              onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
+              owned={owned}
+              viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
+              afterPanel={(summary) =>
+                characterId !== null && (
+                  <MoonTaxLine
+                    characterId={characterId}
+                    oreNames={summary.oreNames}
+                    owned={owned}
+                    published={state.status === 'ready' ? state.tax : null}
+                    survey={
+                      currentId !== null && state.status === 'ready'
+                        ? { id: currentId, expiresAt: state.expiresAt, published: state.tax }
+                        : undefined
+                    }
+                  />
+                )
+              }
+              url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
+              expiresAt={expiresAt}
+              footerActions={
+                currentId !== null ? (
+                  <button
+                    type="button"
+                    className={textActionClassName()}
+                    onClick={() => void setCurrentId(null)}
+                  >
+                    {t('survey.newSurvey')}
+                  </button>
+                ) : undefined
+              }
             />
-          )}
-          <ScanFeedback busy={busy} error={error} />
-          {ignoreFailed && (
-            <p role="alert" className="text-sm text-danger">
-              {t('survey.scanList.removeFailed')}
-            </p>
-          )}
-          <SurveyBoard
-            scans={scans}
-            ignored={state.status === 'ready' ? state.ignored : undefined}
-            onSetIgnored={owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined}
-            viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
-            afterPanel={(summary) =>
-              characterId !== null && (
-                <MoonTaxLine
-                  characterId={characterId}
-                  oreNames={summary.oreNames}
-                  owned={owned}
-                  published={state.status === 'ready' ? state.tax : null}
-                  survey={
-                    currentId !== null && state.status === 'ready'
-                      ? { id: currentId, expiresAt: state.expiresAt, published: state.tax }
-                      : undefined
-                  }
-                />
-              )
-            }
-            url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
-            expiresAt={expiresAt}
-            footerActions={
-              currentId !== null ? (
-                <button
-                  type="button"
-                  className={textActionClassName()}
-                  onClick={() => void setCurrentId(null)}
-                >
-                  {t('survey.newSurvey')}
-                </button>
-              ) : undefined
-            }
-          />
-        </>
-      )}
+          </>
+        )}
+      </TabPanel>
     </div>
   );
 }

@@ -1118,7 +1118,8 @@ export function OpenOrdersPanel() {
                             size="sm"
                             variant="plain"
                             icon={<Icon.Refresh />}
-                            label={t('market.orders.checkDeeper')}
+                            label={t('market.orders.checkDeeperGroup', { group: groupTitle })}
+                            tooltip={t('market.orders.checkDeeper')}
                             onClick={() => orderDetail.checkDeeper(group.rows)}
                           />
                         )}
