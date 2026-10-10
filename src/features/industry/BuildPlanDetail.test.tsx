@@ -599,13 +599,24 @@ describe('BuildPlanDetail shopping list', () => {
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
     // Default fixture's "Rifter Blueprint" Blueprint Acquisition row (issue
     // #838) is what gets left out here.
-    render(<Harness />);
+    // The note fades after 2s; on a loaded CI worker that timer can fire before
+    // findBy's next poll, so hold the fade-out back for this test.
+    const realSetTimeout = globalThis.setTimeout;
+    const spy = vi
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) =>
+        ms === 2000 ? 0 : realSetTimeout(fn, ms, ...rest)) as unknown as typeof setTimeout);
+    try {
+      render(<Harness />);
 
-    await user.click(copyButton());
+      await user.click(copyButton());
 
-    expect(
-      await screen.findByText('1 blueprint left out — buy it by contract')
-    ).toBeInTheDocument();
+      expect(
+        await screen.findByText('1 blueprint left out — buy it by contract')
+      ).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('surfaces a denied clipboard instead of failing silently', async () => {
