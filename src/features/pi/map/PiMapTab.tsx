@@ -4,7 +4,7 @@ import { EmptyState, Spinner } from '@/components/ui';
 import { EsiDidntAnswer } from '../EsiDidntAnswer';
 import { PricesUnavailable } from '../PricesUnavailable';
 import { PlanMap } from './PlanMap';
-import { useRetryFocus } from '../useRetryFocus';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useMapAdvice } from './useMapAdvice';
 
 /** The Map tab: loads what the recommendation model needs, then draws the explorer. */

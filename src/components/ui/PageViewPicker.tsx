@@ -28,9 +28,9 @@ export function PageViewPicker({ title, tabs, value, onChange }: PageViewPickerP
         aria-label={t('common.viewPicker.label', { page: title, view: current?.label ?? '' })}
         className="-mx-1 flex min-h-11 max-w-full min-w-0 cursor-pointer items-center gap-2 rounded px-1 text-left uppercase focus-visible:outline-2 focus-visible:outline-accent"
       >
-        <span className="min-w-0 truncate">{title}</span>
+        <span className="max-w-full shrink-0 truncate">{title}</span>
         {current && (
-          <span className="min-w-0 truncate text-base font-normal tracking-normal text-text-dim normal-case">
+          <span className="max-w-full shrink-0 truncate text-base font-normal tracking-normal text-text-dim normal-case">
             {current.label}
           </span>
         )}

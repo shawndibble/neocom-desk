@@ -849,7 +849,8 @@ export function Market() {
                   screen.
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
-                  station, so it has no Region mode to toggle into. */}
+                  station, so it has no Region mode to toggle into, and its hub
+                  picker sits in the panel beside Price %. */}
                 {tab === 'browser' && (
                   <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                     <FilterChip
@@ -866,7 +867,7 @@ export function Market() {
                     />
                   </div>
                 )}
-                {effectiveLocation.mode === 'hub' || tab === 'appraisal' ? (
+                {tab === 'appraisal' ? null : effectiveLocation.mode === 'hub' ? (
                   <Select
                     value={effectiveHub.id}
                     onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
@@ -962,6 +963,7 @@ export function Market() {
               pricePercent={pricePercent}
               onPricePercentChange={handlePricePercentChange}
               hub={effectiveHub}
+              onHubChange={handleHubChange}
               standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
               characterId={activeCharacterId}
               defaultCompareExpanded={expandCompareOnAppraisal}
