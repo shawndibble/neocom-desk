@@ -9,6 +9,7 @@
     "stalledPending": "Reloading…"
   },
   "nav": {
+    "skipToContent": "Skip to content",
     "characters": "Characters",
     "overview": "Overview",
     "corp": "Corporation",
