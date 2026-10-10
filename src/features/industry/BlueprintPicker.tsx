@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SearchInput } from '@/components/ui';
+import { LiveStatus, SearchInput } from '@/components/ui';
 import {
   focusRingInsetClassName,
   rowInteractiveClassName,
@@ -30,6 +30,7 @@ export function BlueprintPicker({
 }: BlueprintPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(
     () => searchByProductName(catalog, query).slice(0, MAX_RESULTS),
@@ -39,11 +40,15 @@ export function BlueprintPicker({
   return (
     <div className={className}>
       <SearchInput
+        ref={inputRef}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('industry.searchPlaceholder')}
         aria-label={t('industry.addPlan')}
       />
+      <LiveStatus>
+        {query.trim() !== '' && t('industry.addPlanResults', { count: results.length })}
+      </LiveStatus>
       {results.length > 0 && (
         <ul className="mt-1 max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
           {results.map((entry) => (
@@ -53,6 +58,7 @@ export function BlueprintPicker({
                 onClick={() => {
                   onPick(entry);
                   setQuery('');
+                  inputRef.current?.focus();
                 }}
                 className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs ${rowInteractiveClassName} ${focusRingInsetClassName}`}
               >
