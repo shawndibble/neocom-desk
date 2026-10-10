@@ -8881,6 +8881,7 @@
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
       "divisionEmpty": "Nothing in this division",
+      "treeLabel": "Corporation assets",
       "tableLabel": "{{group}} assets",
       "columnItem": "Item",
       "columnQuantity": "Quantity",

@@ -123,6 +123,21 @@ describe('Alerts', () => {
     expect(within(filled).getByText('40')).toBeInTheDocument();
   });
 
+  it('shows the newest fire age on a collapsed type row, from md up only', async () => {
+    const now = Date.now();
+    await db.notificationFeed.bulkPut([
+      entry({ id: 'old', firedAt: now - 3 * 86_400_000 }),
+      entry({ id: 'new', firedAt: now - 3 * 3_600_000 }),
+    ]);
+    renderPage();
+
+    const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
+    const age = within(row).getByText('3h ago');
+    expect(within(row).queryByText('3d ago')).not.toBeInTheDocument();
+    // Collapsed row only: the fires are not rendered until it expands.
+    expect(age.closest('time')).toHaveClass('hidden', 'md:block', 'w-16', 'shrink-0');
+  });
+
   it('keys EVE notifications on their own type, not on the event they all share', async () => {
     // Every EVE-native notification carries eventId `eveNotification`; grouping
     // on that alone would fold an attack into a corp bill.
