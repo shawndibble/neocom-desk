@@ -106,7 +106,7 @@ export function ComingUpRail({
       meta={
         <span className="text-[0.6875rem] text-text-dim tabular-nums">
           {t('calendar.rail.count', { count: items.length })}
-          <LiveStatus>{status}</LiveStatus>
+          <LiveStatus announceKey={selectedDayMs ?? 'all'}>{status}</LiveStatus>
         </span>
       }
       actions={
