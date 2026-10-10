@@ -12,6 +12,7 @@ const hull = {
   hullClass: 'Industrial',
   capacityM3: 100,
   owned: false,
+  canFly: true,
 };
 
 const plan = {
@@ -98,6 +99,7 @@ describe('PlanResult', () => {
   describe('Pack instead', () => {
     const shipPlan = {
       ...plan,
+      totals: { ...plan.totals, shipsToFly: 1 },
       perCharacter: [
         {
           ...plan.perCharacter[0],
@@ -137,6 +139,12 @@ describe('PlanResult', () => {
       );
       return onPackShip;
     };
+
+    it('counts each flown ship as a trip on top of the hauls', () => {
+      setup(0);
+      expect(screen.getByText('2 hauls + 1 ship')).toBeTruthy();
+      expect(screen.getByText('3', { selector: 'div' }).textContent).toContain('trips');
+    });
 
     it('names each ship being flown beside the cargo trips', () => {
       setup(0);

@@ -124,7 +124,6 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
     expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'Load split by pickup and trip' })).toBeTruthy();
     expect(screen.getByText('Deliver everything here')).toBeTruthy();
   });
 

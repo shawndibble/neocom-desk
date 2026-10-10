@@ -9,6 +9,7 @@ import { loadStationName, loadStationSystemId } from '@/features/character/stati
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
+import { loadRequirements } from '@/features/fittings/skillRequirements';
 import {
   useFittingCatalogue,
   type FittingCatalogue,
@@ -259,20 +260,23 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const owned = new Set(
       loaded.sources.flatMap((s) => s.assets.filter((a) => a.is_singleton).map((a) => a.type_id))
     );
-    return haulers.flatMap((h) => {
-      const capacityM3 = hullCapacity.current.get(h.typeId);
-      return capacityM3
-        ? [
-            {
-              typeId: h.typeId,
-              name: h.name,
-              hullClass: h.group,
-              capacityM3,
-              owned: owned.has(h.typeId),
-            },
-          ]
-        : [];
-    });
+    const sized = haulers.filter((h) => hullCapacity.current.get(h.typeId));
+    // A hull whose requirements could not be fetched counts as flyable rather than hiding every hauler.
+    const flyable = await Promise.all(
+      sized.map(async (h) =>
+        (await loadRequirements(h.typeId)).every(
+          (r) => (profile.skillLevels.get(r.skillTypeID) ?? 0) >= r.level
+        )
+      )
+    );
+    return sized.map((h, i) => ({
+      typeId: h.typeId,
+      name: h.name,
+      hullClass: h.group,
+      capacityM3: hullCapacity.current.get(h.typeId)!,
+      owned: owned.has(h.typeId),
+      canFly: flyable[i],
+    }));
   }
 
   async function showPlan() {

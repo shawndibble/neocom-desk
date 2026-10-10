@@ -23,6 +23,8 @@ export interface MoveHull {
   capacityM3: number;
   /** Whether any of the user's Characters owns this hull. */
   owned: boolean;
+  /** Whether the pilot has the skills to fly this hull; one they cannot is never suggested. */
+  canFly: boolean;
 }
 
 export interface MovePickupGroup {
@@ -137,7 +139,7 @@ export function planMove(input: {
   const totalM3 = perCharacter.reduce((sum, c) => sum + c.totalM3, 0);
 
   const comparison: HaulerOption[] = [];
-  for (const hull of input.hulls) {
+  for (const hull of input.hulls.filter((h) => h.canFly)) {
     const trips = tripsFor(totalM3, hull.capacityM3);
     if (trips !== null) comparison.push({ hull, trips });
   }
