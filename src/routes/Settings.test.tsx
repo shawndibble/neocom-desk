@@ -1646,8 +1646,8 @@ describe('Settings — phone tab bar', () => {
     await waitFor(async () => {
       expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([
         '/overview',
-        '/alerts',
         '/skills',
+        '/market',
         '/wallet',
       ]);
     });
