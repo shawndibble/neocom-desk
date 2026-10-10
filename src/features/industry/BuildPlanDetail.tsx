@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
   Checkbox,
+  LiveStatus,
   Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -1782,6 +1783,13 @@ export function BuildPlanDetail({
               having rows: a plan whose every material is already owned still
               renders a full table, and the list it would copy is empty.
             */}
+              <LiveStatus>
+                {copyState === 'copied'
+                  ? t('industry.copyShoppingListDone')
+                  : copyState === 'failed'
+                    ? t('industry.copyShoppingListFailed')
+                    : null}
+              </LiveStatus>
               <IconButton
                 size="sm"
                 icon={

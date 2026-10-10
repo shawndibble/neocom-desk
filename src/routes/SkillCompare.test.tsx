@@ -284,6 +284,10 @@ describe('SkillCompare', () => {
     await user.clear(input);
     await user.type(input, 'Miners{Enter}');
     expect(await screen.findByText('Miners')).toBeInTheDocument();
+    // Enter unmounted the focused input: focus returns to the row's Rename button.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Rename Miners' })).toHaveFocus()
+    );
 
     const row = screen.getByText('Miners').closest('li')!;
     await user.click(within(row).getByRole('button', { name: 'Delete Miners' }));
@@ -291,6 +295,10 @@ describe('SkillCompare', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
+    // The only row is gone: focus lands on the section heading, not <body>.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Saved comparisons' })).toHaveFocus()
+    );
     expect(
       screen.getByText('Pick characters, then use Save comparison to reopen that set later.')
     ).toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -81,5 +81,15 @@ describe('FitImportDialog — initialText', () => {
     render(<FitImportDialog catalog={CATALOG} onApply={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByLabelText(/paste/i)).toHaveValue('');
     expect(screen.queryByText(/Buzzard/)).not.toBeInTheDocument();
+  });
+});
+
+describe('FitImportDialog — live status', () => {
+  it('announces the plan count after Parse', async () => {
+    const user = userEvent.setup();
+    render(<FitImportDialog catalog={CATALOG} onApply={vi.fn()} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/paste/i), { target: { value: '[Buzzard, Scout]' } });
+    await user.click(screen.getByRole('button', { name: 'Read fit' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/1 plan/));
   });
 });

@@ -6,7 +6,7 @@
  * state, including the boring one: a card that vanishes when a Character has
  * no colonies is a card you cannot tell from a card that failed to load.
  */
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
@@ -646,6 +646,7 @@ export function MailCard({ data, nowMs }: { data: MailBoardData | null; nowMs: n
               when={mail.atMs === null ? '—' : formatAge(Math.max(0, nowMs - mail.atMs), t)}
               subject={mail.subject || t('overview.board.mailNoSubject')}
               detail={mail.from ?? undefined}
+              detailLabel={mail.from ?? undefined}
               to="/mail"
             />
           ))}
@@ -722,6 +723,9 @@ export function PriceAlertsCard({
                     components={{ isk: <IskAmount value={alert.targetPrice} decimals={0} /> }}
                   />
                 }
+                detailLabel={t(`overview.board.priceAlertTargetLabel.${alert.direction}`, {
+                  isk: formatIskCompact(alert.targetPrice),
+                })}
                 to="/market"
               />
             ))}
@@ -909,10 +913,13 @@ export function AlertsColumn({
   const { t } = useTranslation();
   const shown = groups.slice(0, 7);
   const hidden = groups.length - shown.length;
+  // "Dismiss all" unmounts itself; park focus on the heading so it isn't lost to <body>.
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   return (
     <Panel
       fill
+      headingRef={headingRef}
       className="flex h-full flex-col"
       title={t('overview.board.alerts')}
       meta={
@@ -922,7 +929,14 @@ export function AlertsColumn({
       }
       actions={
         unread > 0 ? (
-          <button type="button" onClick={onDismissAll} className={textActionClassName()}>
+          <button
+            type="button"
+            onClick={() => {
+              headingRef.current?.focus();
+              onDismissAll();
+            }}
+            className={textActionClassName()}
+          >
             {t('overview.board.dismissAll')}
           </button>
         ) : undefined
@@ -957,7 +971,7 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
     <li className="border-b border-line last:border-b-0">
       <Link to="/alerts" className={boardRowLinkClassName}>
         <span className="flex w-10 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums">
-          <SeverityIcon severity={group.severity} />
+          <SeverityIcon severity={group.severity} label={t(SEVERITY_LABEL[group.severity])} />
           {group.count}
         </span>
         <span className="min-w-0 flex-1">
