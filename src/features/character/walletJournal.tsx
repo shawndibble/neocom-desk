@@ -77,8 +77,8 @@ export function useJournalColumnsBuilder(): (
       {
         id: 'date',
         header: t('wallet.date'),
-        className: 'whitespace-nowrap text-text-dim max-sm:px-1.5',
-        headerClassName: 'max-sm:px-1.5',
+        className: 'whitespace-nowrap text-text-dim max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
         // Date over time on a phone, freeing width for Description; one line from `sm` up.
         render: (entry) => {
           const { date, time } = splitTimestamp(new Date(entry.date), timeZone);
@@ -97,8 +97,8 @@ export function useJournalColumnsBuilder(): (
         id: 'refType',
         header: t('wallet.refType'),
         // Wraps onto two lines on a phone so Amount stays on screen; one line from `sm` up.
-        className: 'max-sm:px-1.5 sm:whitespace-nowrap',
-        headerClassName: 'max-sm:px-1.5',
+        className: 'max-sm:px-1 sm:whitespace-nowrap',
+        headerClassName: 'max-sm:px-1',
         render: (entry) => humanizeRefType(entry.ref_type),
         sortValue: (entry) => humanizeRefType(entry.ref_type),
       },
@@ -106,9 +106,8 @@ export function useJournalColumnsBuilder(): (
         id: 'description',
         header: t('wallet.description'),
         // Wraps in its cell on a phone, capped so Amount stays inside the viewport.
-        className:
-          'max-sm:max-w-40 max-sm:whitespace-normal max-sm:px-1.5 [overflow-wrap:anywhere]',
-        headerClassName: 'max-sm:px-1.5',
+        className: 'max-sm:max-w-40 max-sm:whitespace-normal max-sm:px-1 [overflow-wrap:anywhere]',
+        headerClassName: 'max-sm:px-1',
         render: (entry) => {
           const transaction = linkFor(entry);
           return (
@@ -126,8 +125,8 @@ export function useJournalColumnsBuilder(): (
         id: 'amount',
         header: t('wallet.amount'),
         align: 'right',
-        className: 'tabular-nums max-sm:px-1.5',
-        headerClassName: 'max-sm:px-1.5',
+        className: 'tabular-nums max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
         cellClassName: (entry) => (entry.amount !== undefined ? iskToneClass(entry.amount) : ''),
         render: (entry) =>
           entry.amount !== undefined ? formatIsk(entry.amount, 2) : t('common.unknown'),
