@@ -289,7 +289,7 @@ describe('SkillPlans CRUD', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     expect(await within(dialog).findByText(/Detected: skill plan/)).toBeInTheDocument();
-    expect(within(dialog).getByLabelText(/paste/i)).toHaveValue('Gunnery V');
+    expect(within(dialog).getByRole('textbox', { name: /paste/i })).toHaveValue('Gunnery V');
 
     const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(stored).toHaveLength(1);

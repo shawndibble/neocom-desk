@@ -17,7 +17,7 @@ const ENTRY = { from_id: 500001, from_type: 'faction', standing: 3.5 };
 function renderTab() {
   return render(
     <MemoryRouter>
-      <ContactsStandings characterId={91} tabBar={<div>tab strip</div>} />
+      <ContactsStandings characterId={91} tabBar={<div>tab strip</div>} tabsId="t" />
     </MemoryRouter>
   );
 }

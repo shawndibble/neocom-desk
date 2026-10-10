@@ -47,6 +47,31 @@ export function focusKeyFor(pathname: string): string {
   return SUB_NAV_PAGES[route] ?? route;
 }
 
+let publicRouteRendered = false;
+
+/**
+ * Call from a public page that can lead into the shell (NotFound, a Share
+ * Link): the shell mounting after it is a navigation, not the document's
+ * first load, so route focus must move to its `<h1>`. Not set by redirecting
+ * routes like Root — a cold load of `/` still lands on `/overview` untouched.
+ */
+export function useMarkPublicRouteRendered(): void {
+  useEffect(() => {
+    publicRouteRendered = true;
+  }, []);
+}
+
+/** Test seam: forget that a public route rendered. */
+export function resetPublicRouteRendered(): void {
+  publicRouteRendered = false;
+}
+
+/** Whether this mount follows an earlier entry of the same document. */
+function enteredByNavigation(): boolean {
+  const idx = (window.history.state as { idx?: unknown } | null)?.idx;
+  return publicRouteRendered || (typeof idx === 'number' && idx > 0);
+}
+
 function focusWithoutScroll(element: HTMLElement): void {
   element.focus({ preventScroll: true });
 }
@@ -77,7 +102,9 @@ export function useRouteFocus(
   const focusKey = focusKeyFor(pathname);
   // A ref seeded with the first key, not a "first render" flag: StrictMode's
   // double effect would clear a flag and then focus on initial load.
-  const previousKey = useRef(focusKey);
+  // Seeded `null` when the shell was entered by navigation (from NotFound, a
+  // Share Link), so the first effect focuses the heading.
+  const previousKey = useRef<string | null>(enteredByNavigation() ? null : focusKey);
 
   useEffect(() => {
     if (previousKey.current === focusKey) return;

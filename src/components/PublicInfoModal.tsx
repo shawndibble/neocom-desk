@@ -28,7 +28,16 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { CharacterAvatar, EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
+import {
+  CharacterAvatar,
+  EmptyState,
+  Modal,
+  Spinner,
+  TabPanel,
+  Tabs,
+  useTabsId,
+  type TabItem,
+} from '@/components/ui';
 import { isNpcCharacterId } from '@/esi/entityIds';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
@@ -64,6 +73,7 @@ const IDLE: TabState<never> = { status: 'idle' };
 
 export function PublicInfoModal() {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
   const clear = usePublicInfoModalStore((state) => state.clear);
@@ -169,6 +179,7 @@ export function PublicInfoModal() {
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs
+            tabsId={tabsId}
             tabs={tabs}
             value={activeTab}
             onChange={(id) => setActiveTab(id as PublicInfoKind | 'employment')}
@@ -176,35 +187,39 @@ export function PublicInfoModal() {
           />
         )}
 
-        {activeTab === 'character' && (
-          <CharacterTab
-            state={character}
-            npc={npcCharacter}
-            corporation={corporation}
-            onOpenCorporation={() => setActiveTab('corporation')}
-            onOpenAlliance={() => setActiveTab('alliance')}
-          />
-        )}
-        {activeTab === 'corporation' && (
-          <CorporationTab
-            state={corporation}
-            allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
-            allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
-            onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
-          />
-        )}
-        {activeTab === 'alliance' && <AllianceTab state={alliance} />}
-        {activeTab === 'employment' && (
-          <Suspense
-            fallback={
-              <div className="flex justify-center py-8">
-                <Spinner label={t('common.loading')} />
-              </div>
-            }
-          >
-            <LazyEmploymentTab characterId={request.id} />
-          </Suspense>
-        )}
+        <TabPanel tabsId={tabsId} tabId={activeTab}>
+          {activeTab === 'character' && (
+            <CharacterTab
+              state={character}
+              npc={npcCharacter}
+              corporation={corporation}
+              onOpenCorporation={() => setActiveTab('corporation')}
+              onOpenAlliance={() => setActiveTab('alliance')}
+            />
+          )}
+          {activeTab === 'corporation' && (
+            <CorporationTab
+              state={corporation}
+              allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
+              allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
+              onOpenAlliance={
+                alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined
+              }
+            />
+          )}
+          {activeTab === 'alliance' && <AllianceTab state={alliance} />}
+          {activeTab === 'employment' && (
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              }
+            >
+              <LazyEmploymentTab characterId={request.id} />
+            </Suspense>
+          )}
+        </TabPanel>
       </div>
     </Modal>
   );

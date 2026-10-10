@@ -17,6 +17,7 @@ import {
   RowMoreActions,
   SearchInput,
   Spinner,
+  TabPanel,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
@@ -69,6 +70,24 @@ interface FittingStartScreenProps {
   pageTitle?: string;
   /** The page's tab bar (Ships' Fittings / Tree), drawn right under the header. */
   pageTabs?: ReactNode;
+  /** The tab bar's `tabsId` and selected tab, so the content under it is that tab's panel. */
+  pageTabsPanel?: { tabsId: string; tabId: string };
+}
+
+/** The content under a page tab bar as its panel; without a bar it is just the content. */
+function MaybeTabPanel({
+  panel,
+  children,
+}: {
+  panel?: { tabsId: string; tabId: string };
+  children: ReactNode;
+}) {
+  if (!panel) return <>{children}</>;
+  return (
+    <TabPanel {...panel} className="space-y-3">
+      {children}
+    </TabPanel>
+  );
 }
 
 /**
@@ -90,6 +109,7 @@ export function FittingStartScreen({
   onOpened,
   pageTitle,
   pageTabs,
+  pageTabsPanel,
 }: FittingStartScreenProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -225,170 +245,176 @@ export function FittingStartScreen({
         />
       )}
       {pageTabs}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-64 flex-1">
-          <SearchInput
-            aria-label={t('fittings.start.searchFittings')}
-            placeholder={t('fittings.start.searchFittingsPlaceholder')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-        {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
-        {!pageTitle && refreshInGameButton}
-        {/* On a phone they share the row beneath the search, half each. */}
-        {(showNew || showImport) && (
-          <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
-            {showNew && (
-              <Button variant="primary" onClick={() => setHullOpen(true)}>
-                {t('fittings.start.newFromHull')}
-              </Button>
-            )}
-            {showImport && (
-              <Button onClick={() => setImportOpen(true)}>
-                {t('fittings.start.importAction')}
-              </Button>
-            )}
+      <MaybeTabPanel panel={pageTabsPanel}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-64 flex-1">
+            <SearchInput
+              aria-label={t('fittings.start.searchFittings')}
+              placeholder={t('fittings.start.searchFittingsPlaceholder')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </div>
-        )}
-      </div>
+          {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
+          {!pageTitle && refreshInGameButton}
+          {/* On a phone they share the row beneath the search, half each. */}
+          {(showNew || showImport) && (
+            <div className={`flex gap-2 ${isPhone ? 'w-full *:flex-1' : ''}`}>
+              {showNew && (
+                <Button variant="primary" onClick={() => setHullOpen(true)}>
+                  {t('fittings.start.newFromHull')}
+                </Button>
+              )}
+              {showImport && (
+                <Button onClick={() => setImportOpen(true)}>
+                  {t('fittings.start.importAction')}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
-      {inGameStatus}
-      <FittingExportNotice notice={rowActions.notice} />
-      {/* A picked Fitting the Compare picker couldn't turn into a Fitting Share Code. The
+        {inGameStatus}
+        <FittingExportNotice notice={rowActions.notice} />
+        {/* A picked Fitting the Compare picker couldn't turn into a Fitting Share Code. The
           editor's own workspace flags its open Fitting the same way, so the Open
           dialog never shows it. */}
-      {importInline && workspace.tooLargeToShare && (
-        <p className="text-xs text-warning" role="status">
-          {t('fittings.load.tooLargeToShare')}
-        </p>
-      )}
+        {importInline && workspace.tooLargeToShare && (
+          <p className="text-xs text-warning" role="status">
+            {t('fittings.load.tooLargeToShare')}
+          </p>
+        )}
 
-      {loading && rows.length === 0 ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title={t('fittings.start.emptyTitle')}
-          hint={t(showNew ? 'fittings.start.emptyHint' : 'fittings.start.emptyHintList')}
-        />
-      ) : (
-        <div
-          className={`grid grid-cols-1 items-start gap-3 ${previewing ? 'lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]' : ''}`}
-        >
-          <nav
-            aria-label={t('fittings.start.listLabel')}
-            className={`overflow-y-auto border border-line bg-panel ${listHeight}`}
-            onKeyDown={(event) => {
-              // Arrow keys walk the list: focus moves, and with a preview the pick too.
-              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-              // From a row's ⋮ too, not just the row itself.
-              const focusedId = document.activeElement
-                ?.closest('li')
-                ?.querySelector<HTMLElement>('[data-row-id]')?.dataset.rowId;
-              const from = visible.findIndex(
-                (row) => row.id === (previewing ? selected?.id : focusedId)
-              );
-              const next = visible[from + (event.key === 'ArrowDown' ? 1 : -1)];
-              if (!next) return;
-              event.preventDefault();
-              if (previewing) setSelectedId(next.id);
-              event.currentTarget
-                .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(next.id)}"]`)
-                ?.focus();
-            }}
+        {loading && rows.length === 0 ? (
+          <div className="flex justify-center py-8">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title={t('fittings.start.emptyTitle')}
+            hint={t(showNew ? 'fittings.start.emptyHint' : 'fittings.start.emptyHintList')}
+          />
+        ) : (
+          <div
+            className={`grid grid-cols-1 items-start gap-3 ${previewing ? 'lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]' : ''}`}
           >
-            {searching && (
-              <p className="border-b border-line px-3 py-2 text-xs text-text-dim" role="status">
-                {t('fittings.start.matches', { count: visible.length })}
-              </p>
-            )}
-            {groups.length === 0 && (
-              <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
-            )}
-            {groups.map((group) => (
-              <section key={group.hull ?? ''} className="pb-1">
-                <h3 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {group.hull ?? t('fittings.myFittings.unknownHull')}
-                </h3>
-                <ul>
-                  {group.rows.map((row) => {
-                    const isSelected = previewing && selected?.id === row.id;
-                    const item = (
-                      <li className="flex items-center">
-                        <button
-                          type="button"
-                          data-row-id={row.id}
-                          aria-pressed={previewing ? isSelected : undefined}
-                          onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
-                          onDoubleClick={previewing ? () => open(row) : undefined}
-                          onKeyDown={(event) => {
-                            // Enter opens, as a double-click does; Space still selects.
-                            if (!previewing || event.key !== 'Enter') return;
-                            event.preventDefault();
-                            open(row);
-                          }}
-                          className={cx(
-                            'group flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm md:min-h-9',
-                            rowInteractiveClassName,
-                            focusRingInsetClassName,
-                            isSelected
-                              ? `${selectedRowClassName} text-accent`
-                              : 'border-l-2 border-l-transparent'
-                          )}
+            <nav
+              aria-label={t('fittings.start.listLabel')}
+              className={`overflow-y-auto border border-line bg-panel ${listHeight}`}
+              onKeyDown={(event) => {
+                // Arrow keys walk the list: focus moves, and with a preview the pick too.
+                if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                // From a row's ⋮ too, not just the row itself.
+                const focusedId = document.activeElement
+                  ?.closest('li')
+                  ?.querySelector<HTMLElement>('[data-row-id]')?.dataset.rowId;
+                const from = visible.findIndex(
+                  (row) => row.id === (previewing ? selected?.id : focusedId)
+                );
+                const next = visible[from + (event.key === 'ArrowDown' ? 1 : -1)];
+                if (!next) return;
+                event.preventDefault();
+                if (previewing) setSelectedId(next.id);
+                event.currentTarget
+                  .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(next.id)}"]`)
+                  ?.focus();
+              }}
+            >
+              {searching && (
+                <p className="border-b border-line px-3 py-2 text-xs text-text-dim" role="status">
+                  {t('fittings.start.matches', { count: visible.length })}
+                </p>
+              )}
+              {groups.length === 0 && (
+                <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
+              )}
+              {groups.map((group) => (
+                <section key={group.hull ?? ''} className="pb-1">
+                  <h3 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {group.hull ?? t('fittings.myFittings.unknownHull')}
+                  </h3>
+                  <ul>
+                    {group.rows.map((row) => {
+                      const isSelected = previewing && selected?.id === row.id;
+                      const item = (
+                        <li className="flex items-center">
+                          <button
+                            type="button"
+                            data-row-id={row.id}
+                            aria-pressed={previewing ? isSelected : undefined}
+                            onClick={() => (previewing ? setSelectedId(row.id) : open(row))}
+                            onDoubleClick={previewing ? () => open(row) : undefined}
+                            onKeyDown={(event) => {
+                              // Enter opens, as a double-click does; Space still selects.
+                              if (!previewing || event.key !== 'Enter') return;
+                              event.preventDefault();
+                              open(row);
+                            }}
+                            className={cx(
+                              'group flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm md:min-h-9',
+                              rowInteractiveClassName,
+                              focusRingInsetClassName,
+                              isSelected
+                                ? `${selectedRowClassName} text-accent`
+                                : 'border-l-2 border-l-transparent'
+                            )}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                            <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
+                              {row.source === 'saved'
+                                ? t('fittings.start.sourceSaved')
+                                : t('fittings.start.sourceInGame')}
+                            </span>
+                            {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
+                            {!previewing && !rowMenus && (
+                              <Icon.Descend
+                                aria-hidden
+                                className="shrink-0 text-text-faint group-hover:text-accent"
+                              />
+                            )}
+                          </button>
+                          {rowMenus && <RowMoreActions className="shrink-0" />}
+                        </li>
+                      );
+                      return rowMenus ? (
+                        <RowActionsMenu
+                          key={row.id}
+                          name={row.name}
+                          items={rowActions.itemsFor(row)}
                         >
-                          <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                          <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
-                            {row.source === 'saved'
-                              ? t('fittings.start.sourceSaved')
-                              : t('fittings.start.sourceInGame')}
-                          </span>
-                          {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
-                          {!previewing && !rowMenus && (
-                            <Icon.Descend
-                              aria-hidden
-                              className="shrink-0 text-text-faint group-hover:text-accent"
-                            />
-                          )}
-                        </button>
-                        {rowMenus && <RowMoreActions className="shrink-0" />}
-                      </li>
-                    );
-                    return rowMenus ? (
-                      <RowActionsMenu key={row.id} name={row.name} items={rowActions.itemsFor(row)}>
-                        {item}
-                      </RowActionsMenu>
-                    ) : (
-                      <Fragment key={row.id}>{item}</Fragment>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))}
-          </nav>
-          {previewing &&
-            (selected ? (
-              <FittingPreview
-                key={selected.id}
-                row={selected}
-                catalogue={catalogue}
-                characterId={characterId}
-                onOpen={() => open(selected)}
-                onCompare={(code) =>
-                  void navigate(fittingCompareHref(`f=${encodeURIComponent(code)}`))
-                }
-                onRename={() => selected.source === 'saved' && setRenaming(selected.record)}
-                onDelete={() => selected.source === 'saved' && setDeleting(selected.record)}
-                onSaveNotes={(notes) =>
-                  selected.source === 'saved' && void setFittingNotes(selected.record, notes)
-                }
-              />
-            ) : (
-              <p className="text-sm text-text-dim">{t('fittings.start.pickToPreview')}</p>
-            ))}
-        </div>
-      )}
+                          {item}
+                        </RowActionsMenu>
+                      ) : (
+                        <Fragment key={row.id}>{item}</Fragment>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </nav>
+            {previewing &&
+              (selected ? (
+                <FittingPreview
+                  key={selected.id}
+                  row={selected}
+                  catalogue={catalogue}
+                  characterId={characterId}
+                  onOpen={() => open(selected)}
+                  onCompare={(code) =>
+                    void navigate(fittingCompareHref(`f=${encodeURIComponent(code)}`))
+                  }
+                  onRename={() => selected.source === 'saved' && setRenaming(selected.record)}
+                  onDelete={() => selected.source === 'saved' && setDeleting(selected.record)}
+                  onSaveNotes={(notes) =>
+                    selected.source === 'saved' && void setFittingNotes(selected.record, notes)
+                  }
+                />
+              ) : (
+                <p className="text-sm text-text-dim">{t('fittings.start.pickToPreview')}</p>
+              ))}
+          </div>
+        )}
+      </MaybeTabPanel>
 
       {showNew && onStartHull && (
         <NewFromHullDialog
