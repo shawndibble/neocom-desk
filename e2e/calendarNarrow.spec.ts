@@ -76,7 +76,7 @@ test('period-nav controls meet the 44px touch floor at 390px (#2107)', async ({ 
 
   const prev = page.getByRole('button', { name: /previous (month|fortnight)/i });
   const next = page.getByRole('button', { name: /next (month|fortnight)/i });
-  const today = page.getByRole('button', { name: 'Today' });
+  const today = page.getByRole('button', { name: 'Today', exact: true });
 
   for (const control of [prev, next, today]) {
     await expect(control).toBeVisible();
