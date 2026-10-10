@@ -28,6 +28,7 @@ import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyBoard } from './SurveyBoard';
 import { SurveyPicker } from './SurveyPicker';
+import { SurveyOwnerChange } from './SurveyOwnerChange';
 import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
@@ -301,7 +302,10 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               onSetIgnored={
                 owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
               }
-              onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
+              // Marking the field cleared is the owner's, like the controls beside it.
+              onFinish={
+                owned && currentId !== null && state.status === 'ready' ? finish : undefined
+              }
               owned={owned}
               viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
               afterPanel={(summary) =>
@@ -328,15 +332,28 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
               expiresAt={expiresAt}
               footerActions={
-                currentId !== null ? (
-                  <button
-                    type="button"
-                    className={textActionClassName()}
-                    onClick={() => void setCurrentId(null)}
-                  >
-                    {t('survey.newSurvey')}
-                  </button>
-                ) : undefined
+                currentId === null
+                  ? undefined
+                  : [
+                      ...(owned && characterId !== null
+                        ? [
+                            <SurveyOwnerChange
+                              key="owner"
+                              characterId={characterId}
+                              surveyId={currentId}
+                              onChanged={() => void refresh()}
+                            />,
+                          ]
+                        : []),
+                      <button
+                        key="new"
+                        type="button"
+                        className={textActionClassName()}
+                        onClick={() => void setCurrentId(null)}
+                      >
+                        {t('survey.newSurvey')}
+                      </button>,
+                    ]
               }
             />
           </>

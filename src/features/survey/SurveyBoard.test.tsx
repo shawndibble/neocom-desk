@@ -51,6 +51,38 @@ afterEach(() => {
   configureClipboard(null);
 });
 
+describe('SurveyBoard footer actions', () => {
+  it('puts a dot between each of the bottom-right actions', () => {
+    render(
+      <SurveyBoard
+        scans={SCANS}
+        url={URL}
+        expiresAt={Date.UTC(2026, 9, 15)}
+        owned
+        onFinish={async () => true}
+        footerActions={[<button key="a">Change owner</button>, <button key="b">New survey</button>]}
+      />
+    );
+    const row = screen.getByRole('button', { name: 'Mark field cleared' }).parentElement!;
+    expect(row.textContent).toBe('Mark field cleared·Change owner·New survey');
+    expect(row.querySelectorAll('[aria-hidden]')).toHaveLength(2);
+  });
+
+  it('adds no dot for a lone action', () => {
+    render(
+      <SurveyBoard
+        scans={SCANS}
+        url={URL}
+        expiresAt={null}
+        footerActions={<button>New survey</button>}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'New survey' }).parentElement?.textContent).toBe(
+      'New survey'
+    );
+  });
+});
+
 describe('SurveyBoard', () => {
   it('with no scans shows the empty state, and no paste box', () => {
     render(<SurveyBoard scans={[]} url={null} expiresAt={null} />);

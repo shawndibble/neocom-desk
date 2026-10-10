@@ -44,6 +44,7 @@ function settle(prev: Loaded, id: string, result: LoadSurveyResult): Loaded {
     if (
       result.ok &&
       result.expiresAt === before.expiresAt &&
+      result.owner === before.owner &&
       result.tax?.name === before.tax?.name &&
       result.tax?.pct === before.tax?.pct &&
       result.info?.notes === before.info?.notes &&

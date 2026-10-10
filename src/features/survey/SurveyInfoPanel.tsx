@@ -83,7 +83,9 @@ export function SurveyInfoEditor({
                 store(next, notes);
               }}
             />
-            {location !== null && <SurveyWaypointButton location={location} />}
+            {location?.id != null && (
+              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+            )}
           </div>
         </InfoRow>
         {moon && <MoonTaxRow characterId={characterId} survey={survey} />}
@@ -124,7 +126,9 @@ export function SurveyInfoReadout({
               <p className="min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">
                 {location.name}
               </p>
-              <SurveyWaypointButton location={location} />
+              {location.id !== null && (
+                <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+              )}
             </div>
           </InfoRow>
         )}

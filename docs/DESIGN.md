@@ -767,6 +767,13 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
   together (charge · range · duration · reload) joins them with a spaced
   middle dot, " · ", never commas or slashes. In the stats column `joinDetail`
   (`statKit.tsx`) does it and drops empty parts.
+- **Text actions in one row are separated by a dot.** Adjacent `textActionClassName`
+  actions in a footer or header row ("Mark field cleared · Change owner · New
+  survey") are joined by a dim, `aria-hidden` middle dot, with the row's gap
+  doing the spacing, never a rule or a border. A lone action gets none. The
+  Survey board's footer does it for you: pass actions as an array. An action in
+  such a row that opens a dialog (Change owner) stays a text action, so the row
+  reads as one group.
 - **The fitting stats column is built from one kit.** Each section's row is
   shaded `panel-2` with an uppercase micro-heading title and a
   `text-sm font-semibold` headline figure. Section bodies use only the
