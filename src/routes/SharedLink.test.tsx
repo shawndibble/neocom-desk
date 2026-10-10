@@ -164,7 +164,7 @@ describe('SharedLink', () => {
       renderAt('/share/abc123XYZ');
 
       expect(await screen.findByText("This link isn't valid")).toBeInTheDocument();
-      expect(screen.getByText(/This link expires/)).toBeInTheDocument();
+      expect(screen.getByText('Expires')).toBeInTheDocument();
     });
   });
 });
