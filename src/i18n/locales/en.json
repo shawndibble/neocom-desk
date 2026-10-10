@@ -2715,7 +2715,7 @@
     "compareSelectFor": "Select {{name}} to compare",
     "compareTitle": "Compare build plans",
     "compareBuyCost": "Cost to buy",
-    "compareHubOrdersPerDay": "Orders per day (hub region)",
+    "compareHubOrdersPerDay": "Orders per day",
     "compareHubBuyOrders": "Buy orders at hub",
     "compareHubSellOrders": "Sell orders at hub",
     "compareHubBuyVolume": "Units on buy orders",
