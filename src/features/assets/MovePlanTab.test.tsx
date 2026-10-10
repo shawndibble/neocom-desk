@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { planMove } from '@/engine/assets/movePlan';
 import { MovePlanTab } from './MovePlanTab';
+
+vi.mock('@/engine/assets/movePlan', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/engine/assets/movePlan')>();
+  return { ...actual, planMove: vi.fn(actual.planMove) };
+});
 
 const asset = (item_id: number, type_id: number, location_id: number, quantity = 1000) => ({
   item_id,
@@ -151,5 +157,38 @@ describe('MovePlanTab', () => {
     expect((show as HTMLButtonElement).disabled).toBe(true);
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
     expect((show as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('puts focus on the plan heading after Show plan, and back on Deliver to after Back', async () => {
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+    const plan = await screen.findByRole('heading', { name: 'Plan a move' });
+    await waitFor(() => expect(document.activeElement).toBe(plan));
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    const deliver = await screen.findByRole('heading', { name: 'Deliver to' });
+    await waitFor(() => expect(document.activeElement).toBe(deliver));
+  });
+
+  it('announces a plan that could not be worked out', async () => {
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    vi.mocked(planMove).mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
+    const status = screen.getAllByRole('status').find((el) => el.className.includes('sr-only'));
+    expect(status).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+    await waitFor(() => expect(status!.textContent).toMatch(/could not work out the plan/i));
+  });
+
+  it('keeps focused rows clear of the sticky bars', async () => {
+    await open();
+    const scroller = screen.getByRole('region', { name: 'Plan a move' });
+    expect(scroller.className).toContain('scroll-pb-');
+    expect(scroller.className).toContain('max-sm:scroll-pt-');
   });
 });

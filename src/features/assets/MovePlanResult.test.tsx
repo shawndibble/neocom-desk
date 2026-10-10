@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -36,6 +37,22 @@ const plan = {
   comparison: [{ hull, trips: 2 }],
 } as MovePlan;
 
+const shipPlan = {
+  ...plan,
+  totals: { ...plan.totals, shipsToFly: 1 },
+  perCharacter: [
+    {
+      ...plan.perCharacter[0],
+      pickups: [
+        {
+          ...plan.perCharacter[0].pickups[0],
+          ships: [{ itemId: 77, typeId: 648 }],
+        },
+      ],
+    },
+  ],
+} as MovePlan;
+
 describe('PlanResult', () => {
   it('has one Back control and puts the unit on each trip lane label', () => {
     render(
@@ -49,6 +66,7 @@ describe('PlanResult', () => {
           }}
           scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
+          headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
           onBack={vi.fn()}
           onDone={vi.fn()}
@@ -80,6 +98,7 @@ describe('PlanResult', () => {
           }}
           scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
+          headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
           onBack={vi.fn()}
           onDone={vi.fn()}
@@ -97,21 +116,6 @@ describe('PlanResult', () => {
   });
 
   describe('Pack instead', () => {
-    const shipPlan = {
-      ...plan,
-      totals: { ...plan.totals, shipsToFly: 1 },
-      perCharacter: [
-        {
-          ...plan.perCharacter[0],
-          pickups: [
-            {
-              ...plan.perCharacter[0].pickups[0],
-              ships: [{ itemId: 77, typeId: 648 }],
-            },
-          ],
-        },
-      ],
-    } as MovePlan;
     const setup = (rigs: number) => {
       const onPackShip = vi.fn();
       render(
@@ -125,6 +129,7 @@ describe('PlanResult', () => {
             }}
             scope={{ characters: [], activeCharacterId: null } as never}
             compareOpen={false}
+            headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
             onBack={vi.fn()}
             onDone={vi.fn()}
@@ -177,6 +182,7 @@ describe('PlanResult', () => {
             }}
             scope={{ characters: [], activeCharacterId: null } as never}
             compareOpen={false}
+            headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
             onBack={vi.fn()}
             onDone={vi.fn()}
@@ -207,6 +213,67 @@ describe('PlanResult', () => {
       expect(screen.getByRole('checkbox', { name: "Don't remind me again" })).toBeTruthy();
       await userEvent.click(screen.getByRole('button', { name: 'Pack anyway' }));
       expect(onPackShip).toHaveBeenCalledWith(77);
+    });
+  });
+
+  describe('focus after Pack instead', () => {
+    /** Packing moves the ship from `ships` to `lines`, so the Pack button disappears. */
+    function Harness({ rigs }: { rigs: number }) {
+      const [packed, setPacked] = useState(false);
+      const pickup = shipPlan.perCharacter[0].pickups[0];
+      const next = packed
+        ? ({
+            ...shipPlan,
+            perCharacter: [
+              {
+                ...shipPlan.perCharacter[0],
+                pickups: [{ ...pickup, ships: [], lines: [{ typeId: 648, quantity: 1, m3: 5 }] }],
+              },
+            ],
+          } as MovePlan)
+        : shipPlan;
+      return (
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: next,
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            scope={{ characters: [], activeCharacterId: null } as never}
+            compareOpen={false}
+            headingRef={{ current: null }}
+            onToggleCompare={vi.fn()}
+            onBack={vi.fn()}
+            onDone={vi.fn()}
+            onPackShip={() => setPacked(true)}
+            rigsOf={() => rigs}
+            canPack={() => true}
+            name={() => 'Badger'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+    }
+
+    it('lands on the pickup heading when the ship packs straight away', async () => {
+      render(<Harness rigs={0} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      expect(screen.queryByRole('button', { name: 'Pack instead' })).toBeNull();
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Jita 4-4/ }))
+      );
+    });
+
+    it('lands on the pickup heading after the rig warning closes', async () => {
+      render(<Harness rigs={2} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Pack anyway' }));
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Jita 4-4/ }))
+      );
     });
   });
 });
