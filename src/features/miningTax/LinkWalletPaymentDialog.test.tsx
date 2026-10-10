@@ -171,7 +171,7 @@ describe('LinkWalletPaymentDialog', () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('Paid in kind · 2026-09-11'));
 
-    expect(screen.getByText('Matches exactly ✓')).toBeInTheDocument();
+    expect(screen.getByText('Matches exactly')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /^Remember/ })).not.toBeInTheDocument();
     await userEvent.type(screen.getByRole('textbox', { name: 'Value handed over' }), '500,000');
     await userEvent.click(screen.getByRole('button', { name: 'Mark 3 paid with this payment' }));
