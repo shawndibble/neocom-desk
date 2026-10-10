@@ -108,10 +108,7 @@ export async function signInAndGoto(
     },
     settings: [
       { key: ACTIVE_CHARACTER_KEY, value: CHARACTER_ID },
-      // The rail's first-run question would cover the page, and its short
-      // default set would hide pages specs expect to find: seed it answered,
-      // with nothing hidden.
-      { key: 'sync.navSetupAnswered', value: true },
+      // Nothing hidden, so specs find every page.
       { key: 'sync.navHidden', value: [] },
     ],
   };

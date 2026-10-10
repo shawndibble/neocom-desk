@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Tabs } from '@/components/ui';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
-import { SHIPS_TABS, type ShipsTab } from './shipsTabs';
+import { SHIPS_TABS, SHIPS_TABS_ID, type ShipsTab } from './shipsTabs';
 
 /** The Ships section's tab bar — Fittings, Tree — under the page header, as Industry's is. */
 export function ShipsTabBar() {
@@ -10,6 +10,7 @@ export function ShipsTabBar() {
   const [tab, setTab] = usePageTab(SHIPS_TABS);
   return (
     <Tabs
+      tabsId={SHIPS_TABS_ID}
       label={t('nav.ships')}
       value={tab}
       onChange={(id) => setTab(id as ShipsTab)}

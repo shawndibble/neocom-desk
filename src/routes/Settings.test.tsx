@@ -306,7 +306,10 @@ describe('Settings', () => {
     render(<App />);
     await openTab(user, /activity log/i);
 
-    expect(screen.getByRole('button', { name: /clear log/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /clear log/i })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
 
     act(() => {
       useActivityLog.getState().record({
@@ -328,7 +331,9 @@ describe('Settings', () => {
 
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
     expect(await screen.findByText(/log cleared/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /clear log/i })).toBeDisabled();
+    // aria-disabled, not disabled: the pressed button keeps keyboard focus (issue #3365).
+    expect(document.activeElement).toBe(clearButton);
+    expect(clearButton).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('clears cached ESI data on demand (issue #422)', async () => {
@@ -1646,8 +1651,8 @@ describe('Settings — phone tab bar', () => {
     await waitFor(async () => {
       expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([
         '/overview',
-        '/alerts',
         '/skills',
+        '/market',
         '/wallet',
       ]);
     });
@@ -1974,5 +1979,18 @@ describe('Settings — review follow-ups', () => {
       await screen.findByRole('button', { name: /clear cached esi data/i })
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /data credit/i })).not.toBeInTheDocument();
+  });
+
+  it('gives both backup password inputs a visible <label for>', async () => {
+    window.history.pushState({}, '', '/settings/dataAge');
+    const { container } = render(<App />);
+
+    await screen.findByRole('button', { name: /clear cached esi data/i });
+    const inputs = screen.getAllByLabelText('Password');
+    expect(inputs).toHaveLength(2);
+    for (const input of inputs) {
+      expect(input.id).not.toBe('');
+      expect(container.querySelector(`label[for="${input.id}"]`)).toBeInTheDocument();
+    }
   });
 });

@@ -16,6 +16,7 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  LiveStatus,
   SearchInput,
   Select,
   SelectContent,
@@ -318,6 +319,14 @@ export function JournalTable({
           />
         </p>
       )}
+      <LiveStatus>
+        {filterIsActive &&
+          filteredJournal.length > 0 &&
+          t('wallet.journalFilteredSummaryStatus', {
+            count: filteredJournal.length,
+            net: signedIsk(filteredNet, 2),
+          })}
+      </LiveStatus>
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}

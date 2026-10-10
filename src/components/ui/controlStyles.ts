@@ -40,6 +40,21 @@ export const interactiveClassName =
 export const focusRingClassName =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
 
+/**
+ * The active option of a menu or search picker (DESIGN.md §6c "Highlighted
+ * option"): the inset 2px accent ring, drawn only while the last input was
+ * the keyboard (`data-input` on `<html>`, `app/inputModality.ts`), so a
+ * hovering pointer keeps just the `panel-2` fill. A picker composes
+ * `activeOptionClassName` on the option it highlights; a Radix menu item
+ * composes `highlightedOptionClassName`, as the item is only highlighted
+ * while `data-highlighted` is set.
+ */
+export const activeOptionClassName =
+  'in-data-[input=keyboard]:outline-2 in-data-[input=keyboard]:-outline-offset-2 in-data-[input=keyboard]:outline-accent';
+
+export const highlightedOptionClassName =
+  'data-[highlighted]:in-data-[input=keyboard]:outline-2 data-[highlighted]:in-data-[input=keyboard]:-outline-offset-2 data-[highlighted]:in-data-[input=keyboard]:outline-accent';
+
 export const focusRingInsetClassName =
   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 

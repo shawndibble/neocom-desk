@@ -301,7 +301,20 @@ service cloud.firestore {
         && (request.resource.data.type != 'dscan'
           || (request.resource.data.payload.text is string
             && request.resource.data.payload.text.size() <= 50000));
-      allow update, delete: if false;
+      // The one update a share allows: handing a survey to another Character
+      // (src/features/survey/surveyStore.ts setSurveyOwner). Only `payload.owner`
+      // may change, to a non-empty name; the survey is named by Character name,
+      // which rules can't check against a sign-in, so the app only offers it to
+      // the current owner.
+      allow update: if request.auth != null
+        && resource.data.type == 'survey'
+        && resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['payload'])
+        && request.resource.data.payload.diff(resource.data.payload).affectedKeys().hasOnly(['owner'])
+        && request.resource.data.payload.owner is string
+        && request.resource.data.payload.owner.size() > 0
+        && request.resource.data.payload.owner.size() <= 400;
+      allow delete: if false;
 
       // A Survey's scans (src/features/survey/surveyStore.ts): one create-only
       // doc per pasted Survey Scan, under a `survey` share. Anyone holding the
@@ -352,6 +365,36 @@ service cloud.firestore {
           && request.resource.data.pct is number
           && request.resource.data.pct >= 0
           && request.resource.data.pct <= 100
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt
+            == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
+        allow update, delete: if false;
+      }
+
+      // A Survey's location and notes (src/features/survey/surveyStore.ts): where
+      // the fleet is mining (a solar system, station or structure id, with its
+      // name, since a visitor can't resolve one; a manual location is a name alone) and the starter's notes. One
+      // create-only doc per change carrying the whole current info, the newest
+      // counting; a field left out is cleared. Same sign-in, owner and expiry
+      // rules as the moon tax. The client caps by characters (MAX_LOCATION_NAME, MAX_SURVEY_NOTES); these allow 4x that so multibyte text is never refused.
+      match /surveyInfo/{infoId} {
+        allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
+        allow create: if request.auth != null
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(['locationId', 'locationName', 'notes', 'createdAt', 'expiresAt'])
+          && request.resource.data.keys().hasAll(['createdAt', 'expiresAt'])
+          && (!('locationId' in request.resource.data) || 'locationName' in request.resource.data)
+          && (!('locationId' in request.resource.data)
+            || (request.resource.data.locationId is int
+              && request.resource.data.locationId > 0))
+          && (!('locationName' in request.resource.data)
+            || (request.resource.data.locationName is string
+              && request.resource.data.locationName.size() > 0
+              && request.resource.data.locationName.size() <= 480))
+          && (!('notes' in request.resource.data)
+            || (request.resource.data.notes is string
+              && request.resource.data.notes.size() <= 4000))
           && request.resource.data.createdAt == request.time
           && request.resource.data.expiresAt
             == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;

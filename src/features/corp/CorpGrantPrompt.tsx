@@ -17,7 +17,7 @@
  * prompt is eligible again — the Settings Corporation Permission row is the durable path
  * back regardless.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -25,6 +25,7 @@ import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 import { useCorpAccess } from './useCorpAccess';
 import { corpRoleLabel } from './roles';
 import {
@@ -69,10 +70,13 @@ export function CorpGrantPrompt() {
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('corp-grant', eligible);
+  const bannerRef = useRef<HTMLDivElement>(null);
   // Both, not just the slot: registration happens in an effect, so the store
   // still says "eligible" for the one commit after a dismissal flips
   // `eligible` false.
-  if (!eligible || !hasSlot) return null;
+  const shown = eligible && hasSlot;
+  useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
+  if (!shown) return null;
   // Restated rather than derived from `eligible`: a boolean carries none of
   // the narrowing the render below needs from these two.
   if (activeCharacterId === null || access.state !== 'roles-without-grant') return null;
@@ -92,6 +96,7 @@ export function CorpGrantPrompt() {
 
   return (
     <div
+      ref={bannerRef}
       role="alert"
       aria-label={t('corp.grantPromptTitle')}
       data-testid="onboarding-banner"

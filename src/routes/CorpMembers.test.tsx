@@ -265,8 +265,13 @@ describe('the roster table', () => {
       ])
     );
     const table = await rosterTable();
-    expect(within(table).getByText('90d ago').className).toContain('text-warning');
-    expect(within(table).getByText('1h ago').className).not.toContain('text-warning');
+    const dark = within(table).getByText('90d ago').closest('td')!;
+    const active = within(table).getByText('1h ago').closest('td')!;
+    expect(dark.className).toContain('text-warning');
+    expect(active.className).not.toContain('text-warning');
+    // Not hue alone (WCAG 1.4.1): the dark cell carries a glyph, the active one none.
+    expect(dark.querySelectorAll('svg')).toHaveLength(1);
+    expect(active.querySelectorAll('svg')).toHaveLength(0);
     expect(screen.getByText('Dark 30d+').parentElement).toHaveTextContent('1');
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import {
@@ -10,6 +10,7 @@ import {
 } from './installPromptRules';
 import { useInstallApp } from './installApp';
 import { useOnboardingBannerSlot } from './onboardingBannerSlot';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 
 const INSTRUCTION_KEYS = {
   'ios-safari': 'pwa.installIosSafariCta',
@@ -29,6 +30,7 @@ export function InstallPrompt() {
   const { t } = useTranslation();
   const { value: seen, hydrated, hydrate, setValue } = useInstallPromptSeen();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void hydrate();
@@ -60,7 +62,9 @@ export function InstallPrompt() {
   // Both, not just the slot: registration happens in an effect, so the store
   // still says "eligible" for the one commit after a dismissal flips
   // `variant` back to 'none'.
-  if (variant === 'none' || !hasSlot) return null;
+  const shown = variant !== 'none' && hasSlot;
+  useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
+  if (!shown) return null;
 
   const dismiss = () => void setValue(true);
 
@@ -75,6 +79,7 @@ export function InstallPrompt() {
 
   return (
     <div
+      ref={bannerRef}
       role="alert"
       data-testid="onboarding-banner"
       className="fixed bottom-16 left-4 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"

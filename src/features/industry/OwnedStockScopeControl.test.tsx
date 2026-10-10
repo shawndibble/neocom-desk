@@ -105,6 +105,22 @@ describe('OwnedStockScopeControl', () => {
     expect(screen.getByRole('checkbox', { name: 'Alice — Jita IV - Moon 4' })).toBeInTheDocument();
   });
 
+  it('is a plain labelled list, not a tree, and names each group by its heading', async () => {
+    render(
+      <OwnedStockScopeControl
+        scope={{ mode: 'selected', locations: [] }}
+        detectedStock={stockOf([placement(), corpPlacement])}
+        detection={detectionOf()}
+        onChange={() => {}}
+      />
+    );
+    await openPicker();
+    expect(screen.queryByRole('tree')).toBeNull();
+    expect(screen.getByRole('list', { name: /owned material source/i })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Corp Assets' })).toBeInTheDocument();
+  });
+
   it('groups Personal and Corp Assets once a corp placement is present', async () => {
     render(
       <OwnedStockScopeControl

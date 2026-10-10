@@ -746,7 +746,7 @@ export function Clones() {
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}
               onClick={refresh}
-              disabled={loading}
+              busy={loading}
             />
             <TableActionsMenu name={t('clones.title')} tableExport={clonesExport} />
           </span>
@@ -798,6 +798,10 @@ export function Clones() {
                   options={CLONES_SORTS.map((value) => ({
                     value,
                     label: t(`clones.sort.${value}`),
+                    // Only a note card means "no verdict"; null is still loading.
+                    ...(value === 'training' && verdictCard?.kind === 'note'
+                      ? { disabled: true, disabledReason: verdictCard.message }
+                      : {}),
                   }))}
                 />
               </div>

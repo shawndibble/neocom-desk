@@ -182,6 +182,12 @@ beforeEach(() => {
   loaders = fakeOrderDetailLoaders();
 });
 
+/** The visible count line; the sr-only `LiveStatus` repeats the same text. */
+async function findMatchCount(text: string) {
+  const matches = await screen.findAllByText(text);
+  return matches.find((el) => el.getAttribute('role') !== 'status') as HTMLElement;
+}
+
 describe('OpenOrdersPanel', () => {
   it("grants for the lapsed Character's own grant, not the active one's, and names them", async () => {
     mockedLoadAll.mockResolvedValue(
@@ -916,19 +922,25 @@ describe('OpenOrdersPanel', () => {
       renderMixedFixture();
       // Default (hideHealthy on): belowFloor + expiringOrStale match, the
       // healthy no-cost-basis order is folded out of the count.
-      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
+      // The same count reaches screen readers through the status region (issue #3354).
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole('status').some((el) => el.textContent === '2 of 3 orders match')
+        ).toBe(true)
+      );
 
       // Anchored to the chip's own accessible name (label + count), not the
       // group header button, which carries the same words plus a separator.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'Priced below cost1' }));
-      expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
     });
 
     it('keeps the whole control set behind the funnel until it is opened', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await screen.findByText('2 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
 
       expect(screen.queryByRole('combobox', { name: 'Expires within' })).not.toBeInTheDocument();
       await openFunnel(user);
@@ -944,7 +956,7 @@ describe('OpenOrdersPanel', () => {
     it('opens narrowed to the problem the link names', async () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       // One of the three, where the page's own default matches two.
-      expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
     });
 
     describe('opened for a chosen Character (issue #2936)', () => {
@@ -989,7 +1001,7 @@ describe('OpenOrdersPanel', () => {
       it('shows only that Character, states whose data it is, and leaves the active one alone', async () => {
         renderPanel('/market/orders?char=2');
         expect(await screen.findByText('Bravo only')).toBeInTheDocument();
-        expect(await screen.findByText('1 of 1 orders match')).toBeInTheDocument();
+        expect(await findMatchCount('1 of 1 orders match')).toBeInTheDocument();
         expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
       });
 
@@ -1050,7 +1062,7 @@ describe('OpenOrdersPanel', () => {
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
       renderPanel('/market/orders?orders.characters=1');
 
-      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
     });
 
     it('labels a link naming an alt other than the active Character "All characters", without widening the table it still narrows', async () => {
@@ -1096,25 +1108,25 @@ describe('OpenOrdersPanel', () => {
     it('keeps the filter it applied removable, rather than silently narrowing', async () => {
       const user = userEvent.setup();
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
-      await screen.findByText('1 of 3 orders match');
+      await findMatchCount('1 of 3 orders match');
 
       // The chip row is the only thing telling the reader why they are seeing
       // one order out of three, and the only way back to all of them.
       // "Problem: " is the chip's own prefix (`chipLabel`) — the group header
       // below carries the same words without it.
       await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
-      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
     });
 
     it('ignores a param it cannot read instead of showing an empty page', async () => {
       renderMixedFixture('/market/orders?orders.problems=nonsense');
-      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('2 of 3 orders match')).toBeInTheDocument();
     });
 
     it('still renders a zero-count problem chip, at full contrast', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await screen.findByText('2 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
       await openFunnel(user);
 
       // Nothing in this fixture is undercut at the station tier. The `0`
@@ -1127,37 +1139,37 @@ describe('OpenOrdersPanel', () => {
     it('narrows the list with the cost-basis chip pair', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await screen.findByText('2 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
 
       // Only the expiring order (visible by default) has no cost basis linked.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'No cost basis' }));
-      expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
     });
 
     it('narrows the list with the "expires within" select', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await screen.findByText('2 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
 
       // The below-floor order expires in 60 days; only the expiring order (5
       // days left) is inside a 7-day window.
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'Expires within' }));
       await user.click(screen.getByRole('option', { name: '7 days' }));
-      expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('1 of 3 orders match')).toBeInTheDocument();
     });
 
     it('narrows the list with the "ISK tied up over" select', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
-      await screen.findByText('2 of 3 orders match');
+      await findMatchCount('2 of 3 orders match');
 
       // Both visible orders tie up well under 10M ISK.
       await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'ISK tied up over' }));
       await user.click(screen.getByRole('option', { name: '10M ISK' }));
-      expect(await screen.findByText('0 of 3 orders match')).toBeInTheDocument();
+      expect(await findMatchCount('0 of 3 orders match')).toBeInTheDocument();
     });
   });
 
@@ -1199,7 +1211,7 @@ describe('OpenOrdersPanel', () => {
       expect(group).toHaveTextContent(`· ${itemCount}`);
 
       await user.click(
-        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
       );
 
       expect(loaders.regionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
@@ -1231,7 +1243,7 @@ describe('OpenOrdersPanel', () => {
 
       const group = screen.getByTestId('order-group-belowFloor');
       await user.click(
-        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
       );
       // Still in flight from opening the row's own detail view — the group
       // check must not fire a second request for the same item.

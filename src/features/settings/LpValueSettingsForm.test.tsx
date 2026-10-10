@@ -63,7 +63,7 @@ describe('LpValueSettingsForm', () => {
     expect(useLpValue.getState().value).toBe(0);
   });
 
-  it('Escape and invalid text revert to the stored rate', async () => {
+  it('Escape reverts to the stored rate; invalid text stays with an error, unsaved', async () => {
     const user = userEvent.setup();
     useLpValue.setState({ value: 900, hydrated: true });
     render(<LpValueSettingsForm />);
@@ -73,7 +73,8 @@ describe('LpValueSettingsForm', () => {
     expect(input).toHaveValue('900');
     await user.type(input, 'x');
     await user.tab();
-    expect(screen.getByRole('textbox', { name: /Your LP value/ })).toHaveValue('900');
+    expect(screen.getByRole('textbox', { name: /Your LP value/ })).toHaveValue('900x');
+    expect(screen.getByRole('alert')).toHaveTextContent('Not an ISK amount');
     expect(useLpValue.getState().value).toBe(900);
   });
 });

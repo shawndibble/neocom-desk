@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { Tooltip } from './Tooltip';
 import {
   iconButtonClassName,
@@ -32,6 +32,13 @@ interface IconButtonProps extends Omit<
   /** Present makes this a toggle: renders `aria-pressed` and takes the accent treatment when on. */
   pressed?: boolean;
   disabled?: boolean;
+  /**
+   * The control's own press has put it to work (Refresh, Scan). Sets
+   * `aria-disabled` and `aria-busy` and ignores clicks, but stays focusable
+   * with its tooltip working — native `disabled` would drop keyboard focus to
+   * the page. Looks the same as `disabled`; no spinner (pass one as `icon`).
+   */
+  busy?: boolean;
   /**
    * `ghost` (default) carries the hairline border of a Button. `plain` drops
    * it, for affordances that sit inside a row and would otherwise draw a box
@@ -92,6 +99,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     onClick,
     pressed,
     disabled = false,
+    busy = false,
     variant = 'ghost',
     tone = 'default',
     size = 'md',
@@ -102,6 +110,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   },
   ref
 ) {
+  const ariaDisabled = busy || rest['aria-disabled'] === true || rest['aria-disabled'] === 'true';
+  // Same guard as `Button`: `aria-disabled` alone does not stop the browser delivering the click.
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (ariaDisabled) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.();
+  };
   return (
     <Tooltip content={tooltip ?? label} openOnTap={openOnTap}>
       <button
@@ -110,8 +127,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         type="button"
         aria-label={label}
         aria-pressed={pressed}
+        aria-disabled={ariaDisabled || undefined}
+        aria-busy={busy || undefined}
         disabled={disabled}
-        onClick={onClick}
+        onClick={handleClick}
         className={iconButtonClassName({
           variant,
           tone,
@@ -119,7 +138,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           withText: visibleLabel !== undefined,
           pressed,
           // `aria-disabled` (a tooltip-bearing inert button) must not hover either.
-          disabled: disabled || rest['aria-disabled'] === true || rest['aria-disabled'] === 'true',
+          disabled: disabled || ariaDisabled,
           className,
         })}
       >

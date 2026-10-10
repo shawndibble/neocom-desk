@@ -178,7 +178,10 @@ export function EventDetailModal({
           </p>
           <div className="space-y-2 border-t border-line pt-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <p
+                id="rsvp-response-label"
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
                 {t('calendar.yourResponse')}
               </p>
               {/*
@@ -201,7 +204,11 @@ export function EventDetailModal({
                   );
                 })()}
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div
+              role="group"
+              aria-labelledby="rsvp-response-label"
+              className="flex flex-wrap gap-2"
+            >
               {RSVP_OPTIONS.map(({ response, labelKey }) => {
                 const OptionIcon = RESPONSE_ICON[response];
                 const active = state.detail.data.response === response;

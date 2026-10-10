@@ -1335,7 +1335,7 @@ export function MaterialsTable({
         className={cx(
           editableValueClassName,
           'tabular-nums',
-          owned > 0 ? 'text-accent' : 'text-text-faint'
+          owned > 0 ? 'text-accent' : 'text-text-dim'
         )}
       >
         <span className="sr-only">

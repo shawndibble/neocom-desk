@@ -62,33 +62,33 @@ test('a sync error is visible at 390px from a route outside /skills/plans', asyn
 
   // The note is absent while sync is healthy — otherwise the assertion below
   // would pass on a note that was always there.
-  await expect(page.getByText(ERROR_NOTE)).toHaveCount(0);
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toHaveCount(0);
 
   await forceSyncError(page);
-  await expect(page.getByText(ERROR_NOTE)).toBeVisible();
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toBeVisible();
 });
 
 test('the shell note follows the pilot across routes at 390px', async ({ page }) => {
   await openRoute(page, './settings', 'Settings');
   await forceSyncError(page);
-  await expect(page.getByText(ERROR_NOTE)).toBeVisible();
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toBeVisible();
 
   // A client-side route change keeps the module state, so the note should
   // simply still be there — the point of mounting it in the shell. `/overview`
   // is in `DEFAULT_MOBILE_TABS`, so the link is in the phone's tab bar.
   await page.getByRole('link', { name: 'Overview' }).first().click();
   await page.waitForURL(/\/overview$/);
-  await expect(page.getByText(ERROR_NOTE)).toBeVisible();
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toBeVisible();
 });
 
 test('/skills/plans shows exactly one note, not the shell note plus its own', async ({ page }) => {
   await openRoute(page, './skills/plans', 'Skills');
   await forceSyncError(page);
-  await expect(page.getByText(ERROR_NOTE)).toHaveCount(1);
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toHaveCount(1);
 });
 
 test('the note is kept at desktop width, where /skills/plans already had it', async ({ page }) => {
   await openRoute(page, './settings', 'Settings', DESKTOP);
   await forceSyncError(page);
-  await expect(page.getByText(ERROR_NOTE)).toBeVisible();
+  await expect(page.locator('p', { hasText: ERROR_NOTE })).toBeVisible();
 });
