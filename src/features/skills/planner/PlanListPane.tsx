@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,6 +12,7 @@ import {
   IconButton,
   Panel,
   Spinner,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { markPlanDeleted, scheduleSync } from '@/sync';
@@ -144,10 +145,7 @@ export function PlanListPane({
   }
 
   const [certifiedOpen, setCertifiedOpen] = useState(false);
-  // Set by the menu item; the dialog opens once the menu has handed focus back
-  // to its trigger, so the native <dialog> restores focus there on close
-  // rather than to a menu item that has already unmounted.
-  const openCertifiedAfterMenu = useRef(false);
+  const newPlanMenu = useOpenAfterMenu();
 
   // Named after the certified plan already, so no rename-on-arrival flag.
   async function handleCreateFromCertified(
@@ -236,20 +234,8 @@ export function PlanListPane({
                 label={t('plans.newPlanOptions')}
               />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onCloseAutoFocus={() => {
-                if (openCertifiedAfterMenu.current) {
-                  openCertifiedAfterMenu.current = false;
-                  setCertifiedOpen(true);
-                }
-              }}
-            >
-              <DropdownMenuItem
-                onSelect={() => {
-                  openCertifiedAfterMenu.current = true;
-                }}
-              >
+            <DropdownMenuContent align="end" onCloseAutoFocus={newPlanMenu.onCloseAutoFocus}>
+              <DropdownMenuItem onSelect={() => newPlanMenu.run(() => setCertifiedOpen(true))}>
                 {t('plans.fromCertifiedItem')}
               </DropdownMenuItem>
             </DropdownMenuContent>

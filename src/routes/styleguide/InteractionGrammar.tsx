@@ -4,10 +4,15 @@ import {
   Button,
   Caret,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconButton,
   InfoTooltip,
   IskAmount,
   MenuItem,
+  Modal,
   Panel,
   RowActionsMenu,
   RowCaret,
@@ -17,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
   textActionClassName,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
@@ -46,6 +52,33 @@ function Cue({ rule, note, children }: { rule: string; note?: string; children: 
       <div className="flex flex-wrap items-center gap-3 text-sm">{children}</div>
       {note && <p className="text-xs text-text-dim">{note}</p>}
     </div>
+  );
+}
+
+/** A menu item that opens a dialog, opened only once the menu has closed (`useOpenAfterMenu`). */
+function MenuOpensDialogSample({ k }: { k: (key: string) => string }) {
+  const [open, setOpen] = useState(false);
+  const afterMenu = useOpenAfterMenu();
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton
+            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+            label={k('samples.menuDialogTrigger')}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" onCloseAutoFocus={afterMenu.onCloseAutoFocus}>
+          <DropdownMenuItem onSelect={() => afterMenu.run(() => setOpen(true))}>
+            {k('samples.menuDialogItem')}
+          </DropdownMenuItem>
+          <DropdownMenuItem>{k('samples.menuItemDuplicate')}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Modal open={open} onClose={() => setOpen(false)} title={k('samples.menuDialogTitle')}>
+        <p className="text-sm">{k('samples.menuDialogBody')}</p>
+      </Modal>
+    </>
   );
 }
 
@@ -224,6 +257,9 @@ export function InteractionGrammar() {
               )}
             />
           </div>
+        </Cue>
+        <Cue rule={k('rules.menuOpensDialog')} note={k('notes.menuOpensDialog')}>
+          <MenuOpensDialogSample k={k} />
         </Cue>
         <Cue rule={k('rules.selectedRow')} note={k('notes.selectedRow')}>
           <div className="w-full">

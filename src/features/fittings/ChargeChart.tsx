@@ -148,12 +148,12 @@ export function ChargeChart({
     <div className="space-y-2">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        role="img"
+        role="group"
         aria-label={t('fittings.chargePicker.chartLabel')}
         className="block h-auto w-full text-[0.6875rem]"
       >
         {ticksY.map((v) => (
-          <g key={`y${v}`}>
+          <g key={`y${v}`} aria-hidden="true">
             <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="stroke-line" />
             <text x={PAD.left - 4} y={y(v) + 3} textAnchor="end" className="fill-text-dim">
               {v}
@@ -163,6 +163,7 @@ export function ChargeChart({
         {ticksX.map((v) => (
           <text
             key={`x${v}`}
+            aria-hidden="true"
             x={x(v * 1000)}
             y={H - PAD.bottom + 12}
             textAnchor="middle"

@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useId, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { FieldNoteContext } from './fieldNote';
 
 /**
  * `compact` is the fitting stats column's: dim 12px labels sized to their
@@ -91,19 +92,25 @@ export function Field({
   const variant = useContext(VariantContext);
   const labelClassName = LABEL[variant][tone ?? 'normal'];
   const inlineRow = inline && variant === 'form';
+  const noteId = useId();
+  const hasNote = note !== undefined && note !== null && note !== false;
   return (
-    <div className={cx('col-span-full grid', inlineRow ? INLINE_ROW : ROW[variant])}>
-      {htmlFor ? (
-        <label htmlFor={htmlFor} className={labelClassName}>
-          {label}
-        </label>
-      ) : (
-        <span className={labelClassName}>{label}</span>
-      )}
-      <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
-      {note !== undefined && note !== null && note !== false && (
-        <p className={inlineRow ? INLINE_NOTE : NOTE[variant]}>{note}</p>
-      )}
-    </div>
+    <FieldNoteContext.Provider value={hasNote ? noteId : undefined}>
+      <div className={cx('col-span-full grid', inlineRow ? INLINE_ROW : ROW[variant])}>
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className={labelClassName}>
+            {label}
+          </label>
+        ) : (
+          <span className={labelClassName}>{label}</span>
+        )}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
+        {hasNote && (
+          <p id={noteId} className={inlineRow ? INLINE_NOTE : NOTE[variant]}>
+            {note}
+          </p>
+        )}
+      </div>
+    </FieldNoteContext.Provider>
   );
 }

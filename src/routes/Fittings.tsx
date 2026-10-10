@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
+import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -15,6 +16,8 @@ import {
   Panel,
   SlideOver,
   Tabs,
+  TabPanel,
+  useTabsId,
   TextInput,
   Toast,
   useTimedToast,
@@ -162,6 +165,8 @@ function FittingsPage() {
   const view = resolveFittingView(storedView, isPhone);
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
+  // One tab bar renders at a time (phone sheet or docked/wide), so one id base serves both.
+  const viewTabsId = useTabsId();
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
   // The module dialog's variations start folded: a tap on a module is
@@ -429,6 +434,7 @@ function FittingsPage() {
         onStartHull={startHull}
         pageTitle={t('nav.ships')}
         pageTabs={<ShipsTabBar />}
+        pageTabsPanel={{ tabsId: SHIPS_TABS_ID, tabId: 'fittings' }}
       />
     );
   }
@@ -710,6 +716,7 @@ function FittingsPage() {
             (addMode === 'sheet' ? (
               <div className="space-y-3">
                 <Tabs
+                  tabsId={viewTabsId}
                   tabs={[
                     { id: 'ring', label: t('fittings.view.ring') },
                     { id: 'list', label: t('fittings.view.list') },
@@ -726,7 +733,13 @@ function FittingsPage() {
                   }}
                   label={t('fittings.phoneTabs.label')}
                 />
-                {phoneTab === 'stats' ? statsSections : editor}
+                <TabPanel
+                  tabsId={viewTabsId}
+                  tabId={phoneTab === 'stats' ? 'stats' : view}
+                  className="space-y-3"
+                >
+                  {phoneTab === 'stats' ? statsSections : editor}
+                </TabPanel>
               </div>
             ) : (
               <div
@@ -770,6 +783,7 @@ function FittingsPage() {
                   }`}
                 >
                   <Tabs
+                    tabsId={viewTabsId}
                     tabs={[
                       { id: 'ring', label: t('fittings.view.ring') },
                       { id: 'list', label: t('fittings.view.list') },
@@ -778,7 +792,9 @@ function FittingsPage() {
                     onChange={(id) => void setView(id as FittingView)}
                     label={t('fittings.view.label')}
                   />
-                  {editor}
+                  <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
+                    {editor}
+                  </TabPanel>
                 </div>
                 {statsSections}
               </div>

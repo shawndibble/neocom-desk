@@ -95,7 +95,8 @@ function PrefetchIndicator() {
       <span
         role="status"
         aria-label={label}
-        className="inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent"
+        tabIndex={0}
+        className={`inline-block size-2 shrink-0 motion-safe:animate-pulse rounded-full bg-accent ${focusRingClassName}`}
       />
     </Tooltip>
   );

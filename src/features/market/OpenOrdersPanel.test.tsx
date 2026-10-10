@@ -1199,7 +1199,7 @@ describe('OpenOrdersPanel', () => {
       expect(group).toHaveTextContent(`· ${itemCount}`);
 
       await user.click(
-        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
       );
 
       expect(loaders.regionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
@@ -1231,7 +1231,7 @@ describe('OpenOrdersPanel', () => {
 
       const group = screen.getByTestId('order-group-belowFloor');
       await user.click(
-        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+        within(group).getByRole('button', { name: /^Refresh system & region prices for / })
       );
       // Still in flight from opening the row's own detail view — the group
       // check must not fire a second request for the same item.

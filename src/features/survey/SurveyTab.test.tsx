@@ -68,7 +68,7 @@ function renderTab(entry: string | { pathname: string; state: unknown } = '/mini
   return render(
     <MemoryRouter initialEntries={[entry]}>
       <Grab />
-      <SurveyTab tabBar={<div />} />
+      <SurveyTab tabBar={<div />} tabsId="t" />
     </MemoryRouter>
   );
 }
