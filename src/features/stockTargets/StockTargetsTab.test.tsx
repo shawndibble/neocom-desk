@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { buildStockRows } from '@/engine/stockTargets/stockRows';
 import type { StockList } from '@/engine/stockTargets/stockLists';
+import { encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import { ItemActionsContext, type ItemActions } from '@/features/market/itemActions';
 import { useSelectedStockList, useStockLists } from './stockListsStore';
 import { StockTargetsTab } from './StockTargetsTab';
@@ -60,9 +61,9 @@ const efa: StockList = {
   ],
 };
 
-function renderTab() {
+function renderTab(path = '/assets/targets') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <ItemActionsContext.Provider value={actions}>
         <StockTargetsTab activeCharacterId={1} />
       </ItemActionsContext.Provider>
@@ -136,5 +137,21 @@ describe('StockTargetsTab', () => {
     const table = await screen.findByRole('table', { name: 'Stock targets' });
     await userEvent.click(within(table).getByText('Warrior II'));
     expect(showInfo).toHaveBeenCalledWith(WARRIOR, 'Warrior II');
+  });
+
+  it('saves a copy of a shared list from its link', async () => {
+    seed([]);
+    const code = encodeStockListShare({
+      name: 'Efa Market',
+      items: [{ typeId: CATALYST, target: 40 }],
+    });
+    renderTab(`/assets/targets?list=${code}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Save a copy' }));
+    await waitFor(() => expect(useStockLists.getState().value).toHaveLength(1));
+    expect(useStockLists.getState().value[0]).toMatchObject({
+      name: 'Efa Market',
+      items: [{ typeId: CATALYST, target: 40 }],
+    });
+    expect(screen.queryByRole('region', { name: 'Shared stock list' })).not.toBeInTheDocument();
   });
 });

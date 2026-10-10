@@ -10385,6 +10385,15 @@
       "status": "Status",
       "remove": "Remove from list"
     },
+    "share": {
+      "copy": "Copy share link",
+      "copied": "Share link copied",
+      "bannerLabel": "Shared stock list",
+      "banner_one": "Someone shared \"{{name}}\" with you: {{count}} item. Save a copy to count it against your own stock.",
+      "banner_other": "Someone shared \"{{name}}\" with you: {{count}} items. Save a copy to count it against your own stock.",
+      "save": "Save a copy",
+      "dismiss": "Dismiss"
+    },
     "dialog": {
       "menuItem": "Set stock target…",
       "title": "Stock target for {{name}}",

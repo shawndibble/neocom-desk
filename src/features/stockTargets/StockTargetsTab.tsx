@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import {
   Button,
   DataAgeBadge,
@@ -30,6 +31,7 @@ import {
   Spinner,
   StatChip,
   StatChips,
+  Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -45,6 +47,8 @@ import { STOCK_STATUSES, summarizeStock, type StockStatus } from '@/engine/stock
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { formatIskCompact } from '@/lib/isk';
+import { writeToClipboard } from '@/lib/clipboard';
+import { decodeStockListShare, encodeStockListShare } from '@/engine/stockTargets/stockListShare';
 import {
   AddStockItemsDialog,
   DeleteStockListDialog,
@@ -59,6 +63,8 @@ type View = 'manager' | 'builder';
 type Dialog = 'new' | 'rename' | 'delete' | 'add' | null;
 
 const ANYWHERE = 'anywhere';
+/** The Targets tab's query param carrying a shared Stock List's code. */
+const SHARE_PARAM = 'list';
 
 export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: number | null }) {
   const { t } = useTranslation();
@@ -83,6 +89,10 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
   const [statusFilter, setStatusFilter] = useState<StockStatus | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sharedCode = searchParams.get(SHARE_PARAM);
+  const shared = sharedCode ? decodeStockListShare(sharedCode) : null;
 
   const [loaded, setLoaded] = useState<{ key: string; data: StockTargetsData } | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -167,9 +177,50 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
     </>
   );
 
+  function dismissShared() {
+    setSearchParams(
+      (params) => {
+        params.delete(SHARE_PARAM);
+        return params;
+      },
+      { replace: true }
+    );
+  }
+
+  function saveSharedCopy() {
+    if (!shared) return;
+    const id = newStockListId();
+    update(
+      shared.items.reduce(
+        (acc, item) => setStockTarget(acc, id, item.typeId, item.target),
+        addStockList(lists, { id, name: shared.name })
+      )
+    );
+    void setSelectedId(id);
+    dismissShared();
+  }
+
+  const sharedBanner = shared && (
+    <div
+      role="region"
+      aria-label={t('stockTargets.share.bannerLabel')}
+      className="flex flex-wrap items-center gap-2 rounded-xs border border-accent-dim bg-panel px-3 py-2 text-sm"
+    >
+      <span className="min-w-0 flex-1">
+        {t('stockTargets.share.banner', { name: shared.name, count: shared.items.length })}
+      </span>
+      <Button variant="primary" onClick={saveSharedCopy}>
+        {t('stockTargets.share.save')}
+      </Button>
+      <Button onClick={dismissShared}>{t('stockTargets.share.dismiss')}</Button>
+    </div>
+  );
+  const toastEl = toast && <Toast message={toast} onClose={() => setToast(null)} />;
+
   if (!list) {
     return (
       <>
+        {sharedBanner}
         <EmptyState
           title={t('stockTargets.emptyTitle')}
           hint={t('stockTargets.emptyHint')}
@@ -180,6 +231,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
           }
         />
         {dialogs}
+        {toastEl}
       </>
     );
   }
@@ -204,6 +256,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {sharedBanner}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={list.id} onValueChange={(id) => void setSelectedId(id)}>
           <SelectTrigger
@@ -233,6 +286,16 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setDialog('rename')}>
               {t('stockTargets.list.renameEllipsis')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={list.items.length === 0}
+              onSelect={() => {
+                const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+                const url = `${window.location.origin}${base}/assets/targets?${SHARE_PARAM}=${encodeStockListShare(list)}`;
+                void writeToClipboard(url).then(() => setToast(t('stockTargets.share.copied')));
+              }}
+            >
+              {t('stockTargets.share.copy')}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setDialog('delete')}>
               {t('stockTargets.list.deleteEllipsis')}
@@ -375,6 +438,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
         />
       )}
       {dialogs}
+      {toastEl}
     </div>
   );
 }
