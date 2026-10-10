@@ -284,7 +284,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   <div
                     id={headingId}
                     role="presentation"
-                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase"
+                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
                   >
                     {t(group.provider.labelKey)}
                     {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
@@ -325,15 +325,13 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                             <span className="flex min-w-0 flex-1 flex-col">
                               <span className="truncate">{result.label}</span>
                               {result.sublabel && (
-                                <span className="truncate text-xs text-text-faint">
+                                <span className="truncate text-xs text-text-dim">
                                   {result.sublabel}
                                 </span>
                               )}
                             </span>
                             {result.hint && (
-                              <span className="shrink-0 text-xs text-text-faint">
-                                {result.hint}
-                              </span>
+                              <span className="shrink-0 text-xs text-text-dim">{result.hint}</span>
                             )}
                             {result.locked && (
                               <>
@@ -348,7 +346,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                         );
                       })}
                       {query.trim() !== '' && group.results.length >= GROUP_LIMIT && (
-                        <div className="px-2 py-1 text-xs text-text-faint">
+                        <div className="px-2 py-1 text-xs text-text-dim">
                           {t('commandPalette.groupCapped', { count: GROUP_LIMIT })}
                         </div>
                       )}

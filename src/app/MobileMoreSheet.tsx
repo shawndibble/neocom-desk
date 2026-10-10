@@ -125,8 +125,15 @@ export function MobileMoreSheet({
     if (!editing || !canHide(page.path)) return link;
     const pageHidden = hiddenSet.has(page.path);
     return (
-      <div key={page.path} className={pageHidden ? 'relative opacity-60' : 'relative'}>
+      <div key={page.path} className="relative">
         {link}
+        {pageHidden && (
+          <Icon.NavHidden
+            aria-hidden="true"
+            size={Icon.ICON_SIZE.sm}
+            className="pointer-events-none absolute top-1.5 left-1.5 text-text-dim"
+          />
+        )}
         <NavHideToggle
           path={page.path}
           label={t(page.labelKey)}

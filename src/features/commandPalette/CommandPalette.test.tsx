@@ -158,6 +158,14 @@ describe('CommandPalette', () => {
     expect(screen.queryByRole('group', { name: 'Commands' })).not.toBeInTheDocument();
   });
 
+  it('keeps the decoration-only text-faint token out of the list', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    const list = await screen.findByRole('listbox');
+    expect(list.querySelectorAll('.text-text-faint')).toHaveLength(0);
+  });
+
   it('finds Industry › Opportunities for "opp" and Enter navigates there', async () => {
     const user = userEvent.setup();
     renderShell();
