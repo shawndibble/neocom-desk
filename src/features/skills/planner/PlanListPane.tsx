@@ -296,7 +296,7 @@ export function PlanListPane({
             onDuplicate={(id) => void handleDuplicate(id)}
             otherCharacters={otherCharacters}
             onCopyToCharacter={(id, characterId) => void handleCopyToCharacter(id, characterId)}
-            onDelete={(id) => void handleDelete(id)}
+            onDelete={handleDelete}
             onRename={(id, name) => void handleRename(id, name)}
           />
         )}

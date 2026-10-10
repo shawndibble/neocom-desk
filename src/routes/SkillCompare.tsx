@@ -359,6 +359,9 @@ export function SkillCompare() {
     if (activeComparisonId === id) setCompareParams({ comparisonId: null });
     setDeletingId(null);
     await comparisonsSetValue(removeComparison(comparisonsValue, id, Date.now()));
+    // One macrotask on: the dialog's own focus restore (to the row being
+    // deleted) runs in a passive effect and must not land after this request.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, savedHeadingRef);
   }
 

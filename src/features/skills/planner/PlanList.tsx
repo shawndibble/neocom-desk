@@ -233,6 +233,9 @@ export function PlanList({
       (plan) => () => (plan ? linkRefs.current.get(plan.id) : null)
     );
     await onDelete(target.id);
+    // One macrotask on: the dialog's own focus restore (to the row being
+    // deleted) runs in a passive effect and must not land after this request.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, headingRef);
   }
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
