@@ -8,6 +8,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput, textActionClassName } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import {
   MIN_RECIPIENT_SEARCH_LENGTH,
   searchMailRecipients,
@@ -103,7 +105,10 @@ export function SurveyOwnerChange({
                 <li key={hit.characterId}>
                   <button
                     type="button"
-                    className="w-full rounded-xs px-2 py-1 text-left hover:bg-panel-2 touch:min-h-11"
+                    className={cx(
+                      'w-full rounded-xs px-2 py-1 text-left hover:bg-panel-2 touch:min-h-11',
+                      focusRingClassName
+                    )}
                     onClick={() => setChosen(hit)}
                   >
                     {hit.name}
