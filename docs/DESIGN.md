@@ -185,7 +185,7 @@ fill is plain `text`, and the figure is always printed, so colour is never the o
 
 `oreValueTiers` (`src/engine/survey/valueTier.ts`) colours the Mining Survey's
 ore bars by unit price, between the cheapest and dearest ore on the field
-(dearest always orange, cheapest always gray): gray
+(dearest always orange, cheapest always gray when more than one price): gray
 (`line-bright`), blue (`accent`), yellow (`warning`) and orange (halfway along
 `warning`→`danger`), dearer left to right. It borrows Kill heat's yellow and
 orange rather than adding tokens. The ISK and percent are printed beside every

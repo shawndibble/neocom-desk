@@ -22,13 +22,12 @@ export function SurveyOres({
   const { t } = useTranslation();
   const tiers = oreValueTiers(summary.ores);
   const hasIsk = summary.iskLeft !== null;
-  // Dearest unit first, as `summarizeSurvey` ranks them; the rocks to mine up front.
-  const ores = summary.ores;
+  // `summary.ores` is dearest unit first: the rocks to mine up front.
   return (
     <Panel title={t('survey.oresTitle')}>
       <div className="space-y-4">
         <ul className="space-y-3">
-          {ores.map((ore) => {
+          {summary.ores.map((ore) => {
             const leftPercent =
               ore.startVolume > 0 ? Math.round((ore.volume / ore.startVolume) * 100) : 0;
             return (

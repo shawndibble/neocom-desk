@@ -3,7 +3,7 @@
  * ore bars: gray, blue, yellow, orange, dearer left to right. Dearness is the
  * market price of one unit of the ore, placed between the cheapest and the
  * dearest ore on the field, so the dearest is always orange and the cheapest
- * always gray, whatever the market is doing.
+ * always gray (an ore with no price is gray), whatever the market is doing.
  */
 import type { SurveyOre } from './series';
 
@@ -24,7 +24,9 @@ export function oreValueTiers(
   const worst = Math.min(best, ...prices);
   return new Map(
     ores.map((ore) => {
-      if (ore.unitPrice === null || best === worst) return [ore.ore, 'gray'];
+      if (ore.unitPrice === null) return [ore.ore, 'gray'];
+      // One price on the field, or all alike: the dearest there is.
+      if (best === worst) return [ore.ore, 'orange'];
       const share = (ore.unitPrice - worst) / (best - worst);
       return [ore.ore, TIER_FLOORS.find(([, floor]) => share >= floor)?.[0] ?? 'gray'];
     })

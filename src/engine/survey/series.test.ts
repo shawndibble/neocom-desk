@@ -208,6 +208,17 @@ describe('summarizeSurvey', () => {
     expect(s.ores.find((o) => o.ore === 'Gone')).toMatchObject({ rocks: 0, unitPrice: 60 });
   });
 
+  it('orders ores at one price by name, not by how much is in the paste', () => {
+    const s = summarizeSurvey(
+      [scan(0, ['Veldspar', 5_000], ['Scordite', 10])],
+      new Map([
+        ['Veldspar', 20],
+        ['Scordite', 20],
+      ])
+    )!;
+    expect(s.oreNames).toEqual(['Scordite', 'Veldspar']);
+  });
+
   it('puts an ore with no price after every priced ore', () => {
     const s = summarizeSurvey(
       [scan(0, ['Odd', 1_000_000], ['Veldspar', 10])],

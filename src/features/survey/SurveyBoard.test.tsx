@@ -145,8 +145,8 @@ describe('SurveyBoard', () => {
         screen.getByText('Bar colour is the price of one unit · Jita buy, compressed')
       ).toBeTruthy();
       // Colour is never the only signal: each row also says its tier in words for a screen reader.
-      expect(screen.getByText(/dearest ore/)).toBeTruthy();
-      expect(screen.getByText(/cheapest ore/)).toBeTruthy();
+      expect(screen.getByText(/highest price/)).toBeTruthy();
+      expect(screen.getByText(/lowest price/)).toBeTruthy();
     });
 
     it('shows each ore with its rocks and the ISK left in it', () => {

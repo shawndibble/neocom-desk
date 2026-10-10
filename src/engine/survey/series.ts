@@ -46,7 +46,7 @@ export interface SurveyOre {
   isk: number;
   /** m³ of it the scans have shown in all: its first showing plus any that came into range. */
   startVolume: number;
-  /** ISK for one unit of it, which is what the ore lists and the chart's layers sort by, however much of it is in the scans; null when it has no price. */
+  /** Market ISK for one unit of it, which the ore list, the chart's layers and the bar colours go by, however much of it is in the scans; null when it has no price. */
   unitPrice: number | null;
 }
 
@@ -68,12 +68,12 @@ export interface SurveySummary {
   rocksLeft: number;
   /** The scanner's ISK value of everything left, summed; null when no row carried one. */
   iskLeft: number | null;
-  /** Every ore the scans showed, the most valuable left first (biggest volume when no scan carries ISK); mined-out ores last. */
+  /** Every ore the scans showed, dearest unit price first; unpriced ores last, by value left. */
   ores: SurveyOre[];
   intervals: SurveyInterval[];
   /** Every scan, oldest first, for the chart. */
   points: SurveyPoint[];
-  /** Every ore any scan showed, in `ores` order (most valuable left first), so chart layers read like the ore list. */
+  /** Every ore any scan showed, in `ores` order (dearest unit first), so chart layers read like the ore list. */
   oreNames: string[];
   /** m³/s over the last few intervals, or null before there is any real mining. */
   pace: number | null;
@@ -212,31 +212,22 @@ export function summarizeSurvey(
       unitPrice: unitPrices?.get(ore) ?? null,
     });
   }
-  // With no market price for an ore, the unit price its latest priced rock implies stands in.
-  for (const scan of scans) {
-    for (const rock of scan.rocks) {
-      const entry = byOre.get(rock.ore)!;
-      if (unitPrices?.has(rock.ore) || rock.units === undefined || rock.units <= 0) continue;
-      if (rock.isk !== undefined && rock.isk > 0) entry.unitPrice = rock.isk / rock.units;
-    }
-  }
   for (const rock of last.rocks) {
     const entry = byOre.get(rock.ore)!;
     entry.rocks += 1;
     entry.volume += rock.volume;
     entry.isk += rock.isk ?? 0;
   }
-  // Dearest unit first, however much of each is in the scans; unpriced ores fall back to the biggest
-  // value left, else the biggest volume.
+  // Dearest unit first, whatever amount of each is in the scans; equal prices go by name. Ores with
+  // no market price come last, the biggest value left first, else the biggest volume.
   const hasIsk = last.rocks.some((r) => r.isk !== undefined);
   const rank = (o: SurveyOre): number => (hasIsk ? o.isk : o.volume);
-  const ores = [...byOre.values()].sort(
-    (a, b) =>
-      (b.unitPrice ?? -1) - (a.unitPrice ?? -1) ||
-      rank(b) - rank(a) ||
-      b.volume - a.volume ||
-      b.startVolume - a.startVolume
-  );
+  const ores = [...byOre.values()].sort((a, b) => {
+    if (a.unitPrice === null && b.unitPrice === null) {
+      return rank(b) - rank(a) || b.volume - a.volume || b.startVolume - a.startVolume;
+    }
+    return (b.unitPrice ?? -1) - (a.unitPrice ?? -1) || a.ore.localeCompare(b.ore);
+  });
 
   return {
     startVolume,

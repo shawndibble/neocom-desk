@@ -60,8 +60,12 @@ function parts(message: string): { heading: string; box: string[] } {
   return { heading, box };
 }
 
-const message = (scans: SurveyScan[], url = URL): { heading: string; box: string[] } =>
-  parts(surveyChatMessage(summarizeSurvey(scans)!, url, labels));
+const message = (
+  scans: SurveyScan[],
+  url = URL,
+  unitPrices?: ReadonlyMap<string, number>
+): { heading: string; box: string[] } =>
+  parts(surveyChatMessage(summarizeSurvey(scans, unitPrices)!, url, labels));
 
 /**
  * The rails sit over the bar without ever being shorter than it, and less than
@@ -162,21 +166,30 @@ describe('surveyChatMessage', () => {
     expect(box[2]).toBe('│ Left: 1 A · 1 B · 4 other');
   });
 
-  it('calls out the two dearest ores per unit, with how many rocks each has', () => {
+  it('calls out the two ores with the dearest unit price, with how many rocks each has', () => {
     // Per unit: Scordite 500, Kernite 200, Pyroxeres 80, Veldspar 50 (total ISK would put Pyroxeres second).
-    const rocks = (ore: string, count: number, each: number) =>
-      Array.from({ length: count }, () => ({ ore, volume: 100, units: 10_000, isk: each }));
-    const { box } = message([
-      {
-        at: T0,
-        rocks: [
-          ...rocks('Veldspar', 20, 500_000),
-          ...rocks('Scordite', 5, 5_000_000),
-          ...rocks('Pyroxeres', 15, 800_000),
-          ...rocks('Kernite', 4, 2_000_000),
-        ],
-      },
-    ]);
+    const rocks = (ore: string, count: number) =>
+      Array.from({ length: count }, () => ({ ore, volume: 100 }));
+    const { box } = message(
+      [
+        {
+          at: T0,
+          rocks: [
+            ...rocks('Veldspar', 20),
+            ...rocks('Scordite', 5),
+            ...rocks('Pyroxeres', 15),
+            ...rocks('Kernite', 4),
+          ],
+        },
+      ],
+      URL,
+      new Map([
+        ['Scordite', 500],
+        ['Kernite', 200],
+        ['Pyroxeres', 80],
+        ['Veldspar', 50],
+      ])
+    );
     expect(box[2]).toBe('│ Left: 5 Scordite · 4 Kernite · 35 other');
   });
 

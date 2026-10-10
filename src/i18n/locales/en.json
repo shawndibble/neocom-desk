@@ -4013,10 +4013,10 @@
     "formCompressed": "compressed",
     "formRaw": "raw",
     "tier": {
-      "gray": "cheapest ore",
-      "blue": "cheap ore",
-      "yellow": "dear ore",
-      "orange": "dearest ore"
+      "gray": "lowest price",
+      "blue": "low price",
+      "yellow": "high price",
+      "orange": "highest price"
     },
     "valueLow": "cheaper",
     "valueHigh": "dearer",

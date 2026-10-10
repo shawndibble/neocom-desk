@@ -25,9 +25,14 @@ describe('oreValueTiers', () => {
     expect(tiers.get('Cheap')).toBe('gray');
   });
 
-  it('is gray for an unpriced ore, and for every ore when the prices are all alike or missing', () => {
+  it('is gray for an unpriced ore, and for every ore when no price is known', () => {
     expect(oreValueTiers([ore('Real', 50), ore('Odd', null)]).get('Odd')).toBe('gray');
-    expect([...oreValueTiers([ore('A', 50), ore('B', 50)]).values()]).toEqual(['gray', 'gray']);
     expect([...oreValueTiers([ore('A', null), ore('B', null)]).values()]).toEqual(['gray', 'gray']);
+  });
+
+  it('makes a lone priced ore, or ores all at one price, orange: the dearest there is', () => {
+    expect(oreValueTiers([ore('Only', 50)]).get('Only')).toBe('orange');
+    expect(oreValueTiers([ore('Only', 50), ore('Odd', null)]).get('Only')).toBe('orange');
+    expect([...oreValueTiers([ore('A', 50), ore('B', 50)]).values()]).toEqual(['orange', 'orange']);
   });
 });
