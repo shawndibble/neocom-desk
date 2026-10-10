@@ -521,8 +521,9 @@ describe('ItemDetailModal', () => {
       </MemoryRouter>
     );
 
-    const chip = await screen.findByRole('button', { name: '12,000 m' });
+    const chip = await screen.findByRole('button', { name: /^12,000 m.*skills that change/ });
     await user.click(chip);
+    expect(await screen.findByRole('dialog', { name: /skills that change/ })).toBeInTheDocument();
 
     const skillLine = await screen.findByText('Sharpshooter: +5% per level');
     const popoverContent = skillLine.closest('div') as HTMLElement;

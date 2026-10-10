@@ -7675,6 +7675,14 @@
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}",
+      "drag": {
+        "start": "Picked up {{name}}.",
+        "over": "{{name}} moved to position {{position}} of {{total}}.",
+        "overNone": "{{name}} is no longer over a valid position.",
+        "end": "{{name}} dropped at position {{position}} of {{total}}.",
+        "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
+        "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
+      },
       "addItem": "Add {{name}} to Quickbar"
     },
     "priceAlert": {
@@ -7709,6 +7717,7 @@
       "groupNoneSold_other": "{{count}} items · none sold at {{scope}}"
     },
     "itemDetail": {
+      "modifiersFor": "skills that change {{attribute}}",
       "openInMarket": "View in Market",
       "volume": "Volume: {{volume}} m3",
       "bestSell": "Best sell:",
@@ -7956,6 +7965,7 @@
         "matchCount": "{{count}} of {{total}} orders match"
       },
       "checkDeeper": "Refresh system & region prices",
+      "checkDeeperGroup": "Refresh system & region prices for {{group}}",
       "checkingDeeper": "Checking…",
       "refreshOrders": "Refresh orders & market prices",
       "scopeNotChecked": "Not checked yet",
