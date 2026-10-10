@@ -64,7 +64,7 @@ Locks: `NAV_LOCK_PATHS` (`:311`) = every `scope` page and its sub-views; `useLoc
 
 ### Hide rules (`src/app/navRail.ts`)
 
-`NEVER_HIDDEN` (`:88`) = every footer page (Help, Settings, Characters) and Corporation. `canHide(path)` (`:94`) = known nav path and not in that set. `parseHiddenNav` (`:111`) keeps known paths in nav order, drops never-hide paths, and **keeps unknown paths** (written by a newer build) at the end so an older build cannot un-hide them. Stored as `sync.navHidden` (`src/app/navPreferences.ts:14`, default `[]`), synced across devices ("which parts of EVE a pilot plays is about the pilot"). Decision: `20261002-145653-rail-opens-the-current-page-icons-hiding-and.md`.
+`NEVER_HIDDEN` (`:88`) = every footer page (Help, Settings, Characters) and Corporation. `canHide(path)` (`:94`) = known nav path and not in that set. `parseHiddenNav` (`:111`) keeps known paths in nav order, drops never-hide paths, and **keeps unknown paths** (written by a newer build) at the end so an older build cannot un-hide them. Stored as `sync.navHidden` (`src/app/navPreferences.ts:14`, default: every hideable page outside the eight-page short rail, see `defaultHiddenNav`; first-run question gated by `sync.navSetupAnswered`), synced across devices ("which parts of EVE a pilot plays is about the pilot"). Decision: `20261002-145653-rail-opens-the-current-page-icons-hiding-and.md`.
 
 ## Phone: tab bar and More sheet
 

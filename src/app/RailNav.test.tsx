@@ -10,6 +10,7 @@ import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { useHiddenNav, useRecentNav } from './navPreferences';
+import { defaultHiddenNav } from './navRail';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -123,14 +124,34 @@ describe('the rail', () => {
 
     expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();
     expect(within(rail()).getByRole('link', { name: 'PI' })).toBeInTheDocument();
-    expect(within(rail()).getByRole('button', { name: '3 hidden · Edit' })).toBeInTheDocument();
+    // Pages only: a hidden view is not a page.
+    expect(within(rail()).getByRole('button', { name: /more page/ })).toBeInTheDocument();
+  });
+
+  it('starts a new pilot on the eight-page default, the rest behind "N more pages"', async () => {
+    const user = userEvent.setup();
+    useHiddenNav.setState({ value: defaultHiddenNav() });
+    renderAt('/overview');
+
+    expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();
+    for (const name of ['Skills', 'Industry', 'Ships', 'Market', 'Assets', 'Wallet', 'Travel']) {
+      expect(within(rail()).getByRole('link', { name })).toBeInTheDocument();
+    }
+    const more = within(rail()).getByRole('button', { name: /more pages/ });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    await user.click(more);
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+    expect(within(rail()).getByRole('link', { name: 'Mining' })).toBeInTheDocument();
+
+    await user.click(within(rail()).getByRole('button', { name: 'Always show Mining' }));
+    await waitFor(() => expect(useHiddenNav.getState().value).not.toContain('/mining'));
   });
 
   it('hides and shows pages from the rail editor, and never offers to hide Corporation or Settings', async () => {
     const user = userEvent.setup();
     renderAt('/overview');
 
-    await user.click(within(rail()).getByRole('button', { name: /hide pages you don't use/i }));
+    await user.click(within(rail()).getByRole('button', { name: 'Customize' }));
     // One fixed name; `aria-pressed` says whether it is on.
     const mining = within(rail()).getByRole('button', { name: 'Show Mining in navigation' });
     expect(mining).toHaveAttribute('aria-pressed', 'true');

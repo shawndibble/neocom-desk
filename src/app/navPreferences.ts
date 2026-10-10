@@ -8,13 +8,37 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { parseHiddenNav, parseRecentNav, pushRecentNav } from './navRail';
+import {
+  defaultHiddenNav,
+  hiddenNavForActivities,
+  parseHiddenNav,
+  parseRecentNav,
+  pushRecentNav,
+} from './navRail';
 
 export const useHiddenNav = createSyncedSetting<readonly string[]>({
   key: 'sync.navHidden',
-  defaultValue: [],
+  // The short rail: a pilot who never answered the first-run question sees it.
+  defaultValue: defaultHiddenNav(),
   parse: parseHiddenNav,
 });
+
+/** Whether the first-run "What do you do in EVE?" question was answered or skipped. */
+export const useNavSetupAnswered = createSyncedSetting<boolean>({
+  key: 'sync.navSetupAnswered',
+  defaultValue: false,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
+});
+
+/**
+ * Settles the first-run question: writes the starting hidden list and the flag
+ * together, so a second device pulling the flag never asks again. Skipping
+ * (no activities) gives the default set.
+ */
+export async function answerNavSetup(activities: readonly string[]): Promise<void> {
+  await useHiddenNav.getState().setValue(hiddenNavForActivities(activities));
+  await useNavSetupAnswered.getState().setValue(true);
+}
 
 export const useRecentNav = createLocalSetting<readonly string[]>({
   key: 'navRecent',

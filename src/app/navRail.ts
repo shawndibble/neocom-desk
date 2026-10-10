@@ -114,6 +114,48 @@ export function parseHiddenNav(raw: unknown): string[] | null {
   return kept && kept.sort((a, b) => order(a) - order(b));
 }
 
+/** What a new pilot sees on the rail (scope decision `20261009-163837-pinned-rail-...`). */
+export const DEFAULT_SHOWN_NAV: readonly string[] = [
+  '/overview',
+  '/skills',
+  '/industry',
+  '/ships',
+  '/market',
+  '/assets',
+  '/wallet',
+  '/travel',
+];
+
+/** The first-run question's answers, each with the pages it brings onto the rail. */
+export const NAV_ACTIVITIES = [
+  { id: 'mining', paths: ['/mining'] },
+  { id: 'pi', paths: ['/planetary-industry'] },
+  { id: 'trading', paths: ['/contracts'] },
+  { id: 'industry', paths: [] },
+  { id: 'social', paths: ['/mail', '/calendar', '/contacts'] },
+  { id: 'intel', paths: ['/alerts', '/pilot-lookup'] },
+] as const satisfies readonly { id: string; paths: readonly string[] }[];
+
+function hiddenExcept(shown: ReadonlySet<string>): string[] {
+  return (NAV_PAGES as readonly NavPage[])
+    .map((page) => page.path as string)
+    .filter((path) => canHide(path) && !shown.has(path));
+}
+
+/** The hidden list of a pilot who has not chosen anything: every page outside the default set. */
+export function defaultHiddenNav(): string[] {
+  return hiddenExcept(new Set(DEFAULT_SHOWN_NAV));
+}
+
+/** The starting hidden list for the activities a pilot picked: the default set plus their pages. */
+export function hiddenNavForActivities(activities: readonly string[]): string[] {
+  const shown = new Set(DEFAULT_SHOWN_NAV);
+  for (const activity of NAV_ACTIVITIES) {
+    if (activities.includes(activity.id)) for (const path of activity.paths) shown.add(path);
+  }
+  return hiddenExcept(shown);
+}
+
 /** How many recent views are kept: one more than are shown, so the current one can be skipped. */
 const RECENT_KEPT = 4;
 const RECENT_SHOWN = 3;

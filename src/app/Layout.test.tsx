@@ -12,7 +12,7 @@ import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAcce
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { Layout } from './Layout';
-import { useRecentNav } from './navPreferences';
+import { useHiddenNav, useRecentNav } from './navPreferences';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 const mockedCorpAccess = vi.mocked(useCorpAccess);
@@ -119,6 +119,8 @@ beforeEach(async () => {
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
   // Likewise the Recent row: one test's visits must not show up as another's links.
   useRecentNav.setState({ value: [], hydrated: true });
+  // These tests list the whole rail; the short default set is RailNav.test's.
+  useHiddenNav.setState({ value: [], hydrated: true });
 });
 
 describe('Layout sync status dot', () => {

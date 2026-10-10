@@ -66,6 +66,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.targetSkillPlan': /target skill plan/i,
   'sync.overviewHiddenCards': /hidden and reordered Overview cards/i,
   'sync.navHidden': /pages hidden from the navigation/i,
+  'sync.navSetupAnswered': /answered the rail question/i,
   'sync.overviewCardOrder': /hidden and reordered Overview cards/i,
   'sync.avoidedSystems': /avoided systems/i,
   'sync.avoidedSystemsEnabled': /whether the list is on/i,

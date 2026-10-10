@@ -25,7 +25,7 @@ import {
   type NavPagePath,
 } from './navDestinations';
 import { canHide, navPlaceFor, viewsByPage } from './navRail';
-import { useHiddenNav } from './navPreferences';
+import { toggleHiddenNav, useHiddenNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
 
 const APPLE = isApplePlatform();
@@ -229,7 +229,14 @@ const RailNavBody = memo(function RailNavBody({
     [locked, corpVisible, capabilities, t]
   );
 
-  const hiddenCount = hiddenList.filter((path) => canHide(path)).length;
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreId = useId();
+  // Pages the short rail leaves out, flat and in nav order (no headings: one
+  // level, not a second tree). The page you are on stays in its own group.
+  const morePages = RAIL_GROUPS.flatMap((group) => group.pages).filter(
+    (page) =>
+      (page.gating !== 'corp' || corpVisible) && hidden.has(page.path) && page.path !== current
+  );
   const toggleOpen = useCallback(
     (path: string) => setOpen((state) => ({ ...state, path: state.path === path ? null : path })),
     []
@@ -278,6 +285,51 @@ const RailNavBody = memo(function RailNavBody({
             </Fragment>
           );
         })}
+        {!editing && morePages.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((now) => !now)}
+              aria-expanded={moreOpen}
+              aria-controls={moreId}
+              className={cx(
+                'flex min-h-8 w-full items-center gap-1.5 rounded-xs px-2 text-left text-xs text-text-dim hover:text-text',
+                rowInteractiveClassName,
+                focusRingClassName
+              )}
+            >
+              <span className="min-w-0 flex-1">
+                {t('nav.morePages', { count: morePages.length })}
+              </span>
+              <Caret expanded={moreOpen} />
+            </button>
+            {moreOpen && (
+              <ul id={moreId} className="mt-0.5 flex flex-col gap-0.5">
+                {morePages.map((page) => {
+                  const label = t(page.labelKey);
+                  return (
+                    <li key={page.path} className="flex items-center gap-0.5 opacity-60">
+                      <NavItem
+                        to={page.path}
+                        label={label}
+                        locked={page.gating === 'scope' && locked.has(page.path)}
+                        badge={page.path === '/alerts' ? unreadAlerts : undefined}
+                        className="flex-1"
+                      />
+                      <IconButton
+                        variant="plain"
+                        size="sm"
+                        icon={<Icon.AddRow />}
+                        label={t('nav.showPermanently', { page: label })}
+                        onClick={() => toggleHiddenNav(page.path)}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
         {!editing && (
           <button
             type="button"
@@ -289,7 +341,7 @@ const RailNavBody = memo(function RailNavBody({
             )}
           >
             <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-            {hiddenCount > 0 ? t('nav.hiddenCount', { count: hiddenCount }) : t('nav.editRail')}
+            {t('nav.customize')}
           </button>
         )}
       </nav>
