@@ -92,6 +92,31 @@ test.describe('Corp Members narrow table', () => {
     expect(new URL(page.url()).search).toContain('sort');
   });
 
+  test('pinned Member column matches the panel surface at 1440 and 1024', async ({ page }) => {
+    for (const width of [1440, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('./corp/members');
+      // The pinned cell paints the panel surface, not the darker page behind
+      // the Panel (`bg-bg`), in the header and in the body.
+      const bg = (loc: ReturnType<typeof page.locator>) =>
+        loc.first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      const pageBg = await page.evaluate(() => {
+        for (const el of [document.body, document.documentElement]) {
+          const c = getComputedStyle(el).backgroundColor;
+          if (c !== 'rgba(0, 0, 0, 0)') return c;
+        }
+        return 'none';
+      });
+      const memberHeader = page.getByRole('columnheader', { name: /Member/ });
+      await expect(memberHeader).toBeVisible();
+      const row = page.locator('table tbody tr:not(.dt-spacer)').first();
+      const pinnedBody = await bg(row.locator('td').first());
+      expect(await bg(memberHeader)).not.toBe(pageBg);
+      expect(pinnedBody).not.toBe(pageBg);
+      expect(await bg(memberHeader)).toBe(pinnedBody);
+    }
+  });
+
   test('no picker at 1280px', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./corp/members');
