@@ -530,6 +530,18 @@
       "indexes": []
     },
     {
+      "collectionGroup": "surveyInfo",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "surveyInfo",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "surveyIgnores",
       "fieldPath": "*",
       "ttl": false,

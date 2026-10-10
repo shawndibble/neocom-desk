@@ -857,9 +857,14 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(screen.queryByText('Offers shown')).not.toBeInTheDocument();
     expect(screen.getByText('Your LP')).toBeInTheDocument();
     expect(screen.getByText('12,000')).toBeInTheDocument();
-    expect(screen.getByText('2 / 2 offers')).toBeInTheDocument();
+    expect(screen.getAllByText('2 / 2 offers').length).toBeGreaterThan(0);
 
     await user.type(screen.getByPlaceholderText('Search offers…'), 'Scourge');
-    expect(await screen.findByText('1 / 2 offers')).toBeInTheDocument();
+    // The visible count is `md:` only; the status region carries it at every width.
+    await waitFor(() =>
+      expect(screen.getAllByRole('status').some((el) => el.textContent === '1 / 2 offers')).toBe(
+        true
+      )
+    );
   });
 });

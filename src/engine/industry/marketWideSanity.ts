@@ -57,6 +57,20 @@ export function averageDailyVolume(
   return units / SALES_WINDOW_DAYS;
 }
 
+/**
+ * Orders that traded per day over the last `SALES_WINDOW_DAYS` in one region's
+ * history (ESI's `order_count`). Same whole-window divisor as
+ * `averageDailyVolume`: an omitted day is a zero.
+ */
+export function averageDailyOrders(history: readonly MarketHistoryPoint[], nowMs: number): number {
+  const since = nowMs - SALES_WINDOW_DAYS * DAY_MS;
+  let orders = 0;
+  for (const point of history) {
+    if (Date.parse(`${point.date}T00:00:00Z`) >= since) orders += point.orderCount;
+  }
+  return orders / SALES_WINDOW_DAYS;
+}
+
 export function isRarelySold(unitsPerDay: number): boolean {
   return unitsPerDay < RARELY_SOLD_PER_DAY;
 }

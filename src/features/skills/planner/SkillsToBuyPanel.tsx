@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Disclosure, IskAmount, IskFigureGroup } from '@/components/ui';
+import { Disclosure, IskAmount, IskFigureGroup, LiveStatus } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { useMarketHub } from '@/features/market/hub';
@@ -78,6 +78,8 @@ export function SkillsToBuyPanel({
   }, [hub, hubHydrated, typeKey]);
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  // Bumped per copy so a second "copied" is announced again.
+  const [copyCount, setCopyCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
   const loaded = prices !== null && prices.key === `${hub.id}:${typeKey}`;
@@ -93,6 +95,7 @@ export function SkillsToBuyPanel({
 
   const copy = async () => {
     if (!facts) return;
+    setCopyCount((n) => n + 1);
     try {
       await writeToClipboard(facts.multibuy);
       setCopyState('copied');
@@ -138,6 +141,13 @@ export function SkillsToBuyPanel({
             {t('plans.skillsToBuy.unpriced', { count: facts.unpricedCount })}
           </p>
         )}
+        <LiveStatus announceKey={copyCount}>
+          {copyState === 'copied'
+            ? t('plans.skillsToBuy.copied')
+            : copyState === 'failed'
+              ? t('plans.skillsToBuy.copyFailed')
+              : null}
+        </LiveStatus>
         <button type="button" className={inlineLinkClassName} onClick={() => void copy()}>
           {copyState === 'copied'
             ? t('plans.skillsToBuy.copied')

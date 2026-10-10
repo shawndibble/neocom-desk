@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -193,8 +193,12 @@ function ItemRow({ entry, rack, placeable, problems, blocked, draggable, onAdd }
     >
       <button
         type="button"
-        disabled={!placeable || blocked}
-        onClick={() => onAdd(entry.typeId, rack)}
+        // aria-disabled, not disabled: adding into the last free slot greys the
+        // row while it holds focus, and a native disabled button drops it.
+        aria-disabled={!placeable || blocked || undefined}
+        onClick={() => {
+          if (placeable && !blocked) onAdd(entry.typeId, rack);
+        }}
         className={cx(
           'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
           rowInteractiveClassName,
@@ -318,6 +322,7 @@ export function FittingAddPanel({
     next.delete('skills');
     return next;
   }, [fitFilters]);
+  const searchRef = useRef<HTMLInputElement>(null);
   const hiddenByFilters = useMemo(() => {
     if (catalogue === null || hullFit === null || relaxed.size === fitFilters.size) return 0;
     const base = { tab, slotRack, metaGroupId, hullFit };
@@ -332,7 +337,11 @@ export function FittingAddPanel({
       <button
         type="button"
         className={`${inlineLinkClassName} min-h-11 text-left text-xs md:min-h-9`}
-        onClick={() => setFitFilters(relaxed)}
+        onClick={() => {
+          setFitFilters(relaxed);
+          // This button goes away with the filters it lifts; focus follows to the search.
+          searchRef.current?.focus();
+        }}
       >
         {t('fittings.add.hiddenByFilters', { count: hiddenByFilters })}
       </button>
@@ -481,6 +490,7 @@ export function FittingAddPanel({
         ) : (
           <>
             <SearchInput
+              ref={searchRef}
               aria-label={t('fittings.add.searchLabel')}
               placeholder={t('fittings.add.searchPlaceholder')}
               value={query}

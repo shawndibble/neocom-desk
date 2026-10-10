@@ -284,6 +284,10 @@ describe('SkillCompare', () => {
     await user.clear(input);
     await user.type(input, 'Miners{Enter}');
     expect(await screen.findByText('Miners')).toBeInTheDocument();
+    // Enter unmounted the focused input: focus returns to the row's Rename button.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Rename Miners' })).toHaveFocus()
+    );
 
     const row = screen.getByText('Miners').closest('li')!;
     await user.click(within(row).getByRole('button', { name: 'Delete Miners' }));
@@ -291,6 +295,10 @@ describe('SkillCompare', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
+    // The only row is gone: focus lands on the section heading, not <body>.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Saved comparisons' })).toHaveFocus()
+    );
     expect(
       screen.getByText('Pick characters, then use Save comparison to reopen that set later.')
     ).toBeInTheDocument();
@@ -309,9 +317,13 @@ describe('SkillCompare', () => {
 
     expect(
       await screen.findByText(
-        'Some characters in this comparison have been removed and are no longer shown.'
+        'Some characters in this comparison have been removed and are no longer shown.',
+        { selector: 'p' }
       )
     ).toBeInTheDocument();
+    expect(screen.getAllByRole('status').map((el) => el.textContent)).toContain(
+      'Some characters in this comparison have been removed and are no longer shown.'
+    );
     // The table is awaited *before* the pressed state is read: it renders only
     // once the selection has been applied, so it is the signal this assertion
     // needs — reading `aria-pressed` synchronously raced that. Note the click
