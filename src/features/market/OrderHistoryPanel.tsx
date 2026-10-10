@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode, type RefObject } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -140,13 +140,15 @@ function HistoryFilterBar({ filter, onChange, actions }: HistoryFilterBarProps) 
 interface OrderHistoryPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
   onViewChange: (view: HistoryView) => void;
+  /** See `HistoryViewSelect`'s `focusOnMountRef`. */
+  focusViewOnMount?: RefObject<boolean>;
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const orderHistoryRowKey = (order: MarketOrderHistory) => order.order_id;
 
 /** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
-export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
+export function OrderHistoryPanel({ onViewChange, focusViewOnMount }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -303,7 +305,11 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       actionsFill={isPhone}
       actions={
         <span className="flex w-full items-center justify-between gap-2">
-          <HistoryViewSelect value="history" onChange={onViewChange} />
+          <HistoryViewSelect
+            value="history"
+            onChange={onViewChange}
+            focusOnMountRef={focusViewOnMount}
+          />
           <span className="flex items-center gap-2">
             <IconButton
               size={isPhone ? 'md' : 'sm'}

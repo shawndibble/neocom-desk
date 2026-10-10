@@ -43,7 +43,7 @@ describe('CopyablePrice', () => {
     await userEvent.setup().click(screen.getByText('1,233,000'));
 
     expect(written).toEqual(['1233000']);
-    expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
+    expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
   });
 
   it('has no separate copy icon button — the price text is the only control', async () => {

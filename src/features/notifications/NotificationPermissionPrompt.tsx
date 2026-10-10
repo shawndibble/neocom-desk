@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from '@/components/ui';
@@ -13,6 +13,7 @@ import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 import { useHasLeftFirstScreen } from './firstScreen';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
@@ -58,9 +59,12 @@ export function NotificationPermissionPrompt() {
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('notifications', visible);
+  const bannerRef = useRef<HTMLDivElement>(null);
   // Both, not just the slot: registration happens in an effect, so the store
   // still says "eligible" for the one commit after `visible` goes false.
-  if (!visible || !hasSlot) return null;
+  const shown = visible && hasSlot;
+  useStickyClearance(bannerRef, 'onboarding-banner', { enabled: shown });
+  if (!shown) return null;
 
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
@@ -70,6 +74,7 @@ export function NotificationPermissionPrompt() {
 
   return (
     <div
+      ref={bannerRef}
       role="alert"
       data-testid="onboarding-banner"
       // Shares one bottom slot with the other onboarding banners, so it can

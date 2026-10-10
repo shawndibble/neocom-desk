@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { createRef, useState, type ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -207,4 +207,92 @@ describe('PlanList row link (DESIGN.md §6c)', () => {
       '/skills/plans/p1'
     );
   });
+});
+
+describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
+  const moreOf = (name: string) => screen.getByRole('button', { name: `More actions for ${name}` });
+
+  function Harness({ initial, headingRef }: { initial: SkillPlanRecord[]; headingRef?: never }) {
+    const [plans, setPlans] = useState(initial);
+    return (
+      <PlanList
+        plans={plans}
+        planHref={planHref}
+        onDuplicate={noop}
+        onDelete={async (id) => {
+          await Promise.resolve();
+          setPlans((current) => current.filter((p) => p.id !== id));
+        }}
+        onRename={noop}
+        otherCharacters={[{ characterId: 9, name: 'Other Pilot' }]}
+        onCopyToCharacter={noop}
+        headingRef={headingRef}
+      />
+    );
+  }
+
+  it('moves focus to the next plan link after a delete', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
+    await user.click(moreOf('Alpha'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: /Beta/ })).toHaveFocus());
+  });
+
+  it('falls back to the previous plan link when the last row is deleted', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
+    await user.click(moreOf('Beta'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: /Alpha/ })).toHaveFocus());
+  });
+
+  it('falls back to the panel title when the only plan is deleted', async () => {
+    const user = userEvent.setup();
+    const headingRef = createRef<HTMLHeadingElement>();
+    render(
+      <>
+        <h2 ref={headingRef} tabIndex={-1}>
+          Plans
+        </h2>
+        <Harness initial={[plan('1', 'Alpha')]} headingRef={headingRef as never} />
+      </>
+    );
+    await user.click(moreOf('Alpha'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Plans' })).toHaveFocus());
+  });
+
+  it('returns focus to the row ⋮ when the delete dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[plan('1', 'Alpha')]} />);
+    await user.click(moreOf('Alpha'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
+  });
+
+  it('returns focus to the row ⋮ after copying to a character', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[plan('1', 'Alpha')]} />);
+    await user.click(moreOf('Alpha'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy to character…' }));
+    await user.click(screen.getByRole('button', { name: 'Other Pilot' }));
+    await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
+  });
+
+  it.each(['{Enter}', '{Escape}'])(
+    'returns focus to the row ⋮ after rename ends with %s',
+    async (key) => {
+      const user = userEvent.setup();
+      render(<Harness initial={[plan('1', 'Alpha')]} />);
+      await user.click(moreOf('Alpha'));
+      await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+      await user.type(screen.getByRole('textbox', { name: 'Rename' }), `Z${key}`);
+      await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
+    }
+  );
 });
