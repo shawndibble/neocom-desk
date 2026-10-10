@@ -3957,6 +3957,7 @@
     "statPace": "Pace (m³/s)",
     "statDone": "Done at",
     "statTimeLeft": "Time left",
+    "statTotalTime": "Total time",
     "statRocks": "Rocks left",
     "statIsk": "ISK left",
     "eveTime": "{{time}} EVE",

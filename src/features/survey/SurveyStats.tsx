@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
+import { formatDuration as formatTotalTime } from '@/lib/duration';
 import type { SurveySummary } from '@/engine/survey/series';
 import { IskAmount, Tooltip } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -58,7 +59,9 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-x-4 gap-y-3">
-      <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
+      {!summary.finished && (
+        <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
+      )}
       <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
       <Tile label={t('survey.statDone')} emphasis>
         {summary.finished ? (
@@ -75,14 +78,21 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
           </Tooltip>
         )}
       </Tile>
-      <Tile label={t('survey.statTimeLeft')}>
-        {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
-      </Tile>
-      <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
-      {summary.iskLeft !== null && (
-        <Tile label={t('survey.statIsk')}>
-          <IskAmount value={summary.iskLeft} decimals={0} />
-        </Tile>
+      {summary.finished ? (
+        // "1d 14h 36m", "12h 5m" or "55m": a unit shows only once it took that long.
+        <Tile label={t('survey.statTotalTime')}>{formatTotalTime(summary.elapsedMs / 1000)}</Tile>
+      ) : (
+        <>
+          <Tile label={t('survey.statTimeLeft')}>
+            {summary.etaAt === null ? '–' : formatDuration(summary.etaAt - summary.lastAt)}
+          </Tile>
+          <Tile label={t('survey.statRocks')}>{summary.rocksLeft}</Tile>
+          {summary.iskLeft !== null && (
+            <Tile label={t('survey.statIsk')}>
+              <IskAmount value={summary.iskLeft} decimals={0} />
+            </Tile>
+          )}
+        </>
       )}
     </div>
   );
