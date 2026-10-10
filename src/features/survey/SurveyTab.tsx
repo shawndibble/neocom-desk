@@ -130,7 +130,7 @@ export function SurveyTab({ tabBar }: SurveyTabProps) {
           if (!confirmed && choice === undefined && !hasSubmittedScan()) {
             // Against the latest scan only: an ore an earlier scan showed but the
             // latest already lacks is mined out, not a collapsed section.
-            const ores = missingOres(latest.rocks, parseSurveyScan(text) ?? []);
+            const ores = missingOres(latest?.rocks ?? null, parseSurveyScan(text) ?? []);
             if (ores.length > 0) {
               setChecking({ text, ores, forId: currentId, choice });
               return 'ok';
