@@ -40,6 +40,7 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  LiveStatus,
   PageHeader,
   Panel,
   SearchInput,
@@ -607,6 +608,13 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                 {t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
               </p>
             )}
+            <LiveStatus>
+              {selectMode && selectedIds.size > 0
+                ? t('assets.select.selectedCount', { count: selectedIds.size })
+                : searchActive
+                  ? t('assets.search.resultCount', { count: searchMatches.length })
+                  : null}
+            </LiveStatus>
             <SearchInput
               ref={searchRef}
               value={search}

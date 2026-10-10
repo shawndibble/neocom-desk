@@ -34,6 +34,7 @@ import {
   SelectValue,
   Spinner,
   IskInput,
+  LiveStatus,
   Tabs,
   TabPanel,
   useTabsId,
@@ -1794,6 +1795,16 @@ export function Assets() {
               characterIds={shipCharacterIds}
               activeCharacterId={activeCharacterId}
             />
+          )}
+
+          {tab === 'items' && (
+            <LiveStatus>
+              {selectMode && selectedIds.size > 0
+                ? t('assets.select.selectedCount', { count: selectedIds.size })
+                : searchActive && debouncedSearch.trim().length > 0
+                  ? t('assets.search.resultCount', { count: flatMatches.length })
+                  : null}
+            </LiveStatus>
           )}
 
           {tab === 'items' && assetsResult && !assetsNeedsReauth && (

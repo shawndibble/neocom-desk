@@ -117,11 +117,9 @@ function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoa
             )}
             {/* The total, only when rows are hidden: "there are more" without scrolling to the footer. */}
             {hidden > 0 && (
-              <span
-                className="text-text-dim"
-                aria-label={t('corp.cards.total', { count: items.length })}
-              >
-                {items.length}
+              <span className="text-text-dim">
+                <span aria-hidden="true">{items.length}</span>
+                <span className="sr-only">{t('corp.cards.total', { count: items.length })}</span>
               </span>
             )}
           </span>
