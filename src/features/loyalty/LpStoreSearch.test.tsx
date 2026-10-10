@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
@@ -106,6 +106,15 @@ describe('LpStoreSearch', () => {
     expect(rows[0]).toHaveTextContent('41.5');
     expect(rows[1]).toHaveTextContent('Sisters of EVE');
     expect(rows[1]).toHaveTextContent('12.3');
+  });
+
+  it('announces a stores and items summary through a persistent status region (issue #3354)', async () => {
+    useLpStoreSearch.mockReturnValue(state());
+    renderSearch();
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/^\d+ stores?, \d+ items?$/)
+    );
   });
 
   it('opens the store with the offer selected, carrying the query for the crumb back', () => {

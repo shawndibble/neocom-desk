@@ -284,6 +284,21 @@ describe('SkillDetailModal', () => {
     expect(await within(dialog).findByText('No prerequisites')).toBeInTheDocument();
   });
 
+  it('Try again keeps focus inside the dialog, including after the result loads', async () => {
+    vi.mocked(loadSkills).mockRejectedValueOnce(new Error('boom'));
+    const user = userEvent.setup();
+
+    renderModal();
+    act(() => useSkillDetailModalStore.getState().open(3));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: 'Try again' }));
+
+    expect(await within(dialog).findByText('No prerequisites')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+  });
+
   it('close() from the store hides the dialog', async () => {
     renderModal();
     act(() => useSkillDetailModalStore.getState().open(3));

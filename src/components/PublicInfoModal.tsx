@@ -25,6 +25,8 @@
  */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { tabDomId } from '@/components/ui/tabPanel';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
@@ -81,6 +83,12 @@ export function PublicInfoModal() {
   const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
+  const focusAfterCommit = useFocusAfterCommit();
+  // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
+  const openTab = (id: PublicInfoKind) => {
+    setActiveTab(id);
+    focusAfterCommit(() => document.getElementById(tabDomId(tabsId, id)));
+  };
   const [character, setCharacter] = useState<CharacterState>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
@@ -193,8 +201,8 @@ export function PublicInfoModal() {
               state={character}
               npc={npcCharacter}
               corporation={corporation}
-              onOpenCorporation={() => setActiveTab('corporation')}
-              onOpenAlliance={() => setActiveTab('alliance')}
+              onOpenCorporation={() => openTab('corporation')}
+              onOpenAlliance={() => openTab('alliance')}
             />
           )}
           {activeTab === 'corporation' && (
@@ -202,9 +210,7 @@ export function PublicInfoModal() {
               state={corporation}
               allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
               allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
-              onOpenAlliance={
-                alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined
-              }
+              onOpenAlliance={alliance.status !== 'idle' ? () => openTab('alliance') : undefined}
             />
           )}
           {activeTab === 'alliance' && <AllianceTab state={alliance} />}

@@ -171,6 +171,42 @@ describe('PublicInfoModal', () => {
     expect(within(dialog).getByRole('button', { name: 'Linked Alliance' })).toBeInTheDocument();
   });
 
+  it('leaves focus on the Corporation tab after its button in the Character tab is pressed', async () => {
+    mockCharacter(91, {
+      name: 'Some Pilot',
+      corporation_id: 2,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+      security_status: 1.5,
+    });
+    mockCorporation(2, {
+      name: 'Some Corp',
+      ticker: 'SOME',
+      ceo_id: 99,
+      creator_id: 99,
+      member_count: 42,
+      tax_rates: { isk: 10 },
+    });
+    mockNames([
+      { id: 99, name: 'CEO Pilot' },
+      { id: 2, name: 'Some Corp' },
+    ]);
+
+    renderModal();
+    act(() => usePublicInfoModalStore.getState().open('character', 91));
+
+    const dialog = await screen.findByRole('dialog');
+    const button = await within(dialog).findByRole('button', { name: /some corp/i });
+    act(() => button.focus());
+    act(() => button.click());
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toHaveFocus()
+    );
+  });
+
   it('opening by corporation id skips straight to the Corporation tab, no Character tab', async () => {
     mockCorporation(2, {
       name: 'Some Corp',

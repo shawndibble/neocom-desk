@@ -1971,6 +1971,60 @@ describe('removing an entry requires confirmation (#408)', () => {
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
   });
+
+  it("removing entry 1 of 2 moves focus to the next row's reorder button (WCAG 2.4.3)", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /reorder skill b/i })).toHaveFocus()
+    );
+  });
+
+  it('removing the only entry moves focus to the "Your entries" heading', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      plan: { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 1 }] },
+    });
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Your entries' })).toHaveFocus()
+    );
+  });
+
+  it("Cancel gives focus back to the row's ⋮ (WCAG 2.4.3)", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    const more = screen.getByRole('button', { name: /more actions for skill a/i });
+    await user.click(more);
+    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(more).toHaveFocus();
+  });
+
+  it("Saving a milestone gives focus back to the row's ⋮ (WCAG 2.4.3)", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    const more = screen.getByRole('button', { name: /more actions for skill a i/i });
+    await user.click(more);
+    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Name this milestone' });
+    await user.type(within(dialog).getByRole('textbox'), 'Fly Loki');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(more).toHaveFocus();
+  });
 });
 
 describe('yearly remap on cooldown (#1404)', () => {
