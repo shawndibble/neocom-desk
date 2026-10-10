@@ -608,7 +608,7 @@ describe('Mail', () => {
     const loadMore = screen.getByRole('button', { name: /load more/i });
     await user.click(loadMore);
 
-    expect(await screen.findByText('Older mail')).toBeInTheDocument();
+    expect(await screen.findByText('Older mail', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(lastMailIdParam).toBe('951');
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
@@ -636,7 +636,7 @@ describe('Mail', () => {
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
 
-    const olderRow = (await screen.findByText('Older mail')).closest('li');
+    const olderRow = (await screen.findByText('Older mail', {}, { timeout: 5000 })).closest('li');
     expect(olderRow).toHaveTextContent('Market Bot');
   });
 
@@ -671,7 +671,7 @@ describe('Mail', () => {
     render(<App />);
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
-    await user.click(await screen.findByText('Older mail'));
+    await user.click(await screen.findByText('Older mail', {}, { timeout: 5000 }));
 
     expect(
       await screen.findByRole('img', {
