@@ -127,7 +127,8 @@ describe('Layout sync status dot', () => {
   it('is hidden when sync is unconfigured', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The shell's always-mounted notice regions exist but stay empty.
+    for (const region of screen.getAllByRole('status')) expect(region).toBeEmptyDOMElement();
   });
 
   it('is shown, subscribed to sync status, when sync is configured', () => {
