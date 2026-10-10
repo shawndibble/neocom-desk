@@ -6,13 +6,25 @@
  * plan was open before compare mode started (CONTEXT.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { onPlanLinkClick, planHref } from './planLinkClick';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
+import {
+  Button,
+  ColumnPickerMenu,
+  DataTable,
+  InfoTooltip,
+  IskAmount,
+  Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -21,12 +33,26 @@ import { formatDuration } from '@/lib/duration';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import type { HubOrderCounts } from '@/market/fuzzwork';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { buildPlanCompareCsvColumns } from './buildPlanCompareCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import { TRADE_HUBS } from '@/market/hubs';
+import {
+  COMPARE_COLUMN_IDS,
+  COMPARE_DEFAULT_COLUMNS,
+  HUB_COLUMN_IDS,
+  PLAN_HUB,
+  useCompareHub,
+  useVisibleCompareColumns,
+  type CompareColumnId,
+  type CompareHubChoice,
+} from './compareColumns';
+import { hubOrderKey, useHubOrderCounts, type HubOrderTarget } from './useHubOrderCounts';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -101,12 +127,50 @@ export function BuildPlanCompare({
     pricingInputs,
   });
   const unknown = t('common.unknown');
-  const csvColumns = useMemo(() => buildPlanCompareCsvColumns(t), [t]);
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleCompareColumns,
+    COMPARE_DEFAULT_COLUMNS
+  );
+  const hubChoice = useCompareHub((state) => state.value);
+  const setHubChoice = useCompareHub((state) => state.setValue);
+  const hydrateHubChoice = useCompareHub((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateHubChoice();
+  }, [hydrateHubChoice]);
+
+  const showHubColumns = HUB_COLUMN_IDS.some(isVisible);
+  const targets = useMemo(() => {
+    const byPlan = new Map<string, HubOrderTarget>();
+    for (const plan of plans) {
+      const typeId = catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productTypeID;
+      if (typeId == null) continue;
+      byPlan.set(plan.id, { hubId: hubChoice === PLAN_HUB ? plan.hubId : hubChoice, typeId });
+    }
+    return byPlan;
+  }, [plans, catalog, hubChoice]);
+  const hubOrders = useHubOrderCounts([...targets.values()], showHubColumns);
+  const hubCountsFor = (row: ComparedBuildRow) => {
+    const target = targets.get(row.planId);
+    return target ? hubOrders.counts.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
+  };
+
+  const csvColumns = buildPlanCompareCsvColumns(t, { visible, hubCounts: hubCountsFor });
   const compareExport = useTableExport({
     surface: 'build-plan-compare',
     rows,
     columns: csvColumns,
   });
+
+  /** A hub-book cell: "…" while loading, "—" when the plan has no product or the read failed. */
+  const hubCell = (row: ComparedBuildRow, pick: (c: HubOrderCounts) => number): ReactNode => {
+    if (row.loading || hubOrders.loading) return '…';
+    const counts = hubCountsFor(row);
+    return counts ? pick(counts).toLocaleString() : unknown;
+  };
+  const hubSort = (row: ComparedBuildRow, pick: (c: HubOrderCounts) => number) => {
+    const counts = hubCountsFor(row);
+    return counts ? pick(counts) : undefined;
+  };
 
   const columns: DataTableColumn<ComparedBuildRow>[] = [
     {
@@ -159,6 +223,34 @@ export function BuildPlanCompare({
       render: (row) => numericCell(row, row.result?.seconds ?? null, formatDuration, unknown),
     },
     {
+      id: 'materialCost',
+      header: t('industry.materialCost'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.result?.materialCost ?? undefined,
+      render: (row) =>
+        numericCell(
+          row,
+          row.result?.materialCost ?? null,
+          (v) => <IskAmount value={v} decimals={0} />,
+          unknown
+        ),
+    },
+    {
+      id: 'jobFee',
+      header: t('industry.jobFee'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.result?.jobFee.total ?? undefined,
+      render: (row) =>
+        numericCell(
+          row,
+          row.result?.jobFee.total ?? null,
+          (v) => <IskAmount value={v} decimals={0} />,
+          unknown
+        ),
+    },
+    {
       id: 'totalCost',
       header: t('industry.totalCost'),
       align: 'right',
@@ -168,6 +260,20 @@ export function BuildPlanCompare({
         numericCell(
           row,
           row.result?.totalCost ?? null,
+          (v) => <IskAmount value={v} decimals={0} />,
+          unknown
+        ),
+    },
+    {
+      id: 'revenue',
+      header: t('industry.revenue'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.result?.revenue ?? undefined,
+      render: (row) =>
+        numericCell(
+          row,
+          row.result?.revenue ?? null,
           (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
@@ -224,13 +330,93 @@ export function BuildPlanCompare({
           unknown
         ),
     },
+    {
+      id: 'buyCost',
+      header: t('industry.compareBuyCost'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.result?.buyCost ?? undefined,
+      render: (row) =>
+        numericCell(
+          row,
+          row.result?.buyCost ?? null,
+          (v) => <IskAmount value={v} decimals={0} />,
+          unknown
+        ),
+    },
+    {
+      id: 'hubBuyOrders',
+      header: t('industry.compareHubBuyOrders'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => hubSort(row, (c) => c.buyOrders),
+      render: (row) => hubCell(row, (c) => c.buyOrders),
+    },
+    {
+      id: 'hubSellOrders',
+      header: t('industry.compareHubSellOrders'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => hubSort(row, (c) => c.sellOrders),
+      render: (row) => hubCell(row, (c) => c.sellOrders),
+    },
+    {
+      id: 'hubBuyVolume',
+      header: t('industry.compareHubBuyVolume'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => hubSort(row, (c) => c.buyVolume),
+      render: (row) => hubCell(row, (c) => c.buyVolume),
+    },
+    {
+      id: 'hubSellVolume',
+      header: t('industry.compareHubSellVolume'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => hubSort(row, (c) => c.sellVolume),
+      render: (row) => hubCell(row, (c) => c.sellVolume),
+    },
   ];
+
+  const columnsById = Object.fromEntries(columns.map((c) => [c.id, c])) as Record<
+    CompareColumnId,
+    DataTableColumn<ComparedBuildRow>
+  >;
+  const shownColumns = columns.filter((c) => c.id === 'plan' || isVisible(c.id as CompareColumnId));
 
   return (
     <Panel
       title={t('industry.compareTitle')}
       actions={
         <span className="flex items-center gap-2">
+          {showHubColumns && (
+            <Select
+              value={hubChoice}
+              onValueChange={(value) => void setHubChoice(value as CompareHubChoice)}
+            >
+              <SelectTrigger size="sm" aria-label={t('industry.compareHubPicker')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PLAN_HUB}>{t('industry.comparePlanHub')}</SelectItem>
+                {TRADE_HUBS.map((hub) => (
+                  <SelectItem key={hub.id} value={hub.id}>
+                    {hub.systemName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <ColumnPickerMenu
+            available={COMPARE_COLUMN_IDS}
+            visible={visible}
+            columnsById={columnsById}
+            onToggle={toggle}
+            onReset={reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+          />
           <TableActionsMenu name={t('industry.compareTitle')} tableExport={compareExport} />
           <Button size="sm" onClick={onDone}>
             {t('industry.compareDone')}
@@ -239,10 +425,15 @@ export function BuildPlanCompare({
       }
     >
       <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+      {showHubColumns && (
+        <p className="mb-2 text-xs text-text-dim">
+          {hubOrders.failed ? t('industry.compareHubFailed') : t('industry.compareHubOrdersHint')}
+        </p>
+      )}
       <div className="overflow-x-auto">
         <DataTable
           {...compareExport.tableProps}
-          columns={columns}
+          columns={shownColumns}
           rows={rows}
           rowKey={(row) => row.planId}
           label={t('industry.compareTableLabel')}

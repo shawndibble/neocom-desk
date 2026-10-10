@@ -11,6 +11,12 @@ import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 
+vi.mock('@/market/fuzzwork', () => ({
+  fetchOrderCounts: vi.fn(
+    async () => new Map([[587, { buyOrders: 28, sellOrders: 44, buyVolume: 9, sellVolume: 8 }]])
+  ),
+}));
+
 vi.mock('./useComparedBuildResults', async () => {
   const actual = await vi.importActual<typeof import('./useComparedBuildResults')>(
     './useComparedBuildResults'
@@ -185,5 +191,40 @@ describe('BuildPlanCompare', () => {
     ]);
     await userEvent.click(screen.getByRole('link', { name: 'Raven mission fit' }));
     expect(onOpenPlan).toHaveBeenCalledWith('a');
+  });
+
+  it('shows the buy orders of the plan product at its hub, and lets the picker add more columns', async () => {
+    const catalog = {
+      ...EMPTY_CATALOG,
+      byBlueprintTypeID: new Map([[1, { productTypeID: 587 }]]),
+    } as unknown as BlueprintCatalog;
+    mockedUseComparedBuildResults.mockReturnValue([
+      row({ planId: 'a', planName: 'Rifter run', productName: 'Rifter', result: RESULT }),
+    ]);
+    render(
+      <MemoryRouter>
+        <BuildPlanCompare
+          plans={[plan({ id: 'a' })]}
+          catalog={catalog}
+          pi={null}
+          ownedBlueprints={[]}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
+          onDone={vi.fn()}
+          onOpenPlan={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('28')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Buy orders at hub/ })).toBeInTheDocument();
+    // The extras start unticked.
+    expect(screen.queryByRole('columnheader', { name: /Sell orders at hub/ })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemcheckbox', { name: 'Sell orders at hub' })
+    );
+    expect(await screen.findByText('44')).toBeInTheDocument();
   });
 });
