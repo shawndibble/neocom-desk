@@ -502,6 +502,8 @@ export function Market() {
     handleToggle,
     itemTab,
     setItemTab,
+    compareRegionIds,
+    setCompareRegionIds,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
 
   // Spoken summary of the finder's result: the visible notes and the swap to
@@ -1203,6 +1205,17 @@ export function Market() {
                             regionId={resolvedRegion.regionId}
                             typeId={selectedTypeId}
                             itemName={selectedItem?.name ?? ''}
+                            compare={
+                              // A Global Market Region item trades nowhere
+                              // else, so there is no other region to compare.
+                              resolvedRegion.override || !marketRegions
+                                ? undefined
+                                : {
+                                    regionIds: compareRegionIds,
+                                    onChange: setCompareRegionIds,
+                                    regions: marketRegions,
+                                  }
+                            }
                           />
                         )
                       ) : itemTab === 'variations' ? (

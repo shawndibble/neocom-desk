@@ -84,6 +84,10 @@ count had nothing honest to borrow: `warning` would make a data series read as
 an alert about the data, and a clock kind (below) names where a _deadline_ came
 from, so reusing one would give a single hue two meanings. It sits clear of
 `warning` on the orange side and of `kind-industry-job` on the saturated side.
+Price History's compared regions are the other case. They are a categorical set,
+one per region the reader picked, each named in the legend and drawn with its own
+dash. So they borrow clock kinds as the Net Worth layers do (below), rather than
+being one fixed series that would make a kind's hue mean something else.
 
 A second entry here is the start of the parallel palette this section forbids —
 so before adding one, try telling the new series apart by **form** instead:
@@ -125,8 +129,9 @@ magnitudes. These eight are **nominal**: no order, no magnitude, identity only. 
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 
-- **Other categorical series borrow these tokens**, as the Net Worth layers and the D-Scan
-  Fleet board's roles do (their legends name each one), instead of minting hues.
+- **Other categorical series borrow these tokens**, as the Net Worth layers, the D-Scan
+  Fleet board's roles and Price History's compared regions (each also with its own dash) do
+  (their legends name each one), instead of minting hues.
 - **This is meant to be the app's only nominal set.** The next categorical thing that
   genuinely needs color extends these tokens rather than minting a parallel palette —
   the fork is the failure mode the Mail decision named when it refused per-folder hues.

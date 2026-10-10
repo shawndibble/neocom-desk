@@ -37,4 +37,18 @@ describe('priceHistoryCsvColumns', () => {
       '312',
     ]);
   });
+
+  it('adds one average column per compared region, blank on a day that region did not trade', () => {
+    const tr = (k: string, o?: Record<string, unknown>) => (o ? `${k}:${String(o.region)}` : k);
+    const columns = priceHistoryCsvColumns(tr, [
+      { regionId: 10000043, name: 'Domain' },
+      { regionId: 10000032, name: 'Sinq Laison' },
+    ]);
+    expect(columns.slice(6).map((c) => c.header)).toEqual([
+      'market.priceHistory.regionAverageColumn:Domain',
+      'market.priceHistory.regionAverageColumn:Sinq Laison',
+    ]);
+    const csv = toCsv([{ ...POINT, comparison: { 10000043: 4.9 } }], columns);
+    expect(csv.split('\r\n')[1].split(',').slice(6)).toEqual(['4.9', '']);
+  });
 });

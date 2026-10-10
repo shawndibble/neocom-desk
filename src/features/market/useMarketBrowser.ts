@@ -18,7 +18,12 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRememberedUrlParams, useUrlParam, type UrlParamValues } from '@/lib/useUrlState';
-import { enumParam, TEXT_DEBOUNCE_MS, type UrlParamCodec } from '@/lib/urlState';
+import {
+  enumParam,
+  orderedIdListParam,
+  TEXT_DEBOUNCE_MS,
+  type UrlParamCodec,
+} from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
@@ -48,6 +53,13 @@ const NO_IDS: ReadonlySet<number> = new Set();
 export type MarketItemTab = 'orders' | 'variations' | 'history';
 
 const ITEM_TAB_PARAM = enumParam<MarketItemTab>(['orders', 'variations', 'history'], 'orders');
+
+/**
+ * Price History's compared regions, in pick order (each one's line follows
+ * its slot). Kept across item changes — a trader comparing Jita with Amarr
+ * is comparing them for the next item too.
+ */
+const COMPARE_REGIONS_PARAM = orderedIdListParam();
 
 /**
  * The URL's `hub`/`region`, read exactly as `parseMarketParams` reads them,
@@ -103,6 +115,9 @@ export interface MarketBrowserController {
   /** Order Book / Price History — Order Book by default. */
   itemTab: MarketItemTab;
   setItemTab: (next: MarketItemTab) => void;
+  /** Price History's compared regions, from the URL as written — the panel normalizes them. */
+  compareRegionIds: readonly number[];
+  setCompareRegionIds: (next: readonly number[]) => void;
 }
 
 export function useMarketBrowser({
@@ -185,6 +200,10 @@ export function useMarketBrowser({
   }>({ query: '', ids: new Set() });
 
   const [itemTab, setItemTab] = useUrlParam('browser.itemTab', ITEM_TAB_PARAM);
+  const [compareRegionIds, setCompareRegionIds] = useUrlParam(
+    'browser.compare',
+    COMPARE_REGIONS_PARAM
+  );
 
   // Separate from Appraisal's `hydratePricePercent` effect (Market.tsx) —
   // different concern; two independent mount-effects behave the same as one.
@@ -445,5 +464,7 @@ export function useMarketBrowser({
     handleToggle,
     itemTab,
     setItemTab,
+    compareRegionIds,
+    setCompareRegionIds,
   };
 }

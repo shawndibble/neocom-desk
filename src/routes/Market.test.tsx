@@ -73,9 +73,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 vi.mock('@/features/market/PriceHistoryChart', () => ({
-  default: ({ points, itemName }: { points: { date: string }[]; itemName: string }) => (
+  default: ({
+    points,
+    itemName,
+    comparisons,
+  }: {
+    points: { date: string }[];
+    itemName: string;
+    comparisons?: { name: string; status: string }[];
+  }) => (
     <div data-testid="price-history-chart">
       {itemName}: {points.length} points
+      {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}]`).join('')}
     </div>
   ),
 }));
@@ -821,6 +830,36 @@ describe('Price History tab (issue #11)', () => {
 
     expect(await screen.findByText('No price history')).toBeInTheDocument();
     expect(screen.queryByTestId('price-history-chart')).not.toBeInTheDocument();
+  });
+
+  it('reads compared regions from the URL and fetches each one, so a shared link compares the same regions', async () => {
+    const forgeHits = { count: 0 };
+    const domainHits = { count: 0 };
+    const day = [
+      { date: RECENT_DATE, average: 5, highest: 5.5, lowest: 4.5, order_count: 2, volume: 100 },
+    ];
+    server.use(
+      ordersHandler({ count: 0 }),
+      historyHandler(forgeHits, RIFTER_REGION_ID, { 587: day }),
+      historyHandler(domainHits, 10000043, { 587: day })
+    );
+    window.history.pushState(
+      {},
+      '',
+      '/market?type=587&browser.itemTab=history&browser.compare=10000043'
+    );
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('price-history-chart')).toHaveTextContent(
+        'Rifter: 1 points [Domain:ready]'
+      )
+    );
+    expect(forgeHits.count).toBe(1);
+    expect(domainHits.count).toBe(1);
+    expect(
+      screen.getByRole('button', { name: 'Compare regions, 1 of 4 picked' })
+    ).toBeInTheDocument();
   });
 });
 

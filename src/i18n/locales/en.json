@@ -7731,7 +7731,20 @@
       "summaryVolume": "Volume",
       "summaryOrdersPerDay": "Orders / day",
       "summaryNone": "No data in this range",
-      "movingAverage": "Moving average"
+      "movingAverage": "Moving average",
+      "regionAverage": "{{region}} average",
+      "regionAverageColumn": "Average Price ({{region}})",
+      "noTrades": "No trades",
+      "compareRegions": "Compare regions",
+      "compareButton": "Compare regions, {{count}} of {{max}} picked",
+      "compareHubsGroup": "Trade hubs",
+      "compareAllGroup": "All regions",
+      "compareHubOption": "{{region}} ({{hub}})",
+      "compareLimit": "Up to {{max}} regions",
+      "compareClear": "Clear",
+      "compareLoading": "{{region}} · loading…",
+      "compareFailed": "{{region}} · couldn't load",
+      "compareEmpty": "{{region}} · no trades in this range"
     },
     "compare": {
       "unitColumn": "Unit",

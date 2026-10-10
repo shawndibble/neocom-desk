@@ -831,6 +831,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Price History**: The Market Browser item tab charting one item's daily
   history in a Region: **Daily Range**, average price and its moving average
   above, **Traded Volume** and **Order Count** below, on one shared date axis.
+  Up to four other Regions can be compared by their average line alone.
   Every figure comes from ESI's own daily rows — nothing here is derived from
   the live **Order Book**.
 - **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork).
