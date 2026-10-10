@@ -115,3 +115,46 @@ describe('IskInput description', () => {
     expect(input).toHaveAccessibleDescription('= 1,000,000,000 ISK');
   });
 });
+
+describe('IskInput invalid text', () => {
+  it('never errors while "1.5b" is typed, even at "1."', async () => {
+    const user = userEvent.setup();
+    render(<Harness onCommit={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1.5b');
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('holds a trailing "." until blur', async () => {
+    const user = userEvent.setup();
+    render(<Harness onCommit={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1.');
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole('alert')).toHaveTextContent('Not an ISK amount');
+  });
+
+  it('shows the error after a pause, describes the field by it, and clears when fixed', async () => {
+    const user = userEvent.setup();
+    render(<Harness onCommit={vi.fn()} />);
+    const input = screen.getByRole('textbox', { name: 'Max price' });
+    await user.type(input, 'abc');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not an ISK amount');
+    expect(input).toHaveAccessibleDescription(/Not an ISK amount/);
+    await user.clear(input);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await user.type(input, '1b');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
+  });
+
+  it('shows the error on blur at once, even with the echo off', async () => {
+    const user = userEvent.setup();
+    render(<Harness onCommit={vi.fn()} echo={false} />);
+    await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1x');
+    await user.tab();
+    expect(screen.getByRole('alert')).toHaveTextContent('Not an ISK amount');
+  });
+});
