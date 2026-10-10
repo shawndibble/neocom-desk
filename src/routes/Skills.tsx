@@ -532,7 +532,7 @@ export function Skills() {
                         disabled={searching}
                         onClick={() => toggleGroup(group.groupName)}
                         className={cx(
-                          'flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
+                          'flex min-h-11 w-full scroll-mt-14 items-center justify-between gap-2 border-line px-3 py-1 text-left disabled:hover:bg-transparent md:min-h-0',
                           rowInteractiveClassName,
                           focusRingInsetClassName,
                           expanded && 'border-b'
@@ -570,7 +570,7 @@ export function Skills() {
                                 }
                                 className={cx(
                                   tappableRowClassName,
-                                  'flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs',
+                                  'flex w-full scroll-mt-14 items-center justify-between gap-2 py-1.5 text-left text-xs',
                                   rowInteractiveClassName,
                                   focusRingInsetClassName,
                                   selected
