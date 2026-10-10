@@ -152,9 +152,9 @@ function BoosterRow({
     return ok;
   };
 
-  const expiresIn = useDurationFields(row.expiresAt, row.startsAt, (expiresAt) =>
-    patch({ expiresAt })
-  );
+  // The first row has no one to wait for: a start an older build saved on it is ignored.
+  const startsAt = position > 1 ? row.startsAt : null;
+  const expiresIn = useDurationFields(row.expiresAt, startsAt, (expiresAt) => patch({ expiresAt }));
 
   // eslint-disable-next-line react-hooks/purity -- display-only "expired" hint, same as PlanEditor's own clock read
   const expired = row.expiresAt !== null && row.expiresAt <= Date.now();
@@ -217,9 +217,7 @@ function BoosterRow({
           <button
             key={hours}
             type="button"
-            onClick={() =>
-              patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt, Date.now()) })
-            }
+            onClick={() => patch({ expiresAt: boosterExpiryFromNow(hours, startsAt, Date.now()) })}
             className={cx(
               tappableRowClassName,
               'rounded-xs border px-1.5 text-[0.6875rem]',
@@ -248,7 +246,9 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
   const { t } = useTranslation();
 
   function patchRow(index: number, patch: Partial<PlanBooster>): boolean {
-    const edited = boosters.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    // Setting the first row's time left means it runs from now, whatever start an older build saved.
+    const applied = index === 0 && 'expiresAt' in patch ? { ...patch, startsAt: null } : patch;
+    const edited = boosters.map((row, i) => (i === index ? { ...row, ...applied } : row));
     // Later rows keep their length and follow the edited one's new expiry.
     // eslint-disable-next-line react-hooks/purity -- event handler, not render
     const next = linkBoosterChain(edited, Date.now());

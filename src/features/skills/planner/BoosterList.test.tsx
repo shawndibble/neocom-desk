@@ -144,6 +144,17 @@ describe('BoosterList time left', () => {
     expect(screen.getAllByText(/before it runs out/i)).toHaveLength(1);
   });
 
+  it('runs a first row from now even if an older build saved a future start on it', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderList([ROW({ startsAt: Date.now() + 9 * DAY, expiresAt: null })]);
+
+    await user.type(screen.getByLabelText('Days'), '2');
+
+    const [rows] = onChange.mock.calls.at(-1) as [PlanBooster[]];
+    expect(rows[0].startsAt).toBeNull();
+    expect(rows[0].expiresAt).toBeLessThan(Date.now() + 2 * DAY + 5000);
+  });
+
   it('moves a queued row with the one in front of it, keeping its length', async () => {
     const user = userEvent.setup();
     const now = Date.now();
@@ -161,14 +172,18 @@ describe('BoosterList time left', () => {
 });
 
 describe('BoosterList quick picks', () => {
-  it('measures a quick pick from the row’s own startsAt, not from now', async () => {
+  it('measures a queued row’s quick pick from its own start, not from now', async () => {
     const user = userEvent.setup();
     const futureStart = new Date(2099, 0, 1).getTime();
-    const { onChange } = renderList([ROW({ startsAt: futureStart, expiresAt: null })]);
+    const { onChange } = renderList([
+      ROW({ expiresAt: futureStart }),
+      ROW({ startsAt: futureStart, expiresAt: null }),
+    ]);
 
-    await user.click(screen.getByRole('button', { name: '+1h' }));
+    await user.click(screen.getAllByRole('button', { name: '+1h' })[1]);
 
     expect(onChange).toHaveBeenCalledWith([
+      ROW({ expiresAt: futureStart }),
       ROW({ startsAt: futureStart, expiresAt: futureStart + 60 * 60 * 1000 }),
     ]);
   });

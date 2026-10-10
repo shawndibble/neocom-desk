@@ -318,7 +318,7 @@ export function joinBoosterDuration({ days, hours, minutes }: BoosterDuration): 
  */
 export function rebaseBooster(row: PlanBooster, startsAt: number | null, now: number): PlanBooster {
   if (row.expiresAt === null) return { ...row, startsAt };
-  const duration = row.expiresAt - boosterDurationBase(row.startsAt, now);
+  const duration = row.expiresAt - (row.startsAt ?? now);
   if (duration <= 0) return { ...row, startsAt };
   return { ...row, startsAt, expiresAt: boosterDurationBase(startsAt, now) + duration };
 }

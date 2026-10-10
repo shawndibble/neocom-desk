@@ -349,6 +349,11 @@ describe('rebaseBooster', () => {
     expect(rebaseBooster(booster({ enabled: true }), NOW + DAY, NOW).expiresAt).toBeNull();
   });
 
+  it('keeps the full length of a row whose start has already passed', () => {
+    const row = booster({ enabled: true, startsAt: NOW - 10 * DAY, expiresAt: NOW + 20 * DAY });
+    expect(rebaseBooster(row, NOW + 3 * DAY, NOW).expiresAt).toBe(NOW + 33 * DAY);
+  });
+
   it('starts a queued row from now, with the same length', () => {
     const row = booster({ enabled: true, startsAt: NOW + 5 * DAY, expiresAt: NOW + 35 * DAY });
     expect(rebaseBooster(row, null, NOW)).toEqual({
