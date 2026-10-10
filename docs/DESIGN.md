@@ -914,6 +914,13 @@ count-labelled button ("Grant selected (3)") that appears once a row is ticked.
 The per-row action stays. Ticks belong to the context they were made in and
 clear when it changes (a different Character).
 
+**Menu item that opens a dialog.** A menu item that opens a dialog opens it
+after the menu has closed (`useOpenAfterMenu`), so closing the dialog puts
+focus back on the menu button. Opened from the item's `onSelect`, the dialog
+would hand focus back to a menu item that no longer exists, and focus falls to
+the top of the page (WCAG 2.4.3). An item that hands focus to an inline field
+instead (a rename) passes `keepFocus`.
+
 ### Cue vocabulary
 
 | Cue                                                  | Means only                                                                                                                                                                                                                                                                                                                                                                |
