@@ -4,6 +4,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 import { useSurveyPayeeId } from './surveyPayeePref';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -346,6 +347,7 @@ interface TaxTabProps {
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const selectionToolbarRef = useRef<HTMLDivElement>(null);
   // The Ore column only where the table has room for it beside a full Payee
   // name: the Payee is what a row is read by, the ore is one click away in
   // the entry itself (and at 1024px it pushed Status off-screen, #2147).
@@ -1173,6 +1175,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     () => openRows.filter((dr) => selection.has(dr.key)),
     [openRows, selection]
   );
+  // The sticky toolbar covers the page bottom: reserve its height as scroll padding so a focused row clears it.
+  useStickyClearance(selectionToolbarRef, 'selection-toolbar', {
+    enabled: selectedRows.length > 0,
+  });
 
   const selectedSettleUpRows: SettleUpRow[] = useMemo(
     () => settleUpRowsFor(settleUpMembers(selectedRows)),
@@ -1469,7 +1475,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
                 <label className={touchCheckboxLabelClassName}>
                   <Checkbox
-                    aria-label={t('miningTax.selectForBulkAction')}
+                    aria-label={t('miningTax.selectRow', {
+                      date: dateLabel(dr),
+                      system: systemName(dr),
+                    })}
                     checked={selection.has(dr.key)}
                     onChange={() => toggleRowSelected(dr.key)}
                   />
@@ -1950,7 +1959,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   viewport on desktop), so the bulk actions stay in reach
                   wherever the ticked row sits in a long ledger. */}
                 {selectedRows.length > 0 && (
-                  <div className="sticky bottom-[var(--bottom-nav-clearance)] z-30 md:bottom-3">
+                  <div
+                    ref={selectionToolbarRef}
+                    className="sticky bottom-[var(--bottom-nav-clearance)] z-30 md:bottom-3"
+                  >
                     <SelectionToolbar
                       selectedCount={selectedRows.length}
                       canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}

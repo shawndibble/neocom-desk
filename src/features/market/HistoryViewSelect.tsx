@@ -1,3 +1,4 @@
+import { useEffect, useRef, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   InfoTooltip,
@@ -16,6 +17,11 @@ export type HistoryView = 'history' | 'transactions';
 interface HistoryViewSelectProps {
   value: HistoryView;
   onChange: (view: HistoryView) => void;
+  /**
+   * Set by the parent when the user just picked a view: the swap unmounted the
+   * control they used, so this fresh one takes focus once, then clears the flag.
+   */
+  focusOnMountRef?: RefObject<boolean>;
 }
 
 /**
@@ -34,26 +40,36 @@ interface HistoryViewSelectProps {
  * layout gives it. Still inside the panel's own header, so it still reads as
  * a view of this table rather than a second row of tabs.
  */
-export function HistoryViewSelect({ value, onChange }: HistoryViewSelectProps) {
+export function HistoryViewSelect({ value, onChange, focusOnMountRef }: HistoryViewSelectProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!focusOnMountRef?.current) return;
+    focusOnMountRef.current = false;
+    wrapRef.current
+      ?.querySelector<HTMLElement>('[role="combobox"], button[aria-pressed="true"]')
+      ?.focus();
+  }, [focusOnMountRef]);
   if (isPhone) {
     return (
-      <SegmentedControl
-        label={t('market.sections.historyViews')}
-        options={[
-          { value: 'history', label: t('market.sections.historyOrders') },
-          { value: 'transactions', label: t('market.sections.transactions') },
-        ]}
-        value={value}
-        onChange={onChange}
-        fill
-        className="min-w-0 flex-1"
-      />
+      <span ref={wrapRef} className="contents">
+        <SegmentedControl
+          label={t('market.sections.historyViews')}
+          options={[
+            { value: 'history', label: t('market.sections.historyOrders') },
+            { value: 'transactions', label: t('market.sections.transactions') },
+          ]}
+          value={value}
+          onChange={onChange}
+          fill
+          className="min-w-0 flex-1"
+        />
+      </span>
     );
   }
   return (
-    <span className="flex items-center gap-1">
+    <span ref={wrapRef} className="flex items-center gap-1">
       <Select value={value} onValueChange={(value) => onChange(value as HistoryView)}>
         <SelectTrigger size="sm" className="w-32" aria-label={t('market.sections.historyViews')}>
           <SelectValue />

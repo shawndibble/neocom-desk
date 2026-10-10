@@ -1277,14 +1277,17 @@ export function Assets() {
   // Level-heading focus (issue #1485): a location/container/search-result
   // link, or Back, unmounts the control the pilot just activated — without
   // this, focus falls back to the page body with no cue what happened (WCAG
-  // 2.4.3). Keyed on `wildcard` alone (the drill-down path), not
-  // `flatModeActive`: that flips true the instant a search keystroke lands,
-  // which would otherwise yank focus off the search box mid-type.
+  // 2.4.3). Keyed on the drill-down path only, not `wildcard` (which also
+  // carries the tab segment: arrowing onto Items would pull focus out of the
+  // tab strip) and not `flatModeActive` (which flips true the instant a
+  // search keystroke lands and would yank focus off the search box).
   // `levelHeadingRef` is shared by whichever of the three header blocks below
   // is actually rendered (root list / drilled level); only one exists at a
   // time.
   const levelHeadingRef = useRef<HTMLHeadingElement>(null);
-  useFocusHeading(levelHeadingRef, wildcard);
+  const levelKey = `${pathStationId ?? ''}/${pathSegments.join('/')}`;
+  useFocusHeading(levelHeadingRef, levelKey);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
@@ -1795,6 +1798,7 @@ export function Assets() {
 
           {tab === 'items' && assetsResult && !assetsNeedsReauth && (
             <SearchInput
+              ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('assets.searchPlaceholder')}
@@ -1919,7 +1923,10 @@ export function Assets() {
                             label={t('assets.search.clear')}
                             variant="plain"
                             size="sm"
-                            onClick={() => setSearch('')}
+                            onClick={() => {
+                              setSearch('');
+                              searchRef.current?.focus();
+                            }}
                           />
                         )}
                       </div>
@@ -2120,6 +2127,7 @@ export function Assets() {
                     <div
                       ref={scrollParentRef}
                       data-virtual-scroll-root
+                      role="region"
                       aria-label={t('assets.treeLabel')}
                       className="min-h-0 flex-1 overflow-y-auto"
                     >

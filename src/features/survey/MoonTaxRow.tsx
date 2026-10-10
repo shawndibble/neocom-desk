@@ -1,8 +1,8 @@
 /**
  * Moon ore is taxed by whoever owns the moon, so a Survey that shows any asks
- * who and at what rate, and hands both to the Moon Mining Tax tab. It sits in
- * its own panel under Field progress and reads as one line of text, "8% to
- * Moon Corp"; clicking the rate or the name turns both into fields (the one
+ * who and at what rate, and hands both to the Moon Mining Tax tab. It is the
+ * Moon tax row of the Additional information panel (`SurveyInfoPanel`) and reads
+ * as one line of text, "8% to Moon Corp"; clicking the rate or the name turns both into fields (the one
  * clicked has focus), since a rate means little without its payee. Enter, or
  * focus leaving the pair, saves. The name completes from the pilot's Payees (and
  * fills in that Payee's rate), and the link opens the Tax tab, where the ledger
@@ -20,7 +20,11 @@ import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, buttonClassName, Panel, TextInput } from '@/components/ui';
+import { Button, buttonClassName, TextInput } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { InfoRow } from './InfoRow';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import * as Icon from '@/components/ui/icons';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
@@ -30,8 +34,10 @@ import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
 
 // Accent text is clickable and the faint pencil after it says "edit in place" (DESIGN.md §6c);
 // `touch:min-h-11` keeps the phone target at 44px.
-const editClassName =
-  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11';
+const editClassName = cx(
+  'inline-flex items-center gap-1.5 rounded-xs text-left text-accent hover:underline touch:min-h-11',
+  focusRingClassName
+);
 
 function Pencil() {
   return <Icon.Rename aria-hidden className="size-[0.6em] shrink-0 text-text-dim" />;
@@ -60,6 +66,9 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   // Which field was clicked: both show while editing, and this one takes focus.
   const [editing, setEditing] = useState<'name' | 'pct' | null>(null);
   const inFlight = useRef(false);
+  const rateButton = useRef<HTMLButtonElement>(null);
+  const payeeButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const pct = parseTaxPct(saved.pct);
   const name = saved.name.trim();
@@ -107,19 +116,21 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
   }
 
   // Focus moving between the two fields keeps editing; only leaving the pair ends it.
-  const stopEditing = {
-    onBlur: (event: FocusEvent<HTMLInputElement>) => {
-      if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
-        setEditing(null);
-      }
-    },
-    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter' || event.key === 'Escape') setEditing(null);
-    },
-  };
+  function stopOnBlur(event: FocusEvent<HTMLInputElement>) {
+    if (!event.currentTarget.closest('[data-tax-fields]')?.contains(event.relatedTarget)) {
+      setEditing(null);
+    }
+  }
+
+  function stopOnKey(event: KeyboardEvent<HTMLInputElement>, field: 'name' | 'pct') {
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    setEditing(null);
+    // The field unmounts: hand focus to the button that replaces it.
+    focusAfterCommit(field === 'pct' ? rateButton : payeeButton);
+  }
 
   return (
-    <Panel title={t('survey.moonTax.label')}>
+    <InfoRow label={t('survey.moonTax.label')}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div
           data-tax-fields
@@ -137,15 +148,19 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
                 placeholder="0"
                 aria-invalid={saved.pct !== '' && pct === null}
                 onChange={(event) => setSaved({ ...saved, pct: event.target.value })}
-                {...stopEditing}
+                onBlur={stopOnBlur}
+                onKeyDown={(event) => stopOnKey(event, 'pct')}
               />
               <span className="text-text-dim">%</span>
             </span>
           ) : (
             <button
+              ref={rateButton}
               type="button"
               className={`${editClassName} tabular-nums`}
-              aria-label={`${t('survey.moonTax.rate')}: ${saved.pct}%`}
+              aria-label={t('survey.moonTax.rateButton', {
+                value: saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`,
+              })}
               onClick={() => setEditing('pct')}
             >
               {saved.pct === '' ? t('survey.moonTax.noRate') : `${saved.pct}%`}
@@ -164,7 +179,8 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
                 value={saved.name}
                 placeholder={t('survey.moonTax.payeePlaceholder')}
                 onChange={(event) => changeName(event.target.value)}
-                {...stopEditing}
+                onBlur={stopOnBlur}
+                onKeyDown={(event) => stopOnKey(event, 'name')}
               />
               <datalist id={listId}>
                 {payees.map((p) => (
@@ -174,9 +190,12 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
             </>
           ) : (
             <button
+              ref={payeeButton}
               type="button"
               className={`${editClassName} min-w-0 [overflow-wrap:anywhere]`}
-              aria-label={`${t('survey.moonTax.payee')}: ${saved.name}`}
+              aria-label={t('survey.moonTax.payeeButton', {
+                value: name === '' ? t('survey.moonTax.set') : saved.name,
+              })}
               onClick={() => setEditing('name')}
             >
               {name === '' ? t('survey.moonTax.set') : saved.name}
@@ -186,7 +205,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
         </div>
         <Button
           size="sm"
-          className="sm:ml-auto"
+          className="touch:min-h-11 sm:ml-auto"
           disabled={!ready}
           loading={busy}
           onClick={() => void openTax()}
@@ -199,7 +218,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
           </span>
         )}
       </div>
-    </Panel>
+    </InfoRow>
   );
 }
 
@@ -207,7 +226,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
 export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
   const { t } = useTranslation();
   return (
-    <Panel title={t('survey.moonTax.label')}>
+    <InfoRow label={t('survey.moonTax.label')}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xl font-semibold">
           <span className="tabular-nums">{tax.pct}%</span>
@@ -224,6 +243,6 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
           {t('survey.moonTax.manage')}
         </Link>
       </div>
-    </Panel>
+    </InfoRow>
   );
 }

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -251,6 +252,20 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const trimmed = query.trim();
   // The error row is not an option, so the live count alone would hide it.
   const groupFailed = groups.some((group) => group.status === 'error');
+  const groupCapped = groups.some(
+    (group) => group.status !== 'error' && group.results.length >= GROUP_LIMIT
+  );
+  // The capped note and group error rows are `aria-hidden` (a listbox child
+  // that is not an option); the status region carries them instead.
+  const statusParts = [
+    t('commandPalette.resultsCount', { count: options.length }),
+    groupCapped && t('commandPalette.groupCapped', { count: GROUP_LIMIT }),
+    groupFailed && t('commandPalette.groupError'),
+  ].filter((part): part is string => typeof part === 'string');
+  const statusText =
+    trimmed === ''
+      ? ''
+      : `${statusParts.map((part) => part.replace(/\.$/, '')).join('. ')}${statusParts.length > 1 ? '.' : ''}`;
 
   return (
     <Modal open onClose={onClose} title={t('commandPalette.title')}>
@@ -284,13 +299,13 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                   <div
                     id={headingId}
                     role="presentation"
-                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase"
+                    className="flex items-center gap-2 px-2 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
                   >
                     {t(group.provider.labelKey)}
                     {group.provider.scope && <CharacterScopeReadout {...group.provider.scope} />}
                   </div>
                   {group.status === 'error' ? (
-                    <div className="px-2 py-1.5 text-sm text-danger">
+                    <div aria-hidden="true" className="px-2 py-1.5 text-sm text-danger">
                       {t('commandPalette.groupError')}
                     </div>
                   ) : group.status === 'loading' ? (
@@ -318,22 +333,20 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                             className={cx(
                               'flex min-h-11 cursor-pointer md:min-h-9 items-center gap-2 rounded-xs px-2 py-1.5 text-sm',
                               highlighted
-                                ? 'bg-panel-2 text-text'
+                                ? `bg-panel-2 text-text ${activeOptionClassName}`
                                 : 'text-text-dim hover:bg-panel-2'
                             )}
                           >
                             <span className="flex min-w-0 flex-1 flex-col">
                               <span className="truncate">{result.label}</span>
                               {result.sublabel && (
-                                <span className="truncate text-xs text-text-faint">
+                                <span className="truncate text-xs text-text-dim">
                                   {result.sublabel}
                                 </span>
                               )}
                             </span>
                             {result.hint && (
-                              <span className="shrink-0 text-xs text-text-faint">
-                                {result.hint}
-                              </span>
+                              <span className="shrink-0 text-xs text-text-dim">{result.hint}</span>
                             )}
                             {result.locked && (
                               <>
@@ -348,7 +361,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
                         );
                       })}
                       {query.trim() !== '' && group.results.length >= GROUP_LIMIT && (
-                        <div className="px-2 py-1 text-xs text-text-faint">
+                        <div aria-hidden="true" className="px-2 py-1 text-xs text-text-dim">
                           {t('commandPalette.groupCapped', { count: GROUP_LIMIT })}
                         </div>
                       )}
@@ -369,9 +382,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           {t('commandPalette.scopeNote')}
         </p>
         <span role="status" aria-live="polite" className="sr-only">
-          {trimmed === ''
-            ? ''
-            : `${t('commandPalette.resultsCount', { count: options.length })}${groupFailed ? `. ${t('commandPalette.groupError')}` : ''}`}
+          {statusText}
         </span>
       </div>
     </Modal>

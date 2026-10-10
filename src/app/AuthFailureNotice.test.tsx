@@ -156,7 +156,8 @@ describe('AuthFailureNotice', () => {
         <AuthFailureNotice />
       </MemoryRouter>
     );
-    expect(await screen.findByText(/Pilot One/)).toBeInTheDocument();
+    // Once in the live region, once in the visible block.
+    expect(await screen.findAllByText(/Pilot One/)).toHaveLength(2);
   });
 
   it('falls back to the unnamed hint when the character record is not yet loaded', () => {
@@ -187,11 +188,14 @@ describe('AuthFailureNotice on a page that owns the banner', () => {
 
   it('stays quiet for the planets refusal on a PI tab', () => {
     renderAt('/planetary-industry/map');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('still shows for the same refusal elsewhere', () => {
     renderAt('/mail');
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dismiss/i })).toBeInTheDocument();
+    // Announced through the always-mounted region, not a role on the block.
+    expect(screen.getAllByRole('status')).toHaveLength(1);
   });
 });

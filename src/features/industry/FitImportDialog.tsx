@@ -11,7 +11,7 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Checkbox, TextArea } from '@/components/ui';
+import { Button, LiveStatus, Modal, Checkbox, TextArea } from '@/components/ui';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -94,6 +94,13 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
           <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
             {t('industry.fitImportPasteFromClipboard')}
           </Button>
+          <LiveStatus>
+            {preview
+              ? planCount === 0
+                ? t('industry.fitImportEmpty')
+                : t('industry.fitImportApply', { count: planCount })
+              : null}
+          </LiveStatus>
           <Button size="sm" variant="primary" onClick={() => parse()} disabled={text.trim() === ''}>
             {t('industry.fitImportParse')}
           </Button>

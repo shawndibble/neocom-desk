@@ -30,7 +30,6 @@ import {
   sortChoices,
   sortGroups,
   strictlyWorseThan,
-  WEAK_SHARE,
   type ChargeChoice,
   type ChargeFactionGroup,
   type ChargeFilters,
@@ -435,7 +434,6 @@ function TypeList({
     const hasLoaded = g.choices.some((c) => group.loaded.has(c.typeId));
     const cargo = g.choices.reduce((n, c) => n + c.cargo, 0);
     const prices = g.choices.map((c) => c.price).filter((p): p is number => p !== null);
-    const weak = distance !== null && !rep.skillMissing && score < best * WEAK_SHARE;
     const isBest = distance !== null && best > 0 && !rep.skillMissing && score === best;
     const rank =
       showRank && g.tier === 'tech1'
@@ -446,7 +444,7 @@ function TypeList({
             : null
         : null;
     return (
-      <div key={g.baseTypeId} className={cx('border-b border-line', weak && 'opacity-45')}>
+      <div key={g.baseTypeId} className={'border-b border-line'}>
         <button
           type="button"
           aria-expanded={isOpen}
@@ -625,7 +623,7 @@ function TypeDetail({
                     isLoaded,
                     cx(
                       'grid w-full grid-cols-[minmax(0,1fr)_2.4rem_3.6rem_4rem] gap-0.5 border-t border-line py-1 text-left tabular-nums',
-                      (worse || c.skillMissing) && 'opacity-50'
+                      c.skillMissing && 'opacity-50'
                     )
                   )}
                 >
@@ -650,6 +648,13 @@ function TypeDetail({
                   </span>
                   {(worse || c.skillMissing) && (
                     <span className="col-span-full text-text-dim">
+                      {!c.skillMissing && (
+                        <Icon.Descending
+                          size={Icon.ICON_SIZE.sm}
+                          className="mr-1 inline"
+                          aria-hidden
+                        />
+                      )}
                       {c.skillMissing
                         ? t('fittings.chargePicker.needsSkill')
                         : t('fittings.chargePicker.worseThan', { name: tierLabel(t, worse!) })}
@@ -692,11 +697,10 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
         const worse = rows.map((c) => strictlyWorseThan(c, choices));
         const allWorse = worse.length > 0 && worse.every((w) => w !== null);
         const hasLoaded = g.choices.some((c) => group.loaded.has(c.typeId));
-        const groupBest = Math.max(0, ...rows.map((c) => chargeScore(c, distance)));
         const name =
           g.tier === 'faction' ? (g.faction ?? '') : t(`fittings.chargePicker.${g.tier}`);
         return (
-          <div key={g.key} className={cx('border-b border-line', allWorse && 'opacity-50')}>
+          <div key={g.key} className={'border-b border-line'}>
             <button
               type="button"
               aria-expanded={isOpen}
@@ -721,8 +725,13 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
               </span>
               <span className="col-span-full text-[0.6875rem] text-text-dim">
                 {meta(g)}
-                {allWorse &&
-                  ` · ${t('fittings.chargePicker.worseThan', { name: tierLabel(t, worse[0]!) })}`}
+                {allWorse && (
+                  <>
+                    {' · '}
+                    <Icon.Descending size={Icon.ICON_SIZE.sm} className="mr-1 inline" aria-hidden />
+                    {t('fittings.chargePicker.worseThan', { name: tierLabel(t, worse[0]!) })}
+                  </>
+                )}
               </span>
             </button>
             {isOpen && (
@@ -763,11 +772,7 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                             isLoaded,
                             cx(
                               'grid w-full grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.8rem] items-center gap-1.5 py-1.5 pr-1.5 pl-3 text-left text-[0.6875rem] tabular-nums',
-                              distance !== null &&
-                                !c.skillMissing &&
-                                score < groupBest * WEAK_SHARE &&
-                                'opacity-45',
-                              (c.skillMissing || (!allWorse && worse[i] !== null)) && 'opacity-50'
+                              c.skillMissing && 'opacity-50'
                             )
                           )}
                         >

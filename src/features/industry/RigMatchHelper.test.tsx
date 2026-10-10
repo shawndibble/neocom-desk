@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { RigMatchHelper } from './RigMatchHelper';
@@ -32,8 +32,20 @@ describe('RigMatchHelper', () => {
   it('says so when nothing matches, naming the line to read', async () => {
     await openAndType('3.33', '7');
     expect(
-      screen.getByText(/No rig fit gives those numbers.*Structure Role Bonus/)
+      screen.getByText(/No rig fit gives those numbers.*Structure Role Bonus/, { selector: 'p' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use this fit' })).toBeNull();
+  });
+
+  it('announces the outcome in a status region', async () => {
+    await openAndType('3.33', '7');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/No rig fit gives those numbers/)
+    );
+  });
+
+  it('announces how many fits match', async () => {
+    await openAndType('5.04', '42');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 rig fit matches'));
   });
 });

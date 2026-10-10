@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Disclosure, SearchInput, Spinner } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { beginEveLogin } from '@/app/loginFlow';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -285,7 +286,9 @@ export function BuildLocationPicker({
                 aria-selected={index === highlightedIndex}
                 className={cx(
                   'flex cursor-pointer flex-col items-start gap-0.5 border-b border-line px-2 py-1.5 last:border-b-0',
-                  index === highlightedIndex ? 'bg-panel-2' : 'hover:bg-panel-2'
+                  index === highlightedIndex
+                    ? `bg-panel-2 ${activeOptionClassName}`
+                    : 'hover:bg-panel-2'
                 )}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(option)}
