@@ -18,12 +18,14 @@ import {
   corpRosterDomain,
   corpWalletDomain,
   priceAlertDomain,
+  stockTargetDomain,
   deriveMarketOrderEntries,
   domainForEvent,
   renderNotification,
   notificationSubjectId,
 } from './pollDomains';
 import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
+import { useStockLists } from '@/features/stockTargets/stockListsStore';
 import { eventEntry } from './eventEntries';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
@@ -69,6 +71,7 @@ import type {
 vi.mock('@/features/character/contracts', () => ({ loadContracts: vi.fn() }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletJournalWithStatus: vi.fn() }));
 vi.mock('@/features/character/orders', () => ({
+  KEYS: { open: 'orders', history: 'orders:history' },
   loadOrders: vi.fn(),
   loadOrderHistory: vi.fn(),
 }));
@@ -194,6 +197,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       corpRoster: ['corpMemberJoined', 'corpMemberLeft'],
       corpWallet: ['corpWalletThreshold'],
       priceAlert: ['priceAlertTriggered'],
+      stockTargets: ['stockBelowTarget'],
     });
   });
 
@@ -1469,5 +1473,68 @@ describe('copy wiring', () => {
       'Kestrel'
     );
     expect(copy).toEqual({ title: 'New mail', body: 'Kestrel has new mail.' });
+  });
+});
+
+describe('stockTargetDomain (issue #3521)', () => {
+  const ASSETS_SCOPE = 'esi-assets.read_assets.v1';
+  const token = (characterId: number) => ({
+    characterId,
+    accessToken: 'a',
+    refreshToken: 'r',
+    expiresAt: 0,
+    scopes: [ASSETS_SCOPE],
+  });
+
+  beforeEach(async () => {
+    await db.tokens.clear();
+    await db.esiCache.clear();
+    vi.mocked(loadTypeNames).mockResolvedValue(new Map([[16240, 'Catalyst']]));
+    useStockLists.setState({
+      value: [{ id: 'efa', name: 'Efa', locationId: null, items: [{ typeId: 16240, target: 40 }] }],
+      hydrated: true,
+      hydrate: async () => {},
+    });
+  });
+
+  it('files the account-wide lists under one Character only, so one shelf fires once', async () => {
+    await db.tokens.bulkPut([token(2), token(1)]);
+    expect(await stockTargetDomain.load(2)).toEqual([]);
+    expect(await stockTargetDomain.load(1)).toHaveLength(1);
+  });
+
+  it("counts every Character's cached assets and never reads ESI", async () => {
+    await db.tokens.bulkPut([token(1), token(2)]);
+    await db.characters.bulkPut([
+      { characterId: 1, name: 'A', ownerHash: 'a', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'b', addedAt: 0 },
+    ]);
+    const asset = {
+      item_id: 9,
+      type_id: 16240,
+      quantity: 12,
+      location_id: 60003760,
+      location_type: 'station',
+      location_flag: 'Hangar',
+      is_singleton: false,
+    };
+    await db.esiCache.put({ characterId: 2, key: 'assets', value: [asset], fetchedAt: 1 });
+    expect(await stockTargetDomain.load(1)).toEqual([
+      {
+        listId: 'efa',
+        listName: 'Efa',
+        typeId: 16240,
+        name: 'Catalyst',
+        target: 40,
+        onHand: 12,
+      },
+    ]);
+  });
+
+  it('reads on hand as unknown, not zero, before any asset list is cached', async () => {
+    await db.tokens.put(token(1));
+    expect(await stockTargetDomain.load(1)).toEqual([
+      expect.objectContaining({ typeId: 16240, onHand: null }),
+    ]);
   });
 });

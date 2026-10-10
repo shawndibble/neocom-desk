@@ -6,9 +6,14 @@
  */
 import { detectOwnedStock, type OwnedStockPlacement } from '@/engine/industry/ownedStock';
 import { countOnHand, type OnHandCount } from '@/engine/stockTargets/onHand';
+import type { StockAlertEntry } from '@/engine/stockTargets/stockAlert';
 import { buildStockRows, type StockRow } from '@/engine/stockTargets/stockRows';
 import type { StockList } from '@/engine/stockTargets/stockLists';
-import { loadAllCharactersAssets } from '@/features/character/assets';
+import { db } from '@/db';
+import type { CharacterAsset, MarketOrder } from '@/esi/endpoints';
+import { readCachedRows } from '@/esi/cache';
+import { KEY as ASSETS_KEY, loadAllCharactersAssets } from '@/features/character/assets';
+import { KEYS as ORDER_KEYS } from '@/features/character/orders';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveStockLocationNames } from '@/features/industry/ownedStockDetection';
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
@@ -97,4 +102,46 @@ export async function loadStockTargetsData(
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return { rows, names, counts, incompleteCharacters, oldestFetchedAt, locations };
+}
+
+/**
+ * The below-target alert's reading: every Stock Target on every list against
+ * the **cached** assets and orders of every Character. Cache only — this runs
+ * inside the foreground poll, where a live read would fan an asset request out
+ * per Character on every poll; the asset cache refreshes on its own schedule.
+ */
+export async function loadStockAlertEntries(
+  lists: readonly StockList[]
+): Promise<StockAlertEntry[]> {
+  const items = lists.flatMap((list) => list.items);
+  if (items.length === 0) return [];
+  const characterIds = (await db.characters.toArray()).map((c) => c.characterId);
+  const typeIds = [...new Set(items.map((item) => item.typeId))];
+  const [assets, orders, names] = await Promise.all([
+    readCachedRows<CharacterAsset[]>(characterIds, ASSETS_KEY),
+    readCachedRows<MarketOrder[]>(characterIds, ORDER_KEYS.open),
+    loadTypeNames(typeIds),
+  ]);
+  const known = assets.size > 0;
+  const detected = detectOwnedStock(
+    [...assets].map(([characterId, cached]) => ({ characterId, assets: cached.data })),
+    new Set(typeIds)
+  );
+  const sellOrders = [...orders.values()].flatMap((cached) => cached.data);
+  return lists.flatMap((list) => {
+    const counts = countOnHand(
+      detected,
+      sellOrders,
+      list.locationId,
+      list.items.map((item) => item.typeId)
+    );
+    return list.items.map((item) => ({
+      listId: list.id,
+      listName: list.name,
+      typeId: item.typeId,
+      name: names.get(item.typeId) ?? `#${item.typeId}`,
+      target: item.target,
+      onHand: known ? (counts.get(item.typeId)?.total ?? 0) : null,
+    }));
+  });
 }

@@ -247,6 +247,14 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.priceAlertTriggered',
     defaultChannels: 'both',
   },
+  // A Stock List item dropping to Low or Out (issue #3521). Counted from the
+  // cached asset lists, so it needs the assets scope to have anything to count.
+  {
+    id: 'stockBelowTarget',
+    labelKey: 'settings.notifications.event.stockBelowTarget',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterAssets'),
+  },
 ] as const satisfies readonly CatalogRow[];
 
 export type NotificationEventId = (typeof CATALOG)[number]['id'];

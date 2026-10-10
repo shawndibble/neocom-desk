@@ -37,6 +37,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'corpMemberLeft',
       'corpWalletThreshold',
       'priceAlertTriggered',
+      'stockBelowTarget',
     ]);
   });
 

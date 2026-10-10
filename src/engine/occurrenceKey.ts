@@ -53,6 +53,7 @@ import type {
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
 } from './notificationDiffs';
+import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 
 /**
  * Every fire an Occurrence Key can be derived from — the same members as
@@ -82,7 +83,8 @@ export type OccurrenceFire =
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
   | StructureReinforcementExitFire
-  | PriceAlertTriggeredFire;
+  | PriceAlertTriggeredFire
+  | StockBelowTargetFire;
 
 const DAY_MS = 86_400_000;
 
@@ -180,6 +182,19 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // re-observation of the old one.
     case 'priceAlertTriggered':
       return [characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(':');
+    // The diff only fires on a drop into Low or Out, so the drop itself —
+    // per list, item, Stock Target and status, bucketed by day — is the
+    // identity: the same drop seen twice in a day is one occurrence.
+    case 'stockBelowTarget':
+      return [
+        characterId,
+        fire.eventId,
+        fire.listId,
+        fire.typeId,
+        fire.target,
+        fire.status,
+        dayBucket(nowMs),
+      ].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -263,6 +278,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // falls through
     case 'priceAlertTriggered':
     case 'marketOrderUndercut':
+    // An asset list carries no per-item time; the poll that saw the drop is it.
+    // falls through
+    case 'stockBelowTarget':
       return nowMs;
     default: {
       const exhaustive: never = fire;

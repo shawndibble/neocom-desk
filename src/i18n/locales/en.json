@@ -7085,6 +7085,11 @@
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
       },
+      "stockBelowTarget": {
+        "lowTitle": "{{item}} is running low",
+        "outTitle": "{{item}} is out of stock",
+        "body": "{{list}}: {{onHand}} on hand of a {{target}} stock target."
+      },
       "priceAlertTriggered": {
         "title": "Price alert",
         "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
@@ -8554,6 +8559,7 @@
         "corpMemberJoined": "Member Joined",
         "corpMemberLeft": "Member Left",
         "corpWalletThreshold": "Corp Wallet Threshold",
+        "stockBelowTarget": "Stock target running low",
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",

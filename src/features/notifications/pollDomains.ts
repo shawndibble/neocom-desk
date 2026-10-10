@@ -57,6 +57,7 @@ import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapability } from '@/engine/corpRoles';
 import { db, type QuickbarItem } from '@/db';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { getHubPrices, getStationPrices, type HubAggregate } from '@/market/prices';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
@@ -133,6 +134,13 @@ import {
   type PriceAlertSnapshot,
   type PriceAlertTriggeredFire,
 } from '@/engine/notificationDiffs';
+import type {
+  StockAlertEntry,
+  StockAlertSnapshot,
+  StockBelowTargetFire,
+} from '@/engine/stockTargets/stockAlert';
+import { useStockLists } from '@/features/stockTargets/stockListsStore';
+import { loadStockAlertEntries } from '@/features/stockTargets/stockTargetsData';
 import {
   projectSkillQueue,
   projectIndustryJobs,
@@ -1655,6 +1663,58 @@ export async function lastPriceAlertSnapshot(
   return (snapshot as PriceAlertSnapshot | undefined) ?? null;
 }
 
+/* Stock Targets: below-target alert ----------------------------------------- */
+
+function isStockAlertEntry(raw: unknown): raw is StockAlertEntry {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.listId === 'string' &&
+    typeof r.listName === 'string' &&
+    typeof r.typeId === 'number' &&
+    typeof r.name === 'string' &&
+    typeof r.target === 'number' &&
+    (r.onHand === null || typeof r.onHand === 'number')
+  );
+}
+
+/**
+ * The one Character the lists' alerts are filed under. Stock Lists are
+ * account-wide and count every Character's assets, so polling them under each
+ * Character would fire one alert per Character for a single empty shelf. The
+ * lowest id with the assets scope is stable for as long as the roster is.
+ */
+async function stockAlertOwner(): Promise<number | null> {
+  const scope = ESI_REGISTRY.getCharacterAssets.scope;
+  const tokens = await db.tokens.toArray();
+  const ids = tokens
+    .filter((token) => (token.scopes ?? []).includes(scope))
+    .map((token) => token.characterId)
+    .sort((a, b) => a - b);
+  return ids[0] ?? null;
+}
+
+/**
+ * Stock List items dropping to Low or Out (issue #3521), counted from the
+ * cached asset and order lists only — never a live fetch inside the poll.
+ */
+export const stockTargetDomain = defineDomain<
+  StockAlertEntry,
+  StockAlertSnapshot,
+  StockBelowTargetFire
+>({
+  source: SNAPSHOT_SOURCES.stockTargets,
+  stateKey: 'notifications.pollerState.stockTargets',
+  entriesKey: 'entries',
+  isEntry: isStockAlertEntry,
+  load: async (characterId) => {
+    if ((await stockAlertOwner()) !== characterId) return [];
+    await useStockLists.getState().hydrate();
+    return loadStockAlertEntries(useStockLists.getState().value);
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
@@ -1677,6 +1737,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   corpRosterDomain,
   corpWalletDomain,
   priceAlertDomain,
+  stockTargetDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(
