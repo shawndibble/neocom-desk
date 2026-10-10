@@ -52,7 +52,11 @@ export function SkillDetailModal() {
   // own Refresh sits behind the modal overlay, out of reach.
   const [attempt, setAttempt] = useState(0);
   const [resultRef, armRetryFocus] = useRetryFocus(
-    state.status === 'error' ? 'failed' : state.status === 'ready' ? 'ok' : 'busy',
+    state.status === 'error'
+      ? 'failed'
+      : state.status === 'loading' || state.status === 'idle'
+        ? 'busy'
+        : 'ok',
     request
   );
 

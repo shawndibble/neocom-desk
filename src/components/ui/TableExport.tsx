@@ -155,6 +155,8 @@ export function TableActionsMenu<T>({
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
+  // Bumped per copy so a second copy of the same count within 2s is read again.
+  const [copyCount, setCopyCount] = useState(0);
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const exportOnly = !children;
@@ -169,13 +171,14 @@ export function TableActionsMenu<T>({
   const onDone = (format: ExportFormat, count: number) => {
     if (format !== 'clipboard') return;
     setCopied(count);
+    setCopyCount((n) => n + 1);
     clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(null), 2000);
   };
   return (
     <>
       {/* Before the menu: keeps the trigger the last child for callers' space-x-* rules. */}
-      <LiveStatus>
+      <LiveStatus announceKey={copyCount}>
         {copied !== null && t('common.tableExport.copied', { count: copied })}
       </LiveStatus>
       <DropdownMenu>
