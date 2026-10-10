@@ -31,6 +31,15 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: /reload/i })).toBeInTheDocument();
   });
 
+  it('moves focus to the heading, so a failed click does not drop it to the page top', () => {
+    render(
+      <ErrorBoundary inline>
+        <Boom />
+      </ErrorBoundary>
+    );
+    expect(screen.getByRole('heading', { name: /something went wrong/i })).toHaveFocus();
+  });
+
   it('never puts the error message on screen: it can carry response data', () => {
     render(
       <ErrorBoundary>
