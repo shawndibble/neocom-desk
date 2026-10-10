@@ -186,7 +186,9 @@ describe('SkillPicker', () => {
     render(
       <>
         <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
-        <div id="plan-entry-1-3" />
+        <div id="plan-entry-1-3">
+          <button type="button" aria-label="Reorder Frigate III" data-plan-handle="1-3" />
+        </div>
       </>
     );
     const row = document.getElementById('plan-entry-1-3');
@@ -205,6 +207,8 @@ describe('SkillPicker', () => {
     const jumpLink = await screen.findByRole('button', { name: /jump to it/i });
     await user.click(jumpLink);
     expect(scrollIntoView).toHaveBeenCalled();
+    // Focus follows the scroll, onto the row's handle (WCAG 2.4.3).
+    expect(within(row).getByRole('button', { name: /reorder/i })).toHaveFocus();
   });
 
   it('offers no jump-to-it link when the added row is already on-screen (#1704)', async () => {
