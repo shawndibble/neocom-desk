@@ -180,6 +180,7 @@ export function SkillPicker({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchInput
           ref={searchRef}
+          inputClassName="lg:scroll-mt-40"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
