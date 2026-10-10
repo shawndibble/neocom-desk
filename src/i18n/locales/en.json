@@ -2068,7 +2068,7 @@
     "dragAnnounceOverNone": "{{name}} is no longer over a valid position.",
     "dragAnnounceEnd": "{{name}} dropped at position {{position}} of {{total}}.",
     "dragAnnounceCancelled": "Reordering cancelled. {{name}} stayed at its original position.",
-    "dragInstructions": "To pick up an entry or remap marker, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it in its new position, or press escape to cancel. Each row's Move menu offers the same reorder without dragging.",
+    "dragInstructions": "To pick up an entry or remap marker, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it in its new position, or press escape to cancel.",
     "removeEntry": "Remove {{name}}",
     "removeBlockedByDependent": "Required by {{blocker}}",
     "removeEntryConfirmTitle": "Remove skill",
@@ -2205,6 +2205,7 @@
     "jumpToAdded": "Jump to it",
     "certified": {
       "title": "New certified plan",
+      "pickLabel": "Certified plans",
       "intro": "CCP’s own career plans, the ones the game lists under Skill Plans › Certified Plans. The new plan keeps CCP’s training order and milestones, minus any levels you’ve already trained.",
       "careerPaths": "Career path",
       "career": {
