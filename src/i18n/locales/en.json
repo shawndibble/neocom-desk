@@ -3995,7 +3995,6 @@
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
     "addSecondScan": "Add another scan to see the chart",
-    "finished": "Field cleared",
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
     "copyChat": "Copy chat message",

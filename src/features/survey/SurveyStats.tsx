@@ -57,6 +57,8 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
   const setLocal = useDoneAtLocal((state) => state.setValue);
   const n = (value: number, digits = 0) =>
     value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
+  // Once the field is cleared, the time it was marked cleared; until then, the estimate.
+  const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-x-4 gap-y-3">
       {!summary.finished && (
@@ -64,16 +66,14 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
       )}
       <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
       <Tile label={t('survey.statDone')} emphasis>
-        {summary.finished ? (
-          t('survey.finished')
-        ) : summary.etaAt === null ? (
+        {doneAt === null ? (
           '–'
         ) : (
           <Tooltip content={t(local ? 'survey.showEveTime' : 'survey.showLocalTime')}>
             <button type="button" className={toggleClassName} onClick={() => void setLocal(!local)}>
               {local
-                ? formatLocalClock(summary.etaAt)
-                : t('survey.eveTime', { time: formatEveClock(summary.etaAt) })}
+                ? formatLocalClock(doneAt)
+                : t('survey.eveTime', { time: formatEveClock(doneAt) })}
             </button>
           </Tooltip>
         )}
