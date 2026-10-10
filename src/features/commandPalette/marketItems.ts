@@ -126,7 +126,7 @@ export function createMarketItemsProvider({
   return {
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
-    order: 4,
+    order: 7,
     minQueryLength: MARKET_ITEMS_MIN_QUERY_LENGTH,
     search: (query) => {
       const index = catalogue.peek();
