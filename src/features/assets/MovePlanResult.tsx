@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { MovePlan } from '@/engine/assets/movePlan';
 import {
   CharacterScopeReadout,
@@ -334,7 +334,7 @@ export function PlanResult({
       >
         <div className="flex flex-col gap-3 text-sm">
           <p className="m-0">{t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}</p>
-          <label className="flex cursor-pointer items-center gap-2">
+          <label className={`flex cursor-pointer items-center gap-2 ${tappableRowClassName}`}>
             <Checkbox checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} />
             {t('assets.movePlan.dontRemind')}
           </label>
