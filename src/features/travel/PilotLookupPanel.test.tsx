@@ -104,10 +104,10 @@ function LocationProbe() {
   return null;
 }
 
-function renderTab(url = '/pilot-lookup') {
+function renderTab(url = '/travel/pilot') {
   render(
     <MemoryRouter initialEntries={[url]}>
-      <PilotLookupPanel />
+      <PilotLookupPanel tabBar={null} />
       <LocationProbe />
     </MemoryRouter>
   );
@@ -362,7 +362,7 @@ describe('PilotLookupPanel', () => {
     });
 
     it('swaps one open pilot for the list when a second name is added', async () => {
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
       const box = screen.getByRole('combobox', { name: 'Pilot' });
       fireEvent.change(box, { target: { value: 'Some Pilot' + NL + 'Beta Two' } });
@@ -449,7 +449,7 @@ describe('PilotLookupPanel', () => {
   });
 
   it('deep-links a pilot from ?pilot= and links to zKillboard', async () => {
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
     expect(mocks.loadPilotProfile).toHaveBeenCalledWith(42);
     expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('Some Pilot');
@@ -470,20 +470,20 @@ describe('PilotLookupPanel', () => {
 
   it('shows the unknown-pilot state when ESI has no such character', async () => {
     mocks.loadPilotProfile.mockResolvedValue(null);
-    renderTab('/pilot-lookup?pilot=9');
+    renderTab('/travel/pilot?pilot=9');
     expect(await screen.findByText("This pilot couldn't be found")).toBeTruthy();
   });
 
   it('shows an ESI outage apart from an unknown pilot', async () => {
     mocks.loadPilotProfile.mockRejectedValue(new Error('offline'));
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByText("EVE couldn't be reached")).toBeTruthy();
     expect(screen.queryByText("This pilot couldn't be found")).toBeNull();
   });
 
   it('retries the profile after an outage, and shows its age once loaded', async () => {
     mocks.loadPilotProfile.mockRejectedValueOnce(new Error('offline'));
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(mocks.loadPilotProfile).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(document.querySelector('time')).not.toBeNull());
@@ -491,7 +491,7 @@ describe('PilotLookupPanel', () => {
 
   it('retries zKillboard stats after a failure', async () => {
     mocks.fetchPilotStats.mockResolvedValueOnce({ kind: 'failed' });
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     await screen.findByText("zKillboard couldn't be reached");
     const calls = mocks.fetchPilotStats.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -500,14 +500,14 @@ describe('PilotLookupPanel', () => {
 
   it('shows no history apart from a failure', async () => {
     mocks.fetchPilotStats.mockResolvedValue({ kind: 'no-history' });
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByText('No kills or losses on zKillboard')).toBeTruthy();
     expect(screen.queryByText("zKillboard couldn't be reached")).toBeNull();
   });
 
   it('shows a zKillboard failure apart from no history', async () => {
     mocks.fetchPilotStats.mockResolvedValue({ kind: 'failed' });
-    renderTab('/pilot-lookup?pilot=42');
+    renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByText("zKillboard couldn't be reached")).toBeTruthy();
     expect(screen.queryByText('No kills or losses on zKillboard')).toBeNull();
   });
@@ -571,7 +571,7 @@ describe('PilotLookupPanel', () => {
     });
 
     it('lists kills and losses without reading any killmail', async () => {
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       const list = await screen.findByRole('list', { name: 'Recent kills and losses' });
       expect(mocks.fetchPilotKillmails).toHaveBeenCalledWith(42);
       expect(await within(list).findByText('Victim Pilot')).toBeTruthy();
@@ -591,13 +591,13 @@ describe('PilotLookupPanel', () => {
         ok: true,
         entries: Array.from({ length: 25 }, (_, i) => ({ ...INLINE_KILL, killmailId: 900 + i })),
       });
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       expect(await screen.findByText(/Showing the latest 25/)).toBeTruthy();
     });
 
     it('reads a hash-only row on expand, once, and opens its fit in Fittings', async () => {
       mocks.loadKillmailFit.mockResolvedValue(FIT);
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       await screen.findByRole('list', { name: 'Recent kills and losses' });
       const [, lossRow] = screen.getAllByRole('button', { expanded: false });
       fireEvent.click(lossRow!);
@@ -620,7 +620,7 @@ describe('PilotLookupPanel', () => {
 
     it('says so when a killmail cannot be read', async () => {
       mocks.loadKillmailFit.mockResolvedValue({ ok: false });
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       await screen.findByRole('list', { name: 'Recent kills and losses' });
       fireEvent.click(screen.getAllByRole('button', { expanded: false })[1]!);
       expect(await screen.findByText(/killmail couldn't be read/i)).toBeTruthy();
@@ -628,7 +628,7 @@ describe('PilotLookupPanel', () => {
 
     it('shows a zKillboard failure apart from an empty list', async () => {
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: false });
-      renderTab('/pilot-lookup?pilot=42');
+      renderTab('/travel/pilot?pilot=42');
       expect(await screen.findByText("Recent kills and losses couldn't be loaded")).toBeTruthy();
     });
   });

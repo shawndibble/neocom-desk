@@ -1,6 +1,7 @@
 export { Panel } from './Panel';
 export { CollapsiblePanel } from './CollapsiblePanel';
 export { PageHeader } from './PageHeader';
+export { AlertsBell } from './AlertsBell';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { buttonClassName } from './buttonClassName';
@@ -14,6 +15,9 @@ export { Toast } from './Toast';
 export { useTimedToast } from './useTimedToast';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
+export { PageViewPicker } from './PageViewPicker';
+export { usesViewPicker, VIEW_PICKER_MIN_TABS } from './viewPicker';
+export type { PageViews } from './viewPicker';
 export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';

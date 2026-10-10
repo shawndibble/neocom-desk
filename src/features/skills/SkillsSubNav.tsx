@@ -1,6 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { SKILLS_VIEWS } from './skillsViews';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { usesViewPicker } from '@/components/ui';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -20,23 +23,17 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
  */
 export function SkillsSubNav() {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  // A phone's `SkillsPageHeader` carries the views as a picker instead.
+  if (usesViewPicker(SKILLS_VIEWS.length, isPhone)) return null;
   return (
     <div className={tabScrollerClassName}>
       <nav aria-label={t('nav.skills')} className={tabListClassName}>
-        {/* Plans leads: /skills redirects here (App.tsx), and a section that
-            opens on its second tab reads as broken. */}
-        <NavLink to="/skills/plans" className={subNavClass}>
-          {t('skills.plansTab')}
-        </NavLink>
-        <NavLink to="/skills/trained" className={subNavClass}>
-          {t('skills.trainedTab')}
-        </NavLink>
-        <NavLink to="/skills/compare" className={subNavClass}>
-          {t('skills.compareTab')}
-        </NavLink>
-        <NavLink to="/skills/certificates" className={subNavClass}>
-          {t('skills.certificatesTab')}
-        </NavLink>
+        {SKILLS_VIEWS.map((view) => (
+          <NavLink key={view.id} to={`/skills/${view.id}`} className={subNavClass}>
+            {t(view.labelKey)}
+          </NavLink>
+        ))}
       </nav>
     </div>
   );

@@ -35,7 +35,8 @@ function StoreCell({
   const { t } = useTranslation();
   const system = search.systemName(store.nearestSystemId);
   let caption: string | null = null;
-  if (search.jumpsStatus === 'ready') {
+  // Distances come from the snapshot's systems; without it a null reads as "no route".
+  if (search.jumpsStatus === 'ready' && search.status === 'ready') {
     caption =
       store.jumps === null || system === null
         ? t('loyaltyStore.search.noRoute')
@@ -122,31 +123,56 @@ export function LpStoreSearch({
       />
       <JumpsNote status={search.jumpsStatus} />
 
-      {search.status === 'loading' ? (
-        <div className="flex justify-center p-6">
-          <Spinner />
-        </div>
-      ) : search.status === 'unavailable' ? (
-        <Panel>
-          <EmptyState
-            title={t('loyaltyStore.search.unavailableTitle')}
-            hint={t('loyaltyStore.search.unavailableHint')}
-          />
-        </Panel>
-      ) : !hasQuery ? (
-        <Panel>
-          <EmptyState
-            title={t('loyaltyStore.search.promptTitle')}
-            hint={t('loyaltyStore.search.promptHint')}
-          />
-        </Panel>
+      {!hasQuery ? (
+        search.heldStores.length > 0 ? (
+          <Panel
+            title={t('loyaltyStore.search.heldPanel')}
+            meta={t('loyaltyStore.search.storeCount', { count: search.heldStores.length })}
+          >
+            <ul className="flex flex-col divide-y divide-line">
+              {search.heldStores.map((store) => (
+                <li key={store.corporationId} className="py-1.5">
+                  <Link
+                    to={lpStorePath(store.corporationId)}
+                    className={entityLinkClassName('flex items-baseline justify-between gap-3')}
+                  >
+                    <span>{store.name}</span>
+                    <span className="shrink-0 text-accent tabular-nums">
+                      {t('loyaltyStore.pickerBalance', { lp: (store.lp ?? 0).toLocaleString() })}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        ) : (
+          <Panel>
+            <EmptyState
+              title={t('loyaltyStore.search.promptTitle')}
+              hint={t('loyaltyStore.search.promptHint')}
+            />
+          </Panel>
+        )
       ) : result.groups.length === 0 && result.corporations.length === 0 ? (
-        <Panel>
-          <EmptyState
-            title={t('loyaltyStore.search.noResultsTitle')}
-            hint={t('loyaltyStore.search.noResultsHint')}
-          />
-        </Panel>
+        search.status === 'loading' ? (
+          <div className="flex justify-center p-6">
+            <Spinner />
+          </div>
+        ) : search.status === 'unavailable' ? (
+          <Panel>
+            <EmptyState
+              title={t('loyaltyStore.search.unavailableTitle')}
+              hint={t('loyaltyStore.search.unavailableHint')}
+            />
+          </Panel>
+        ) : (
+          <Panel>
+            <EmptyState
+              title={t('loyaltyStore.search.noResultsTitle')}
+              hint={t('loyaltyStore.search.noResultsHint')}
+            />
+          </Panel>
+        )
       ) : (
         <>
           {result.corporations.length > 0 && (
@@ -168,6 +194,11 @@ export function LpStoreSearch({
                 ))}
               </ul>
             </Panel>
+          )}
+          {search.status === 'unavailable' && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('loyaltyStore.search.unavailableNote')}
+            </p>
           )}
           {result.groups.map((group) => (
             <Panel

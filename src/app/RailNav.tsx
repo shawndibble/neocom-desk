@@ -76,7 +76,6 @@ interface RailPageProps {
   open: boolean;
   onToggle: (path: string) => void;
   locked: boolean;
-  badge?: number;
   hidden: ReadonlySet<string>;
   editing: boolean;
   activeViewPath: string | null;
@@ -93,7 +92,6 @@ const RailPage = memo(function RailPage({
   open,
   onToggle,
   locked,
-  badge,
   hidden,
   editing,
   activeViewPath,
@@ -115,7 +113,6 @@ const RailPage = memo(function RailPage({
           to={page.path}
           label={label}
           locked={locked}
-          badge={badge}
           className={cx('flex-1', pageHidden && 'line-through opacity-60')}
         />
         {shownViews.length > 0 && (
@@ -190,18 +187,16 @@ const RailPage = memo(function RailPage({
  * the body is memoized on the place it derives, so a query-string write (a
  * page's filters, as the pilot types) re-renders this wrapper alone.
  */
-export function RailNav({ unreadAlerts }: { unreadAlerts: number }) {
+export function RailNav() {
   const { pathname } = useLocation();
   const { pagePath, viewPath } = navPlaceFor(pathname);
-  return <RailNavBody unreadAlerts={unreadAlerts} current={pagePath} activeViewPath={viewPath} />;
+  return <RailNavBody current={pagePath} activeViewPath={viewPath} />;
 }
 
 const RailNavBody = memo(function RailNavBody({
-  unreadAlerts,
   current,
   activeViewPath,
 }: {
-  unreadAlerts: number;
   current: NavPagePath | null;
   activeViewPath: string | null;
 }) {
@@ -269,7 +264,6 @@ const RailNavBody = memo(function RailNavBody({
                   open={open.path === page.path}
                   onToggle={toggleOpen}
                   locked={page.gating === 'scope' && locked.has(page.path)}
-                  badge={page.path === '/alerts' ? unreadAlerts : undefined}
                   hidden={hidden}
                   editing={editing}
                   activeViewPath={activeViewPath}

@@ -1,5 +1,10 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { AlertsBell } from './AlertsBell';
+import { UnreadAlertsContext } from './unreadAlertsContext';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { PageViewPicker } from './PageViewPicker';
+import { usesViewPicker, type PageViews } from './viewPicker';
 
 interface PageHeaderProps {
   /** Already-translated page title. Rendered as the route's one `<h1>`. */
@@ -28,6 +33,12 @@ interface PageHeaderProps {
    * `tabListFlushClassName` rather than bringing a second baseline.
    */
   subNav?: ReactNode;
+  /**
+   * The page's full view list. On a phone, a list of four or more replaces the
+   * title with a `PageViewPicker` (the page then drops its own tab strip with
+   * `usesViewPicker`); otherwise ignored.
+   */
+  views?: PageViews;
   className?: string;
 }
 
@@ -55,7 +66,19 @@ interface PageHeaderProps {
  * and so no filter control, has nothing to name here either — the bottom
  * tab bar's More sheet is still a phone's route to Characters either way.
  */
-export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  meta,
+  actions,
+  subNav,
+  views,
+  className = '',
+}: PageHeaderProps) {
+  const isPhone = useIsPhone();
+  const picker = views && usesViewPicker(views.tabs.length, isPhone) ? views : null;
+  // The bell joins the cluster only while it has something to say, so a route
+  // with no actions still draws no empty wrapper.
+  const hasAlerts = useContext(UnreadAlertsContext) > 0;
   return (
     <header
       className={cx(
@@ -73,10 +96,10 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
           tabIndex={-1}
           className="min-w-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
         >
-          {title}
+          {picker ? <PageViewPicker title={title} {...picker} /> : title}
         </h1>
         {meta}
-        {actions && (
+        {(actions || hasAlerts) && (
           // `md:order-1`: after the sub-nav, which sits between meta and actions at `md`.
           <div
             className={cx(
@@ -85,6 +108,7 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
             )}
           >
             {actions}
+            <AlertsBell />
           </div>
         )}
       </div>

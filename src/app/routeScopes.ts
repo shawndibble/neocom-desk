@@ -198,8 +198,7 @@ export const ROUTE_REQUIREMENTS = {
   // jumps, region names) and the local stargate graph, so no grant can lock
   // it. It still sits behind a signed-in Character like every route here.
   '/travel': UNGATED,
-  '/travel/pilot': UNGATED,
-  // Public ESI only, like Travel it came from.
+  // A redirect to Travel's Pilot Lookup tab; public ESI only, like Travel.
   '/pilot-lookup': UNGATED,
   /*
    * UNGATED, and not because it needs no scope — History needs

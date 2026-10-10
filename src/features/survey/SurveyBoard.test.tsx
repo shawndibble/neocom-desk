@@ -245,4 +245,67 @@ describe('SurveyBoard', () => {
       expect(screen.queryByText(/removed/)).toBeNull();
     });
   });
+
+  describe('marking the field cleared', () => {
+    // Relative to the real clock: the button reads it. Pace is 43 m³/s, so 169,000 m³ left is over an hour away.
+    const recent = (offsetMs = 0) => [
+      { at: Date.now() - 10 * 60_000 + offsetMs, rocks: parseSurveyScan(FIRST)! },
+      { at: Date.now() + offsetMs, rocks: parseSurveyScan(SECOND)! },
+    ];
+    const BUTTON = 'Mark field cleared';
+
+    it('offers nothing when the board has no finish action', () => {
+      render(<SurveyBoard scans={recent()} url={URL} expiresAt={null} owned />);
+      expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    });
+
+    it('offers the owner the button at any point, and runs the action', async () => {
+      const onFinish = vi.fn().mockResolvedValue(true);
+      render(<SurveyBoard scans={recent()} url={URL} expiresAt={null} owned onFinish={onFinish} />);
+      await userEvent.click(screen.getByRole('button', { name: BUTTON }));
+      expect(onFinish).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps it from anyone else while the field is well under way', () => {
+      render(<SurveyBoard scans={recent()} url={URL} expiresAt={null} onFinish={vi.fn()} />);
+      expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    });
+
+    it('offers anyone the button once the Done at time has passed', () => {
+      // Scanned long enough ago that the estimate is behind us.
+      render(
+        <SurveyBoard
+          scans={recent(-3 * 60 * 60_000)}
+          url={URL}
+          expiresAt={null}
+          onFinish={vi.fn()}
+        />
+      );
+      expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
+    });
+
+    it('offers anyone the button at 99% mined', () => {
+      const nearly = [
+        { at: Date.now() - 10 * 60_000, rocks: parseSurveyScan(FIRST)! },
+        { at: Date.now(), rocks: [{ ore: 'Clear Icicle', volume: 1_500 }] },
+      ];
+      render(<SurveyBoard scans={nearly} url={URL} expiresAt={null} onFinish={vi.fn()} />);
+      expect(screen.getByText('99% mined')).toBeTruthy();
+      expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
+    });
+
+    it('is gone once the field is finished, owner or not', () => {
+      const done = [...recent(), { at: Date.now() + 60_000, rocks: [] }];
+      render(<SurveyBoard scans={done} url={URL} expiresAt={null} owned onFinish={vi.fn()} />);
+      expect(screen.getByText('Field cleared')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
+    });
+
+    it('says so when the field could not be marked cleared', async () => {
+      const onFinish = vi.fn().mockResolvedValue(false);
+      render(<SurveyBoard scans={recent()} url={URL} expiresAt={null} owned onFinish={onFinish} />);
+      await userEvent.click(screen.getByRole('button', { name: BUTTON }));
+      expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn't mark/);
+    });
+  });
 });

@@ -80,37 +80,24 @@ test('the phone sort control stays hidden at and above md (768px) (issue #2174)'
   await expect(page.getByRole('combobox', { name: 'Sort by' })).toBeHidden();
 });
 
-test('the header corporation picker fits a 390px phone without horizontal scroll (issue #2321)', async ({
+test('the headers carry no corporation select and fit a 390px phone (issue #3265)', async ({
   page,
 }) => {
-  async function expectPickerFits() {
-    const picker = page.getByRole('button', { name: /LP Store corporation/ });
-    await expect(picker).toBeVisible();
-    await picker.click();
-    // The popover opens too: both it and the closed select stay on screen.
-    const popover = page.getByRole('dialog', { name: 'LP Store corporation' });
-    await expect(popover).toBeVisible();
-    for (const el of [picker, popover]) {
-      const box = await el.evaluate((node) => {
-        const r = node.getBoundingClientRect();
-        return { left: r.left, right: r.right };
-      });
-      expect(box.left).toBeGreaterThanOrEqual(0);
-      expect(box.right).toBeLessThanOrEqual(PHONE.width);
-    }
+  async function expectNoPicker() {
+    await expect(page.getByRole('button', { name: /LP Store corporation/ })).toHaveCount(0);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
     );
     expect(overflow).toBeLessThanOrEqual(0);
-    await page.keyboard.press('Escape');
   }
 
   await signInAndGoto(page, './market/lp-store');
   await page.setViewportSize(PHONE);
-  await expectPickerFits();
+  await expectNoPicker();
 
   await page.goto(`./market/lp-store/${CORPORATION_ID}`);
-  await expectPickerFits();
+  await expect(page.getByRole('link', { name: 'Change store' })).toBeVisible();
+  await expectNoPicker();
 });
 
 for (const width of [390, 1024, 1280]) {

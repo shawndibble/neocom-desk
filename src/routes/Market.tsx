@@ -23,6 +23,8 @@ import {
   Tabs,
   Toast,
   TypeIcon,
+  usesViewPicker,
+  type PageViews,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -304,6 +306,25 @@ export function Market() {
     setTab(next);
     setExpandCompareOnAppraisal(expandCompare);
   }
+  const isPhone = useIsPhone();
+  // Market's full view list: a strip on desktop, the title-row picker on a phone.
+  const marketViews: PageViews = {
+    value: isHistoryView(tab) ? 'history' : tab,
+    // Clicking History while already inside it would otherwise throw away
+    // the chosen view and snap back to the orders one.
+    onChange: (id) => {
+      if (id === 'history' && isHistoryView(tab)) return;
+      changeTab(id as MarketTab);
+    },
+    tabs: [
+      { id: 'browser', label: t('market.sections.browser') },
+      { id: 'orders', label: t('market.sections.openOrders') },
+      { id: 'history', label: t('market.sections.history') },
+      { id: 'appraisal', label: t('market.sections.appraisal') },
+      { id: 'hauling', label: t('market.sections.hauling') },
+      { id: 'lp-store', label: t('loyaltyStore.title') },
+    ],
+  };
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // The Appraisal tab's other half of the same control pair as the header's hub picker.
@@ -620,7 +641,6 @@ export function Market() {
   // and a desktop whose finder column leaves the book too narrow for the
   // columns the pilot has picked and the figures on screen, both get the
   // card. Short of that, Location narrows first, so fewer widths need cards.
-  const isPhone = useIsPhone();
   const bookBestSell = loadedView?.summary.bestSell ?? null;
   // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
@@ -786,6 +806,7 @@ export function Market() {
         {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}
+          views={marketViews}
           actions={
             usesHubPicker(tab) ? (
               <>
@@ -869,24 +890,14 @@ export function Market() {
           }
         />
 
-        <Tabs
-          label={t('market.title')}
-          value={isHistoryView(tab) ? 'history' : tab}
-          // Clicking History while already inside it would otherwise throw away
-          // the chosen view and snap back to the orders one.
-          onChange={(id) => {
-            if (id === 'history' && isHistoryView(tab)) return;
-            changeTab(id as MarketTab);
-          }}
-          tabs={[
-            { id: 'browser', label: t('market.sections.browser') },
-            { id: 'orders', label: t('market.sections.openOrders') },
-            { id: 'history', label: t('market.sections.history') },
-            { id: 'appraisal', label: t('market.sections.appraisal') },
-            { id: 'hauling', label: t('market.sections.hauling') },
-            { id: 'lp-store', label: t('loyaltyStore.title') },
-          ]}
-        />
+        {!usesViewPicker(marketViews.tabs.length, isPhone) && (
+          <Tabs
+            label={t('market.title')}
+            value={marketViews.value}
+            onChange={marketViews.onChange}
+            tabs={[...marketViews.tabs]}
+          />
+        )}
 
         {tab === 'orders' && <OpenOrdersPanel />}
 

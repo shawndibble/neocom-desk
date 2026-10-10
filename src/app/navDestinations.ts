@@ -30,7 +30,7 @@ export type NavGating = 'scope' | 'corp' | 'ungated';
  * `primary` sits at the top of the rail with no heading; `footer` is pinned
  * below the scrolling rail (Settings, then the Character link).
  */
-export type NavGroupId = 'primary' | 'progression' | 'economy' | 'social' | 'intel' | 'footer';
+export type NavGroupId = 'primary' | 'progression' | 'economy' | 'social' | 'footer';
 
 export interface NavGroup {
   readonly id: NavGroupId;
@@ -48,13 +48,6 @@ export const NAV_GROUPS = [
   { id: 'progression', labelKey: 'nav.groups.progression' },
   { id: 'economy', labelKey: 'nav.groups.economy' },
   { id: 'social', labelKey: 'nav.groups.social' },
-  /*
-   * Where you are going and who is there: Travel's Route Safety,
-   * Thera/Turnur connections (#2330) and Pilot Lookup (#2331) — the
-   * intel tools the remit took in with #2328. Not "Travel" as a heading: it
-   * would sit over a single item of the same name.
-   */
-  { id: 'intel', labelKey: 'nav.groups.intel' },
   { id: 'footer', labelKey: null },
 ] as const satisfies readonly NavGroup[];
 
@@ -71,6 +64,8 @@ export interface NavPage {
    * has a permanent row in the More sheet. Both keep their sheet rows.
    */
   readonly mobileTab: boolean;
+  /** `false` leaves the page out of `railGroups()`: reached by a header control, Ctrl K or the phone bar instead. */
+  readonly inRail?: false;
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
   /**
@@ -119,11 +114,18 @@ export const NAV_PAGES = [
     ],
   },
   /*
-   * Under Overview, not in Social: an alert is what the board is summarising,
-   * and the two are read in that order. Mail and calendar are correspondence —
-   * things other people sent you on purpose — which is a different errand.
+   * No rail row: the bell in every page header (`AlertsBell`) is the way in, and
+   * Ctrl K and the phone's bar and sheet still list it (scope decision
+   * `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`).
    */
-  { path: '/alerts', labelKey: 'nav.alerts', group: 'primary', gating: 'scope', mobileTab: true },
+  {
+    path: '/alerts',
+    labelKey: 'nav.alerts',
+    group: 'primary',
+    gating: 'scope',
+    mobileTab: true,
+    inRail: false,
+  },
   /*
    * Beside Overview rather than inside a group: the two are the same kind of
    * destination — "this pilot" and "this corporation" — and the Corp section
@@ -178,6 +180,19 @@ export const NAV_PAGES = [
     mobileTab: true,
   },
   /*
+   * `ungated` rather than `scope`: every read is public ESI or the local
+   * stargate graph, so there is no grant whose absence could lock it. Last in
+   * Progression, which took it in with Pilot Lookup (a Travel tab) when the
+   * Intel heading went.
+   */
+  {
+    path: '/travel',
+    labelKey: 'nav.travel',
+    group: 'progression',
+    gating: 'ungated',
+    mobileTab: true,
+  },
+  /*
    * Leads Economy: it is the one economy view that answers a question before
    * you own anything, and the only one here that isn't Character-scoped.
    */
@@ -223,28 +238,6 @@ export const NAV_PAGES = [
     gating: 'scope',
     mobileTab: true,
     tablessNav: true,
-  },
-  /*
-   * `ungated` rather than `scope`: every read is public ESI or the local
-   * stargate graph, so there is no grant whose absence could lock it.
-   */
-  {
-    path: '/travel',
-    labelKey: 'nav.travel',
-    group: 'intel',
-    gating: 'ungated',
-    mobileTab: true,
-  },
-  /*
-   * Its own page, not a Travel tab: "who is this pilot" is not a travel
-   * question, and the Intel heading no longer sits over a single item.
-   */
-  {
-    path: '/pilot-lookup',
-    labelKey: 'nav.pilotLookup',
-    group: 'intel',
-    gating: 'ungated',
-    mobileTab: true,
   },
   /*
    * Help is not a setting: FAQ and Support left Settings for this footer page.
@@ -325,12 +318,18 @@ export interface RailGroup {
   readonly pages: readonly NavPage[];
 }
 
-/** The desktop rail's scrolling groups, in order; the footer is placed by hand. */
-export function railGroups(): RailGroup[] {
+/**
+ * The desktop rail's scrolling groups, in order; the footer is placed by hand.
+ * `withRailless` keeps the pages the rail leaves out (`inRail: false`), which
+ * the phone's More sheet still lists.
+ */
+export function railGroups(withRailless = false): RailGroup[] {
   return NAV_GROUPS.filter((group) => group.id !== 'footer').map((group) => ({
     id: group.id,
     labelKey: group.labelKey,
-    pages: NAV_PAGES.filter((page) => page.group === group.id),
+    pages: NAV_PAGES.filter(
+      (page) => group.id === page.group && (withRailless || (page as NavPage).inRail !== false)
+    ),
   }));
 }
 

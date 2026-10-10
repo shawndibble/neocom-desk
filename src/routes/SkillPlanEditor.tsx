@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { buttonClassName, PageHeader, Spinner } from '@/components/ui';
+import { buttonClassName, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { PlanEditor, type PlanPatch } from '@/features/skills/planner/PlanEditor';
 import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
@@ -121,8 +122,7 @@ export function SkillPlanEditor() {
       {/* Same title as the other two Skills views: the editor is a third view
           of the same section, and dropping the <h1> when a plan opens made the
           page look like it had navigated somewhere else. */}
-      <PageHeader
-        title={t('nav.skills')}
+      <SkillsPageHeader
         actions={<div ref={setHeaderActionsEl} className="flex items-center gap-1.5" />}
       />
       <SkillsSubNav />
