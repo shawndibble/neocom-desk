@@ -195,7 +195,8 @@ export function SurveyCharts({
   const plot = (
     <div className="h-56 w-full">
       <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
-        <ComposedChart data={chartRows} margin={MARGIN}>
+        {/* Recharts stacks in the order the areas first registered, and a re-sort only moves them, so a new order remounts the chart. */}
+        <ComposedChart key={summary.oreNames.join('|')} data={chartRows} margin={MARGIN}>
           <CartesianGrid stroke="var(--color-line)" vertical={false} />
           {xAxis(true)}
           <YAxis
