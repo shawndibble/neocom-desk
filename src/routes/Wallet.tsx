@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -48,6 +48,7 @@ import type { CachedResult } from '@/esi/cache';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
@@ -227,8 +228,30 @@ export function Wallet() {
 
   // Drilling into one Character is route state, so the browser Back button undoes it.
   const [drilledId, setDrilledId] = useUrlParam('drill', DRILL_PARAM);
-  const drillInto = useCallback((id: number) => setDrilledId(id, { push: true }), [setDrilledId]);
-  const leaveDrill = useCallback(() => setDrilledId(0, { push: true }), [setDrilledId]);
+  // The drill swaps one panel for another, so the focused row or button is
+  // removed; hand focus to its counterpart in the panel that replaces it.
+  const focusAfterCommit = useFocusAfterCommit();
+  const panelHeadingRef = useRef<HTMLHeadingElement>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const drillInto = useCallback(
+    (id: number) => {
+      setDrilledId(id, { push: true });
+      focusAfterCommit(backButtonRef);
+    },
+    [setDrilledId, focusAfterCommit]
+  );
+  const leaveDrill = useCallback(() => {
+    setDrilledId(0, { push: true });
+    focusAfterCommit(
+      () =>
+        document.querySelector<HTMLElement>(
+          `[aria-label="${CSS.escape(t('wallet.balanceByCharacter'))}"] [data-row-key="${drilledId}"]`
+        ),
+      // The old drilled panel's heading is still mounted until the route
+      // commits, so only fall back to it once the back button is gone.
+      () => (backButtonRef.current?.isConnected ? null : panelHeadingRef.current)
+    );
+  }, [setDrilledId, focusAfterCommit, drilledId, t]);
 
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const activeCharacter = allCharacters?.find((c) => c.characterId === activeCharacterId);
@@ -565,11 +588,13 @@ export function Wallet() {
               <NetWorthPanel
                 mode="single"
                 drilled
+                backRef={backButtonRef}
                 characters={drilledCharacters}
                 liveWallet={liveWallet}
                 filterMeta={walletCharacterFilterMeta}
                 onDrill={drillInto}
                 onBack={leaveDrill}
+                headingRef={panelHeadingRef}
               />
             ) : showingAllWalletBalances ? (
               <NetWorthPanel
@@ -579,6 +604,7 @@ export function Wallet() {
                 filterMeta={walletCharacterFilterMeta}
                 onDrill={drillInto}
                 onBack={leaveDrill}
+                headingRef={panelHeadingRef}
                 actions={
                   <IconButton
                     size="sm"
@@ -598,6 +624,7 @@ export function Wallet() {
                   filterMeta={walletCharacterFilterMeta}
                   onDrill={drillInto}
                   onBack={leaveDrill}
+                  headingRef={panelHeadingRef}
                   stats={
                     <div>
                       <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

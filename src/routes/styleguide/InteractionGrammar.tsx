@@ -16,6 +16,7 @@ import {
   Panel,
   RowActionsMenu,
   RowCaret,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +28,7 @@ import {
 import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
 import {
+  activeOptionClassName,
   focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -34,6 +36,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
+import { MyOrderMark } from '@/features/market/marketOrderCells';
 import { cx } from '@/lib/cx';
 
 const SAMPLE_ROWS = [
@@ -164,6 +167,12 @@ export function InteractionGrammar() {
           <button type="button" className={textActionClassName()}>
             {t('market.structureFee.setFee')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.myOrder')}>
+          <span className="tabular-nums">
+            <MyOrderMark t={t} />
+            {k('samples.myOrder')}
+          </span>
         </Cue>
         <Cue rule={k('rules.iskAmount')} note={k('notes.iskAmount')}>
           <IskAmount value={1_342_500_000} />
@@ -302,6 +311,16 @@ export function InteractionGrammar() {
                 {k('samples.inlineLink')}
               </a>
             </Cue>
+            <Cue rule={k('rules.stateHighlighted')} note={k('notes.highlighted')}>
+              <span
+                className={cx(
+                  'rounded-xs bg-panel-2 px-2 py-1.5 text-sm text-text',
+                  activeOptionClassName
+                )}
+              >
+                {k('samples.option')}
+              </span>
+            </Cue>
             <Cue rule={k('rules.stateDisabled')} note={k('notes.disabled')}>
               <Button disabled>{k('samples.disabled')}</Button>
               <Button aria-disabled="true">{k('samples.ariaDisabled')}</Button>
@@ -315,6 +334,17 @@ export function InteractionGrammar() {
             <Cue rule={k('rules.stateSelected')} note={k('notes.selectedToggle')}>
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOn')} pressed />
               <IconButton icon={<Icon.Info />} label={k('samples.toggleOff')} pressed={false} />
+            </Cue>
+            <Cue rule={k('rules.stateSelectedSegment')} note={k('notes.selectedSegment')}>
+              <SegmentedControl
+                label={k('rules.stateSelectedSegment')}
+                options={[
+                  { value: 'a', label: k('samples.segmentOn') },
+                  { value: 'b', label: k('samples.segmentOff') },
+                ]}
+                value="a"
+                onChange={() => undefined}
+              />
             </Cue>
           </div>
         </div>

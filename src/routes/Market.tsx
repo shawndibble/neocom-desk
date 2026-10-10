@@ -19,6 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  LiveStatus,
   Spinner,
   TabPanel,
   Tabs,
@@ -44,6 +45,7 @@ import {
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
@@ -504,12 +506,31 @@ export function Market() {
     setItemTab,
   } = useMarketBrowser({ groups, types, marketRegions, groupsById });
 
+  // Spoken summary of the finder's result: the visible notes and the swap to
+  // "No results" are plain text, so a screen reader hears nothing as you type.
+  let browserStatus: string | null = null;
+  if (filterResult) {
+    browserStatus =
+      filterResult.visibleGroupIds.size === 0 && !filterResult.bestMatch
+        ? t('market.noResults')
+        : t('market.searchMatchCount', { count: filterResult.totalMatches });
+  } else if (query.trim().length > 0) {
+    browserStatus = t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH });
+  }
+
   // Focus management for the finder <-> item panel swap below the `lg:`
   // breakpoint (issue #1485): selecting an item hides the finder and shows
   // the item panel with no focus cue, and Back does the reverse. `enabled:
   // !isDesktop` — see `useFocusHeading`'s own doc comment for why that's a
   // separate param rather than folded into the key.
   const itemHeadingRef = useRef<HTMLHeadingElement>(null);
+  // The Order Book's buttons that unmount themselves ("Show all", "Only this
+  // station", "Clear filter") hand focus on through these (#3353).
+  const focusAfterCommit = useFocusAfterCommit();
+  const sellHeadingRef = useRef<HTMLHeadingElement>(null);
+  const buyHeadingRef = useRef<HTMLHeadingElement>(null);
+  const clearFilterRef = useRef<HTMLButtonElement>(null);
+  const focusHistoryView = useRef(false);
   useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
   const selectedInCompare = useCompareSet((state) =>
     state.items.some((item) => item.typeId === selectedTypeId)
@@ -618,6 +639,10 @@ export function Market() {
     solarSystemMap,
     t,
   });
+  function filterToStation(locationId: number) {
+    focusAfterCommit(clearFilterRef);
+    setStationFilter(locationId);
+  }
 
   /**
    * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
@@ -682,7 +707,7 @@ export function Market() {
     singleStationBook ? ids.filter((id) => id !== 'location') : ids;
   const orderBookWidths = orderBookWidthsRem(
     singleStationBook ? pickedOrderColumns.filter((id) => id !== 'location') : pickedOrderColumns,
-    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell)
+    orderBookFigureChars([...sellRows, ...buyRows], bookBestSell, myOrderIds)
   );
   const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
     useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
@@ -849,7 +874,8 @@ export function Market() {
                   screen.
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
-                  station, so it has no Region mode to toggle into. */}
+                  station, so it has no Region mode to toggle into, and its hub
+                  picker sits in the panel beside Price %. */}
                 {tab === 'browser' && (
                   <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                     <FilterChip
@@ -866,7 +892,7 @@ export function Market() {
                     />
                   </div>
                 )}
-                {effectiveLocation.mode === 'hub' || tab === 'appraisal' ? (
+                {tab === 'appraisal' ? null : effectiveLocation.mode === 'hub' ? (
                   <Select
                     value={effectiveHub.id}
                     onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
@@ -941,16 +967,20 @@ export function Market() {
 
           {tab === 'history' && (
             <OrderHistoryPanel
-              onViewChange={(view) =>
-                changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-              }
+              focusViewOnMount={focusHistoryView}
+              onViewChange={(view) => {
+                focusHistoryView.current = view === 'transactions';
+                changeTab(view === 'transactions' ? 'history/transactions' : 'history');
+              }}
             />
           )}
           {tab === 'history/transactions' && (
             <TransactionsPanel
-              onViewChange={(view) =>
-                changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-              }
+              focusViewOnMount={focusHistoryView}
+              onViewChange={(view) => {
+                focusHistoryView.current = view === 'history';
+                changeTab(view === 'transactions' ? 'history/transactions' : 'history');
+              }}
             />
           )}
 
@@ -962,6 +992,7 @@ export function Market() {
               pricePercent={pricePercent}
               onPricePercentChange={handlePricePercentChange}
               hub={effectiveHub}
+              onHubChange={handleHubChange}
               standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
               characterId={activeCharacterId}
               defaultCompareExpanded={expandCompareOnAppraisal}
@@ -996,6 +1027,8 @@ export function Market() {
                     />
                   }
                 />
+
+                <LiveStatus>{browserStatus}</LiveStatus>
 
                 {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
                   <p className="shrink-0 pt-2 text-[0.6875rem] text-text-dim uppercase">
@@ -1232,7 +1265,17 @@ export function Market() {
                                   station: stationFilterLabel ?? t('market.unknownStructure'),
                                 })}
                               </span>
-                              <Button size="sm" onClick={() => setStationFilter(null)}>
+                              <Button
+                                ref={clearFilterRef}
+                                size="sm"
+                                onClick={() => {
+                                  // Sell's heading, or Buy's when the phone toggle hides Sell.
+                                  focusAfterCommit(
+                                    isPhone && phoneSide === 'buy' ? buyHeadingRef : sellHeadingRef
+                                  );
+                                  setStationFilter(null);
+                                }}
+                              >
                                 {t('market.clearStationFilter')}
                               </Button>
                             </div>
@@ -1289,9 +1332,13 @@ export function Market() {
                             tableExport={sellExport}
                             hiddenOnPhone={phoneSide !== 'sell'}
                             cards={orderCards}
+                            headingRef={sellHeadingRef}
                             onShowAll={
                               !sellShowAll && sortedSell.length > ROW_CAP
-                                ? () => setSellShowAll(true)
+                                ? () => {
+                                    focusAfterCommit(sellHeadingRef);
+                                    setSellShowAll(true);
+                                  }
                                 : null
                             }
                             rowContextMenu={orderRowContextMenu}
@@ -1305,7 +1352,7 @@ export function Market() {
                                 solarSystems={solarSystemMap}
                                 hiddenColumns={sellHiddenColumns}
                                 orderColumnsById={orderColumnsById}
-                                onFilterToStation={stationFilter === null ? setStationFilter : null}
+                                onFilterToStation={stationFilter === null ? filterToStation : null}
                               />
                             )}
                             empty={
@@ -1347,9 +1394,13 @@ export function Market() {
                             tableExport={buyExport}
                             hiddenOnPhone={phoneSide !== 'buy'}
                             cards={orderCards}
+                            headingRef={buyHeadingRef}
                             onShowAll={
                               !buyShowAll && sortedBuy.length > ROW_CAP
-                                ? () => setBuyShowAll(true)
+                                ? () => {
+                                    focusAfterCommit(buyHeadingRef);
+                                    setBuyShowAll(true);
+                                  }
                                 : null
                             }
                             rowContextMenu={orderRowContextMenu}
@@ -1363,7 +1414,7 @@ export function Market() {
                                 solarSystems={solarSystemMap}
                                 hiddenColumns={buyHiddenColumns}
                                 orderColumnsById={orderColumnsById}
-                                onFilterToStation={stationFilter === null ? setStationFilter : null}
+                                onFilterToStation={stationFilter === null ? filterToStation : null}
                               />
                             )}
                             empty={

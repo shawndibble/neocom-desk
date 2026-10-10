@@ -39,6 +39,7 @@ import { useRouteQuery } from '@/features/route/routeRules';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { enumParam, optionalEnumParam, optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { TheraFilters } from './TheraFilters';
@@ -156,20 +157,36 @@ function TheraBody({
   onResetFilters?: () => void;
 }) {
   const { t } = useTranslation();
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    state.kind === 'loading' ? 'busy' : state.kind === 'unavailable' ? 'failed' : 'ok',
+    null
+  );
+  // One wrapper in every state, so focus on Retry has somewhere to stay while the list loads.
+  const wrap = (children: ReactNode) => (
+    <div ref={resultRef} tabIndex={-1} className="outline-none">
+      {children}
+    </div>
+  );
   if (state.kind === 'loading') {
-    return (
+    return wrap(
       <div className="flex justify-center py-10">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
   if (state.kind === 'unavailable') {
-    return (
+    return wrap(
       <EmptyState
         title={t('travel.thera.unavailableTitle')}
         hint={t('travel.thera.unavailableHint')}
         action={
-          <Button size="sm" onClick={state.retry}>
+          <Button
+            size="sm"
+            onClick={() => {
+              holdFocus();
+              state.retry();
+            }}
+          >
             {t('common.retry')}
           </Button>
         }
@@ -197,7 +214,7 @@ function TheraBody({
           ? t('travel.thera.jumpsUnknown')
           : '';
   const listed = state.rows.length > 0;
-  return (
+  return wrap(
     <Panel>
       <div className="space-y-3">
         <p role="status" className={cx('text-sm text-text-dim', jumpsNote === '' && 'sr-only')}>

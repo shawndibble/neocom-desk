@@ -1114,9 +1114,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     ),
                     hideIcon: true,
                   }}
-                  rowClassName={(row) =>
-                    overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
-                  }
                 />
               </div>
 

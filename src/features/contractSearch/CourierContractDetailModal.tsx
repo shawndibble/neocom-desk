@@ -97,6 +97,8 @@ export interface CourierContractDetailModalProps {
   preference: RoutePreferenceKind;
   /** The return leg, resolved by the board — it holds the corpus and the filter. */
   reverseLane: ReverseLane;
+  /** Where focus lands on close when the row that opened this is gone (the reverse-lane search filters it out). */
+  returnFocusFallback?: () => HTMLElement | null;
   /** Swap the two region filters and go look, closing this. */
   onSearchReverseLane: () => void;
   onClose: () => void;
@@ -213,6 +215,7 @@ export function CourierContractDetailModal({
   reverseLane,
   onSearchReverseLane,
   onClose,
+  returnFocusFallback,
 }: CourierContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -297,6 +300,7 @@ export function CourierContractDetailModal({
     <Modal
       open
       onClose={onClose}
+      returnFocusFallback={returnFocusFallback}
       title={t('contractSearch.courierModalTitle', {
         origin: endpointSystemName(row.origin),
         destination: endpointSystemName(row.destination),

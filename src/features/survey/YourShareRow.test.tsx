@@ -118,4 +118,33 @@ describe('YourShareRow', () => {
     await screen.findByText(/in Jita/);
     expect(resolveSolarSystem).toHaveBeenCalledTimes(1);
   });
+
+  it('focuses the system field when opened, and "Change system" when it closes', async () => {
+    render(<YourShareRow characterId={7} summary={summary} />);
+    await screen.findByText(/in Jita/);
+    fireEvent.click(screen.getByRole('button', { name: 'Change system' }));
+    const input = screen.getByLabelText('Solar system');
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change system' }))
+    );
+  });
+
+  it('leaves focus alone when the field closes because focus moved elsewhere', async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    render(
+      <>
+        <YourShareRow characterId={7} summary={summary} />
+        <button type="button">Elsewhere</button>
+      </>
+    );
+    await screen.findByText(/in Jita/);
+    fireEvent.click(screen.getByRole('button', { name: 'Change system' }));
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    elsewhere.focus();
+    fireEvent.blur(screen.getByLabelText('Solar system'));
+    await waitFor(() => expect(screen.queryByLabelText('Solar system')).toBeNull());
+    expect(document.activeElement).toBe(elsewhere);
+  });
 });
