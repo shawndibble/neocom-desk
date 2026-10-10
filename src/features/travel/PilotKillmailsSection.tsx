@@ -16,6 +16,7 @@ import { resolveNames } from '@/features/character/names';
 import { FittingModuleList } from '@/features/fittings/FittingModuleList';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import { formatIskCompact } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -125,9 +126,19 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
     });
   }
 
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLElement>(
+    result === null ? 'busy' : result.ok ? 'ok' : 'failed',
+    characterId
+  );
+
   const title = t('travel.pilot.recent.title');
   return (
-    <section aria-labelledby={headingId} className="space-y-2">
+    <section
+      ref={resultRef}
+      tabIndex={-1}
+      aria-labelledby={headingId}
+      className="space-y-2 outline-none"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3
           id={headingId}
@@ -149,6 +160,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           <Button
             size="sm"
             onClick={() => {
+              holdFocus();
               setResult(null);
               setAttempt((n) => n + 1);
             }}

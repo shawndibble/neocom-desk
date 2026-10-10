@@ -69,6 +69,25 @@ describe('useRetryFocus', () => {
     expect(screen.getByTestId('wrapper')).toHaveFocus();
   });
 
+  it('holds focus on the wrapper from the click when Retry unmounts', () => {
+    function Held({ read }: { read: 'busy' | 'failed' | 'ok' }) {
+      const [ref, , hold] = useRetryFocus<HTMLDivElement>(read, 'a');
+      return (
+        <div ref={ref} tabIndex={-1} data-testid="wrapper">
+          {read === 'failed' && (
+            <button onClick={hold} data-testid="retry">
+              Retry
+            </button>
+          )}
+        </div>
+      );
+    }
+    const { rerender } = render(<Held read="failed" />);
+    press('retry');
+    rerender(<Held read="busy" />);
+    expect(screen.getByTestId('wrapper')).toHaveFocus();
+  });
+
   it('drops a pending retry when resetKey changes', () => {
     const { rerender } = render(<Sibling read="failed" resetKey="a" />);
     press('retry');
