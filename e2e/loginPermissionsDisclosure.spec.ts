@@ -1,11 +1,11 @@
 /**
- * The logged-out landing page's permissions disclosure (the read-scope and
- * write-exception paragraphs under the trust cards) is body text, not fine
+ * The logged-out landing page's permissions disclosure (the read-scope
+ * paragraph under the trust cards) is body text, not fine
  * print: 14px, capped near 768px so a line stays readable (issue #3514).
  */
 import { test, expect } from './support/testBase';
 
-const PARAGRAPHS = [/^Logging in lets it read/, /^It also asks for five permissions that write/];
+const PARAGRAPHS = [/^Logging in lets it read/];
 
 for (const size of [
   { width: 1440, height: 900 },

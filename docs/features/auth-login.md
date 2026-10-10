@@ -5,7 +5,7 @@ Routes `/login` (`src/routes/Login.tsx`), `/callback` (`src/routes/Callback.tsx`
 | Feature                                         | Where                                                                       |
 | ----------------------------------------------- | --------------------------------------------------------------------------- |
 | Landing page for signed-out users               | `Login.tsx`                                                                 |
-| "Log in with EVE Online" button                 | `SsoButton` `Login.tsx:679`                                                 |
+| "Log in with EVE Online" button                 | `EveSsoButton` in `Login.tsx`                                                 |
 | Custom permissions dialog                       | `CustomizePermissionsDialog.tsx`                                            |
 | SSO redirect, PKCE, state                       | `session.ts startLogin`, `sso.ts buildAuthorizeUrl`                         |
 | Callback: exchange, error panel, one auto retry | `Callback.tsx`                                                              |
@@ -21,9 +21,9 @@ Sign in with EVE SSO (first Character, or add an alt), choose how much to grant,
 
 ## Login page controls and content
 
-- Shown only with zero Characters: any Character -> `Navigate('/characters')` (`Login.tsx:264`); count loading -> `BootScreen gate="login"`.
+- Shown only with zero Characters: any Character -> `Navigate('/characters')` (`Login.tsx:Login()`); count loading -> `BootScreen gate="login"`.
 - Play Store (TWA) variant (`isPlayStoreApp`, referrer-based, read once): logo, name, login, customize link only.
-- Marketing sections (`login.*`): header; hero (eyebrow "Free . Open source . Runs on your device", heading "Answers, not API dumps.", tagline, login + customize buttons, static preview board with sample "Aurelia Vex" data using `overview.board.*` keys, `PREVIEW` `Login.tsx:205`); 6 "answers" cards; screenshot gallery (5 desktop scroll-snap + 4 phone, `/screenshots/*.webp`, click opens `Modal placement="media"`, lazy images with fixed size); feature catalog (Command, Progression, Economy, Social); trust cards ("Five writes, and nothing else", refresh token stays on device, offline, open source) with `login.permissionsHint` and `login.writeExceptions` (mail read flag, calendar response, mail send, Fitting save, autopilot waypoints); closing CTA; footer (GitHub, `/privacy.html`, `/data-credit.html`, Discord).
+- Marketing sections (`login.*`): header; hero (eyebrow "Free . Open source . Runs on your device", heading "Answers, not API dumps.", tagline, login + customize buttons, static preview board with sample "Aurelia Vex" data using `overview.board.*` keys, `PREVIEW` `Login.tsx:PREVIEW`); 6 "answers" cards; screenshot gallery (6 desktop scroll-snap + 4 phone, sample data, `/screenshots/*.webp`, click opens `Modal placement="media"`, lazy images with fixed size); feature catalog (Command, Progression, Economy, Social); trust cards ("Five writes, and nothing else", refresh token stays on device, offline, open source) with `login.permissionsHint` (read scopes) and a privacy-policy link; the five writes are listed in the first trust card; closing CTA; footer (GitHub, `/privacy.html`, `/data-credit.html`, Discord).
 - Login click -> `beginAddCharacterLogin()` (Base Grant), `pending` spinner/disabled; error resets.
 
 ## Scopes and Permissions
@@ -84,9 +84,9 @@ Dexie `characters`, `tokens` (refresh token never leaves device). `sessionStorag
 
 ## Observed gaps
 
-- Dead-grant redirect to `/login` is bounced by `Login` to `/characters` (`Login.tsx:264`) with no message; `state.from` unused. `useAuthFailure` is read only by `AuthFailureNotice`, `tokenProvider`, `PlanetaryIndustry`.
+- Dead-grant redirect to `/login` is bounced by `Login` to `/characters` (`Login.tsx:Login()`) with no message; `state.from` unused. `useAuthFailure` is read only by `AuthFailureNotice`, `tokenProvider`, `PlanetaryIndustry`.
 - Stale "13" text: `src/app/loginFlow.ts:146` ("Customize offers all 13 either way") and `CustomizePermissionsDialog.tsx:11` ("all 13 Permissions") vs `SCOPE_GROUPS` = 15 (`registry.ts:53`); the dialog renders all 15 (`:146`, test "every one of the 15"); `loginFlow.test.ts:359` also says "all 13".
-- Landing preview uses hard-coded sample data (`Login.tsx:205`).
+- Landing preview uses hard-coded sample data (`Login.tsx:PREVIEW`).
 - Landing permission copy is prose (`login.permissionsHint`), not generated from `PERMISSIONS`.
 - No logout control here (Settings > Data & storage).
 
