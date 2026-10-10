@@ -150,13 +150,13 @@ export function BuildPlanCompare({
   const showBookColumns = HUB_BOOK_COLUMN_IDS.some(isVisible);
   const targets = useMemo(() => {
     const byPlan = new Map<string, HubOrderTarget>();
-    for (const plan of plans) {
+    for (const plan of pricedPlans) {
       const typeId = catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productTypeID;
       if (typeId == null) continue;
-      byPlan.set(plan.id, { hubId: hubChoice === PLAN_HUB ? plan.hubId : hubChoice, typeId });
+      byPlan.set(plan.id, { hubId: plan.hubId, typeId });
     }
     return byPlan;
-  }, [plans, catalog, hubChoice]);
+  }, [pricedPlans, catalog]);
   const hubOrders = useHubOrderCounts([...targets.values()], showBookColumns);
   const hubCountsFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);

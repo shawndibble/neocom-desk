@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -126,6 +126,10 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn(), onOpenPlan = 
 }
 
 describe('BuildPlanCompare', () => {
+  afterEach(async () => {
+    await useCompareHub.getState().setValue('plan');
+  });
+
   it('shows a resolved row with every metric column', () => {
     renderCompare([
       row({
@@ -270,6 +274,5 @@ describe('BuildPlanCompare', () => {
       const last = mockedUseComparedBuildResults.mock.calls.at(-1)?.[0];
       expect(last?.plans.map((p) => p.hubId)).toEqual(['amarr']);
     });
-    await useCompareHub.getState().setValue('plan');
   });
 });
