@@ -17,6 +17,22 @@ vi.mock('@/market/fuzzwork', () => ({
   ),
 }));
 
+vi.mock('@/features/market/priceHistory', () => ({
+  loadPriceHistory: vi.fn(async () => ({
+    points: [
+      {
+        date: new Date().toISOString().slice(0, 10),
+        average: 1,
+        highest: 1,
+        lowest: 1,
+        volume: 1,
+        orderCount: 300,
+      },
+    ],
+    fetchedAt: 0,
+  })),
+}));
+
 vi.mock('./useComparedBuildResults', async () => {
   const actual = await vi.importActual<typeof import('./useComparedBuildResults')>(
     './useComparedBuildResults'
@@ -217,6 +233,9 @@ describe('BuildPlanCompare', () => {
     );
 
     expect(await screen.findByText('28')).toBeInTheDocument();
+    // 300 orders on one day of the 30-day window.
+    expect(await screen.findByText('10')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Orders per day/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Buy orders at hub/ })).toBeInTheDocument();
     // The extras start unticked.
     expect(screen.queryByRole('columnheader', { name: /Sell orders at hub/ })).toBeNull();

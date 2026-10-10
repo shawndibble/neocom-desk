@@ -21,6 +21,7 @@ export const COMPARE_COLUMN_IDS = [
   'iskPerHour',
   'breakEvenPrice',
   'buyCost',
+  'hubOrdersPerDay',
   'hubBuyOrders',
   'hubSellOrders',
   'hubBuyVolume',
@@ -37,11 +38,13 @@ export const COMPARE_DEFAULT_COLUMNS: readonly CompareColumnId[] = [
   'margin',
   'iskPerHour',
   'breakEvenPrice',
+  'hubOrdersPerDay',
   'hubBuyOrders',
 ];
 
-/** The columns read off the hub's live order book rather than off the plan's own result. */
+/** The columns read off the hub's live order book rather than off the plan's own result (`hubOrdersPerDay` reads the hub's region history instead). */
 export const HUB_COLUMN_IDS: readonly CompareColumnId[] = [
+  'hubOrdersPerDay',
   'hubBuyOrders',
   'hubSellOrders',
   'hubBuyVolume',

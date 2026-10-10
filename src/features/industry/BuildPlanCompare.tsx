@@ -53,6 +53,7 @@ import {
   type CompareHubChoice,
 } from './compareColumns';
 import { hubOrderKey, useHubOrderCounts, type HubOrderTarget } from './useHubOrderCounts';
+import { useHubDailyOrders } from './useHubDailyOrders';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -154,7 +155,17 @@ export function BuildPlanCompare({
     return target ? hubOrders.counts.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
   };
 
-  const csvColumns = buildPlanCompareCsvColumns(t, { visible, hubCounts: hubCountsFor });
+  const dailyOrders = useHubDailyOrders([...targets.values()], isVisible('hubOrdersPerDay'));
+  const ordersPerDayFor = (row: ComparedBuildRow) => {
+    const target = targets.get(row.planId);
+    return target ? dailyOrders.perDay.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
+  };
+
+  const csvColumns = buildPlanCompareCsvColumns(t, {
+    visible,
+    hubCounts: hubCountsFor,
+    ordersPerDay: ordersPerDayFor,
+  });
   const compareExport = useTableExport({
     surface: 'build-plan-compare',
     rows,
@@ -343,6 +354,20 @@ export function BuildPlanCompare({
           (v) => <IskAmount value={v} decimals={0} />,
           unknown
         ),
+    },
+    {
+      id: 'hubOrdersPerDay',
+      header: t('industry.compareHubOrdersPerDay'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => ordersPerDayFor(row),
+      render: (row) => {
+        if (row.loading || dailyOrders.loading) return '…';
+        const perDay = ordersPerDayFor(row);
+        return perDay === undefined
+          ? unknown
+          : perDay.toLocaleString(undefined, { maximumFractionDigits: 1 });
+      },
     },
     {
       id: 'hubBuyOrders',

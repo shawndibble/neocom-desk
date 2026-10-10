@@ -19,6 +19,8 @@ export interface CompareCsvOptions {
   /** The columns the table shows; the plan name is always first. Defaults to the table's own default set. */
   visible?: readonly CompareColumnId[];
   /** A row's order counts at the chosen hub; null/undefined while loading, failed or unknown. */
+  /** A row's average orders traded per day in the hub's region. */
+  ordersPerDay?: (row: ComparedBuildRow) => number | null | undefined;
   hubCounts?: (row: ComparedBuildRow) => HubOrderCounts | null | undefined;
 }
 
@@ -30,7 +32,11 @@ export interface CompareCsvOptions {
  */
 export function buildPlanCompareCsvColumns(
   t: CsvTranslate,
-  { visible = COMPARE_DEFAULT_COLUMNS, hubCounts = () => null }: CompareCsvOptions = {}
+  {
+    visible = COMPARE_DEFAULT_COLUMNS,
+    hubCounts = () => null,
+    ordersPerDay = () => null,
+  }: CompareCsvOptions = {}
 ): CsvColumn<ComparedBuildRow>[] {
   const hub =
     (pick: (counts: HubOrderCounts) => number) =>
@@ -54,6 +60,10 @@ export function buildPlanCompareCsvColumns(
       value: figure((r) => r.breakEvenPrice),
     },
     buyCost: { header: t('industry.compareBuyCost'), value: figure((r) => r.buyCost) },
+    hubOrdersPerDay: {
+      header: t('industry.compareHubOrdersPerDay'),
+      value: (row) => ordersPerDay(row) ?? null,
+    },
     hubBuyOrders: { header: t('industry.compareHubBuyOrders'), value: hub((c) => c.buyOrders) },
     hubSellOrders: { header: t('industry.compareHubSellOrders'), value: hub((c) => c.sellOrders) },
     hubBuyVolume: { header: t('industry.compareHubBuyVolume'), value: hub((c) => c.buyVolume) },
