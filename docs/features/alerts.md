@@ -9,7 +9,7 @@ Route `/alerts` (`src/routes/Alerts.tsx`): the record of every alert this device
 | Mute/unmute type (feed channel only)                              | `AlertGroupRow.tsx`                                  |
 | Dismiss one / type / all                                          | `feedSync.ts dismissFeedEntriesAndSync`              |
 | Row click-through                                                 | `notificationUrlForSubject` (`notificationClick.ts`) |
-| Unread badge (rail, app icon)                                     | `useUnreadAlertCount.ts`, `appBadge.ts`              |
+| Unread count (header bell, tab bar, app icon)                     | `useUnreadAlertCount.ts`, `appBadge.ts`              |
 | Delivery, preferences                                             | `notifications.md`                                   |
 
 ## Purpose and user goal

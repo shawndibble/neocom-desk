@@ -15,9 +15,9 @@ describe('legacyLocation', () => {
     });
   });
 
-  it('sends Travel › Pilot Lookup to its own page with the query intact', () => {
-    expect(legacyLocation('/travel/pilot', '?pilot=90000001', '').pathname).toBe('/pilot-lookup');
-    expect(legacyLocation('/travel/pilot', '?pilot=90000001', '').search).toBe('?pilot=90000001');
+  it('sends the retired Pilot Lookup page to its Travel tab with the query intact', () => {
+    expect(legacyLocation('/pilot-lookup', '?pilot=90000001', '').pathname).toBe('/travel/pilot');
+    expect(legacyLocation('/pilot-lookup', '?pilot=90000001', '').search).toBe('?pilot=90000001');
   });
 
   it('sends Settings › FAQ and Settings › Help to the Help page', () => {

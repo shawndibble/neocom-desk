@@ -17,7 +17,7 @@ import type { AppRoutePath } from './routeScopes';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
 
-const SHEET_GROUPS = railGroups();
+const SHEET_GROUPS = railGroups(true);
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
 const ALL_CORP_VIEWS = { canReadMembers: true, canReadWallet: true, canReadAssets: true };
 

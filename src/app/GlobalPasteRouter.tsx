@@ -23,7 +23,7 @@ const SKILL_PLANS_PATH = '/skills/plans';
 
 /** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
 const pilotLookup = (text: string): [string, { state: unknown }] => [
-  '/pilot-lookup',
+  '/travel/pilot',
   { state: { pilotListText: text } satisfies PilotListState },
 ];
 

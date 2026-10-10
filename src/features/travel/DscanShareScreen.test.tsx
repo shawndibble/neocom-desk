@@ -77,7 +77,7 @@ describe('Shared D-Scan', () => {
         <DscanShareScreen
           state={{ status: 'invalid' }}
           expiresAt={Date.now()}
-          openInApp={{ path: '/pilot-lookup?share=abc' }}
+          openInApp={{ path: '/travel/pilot?share=abc' }}
         />
       </MemoryRouter>
     );

@@ -1080,6 +1080,8 @@ Three tiers decide how a page-header or toolbar control is labelled:
 
 The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.
 
+**The alerts bell** (`AlertsBell`) sits last in the header's control cluster on every page (`PageHeader`, and `CharacterHeader` / `FittingHeader`, which stand in for it). It is a link to `/alerts` showing the unread count, and it renders nothing at all at zero, so a phone header's corner stays clear. It is not one of the three tiers: it is navigation, not an action.
+
 ### Restraint: decide by what is already there
 
 The cues above say what a control means. They never say a row needs one.

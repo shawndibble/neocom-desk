@@ -39,18 +39,33 @@ describe('railGroups', () => {
         paths: group.pages.map((page) => page.path),
       }))
     ).toEqual([
-      { labelKey: null, paths: ['/overview', '/alerts', '/corp'] },
+      { labelKey: null, paths: ['/overview', '/corp'] },
       {
         labelKey: 'nav.groups.progression',
-        paths: ['/skills', '/industry', '/ships', '/mining', '/planetary-industry'],
+        paths: ['/skills', '/industry', '/ships', '/mining', '/planetary-industry', '/travel'],
       },
       {
         labelKey: 'nav.groups.economy',
         paths: ['/market', '/wallet', '/assets', '/contracts'],
       },
       { labelKey: 'nav.groups.social', paths: ['/mail', '/calendar', '/contacts'] },
-      { labelKey: 'nav.groups.intel', paths: ['/travel', '/pilot-lookup'] },
     ]);
+  });
+});
+
+describe('railGroups without the rail row', () => {
+  it('keeps Alerts out of the rail but lets the phone sheet list it, with no Intel group anywhere', () => {
+    const rail = railGroups().flatMap((group) => group.pages.map((page) => page.path));
+    expect(rail).not.toContain('/alerts');
+    const sheet = railGroups(true).flatMap((group) => group.pages.map((page) => page.path));
+    expect(sheet).toContain('/alerts');
+    expect(NAV_GROUPS.map((group) => group.id)).not.toContain('intel');
+  });
+
+  it('draws Travel as the last Progression page, and Pilot Lookup is a Travel tab, not a page', () => {
+    const progression = railGroups().find((group) => group.id === 'progression');
+    expect(progression?.pages.at(-1)?.path).toBe('/travel');
+    expect(NAV_PAGES.map((page) => page.path)).not.toContain('/pilot-lookup');
   });
 });
 
