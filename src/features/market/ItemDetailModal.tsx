@@ -484,6 +484,12 @@ function PriceLink({
   );
 }
 
+/**
+ * A side of the order book with no orders renders as '—', matching
+ * CompareDrawer/VariationsTable — and so does the shorthand a real price gets,
+ * so the same figure reads the same way wherever the Market area shows it.
+ * The line is inert, so a tap is free to be the reveal.
+ */
 function priceCell(price: number | null): ReactNode {
   return price != null ? <IskAmount value={price} decimals={marketIskDecimals(price)} /> : '—';
 }
