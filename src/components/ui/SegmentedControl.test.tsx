@@ -50,6 +50,22 @@ describe('SegmentedControl', () => {
   });
 });
 
+describe('SegmentedControl selected cue', () => {
+  const underline = 'shadow-[inset_0_-2px_0_var(--color-accent)]';
+
+  it('draws an inset accent underline on the selected segment only', () => {
+    render(<SegmentedControl label="Pick" options={options} value="b" onChange={noop} />);
+    expect(screen.getByRole('button', { name: 'Beta', pressed: true }).className).toContain(
+      underline
+    );
+    for (const name of ['Alpha', 'Gamma']) {
+      expect(screen.getByRole('button', { name, pressed: false }).className).not.toContain(
+        'shadow-'
+      );
+    }
+  });
+});
+
 describe('SegmentedControl states', () => {
   it('fills an idle segment with panel-2 on hover and darkens it on press', () => {
     render(
