@@ -19,7 +19,7 @@ import { isTypingTarget } from '@/lib/shortcuts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
-import { MoonTaxReadout } from './MoonTaxRow';
+import { SurveyInfoReadout } from './SurveyInfoPanel';
 import { SurveyBoard } from './SurveyBoard';
 import { ExpandedCheck } from './ExpandedCheck';
 import { stashPendingScan } from './pendingScan';
@@ -29,7 +29,7 @@ import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { addSurveyScan, finishSurvey, loadSurvey } from './surveyStore';
 import { useHasMoonOre } from './useHasMoonOre';
 import { useSurvey } from './useSurvey';
-import type { SurveyTaxShare } from './surveyStore';
+import type { SurveyInfoShare, SurveyTaxShare } from './surveyStore';
 
 export function SurveyShareScreen({ shareId }: { shareId: string }) {
   const { t } = useTranslation();
@@ -165,7 +165,9 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             onFinish={finish}
             url={shareUrl(shareId)}
             expiresAt={state.expiresAt}
-            afterPanel={(summary) => <MoonTaxIfMoon tax={state.tax} oreNames={summary.oreNames} />}
+            afterPanel={(summary) => (
+              <SurveyInfoIfAny info={state.info} tax={state.tax} oreNames={summary.oreNames} />
+            )}
             panelTitle={t('survey.sharePanelTitle')}
           />
         </>
@@ -174,8 +176,16 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   );
 }
 
-/** The tax line, only when the creator set one and the scans show a moon ore. */
-function MoonTaxIfMoon({ tax, oreNames }: { tax: SurveyTaxShare | null; oreNames: string[] }) {
+/** What the creator set: the location, notes, and the tax when the scans show a moon ore. Nothing set, no panel. */
+function SurveyInfoIfAny({
+  info,
+  tax,
+  oreNames,
+}: {
+  info: SurveyInfoShare | null;
+  tax: SurveyTaxShare | null;
+  oreNames: string[];
+}) {
   const moon = useHasMoonOre(oreNames);
-  return tax !== null && moon ? <MoonTaxReadout tax={tax} /> : null;
+  return <SurveyInfoReadout info={info} tax={moon ? tax : null} />;
 }

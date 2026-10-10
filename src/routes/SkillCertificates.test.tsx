@@ -108,6 +108,13 @@ describe('SkillCertificates', () => {
     expect(screen.getByText(/Improved needs 1 skill level/)).toBeInTheDocument();
   });
 
+  it('labels the filters as a group, not a toolbar', async () => {
+    renderPage();
+    await screen.findByText('Standard (2 of 5)');
+    expect(screen.getByRole('group', { name: 'Certificate filters' })).toBeInTheDocument();
+    expect(screen.queryByRole('toolbar')).toBeNull();
+  });
+
   it('filters by grade, each option carrying its count', async () => {
     const user = userEvent.setup();
     renderPage();

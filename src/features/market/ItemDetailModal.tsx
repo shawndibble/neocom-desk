@@ -38,6 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   Spinner,
+  Tooltip,
   TypeIcon,
 } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
@@ -69,7 +70,7 @@ import {
 import { RequiredSkillsSection } from './RequiredSkillsSection';
 import { skillNameOrFallback } from './skillNameOrFallback';
 import { UsedInSection } from './UsedInSection';
-import { formatIsk, marketIskDecimals } from '@/lib/isk';
+import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -350,6 +351,7 @@ export function ItemDetailModal({
                               trainedSkills={trainedSkills}
                               target={targetPlan}
                               itemName={itemName}
+                              attributeName={attribute.name}
                             >
                               {valueText}
                             </AttributeModifierTrigger>
@@ -421,7 +423,6 @@ function PriceFigure({
   onNavigate: () => void;
   replace: boolean;
 }) {
-  const { t } = useTranslation();
   const inRouter = useInRouterContext();
   const figure = price === undefined ? '…' : priceCell(price);
   return (
@@ -430,16 +431,11 @@ function PriceFigure({
       {inRouter && price != null ? (
         <PriceLink
           typeId={typeId}
-          ariaLabel={
-            side === 'sell'
-              ? t('market.itemDetail.bestSellOpen', { price: exactPrice(price) })
-              : t('market.itemDetail.bestBuyOpen', { price: exactPrice(price) })
-          }
+          side={side}
+          price={price}
           onNavigate={onNavigate}
           replace={replace}
-        >
-          {figure}
-        </PriceLink>
+        />
       ) : (
         <span className="tabular-nums text-text">{figure}</span>
       )}
@@ -453,28 +449,39 @@ function exactPrice(price: number): string {
 
 function PriceLink({
   typeId,
-  ariaLabel,
+  side,
+  price,
   onNavigate,
   replace,
-  children,
 }: {
   typeId: number;
-  ariaLabel: string;
+  side: 'sell' | 'buy';
+  price: number;
   onNavigate: () => void;
   replace: boolean;
-  children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const { search } = useLocation();
+  const exact = exactPrice(price);
+  // The Link itself is the tooltip trigger (one tab stop). The visible figure is
+  // the compact text and the accessible name is built from content, so it leads
+  // with what is on screen (WCAG 2.5.3).
   return (
-    <Link
-      to={marketItemUrl(typeId, search)}
-      replace={replace}
-      onClick={onNavigate}
-      aria-label={ariaLabel}
-      className={cx(inlineLinkClassName, 'tabular-nums')}
-    >
-      {children}
-    </Link>
+    <Tooltip content={t('common.iskExact', { amount: formatIsk(price, marketIskDecimals(price)) })}>
+      <Link
+        to={marketItemUrl(typeId, search)}
+        replace={replace}
+        onClick={onNavigate}
+        className={cx(inlineLinkClassName, 'cursor-help tabular-nums')}
+      >
+        {formatIskCompact(price)}{' '}
+        <span className="sr-only">
+          {side === 'sell'
+            ? t('market.itemDetail.bestSellOpen', { price: exact })
+            : t('market.itemDetail.bestBuyOpen', { price: exact })}
+        </span>
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -500,6 +507,7 @@ function AttributeModifierTrigger({
   trainedSkills,
   target,
   itemName,
+  attributeName,
   children,
 }: {
   modifiers: readonly ModifyingSkillEffect[];
@@ -507,8 +515,11 @@ function AttributeModifierTrigger({
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   target: TargetPlan;
   itemName: string;
+  attributeName: string;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const modifiersLabel = t('market.itemDetail.modifiersFor', { attribute: attributeName });
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -523,10 +534,11 @@ function AttributeModifierTrigger({
           )}
         >
           {children}
+          <span className="sr-only">{modifiersLabel}</span>
           <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-2">
+      <PopoverContent align="end" className="w-64 space-y-2" aria-label={modifiersLabel}>
         {modifiers.map((modifier) => (
           <AttributeModifierRow
             key={modifier.ownerSkillTypeID}

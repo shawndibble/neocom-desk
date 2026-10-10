@@ -52,7 +52,6 @@ import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
-import { cx } from '@/lib/cx';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
@@ -99,7 +98,8 @@ interface ListSort {
 }
 
 function sortValue(stats: PlanIndexStats | undefined, key: SortKey): number | null {
-  if (!stats) return null;
+  // A "Fix location" plan's figures are not real, so it never ranks on them.
+  if (!stats || stats.verdict === 'fixLocation') return null;
   if (key === 'profit') return stats.profit;
   return (key === 'iskPerHour' ? stats.iskPerHour : stats.marginPct) ?? null;
 }
@@ -195,15 +195,28 @@ function VerdictTag({
         : verdict === 'fixLocation'
           ? t('industry.reactionBlocked.fixLocationTag')
           : t('industry.verdictTagUnknown');
+  const hasCosts =
+    verdict !== 'unknown' && verdict !== 'fixLocation' && buildCost != null && buyCost != null;
+  // The tooltip below is hover/tap only and the list shows these costs nowhere
+  // else, so the tag carries them as its accessible name (no extra tab stop).
   const tag = (
     <span
+      role={hasCosts ? 'img' : undefined}
+      aria-label={
+        hasCosts
+          ? t('industry.verdictTagSummary', {
+              verdict: label,
+              buildCost: t('industry.verdictTagAmount', { amount: formatIsk(buildCost) }),
+              buyCost: t('industry.verdictTagAmount', { amount: formatIsk(buyCost) }),
+            })
+          : undefined
+      }
       className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-widest ${VERDICT_TAG_CLASS[verdict]}`}
     >
       {label}
     </span>
   );
-  if (verdict === 'unknown' || verdict === 'fixLocation' || buildCost == null || buyCost == null)
-    return tag;
+  if (!hasCosts) return tag;
   return (
     <Tooltip
       content={
@@ -242,10 +255,10 @@ function RunsCell({ runs }: { runs: number }) {
 }
 
 /** Sign kept alongside the color, not instead of it (DESIGN.md §7) — a viewer who can't tell green from red still reads "+"/"-". */
-function ProfitCell({ profit }: { profit: number | null }) {
+function ProfitCell({ profit, muted = false }: { profit: number | null; muted?: boolean }) {
   if (profit === null) return <span className="tabular-nums text-text-dim">—</span>;
   return (
-    <span className={`tabular-nums ${iskToneClass(profit)}`}>
+    <span className={`tabular-nums ${muted ? 'text-text-dim' : iskToneClass(profit)}`}>
       {profit > 0 ? '+' : ''}
       {/* Tap: the row is tappable, so the tap opens the plan; the exact figure
           is on hover/focus. */}
@@ -556,32 +569,34 @@ function PlanRow({
               </Tooltip>
             </span>
           )}
-          {/* Dimmed, not withheld, while the verdict is "Fix location". */}
-          <span
-            className={cx(
-              'w-24 shrink-0 text-right',
-              stats?.verdict === 'fixLocation' && 'opacity-50'
+          {/* Kept, not withheld, while the verdict is "Fix location": the figures
+          read in the dim tone with a warning glyph, never faded. */}
+          <span className="w-24 shrink-0 text-right">
+            <span className="sr-only">{t('industry.profitColumn')}: </span>
+            {stats?.verdict === 'fixLocation' && (
+              <Tooltip content={t('industry.reactionBlocked.profitNotReal')} openOnTap>
+                <span
+                  tabIndex={0}
+                  role="img"
+                  aria-label={t('industry.reactionBlocked.profitNotReal')}
+                  className="-my-1 mr-0 inline-flex size-6 items-center justify-center align-middle focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" />
+                </span>
+              </Tooltip>
             )}
-          >
-            <ProfitCell profit={stats?.profit ?? null} />
+            <ProfitCell profit={stats?.profit ?? null} muted={stats?.verdict === 'fixLocation'} />
           </span>
-          <span
-            className={cx(
-              'hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block',
-              stats?.verdict === 'fixLocation' && 'opacity-50'
-            )}
-          >
+          <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
+            <span className="sr-only">{t('industry.iskPerHourColumn')}: </span>
             {stats?.iskPerHour == null ? '—' : <IskAmount value={stats.iskPerHour} decimals={0} />}
           </span>
-          <span
-            className={cx(
-              'hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block',
-              stats?.verdict === 'fixLocation' && 'opacity-50'
-            )}
-          >
+          <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
+            <span className="sr-only">{t('industry.marginColumn')}: </span>
             {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
           </span>
           <span className="hidden w-14 shrink-0 justify-end sm:flex">
+            <span className="sr-only">{t('industry.verdictColumn')}: </span>
             <VerdictTag
               verdict={stats?.verdict ?? 'unknown'}
               buildCost={stats?.buildCost}
@@ -589,6 +604,7 @@ function PlanRow({
             />
           </span>
           <span className="hidden w-8 shrink-0 text-right sm:block">
+            <span className="sr-only">{t('industry.runsColumn')}: </span>
             <RunsCell runs={stats?.runs ?? 0} />
           </span>
           {/* Unmounted while renaming: closing the menu hands focus back to the ⋮,
@@ -719,11 +735,13 @@ function GroupHeader({
             </span>
           )}
           <span className="w-24 shrink-0 text-right">
+            <span className="sr-only">{t('industry.profitColumn')}: </span>
             <ProfitCell profit={stats?.profit ?? null} />
           </span>
           <span className="hidden w-24 shrink-0 lg:block" aria-hidden="true" />
           <span className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
           <span className="hidden w-14 shrink-0 justify-end sm:flex">
+            <span className="sr-only">{t('industry.verdictColumn')}: </span>
             <VerdictTag
               verdict={stats?.verdict ?? 'unknown'}
               buildCost={stats?.buildCost}

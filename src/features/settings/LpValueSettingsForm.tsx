@@ -31,7 +31,8 @@ export function LpValueField({ id }: { id: string }) {
   }
 
   function commit() {
-    if (!parseable) return revert();
+    // Keep the typed text and its error; nothing is saved until it parses.
+    if (!parseable) return;
     if (draft === null) return;
     const next = draft === '' ? DEFAULT_LP_VALUE : Number(draft);
     if (!Number.isFinite(next) || next < 0) return revert();

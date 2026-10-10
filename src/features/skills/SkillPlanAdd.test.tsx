@@ -65,6 +65,20 @@ describe('SkillPlanAdd', () => {
     await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([]));
   });
 
+  it('moves focus to Undo after Add, and back to Add after Undo', async () => {
+    await db.skillPlans.add(plan('plan-1', 'PvP Fit', []));
+    const user = userEvent.setup();
+    renderAdd(2);
+
+    await user.click(await screen.findByRole('button', { name: 'Add to Skill Plan' }));
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    await waitFor(() => expect(undo).toHaveFocus());
+
+    await user.click(undo);
+    const add = await screen.findByRole('button', { name: 'Add to Skill Plan' });
+    await waitFor(() => expect(add).toHaveFocus());
+  });
+
   it('adds into the plan picked when there are several', async () => {
     await db.skillPlans.bulkAdd([plan('plan-1', 'PvP Fit', []), plan('plan-2', 'Mining', [])]);
     const user = userEvent.setup();

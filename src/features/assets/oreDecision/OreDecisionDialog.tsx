@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { cx } from '@/lib/cx';
+import * as Icon from '@/components/ui/icons';
 import {
   DataTable,
   IskAmount,
@@ -52,7 +53,7 @@ import type { ReprocessingMaterial } from '@/engine/industry/reprocessing';
 import { useOreRefiningStructureRate } from './refiningFacility';
 
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
-const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
+const CARD_SUGGESTED = 'border-accent-dim';
 const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
 const TABLE_TITLE_TEXT =
@@ -97,9 +98,23 @@ function Card({
   children: React.ReactNode;
   hint?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={cx(CARD, suggested ? CARD_SUGGESTED : 'border-line')}>
-      <p className={cx(CARD_LABEL, suggested ? 'text-accent' : 'text-text-dim')}>{label}</p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <p className={cx(CARD_LABEL, 'text-text-dim')}>{label}</p>
+        {suggested && (
+          // Decorative twin of a screen-reader "Suggested": hue alone never
+          // marks the pick (WCAG 1.4.1), and `accent-dim` is not for text.
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold tracking-wide text-accent uppercase"
+          >
+            <Icon.Done size={12} className="shrink-0" />
+            {t('assets.oreDecision.suggested')}
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-xl font-semibold tabular-nums">{children}</p>
       {hint && <p className={CARD_HINT}>{hint}</p>}
     </div>

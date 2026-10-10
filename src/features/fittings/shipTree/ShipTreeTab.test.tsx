@@ -120,6 +120,14 @@ describe('ShipTreeTab — map', () => {
     expect(screen.getByText('4 / 5 hulls flyable')).toBeInTheDocument();
   });
 
+  it('sets the artwork credit in a readable colour, not the decorative faint one', async () => {
+    renderTab();
+    await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    const credit = screen.getByText(/EVE Online artwork/);
+    expect(credit).toHaveClass('text-text-dim');
+    expect(credit).not.toHaveClass('text-text-faint');
+  });
+
   it('marks each tile with its tone and tech corner', async () => {
     const { container } = renderTab();
     await screen.findByRole('region', { name: 'Caldari State ship tree' });
@@ -150,6 +158,77 @@ describe('ShipTreeTab — map', () => {
     expect(within(card).getByText('Caldari Frigate bonuses (per skill level):')).toBeVisible();
     expect(within(card).getByText('Role bonus:')).toBeVisible();
     expect(within(card).getByText('5%')).toBeVisible();
+  });
+
+  it('keeps the hover card open while the pointer crosses onto it, closes on leaving it', async () => {
+    renderTab();
+    const merlin = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    fireEvent.mouseEnter(merlin);
+    fireEvent.mouseLeave(merlin);
+    const card = screen.getByTestId('ship-tree-hover-card');
+    fireEvent.mouseEnter(card);
+    // Past the close delay the card is still there: the card cancelled it.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
+    fireEvent.mouseLeave(card);
+    expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
+  });
+
+  it('closes the hover card after a beat once the pointer leaves the tile', async () => {
+    renderTab();
+    const merlin = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    fireEvent.mouseEnter(merlin);
+    fireEvent.mouseLeave(merlin);
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument()
+    );
+  });
+
+  it('dismisses the hover card with Escape, leaving focus on the tile', async () => {
+    renderTab();
+    const tile = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    tile.focus();
+    fireEvent.mouseEnter(tile);
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeVisible();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
+    expect(tile).toHaveFocus();
+  });
+
+  it('labels the zoom percentage for screen readers', async () => {
+    renderTab();
+    const label = await screen.findByText(/zoom level/i, { selector: 'span.sr-only' });
+    expect(label.parentElement).toHaveTextContent('Zoom level: 100%');
+    expect(label.parentElement).not.toHaveAttribute('aria-label');
+  });
+
+  it('announces the search result count, and says so when nothing matches', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const search = await screen.findByRole('searchbox', { name: 'Search hulls in every faction' });
+    await user.type(search, 'wor');
+    await waitFor(() =>
+      expect(screen.getAllByRole('status')[0]).toHaveTextContent(/\d+ hulls? match/)
+    );
+    await user.clear(search);
+    await user.type(search, 'zzzz');
+    await waitFor(() =>
+      expect(screen.getAllByRole('status')[0]).toHaveTextContent('No hulls match')
+    );
+    await user.clear(search);
+    await waitFor(() => expect(screen.getAllByRole('status')[0]).toBeEmptyDOMElement());
+  });
+
+  it('names a search result with its fly status', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.type(
+      await screen.findByRole('searchbox', { name: 'Search hulls in every faction' }),
+      'merlin'
+    );
+    const results = screen.getByRole('list', { name: 'Matching hulls' });
+    expect(within(results).getByRole('button', { name: /Can fly\s*Merlin/ })).toBeInTheDocument();
   });
 
   it('resets to 100% on a faction switch, even after the reader zoomed', async () => {
@@ -324,7 +403,7 @@ describe('ShipTreeTab — ladder', () => {
       'worm'
     );
     expect(screen.getByText('No hulls match.')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Worm' }));
+    await user.click(screen.getByRole('button', { name: /^Can fly\s*Worm$/ }));
     expect(screen.getByTestId('location')).toHaveTextContent('faction=500010');
     expect(await screen.findByRole('dialog', { name: 'Worm' })).toBeVisible();
   });

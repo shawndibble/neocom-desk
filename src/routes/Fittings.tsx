@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
+import { SHIPS_TABS_ID } from '@/features/fittings/shipsTabs';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -11,10 +12,13 @@ import {
   Button,
   Disclosure,
   IskAmount,
+  LiveStatus,
   Modal,
   Panel,
   SlideOver,
   Tabs,
+  TabPanel,
+  useTabsId,
   TextInput,
   Toast,
   useTimedToast,
@@ -147,6 +151,9 @@ function FittingsPage() {
   // Opened by an empty slot, or by "+ Add module" — which works before the
   // ship data (and so the empty slots) exists.
   const [addOpen, setAddOpen] = useState(false);
+  // What the last add did, read out by the sr-only status (the browser stays open beside the Ring).
+  const [added, setAdded] = useState({ message: '', n: 0 });
+  const setAddedMessage = (message: string) => setAdded((a) => ({ message, n: a.n + 1 }));
   const [makeItFitOpen, setMakeItFitOpen] = useState(false);
   // What the last applied Make it fit swap changed, for its confirmation toast.
   const [swapped, setSwapped] = useState<string | null>(null);
@@ -162,6 +169,8 @@ function FittingsPage() {
   const view = resolveFittingView(storedView, isPhone);
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
+  // One tab bar renders at a time (phone sheet or docked/wide), so one id base serves both.
+  const viewTabsId = useTabsId();
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
   // The module dialog's variations start folded: a tap on a module is
@@ -304,6 +313,7 @@ function FittingsPage() {
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
       edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
+      setAddedMessage(t('fittings.add.addedDrone', { name: typeName(typeId) }));
       if (addMode === 'sheet') closeAdd();
       return;
     }
@@ -313,11 +323,15 @@ function FittingsPage() {
     // goes in one click each. An item for another rack (fits-this-slot off)
     // goes in that rack's first free slot and leaves the chosen one be.
     const onTarget = target?.kind === 'slot' && target.slot === rack;
-    const after: { target: AddTarget | null } = { target };
+    const after: { target: AddTarget | null; slotIndex: number | null } = {
+      target,
+      slotIndex: null,
+    };
     edit((f) => {
       const slotIndex =
         onTarget && target.kind === 'slot' ? target.slotIndex : firstFreeSlotIndex(f, rack, count);
       if (slotIndex === null) return f;
+      after.slotIndex = slotIndex;
       const next = addModule(f, rack, slotIndex, typeId, () =>
         defaultCharges(f.shipTypeId, rack, typeId)
       );
@@ -328,6 +342,14 @@ function FittingsPage() {
       }
       return next;
     });
+    if (after.slotIndex !== null) {
+      setAddedMessage(
+        t('fittings.add.added', {
+          name: typeName(typeId),
+          slot: t(`fittings.makeItFit.slot.${rack}`, { index: after.slotIndex + 1 }),
+        })
+      );
+    }
     if (addMode === 'sheet') closeAdd();
     else setTarget(after.target);
   }
@@ -429,6 +451,7 @@ function FittingsPage() {
         onStartHull={startHull}
         pageTitle={t('nav.ships')}
         pageTabs={<ShipsTabBar />}
+        pageTabsPanel={{ tabsId: SHIPS_TABS_ID, tabId: 'fittings' }}
       />
     );
   }
@@ -701,6 +724,9 @@ function FittingsPage() {
           {/* Only a Load that opened a Fitting describes this one; a failed Load's
           warnings stay with the Load card that reported them. */}
           {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
+          <LiveStatus data-testid="fitting-added-status" announceKey={added.n}>
+            {added.message}
+          </LiveStatus>
           {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
           <p role="status" className="text-xs text-text-dim empty:hidden">
             {charges.message}
@@ -710,6 +736,7 @@ function FittingsPage() {
             (addMode === 'sheet' ? (
               <div className="space-y-3">
                 <Tabs
+                  tabsId={viewTabsId}
                   tabs={[
                     { id: 'ring', label: t('fittings.view.ring') },
                     { id: 'list', label: t('fittings.view.list') },
@@ -726,7 +753,13 @@ function FittingsPage() {
                   }}
                   label={t('fittings.phoneTabs.label')}
                 />
-                {phoneTab === 'stats' ? statsSections : editor}
+                <TabPanel
+                  tabsId={viewTabsId}
+                  tabId={phoneTab === 'stats' ? 'stats' : view}
+                  className="space-y-3"
+                >
+                  {phoneTab === 'stats' ? statsSections : editor}
+                </TabPanel>
               </div>
             ) : (
               <div
@@ -770,6 +803,7 @@ function FittingsPage() {
                   }`}
                 >
                   <Tabs
+                    tabsId={viewTabsId}
                     tabs={[
                       { id: 'ring', label: t('fittings.view.ring') },
                       { id: 'list', label: t('fittings.view.list') },
@@ -778,7 +812,9 @@ function FittingsPage() {
                     onChange={(id) => void setView(id as FittingView)}
                     label={t('fittings.view.label')}
                   />
-                  {editor}
+                  <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
+                    {editor}
+                  </TabPanel>
                 </div>
                 {statsSections}
               </div>

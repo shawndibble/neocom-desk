@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { fetchAggregates, FUZZWORK_AGGREGATES_URL } from './fuzzwork';
+import { fetchAggregates, fetchOrderCounts, FUZZWORK_AGGREGATES_URL } from './fuzzwork';
 
 const server = setupServer();
 
@@ -167,5 +167,36 @@ describe('fetchAggregates', () => {
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => new HttpResponse('boom', { status: 500 })));
 
     await expect(fetchAggregates(60003760, [34])).rejects.toThrow(/500/);
+  });
+});
+
+describe('fetchOrderCounts', () => {
+  it('reads open order counts and volumes per side at the station', async () => {
+    let captured: URL | null = null;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
+        captured = new URL(request.url);
+        return HttpResponse.json({
+          34: {
+            buy: { max: '3.71', volume: '700.0', orderCount: '28' },
+            sell: { min: '3.8', volume: '1100.0', orderCount: '44' },
+          },
+          35: { buy: { orderCount: '0' }, sell: { orderCount: '0' } },
+        });
+      })
+    );
+
+    const result = await fetchOrderCounts(60003760, [34, 35, 36]);
+
+    expect((captured as URL | null)?.searchParams.get('station')).toBe('60003760');
+    expect(result.get(34)).toEqual({
+      buyOrders: 28,
+      sellOrders: 44,
+      buyVolume: 700,
+      sellVolume: 1100,
+    });
+    // No orders and no entry at all both read as zero orders, never unknown.
+    expect(result.get(35)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
+    expect(result.get(36)).toEqual({ buyOrders: 0, sellOrders: 0, buyVolume: 0, sellVolume: 0 });
   });
 });

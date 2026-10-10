@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
+import { configureClipboard } from '@/lib/clipboard';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 
 vi.mock('@/market/prices', () => ({
@@ -29,6 +30,7 @@ function renderPanel(known = true, collapsible = false) {
 
 describe('SkillsToBuyPanel', () => {
   beforeEach(() => vi.clearAllMocks());
+  afterEach(() => configureClipboard(null));
 
   it('lists unowned skills and totals them', async () => {
     renderPanel();
@@ -59,5 +61,24 @@ describe('SkillsToBuyPanel', () => {
     expect(screen.getByText('Skill 1')).toBeInTheDocument();
     expect(screen.getByText(/Total cost/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy multibuy/i })).toBeInTheDocument();
+  });
+});
+
+describe('SkillsToBuyPanel copy status', () => {
+  it('announces the copy result in a status region', async () => {
+    const writeText = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('x'));
+    configureClipboard(writeText);
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByText(/Total cost/);
+    await user.click(screen.getByRole('button', { name: /copy multibuy/i }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Multibuy list copied')
+    );
+    await user.click(screen.getByRole('button', { name: /copy multibuy|copied/i }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/couldn.t copy/i));
   });
 });

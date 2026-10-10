@@ -22,6 +22,7 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  LiveStatus,
   Panel,
   Spinner,
 } from '@/components/ui';
@@ -649,6 +650,9 @@ export function BuildGroupPanel({
               label={t('industry.retargetGroupAction')}
               onClick={() => setRetargeting(true)}
             />
+            <LiveStatus>
+              {copyStatusFor(GROUP_COPY) === 'copied' ? t('industry.copyShoppingListDone') : null}
+            </LiveStatus>
             <IconButton
               size="sm"
               icon={

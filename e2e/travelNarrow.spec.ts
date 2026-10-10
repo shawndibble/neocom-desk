@@ -104,14 +104,14 @@ test.describe('Travel at 390px', () => {
 
   test('Route Safety with no stops shows Add a stop without a tap', async ({ page }) => {
     await signInAndGoto(page, './travel/route');
-    await expect(page.getByRole('button', { name: 'Add a stop' })).toBeVisible(COLD_LOAD);
+    await expect(page.getByRole('button', { name: /^add stop/i })).toBeVisible(COLD_LOAD);
     await expect(page.getByRole('button', { name: 'Edit stops' })).toHaveCount(0);
   });
 
   test('Route Safety with a stop still opens folded', async ({ page }) => {
     await signInAndGoto(page, `./travel/route?stops=${AMARR}`);
     await expect(page.getByRole('button', { name: 'Edit stops' })).toBeVisible(COLD_LOAD);
-    await expect(page.getByRole('button', { name: 'Add a stop' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^add stop/i })).toHaveCount(0);
   });
 
   for (const [name, systemId] of [
@@ -230,7 +230,7 @@ test('Route Safety at 1280px: Stops never folds, and the Jita picker keeps its h
   const trigger = page.getByRole('button', { name: /^Change starting system — Jita/ });
   await expect(trigger).toBeVisible(COLD_LOAD);
   await expect(page.getByRole('button', { name: 'Edit stops' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Add a stop' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^add stop/i })).toBeVisible();
   // `md:h-9`: the same single line as before the trigger learned to truncate.
   expect((await trigger.boundingBox())!.height).toBe(36);
 });

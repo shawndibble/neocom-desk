@@ -107,7 +107,7 @@ function LocationProbe() {
 function renderTab(url = '/travel/pilot') {
   render(
     <MemoryRouter initialEntries={[url]}>
-      <PilotLookupPanel tabBar={null} />
+      <PilotLookupPanel tabBar={null} tabsId="t" />
       <LocationProbe />
     </MemoryRouter>
   );

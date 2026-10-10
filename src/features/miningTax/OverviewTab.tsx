@@ -27,6 +27,7 @@ import {
   Panel,
   Spinner,
   type DataTableColumn,
+  TabPanel,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -131,9 +132,11 @@ function PriceSourceTag({ source }: { source: PriceSource }) {
 interface OverviewTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
+  /** The id base the tab bar was built with, so the body is its tab panel. */
+  tabsId: string;
 }
 
-export function OverviewTab({ tabBar }: OverviewTabProps) {
+export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const { t } = useTranslation();
   const showRefining = useMiningShowRefining((state) => state.value);
   const setShowRefining = useMiningShowRefining((state) => state.setValue);
@@ -584,213 +587,216 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         }
       />
       {tabBar}
-
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : (
-        <>
-          {data && data.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
-
-          {data && data.reauthCharacters.length > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
-              <ul className="space-y-1">
-                {data.reauthCharacters.map((c) => (
-                  <li key={c.characterId} className="flex items-center justify-between gap-2">
-                    <span>
-                      {t('miningTax.reauthCharacterHint', { character: c.characterName })}
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
-                    >
-                      {t('miningTax.reauthAction')}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="empty:hidden">
-            {refiningCharacters.map((c) => (
-              <ImplantsAssumedNote
-                key={c.characterId}
-                characterId={c.characterId}
-                hint={t('miningTax.overview.refineAssumesNoImplantsHint', {
-                  character: c.characterName,
-                })}
-              />
-            ))}
+      <TabPanel tabsId={tabsId} tabId="overview" className="space-y-4">
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
           </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : (
+          <>
+            {data && data.fromCache && (
+              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
+            )}
 
-          {visibleRows.length === 0 ? (
-            <EmptyState
-              title={t('miningTax.overview.emptyTitle')}
-              hint={t('miningTax.overview.emptyHint')}
-            />
-          ) : (
-            <>
-              <p className="text-xs text-text-dim">
-                {[basisSummary(t, basis, buybackRate), basisUsage(t, basis, daysBySource)]
-                  .filter(Boolean)
-                  .join(' ')}
-              </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Panel>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.totalValueStat')}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">
-                    <IskAmount value={totals.rawValue} decimals={0} />
-                  </p>
-                  {showRefining && (
-                    <p className="text-[0.6875rem] text-text-dim">
-                      {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
-                      <IskAmount value={totals.refineValue} decimals={0} />
-                    </p>
-                  )}
-                </Panel>
-                <Panel>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.iskPerDayStat')}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">
-                    {totals.iskPerDay !== null ? (
-                      <IskAmount value={totals.iskPerDay} decimals={0} />
-                    ) : (
-                      '—'
-                    )}
-                  </p>
-                  <p className="text-[0.6875rem] text-text-dim">
-                    {t('miningTax.overview.iskPerDayBasisHint')}
-                  </p>
-                </Panel>
-                <Panel>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.volumeStat')}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">
-                    {volumeDisplayMode(totals.volume).kind === 'complete'
-                      ? `${formatVolume(totals.volume.m3)} m³`
-                      : volumeDisplayMode(totals.volume).kind === 'unknown'
-                        ? '—'
-                        : `≈ ${formatVolume(totals.volume.m3)} m³`}
-                  </p>
-                  {volumeDisplayMode(totals.volume).kind === 'partial' && (
-                    <p className="text-[0.6875rem] text-warning">
-                      {t('miningTax.overview.volumeStatWarning', {
-                        count: totals.volume.missingTypeIds.length,
-                      })}
-                    </p>
-                  )}
-                </Panel>
-                <Panel>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.daysMinedStat')}
-                  </p>
-                  <p className="mt-1 text-xl font-semibold tabular-nums">
-                    {t('miningTax.overview.daysCoveredValue', {
-                      count: coverage.daysWithData,
-                      total: coverage.rangeDays,
-                    })}
-                  </p>
-                  {coverage.historyStartsInRange ? (
-                    <p className="text-[0.6875rem] text-warning">
-                      {t('miningTax.overview.historyStartsHint', {
-                        date: coverage.historyStartsInRange,
-                      })}
-                    </p>
-                  ) : (
-                    <p className="text-[0.6875rem] text-text-dim">{dateRangeLabel(totals.dates)}</p>
-                  )}
-                </Panel>
+            {data && data.reauthCharacters.length > 0 && (
+              <div
+                role="alert"
+                className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+              >
+                <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
+                <ul className="space-y-1">
+                  {data.reauthCharacters.map((c) => (
+                    <li key={c.characterId} className="flex items-center justify-between gap-2">
+                      <span>
+                        {t('miningTax.reauthCharacterHint', { character: c.characterName })}
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
+                      >
+                        {t('miningTax.reauthAction')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
               </div>
+            )}
 
-              {/* The charts draw their own two cards. */}
-              <Suspense
-                fallback={
-                  <Panel padded>
-                    <div className="flex justify-center py-8">
-                      <Spinner label={t('common.loading')} />
-                    </div>
-                  </Panel>
-                }
-              >
-                <LazyMiningYieldCharts
-                  metric={chartMetric}
-                  dailyRate={dailyRate}
-                  dailyVolume={dailyVolume}
-                  dailyCount={dailyCount}
-                  typeComparison={typeComparison}
-                  typeVolumeComparison={typeVolumeComparisonPoints}
-                  typeCountComparison={typeCountComparisonPoints}
-                  showRefining={showRefining}
+            <div className="empty:hidden">
+              {refiningCharacters.map((c) => (
+                <ImplantsAssumedNote
+                  key={c.characterId}
+                  characterId={c.characterId}
+                  hint={t('miningTax.overview.refineAssumesNoImplantsHint', {
+                    character: c.characterName,
+                  })}
                 />
-              </Suspense>
+              ))}
+            </div>
 
-              <Panel
-                padded={false}
-                actions={
-                  <>
-                    <ColumnPickerMenu
-                      available={availableColumnIds}
-                      visible={activeColumnIds}
-                      columnsById={columnsById}
-                      onToggle={handleToggleColumn}
-                      onReset={handleResetColumns}
-                      buttonLabel={t('miningTax.overview.columnsButton')}
-                      menuTitle={t('miningTax.overview.columnsMenuTitle')}
-                      resetLabel={t('miningTax.overview.resetColumnsAction')}
-                    />
-                    <TableActionsMenu
-                      name={t('miningTax.overviewTab')}
-                      tableExport={overviewExport}
-                    />
-                  </>
-                }
-              >
-                <div className="overflow-x-auto">
-                  <DataTable
-                    {...overviewExport.tableProps}
-                    columns={columns}
-                    rows={visibleRows}
-                    rowKey={(row) =>
-                      `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`
-                    }
-                    label={t('miningTax.overviewTab')}
-                    stackLayout="dense"
-                    {...overviewSort}
-                    onRowClick={(row) => setDetailRow(row)}
-                  />
+            {visibleRows.length === 0 ? (
+              <EmptyState
+                title={t('miningTax.overview.emptyTitle')}
+                hint={t('miningTax.overview.emptyHint')}
+              />
+            ) : (
+              <>
+                <p className="text-xs text-text-dim">
+                  {[basisSummary(t, basis, buybackRate), basisUsage(t, basis, daysBySource)]
+                    .filter(Boolean)
+                    .join(' ')}
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Panel>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('miningTax.overview.totalValueStat')}
+                    </p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      <IskAmount value={totals.rawValue} decimals={0} />
+                    </p>
+                    {showRefining && (
+                      <p className="text-[0.6875rem] text-text-dim">
+                        {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
+                        <IskAmount value={totals.refineValue} decimals={0} />
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('miningTax.overview.iskPerDayStat')}
+                    </p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {totals.iskPerDay !== null ? (
+                        <IskAmount value={totals.iskPerDay} decimals={0} />
+                      ) : (
+                        '—'
+                      )}
+                    </p>
+                    <p className="text-[0.6875rem] text-text-dim">
+                      {t('miningTax.overview.iskPerDayBasisHint')}
+                    </p>
+                  </Panel>
+                  <Panel>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('miningTax.overview.volumeStat')}
+                    </p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {volumeDisplayMode(totals.volume).kind === 'complete'
+                        ? `${formatVolume(totals.volume.m3)} m³`
+                        : volumeDisplayMode(totals.volume).kind === 'unknown'
+                          ? '—'
+                          : `≈ ${formatVolume(totals.volume.m3)} m³`}
+                    </p>
+                    {volumeDisplayMode(totals.volume).kind === 'partial' && (
+                      <p className="text-[0.6875rem] text-warning">
+                        {t('miningTax.overview.volumeStatWarning', {
+                          count: totals.volume.missingTypeIds.length,
+                        })}
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('miningTax.overview.daysMinedStat')}
+                    </p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {t('miningTax.overview.daysCoveredValue', {
+                        count: coverage.daysWithData,
+                        total: coverage.rangeDays,
+                      })}
+                    </p>
+                    {coverage.historyStartsInRange ? (
+                      <p className="text-[0.6875rem] text-warning">
+                        {t('miningTax.overview.historyStartsHint', {
+                          date: coverage.historyStartsInRange,
+                        })}
+                      </p>
+                    ) : (
+                      <p className="text-[0.6875rem] text-text-dim">
+                        {dateRangeLabel(totals.dates)}
+                      </p>
+                    )}
+                  </Panel>
                 </div>
-              </Panel>
-            </>
-          )}
-        </>
-      )}
 
-      {detailRow && (
-        <YieldDetailModal
-          open
-          onClose={() => setDetailRow(null)}
-          row={detailRow}
-          systemName={systemName(detailRow)}
-          systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
-          typeNames={data?.typeNames ?? new Map()}
-          typeVolumes={data?.typeVolumes ?? new Map()}
-          showRefining={showRefining}
-        />
-      )}
+                {/* The charts draw their own two cards. */}
+                <Suspense
+                  fallback={
+                    <Panel padded>
+                      <div className="flex justify-center py-8">
+                        <Spinner label={t('common.loading')} />
+                      </div>
+                    </Panel>
+                  }
+                >
+                  <LazyMiningYieldCharts
+                    metric={chartMetric}
+                    dailyRate={dailyRate}
+                    dailyVolume={dailyVolume}
+                    dailyCount={dailyCount}
+                    typeComparison={typeComparison}
+                    typeVolumeComparison={typeVolumeComparisonPoints}
+                    typeCountComparison={typeCountComparisonPoints}
+                    showRefining={showRefining}
+                  />
+                </Suspense>
+
+                <Panel
+                  padded={false}
+                  actions={
+                    <>
+                      <ColumnPickerMenu
+                        available={availableColumnIds}
+                        visible={activeColumnIds}
+                        columnsById={columnsById}
+                        onToggle={handleToggleColumn}
+                        onReset={handleResetColumns}
+                        buttonLabel={t('miningTax.overview.columnsButton')}
+                        menuTitle={t('miningTax.overview.columnsMenuTitle')}
+                        resetLabel={t('miningTax.overview.resetColumnsAction')}
+                      />
+                      <TableActionsMenu
+                        name={t('miningTax.overviewTab')}
+                        tableExport={overviewExport}
+                      />
+                    </>
+                  }
+                >
+                  <div className="overflow-x-auto">
+                    <DataTable
+                      {...overviewExport.tableProps}
+                      columns={columns}
+                      rows={visibleRows}
+                      rowKey={(row) =>
+                        `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`
+                      }
+                      label={t('miningTax.overviewTab')}
+                      stackLayout="dense"
+                      {...overviewSort}
+                      onRowClick={(row) => setDetailRow(row)}
+                    />
+                  </div>
+                </Panel>
+              </>
+            )}
+          </>
+        )}
+
+        {detailRow && (
+          <YieldDetailModal
+            open
+            onClose={() => setDetailRow(null)}
+            row={detailRow}
+            systemName={systemName(detailRow)}
+            systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
+            typeNames={data?.typeNames ?? new Map()}
+            typeVolumes={data?.typeVolumes ?? new Map()}
+            showRefining={showRefining}
+          />
+        )}
+      </TabPanel>
     </div>
   );
 }
