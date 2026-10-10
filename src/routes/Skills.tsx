@@ -7,7 +7,6 @@ import {
   Caret,
   DataAgeBadge,
   EmptyState,
-  PageHeader,
   Panel,
   SearchInput,
   SkillBar,
@@ -26,6 +25,7 @@ import {
 import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
+import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
@@ -366,8 +366,7 @@ export function Skills() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('nav.skills')}
+      <SkillsPageHeader
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
         actions={
           <>
