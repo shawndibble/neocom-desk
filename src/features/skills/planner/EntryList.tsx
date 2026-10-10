@@ -133,11 +133,14 @@ function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   const { t } = useTranslation();
   const label = attributePairLabel(primary, secondary);
   return (
-    <span
-      aria-label={t('plans.attributePairLabel', { pair: label })}
-      className="px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
-    >
-      {label}
+    <span className="px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase">
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">
+        {t('plans.attributePairFull', {
+          primary: t(`skills.attr.${primary}`),
+          secondary: t(`skills.attr.${secondary}`),
+        })}
+      </span>
     </span>
   );
 }
@@ -195,6 +198,7 @@ const PRIORITY_TONE: Record<PlanPriority, string> = {
 
 interface PriorityPillProps {
   skillTypeID: number;
+  /** The row's full label (name and level), so two levels of one skill get distinct names. */
   name: string;
   priority: PlanPriority;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
@@ -230,7 +234,7 @@ function PriorityPill({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={t('plans.priorityLabel', { name })}
+          aria-label={t('plans.priorityLabel', { priority: t(priorityLabelKey(priority)), name })}
           className={`group inline-flex items-center lg:scroll-mt-40 ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
           <span
@@ -495,7 +499,7 @@ const EntryRow = memo(function EntryRow({
   const priorityControl = columns.priority ? (
     <PriorityPill
       skillTypeID={entry.skillTypeID}
-      name={name}
+      name={rowLabel}
       priority={entry.priority ?? 'normal'}
       onSetPriority={onSetPriority}
       touchTarget={!isDesktop}
@@ -807,7 +811,7 @@ const MarkerRow = memo(function MarkerRow({
       <button
         type="button"
         {...handleProps}
-        aria-label={t('plans.reorderMarker')}
+        aria-label={t('plans.reorderMarker', { position: markerIndex + 1 })}
         className={GRIP_BUTTON}
       >
         <Icon.DragHandle />
@@ -826,6 +830,7 @@ const MarkerRow = memo(function MarkerRow({
           <button
             type="button"
             onClick={() => onEdit(markerIndex)}
+            aria-label={t('plans.markerEdit', { position: markerIndex + 1 })}
             className={entityLinkClassName(
               'font-semibold tracking-widest uppercase lg:scroll-mt-40'
             )}
@@ -838,7 +843,7 @@ const MarkerRow = memo(function MarkerRow({
       <button
         type="button"
         className={DANGER_ICON_BUTTON}
-        aria-label={t('plans.removeMarker')}
+        aria-label={t('plans.removeMarker', { position: markerIndex + 1 })}
         onClick={() => onRemove(markerIndex)}
       >
         <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />

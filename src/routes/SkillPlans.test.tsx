@@ -1135,7 +1135,7 @@ describe('SkillPlans editor: remap markers', () => {
     await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([4]));
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
 
-    await user.click(screen.getByRole('button', { name: 'Remove marker' }));
+    await user.click(screen.getByRole('button', { name: 'Remove remap marker 1' }));
     await waitFor(() => expect(screen.queryByText('Remap marker')).not.toBeInTheDocument());
     expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([]);
   });
@@ -1645,7 +1645,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(await screen.findByLabelText('Days')).toHaveValue('5');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
-    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
   });
 });
 
