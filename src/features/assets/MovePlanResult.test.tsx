@@ -12,6 +12,7 @@ const hull = {
   hullClass: 'Industrial',
   capacityM3: 100,
   owned: false,
+  canFly: true,
 };
 
 const plan = {
@@ -98,6 +99,7 @@ describe('PlanResult', () => {
   describe('Pack instead', () => {
     const shipPlan = {
       ...plan,
+      totals: { ...plan.totals, shipsToFly: 1 },
       perCharacter: [
         {
           ...plan.perCharacter[0],
@@ -138,12 +140,19 @@ describe('PlanResult', () => {
       return onPackShip;
     };
 
+    it('counts each flown ship as a trip on top of the hauls', () => {
+      setup(0);
+      expect(screen.getByText('2 hauls + 1 ship')).toBeTruthy();
+      expect(screen.getByText('trips').parentElement?.textContent).toBe('3trips');
+    });
+
     it('names each ship being flown beside the cargo trips', () => {
       setup(0);
       expect(screen.getByText('Fly Badger')).toBeTruthy();
     });
 
     it('still names the ship when nothing is hauled', () => {
+      // no hauler to suggest: the ship trips still head the plan
       const none = {
         ...shipPlan,
         totals: { ...shipPlan.totals, totalM3: 0, trips: null },
@@ -181,6 +190,7 @@ describe('PlanResult', () => {
         </MemoryRouter>
       );
       expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('1 ship')).toBeTruthy();
     });
 
     it('packs a ship with no rigs straight away', async () => {

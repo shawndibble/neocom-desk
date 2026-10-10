@@ -13,7 +13,7 @@ import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
-import { pickupHueVar, splitSegments, tripLanes, tripRuns } from './movePlanView';
+import { tripLanes, tripRuns } from './movePlanView';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
@@ -107,11 +107,12 @@ export function PlanResult({
   const { totals } = plan;
   const destinationLabel = destinationStation ?? systemName ?? '';
   const pickups = plan.perCharacter.flatMap((c) => c.pickups);
-  const segments = splitSegments(pickups.map((p, i) => ({ key: i, m3: p.totalM3 })));
   const capacity = plan.suggested?.hull.capacityM3 ?? 0;
   const lanes = tripLanes(totals.totalM3, capacity);
   /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
   const flown = pickups.flatMap((p) => p.ships);
+  /** Every flown ship is a trip of its own on top of the hauls. */
+  const withShips = (hauls: number) => hauls + totals.shipsToFly;
   const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
 
   return (
@@ -122,9 +123,9 @@ export function PlanResult({
       {plan.suggested ? (
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
           <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
-            {plan.suggested.trips}
+            {withShips(plan.suggested.trips)}
             <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
-              {t('assets.movePlan.tripsLabel', { count: plan.suggested.trips })}
+              {t('assets.movePlan.tripsLabel', { count: withShips(plan.suggested.trips) })}
             </small>
           </div>
           <p className="m-0 flex flex-wrap items-center gap-2 font-bold">
@@ -134,20 +135,44 @@ export function PlanResult({
                 {t('assets.movePlan.youOwnOne')}
               </span>
             )}
+            <span className="text-xs font-normal text-text-dim tabular-nums">
+              {[
+                t('assets.movePlan.haulCount', { count: plan.suggested.trips }),
+                totals.shipsToFly > 0 &&
+                  t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly }),
+              ]
+                .filter(Boolean)
+                .join(' + ')}
+            </span>
           </p>
           {alternatives.length > 0 && (
             <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-xs text-text-dim">
               {alternatives.slice(0, INLINE_ALTERNATIVES).map((o) => (
                 <li key={o.hull.typeId}>
                   <b className="font-semibold text-text">{o.hull.name}</b>{' '}
-                  {t('assets.movePlan.tripCount', { count: o.trips })}
+                  {t('assets.movePlan.tripCount', { count: withShips(o.trips) })}
                 </li>
               ))}
             </ul>
           )}
         </div>
       ) : (
-        totals.totalM3 > 0 && <p className="text-text-dim">{t('assets.movePlan.noHauler')}</p>
+        <>
+          {totals.shipsToFly > 0 && (
+            <div className="flex items-center gap-4 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
+              <div className="min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
+                {totals.shipsToFly}
+                <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
+                  {t('assets.movePlan.tripsLabel', { count: totals.shipsToFly })}
+                </small>
+              </div>
+              <span className="text-sm font-bold">
+                {t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly })}
+              </span>
+            </div>
+          )}
+          {totals.totalM3 > 0 && <p className="text-text-dim">{t('assets.movePlan.noHauler')}</p>}
+        </>
       )}
       {alternatives.length > INLINE_ALTERNATIVES && (
         <Disclosure
@@ -158,58 +183,30 @@ export function PlanResult({
           <ul className="text-text-dim">
             {plan.comparison.map((o) => (
               <li key={o.hull.typeId}>
-                {o.hull.name} · {t('assets.movePlan.tripCount', { count: o.trips })}
+                {o.hull.name} · {t('assets.movePlan.tripCount', { count: withShips(o.trips) })}
               </li>
             ))}
           </ul>
         </Disclosure>
       )}
-      {(segments.length > 0 || flown.length > 0) && (
+      {(lanes.length > 0 || flown.length > 0) && (
         <div className="flex flex-col gap-1.5">
-          {segments.length > 0 && (
-            <div
-              role="img"
-              aria-label={t('assets.movePlan.loadSplit')}
-              className="relative flex h-11 overflow-hidden rounded-xs border border-line"
-            >
-              {segments.map((s) => (
-                <i
-                  key={s.key}
-                  className="block h-full"
-                  style={{
-                    width: `${s.share * 100}%`,
-                    background: pickupHueVar(hueOf(pickups[s.key].locationId)),
-                  }}
-                />
-              ))}
-              {lanes.slice(0, -1).map((l) => (
-                <u
-                  key={l.trip}
-                  aria-hidden="true"
-                  className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
-                  style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
-                />
-              ))}
-            </div>
-          )}
-          {(lanes.length > 0 || flown.length > 0) && (
-            <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
-              {tripRuns(lanes).map((r) => (
-                <li key={r.from} className="tabular-nums">
-                  {r.from === r.to
-                    ? t('assets.movePlan.tripLane', { n: r.from })
-                    : t('assets.movePlan.tripRange', { from: r.from, to: r.to })}{' '}
-                  · {formatCubicMetres(r.m3)} m³
-                  {r.from === r.to ? '' : ` ${t('assets.movePlan.each')}`}
-                </li>
-              ))}
-              {flown.map((s) => (
-                <li key={s.itemId} className="font-semibold text-text">
-                  {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
-                </li>
-              ))}
-            </ul>
-          )}
+          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
+            {tripRuns(lanes).map((r) => (
+              <li key={r.from} className="tabular-nums">
+                {r.from === r.to
+                  ? t('assets.movePlan.tripLane', { n: r.from })
+                  : t('assets.movePlan.tripRange', { from: r.from, to: r.to })}{' '}
+                · {formatCubicMetres(r.m3)} m³
+                {r.from === r.to ? '' : ` ${t('assets.movePlan.each')}`}
+              </li>
+            ))}
+            {flown.map((s) => (
+              <li key={s.itemId} className="font-semibold text-text">
+                {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">

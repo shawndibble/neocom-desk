@@ -18,12 +18,13 @@ function asset(overrides: Partial<ConsolidationAsset> & Pick<ConsolidationAsset,
   } satisfies ConsolidationAsset;
 }
 
-const hull = (typeId: number, capacityM3: number, owned = false): MoveHull => ({
+const hull = (typeId: number, capacityM3: number, owned = false, canFly = true): MoveHull => ({
   typeId,
   name: `Hull ${typeId}`,
   hullClass: 'Industrial',
   capacityM3,
   owned,
+  canFly,
 });
 
 const HULLS = [hull(1, 5000), hull(2, 1000, true), hull(3, 1000), hull(4, 400)];
@@ -127,6 +128,17 @@ describe('planMove', () => {
       }),
     ]);
     expect(result.perCharacter).toEqual([]);
+  });
+
+  it('never suggests or compares a hull the pilot cannot fly', () => {
+    const hulls = [hull(1, 5000, false, false), hull(4, 400)];
+    const result = plan([asset({ itemId: 1, typeId: 35, quantity: 600 })], hulls); // 1200 m3
+    expect(result.suggested?.hull.typeId).toBe(4);
+    expect(result.comparison.map((o) => o.hull.typeId)).toEqual([4]);
+    expect(
+      plan([asset({ itemId: 1, typeId: 35, quantity: 600 })], [hull(1, 5000, false, false)])
+        .suggested
+    ).toBeNull();
   });
 
   it('hauls a ship packed instead as cargo at its packaged volume', () => {

@@ -17,7 +17,7 @@ import { hullCargoHolds } from '@/features/market/haulingCargo';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { formatCubicMetres } from '@/lib/volume';
-import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
+import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
 import { PlanResult, type PlanState } from './MovePlanResult';
 import {
@@ -259,20 +259,23 @@ export function MovePlanTab({ onClose, characterIds, activeCharacterId }: MovePl
     const owned = new Set(
       loaded.sources.flatMap((s) => s.assets.filter((a) => a.is_singleton).map((a) => a.type_id))
     );
-    return haulers.flatMap((h) => {
-      const capacityM3 = hullCapacity.current.get(h.typeId);
-      return capacityM3
-        ? [
-            {
-              typeId: h.typeId,
-              name: h.name,
-              hullClass: h.group,
-              capacityM3,
-              owned: owned.has(h.typeId),
-            },
-          ]
-        : [];
-    });
+    const sized = haulers.filter((h) => hullCapacity.current.get(h.typeId));
+    // From the bundled ship tree, so no ESI call per hauler; a hull it lacks counts as flyable.
+    const tree = await loadShipTree().catch(() => null);
+    const required = new Map(tree?.ships.map((ship) => [ship.typeID, ship.required]));
+    const flyable = sized.map((h) =>
+      (required.get(h.typeId) ?? []).every(
+        (r) => (profile.skillLevels.get(r.skillTypeID) ?? 0) >= r.level
+      )
+    );
+    return sized.map((h, i) => ({
+      typeId: h.typeId,
+      name: h.name,
+      hullClass: h.group,
+      capacityM3: hullCapacity.current.get(h.typeId)!,
+      owned: owned.has(h.typeId),
+      canFly: flyable[i],
+    }));
   }
 
   async function showPlan() {
