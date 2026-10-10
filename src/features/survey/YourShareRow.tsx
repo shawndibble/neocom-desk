@@ -47,7 +47,7 @@ function SystemField({
   }
 
   return (
-    <span className="flex flex-wrap items-center gap-2">
+    <span data-system-field className="flex flex-wrap items-center gap-2">
       {suggestions.length > 0 && (
         <span
           className="flex flex-wrap items-center gap-1"
@@ -142,9 +142,11 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
           suggestions={suggestions}
           autoFocus
           onDone={() => {
+            // Focus left the field already (Tab, click away): leave it where the user put it.
+            const inField = document.activeElement?.closest('[data-system-field]') != null;
             setChanging(false);
             // The field unmounts: hand focus back to "Change system".
-            focusAfterCommit(changeButton);
+            if (inField) focusAfterCommit(changeButton);
           }}
         />
       ) : (
