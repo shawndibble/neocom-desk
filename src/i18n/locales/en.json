@@ -4026,6 +4026,17 @@
     "loadFailed": "Couldn't load this survey. It will retry.",
     "emptyTitle": "No survey yet",
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
+    "howTo": {
+      "title": "How to copy a scan",
+      "menuAlt": "The Mining Surveyor icon and its right-click menu, with Open Scan Results Window highlighted.",
+      "resultsAlt": "The Mining Survey Results window: the Scan button below a list of ores, each expanded.",
+      "openMenu": "Right-click the Mining Surveyor icon.",
+      "openResults": "Choose Open Scan Results Window.",
+      "scan": "Click Scan in the new window.",
+      "expand": "Expand every ore, so all its rocks are listed.",
+      "copy": "Click in the list, press Ctrl+A to select everything, then Ctrl+C to copy.",
+      "paste": "Come back here and press Ctrl+V."
+    },
     "minedPercent": "{{percent}}% mined",
     "seenOf": "of {{volume}} m³ seen",
     "statLeft": "m³ left",
