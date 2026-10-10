@@ -25,10 +25,21 @@
  */
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { tabDomId } from '@/components/ui/tabPanel';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { CharacterAvatar, EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
+import {
+  CharacterAvatar,
+  EmptyState,
+  Modal,
+  Spinner,
+  TabPanel,
+  Tabs,
+  useTabsId,
+  type TabItem,
+} from '@/components/ui';
 import { isNpcCharacterId } from '@/esi/entityIds';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
@@ -64,6 +75,7 @@ const IDLE: TabState<never> = { status: 'idle' };
 
 export function PublicInfoModal() {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
   const clear = usePublicInfoModalStore((state) => state.clear);
@@ -71,6 +83,12 @@ export function PublicInfoModal() {
   const shownPathname = useRef(pathname);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
+  const focusAfterCommit = useFocusAfterCommit();
+  // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
+  const openTab = (id: PublicInfoKind) => {
+    setActiveTab(id);
+    focusAfterCommit(() => document.getElementById(tabDomId(tabsId, id)));
+  };
   const [character, setCharacter] = useState<CharacterState>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
@@ -169,6 +187,7 @@ export function PublicInfoModal() {
       <div className="space-y-3">
         {tabs.length > 0 && (
           <Tabs
+            tabsId={tabsId}
             tabs={tabs}
             value={activeTab}
             onChange={(id) => setActiveTab(id as PublicInfoKind | 'employment')}
@@ -176,35 +195,37 @@ export function PublicInfoModal() {
           />
         )}
 
-        {activeTab === 'character' && (
-          <CharacterTab
-            state={character}
-            npc={npcCharacter}
-            corporation={corporation}
-            onOpenCorporation={() => setActiveTab('corporation')}
-            onOpenAlliance={() => setActiveTab('alliance')}
-          />
-        )}
-        {activeTab === 'corporation' && (
-          <CorporationTab
-            state={corporation}
-            allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
-            allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
-            onOpenAlliance={alliance.status !== 'idle' ? () => setActiveTab('alliance') : undefined}
-          />
-        )}
-        {activeTab === 'alliance' && <AllianceTab state={alliance} />}
-        {activeTab === 'employment' && (
-          <Suspense
-            fallback={
-              <div className="flex justify-center py-8">
-                <Spinner label={t('common.loading')} />
-              </div>
-            }
-          >
-            <LazyEmploymentTab characterId={request.id} />
-          </Suspense>
-        )}
+        <TabPanel tabsId={tabsId} tabId={activeTab}>
+          {activeTab === 'character' && (
+            <CharacterTab
+              state={character}
+              npc={npcCharacter}
+              corporation={corporation}
+              onOpenCorporation={() => openTab('corporation')}
+              onOpenAlliance={() => openTab('alliance')}
+            />
+          )}
+          {activeTab === 'corporation' && (
+            <CorporationTab
+              state={corporation}
+              allianceId={character.status === 'ready' ? character.data.allianceId : undefined}
+              allianceName={alliance.status === 'ready' ? alliance.data.name : undefined}
+              onOpenAlliance={alliance.status !== 'idle' ? () => openTab('alliance') : undefined}
+            />
+          )}
+          {activeTab === 'alliance' && <AllianceTab state={alliance} />}
+          {activeTab === 'employment' && (
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              }
+            >
+              <LazyEmploymentTab characterId={request.id} />
+            </Suspense>
+          )}
+        </TabPanel>
       </div>
     </Modal>
   );

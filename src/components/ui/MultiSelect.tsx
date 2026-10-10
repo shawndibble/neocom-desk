@@ -6,8 +6,10 @@ import {
   type MultiSelectGroup,
   type MultiSelectOption,
 } from '@/lib/multiSelectSearch';
+import { LiveStatus } from './LiveStatus';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
+import { activeOptionClassName } from './controlStyles';
 import { menuItemClassName } from './menuStyles';
 
 export type { MultiSelectGroup, MultiSelectOption };
@@ -21,6 +23,8 @@ export interface MultiSelectProps<Id> {
   groups?: readonly MultiSelectGroup<Id>[];
   selected: ReadonlySet<Id>;
   onToggle: (id: Id) => void;
+  /** Names the popover dialog and its listbox. */
+  label: string;
   searchPlaceholder: string;
   noResultsLabel: string;
   /**
@@ -52,6 +56,7 @@ export function MultiSelect<Id>({
   groups,
   selected,
   onToggle,
+  label,
   searchPlaceholder,
   noResultsLabel,
   extraContent,
@@ -106,7 +111,7 @@ export function MultiSelect<Id>({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent className={cx('w-64 p-0', contentClassName)}>
+      <PopoverContent aria-label={label} className={cx('w-64 p-0', contentClassName)}>
         {typeof extraContent === 'function' ? extraContent(() => setOpen(false)) : extraContent}
         <div className="p-1">
           <SearchInput
@@ -128,10 +133,15 @@ export function MultiSelect<Id>({
         <div
           id={listId}
           role="listbox"
+          aria-label={label}
           aria-multiselectable="true"
           className="max-h-64 overflow-y-auto p-1"
         >
-          {!hasResults && <p className="px-2 py-1.5 text-sm text-text-dim">{noResultsLabel}</p>}
+          {!hasResults && (
+            <p aria-hidden="true" className="px-2 py-1.5 text-sm text-text-dim">
+              {noResultsLabel}
+            </p>
+          )}
           {filteredGroups.map((group) => (
             <div key={group.label}>
               {group.label && (
@@ -148,7 +158,10 @@ export function MultiSelect<Id>({
                     id={`${listId}-${index}`}
                     role="option"
                     aria-selected={checked}
-                    className={cx(menuItemClassName, index === highlight && 'bg-panel-2')}
+                    className={cx(
+                      menuItemClassName,
+                      index === highlight && `bg-panel-2 ${activeOptionClassName}`
+                    )}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onToggle(option.id)}
                   >
@@ -163,6 +176,7 @@ export function MultiSelect<Id>({
             </div>
           ))}
         </div>
+        <LiveStatus>{!hasResults && noResultsLabel}</LiveStatus>
       </PopoverContent>
     </Popover>
   );

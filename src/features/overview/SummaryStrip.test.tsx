@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { SummaryStrip, type SummaryStripProps } from './SummaryStrip';
@@ -60,5 +61,27 @@ describe('SummaryStrip cached-data line', () => {
   it('renders nothing when the data is fresh', () => {
     renderStrip({ fetchedAt: new Date(now), now });
     expect(screen.queryByText(/Showing cached data/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SummaryStrip refresh', () => {
+  it('stays focused and focusable while refreshing, and ignores clicks', async () => {
+    const onRefresh = vi.fn();
+    const { rerender } = renderStrip({ onRefresh });
+    const refresh = screen.getByRole('button', { name: 'Refresh the board' });
+    refresh.focus();
+
+    rerender(
+      <MemoryRouter>
+        <SummaryStrip {...BASE_PROPS} onRefresh={onRefresh} refreshing />
+      </MemoryRouter>
+    );
+    const busy = screen.getByRole('button', { name: 'Refresh the board' });
+    expect(busy).toHaveFocus();
+    expect(busy).toHaveAttribute('aria-disabled', 'true');
+    expect(busy).not.toBeDisabled();
+
+    await userEvent.click(busy);
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 });

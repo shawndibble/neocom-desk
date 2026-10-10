@@ -1160,7 +1160,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
                 {suggestions.length > 0 && (
                   <div className="border-b border-line bg-panel-2 px-3 py-2">
-                    <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                    <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                       {t('contractSearch.suggestionsHeading')}
                     </p>
                     <ul

@@ -127,7 +127,8 @@ describe('Layout sync status dot', () => {
   it('is hidden when sync is unconfigured', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The shell's always-mounted notice regions exist but stay empty.
+    for (const region of screen.getAllByRole('status')) expect(region).toBeEmptyDOMElement();
   });
 
   it('is shown, subscribed to sync status, when sync is configured', () => {
@@ -151,7 +152,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
       within(mobileNav)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['Overview', 'Alerts', 'Skills', 'Industry']);
+    ).toEqual(['Overview', 'Skills', 'Industry', 'Market']);
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
@@ -181,7 +182,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
-  it('orders the sheet to match the desktop rail: PI, Market, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
+  it('orders the sheet to match the desktop rail: PI, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -190,19 +191,10 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // Alerts lives in the primary tab bar, not the sheet.
+    // Alerts is the header bell's, in neither the bar nor the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Alerts' })).not.toBeInTheDocument();
 
-    const labels = [
-      'PI',
-      'Market',
-      'Wallet',
-      'Assets',
-      'Contracts',
-      'Mail',
-      'Calendar',
-      'Contacts',
-    ];
+    const labels = ['PI', 'Wallet', 'Assets', 'Contracts', 'Mail', 'Calendar', 'Contacts'];
     const links = labels.map((label) => within(sheet).getByRole('link', { name: label }));
     for (let i = 1; i < links.length; i++) {
       expect(
@@ -416,7 +408,9 @@ describe('Layout desktop rail domain grouping', () => {
     const rail = screen.getByRole('navigation', { name: 'Main navigation' });
     // A page row is its link (the caret beside it is a button); the last child
     // is the rail editor's button, not a page.
+    // Each labelled group wraps its pages in a role=group div: flatten those.
     const items = Array.from(rail.children)
+      .flatMap((el) => (el.getAttribute('role') === 'group' ? Array.from(el.children) : [el]))
       .filter((el) => el.tagName !== 'BUTTON')
       .map((el) =>
         el.tagName === 'P'
@@ -945,7 +939,7 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
     // Everything the default bar held, bar Overview — which is still a tab.
-    for (const evicted of ['Alerts', 'Skills', 'Industry']) {
+    for (const evicted of ['Skills', 'Industry', 'Market']) {
       expect(within(sheet).getByRole('link', { name: evicted })).toBeInTheDocument();
     }
     // And nothing is in both places at once.
@@ -1051,7 +1045,7 @@ describe('Layout Characters switch carries the page it started from (#1764)', ()
 
   it('a tab-bar entry for Characters (once chosen) passes the page it was opened from', async () => {
     useMobileTabs.setState({
-      value: ['/characters', '/alerts', '/skills', '/industry'],
+      value: ['/characters', '/mail', '/skills', '/industry'],
       hydrated: true,
     });
     const user = userEvent.setup();

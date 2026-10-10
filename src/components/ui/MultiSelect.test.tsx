@@ -34,6 +34,7 @@ describe('MultiSelect', () => {
   it('lists every flat option, selected per the current set', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set([1])}
@@ -51,6 +52,7 @@ describe('MultiSelect', () => {
     const onToggle = vi.fn();
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -67,6 +69,7 @@ describe('MultiSelect', () => {
   it('typing in the search box narrows the visible options by label', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -85,6 +88,7 @@ describe('MultiSelect', () => {
   it('clearing the search box restores the full list', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -105,6 +109,7 @@ describe('MultiSelect', () => {
   it('shows the no-results label when nothing matches', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -115,12 +120,13 @@ describe('MultiSelect', () => {
     );
     const user = await openMenu();
     await user.type(screen.getByPlaceholderText('Search'), 'zzz');
-    expect(screen.getByText('No matches')).toBeInTheDocument();
+    expect(screen.getByText('No matches', { selector: 'p' })).toBeInTheDocument();
   });
 
   it('renders grouped options under their group label, hiding a group with zero matches', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         groups={GROUPS}
         selected={new Set()}
@@ -141,6 +147,7 @@ describe('MultiSelect', () => {
   it('renders extraContent above the search box', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -157,6 +164,7 @@ describe('MultiSelect', () => {
   it('gives a function extraContent a close callback that dismisses the popover', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -174,6 +182,7 @@ describe('MultiSelect', () => {
   it('does not close the popover when an option is toggled', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -191,6 +200,7 @@ describe('MultiSelect', () => {
     const onToggle = vi.fn();
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -206,6 +216,13 @@ describe('MultiSelect', () => {
       'id',
       search.getAttribute('aria-activedescendant')
     );
+    // The active option carries the keyboard-only ring cue; its neighbours don't.
+    expect([...screen.getByRole('option', { name: 'Bob' }).classList]).toContain(
+      'in-data-[input=keyboard]:outline-accent'
+    );
+    expect([...screen.getByRole('option', { name: 'Alice' }).classList]).not.toContain(
+      'in-data-[input=keyboard]:outline-accent'
+    );
     await user.type(search, '{Enter}');
     expect(onToggle).toHaveBeenCalledWith(2);
     expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
@@ -214,6 +231,7 @@ describe('MultiSelect', () => {
   it('wraps from the last option back to the first with ArrowDown', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -234,6 +252,7 @@ describe('MultiSelect', () => {
   it('resets the highlight when the search query changes', async () => {
     render(
       <MultiSelect
+        label="People"
         trigger={<button>Open</button>}
         options={OPTIONS}
         selected={new Set()}
@@ -253,5 +272,43 @@ describe('MultiSelect', () => {
       'id',
       search.getAttribute('aria-activedescendant')
     );
+  });
+
+  it('names the dialog and listbox', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        trigger={<button>Open</button>}
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    await openMenu();
+    expect(screen.getByRole('dialog', { name: 'People' })).toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: 'People' })).toBeInTheDocument();
+  });
+
+  it('announces no results through a status and hides the visible copy', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        trigger={<button>Open</button>}
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await user.type(screen.getByPlaceholderText('Search'), 'zzzz');
+    expect(await screen.findByRole('status')).toHaveTextContent('No matches');
+    const list = screen.getByRole('listbox');
+    expect(list.children).toHaveLength(1);
+    expect(list.children[0]).toHaveAttribute('aria-hidden', 'true');
   });
 });

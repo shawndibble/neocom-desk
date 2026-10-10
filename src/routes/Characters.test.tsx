@@ -769,9 +769,13 @@ describe('Characters', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Remove' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
+    // findAll: Toast renders its message twice (visible span + live region), and
+    // the live region fills in a beat later — `findByText` throws on the
+    // two-match state and never recovers while the toast stays up.
     expect(
-      await screen.findByText('Could not remove Pilot One. Nothing was deleted — try again.')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('Could not remove Pilot One. Nothing was deleted — try again.'))
+        .length
+    ).toBeGreaterThan(0);
     expect(screen.getByText('Pilot One')).toBeInTheDocument();
   });
 
@@ -1135,7 +1139,7 @@ describe('Characters table view', () => {
 
   it('Refresh all updates the Last synced cell per character as soon as that character finishes, before the roster does (#1907)', async () => {
     const user = userEvent.setup();
-    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const threeHoursAgo = new Date(Date.now() - 3.5 * 60 * 60 * 1000);
     const queueAt = (fetchedAt: Date): RosterEntry['queue'] => ({
       data: [],
       fetchedAt,
