@@ -439,6 +439,8 @@
         "cargo": "cargo hold"
       },
       "searchLabel": "Search items to add",
+      "added": "Added {{name}} to {{slot}}",
+      "addedDrone": "Added {{name}} to the drone bay",
       "searchPlaceholder": "Search modules, rigs, drones…",
       "fitsSlot": "Fits this slot",
       "fitsSlotTooltip": "Only items that go in the slot you picked. Pick an empty slot to use it.",
@@ -1367,6 +1369,7 @@
       "differencesOnly": "Show differences only",
       "pagePrev": "Previous",
       "pageNext": "Next",
+      "pageStatus": "Fittings {{from}}–{{to}} of {{count}}",
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
       "canFlyUnknown": "Skills unknown",
