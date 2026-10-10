@@ -54,6 +54,9 @@ import { upcomingCommittedEvents } from '@/engine/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
+import type { StockRow } from '@/engine/stockTargets/stockRows';
+import { StockStatusPill } from '@/features/stockTargets/StockStatus';
+import { stockBoardSeverity, type StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { CorpBoardItem } from '@/engine/corp/board';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import {
@@ -730,6 +733,83 @@ export function PriceAlertsCard({
               />
             ))}
           </ul>
+        </>
+      )}
+    </BoardCard>
+  );
+}
+
+// --- Stock -----------------------------------------------------------------
+
+/**
+ * The last-viewed Stock List's Out and Low counts, its cost to fill and its
+ * worst items (issue #3521). Absent from the board, and from the edit menu,
+ * until the pilot has a Stock List.
+ */
+const STOCK_TARGETS_PATH = '/assets/targets';
+
+export function StockCard({ data }: { data: StockBoardData | null }) {
+  const { t } = useTranslation();
+  const short = data?.rows.filter((row) => row.shortfall > 0).slice(0, ROW_LIMIT) ?? [];
+  const nameOf = (row: StockRow) => data?.names.get(row.typeId) ?? `#${row.typeId}`;
+  return (
+    <BoardCard
+      title={
+        data ? t('overview.board.stockFor', { list: data.listName }) : t('overview.board.stock')
+      }
+      meta={<SeverityWord severity={stockBoardSeverity(data)} />}
+      to={STOCK_TARGETS_PATH}
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : !data.counted
+            ? t('overview.board.stockNotCounted')
+            : t('overview.board.stockCostToFill', {
+                isk: formatIskCompact(data.summary.costToFill),
+              })
+      }
+    >
+      {data === null || !data.counted ? (
+        <CardEmpty>{t('overview.board.checking')}</CardEmpty>
+      ) : (
+        <>
+          <TileRow>
+            <NumberTile
+              label={t('overview.board.stockOut')}
+              value={data.summary.out}
+              severity="warning"
+            />
+            <NumberTile
+              label={t('overview.board.stockLow')}
+              value={data.summary.low}
+              severity="watch"
+            />
+          </TileRow>
+          {short.length === 0 ? (
+            <CardEmpty>{t('overview.board.stockAllStocked')}</CardEmpty>
+          ) : (
+            <ul>
+              {short.map((row) => (
+                <TriageRow
+                  key={row.typeId}
+                  severity={row.status === 'out' ? 'warning' : 'watch'}
+                  when={<StockStatusPill status={row.status} />}
+                  whenLabel={t(`stockTargets.status.${row.status}`)}
+                  subject={nameOf(row)}
+                  detail={t('overview.board.stockRowDetail', {
+                    onHand: row.onHand.toLocaleString(),
+                    target: row.target.toLocaleString(),
+                  })}
+                  detailLabel={t('overview.board.stockRowDetail', {
+                    onHand: row.onHand.toLocaleString(),
+                    target: row.target.toLocaleString(),
+                  })}
+                  to={STOCK_TARGETS_PATH}
+                />
+              ))}
+            </ul>
+          )}
         </>
       )}
     </BoardCard>

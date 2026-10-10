@@ -26,6 +26,7 @@ export const OVERVIEW_CARD_KEYS = [
   'spExtraction',
   'mail',
   'priceAlerts',
+  'stock',
   'alerts',
 ] as const;
 
@@ -47,6 +48,7 @@ export const OVERVIEW_CARD_LABEL: Record<OverviewCardKey, string> = {
   spExtraction: 'overview.board.spExtraction',
   mail: 'overview.board.mail',
   priceAlerts: 'overview.board.priceAlerts',
+  stock: 'overview.board.stock',
   alerts: 'overview.board.alerts',
 };
 
