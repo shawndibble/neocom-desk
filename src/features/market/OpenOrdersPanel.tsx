@@ -1051,7 +1051,7 @@ export function OpenOrdersPanel() {
           </LiveStatus>
 
           {matchCountVisible && (
-            <p className="px-3 pt-2 text-xs text-text-dim">
+            <p aria-hidden="true" className="px-3 pt-2 text-xs text-text-dim">
               {t('market.orders.filter.matchCount', {
                 count: visibleRows.length,
                 total: allRows.length,

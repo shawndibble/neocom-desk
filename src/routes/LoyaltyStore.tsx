@@ -778,7 +778,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             <LiveStatus>
               {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
             </LiveStatus>
-            <span className="hidden text-xs tabular-nums md:inline">
+            <span aria-hidden="true" className="hidden text-xs tabular-nums md:inline">
               {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
             </span>
             <span data-testid="lp-basis-readout" className="min-w-0 truncate">
