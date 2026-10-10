@@ -163,7 +163,7 @@ describe('HaulingPanel trip summary', () => {
   it('select all in the summary row unticks and reticks every row', async () => {
     const user = userEvent.setup();
     renderPanel();
-    const all = screen.getByRole('checkbox', { name: 'Select all' });
+    const all = screen.getByRole('checkbox', { name: /select all.*[0-9]+ of [0-9]+/i });
     const row = screen.getByRole('checkbox', { name: /Include Damage Control II/ });
     expect(all).toBeChecked();
     await user.click(all);

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { panelDomId, tabDomId, useTabPanelProps } from './tabPanel';
 import {
   tabItemActiveClassName,
   tabItemClassName,
@@ -13,12 +14,32 @@ export interface TabItem {
   label: string;
 }
 
+interface TabPanelProps {
+  tabsId: string;
+  /** The selected tab this panel shows. */
+  tabId: string;
+  className?: string;
+  children: ReactNode;
+}
+
+/** The content region for the selected tab of a `Tabs` bar. */
+export function TabPanel({ tabsId, tabId, className, children }: TabPanelProps) {
+  const { className: ring, ...rest } = useTabPanelProps(tabsId, tabId);
+  return (
+    <div {...rest} className={cx(ring, className)}>
+      {children}
+    </div>
+  );
+}
+
 interface TabsProps {
+  /** Shared id base from `useTabsId`, also given to the tab's panel. */
+  tabsId: string;
   tabs: TabItem[];
   value: string;
   onChange: (id: string) => void;
   /** Accessible name for the tablist. */
-  label?: string;
+  label: string;
   className?: string;
   /**
    * `'manual'`: arrow keys only move focus, Enter/Space selects (native
@@ -36,6 +57,7 @@ interface TabsProps {
  * tablist itself.
  */
 export function Tabs({
+  tabsId,
   tabs,
   value,
   onChange,
@@ -101,8 +123,11 @@ export function Tabs({
               key={tab.id}
               type="button"
               role="tab"
+              id={tabDomId(tabsId, tab.id)}
               data-tab-id={tab.id}
               aria-selected={active}
+              // Only the selected tab has a rendered panel; elsewhere the id would dangle.
+              aria-controls={active ? panelDomId(tabsId, tab.id) : undefined}
               tabIndex={tab.id === focusedId ? 0 : -1}
               onClick={() => {
                 if (activation === 'manual') setManualFocusId(tab.id);

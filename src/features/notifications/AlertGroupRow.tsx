@@ -198,6 +198,9 @@ function AlertFireRow({
       solve the same layout problem but reintroduce the bug above; `order`
       repositions one.
 
+      The body link is first in the DOM so it is the row's first Tab stop and
+      the first thing read; `order-*` alone supplies the visual order above.
+
       The body is never clamped: `line-clamp-2` used to share an element with
       this row's own vertical padding, and `overflow: hidden` clips at the
       *padding* box — a sliver of a clipped third line rendered inside that
@@ -207,6 +210,22 @@ function AlertFireRow({
       row has the width to spare instead.
     */
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-nowrap">
+      <Link
+        to={notificationUrlForSubject(
+          entry.eventId,
+          entry.subjectId ?? entry.typeId,
+          entry.characterId
+        )}
+        // Deliberate §6c deviation: no › caret. The dismiss × is the row's one trailing control and the body text is the link.
+        // Body text stays dim (a feed of accent sentences would drown the cues that matter); it underlines on hover.
+        className={cx(
+          'order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',
+          interactiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        <span className="min-w-0 flex-1 sm:truncate">{body}</span>
+      </Link>
       {pillName !== null && (
         <CharacterLink
           id={entry.characterId}
@@ -232,22 +251,6 @@ function AlertFireRow({
           className="order-2 sm:order-3"
         />
       )}
-      <Link
-        to={notificationUrlForSubject(
-          entry.eventId,
-          entry.subjectId ?? entry.typeId,
-          entry.characterId
-        )}
-        // Deliberate §6c deviation: no › caret. The dismiss × is the row's one trailing control and the body text is the link.
-        // Body text stays dim (a feed of accent sentences would drown the cues that matter); it underlines on hover.
-        className={cx(
-          'order-4 flex min-w-0 basis-full items-center gap-1 rounded-xs text-xs text-text-dim hover:text-text hover:underline sm:order-1 sm:flex-1 sm:basis-auto',
-          interactiveClassName,
-          focusRingInsetClassName
-        )}
-      >
-        <span className="min-w-0 flex-1 sm:truncate">{body}</span>
-      </Link>
       <IconButton
         ref={dismissRef}
         icon={<Icon.Close />}

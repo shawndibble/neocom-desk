@@ -8,18 +8,6 @@ export async function loginAndSelectCharacter(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   // A first-ever login has one Character, so /callback skips the list (#1771).
   await page.waitForURL(/\/overview$/);
-  await answerRailQuestion(page);
-}
-
-/** Ticks every activity in the rail's first-run question, which shows every page. */
-export async function answerRailQuestion(page: Page): Promise<void> {
-  // The question covers the page; every activity ticked leaves the rail whole,
-  // so specs keep finding the pages they were written for.
-  const question = page.getByRole('dialog', { name: 'What do you do in EVE?' });
-  await question.waitFor();
-  for (const box of await question.getByRole('checkbox').all()) await box.check();
-  await question.getByRole('button', { name: 'Start' }).click();
-  await question.waitFor({ state: 'hidden' });
 }
 
 /**
