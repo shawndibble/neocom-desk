@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BuildPlanCompare } from './BuildPlanCompare';
+import { useCompareHub } from './compareColumns';
 import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 import type { BuildPlanRecord } from '@/db';
@@ -236,14 +237,39 @@ describe('BuildPlanCompare', () => {
     // 300 orders on one day of the 30-day window.
     expect(await screen.findByText('10')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Orders per day/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: /Buy orders at hub/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Buy orders/ })).toBeInTheDocument();
     // The extras start unticked.
-    expect(screen.queryByRole('columnheader', { name: /Sell orders at hub/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /Sell orders/ })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
-    await userEvent.click(
-      await screen.findByRole('menuitemcheckbox', { name: 'Sell orders at hub' })
-    );
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Sell orders' }));
     expect(await screen.findByText('44')).toBeInTheDocument();
+  });
+
+  it('always shows the hub picker, even with every hub column unticked', async () => {
+    renderCompare([row({ planId: 'a', result: RESULT })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    for (const name of [
+      'Orders per day',
+      'Buy orders',
+      'Sell orders',
+      'Units on buy orders',
+      'Units on sell orders',
+    ]) {
+      const item = await screen.findByRole('menuitemcheckbox', { name });
+      if (item.getAttribute('aria-checked') === 'true') await userEvent.click(item);
+    }
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('combobox', { name: 'Market hub' })).toBeInTheDocument();
+  });
+
+  it('prices every plan at the picked hub, not only the hub order columns', async () => {
+    await useCompareHub.getState().setValue('amarr');
+    renderCompare([row({ planId: 'a', result: RESULT })]);
+    await waitFor(() => {
+      const last = mockedUseComparedBuildResults.mock.calls.at(-1)?.[0];
+      expect(last?.plans.map((p) => p.hubId)).toEqual(['amarr']);
+    });
+    await useCompareHub.getState().setValue('plan');
   });
 });
