@@ -240,8 +240,10 @@ export interface OrderSideCardProps {
   side: BookSide;
   /** Rows on screen: the side's best-first list, capped until "Show all". */
   rows: readonly RegionOrder[];
-  /** Every order on this side, for the heading and "Show all". */
+  /** Every order on this side the table can show, for the heading and "Show all". */
   total: number;
+  /** Orders a filter keeps out of the table (Hide bait sells), stated so the book never silently loses rows. */
+  hiddenCount?: number;
   best: number | null;
   columns: readonly DataTableColumn<RegionOrder>[];
   availableColumns: readonly MarketOrderColumnId[];
@@ -268,6 +270,7 @@ export function OrderSideCard({
   side,
   rows,
   total,
+  hiddenCount = 0,
   best,
   columns,
   availableColumns,
@@ -312,6 +315,12 @@ export function OrderSideCard({
                   price: formatMarketIsk(best),
                 })}
           </span>
+          {/* Every width, unlike the summary: a phone loses the rows too. */}
+          {hiddenCount > 0 && (
+            <span className="text-xs text-text-dim tabular-nums">
+              {t('market.sideSummary.baitHidden', { count: hiddenCount })}
+            </span>
+          )}
         </div>
         <span className="flex items-center gap-1">
           {/* As a card, the same picks choose what the card carries. */}

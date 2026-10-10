@@ -52,13 +52,26 @@ export const SELL_OUTLIER_FACTOR = 10;
 
 /**
  * How many times the best sell a bait-priced sell order asks — 567,100,000
- * against a 550,000 book — or `null` for an ordinary order. Flagged, never
- * hidden: the row stays in the book, it just stops reading as a real price.
+ * against a 550,000 book — or `null` for an ordinary order. Flagged by
+ * default: the row stays in the book, it just stops reading as a real price,
+ * unless the pilot opts into hiding it (`withoutBaitSells`).
  */
 export function sellOutlierMultiple(price: number, bestSell: number | null): number | null {
   if (bestSell === null || bestSell <= 0) return null;
   const multiple = price / bestSell;
   return multiple >= SELL_OUTLIER_FACTOR ? multiple : null;
+}
+
+/**
+ * The sell side without the orders `sellOutlierMultiple` flags as bait, in the
+ * order given — the Market Browser's opt-in "Hide bait sells". Display only:
+ * depth and best prices still come from the whole book. Returns a copy.
+ */
+export function withoutBaitSells<T extends { price: number }>(
+  sell: readonly T[],
+  bestSell: number | null
+): T[] {
+  return sell.filter((o) => sellOutlierMultiple(o.price, bestSell) === null);
 }
 
 export interface PriceComparison {

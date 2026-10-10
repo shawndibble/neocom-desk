@@ -52,7 +52,12 @@ import {
 import { getVariationRows, type VariationsResult } from '@/features/market/variations';
 import { resolveOrderLocation, type OrderBookSummary } from '@/engine/market/orderBook';
 import type { VariationIndex } from '@/engine/market/variations';
-import { bookDepth, sortBookSide, type DepthAt } from '@/engine/market/orderBookDepth';
+import {
+  bookDepth,
+  sortBookSide,
+  withoutBaitSells,
+  type DepthAt,
+} from '@/engine/market/orderBookDepth';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketLocationParam } from '@/engine/market/urlState';
@@ -92,6 +97,7 @@ const BROWSER_FILTER_PARAMS = {
   'browser.sec': enumSetParam(SPACE_KINDS),
   'browser.minQty': intParam(0, { min: 0 }),
   'browser.npcOnly': boolParam(),
+  'browser.hideBait': boolParam(),
 };
 
 export interface BrowserFilterValue {
@@ -99,6 +105,7 @@ export interface BrowserFilterValue {
   sec: ReadonlySet<SpaceKind>;
   minQty: number;
   npcOnly: boolean;
+  hideBait: boolean;
 }
 
 export interface UseOrderBookOrchestrationArgs {
@@ -155,6 +162,14 @@ export interface OrderBookOrchestration {
   /** Best-first, a price tie broken by distance from the Current System (`sortBookSide`). */
   sortedSell: readonly RegionOrder[];
   sortedBuy: readonly RegionOrder[];
+  /**
+   * `sortedSell` as the table shows it: without bait sells when Hide bait
+   * sells is on (`withoutBaitSells`), else the same rows. Depth, best prices
+   * and CSV export keep reading `sortedSell`, the real book.
+   */
+  shownSell: readonly RegionOrder[];
+  /** Sells Hide bait sells is keeping out of `shownSell`; 0 when it is off. */
+  hiddenBaitCount: number;
   /** Running units/ISK per order id, each side walked best-first. */
   depthByOrder: ReadonlyMap<number, DepthAt>;
   sellShowAll: boolean;
@@ -247,6 +262,7 @@ export function useOrderBookOrchestration({
         'browser.sec': browserFilterSettingValue.sec,
         'browser.minQty': browserFilterSettingValue.minQty,
         'browser.npcOnly': browserFilterSettingValue.npcOnly,
+        'browser.hideBait': browserFilterSettingValue.hideBait,
       },
       hydrated: browserFilterSettingHydrated,
       remember: (patch) => {
@@ -255,6 +271,7 @@ export function useOrderBookOrchestration({
           sec: patch['browser.sec'] ?? browserFilterSettingValue.sec,
           minQty: patch['browser.minQty'] ?? browserFilterSettingValue.minQty,
           npcOnly: patch['browser.npcOnly'] ?? browserFilterSettingValue.npcOnly,
+          hideBait: patch['browser.hideBait'] ?? browserFilterSettingValue.hideBait,
         });
       },
     }),
@@ -271,6 +288,7 @@ export function useOrderBookOrchestration({
   const rangeSet = jumpRange !== DEFAULT_JUMP_RANGE;
   const spansStations = regionMode || rangeSet;
   const npcOnly = spansStations && browserFilters['browser.npcOnly'];
+  const hideBait = browserFilters['browser.hideBait'];
   const currentSystem = useCurrentSystem();
   const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
   // A set range fans out like All regions, over every region in reach — once
@@ -506,6 +524,12 @@ export function useOrderBookOrchestration({
     () => new Map([...bookDepth(sortedSell), ...bookDepth(sortedBuy)]),
     [sortedSell, sortedBuy]
   );
+  const bestSell = loadedView?.summary.bestSell ?? null;
+  const shownSell = useMemo(
+    () => (hideBait ? withoutBaitSells(sortedSell, bestSell) : sortedSell),
+    [hideBait, sortedSell, bestSell]
+  );
+  const hiddenBaitCount = sortedSell.length - shownSell.length;
   /**
    * The catalogue is otherwise loaded lazily on the first context-menu open,
    * so reading it here without asking for it meant `selectedIsBlueprint` was
@@ -537,8 +561,9 @@ export function useOrderBookOrchestration({
       sec: spaceKinds,
       minQty: minQuantity,
       npcOnly: browserFilters['browser.npcOnly'],
+      hideBait,
     }),
-    [jumpRange, spaceKinds, minQuantity, browserFilters]
+    [jumpRange, spaceKinds, minQuantity, browserFilters, hideBait]
   );
   // Only what this mode shows counts: a Security filter left in the URL does
   // nothing on a one-station Hub book, so badging it would claim a filter that
@@ -548,6 +573,7 @@ export function useOrderBookOrchestration({
     spansStations && spaceKinds.size !== SPACE_KINDS.length,
     minQuantity > 0,
     npcOnly,
+    hideBait,
   ].filter(Boolean).length;
   const filtersNarrowBook = activeFilterCount > 0 || stationFilter !== null;
   function handleBrowserFiltersChange(next: BrowserFilterValue) {
@@ -556,6 +582,7 @@ export function useOrderBookOrchestration({
       'browser.sec': next.sec,
       'browser.minQty': next.minQty,
       'browser.npcOnly': next.npcOnly,
+      'browser.hideBait': next.hideBait,
     });
   }
 
@@ -714,6 +741,8 @@ export function useOrderBookOrchestration({
     loadedView,
     sortedSell,
     sortedBuy,
+    shownSell,
+    hiddenBaitCount,
     depthByOrder,
     sellShowAll,
     setSellShowAll,

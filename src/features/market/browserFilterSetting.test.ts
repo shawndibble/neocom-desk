@@ -23,6 +23,7 @@ describe('useBrowserFilterSetting', () => {
       sec: new Set(['highsec', 'lowsec'] as const),
       minQty: 10,
       npcOnly: true,
+      hideBait: true,
     };
     await useBrowserFilterSetting.getState().setValue(value);
     expect((await db.settings.get(BROWSER_FILTER_SETTING_KEY))?.value).toEqual(value);
@@ -34,10 +35,23 @@ describe('useBrowserFilterSetting', () => {
       sec: new Set(['nullsec'] as const),
       minQty: 100,
       npcOnly: false,
+      hideBait: true,
     };
     await db.settings.put({ key: BROWSER_FILTER_SETTING_KEY, value });
     await useBrowserFilterSetting.getState().hydrate();
     expect(useBrowserFilterSetting.getState().value).toEqual(value);
+  });
+
+  it('reads a value stored before Hide bait sells existed as bait shown, keeping its other filters', async () => {
+    const value = {
+      jumps: '5' as const,
+      sec: new Set(['nullsec'] as const),
+      minQty: 100,
+      npcOnly: true,
+    };
+    await db.settings.put({ key: BROWSER_FILTER_SETTING_KEY, value });
+    await useBrowserFilterSetting.getState().hydrate();
+    expect(useBrowserFilterSetting.getState().value).toEqual({ ...value, hideBait: false });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {

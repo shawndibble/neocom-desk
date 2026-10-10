@@ -603,6 +603,8 @@ export function Market() {
     loadedView,
     sortedSell,
     sortedBuy,
+    shownSell,
+    hiddenBaitCount,
     depthByOrder,
     sellShowAll,
     setSellShowAll,
@@ -653,7 +655,9 @@ export function Market() {
     selectedTypeId !== null &&
     (itemActions.actions.blueprints?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
-  const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
+  // Hide bait sells trims what the table shows (`shownSell`); export, depth
+  // and best prices keep the real book (`sortedSell`).
+  const sellRows = sellShowAll ? shownSell : shownSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
   // Every row, not the ROW_CAP the tables mount before "Show all" — hence
@@ -1312,7 +1316,7 @@ export function Market() {
                           <BookSideToggle
                             side={phoneSide}
                             onChange={setPhoneSide}
-                            sellCount={sortedSell.length}
+                            sellCount={shownSell.length}
                             buyCount={sortedBuy.length}
                             bestSell={loadedView?.summary.bestSell ?? null}
                             bestBuy={loadedView?.summary.bestBuy ?? null}
@@ -1320,7 +1324,8 @@ export function Market() {
                           <OrderSideCard
                             side="sell"
                             rows={sellRows}
-                            total={sortedSell.length}
+                            total={shownSell.length}
+                            hiddenCount={hiddenBaitCount}
                             best={loadedView?.summary.bestSell ?? null}
                             columns={baseColumns}
                             availableColumns={pickableColumns(SELL_ORDER_COLUMN_IDS)}
@@ -1332,7 +1337,7 @@ export function Market() {
                             cards={orderCards}
                             headingRef={sellHeadingRef}
                             onShowAll={
-                              !sellShowAll && sortedSell.length > ROW_CAP
+                              !sellShowAll && shownSell.length > ROW_CAP
                                 ? () => {
                                     focusAfterCommit(sellHeadingRef);
                                     setSellShowAll(true);

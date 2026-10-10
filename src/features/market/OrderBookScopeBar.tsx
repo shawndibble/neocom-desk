@@ -125,6 +125,13 @@ function BrowserFilterFields({
           onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
         />
       )}
+      {/* Any scope: a one-station Hub book can carry bait as well. */}
+      <FilterChip
+        label={t('market.filterHideBait')}
+        tooltip={t('market.filterHideBaitHint')}
+        selected={draft.hideBait}
+        onToggle={() => setDraft({ ...draft, hideBait: !draft.hideBait })}
+      />
     </>
   );
 }

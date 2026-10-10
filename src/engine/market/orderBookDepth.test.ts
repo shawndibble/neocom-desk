@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bookDepth, priceComparison, sellOutlierMultiple, sortBookSide } from './orderBookDepth';
+import {
+  bookDepth,
+  priceComparison,
+  sellOutlierMultiple,
+  sortBookSide,
+  withoutBaitSells,
+} from './orderBookDepth';
 
 const order = (order_id: number, price: number, volume_remain: number) => ({
   order_id,
@@ -63,6 +69,23 @@ describe('sellOutlierMultiple', () => {
   it('flags nothing when there is no best sell to measure against', () => {
     expect(sellOutlierMultiple(1_000, null)).toBeNull();
     expect(sellOutlierMultiple(1_000, 0)).toBeNull();
+  });
+});
+
+describe('withoutBaitSells', () => {
+  it('drops exactly the sells the bait flag marks, keeping order', () => {
+    const sell = [
+      order(1, 550_000, 1),
+      order(2, 5_499_999, 1),
+      order(3, 5_500_000, 1),
+      order(4, 567_100_000, 1),
+    ];
+    expect(withoutBaitSells(sell, 550_000).map((o) => o.order_id)).toEqual([1, 2]);
+  });
+
+  it('keeps every row when there is no best sell to measure against', () => {
+    const sell = [order(1, 1_000, 1), order(2, 1_000_000, 1)];
+    expect(withoutBaitSells(sell, null)).toEqual(sell);
   });
 });
 
