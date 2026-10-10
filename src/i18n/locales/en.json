@@ -6855,6 +6855,9 @@
       "storesPanel": "Corporations",
       "storeCount_one": "{{count}} store",
       "storeCount_other": "{{count}} stores",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "resultsStatus": "{{stores}}, {{items}}",
       "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down.",
       "crumb": "LP Store search",
       "changeStore": "Change store"
@@ -7204,6 +7207,8 @@
     "categoryHeader": "{{name}} · {{count}}",
     "searchCapped": "Showing {{limit}} of {{total}} matches — refine your search to see more.",
     "searchTooShort": "Type {{min}}+ characters to search.",
+    "searchMatchCount_one": "{{count}} item matches",
+    "searchMatchCount_other": "{{count}} items match",
     "noResults": "No items match your search.",
     "selectPromptTitle": "Select an item",
     "selectPromptHint": "Search or browse the tree to see its live order book.",

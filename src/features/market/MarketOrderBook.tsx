@@ -7,7 +7,7 @@
  * time behind a Sell | Buy toggle; the other card is only hidden by CSS, so a
  * width change never re-mounts a table.
  */
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement, ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -253,6 +253,8 @@ export interface OrderSideCardProps {
   empty: ReactNode;
   /** Whether a "Show all" button is due, and what it does. */
   onShowAll: (() => void) | null;
+  /** The side's `<h2>`, a focus target once "Show all" or a filter change unmounts the button. */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
   renderDetail: (order: RegionOrder) => ReactNode;
   rowContextMenu: (order: RegionOrder, tr: ReactElement) => ReactElement;
   rowClassName: (order: RegionOrder) => string | undefined;
@@ -275,6 +277,7 @@ export function OrderSideCard({
   tableExport,
   empty,
   onShowAll,
+  headingRef,
   renderDetail,
   rowContextMenu,
   rowClassName,
@@ -295,7 +298,12 @@ export function OrderSideCard({
       {/* Each export sits with the table it exports, beside its own heading. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2 pb-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h2 className="m-0 text-xs font-semibold tracking-widest uppercase">{name}</h2>
+          <h2
+            ref={headingRef}
+            className="m-0 text-xs font-semibold tracking-widest uppercase focus:outline-none"
+          >
+            {name}
+          </h2>
           <span className="text-xs text-text-dim tabular-nums max-sm:hidden">
             {best === null
               ? t('market.sideSummary.none', { count: total })

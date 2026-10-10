@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type RefObject } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -101,12 +101,14 @@ async function loadTransactionsSnapshot(
 interface TransactionsPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
   onViewChange: (view: HistoryView) => void;
+  /** See `HistoryViewSelect`'s `focusOnMountRef`. */
+  focusViewOnMount?: RefObject<boolean>;
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const transactionRowKey = (txn: WalletTransaction) => txn.transaction_id;
 
-export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
+export function TransactionsPanel({ onViewChange, focusViewOnMount }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const timeZone = useTimeZone();
@@ -275,7 +277,11 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
       actionsFill={isPhone}
       actions={
         <span className="flex w-full items-center justify-between gap-2">
-          <HistoryViewSelect value="transactions" onChange={onViewChange} />
+          <HistoryViewSelect
+            value="transactions"
+            onChange={onViewChange}
+            focusOnMountRef={focusViewOnMount}
+          />
           <span className="flex items-center gap-2">
             <IconButton
               size={isPhone ? 'md' : 'sm'}

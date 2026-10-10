@@ -47,6 +47,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  LiveStatus,
   Spinner,
   StatChip,
   StatChips,
@@ -774,7 +775,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       meta={
         ready && (
           <span className="flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim max-md:basis-full">
-            <span className="hidden text-xs tabular-nums md:inline">
+            <LiveStatus>
+              {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
+            </LiveStatus>
+            <span aria-hidden="true" className="hidden text-xs tabular-nums md:inline">
               {filteredRows.length} / {t('loyaltyStore.offerCount', { count: rows.length })}
             </span>
             <span data-testid="lp-basis-readout" className="min-w-0 truncate">
