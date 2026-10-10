@@ -5,11 +5,12 @@
  * running total (the info tooltip says so), and a Survey doesn't record its
  * system, so the pilot names it here.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, TextInput, textActionClassName } from '@/components/ui';
 import type { SurveySummary } from '@/engine/survey/series';
 import { resolveSolarSystem } from '@/features/character/systemLookup';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { useSurveySystem, type SurveySystem } from './surveySystemPref';
 import { useYourShare } from './useYourShare';
@@ -17,9 +18,11 @@ import { useYourShare } from './useYourShare';
 function SystemField({
   suggestions,
   onDone,
+  autoFocus = false,
 }: {
   suggestions: readonly SurveySystem[];
   onDone: () => void;
+  autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
   const setSystem = useSurveySystem((s) => s.setValue);
@@ -44,7 +47,7 @@ function SystemField({
   }
 
   return (
-    <span className="flex flex-wrap items-center gap-2">
+    <span data-system-field className="flex flex-wrap items-center gap-2">
       {suggestions.length > 0 && (
         <span
           className="flex flex-wrap items-center gap-1"
@@ -68,6 +71,7 @@ function SystemField({
       </label>
       <TextInput
         id="survey-system"
+        autoFocus={autoFocus}
         size="sm"
         value={text}
         placeholder={t('survey.systemPlaceholder')}
@@ -103,6 +107,8 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
   const { t } = useTranslation();
   const state = useYourShare(characterId, summary);
   const [changing, setChanging] = useState(false);
+  const changeButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   if (state.status === 'loading' || state.status === 'unavailable') return null;
 
@@ -132,9 +138,24 @@ export function YourShareRow({ characterId, summary }: YourShareRowProps) {
       </span>
       {tooltip}
       {changing ? (
-        <SystemField suggestions={suggestions} onDone={() => setChanging(false)} />
+        <SystemField
+          suggestions={suggestions}
+          autoFocus
+          onDone={() => {
+            // Focus left the field already (Tab, click away): leave it where the user put it.
+            const inField = document.activeElement?.closest('[data-system-field]') != null;
+            setChanging(false);
+            // The field unmounts: hand focus back to "Change system".
+            if (inField) focusAfterCommit(changeButton);
+          }}
+        />
       ) : (
-        <button type="button" className={textActionClassName()} onClick={() => setChanging(true)}>
+        <button
+          ref={changeButton}
+          type="button"
+          className={textActionClassName()}
+          onClick={() => setChanging(true)}
+        >
           {t('survey.changeSystem')}
         </button>
       )}

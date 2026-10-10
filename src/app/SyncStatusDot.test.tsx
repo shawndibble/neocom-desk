@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { SyncStatus } from '@/sync';
 import { SyncStatusDot } from './SyncStatusDot';
@@ -50,8 +51,10 @@ describe('SyncStatusDot', () => {
     expect(new Set(shapes).size).toBe(4);
   });
 
-  it('stays a keyboard tab stop', () => {
+  it('is reachable by keyboard and shows its tooltip on focus', async () => {
     render(<SyncStatusDot status={{ state: 'idle', lastSyncedAt: 1, error: null }} online />);
-    expect(screen.getByRole('status', { name: 'Synced' })).toHaveAttribute('tabindex', '0');
+    await userEvent.tab();
+    expect(screen.getByRole('status', { name: 'Synced' })).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Synced');
   });
 });

@@ -6,13 +6,23 @@ import {
   interactiveClassName,
   type ControlSize,
 } from './controlStyles';
+import { Tooltip } from './Tooltip';
 
 interface SegmentedControlOption<T extends string> {
   value: T;
   /** Already-translated label. */
   label: string;
-  /** Inert and muted. The group's other segments stay live. */
+  /**
+   * Inert and muted. The group's other segments stay live. A disabled segment
+   * never shows as pressed, even when it matches `value`: it is not acting.
+   */
   disabled?: boolean;
+  /**
+   * Why it is disabled, in a tooltip. Keeps the segment hoverable and focusable
+   * (`aria-disabled` instead of the native attribute) so the bubble can be read;
+   * the click does nothing either way. Only read when `disabled`.
+   */
+  disabledReason?: string;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -34,7 +44,7 @@ interface SegmentedControlProps<T extends string> {
 
 /**
  * Pick exactly one of a few views: one joined group, one selected look
- * (`FilterChip`'s accent tint). A `role="group"` of `aria-pressed` buttons, not
+ * (`FilterChip`'s accent tint plus a 2px accent underline, so it isn't colour alone). A `role="group"` of `aria-pressed` buttons, not
  * a tablist — it switches what a panel shows rather than navigating between
  * places (`Tabs`), and it needs no open-then-pick step (`Select`).
  *
@@ -64,14 +74,16 @@ export function SegmentedControl<T extends string>({
       )}
     >
       {options.map((option, index) => {
-        const selected = option.value === value;
-        return (
+        const explained = option.disabled && option.disabledReason !== undefined;
+        const selected = option.value === value && !option.disabled;
+        const segment = (
           <button
-            key={option.value}
+            key={explained ? undefined : option.value}
             type="button"
             aria-pressed={selected}
-            disabled={option.disabled}
-            onClick={() => onChange(option.value)}
+            disabled={option.disabled && !explained}
+            aria-disabled={explained || undefined}
+            onClick={explained ? undefined : () => onChange(option.value)}
             className={cx(
               'inline-flex items-center justify-center px-3 whitespace-nowrap',
               interactiveClassName,
@@ -82,12 +94,23 @@ export function SegmentedControl<T extends string>({
               fill && 'flex-1 basis-0',
               index > 0 && 'border-l border-line',
               selected
-                ? 'bg-accent/15 text-accent enabled:hover:bg-accent/22 enabled:active:bg-accent/28'
-                : 'text-text-dim enabled:hover:bg-panel-2 enabled:hover:text-text enabled:active:bg-panel'
+                ? 'bg-accent/15 text-accent shadow-[inset_0_-2px_0_var(--color-accent)] enabled:hover:bg-accent/22 enabled:active:bg-accent/28'
+                : cx(
+                    'text-text-dim',
+                    !explained &&
+                      'enabled:hover:bg-panel-2 enabled:hover:text-text enabled:active:bg-panel'
+                  )
             )}
           >
             {option.label}
           </button>
+        );
+        return explained ? (
+          <Tooltip key={option.value} content={option.disabledReason}>
+            {segment}
+          </Tooltip>
+        ) : (
+          segment
         );
       })}
     </div>

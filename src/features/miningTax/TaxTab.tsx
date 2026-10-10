@@ -4,6 +4,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 import { useSurveyPayeeId } from './surveyPayeePref';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -33,6 +34,7 @@ import {
   Tooltip,
   type DataTableColumn,
   Checkbox,
+  TabPanel,
 } from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -338,11 +340,14 @@ const TAX_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 interface TaxTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
+  /** The id base the tab bar was built with, so the body is its tab panel. */
+  tabsId: string;
 }
 
-export function TaxTab({ tabBar }: TaxTabProps) {
+export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const selectionToolbarRef = useRef<HTMLDivElement>(null);
   // The Ore column only where the table has room for it beside a full Payee
   // name: the Payee is what a row is read by, the ore is one click away in
   // the entry itself (and at 1024px it pushed Status off-screen, #2147).
@@ -1170,6 +1175,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     () => openRows.filter((dr) => selection.has(dr.key)),
     [openRows, selection]
   );
+  // The sticky toolbar covers the page bottom: reserve its height as scroll padding so a focused row clears it.
+  useStickyClearance(selectionToolbarRef, 'selection-toolbar', {
+    enabled: selectedRows.length > 0,
+  });
 
   const selectedSettleUpRows: SettleUpRow[] = useMemo(
     () => settleUpRowsFor(settleUpMembers(selectedRows)),
@@ -1466,7 +1475,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
                 <label className={touchCheckboxLabelClassName}>
                   <Checkbox
-                    aria-label={t('miningTax.selectForBulkAction')}
+                    aria-label={t('miningTax.selectRow', {
+                      date: dateLabel(dr),
+                      system: systemName(dr),
+                    })}
                     checked={selection.has(dr.key)}
                     onChange={() => toggleRowSelected(dr.key)}
                   />
@@ -1732,550 +1744,566 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         }
       />
       {tabBar}
+      <TabPanel tabsId={tabsId} tabId="tax" className="space-y-4">
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : (
+          <>
+            {data && data.fromCache && (
+              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
+            )}
 
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : (
-        <>
-          {data && data.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
+            <AttentionStrip items={attentionItems} />
 
-          <AttentionStrip items={attentionItems} />
-
-          {/* Until a Payee exists there is nothing to assign an entry to, so
+            {/* Until a Payee exists there is nothing to assign an entry to, so
               the balances and ledger would all read as blank. Point at the
               Payees button (outlined in accent while this shows) instead. */}
-          {needsFirstPayee ? (
-            <EmptyState
-              title={t('miningTax.firstPayeeTitle')}
-              hint={t('miningTax.firstPayeeHint')}
-            />
-          ) : (
-            <>
-              <OwedBalances
-                balances={balances}
-                unassigned={unassigned}
-                unlinkedPaymentCount={linkSuggestions.length}
-                characterNameOf={
-                  characters.length > 1
-                    ? (balance) =>
-                        characters.find((c) => c.characterId === balance.payee.characterId)
-                          ?.characterName
-                    : undefined
-                }
-                isSoleFilter={isSolePayeeFilter}
-                onFilterPayee={filterToPayee}
-                onSettleUp={(balance) => settleUpBalance(balance.members)}
-                onLinkPayment={(balance) => setLinkWalletTarget({ payeeId: balance.payee.id })}
-                onAssignNext={assignNext}
-                onReviewPayments={() => setLinkPaymentOpen(true)}
+            {needsFirstPayee ? (
+              <EmptyState
+                title={t('miningTax.firstPayeeTitle')}
+                hint={t('miningTax.firstPayeeHint')}
               />
+            ) : (
+              <>
+                <OwedBalances
+                  balances={balances}
+                  unassigned={unassigned}
+                  unlinkedPaymentCount={linkSuggestions.length}
+                  characterNameOf={
+                    characters.length > 1
+                      ? (balance) =>
+                          characters.find((c) => c.characterId === balance.payee.characterId)
+                            ?.characterName
+                      : undefined
+                  }
+                  isSoleFilter={isSolePayeeFilter}
+                  onFilterPayee={filterToPayee}
+                  onSettleUp={(balance) => settleUpBalance(balance.members)}
+                  onLinkPayment={(balance) => setLinkWalletTarget({ payeeId: balance.payee.id })}
+                  onAssignNext={assignNext}
+                  onReviewPayments={() => setLinkPaymentOpen(true)}
+                />
 
-              {data && continuations.some((c) => !autoContinue || autoSkip.has(c.next.key)) && (
-                <div className="space-y-2">
-                  {continuations
-                    .filter((c) => !autoContinue || autoSkip.has(c.next.key))
-                    .map((c) => (
-                      <ContinueSessionCard
-                        key={c.next.key}
-                        continuation={c}
-                        systemName={systemName(c.next)}
-                        payeeName={payeeName(c.previous.payeeId)}
-                        typeNames={data.typeNames}
-                        busy={busy}
-                        autoContinue={autoContinue}
-                        onContinue={() => void handleContinue(c)}
-                        onChooseOther={() => setDetailTarget(c.next)}
-                        onKeepSeparate={() => keepSeparate(c)}
-                        onAutoContinueChange={setAutoContinueFromCard}
-                      />
-                    ))}
-                </div>
-              )}
+                {data && continuations.some((c) => !autoContinue || autoSkip.has(c.next.key)) && (
+                  <div className="space-y-2">
+                    {continuations
+                      .filter((c) => !autoContinue || autoSkip.has(c.next.key))
+                      .map((c) => (
+                        <ContinueSessionCard
+                          key={c.next.key}
+                          continuation={c}
+                          systemName={systemName(c.next)}
+                          payeeName={payeeName(c.previous.payeeId)}
+                          typeNames={data.typeNames}
+                          busy={busy}
+                          autoContinue={autoContinue}
+                          onContinue={() => void handleContinue(c)}
+                          onChooseOther={() => setDetailTarget(c.next)}
+                          onKeepSeparate={() => keepSeparate(c)}
+                          onAutoContinueChange={setAutoContinueFromCard}
+                        />
+                      ))}
+                  </div>
+                )}
 
-              {/* The filters sit right on top of the Open list they filter
+                {/* The filters sit right on top of the Open list they filter
                   first: no "Open" heading between them, since every row in
                   it already carries its status. */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <CharacterFilterControl
-                    activeCharacterId={activeCharacterId}
-                    value={characterFilter}
-                    onChange={setCharacterFilter}
-                  />
-
-                  {allPayees.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="sm">
-                          {resolvedPayeeFilter === 'all'
-                            ? t('miningTax.allPayees')
-                            : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {allPayees.map((p) => (
-                          <DropdownMenuCheckboxItem
-                            key={p.id}
-                            checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
-                            onSelect={(e) => e.preventDefault()}
-                            onCheckedChange={() => togglePayee(p.id)}
-                          >
-                            {characters.length > 1
-                              ? t('miningTax.payeeOptionWithCharacter', {
-                                  payee: p.name,
-                                  character:
-                                    characters.find((c) => c.characterId === p.characterId)
-                                      ?.characterName ?? '',
-                                })
-                              : p.name}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-
-                  {/* On a phone the stacked cards have no header row to sort
-                    from; the picker lives here rather than above the list. */}
-                  {isPhone && openRows.length > 1 && (
-                    <DataTableSortPicker
-                      columns={openColumns}
-                      sort={taxSort.sort}
-                      onSortChange={taxSort.onSortChange}
-                      size="sm"
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CharacterFilterControl
+                      activeCharacterId={activeCharacterId}
+                      value={characterFilter}
+                      onChange={setCharacterFilter}
                     />
-                  )}
 
+                    {allPayees.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm">
+                            {resolvedPayeeFilter === 'all'
+                              ? t('miningTax.allPayees')
+                              : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {allPayees.map((p) => (
+                            <DropdownMenuCheckboxItem
+                              key={p.id}
+                              checked={
+                                resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)
+                              }
+                              onSelect={(e) => e.preventDefault()}
+                              onCheckedChange={() => togglePayee(p.id)}
+                            >
+                              {characters.length > 1
+                                ? t('miningTax.payeeOptionWithCharacter', {
+                                    payee: p.name,
+                                    character:
+                                      characters.find((c) => c.characterId === p.characterId)
+                                        ?.characterName ?? '',
+                                  })
+                                : p.name}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+
+                    {/* On a phone the stacked cards have no header row to sort
+                    from; the picker lives here rather than above the list. */}
+                    {isPhone && openRows.length > 1 && (
+                      <DataTableSortPicker
+                        columns={openColumns}
+                        sort={taxSort.sort}
+                        onSortChange={taxSort.onSortChange}
+                        size="sm"
+                      />
+                    )}
+
+                    {visibleRows.length > 0 && (
+                      <span className="ml-auto">
+                        <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* An empty ledger is EmptyState's to explain below; "nothing
+                  open — every entry is paid" would contradict it. */}
                   {visibleRows.length > 0 && (
-                    <span className="ml-auto">
-                      <TableActionsMenu name={t('miningTax.title')} tableExport={taxExport} />
-                    </span>
+                    <section aria-labelledby="mining-tax-open">
+                      <h2 id="mining-tax-open" className="sr-only">
+                        {t('miningTax.sections.open', { count: openRows.length })}
+                      </h2>
+                      {openRows.length === 0 ? (
+                        <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
+                          {t('miningTax.sections.openEmpty')}
+                        </p>
+                      ) : (
+                        <Panel padded={false}>
+                          <div className="overflow-x-auto">
+                            <DataTable
+                              {...taxExport.tableProps}
+                              columns={openColumns}
+                              rows={openRows}
+                              className="dt-dense-lead sm:table-fixed"
+                              rowKey={(dr) => dr.key}
+                              label={t('miningTax.sections.openLabel')}
+                              {...taxSort}
+                              stackLayout="dense"
+                              rowClassName={rowClassName}
+                              onRowClick={(dr) => setDetailTarget(dr)}
+                            />
+                          </div>
+                        </Panel>
+                      )}
+                    </section>
                   )}
                 </div>
 
-                {/* An empty ledger is EmptyState's to explain below; "nothing
-                  open — every entry is paid" would contradict it. */}
-                {visibleRows.length > 0 && (
-                  <section aria-labelledby="mining-tax-open">
-                    <h2 id="mining-tax-open" className="sr-only">
-                      {t('miningTax.sections.open', { count: openRows.length })}
+                {historyRows.length > 0 && (
+                  <section aria-labelledby="mining-tax-history" className="space-y-2">
+                    <h2
+                      id="mining-tax-history"
+                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                    >
+                      {t('miningTax.sections.history')}
                     </h2>
-                    {openRows.length === 0 ? (
-                      <p className="rounded-xs border border-dashed border-line px-3 py-3 text-xs text-text-dim">
-                        {t('miningTax.sections.openEmpty')}
-                      </p>
-                    ) : (
-                      <Panel padded={false}>
-                        <div className="overflow-x-auto">
-                          <DataTable
-                            {...taxExport.tableProps}
-                            columns={openColumns}
-                            rows={openRows}
-                            className="dt-dense-lead sm:table-fixed"
-                            rowKey={(dr) => dr.key}
-                            label={t('miningTax.sections.openLabel')}
-                            {...taxSort}
-                            stackLayout="dense"
-                            rowClassName={rowClassName}
-                            onRowClick={(dr) => setDetailTarget(dr)}
-                          />
-                        </div>
-                      </Panel>
-                    )}
+                    <Panel padded={false}>
+                      <div className="overflow-x-auto">
+                        <DataTable
+                          columns={historyColumns}
+                          rows={historyRows}
+                          // Months are sections here, not folded duplicates:
+                          // their entries line up with Open's, unindented.
+                          className="dt-flat-groups sm:table-fixed"
+                          rowKey={(dr) => dr.key}
+                          label={t('miningTax.sections.history')}
+                          {...historySort}
+                          stackLayout="dense"
+                          rowClassName={rowClassName}
+                          onRowClick={(dr) => setDetailTarget(dr)}
+                          groupBy={{
+                            key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
+                            allWidths: true,
+                            minSize: 1,
+                            // The newest month opens; older ones stay folded.
+                            defaultExpanded: (rows) =>
+                              (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
+                            renderHeader: (rows) => (
+                              <HistoryMonthHeader
+                                month={(dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7)}
+                                count={rows.length}
+                                taxTotal={rows.reduce(
+                                  (sum, dr) => sum + (dr.assignment ? taxOwedOf(dr) : 0),
+                                  0
+                                )}
+                              />
+                            ),
+                          }}
+                        />
+                      </div>
+                    </Panel>
                   </section>
                 )}
-              </div>
 
-              {historyRows.length > 0 && (
-                <section aria-labelledby="mining-tax-history" className="space-y-2">
-                  <h2
-                    id="mining-tax-history"
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-                  >
-                    {t('miningTax.sections.history')}
-                  </h2>
-                  <Panel padded={false}>
-                    <div className="overflow-x-auto">
-                      <DataTable
-                        columns={historyColumns}
-                        rows={historyRows}
-                        // Months are sections here, not folded duplicates:
-                        // their entries line up with Open's, unindented.
-                        className="dt-flat-groups sm:table-fixed"
-                        rowKey={(dr) => dr.key}
-                        label={t('miningTax.sections.history')}
-                        {...historySort}
-                        stackLayout="dense"
-                        rowClassName={rowClassName}
-                        onRowClick={(dr) => setDetailTarget(dr)}
-                        groupBy={{
-                          key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
-                          allWidths: true,
-                          minSize: 1,
-                          // The newest month opens; older ones stay folded.
-                          defaultExpanded: (rows) =>
-                            (dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7) === history[0]?.month,
-                          renderHeader: (rows) => (
-                            <HistoryMonthHeader
-                              month={(dateRangeOf(rows[0]).at(-1) ?? '').slice(0, 7)}
-                              count={rows.length}
-                              taxTotal={rows.reduce(
-                                (sum, dr) => sum + (dr.assignment ? taxOwedOf(dr) : 0),
-                                0
-                              )}
-                            />
-                          ),
-                        }}
-                      />
-                    </div>
-                  </Panel>
-                </section>
-              )}
+                {visibleRows.length === 0 && (
+                  <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
+                )}
 
-              {visibleRows.length === 0 && (
-                <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
-              )}
-
-              {/* Pinned above the phone tab bar (and to the bottom of the
+                {/* Pinned above the phone tab bar (and to the bottom of the
                   viewport on desktop), so the bulk actions stay in reach
                   wherever the ticked row sits in a long ledger. */}
-              {selectedRows.length > 0 && (
-                <div className="sticky bottom-[var(--bottom-nav-clearance)] z-30 md:bottom-3">
-                  <SelectionToolbar
-                    selectedCount={selectedRows.length}
-                    canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
-                    onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
-                    onClear={() => setSelection(new Set())}
-                    settleUpCount={selectedSettleUpRows.length}
-                    onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
-                    combine={combine}
-                    onCombine={handleCombineSelected}
-                    dismissCount={dismissTargets.length}
-                    onDismiss={() => setBulkDismissOpen(true)}
-                    linkPaymentBlockedReason={linkSelectedBlocked}
-                    onLinkPayment={() => {
-                      const payeeId = selectedPayeeIds[0];
-                      if (!payeeId) return;
-                      setLinkWalletTarget({
-                        payeeId,
-                        members: settleUpMembers(selectedRows),
-                      });
-                    }}
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
+                {selectedRows.length > 0 && (
+                  <div
+                    ref={selectionToolbarRef}
+                    className="sticky bottom-[var(--bottom-nav-clearance)] z-30 md:bottom-3"
+                  >
+                    <SelectionToolbar
+                      selectedCount={selectedRows.length}
+                      canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
+                      onSelectAll={() =>
+                        setSelection(new Set(selectableVisible.map((dr) => dr.key)))
+                      }
+                      onClear={() => setSelection(new Set())}
+                      settleUpCount={selectedSettleUpRows.length}
+                      onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
+                      combine={combine}
+                      onCombine={handleCombineSelected}
+                      dismissCount={dismissTargets.length}
+                      onDismiss={() => setBulkDismissOpen(true)}
+                      linkPaymentBlockedReason={linkSelectedBlocked}
+                      onLinkPayment={() => {
+                        const payeeId = selectedPayeeIds[0];
+                        if (!payeeId) return;
+                        setLinkWalletTarget({
+                          payeeId,
+                          members: settleUpMembers(selectedRows),
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          undo={
-            toast.onUndo ? { label: t('miningTax.continue.undo'), onUndo: toast.onUndo } : undefined
-          }
-        />
-      )}
-
-      {oreTagsOpen && (
-        <TypeOverridesDialog
-          open={oreTagsOpen}
-          onClose={() => setOreTagsOpen(false)}
-          onChanged={refresh}
-        />
-      )}
-
-      <PageSettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        pageName={t('miningTax.title')}
-        section="miningTax"
-      >
-        <MiningTaxSettingsForm onAutoContinueChange={setAutoContinueFromCard} />
-      </PageSettingsModal>
-
-      {payeeManagerCharacterId !== null && (
-        <PayeeManagerDialog
-          open={payeeManagerCharacterId !== null}
-          onClose={() => setPayeeManagerCharacterId(null)}
-          characters={characters}
-          payeesByCharacter={data?.payeesByCharacter ?? new Map()}
-          initialCharacterId={payeeManagerCharacterId}
-          onChanged={refresh}
-          owedByPayee={owedByPayee}
-          systemsByPayee={payeeSystems}
-          systemNames={data?.systemNames}
-        />
-      )}
-
-      {detailTarget && data && detailTarget.groupMembers && (
-        <GroupSummaryModal
-          open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
-          members={allMembers(detailTarget)}
-          systemName={systemName(detailTarget)}
-          systemSecurity={systemSecurityOf(detailTarget)}
-          typeNames={data.typeNames}
-          payeeDisplayName={payeeDisplayName(detailTarget)}
-          busy={busy}
-          // A failed link shows in its own dialog, open on top of this one.
-          saveError={linkTransactionTarget ? null : actionError}
-          onEdit={() => {
-            setEditTarget(detailTarget);
-            setDetailTarget(null);
-          }}
-          onSettleUp={
-            detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
-          }
-          onMarkAllPaid={handleMarkGroupPaidFromDetail}
-          onTakeOut={handleTakeOut}
-          onUncombine={handleUncombineAll}
-          onResolve={handleResolveGroup}
-          onUnassignAll={handleUnassignGroup}
-          onLinkWalletPayment={() => {
-            const payeeId = detailTarget.assignment?.payeeId;
-            if (!payeeId) return;
-            setLinkWalletTarget({
-              payeeId,
-              members: allMembers(detailTarget).filter(
-                (m) => m.assignment.status === 'outstanding'
-              ),
-            });
-            setDetailTarget(null);
-          }}
-          linkedTransactions={groupLinkedTransactions}
-          onLinkTransaction={
-            allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
-              ? () => setLinkTransactionTarget(detailTarget)
-              : undefined
-          }
-          onUnlinkTransaction={handleUnlinkTransactionFromDetail}
-        />
-      )}
-
-      {editTarget && data && (
-        <EntryEditDialog
-          open
-          onClose={() => setEditTarget(null)}
-          members={allMembers(editTarget)}
-          systemName={systemName(editTarget)}
-          systemSecurity={systemSecurityOf(editTarget)}
-          payees={allPayees}
-          typeNames={data.typeNames}
-          pricesFor={pricesFor}
-          onSaved={() => {
-            setEditTarget(null);
-            refresh();
-          }}
-        />
-      )}
-
-      {detailTarget && data && !detailTarget.groupMembers && (
-        <RowDetailModal
-          open={detailTarget !== null}
-          onClose={() => setDetailTarget(null)}
-          row={detailTarget.row}
-          assignment={detailTarget.assignment}
-          status={detailTarget.status}
-          systemName={systemName(detailTarget)}
-          systemSecurity={systemSecurityOf(detailTarget)}
-          priceSourcesFor={priceSourcesFor}
-          typeNames={data.typeNames}
-          payees={allPayees}
-          suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
-          pricesFor={pricesFor}
-          busy={busy}
-          // A failed link shows in its own dialog, open on top of this one.
-          saveError={linkTransactionTarget ? null : actionError}
-          onAssigned={handleAssignedFromDetail}
-          onDismiss={handleDismissFromDetail}
-          onMarkPaid={handleMarkPaidFromDetail}
-          onResolve={handleResolveFromDetail}
-          onUndo={handleUndoFromDetail}
-          onEdit={() => {
-            setEditTarget(detailTarget);
-            setDetailTarget(null);
-          }}
-          onSettleUp={
-            detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
-          }
-          onLinkWalletPayment={
-            detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
-              ? () => {
-                  const payeeId = detailTarget.assignment?.payeeId;
-                  if (payeeId) setLinkWalletTarget({ payeeId });
-                  setDetailTarget(null);
-                }
-              : undefined
-          }
-          onAddPayee={
-            payeeManagerDefaultCharacterId !== null
-              ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
-              : undefined
-          }
-          onJoin={() => {
-            setJoinTarget(detailTarget);
-            setDetailTarget(null);
-          }}
-          onSplit={
-            detailTarget.assignment && !detailTarget.assignment.groupId
-              ? () => {
-                  setSplitTarget(detailTarget);
-                  setDetailTarget(null);
-                }
-              : undefined
-          }
-          linkedTransactions={detailLinkedTransactions}
-          onLinkTransaction={
-            detailTarget.status === 'paid'
-              ? () => setLinkTransactionTarget(detailTarget)
-              : undefined
-          }
-          onUnlinkTransaction={handleUnlinkTransactionFromDetail}
-        />
-      )}
-
-      {linkTransactionTarget &&
-        assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (
-          <LinkTransactionDialog
-            open
-            onClose={() => setLinkTransactionTarget(null)}
-            candidates={linkTransactionCandidates}
-            targetAmount={linkTransactionTargetAmount}
-            busy={busy}
-            saveError={actionError}
-            onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
+        {toast && (
+          <Toast
+            message={toast.message}
+            undo={
+              toast.onUndo
+                ? { label: t('miningTax.continue.undo'), onUndo: toast.onUndo }
+                : undefined
+            }
           />
         )}
 
-      {splitTarget && splitTarget.assignment && data && (
-        <SplitDialog
-          open
-          onClose={() => setSplitTarget(null)}
-          assignment={
-            // A needs-review row splits against what ESI reports now, so the
-            // growth (the ore the pilot usually wants to move) is on offer.
-            splitTarget.assignment.status === 'needs-review'
-              ? {
-                  ...splitTarget.assignment,
-                  oreLines: linesOwnedBy(
-                    splitTarget.row.entry.oreLines,
-                    splitTarget.row.assignments,
-                    splitTarget.assignment.id
-                  ),
-                }
-              : splitTarget.assignment
-          }
-          row={splitTarget.row}
-          systemName={systemName(splitTarget)}
-          payees={allPayees}
-          typeNames={data.typeNames}
-          pricesFor={pricesFor}
-          busy={busy}
-          onSplit={() => {
-            setSplitTarget(null);
-            refresh();
-          }}
-        />
-      )}
+        {oreTagsOpen && (
+          <TypeOverridesDialog
+            open={oreTagsOpen}
+            onClose={() => setOreTagsOpen(false)}
+            onChanged={refresh}
+          />
+        )}
 
-      {joinTarget && data && (
-        <JoinAssignDialog
-          open={joinTarget !== null}
-          onClose={() => {
-            setJoinTarget(null);
-            setJoinCandidateOverride(null);
-          }}
-          primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
-          candidates={
-            joinCandidateOverride
-              ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
-              : joinCandidatesFor(joinTarget)
-          }
-          initialSelection={joinCandidateOverride ? 'all' : 'none'}
-          payees={allPayees}
-          typeNames={data.typeNames}
-          pricesFor={pricesFor}
-          busy={busy}
-          onJoined={handleJoined}
-        />
-      )}
+        <PageSettingsModal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          pageName={t('miningTax.title')}
+          section="miningTax"
+        >
+          <MiningTaxSettingsForm onAutoContinueChange={setAutoContinueFromCard} />
+        </PageSettingsModal>
 
-      {settleUpRows && data && (
-        <SettleUpDialog
-          open
-          onClose={() => setSettleUpRows(null)}
-          rows={liveSettleUpRows ?? settleUpRows}
-          systemNames={data.systemNames}
-          arrivalCheck={settleUpRecheck}
-          onPaid={() => {
-            setSelection(new Set());
-            refresh();
-          }}
-          onPickFromWallet={(() => {
-            const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
-            const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
-            if (!only) return undefined;
-            // The entries being settled, not the Payee's whole balance.
-            const members = settleUpRows.flatMap((r) =>
-              allDisplayRows.flatMap(allMembers).filter((m) => m.assignment.id === r.assignment.id)
-            );
-            return () => {
-              setSettleUpRows(null);
-              setLinkWalletTarget({ payeeId: only, members });
-            };
-          })()}
-        />
-      )}
+        {payeeManagerCharacterId !== null && (
+          <PayeeManagerDialog
+            open={payeeManagerCharacterId !== null}
+            onClose={() => setPayeeManagerCharacterId(null)}
+            characters={characters}
+            payeesByCharacter={data?.payeesByCharacter ?? new Map()}
+            initialCharacterId={payeeManagerCharacterId}
+            onChanged={refresh}
+            owedByPayee={owedByPayee}
+            systemsByPayee={payeeSystems}
+            systemNames={data?.systemNames}
+          />
+        )}
 
-      {linkWalletPayee && data && (
-        <LinkWalletPaymentDialog
-          key={linkWalletPayee.id}
-          open
-          onClose={() => setLinkWalletTarget(null)}
-          payee={linkWalletPayee}
-          owed={linkWalletOwed}
-          candidates={linkWalletCandidates}
-          paymentSources={paymentSources}
-          systemNames={data.systemNames}
-          onLinked={() => {
-            setSelection(new Set());
-            refresh();
-          }}
-        />
-      )}
+        {detailTarget && data && detailTarget.groupMembers && (
+          <GroupSummaryModal
+            open={detailTarget !== null}
+            onClose={() => setDetailTarget(null)}
+            members={allMembers(detailTarget)}
+            systemName={systemName(detailTarget)}
+            systemSecurity={systemSecurityOf(detailTarget)}
+            typeNames={data.typeNames}
+            payeeDisplayName={payeeDisplayName(detailTarget)}
+            busy={busy}
+            // A failed link shows in its own dialog, open on top of this one.
+            saveError={linkTransactionTarget ? null : actionError}
+            onEdit={() => {
+              setEditTarget(detailTarget);
+              setDetailTarget(null);
+            }}
+            onSettleUp={
+              detailTarget.status === 'outstanding'
+                ? () => settleUpPayeeOf(detailTarget)
+                : undefined
+            }
+            onMarkAllPaid={handleMarkGroupPaidFromDetail}
+            onTakeOut={handleTakeOut}
+            onUncombine={handleUncombineAll}
+            onResolve={handleResolveGroup}
+            onUnassignAll={handleUnassignGroup}
+            onLinkWalletPayment={() => {
+              const payeeId = detailTarget.assignment?.payeeId;
+              if (!payeeId) return;
+              setLinkWalletTarget({
+                payeeId,
+                members: allMembers(detailTarget).filter(
+                  (m) => m.assignment.status === 'outstanding'
+                ),
+              });
+              setDetailTarget(null);
+            }}
+            linkedTransactions={groupLinkedTransactions}
+            onLinkTransaction={
+              allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
+                ? () => setLinkTransactionTarget(detailTarget)
+                : undefined
+            }
+            onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+          />
+        )}
 
-      {linkPaymentOpen && data && linkSuggestions.length > 0 && (
-        <LinkPaymentDialog
-          open
-          onClose={() => setLinkPaymentOpen(false)}
-          suggestions={linkSuggestions}
-          systemNames={data.systemNames}
-          showCharacter={characters.length > 1}
-          onLinked={refresh}
-        />
-      )}
+        {editTarget && data && (
+          <EntryEditDialog
+            open
+            onClose={() => setEditTarget(null)}
+            members={allMembers(editTarget)}
+            systemName={systemName(editTarget)}
+            systemSecurity={systemSecurityOf(editTarget)}
+            payees={allPayees}
+            typeNames={data.typeNames}
+            pricesFor={pricesFor}
+            onSaved={() => {
+              setEditTarget(null);
+              refresh();
+            }}
+          />
+        )}
 
-      {bulkDismissOpen && data && (
-        <BulkDismissDialog
-          open
-          onClose={() => setBulkDismissOpen(false)}
-          rows={dismissTargets}
-          systemNames={data.systemNames}
-          estimatedValueOf={estimatedValueOf}
-          showCharacter={showCharacterColumn}
-          onDismissed={() => {
-            setSelection(new Set());
-            refresh();
-          }}
-        />
-      )}
+        {detailTarget && data && !detailTarget.groupMembers && (
+          <RowDetailModal
+            open={detailTarget !== null}
+            onClose={() => setDetailTarget(null)}
+            row={detailTarget.row}
+            assignment={detailTarget.assignment}
+            status={detailTarget.status}
+            systemName={systemName(detailTarget)}
+            systemSecurity={systemSecurityOf(detailTarget)}
+            priceSourcesFor={priceSourcesFor}
+            typeNames={data.typeNames}
+            payees={allPayees}
+            suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
+            pricesFor={pricesFor}
+            busy={busy}
+            // A failed link shows in its own dialog, open on top of this one.
+            saveError={linkTransactionTarget ? null : actionError}
+            onAssigned={handleAssignedFromDetail}
+            onDismiss={handleDismissFromDetail}
+            onMarkPaid={handleMarkPaidFromDetail}
+            onResolve={handleResolveFromDetail}
+            onUndo={handleUndoFromDetail}
+            onEdit={() => {
+              setEditTarget(detailTarget);
+              setDetailTarget(null);
+            }}
+            onSettleUp={
+              detailTarget.status === 'outstanding'
+                ? () => settleUpPayeeOf(detailTarget)
+                : undefined
+            }
+            onLinkWalletPayment={
+              detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
+                ? () => {
+                    const payeeId = detailTarget.assignment?.payeeId;
+                    if (payeeId) setLinkWalletTarget({ payeeId });
+                    setDetailTarget(null);
+                  }
+                : undefined
+            }
+            onAddPayee={
+              payeeManagerDefaultCharacterId !== null
+                ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
+                : undefined
+            }
+            onJoin={() => {
+              setJoinTarget(detailTarget);
+              setDetailTarget(null);
+            }}
+            onSplit={
+              detailTarget.assignment && !detailTarget.assignment.groupId
+                ? () => {
+                    setSplitTarget(detailTarget);
+                    setDetailTarget(null);
+                  }
+                : undefined
+            }
+            linkedTransactions={detailLinkedTransactions}
+            onLinkTransaction={
+              detailTarget.status === 'paid'
+                ? () => setLinkTransactionTarget(detailTarget)
+                : undefined
+            }
+            onUnlinkTransaction={handleUnlinkTransactionFromDetail}
+          />
+        )}
+
+        {linkTransactionTarget &&
+          assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (
+            <LinkTransactionDialog
+              open
+              onClose={() => setLinkTransactionTarget(null)}
+              candidates={linkTransactionCandidates}
+              targetAmount={linkTransactionTargetAmount}
+              busy={busy}
+              saveError={actionError}
+              onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
+            />
+          )}
+
+        {splitTarget && splitTarget.assignment && data && (
+          <SplitDialog
+            open
+            onClose={() => setSplitTarget(null)}
+            assignment={
+              // A needs-review row splits against what ESI reports now, so the
+              // growth (the ore the pilot usually wants to move) is on offer.
+              splitTarget.assignment.status === 'needs-review'
+                ? {
+                    ...splitTarget.assignment,
+                    oreLines: linesOwnedBy(
+                      splitTarget.row.entry.oreLines,
+                      splitTarget.row.assignments,
+                      splitTarget.assignment.id
+                    ),
+                  }
+                : splitTarget.assignment
+            }
+            row={splitTarget.row}
+            systemName={systemName(splitTarget)}
+            payees={allPayees}
+            typeNames={data.typeNames}
+            pricesFor={pricesFor}
+            busy={busy}
+            onSplit={() => {
+              setSplitTarget(null);
+              refresh();
+            }}
+          />
+        )}
+
+        {joinTarget && data && (
+          <JoinAssignDialog
+            open={joinTarget !== null}
+            onClose={() => {
+              setJoinTarget(null);
+              setJoinCandidateOverride(null);
+            }}
+            primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
+            candidates={
+              joinCandidateOverride
+                ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
+                : joinCandidatesFor(joinTarget)
+            }
+            initialSelection={joinCandidateOverride ? 'all' : 'none'}
+            payees={allPayees}
+            typeNames={data.typeNames}
+            pricesFor={pricesFor}
+            busy={busy}
+            onJoined={handleJoined}
+          />
+        )}
+
+        {settleUpRows && data && (
+          <SettleUpDialog
+            open
+            onClose={() => setSettleUpRows(null)}
+            rows={liveSettleUpRows ?? settleUpRows}
+            systemNames={data.systemNames}
+            arrivalCheck={settleUpRecheck}
+            onPaid={() => {
+              setSelection(new Set());
+              refresh();
+            }}
+            onPickFromWallet={(() => {
+              const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
+              const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
+              if (!only) return undefined;
+              // The entries being settled, not the Payee's whole balance.
+              const members = settleUpRows.flatMap((r) =>
+                allDisplayRows
+                  .flatMap(allMembers)
+                  .filter((m) => m.assignment.id === r.assignment.id)
+              );
+              return () => {
+                setSettleUpRows(null);
+                setLinkWalletTarget({ payeeId: only, members });
+              };
+            })()}
+          />
+        )}
+
+        {linkWalletPayee && data && (
+          <LinkWalletPaymentDialog
+            key={linkWalletPayee.id}
+            open
+            onClose={() => setLinkWalletTarget(null)}
+            payee={linkWalletPayee}
+            owed={linkWalletOwed}
+            candidates={linkWalletCandidates}
+            paymentSources={paymentSources}
+            systemNames={data.systemNames}
+            onLinked={() => {
+              setSelection(new Set());
+              refresh();
+            }}
+          />
+        )}
+
+        {linkPaymentOpen && data && linkSuggestions.length > 0 && (
+          <LinkPaymentDialog
+            open
+            onClose={() => setLinkPaymentOpen(false)}
+            suggestions={linkSuggestions}
+            systemNames={data.systemNames}
+            showCharacter={characters.length > 1}
+            onLinked={refresh}
+          />
+        )}
+
+        {bulkDismissOpen && data && (
+          <BulkDismissDialog
+            open
+            onClose={() => setBulkDismissOpen(false)}
+            rows={dismissTargets}
+            systemNames={data.systemNames}
+            estimatedValueOf={estimatedValueOf}
+            showCharacter={showCharacterColumn}
+            onDismissed={() => {
+              setSelection(new Set());
+              refresh();
+            }}
+          />
+        )}
+      </TabPanel>
     </div>
   );
 }

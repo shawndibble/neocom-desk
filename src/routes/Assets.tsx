@@ -35,6 +35,8 @@ import {
   Spinner,
   IskInput,
   Tabs,
+  TabPanel,
+  useTabsId,
 } from '@/components/ui';
 import { usePageTab } from '@/lib/usePageTab';
 import { tabBarTabs } from '@/lib/pageTabs';
@@ -670,6 +672,7 @@ export function Assets() {
   // the browser/Android back button steps up one level instead of leaving the
   // page — the single most important thing about drill-down on a phone.
   const [tab, setTab] = usePageTab(ASSETS_TABS);
+  const tabsId = useTabsId();
   const wildcard = useParams()['*'] ?? '';
   const { stationId: pathStationId, segments: pathSegments } = useMemo(
     () => parseAssetPath(wildcard),
@@ -1274,14 +1277,17 @@ export function Assets() {
   // Level-heading focus (issue #1485): a location/container/search-result
   // link, or Back, unmounts the control the pilot just activated — without
   // this, focus falls back to the page body with no cue what happened (WCAG
-  // 2.4.3). Keyed on `wildcard` alone (the drill-down path), not
-  // `flatModeActive`: that flips true the instant a search keystroke lands,
-  // which would otherwise yank focus off the search box mid-type.
+  // 2.4.3). Keyed on the drill-down path only, not `wildcard` (which also
+  // carries the tab segment: arrowing onto Items would pull focus out of the
+  // tab strip) and not `flatModeActive` (which flips true the instant a
+  // search keystroke lands and would yank focus off the search box).
   // `levelHeadingRef` is shared by whichever of the three header blocks below
   // is actually rendered (root list / drilled level); only one exists at a
   // time.
   const levelHeadingRef = useRef<HTMLHeadingElement>(null);
-  useFocusHeading(levelHeadingRef, wildcard);
+  const levelKey = `${pathStationId ?? ''}/${pathSegments.join('/')}`;
+  useFocusHeading(levelHeadingRef, levelKey);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
@@ -1760,415 +1766,427 @@ export function Assets() {
           }
         />
         <Tabs
+          tabsId={tabsId}
           label={t('assets.title')}
           value={tab}
           onChange={(id) => setTab(id as typeof tab)}
           tabs={tabBarTabs(ASSETS_TABS).map((item) => ({ id: item.id, label: t(item.labelKey) }))}
         />
 
-        {tab === 'ships' && (
-          <MyShipsView
-            characterIds={shipCharacterIds}
-            activeCharacterId={activeCharacterId}
-            onShowAllCharacters={
-              !shipsFilterIsAll && crossCharacterCandidates.length > 1
-                ? () => setView({ chars: 'all' })
-                : undefined
-            }
-            hrefFor={(locationId) => assetHref(locationId, [], query)}
-            route={assetsRoute}
-          />
-        )}
+        <TabPanel tabsId={tabsId} tabId={tab} className="flex min-h-0 flex-1 flex-col gap-3">
+          {tab === 'ships' && (
+            <MyShipsView
+              characterIds={shipCharacterIds}
+              activeCharacterId={activeCharacterId}
+              onShowAllCharacters={
+                !shipsFilterIsAll && crossCharacterCandidates.length > 1
+                  ? () => setView({ chars: 'all' })
+                  : undefined
+              }
+              hrefFor={(locationId) => assetHref(locationId, [], query)}
+              route={assetsRoute}
+            />
+          )}
 
-        {tab === 'move' && (
-          <MovePlanTab
-            onClose={() => setTab('items')}
-            characterIds={shipCharacterIds}
-            activeCharacterId={activeCharacterId}
-          />
-        )}
+          {tab === 'move' && (
+            <MovePlanTab
+              onClose={() => setTab('items')}
+              characterIds={shipCharacterIds}
+              activeCharacterId={activeCharacterId}
+            />
+          )}
 
-        {tab === 'items' && assetsResult && !assetsNeedsReauth && (
-          <SearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('assets.searchPlaceholder')}
-          />
-        )}
+          {tab === 'items' && assetsResult && !assetsNeedsReauth && (
+            <SearchInput
+              ref={searchRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('assets.searchPlaceholder')}
+            />
+          )}
 
-        {tab === 'items' && selectMode && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            {selectedIds.size > 0 && (
-              <span className="text-[0.6875rem] text-text-dim tabular-nums">
-                {t('assets.select.selectedCount', { count: selectedIds.size })}
-              </span>
-            )}
-            <Button size="sm" onClick={handleSelectAllInView}>
-              {t('assets.select.selectAllInView')}
-            </Button>
-            <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
-              {t('assets.select.deselectAll')}
-            </Button>
-            {selectedIds.size > 0 && (
-              <>
-                <Button
-                  size="sm"
-                  disabled={activeCharacterId === null}
-                  onClick={handleBulkAddToQuickbar}
-                >
-                  {t('assets.select.addToQuickbar')}
-                </Button>
-                <Button size="sm" onClick={handleBulkAddToCompare}>
-                  {t('assets.select.addToCompare')}
-                </Button>
-                <Button size="sm" onClick={handleBulkCopyNames}>
-                  {t('assets.select.copyNames')}
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-
-        {tab !== 'items' ? null : loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : assetsNeedsReauth ? (
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterAssets']}
-            title={t('assets.reauthTitle')}
-            hint={t('assets.reauthHint')}
-            actionLabel={t('assets.reauthAction')}
-          />
-        ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ) : !assetsResult ? (
-          <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
-            {assetsResult.fromCache && (
-              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-            )}
-            {assetsTruncated && (
-              <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
-                <span>
-                  {t('common.incompleteTitle')} —{' '}
-                  {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+          {tab === 'items' && selectMode && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+              {selectedIds.size > 0 && (
+                <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                  {t('assets.select.selectedCount', { count: selectedIds.size })}
                 </span>
-                <Button size="sm" disabled={loading} onClick={refresh}>
-                  {t('assets.fetchTruncatedRetry')}
-                </Button>
-              </p>
-            )}
+              )}
+              <Button size="sm" onClick={handleSelectAllInView}>
+                {t('assets.select.selectAllInView')}
+              </Button>
+              <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
+                {t('assets.select.deselectAll')}
+              </Button>
+              {selectedIds.size > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    disabled={activeCharacterId === null}
+                    onClick={handleBulkAddToQuickbar}
+                  >
+                    {t('assets.select.addToQuickbar')}
+                  </Button>
+                  <Button size="sm" onClick={handleBulkAddToCompare}>
+                    {t('assets.select.addToCompare')}
+                  </Button>
+                  <Button size="sm" onClick={handleBulkCopyNames}>
+                    {t('assets.select.copyNames')}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
-            <AssetItemActionsContext.Provider value={assetItemActions}>
-              <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
-                {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
-                {flatModeActive ? (
-                  <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('assets.search.resultCount', { count: flatMatches.length })}
-                    </span>
-                    {/* CSV export always stays scoped to the active Character's own
+          {tab !== 'items' ? null : loading && !data ? (
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : assetsNeedsReauth ? (
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCharacterAssets']}
+              title={t('assets.reauthTitle')}
+              hint={t('assets.reauthHint')}
+              actionLabel={t('assets.reauthAction')}
+            />
+          ) : error ? (
+            <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          ) : !assetsResult ? (
+            <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              {assetsResult.fromCache && (
+                <p className="text-[0.6875rem] text-warning uppercase">
+                  {t('common.offlineTitle')}
+                </p>
+              )}
+              {assetsTruncated && (
+                <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
+                  <span>
+                    {t('common.incompleteTitle')} —{' '}
+                    {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+                  </span>
+                  <Button size="sm" disabled={loading} onClick={refresh}>
+                    {t('assets.fetchTruncatedRetry')}
+                  </Button>
+                </p>
+              )}
+
+              <AssetItemActionsContext.Provider value={assetItemActions}>
+                <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
+                  {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
+                  {flatModeActive ? (
+                    <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+                      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('assets.search.resultCount', { count: flatMatches.length })}
+                      </span>
+                      {/* CSV export always stays scoped to the active Character's own
                       assets (see buildCsvGroups above) — this is the only UI surface
                       that explains why (issue #415), shown exactly when cross-
                       character results are actually on screen to be confused by. */}
-                    {activeCrossCharacterData && (
-                      <span className="text-[0.6875rem] text-text-dim">
-                        {t('assets.crossCharacterCsvNote')}
-                      </span>
-                    )}
-                    <div className="ml-auto flex items-center gap-2">
-                      <IskInput
-                        size="sm"
-                        echo={false}
-                        value={minValueInput}
-                        onChange={(min) => setView({ min })}
-                        placeholder={t('assets.minValue.placeholder')}
-                        aria-label={t('assets.minValue.label')}
-                        className="w-24"
-                      />
-                      <Select
-                        value={sortField}
-                        onValueChange={(value) => void setSortField(value as AssetSortField)}
-                      >
-                        <SelectTrigger
+                      {activeCrossCharacterData && (
+                        <span className="text-[0.6875rem] text-text-dim">
+                          {t('assets.crossCharacterCsvNote')}
+                        </span>
+                      )}
+                      <div className="ml-auto flex items-center gap-2">
+                        <IskInput
                           size="sm"
-                          aria-label={t('assets.sort.label')}
-                          className="w-28"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-                          <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-                          <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {searchActive && (
-                        <IconButton
-                          icon={<Icon.Close />}
-                          label={t('assets.search.clear')}
-                          variant="plain"
-                          size="sm"
-                          onClick={() => setSearch('')}
+                          echo={false}
+                          value={minValueInput}
+                          onChange={(min) => setView({ min })}
+                          placeholder={t('assets.minValue.placeholder')}
+                          aria-label={t('assets.minValue.label')}
+                          className="w-24"
                         />
-                      )}
-                    </div>
-                  </div>
-                ) : pathStationId !== null ? (
-                  <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
-                    <IconButton
-                      icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
-                      label={t('assets.breadcrumb.back')}
-                      variant="plain"
-                      onClick={() => void navigate(parentHref)}
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <h2
-                        ref={levelHeadingRef}
-                        tabIndex={-1}
-                        className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                        {currentTotals && (
-                          <span className="sr-only">
-                            {t('assets.levelHeading.itemsSuffix', {
-                              items: t('assets.itemCount', { count: currentTotals.itemCount }),
-                            })}
-                          </span>
-                        )}
-                      </h2>
-                      {phoneFacts && (
-                        <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
-                          {phoneFacts.map((fact, index) => (
-                            <span key={fact.key} className="flex items-center gap-1">
-                              {index > 0 && <span aria-hidden="true">·</span>}
-                              {fact.node}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                      {crumbs.length > 1 && (
-                        <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
-                          {crumbs.slice(0, -1).map((crumb, index) => (
-                            <span key={crumb.href} className="flex min-w-0 items-center gap-1">
-                              {index > 0 && <span aria-hidden="true">›</span>}
-                              <Link to={crumb.href} className="truncate hover:text-accent">
-                                {crumb.label}
-                              </Link>
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </div>
-                    {!phoneFacts &&
-                      resolved.station &&
-                      !isUnresolvedParent(resolved.station, mergedLocationNames) && (
-                        <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
-                          <SecurityValue
-                            security={securityForStation(resolved.station.locationId)}
-                          />
-                          <JumpsAwayText
-                            result={jumpsAwayByKey.get(
-                              `${resolved.station.locationId}:${jumpsFor}`
-                            )}
-                            t={t}
-                            locationId={resolved.station.locationId}
-                            preference={routeOverride}
-                          />
-                        </span>
-                      )}
-                    {currentTotals && !phoneFacts && (
-                      <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
-                        <span className="hidden sm:inline">
-                          {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
-                        </span>
-                        <span className="text-sm font-semibold text-isk-pos">
-                          <IskAmount value={currentTotals.estimatedValue} decimals={0} />
-                        </span>
-                      </span>
-                    )}
-                    {deepest && 'kind' in deepest && deepest.kind === 'ship' && (
-                      <Button
-                        size="md"
-                        className="shrink-0"
-                        onClick={() =>
-                          void assetShipEditLocation(deepest, nodeLabel(deepest)).then(
-                            (location) => {
-                              if (location) void navigate(location);
-                            }
-                          )
-                        }
-                      >
-                        {t('assets.openInFittings')}
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                      <h2
-                        ref={levelHeadingRef}
-                        tabIndex={-1}
-                        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        {t('assets.section.locationCount', { count: sortedTree.length })}
-                        {showTotalValueChip && ' · '}
-                        {showTotalValueChip && (
-                          <span
-                            data-testid="assets-total-value"
-                            className="text-sm font-semibold tracking-normal text-isk-pos normal-case tabular-nums"
+                        <Select
+                          value={sortField}
+                          onValueChange={(value) => void setSortField(value as AssetSortField)}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t('assets.sort.label')}
+                            className="w-28"
                           >
-                            {totalValueFiltered
-                              ? t('assets.section.totalValueFiltered', {
-                                  value: formatIsk(totalValue),
-                                })
-                              : t('assets.section.totalValue', { value: formatIsk(totalValue) })}
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
+                            <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
+                            <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {searchActive && (
+                          <IconButton
+                            icon={<Icon.Close />}
+                            label={t('assets.search.clear')}
+                            variant="plain"
+                            size="sm"
+                            onClick={() => {
+                              setSearch('');
+                              searchRef.current?.focus();
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : pathStationId !== null ? (
+                    <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
+                      <IconButton
+                        icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
+                        label={t('assets.breadcrumb.back')}
+                        variant="plain"
+                        onClick={() => void navigate(parentHref)}
+                      />
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <h2
+                          ref={levelHeadingRef}
+                          tabIndex={-1}
+                          className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
+                          {currentTotals && (
+                            <span className="sr-only">
+                              {t('assets.levelHeading.itemsSuffix', {
+                                items: t('assets.itemCount', { count: currentTotals.itemCount }),
+                              })}
+                            </span>
+                          )}
+                        </h2>
+                        {phoneFacts && (
+                          <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
+                            {phoneFacts.map((fact, index) => (
+                              <span key={fact.key} className="flex items-center gap-1">
+                                {index > 0 && <span aria-hidden="true">·</span>}
+                                {fact.node}
+                              </span>
+                            ))}
                           </span>
                         )}
-                      </h2>
-                      {/* flex-wrap (issue #415): on a narrow phone the two Selects no
+                        {crumbs.length > 1 && (
+                          <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
+                            {crumbs.slice(0, -1).map((crumb, index) => (
+                              <span key={crumb.href} className="flex min-w-0 items-center gap-1">
+                                {index > 0 && <span aria-hidden="true">›</span>}
+                                <Link to={crumb.href} className="truncate hover:text-accent">
+                                  {crumb.label}
+                                </Link>
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                      {!phoneFacts &&
+                        resolved.station &&
+                        !isUnresolvedParent(resolved.station, mergedLocationNames) && (
+                          <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
+                            <SecurityValue
+                              security={securityForStation(resolved.station.locationId)}
+                            />
+                            <JumpsAwayText
+                              result={jumpsAwayByKey.get(
+                                `${resolved.station.locationId}:${jumpsFor}`
+                              )}
+                              t={t}
+                              locationId={resolved.station.locationId}
+                              preference={routeOverride}
+                            />
+                          </span>
+                        )}
+                      {currentTotals && !phoneFacts && (
+                        <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
+                          <span className="hidden sm:inline">
+                            {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
+                          </span>
+                          <span className="text-sm font-semibold text-isk-pos">
+                            <IskAmount value={currentTotals.estimatedValue} decimals={0} />
+                          </span>
+                        </span>
+                      )}
+                      {deepest && 'kind' in deepest && deepest.kind === 'ship' && (
+                        <Button
+                          size="md"
+                          className="shrink-0"
+                          onClick={() =>
+                            void assetShipEditLocation(deepest, nodeLabel(deepest)).then(
+                              (location) => {
+                                if (location) void navigate(location);
+                              }
+                            )
+                          }
+                        >
+                          {t('assets.openInFittings')}
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                        <h2
+                          ref={levelHeadingRef}
+                          tabIndex={-1}
+                          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          {t('assets.section.locationCount', { count: sortedTree.length })}
+                          {showTotalValueChip && ' · '}
+                          {showTotalValueChip && (
+                            <span
+                              data-testid="assets-total-value"
+                              className="text-sm font-semibold tracking-normal text-isk-pos normal-case tabular-nums"
+                            >
+                              {totalValueFiltered
+                                ? t('assets.section.totalValueFiltered', {
+                                    value: formatIsk(totalValue),
+                                  })
+                                : t('assets.section.totalValue', { value: formatIsk(totalValue) })}
+                            </span>
+                          )}
+                        </h2>
+                        {/* flex-wrap (issue #415): on a narrow phone the two Selects no
                         longer share one row with no priority order — Sort stays put
                         (it comes first in DOM order) and Route is the one that drops
                         to its own line when both can't fit beside the label. */}
-                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                        <Select
-                          value={stationSortField}
-                          onValueChange={(value) =>
-                            void setStationSortField(value as StationSortField)
-                          }
-                        >
-                          <SelectTrigger
-                            aria-label={t('assets.stationSort.label')}
-                            className="w-36"
+                        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                          <Select
+                            value={stationSortField}
+                            onValueChange={(value) =>
+                              void setStationSortField(value as StationSortField)
+                            }
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
-                            <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
-                            <SelectItem value="itemCount">
-                              {t('assets.stationSort.itemCount')}
-                            </SelectItem>
-                            <SelectItem value="jumpsAway">
-                              {t('assets.stationSort.jumpsAway')}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={routePreference}
-                          onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
-                        >
-                          <SelectTrigger
-                            aria-label={t('assets.jumpsAway.routePreference.label')}
-                            className="w-40"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ROUTE_PREFERENCES.map((preference) => (
-                              <SelectItem key={preference} value={preference}>
-                                {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                            <SelectTrigger
+                              aria-label={t('assets.stationSort.label')}
+                              className="w-36"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+                              <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+                              <SelectItem value="itemCount">
+                                {t('assets.stationSort.itemCount')}
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                              <SelectItem value="jumpsAway">
+                                {t('assets.stationSort.jumpsAway')}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={routePreference}
+                            onValueChange={(value) =>
+                              setRouteOverride(value as RoutePreferenceKind)
+                            }
+                          >
+                            <SelectTrigger
+                              aria-label={t('assets.jumpsAway.routePreference.label')}
+                              className="w-40"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ROUTE_PREFERENCES.map((preference) => (
+                                <SelectItem key={preference} value={preference}>
+                                  {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      {/* Without the grant every row degrades to "-"; the note
+                      says why (issue #1590). */}
+                      <GrantNote
+                        className="shrink-0 border-b border-line px-3"
+                        characterId={activeCharacterId}
+                        endpoints={LOCATION_ENDPOINTS}
+                        title={t('assets.jumpsAway.locationNotGrantedTitle')}
+                        hint={t('assets.jumpsAway.locationNotGrantedHint')}
+                        actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
+                      />
+                    </>
+                  )}
+
+                  {/* --- the list --- */}
+                  {resolved.unresolved.length > 0 ? (
+                    <EmptyState
+                      title={t('assets.staleLink.title')}
+                      hint={t('assets.staleLink.hint')}
+                      className="py-8"
+                      action={
+                        <Button size="sm" onClick={() => void navigate(assetHref(null, [], query))}>
+                          {t('assets.staleLink.action')}
+                        </Button>
+                      }
+                    />
+                  ) : rows.length === 0 ? (
+                    <EmptyState
+                      title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
+                      className="py-8"
+                    />
+                  ) : (
+                    <div
+                      ref={scrollParentRef}
+                      data-virtual-scroll-root
+                      role="region"
+                      aria-label={t('assets.treeLabel')}
+                      className="min-h-0 flex-1 overflow-y-auto"
+                    >
+                      {showItemColumns && <ItemColumnLabels t={t} />}
+                      <div
+                        role="presentation"
+                        style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                      >
+                        <TableExportProvider tableExport={assetsExport}>
+                          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                            const row = rows[virtualRow.index];
+                            return (
+                              <div
+                                key={virtualRow.key}
+                                data-index={virtualRow.index}
+                                ref={rowVirtualizer.measureElement}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  width: '100%',
+                                  transform: `translateY(${virtualRow.start}px)`,
+                                }}
+                              >
+                                <BrowseRowView
+                                  row={row}
+                                  t={t}
+                                  typeNames={mergedTypeNames}
+                                  characterBadges={characterBadges}
+                                  selectMode={selectMode}
+                                  selectedIds={selectedIds}
+                                  onToggleSelection={toggleNodeSelection}
+                                  stationLabelFor={stationLabelFor}
+                                  nodeLabel={nodeLabel}
+                                  locationNames={mergedLocationNames}
+                                  securityForStation={securityForStation}
+                                  jumpsAwayFor={(locationId) =>
+                                    jumpsAwayByKey.get(`${locationId}:${jumpsFor}`)
+                                  }
+                                  pinStateFor={pinStateFor}
+                                  onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                                  pathStationId={pathStationId}
+                                  pathSegments={pathSegments}
+                                  trailFor={trailFor}
+                                  rootStationIdFor={rootStationIdFor}
+                                  query={query}
+                                />
+                              </div>
+                            );
+                          })}
+                        </TableExportProvider>
                       </div>
                     </div>
-                    {/* Without the grant every row degrades to "-"; the note
-                      says why (issue #1590). */}
-                    <GrantNote
-                      className="shrink-0 border-b border-line px-3"
-                      characterId={activeCharacterId}
-                      endpoints={LOCATION_ENDPOINTS}
-                      title={t('assets.jumpsAway.locationNotGrantedTitle')}
-                      hint={t('assets.jumpsAway.locationNotGrantedHint')}
-                      actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
-                    />
-                  </>
-                )}
-
-                {/* --- the list --- */}
-                {resolved.unresolved.length > 0 ? (
-                  <EmptyState
-                    title={t('assets.staleLink.title')}
-                    hint={t('assets.staleLink.hint')}
-                    className="py-8"
-                    action={
-                      <Button size="sm" onClick={() => void navigate(assetHref(null, [], query))}>
-                        {t('assets.staleLink.action')}
-                      </Button>
-                    }
-                  />
-                ) : rows.length === 0 ? (
-                  <EmptyState
-                    title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
-                    className="py-8"
-                  />
-                ) : (
-                  <div
-                    ref={scrollParentRef}
-                    data-virtual-scroll-root
-                    aria-label={t('assets.treeLabel')}
-                    className="min-h-0 flex-1 overflow-y-auto"
-                  >
-                    {showItemColumns && <ItemColumnLabels t={t} />}
-                    <div
-                      role="presentation"
-                      style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
-                    >
-                      <TableExportProvider tableExport={assetsExport}>
-                        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                          const row = rows[virtualRow.index];
-                          return (
-                            <div
-                              key={virtualRow.key}
-                              data-index={virtualRow.index}
-                              ref={rowVirtualizer.measureElement}
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                transform: `translateY(${virtualRow.start}px)`,
-                              }}
-                            >
-                              <BrowseRowView
-                                row={row}
-                                t={t}
-                                typeNames={mergedTypeNames}
-                                characterBadges={characterBadges}
-                                selectMode={selectMode}
-                                selectedIds={selectedIds}
-                                onToggleSelection={toggleNodeSelection}
-                                stationLabelFor={stationLabelFor}
-                                nodeLabel={nodeLabel}
-                                locationNames={mergedLocationNames}
-                                securityForStation={securityForStation}
-                                jumpsAwayFor={(locationId) =>
-                                  jumpsAwayByKey.get(`${locationId}:${jumpsFor}`)
-                                }
-                                pinStateFor={pinStateFor}
-                                onTogglePin={(locationId) => void handleTogglePin(locationId)}
-                                pathStationId={pathStationId}
-                                pathSegments={pathSegments}
-                                trailFor={trailFor}
-                                rootStationIdFor={rootStationIdFor}
-                                query={query}
-                              />
-                            </div>
-                          );
-                        })}
-                      </TableExportProvider>
-                    </div>
-                  </div>
-                )}
-              </Panel>
-            </AssetItemActionsContext.Provider>
-          </div>
-        )}
+                  )}
+                </Panel>
+              </AssetItemActionsContext.Provider>
+            </div>
+          )}
+        </TabPanel>
       </div>
     </ItemActionsProvider>
   );

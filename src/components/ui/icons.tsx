@@ -121,6 +121,7 @@ import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
+import { User } from '@phosphor-icons/react/dist/csr/User';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
@@ -229,6 +230,8 @@ export const Route = withWeight(ArrowsLeftRight);
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
+/** One of the pilot's own orders in the Order Book — beside the price, named "You". */
+export const MyOrder = withWeight(User);
 /** A Charge Picker row the player holds in cargo — not `ChargeLoaded`, which is what is fitted. */
 export const InCargo = withWeight(Backpack);
 /** The charge currently loaded in the weapon, in either Charge Picker. */

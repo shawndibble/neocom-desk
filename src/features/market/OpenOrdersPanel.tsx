@@ -27,6 +27,7 @@ import {
   IskAmount,
   MenuItem,
   MultiSelect,
+  LiveStatus,
   Panel,
   SearchInput,
   Select,
@@ -923,6 +924,7 @@ export function OpenOrdersPanel() {
                   </Select>
                   {showLocationFilter && (
                     <MultiSelect
+                      label={t('market.orders.filter.location')}
                       trigger={
                         <Button size="sm">
                           {draft.locationIds.length === 0
@@ -1040,8 +1042,17 @@ export function OpenOrdersPanel() {
             would read as a broken filter, so the count steps aside and the
             folded Healthy group speaks for itself.
           */}
+          <LiveStatus>
+            {matchCountVisible
+              ? t('market.orders.filter.matchCount', {
+                  count: visibleRows.length,
+                  total: allRows.length,
+                })
+              : groups.length === 0 && t('orders.noResults')}
+          </LiveStatus>
+
           {matchCountVisible && (
-            <p className="px-3 pt-2 text-xs text-text-dim">
+            <p aria-hidden="true" className="px-3 pt-2 text-xs text-text-dim">
               {t('market.orders.filter.matchCount', {
                 count: visibleRows.length,
                 total: allRows.length,
@@ -1118,7 +1129,8 @@ export function OpenOrdersPanel() {
                             size="sm"
                             variant="plain"
                             icon={<Icon.Refresh />}
-                            label={t('market.orders.checkDeeper')}
+                            label={t('market.orders.checkDeeperGroup', { group: groupTitle })}
+                            tooltip={t('market.orders.checkDeeper')}
                             onClick={() => orderDetail.checkDeeper(group.rows)}
                           />
                         )}

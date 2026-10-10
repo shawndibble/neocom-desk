@@ -19,6 +19,8 @@ import {
   SearchInput,
   Spinner,
   Tabs,
+  TabPanel,
+  useTabsId,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -444,6 +446,7 @@ export function Contracts() {
    * for what the page header and body draw, and `mode` says which corpus.
    */
   const [tabId, setTabId] = useRememberedPageTab(CONTRACTS_TABS, rememberedTab);
+  const tabsId = useTabsId();
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
   const selectTab = useCallback(
@@ -733,141 +736,149 @@ export function Contracts() {
         }
       />
 
-      <Tabs tabs={pageTabs} value={tabId} onChange={selectTab} label={t('contracts.tabsLabel')} />
+      <Tabs
+        tabsId={tabsId}
+        tabs={pageTabs}
+        value={tabId}
+        onChange={selectTab}
+        label={t('contracts.tabsLabel')}
+      />
 
-      {/* Switched outside the history chain below, not inside it: Search needs
+      <TabPanel tabsId={tabsId} tabId={tabId} className="space-y-2 sm:space-y-4">
+        {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
-      {tab === 'search' ? (
-        <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
-      ) : loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : contractsNeedsReauth ? (
-        <GrantBanner
-          characterId={activeCharacterId}
-          endpoints={['getCharacterContracts']}
-          title={t('contracts.reauthTitle')}
-          hint={t('contracts.reauthHint')}
-          actionLabel={t('contracts.reauthAction')}
-        />
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !contractsResult || contracts.length === 0 ? (
-        <CachedEmptyState
-          result={contractsResult}
-          title={t('contracts.emptyTitle')}
-          hint={t('contracts.emptyHint')}
-          fetchedTitle={t('contracts.emptyFetchedTitle')}
-        />
-      ) : (
-        <Panel padded={false}>
-          {contractsResult.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.offlineTitle')}
-            </p>
-          )}
-          {contractsTruncated && (
-            <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              <span>{t('common.incompleteTitle')}</span>
-              <Button size="sm" disabled={loading} onClick={refresh}>
-                {t('contracts.fetchTruncatedRetry')}
-              </Button>
-            </p>
-          )}
-          <ContractsFilterBar
-            filter={filter}
-            onChange={setFilter}
-            statusOptions={statusOptions}
-            typeOptions={typeOptions}
-            actions={
-              <ColumnPickerMenu
-                available={CONTRACTS_HISTORY_COLUMN_IDS}
-                visible={historyColumnVisibility.visible}
-                columnsById={optionalHistoryColumns}
-                showLabel
-                onToggle={historyColumnVisibility.toggle}
-                buttonLabel={t('common.columnsButton')}
-                menuTitle={t('common.columnsMenuTitle')}
-                onReset={historyColumnVisibility.reset}
-                resetLabel={t('common.resetColumns')}
-              />
-            }
-          />
-          {/* Phone only: the filter sheet's status chips, one tap away. */}
-          <div
-            role="group"
-            aria-label={t('contracts.statusFilterLabel')}
-            className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
-          >
-            <FilterChip
-              label={t('contracts.statusAll')}
-              selected={filter.status === null}
-              onToggle={() => setFilter({ ...filter, status: null })}
-            />
-            {statusOptions.map((status) => (
-              <FilterChip
-                key={status}
-                label={t(CONTRACT_STATUS_KEY[status])}
-                selected={filter.status === status}
-                onToggle={() =>
-                  setFilter({ ...filter, status: filter.status === status ? null : status })
-                }
-              />
-            ))}
+        {tab === 'search' ? (
+          <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
+        ) : loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
           </div>
-          {filteredContracts.length === 0 ? (
-            // Zero matches with no active filter can't happen today (an empty
-            // list is caught above), but the reset only belongs where a filter is on.
-            isContractsFilterActive(filter) ? (
-              <EmptyState
-                title={t('contracts.noFilterMatches')}
-                hint={t('contracts.noFilterMatchesResetHint')}
-                className="py-8"
-                action={
-                  <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
-                    {t('common.resetFilters')}
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState
-                title={t('contracts.noFilterMatches')}
-                hint={t('contracts.noFilterMatchesHint')}
-                className="py-8"
-              />
-            )
-          ) : (
-            <DataTable
-              {...historyExport.tableProps}
-              label={t('contracts.title')}
-              columns={columns}
-              rows={filteredContracts}
-              rowKey={contractRowKey}
-              virtualize="auto"
-              highlightRowKey={highlightedContractId}
-              {...historySortProps}
-              stackLayout="dense"
-              // Issue days are sections on a phone, not folded duplicates:
-              // open, with members in line with the cards above them.
-              className="dt-flat-groups"
-              groupBy={{
-                key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
-                minSize: 1,
-                defaultExpanded: () => true,
-                renderHeader: (rows) => (
-                  <ContractDayHeader
-                    date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
-                    count={rows.length}
-                    timeZone={timeZone}
-                  />
-                ),
-              }}
+        ) : contractsNeedsReauth ? (
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterContracts']}
+            title={t('contracts.reauthTitle')}
+            hint={t('contracts.reauthHint')}
+            actionLabel={t('contracts.reauthAction')}
+          />
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !contractsResult || contracts.length === 0 ? (
+          <CachedEmptyState
+            result={contractsResult}
+            title={t('contracts.emptyTitle')}
+            hint={t('contracts.emptyHint')}
+            fetchedTitle={t('contracts.emptyFetchedTitle')}
+          />
+        ) : (
+          <Panel padded={false}>
+            {contractsResult.fromCache && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.offlineTitle')}
+              </p>
+            )}
+            {contractsTruncated && (
+              <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                <span>{t('common.incompleteTitle')}</span>
+                <Button size="sm" disabled={loading} onClick={refresh}>
+                  {t('contracts.fetchTruncatedRetry')}
+                </Button>
+              </p>
+            )}
+            <ContractsFilterBar
+              filter={filter}
+              onChange={setFilter}
+              statusOptions={statusOptions}
+              typeOptions={typeOptions}
+              actions={
+                <ColumnPickerMenu
+                  available={CONTRACTS_HISTORY_COLUMN_IDS}
+                  visible={historyColumnVisibility.visible}
+                  columnsById={optionalHistoryColumns}
+                  showLabel
+                  onToggle={historyColumnVisibility.toggle}
+                  buttonLabel={t('common.columnsButton')}
+                  menuTitle={t('common.columnsMenuTitle')}
+                  onReset={historyColumnVisibility.reset}
+                  resetLabel={t('common.resetColumns')}
+                />
+              }
             />
-          )}
-        </Panel>
-      )}
+            {/* Phone only: the filter sheet's status chips, one tap away. */}
+            <div
+              role="group"
+              aria-label={t('contracts.statusFilterLabel')}
+              className="flex gap-2 overflow-x-auto border-b border-line px-3 py-2 sm:hidden"
+            >
+              <FilterChip
+                label={t('contracts.statusAll')}
+                selected={filter.status === null}
+                onToggle={() => setFilter({ ...filter, status: null })}
+              />
+              {statusOptions.map((status) => (
+                <FilterChip
+                  key={status}
+                  label={t(CONTRACT_STATUS_KEY[status])}
+                  selected={filter.status === status}
+                  onToggle={() =>
+                    setFilter({ ...filter, status: filter.status === status ? null : status })
+                  }
+                />
+              ))}
+            </div>
+            {filteredContracts.length === 0 ? (
+              // Zero matches with no active filter can't happen today (an empty
+              // list is caught above), but the reset only belongs where a filter is on.
+              isContractsFilterActive(filter) ? (
+                <EmptyState
+                  title={t('contracts.noFilterMatches')}
+                  hint={t('contracts.noFilterMatchesResetHint')}
+                  className="py-8"
+                  action={
+                    <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
+                      {t('common.resetFilters')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  title={t('contracts.noFilterMatches')}
+                  hint={t('contracts.noFilterMatchesHint')}
+                  className="py-8"
+                />
+              )
+            ) : (
+              <DataTable
+                {...historyExport.tableProps}
+                label={t('contracts.title')}
+                columns={columns}
+                rows={filteredContracts}
+                rowKey={contractRowKey}
+                virtualize="auto"
+                highlightRowKey={highlightedContractId}
+                {...historySortProps}
+                stackLayout="dense"
+                // Issue days are sections on a phone, not folded duplicates:
+                // open, with members in line with the cards above them.
+                className="dt-flat-groups"
+                groupBy={{
+                  key: (contract) => formatDateOnly(new Date(contract.date_issued), timeZone),
+                  minSize: 1,
+                  defaultExpanded: () => true,
+                  renderHeader: (rows) => (
+                    <ContractDayHeader
+                      date={formatDateOnly(new Date(rows[0].date_issued), timeZone)}
+                      count={rows.length}
+                      timeZone={timeZone}
+                    />
+                  ),
+                }}
+              />
+            )}
+          </Panel>
+        )}
+      </TabPanel>
 
       {tab === 'history' && selectedContract && activeCharacterId !== null && (
         <ContractDetailModal

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import i18n from '@/i18n';
-import { BaitFlag, LocationCell } from './marketOrderCells';
+import { BaitFlag, LocationCell, MyOrderMark } from './marketOrderCells';
 import type { RegionOrder } from '@/esi/endpoints';
 
 const STATION_ORDER: RegionOrder = {
@@ -61,5 +61,14 @@ describe('BaitFlag', () => {
   it('renders nothing for an ordinary price', () => {
     const { container } = render(<BaitFlag multiple={null} t={i18n.t} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('MyOrderMark', () => {
+  it('is a visible glyph named "You", not a tab stop', () => {
+    render(<MyOrderMark t={i18n.t} />);
+    const mark = screen.getByRole('img', { name: 'You' });
+    expect(mark).not.toHaveAttribute('tabindex');
+    expect(mark).not.toHaveClass('sr-only');
   });
 });

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { SyncError, SyncOffline, SyncSynced, SyncSyncing } from '@/components/ui/icons';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import type { SyncStatus } from '@/sync';
 import { syncDisplayState, type SyncDisplayState } from './syncStatus';
 
@@ -31,7 +32,7 @@ export function SyncStatusDot({ status, online }: SyncStatusDotProps) {
         aria-label={label}
         tabIndex={0}
         data-sync-state={displayState}
-        className={`inline-flex shrink-0 ${className}`}
+        className={`inline-flex shrink-0 rounded-full ${className} ${focusRingClassName}`}
       >
         <Icon size={GLYPH_SIZE} aria-hidden="true" />
       </span>

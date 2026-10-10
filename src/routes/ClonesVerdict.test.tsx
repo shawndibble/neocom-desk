@@ -270,12 +270,40 @@ describe('Clones training verdict', () => {
     expect(within(card).queryByRole('button', { name: /^Route to/ })).not.toBeInTheDocument();
   });
 
+  it('describes the queue bar segments to a screen reader without a new tab stop', async () => {
+    scenario.worn = [IMPLANT_INT5];
+    scenario.intelligence = 25;
+    scenario.jumpImplants = [[IMPLANT_PLAIN], []];
+    render(<App />);
+    const card = await verdictCard('Stay put');
+    const bar = within(card).getByRole('img', { name: /^Stay in this clone/ });
+    const list = document.getElementById(bar.getAttribute('aria-describedby') ?? '');
+    expect(list).toHaveClass('sr-only');
+    expect(within(list as HTMLElement).getAllByText(/: \d+[dhm]/).length).toBeGreaterThan(0);
+    expect(bar).not.toHaveAttribute('tabindex');
+  });
+
   it('shows no verdict for an empty queue', async () => {
     scenario.queue = () => [];
     render(<App />);
     expect(await screen.findByText(/training queue is empty/)).toBeInTheDocument();
     expect(screen.queryByText('Worth a jump')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay put')).not.toBeInTheDocument();
+  });
+
+  it('disables the training sort with its reason when there is no verdict, keeping the stored sort', async () => {
+    scenario.queue = () => [];
+    render(<App />);
+    await screen.findByText(/training queue is empty/);
+    const group = screen.getByRole('group', { name: 'Sort clones' });
+    const training = within(group).getByRole('button', { name: 'Best for training' });
+    expect(training).toHaveAttribute('aria-disabled', 'true');
+    for (const b of within(group).getAllByRole('button')) {
+      expect(b).toHaveAttribute('aria-pressed', 'false');
+    }
+    fireEvent.click(training);
+    expect(useClonesSort.getState().value).toBe('training');
+    expect(await db.settings.get('clonesSort')).toBeUndefined();
   });
 
   it('shows no verdict for a paused queue', async () => {

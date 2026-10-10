@@ -104,3 +104,14 @@ describe('IskInput', () => {
     expect(screen.queryByText('= 1,000,000,000 ISK')).not.toBeInTheDocument();
   });
 });
+
+describe('IskInput description', () => {
+  it('describes the field by the echo, only while there is one', async () => {
+    const user = userEvent.setup();
+    render(<Harness onCommit={vi.fn()} />);
+    const input = screen.getByLabelText('Max price');
+    expect(input).not.toHaveAttribute('aria-describedby');
+    await user.type(input, '1b');
+    expect(input).toHaveAccessibleDescription('= 1,000,000,000 ISK');
+  });
+});

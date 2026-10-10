@@ -439,5 +439,41 @@ describe('CompareDrawer', () => {
 
       expect(useCompareSet.getState().items).toEqual([]);
     });
+
+    it('moves focus to the heading when the handle opens it, with the page behind inert until close', async () => {
+      narrowState.narrow = true;
+      const user = userEvent.setup();
+      act(() => useCompareSet.setState({ items: [ITEM_A] }));
+      const { container } = renderDrawer();
+      await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+      const region = await screen.findByRole('region', { name: 'Compare' });
+
+      expect(document.activeElement).toBe(
+        within(region).getByRole('heading', { name: 'Compare (1)' })
+      );
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+      expect(container.parentElement?.querySelector('[inert]')).not.toBeNull();
+
+      await user.click(within(region).getByRole('button', { name: 'Close' }));
+
+      expect(document.querySelector('[inert]')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Compare (1)' })).toHaveFocus();
+    });
+
+    it('a sheet opened from a Variations "Compare" click takes focus, so Escape closes it', async () => {
+      narrowState.narrow = true;
+      const user = userEvent.setup();
+      act(() => {
+        useCompareSet.setState({ items: [ITEM_A] });
+        useCompareSet.getState().openIn('prices');
+      });
+      renderDrawer();
+      const region = await screen.findByRole('region', { name: 'Compare' });
+      expect(region.contains(document.activeElement)).toBe(true);
+
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    });
   });
 });

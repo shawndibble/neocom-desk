@@ -217,6 +217,7 @@ export function RowActionsMenu({
   name,
   items,
   onOpenChange,
+  onCloseAutoFocus,
   tooltip,
   linksKeepBrowserMenu = false,
   children,
@@ -237,7 +238,7 @@ export function RowActionsMenu({
   const extras = useContext(RowMenuExtrasContext);
   useEffect(() => warnRestraint(name, items), [name, items]);
   return (
-    <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
+    <RowActionsContext.Provider value={{ name, items, onOpenChange, onCloseAutoFocus }}>
       <TooltipHoldContext.Provider value={false}>
         <ContextMenu onOpenChange={onOpenChange}>
           {tooltip === undefined ? (
@@ -247,7 +248,7 @@ export function RowActionsMenu({
             // props), never inside it: a component there would drop them.
             <Tooltip content={tooltip}>{trigger}</Tooltip>
           )}
-          <ContextMenuContent>
+          <ContextMenuContent onCloseAutoFocus={onCloseAutoFocus}>
             {items}
             {extras}
           </ContextMenuContent>
@@ -285,7 +286,11 @@ export function RowMoreActions({ className }: { className?: string }) {
       </DropdownMenuTrigger>
       {/* Stops a right-click on an item bubbling (through the React tree,
           portal or not) to the row's own context-menu trigger. */}
-      <DropdownMenuContent align="end" onContextMenu={(event) => event.stopPropagation()}>
+      <DropdownMenuContent
+        align="end"
+        onContextMenu={(event) => event.stopPropagation()}
+        onCloseAutoFocus={actions.onCloseAutoFocus}
+      >
         <MenuKindContext.Provider value="dropdown">
           {actions.items}
           {extras}
