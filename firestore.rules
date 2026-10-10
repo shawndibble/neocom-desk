@@ -363,7 +363,7 @@ service cloud.firestore {
       // name, since a visitor can't resolve one) and the starter's notes. One
       // create-only doc per change carrying the whole current info, the newest
       // counting; a field left out is cleared. Same sign-in, owner and expiry
-      // rules as the moon tax. The caps mirror MAX_LOCATION_NAME and MAX_SURVEY_NOTES.
+      // rules as the moon tax. The client caps by characters (MAX_LOCATION_NAME, MAX_SURVEY_NOTES); these allow 4x that so multibyte text is never refused.
       match /surveyInfo/{infoId} {
         allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
         allow create: if request.auth != null
@@ -377,10 +377,10 @@ service cloud.firestore {
               && request.resource.data.locationId > 0
               && request.resource.data.locationName is string
               && request.resource.data.locationName.size() > 0
-              && request.resource.data.locationName.size() <= 120))
+              && request.resource.data.locationName.size() <= 480))
           && (!('notes' in request.resource.data)
             || (request.resource.data.notes is string
-              && request.resource.data.notes.size() <= 1000))
+              && request.resource.data.notes.size() <= 4000))
           && request.resource.data.createdAt == request.time
           && request.resource.data.expiresAt
             == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;

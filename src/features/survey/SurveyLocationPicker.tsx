@@ -114,7 +114,6 @@ export function SurveyLocationPicker({
   }
 
   const showList = open && places.length > 0;
-  const tagKey = { system: 'system', station: 'station', structure: 'structure' } as const;
 
   return (
     <div className="relative min-w-0 flex-1 basis-64">
@@ -125,7 +124,9 @@ export function SurveyLocationPicker({
         aria-expanded={showList}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
+        aria-activedescendant={
+          !showList || highlight === null ? undefined : `${listId}-${highlight}`
+        }
         autoComplete="off"
         placeholder={t('survey.info.locationPlaceholder')}
         value={query ?? value?.name ?? ''}
@@ -146,6 +147,7 @@ export function SurveyLocationPicker({
       {showList && (
         <ul
           id={listId}
+          onMouseDown={(event) => event.preventDefault()}
           role="listbox"
           className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-auto rounded-xs border border-line bg-panel-2 py-1 shadow-lg"
         >
@@ -169,7 +171,7 @@ export function SurveyLocationPicker({
                 )}
               </span>
               <span className="shrink-0 text-xs text-text-dim">
-                {t(`survey.info.kind.${tagKey[place.kind]}`)}
+                {t(`survey.info.kind.${place.kind}`)}
               </span>
             </li>
           ))}

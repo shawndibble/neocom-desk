@@ -187,7 +187,7 @@ export function MoonTaxRow({ characterId, survey }: { characterId: number; surve
         </div>
         <Button
           size="sm"
-          className="sm:ml-auto"
+          className="touch:min-h-11 sm:ml-auto"
           disabled={!ready}
           loading={busy}
           onClick={() => void openTax()}
