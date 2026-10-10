@@ -29,6 +29,7 @@ import {
   RowMoreActions,
   Tooltip,
   iconButtonClassName,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import {
   controlHeightClassName,
@@ -45,6 +46,7 @@ import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { doneByText } from './doneBy';
+import { PLAN_HANDLE_ATTR } from './focusNeighbour';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import { SkillLink } from '@/features/entities';
@@ -295,7 +297,7 @@ function useRowSortable(id: string): SortableRowChrome {
   return {
     setNodeRef,
     style: { transform: CSS.Transform.toString(transform), transition },
-    handleProps: { ...attributes, ...listeners },
+    handleProps: { ...attributes, ...listeners, [PLAN_HANDLE_ATTR]: id },
     isDragging,
   };
 }
@@ -441,6 +443,8 @@ const EntryRow = memo(function EntryRow({
 }: EntryRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
+  // The dialogs these items open wait for the menu to hand focus back to ⋮.
+  const menu = useOpenAfterMenu();
   const { entry, stepIndices } = row;
   // A row credited as already-trained by the plan's start (`row.seconds: 0`)
   // because it IS the in-game queue's currently-training level (#1701
@@ -515,7 +519,9 @@ const EntryRow = memo(function EntryRow({
     <>
       {milestoneStatus ? (
         <>
-          <MenuItem onSelect={() => onRenameMilestone(milestoneStatus.milestone.id)}>
+          <MenuItem
+            onSelect={() => menu.run(() => onRenameMilestone(milestoneStatus.milestone.id))}
+          >
             {t('plans.milestone.rename')}
           </MenuItem>
           <MenuItem onSelect={() => onRemoveMilestone(milestoneStatus.milestone.id)}>
@@ -523,7 +529,9 @@ const EntryRow = memo(function EntryRow({
           </MenuItem>
         </>
       ) : (
-        <MenuItem onSelect={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}>
+        <MenuItem
+          onSelect={() => menu.run(() => onAddMilestone(entry.skillTypeID, entry.targetLevel))}
+        >
           {t('plans.milestone.add')}
         </MenuItem>
       )}
@@ -535,7 +543,7 @@ const EntryRow = memo(function EntryRow({
       ) : (
         <MenuItem
           className="text-danger"
-          onSelect={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+          onSelect={() => menu.run(() => onRemove(entry.skillTypeID, entry.targetLevel))}
         >
           {t('plans.removeEntry', { name: rowLabel })}
         </MenuItem>
@@ -581,7 +589,7 @@ const EntryRow = memo(function EntryRow({
         isDragging ? 'bg-panel-2' : ''
       }`}
     >
-      <RowActionsMenu name={rowLabel} items={rowMenuItems}>
+      <RowActionsMenu name={rowLabel} items={rowMenuItems} onCloseAutoFocus={menu.onCloseAutoFocus}>
         <div>
           {isDesktop ? (
             <div className="flex items-center justify-between gap-2">

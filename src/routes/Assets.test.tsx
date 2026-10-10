@@ -298,6 +298,25 @@ describe('Assets', () => {
     expect(window.location.search).toBe('?chars=current&min=5');
   });
 
+  it('keeps focus in the tab strip when arrowing from Ships onto Items (WCAG 2.4.3)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/ships');
+    render(<App />);
+    const ships = await screen.findByRole('tab', { name: 'Ships' });
+    ships.focus();
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(window.location.pathname).toBe('/assets/items'));
+    expect(screen.getByRole('tab', { name: 'Items' })).toHaveFocus();
+  });
+
+  it('puts focus back on the search box when Clear search removes itself (WCAG 2.4.3)', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/items?q=trit');
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /clear search/i }));
+    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
+  });
+
   it('moves a pre-tabs drill-down link under the Items tab', async () => {
     window.history.replaceState({}, '', '/assets/60003760?min=5');
     render(<App />);
@@ -1436,11 +1455,7 @@ describe('cross-character search (issue #85)', () => {
 
       expect(window.location.pathname).toBe('/assets/ships');
       expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
-      expect(
-        within(panel)
-          .getAllByRole('row')
-          .filter((r) => r.tagName === 'A')
-      ).toHaveLength(1);
+      expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(1);
       expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
     });
 
@@ -1454,11 +1469,7 @@ describe('cross-character search (issue #85)', () => {
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       await waitFor(() =>
-        expect(
-          within(panel)
-            .getAllByRole('row')
-            .filter((r) => r.tagName === 'A')
-        ).toHaveLength(2)
+        expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(2)
       );
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
     });
@@ -1491,13 +1502,21 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByText('Frigate')).toBeVisible();
     });
 
-    it('a row is one link into the ship’s location', async () => {
+    it('a row holds one link into the ship’s location, on the ship name', async () => {
       const user = userEvent.setup();
       render(<App />);
       const panel = await openMyShips(user);
 
-      const row = (await within(panel).findAllByRole('row')).find((r) => r.tagName === 'A');
-      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
+      const link = await within(panel).findByRole('link', { name: 'Rifter' });
+      expect(link).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
+      expect(
+        within(panel)
+          .getAllByRole('row')
+          .filter((r) => r.tagName === 'A')
+      ).toHaveLength(0);
+      expect(within(panel).getByRole('button', { name: /^ship/i }).className).toContain(
+        'focus-visible:outline-accent'
+      );
       expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
     });
 

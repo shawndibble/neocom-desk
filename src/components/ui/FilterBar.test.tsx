@@ -128,6 +128,20 @@ describe('FilterBar', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('wires the inline funnel to its group without claiming a popup', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const funnel = screen.getByRole('button', { name: 'Filters' });
+    expect(funnel).not.toHaveAttribute('aria-haspopup');
+    expect(funnel).not.toHaveAttribute('aria-controls');
+    await user.click(funnel);
+    expect(funnel).toHaveAttribute('aria-expanded', 'true');
+    expect(funnel).toHaveAttribute(
+      'aria-controls',
+      screen.getByRole('group', { name: 'Filters' }).id
+    );
+  });
+
   it('commits a pointer-viewport edit immediately, with no Apply step', async () => {
     const user = userEvent.setup();
     render(<Harness />);

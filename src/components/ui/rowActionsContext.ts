@@ -11,6 +11,8 @@ export interface RowActions {
   /** The menu's items, built from `MenuItem`/`MenuSub*`. */
   items: ReactNode;
   onOpenChange?: (open: boolean) => void;
+  /** Runs as either menu closes; `useOpenAfterMenu` hands its handler here so an item can open a dialog after focus is back on ⋮. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /**

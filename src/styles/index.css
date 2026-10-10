@@ -1379,9 +1379,25 @@
        compare bar's offset. */
     --bottom-nav-clearance: calc(3.5rem + env(safe-area-inset-bottom));
   }
+  /* Every bottom-pinned bar publishes its own term via useStickyClearance
+     (src/lib); unset terms are 0px. */
+  :root {
+    --sticky-clearance: calc(
+      var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
+        var(--compare-drawer-clearance, 0px)
+    );
+  }
+  /* From md up the page reserves nothing by default (computed `auto`), so
+     the sum applies only once a bar has published a term on the root's
+     inline style. */
+  @media (width >= 48rem) {
+    :root[style*='-clearance'] {
+      scroll-padding-bottom: var(--sticky-clearance);
+    }
+  }
   @media (width < 48rem) {
     :root {
-      scroll-padding-bottom: var(--bottom-nav-clearance);
+      scroll-padding-bottom: calc(var(--sticky-clearance) + var(--bottom-nav-clearance));
     }
   }
 
