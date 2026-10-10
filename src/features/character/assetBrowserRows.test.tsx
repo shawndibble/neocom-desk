@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { ItemRow, SearchResultRow } from './assetBrowserRows';
+import { ItemRow, JumpsAwayText, SearchResultRow, SectionHeading } from './assetBrowserRows';
 
 function renderRow(unitVolume: number | undefined) {
   render(
@@ -196,5 +196,20 @@ describe('estimated value cell', () => {
     const { container } = renderItemRow({ estimatedValue: 1000 });
     expect(screen.queryByText('assets.noEstimate')).toBeNull();
     expect(container.querySelector('.text-isk-pos')).not.toBeNull();
+  });
+});
+
+describe('JumpsAwayText unknown', () => {
+  it('hides the dash and exposes the reason to screen readers', () => {
+    render(<JumpsAwayText result={{ kind: 'unknown', reason: 'noLocation' }} t={(key) => key} />);
+    expect(screen.getByText('assets.jumpsAway.unknownReason.noLocation')).toHaveClass('sr-only');
+    expect(screen.getByText('assets.jumpsAway.unknown')).toHaveAttribute('aria-hidden', 'true');
+  });
+});
+
+describe('SectionHeading', () => {
+  it('is a level 3 heading', () => {
+    render(<SectionHeading>Pinned</SectionHeading>);
+    expect(screen.getByRole('heading', { level: 3, name: 'Pinned' })).toBeInTheDocument();
   });
 });

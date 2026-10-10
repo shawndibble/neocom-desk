@@ -2120,6 +2120,7 @@ export function Assets() {
                     <div
                       ref={scrollParentRef}
                       data-virtual-scroll-root
+                      role="region"
                       aria-label={t('assets.treeLabel')}
                       className="min-h-0 flex-1 overflow-y-auto"
                     >

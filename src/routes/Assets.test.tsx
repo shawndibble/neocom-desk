@@ -1436,11 +1436,7 @@ describe('cross-character search (issue #85)', () => {
 
       expect(window.location.pathname).toBe('/assets/ships');
       expect(await within(panel).findByText('Rifter')).toBeInTheDocument();
-      expect(
-        within(panel)
-          .getAllByRole('row')
-          .filter((r) => r.tagName === 'A')
-      ).toHaveLength(1);
+      expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(1);
       expect(within(panel).queryByText('Pilot Two')).not.toBeInTheDocument();
     });
 
@@ -1454,11 +1450,7 @@ describe('cross-character search (issue #85)', () => {
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
       await waitFor(() =>
-        expect(
-          within(panel)
-            .getAllByRole('row')
-            .filter((r) => r.tagName === 'A')
-        ).toHaveLength(2)
+        expect(within(panel).getAllByRole('link', { name: 'Rifter' })).toHaveLength(2)
       );
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
     });
@@ -1491,13 +1483,21 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByText('Frigate')).toBeVisible();
     });
 
-    it('a row is one link into the ship’s location', async () => {
+    it('a row holds one link into the ship’s location, on the ship name', async () => {
       const user = userEvent.setup();
       render(<App />);
       const panel = await openMyShips(user);
 
-      const row = (await within(panel).findAllByRole('row')).find((r) => r.tagName === 'A');
-      expect(row).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
+      const link = await within(panel).findByRole('link', { name: 'Rifter' });
+      expect(link).toHaveAttribute('href', expect.stringContaining('/assets/items/60003760'));
+      expect(
+        within(panel)
+          .getAllByRole('row')
+          .filter((r) => r.tagName === 'A')
+      ).toHaveLength(0);
+      expect(within(panel).getByRole('button', { name: /^ship/i }).className).toContain(
+        'focus-visible:outline-accent'
+      );
       expect(within(panel).queryByRole('button', { name: /more actions/i })).toBeNull();
     });
 

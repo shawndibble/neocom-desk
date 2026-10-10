@@ -723,6 +723,8 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
                 <div
                   ref={scrollParentRef}
                   data-virtual-scroll-root
+                  role="region"
+                  aria-label={t('corp.assets.treeLabel')}
                   className="min-h-0 overflow-y-auto"
                 >
                   {showItemColumns && <ItemColumnLabels t={t} />}
