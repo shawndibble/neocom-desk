@@ -132,8 +132,8 @@ describe('summarizeSurvey', () => {
   it('lists ores by volume left with rock counts', () => {
     const s = summarizeSurvey([scan(0, ['Bitumens', 50], ['Sylvite', 500], ['Sylvite', 300])])!;
     expect(s.ores).toEqual([
-      { ore: 'Sylvite', rocks: 2, volume: 800, isk: 0, startVolume: 800 },
-      { ore: 'Bitumens', rocks: 1, volume: 50, isk: 0, startVolume: 50 },
+      { ore: 'Sylvite', rocks: 2, volume: 800, isk: 0, startVolume: 800, iskPerM3: null },
+      { ore: 'Bitumens', rocks: 1, volume: 50, isk: 0, startVolume: 50, iskPerM3: null },
     ]);
     expect(s.rocksLeft).toBe(3);
   });
@@ -144,10 +144,10 @@ describe('summarizeSurvey', () => {
       scan(5, ['A', 250], ['B', 300], ['D', 100]),
     ])!;
     expect(s.ores).toEqual([
-      { ore: 'B', rocks: 1, volume: 300, isk: 0, startVolume: 300 },
-      { ore: 'A', rocks: 1, volume: 250, isk: 0, startVolume: 500 },
-      { ore: 'D', rocks: 1, volume: 100, isk: 0, startVolume: 100 },
-      { ore: 'C', rocks: 0, volume: 0, isk: 0, startVolume: 200 },
+      { ore: 'B', rocks: 1, volume: 300, isk: 0, startVolume: 300, iskPerM3: null },
+      { ore: 'A', rocks: 1, volume: 250, isk: 0, startVolume: 500, iskPerM3: null },
+      { ore: 'D', rocks: 1, volume: 100, isk: 0, startVolume: 100, iskPerM3: null },
+      { ore: 'C', rocks: 0, volume: 0, isk: 0, startVolume: 200, iskPerM3: null },
     ]);
   });
 
@@ -197,5 +197,15 @@ describe('summarizeSurvey', () => {
     expect(done.etaAt).toBeNull();
     expect(done.finishedAt).toBe(T0 + 5 * MIN);
     expect(done.elapsedMs).toBe(5 * MIN);
+  });
+
+  it('keeps a mined-out ore in the richest-per-m3 order by its last priced scan', () => {
+    const s = summarizeSurvey([
+      iskScan(0, ['Rich', 1000, 90_000], ['Mid', 1000, 70_000], ['Poor', 1000, 50_000]),
+      iskScan(5, ['Poor', 500, 25_000], ['Mid', 400, 28_000]),
+      iskScan(10, ['Poor', 100, 5_000]),
+    ])!;
+    expect(s.ores.find((o) => o.ore === 'Rich')).toMatchObject({ rocks: 0, iskPerM3: 90 });
+    expect(s.oreNames).toEqual(['Rich', 'Mid', 'Poor']);
   });
 });
