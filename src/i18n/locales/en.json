@@ -356,7 +356,7 @@
     },
     "ring": {
       "title": "Ring",
-      "slotFitted": "{{rack}} {{index}}, {{state}}",
+      "slotFitted": "{{rack}} {{index}}: {{name}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
@@ -576,7 +576,6 @@
       "rankMostDamage": "most damage",
       "bestAt": "BEST AT {{km}} KM",
       "inCargo": "{{count}} in cargo",
-      "inCargoLabel": "in cargo",
       "loadedLabel": "loaded",
       "skillTag": "SKILL",
       "tech1": "Tech I",

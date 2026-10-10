@@ -87,7 +87,7 @@ test.describe('Global paste', () => {
     await expect(page).toHaveURL(/\/ships\/fittings\/edit\?f=/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'Pasted Fit', level: 1 })).toBeVisible();
     // The autocannon landed in the first high slot.
-    await expect(page.getByRole('button', { name: 'High slots 1, active' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^High slots 1: .*, active$/ })).toBeVisible();
   });
 
   test('a pasted item list opens the Appraisal, and prices it', async ({ page }) => {
