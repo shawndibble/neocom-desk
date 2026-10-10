@@ -28,6 +28,7 @@ import {
   Panel,
   Spinner,
   TextArea,
+  TabPanel,
 } from '@/components/ui';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
@@ -59,7 +60,7 @@ const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /** Same debounce as Mail's recipient search, which calls the same ESI search. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-export function PilotLookupPanel({ tabBar }: { tabBar: ReactNode }) {
+export function PilotLookupPanel({ tabBar, tabsId }: { tabBar: ReactNode; tabsId: string }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
   const [resolved, setResolved] = useState<PilotSummary | null>(null);
@@ -86,29 +87,32 @@ export function PilotLookupPanel({ tabBar }: { tabBar: ReactNode }) {
     <div className="space-y-4">
       <PageHeader title={t('travel.title')} />
       {tabBar}
-      {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}
-      <Panel className="relative z-20">
-        <PilotSearch
-          resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
-          list={list}
-          onList={(paste) => {
-            setList(paste);
-            // A list replaces the one pilot on screen, so the pilot leaves the URL.
-            if (paste !== null && params.pilot !== null) setParams({ pilot: null }, { push: true });
-          }}
-          onSelect={(pilot) => {
-            setList(null);
-            setParams({ pilot: pilot.characterId }, { push: true });
-          }}
-        />
-      </Panel>
-      {list !== null ? (
-        <PilotListView paste={list} />
-      ) : params.pilot === null ? (
-        <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
-      ) : (
-        <PilotResult key={params.pilot} characterId={params.pilot} onResolved={setResolved} />
-      )}
+      <TabPanel tabsId={tabsId} tabId="pilot" className="space-y-4">
+        {/* Each Panel's backdrop-blur is its own stacking context; lifting this one keeps the suggestion list above the panel below. */}
+        <Panel className="relative z-20">
+          <PilotSearch
+            resolved={resolved !== null && resolved.characterId === params.pilot ? resolved : null}
+            list={list}
+            onList={(paste) => {
+              setList(paste);
+              // A list replaces the one pilot on screen, so the pilot leaves the URL.
+              if (paste !== null && params.pilot !== null)
+                setParams({ pilot: null }, { push: true });
+            }}
+            onSelect={(pilot) => {
+              setList(null);
+              setParams({ pilot: pilot.characterId }, { push: true });
+            }}
+          />
+        </Panel>
+        {list !== null ? (
+          <PilotListView paste={list} />
+        ) : params.pilot === null ? (
+          <EmptyState title={t('travel.pilot.pickTitle')} hint={t('travel.pilot.pickHint')} />
+        ) : (
+          <PilotResult key={params.pilot} characterId={params.pilot} onResolved={setResolved} />
+        )}
+      </TabPanel>
     </div>
   );
 }

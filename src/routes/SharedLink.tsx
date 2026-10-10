@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useMarkPublicRouteRendered } from '@/app/routeFocus';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
@@ -42,6 +43,7 @@ function dscanState(share: StoredShare): DscanShareState {
  */
 export function SharedLink() {
   const { t } = useTranslation();
+  useMarkPublicRouteRendered();
   const { shareId = '' } = useParams();
   const [loaded, setLoaded] = useState<LoadState>(null);
 

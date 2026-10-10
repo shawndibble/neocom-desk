@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Spinner, Tabs } from '@/components/ui';
+import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { TRAVEL_TABS } from '@/app/pageTabs';
@@ -20,6 +20,7 @@ export function Travel() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [tab, setTab] = usePageTab(TRAVEL_TABS);
+  const tabsId = useTabsId();
   const location = useLocation();
 
   // A shared `/travel?pilot=<id>` from before Pilot Lookup was a tab names no
@@ -43,6 +44,7 @@ export function Travel() {
 
   const tabBar = (
     <Tabs
+      tabsId={tabsId}
       label={t('travel.title')}
       value={tab}
       onChange={(id) => setTab(id as typeof tab)}
@@ -53,11 +55,11 @@ export function Travel() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       {tab === 'thera' ? (
-        <TheraTab tabBar={tabBar} />
+        <TheraTab tabBar={tabBar} tabsId={tabsId} />
       ) : tab === 'pilot' ? (
-        <PilotLookupPanel tabBar={tabBar} />
+        <PilotLookupPanel tabBar={tabBar} tabsId={tabsId} />
       ) : (
-        <RouteSafetyTab tabBar={tabBar} />
+        <RouteSafetyTab tabBar={tabBar} tabsId={tabsId} />
       )}
     </div>
   );
