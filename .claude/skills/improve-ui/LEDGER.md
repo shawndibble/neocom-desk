@@ -105,6 +105,7 @@ Issue number, size (tweak/rework), verdict, one line.
 
 What was killed, and why. This is what stops a re-pitch.
 
+- Mining Tax tab, populated (Balances cards, Continue-session card, ledger, 1440/1024): Balances grid wrapping 2+1 at 1024 (empty half-row) is the deliberate `sm:2 / xl:3` grid (#3120); Ore column is one 16px icon in a wide cell with a keyboard-reachable `Tooltip`: no named cost, taste only.
 - Skills trained per-group SP subtotal in the header: no named user cost; Total SP chip already answers "how much SP".
 - Fittings start page wider than sibling routes (no `max-w-6xl`): shares its container with the wide editor.
 - Contracts History: nothing survived (Expires column shows absolute dates only, but Calendar already carries contract expiries).
