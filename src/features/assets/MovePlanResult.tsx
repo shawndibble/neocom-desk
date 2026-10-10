@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, Disclosure } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { MovePlan } from '@/engine/assets/movePlan';
 import {
   CharacterScopeReadout,
@@ -11,11 +11,18 @@ import {
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCubicMetres } from '@/lib/volume';
+import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
-import { pickupHueVar, splitSegments, tripLanes } from './movePlanView';
+import { pickupHueVar, splitSegments, tripLanes, tripRuns } from './movePlanView';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
+
+/** "Don't remind me again" on the rig warning, ticked once for good. */
+const useSkipRigWarning = createLocalSetting<boolean>({
+  key: 'movePlanSkipPackRigWarning',
+  defaultValue: false,
+});
 
 export interface PlanState {
   plan: MovePlan;
@@ -33,6 +40,12 @@ interface PlanResultProps {
   onToggleCompare: () => void;
   onBack: () => void;
   onDone: () => void;
+  /** Haul this ship (itemID) packaged instead of flying it. */
+  onPackShip: (itemId: number) => void;
+  /** Rigs fitted to a ship; packing it means unfitting them, which destroys them. */
+  rigsOf: (itemId: number) => number;
+  /** Whether the ship type has a packaged volume to plan with. */
+  canPack: (typeId: number) => boolean;
   name: (typeId: number) => string;
   placeLabel: (id: number) => string;
   /** Palette slot of a pickup location. */
@@ -50,11 +63,32 @@ export function PlanResult({
   onToggleCompare,
   onBack,
   onDone,
+  onPackShip,
+  rigsOf,
+  canPack,
   name,
   placeLabel,
   hueOf,
 }: PlanResultProps) {
   const { t } = useTranslation();
+  const skipRigWarning = useSkipRigWarning((s) => s.value);
+  const setSkipRigWarning = useSkipRigWarning((s) => s.setValue);
+  const hydrateSkip = useSkipRigWarning((s) => s.hydrate);
+  const [asking, setAsking] = useState<{ itemId: number; typeId: number; rigs: number } | null>(
+    null
+  );
+  const [dontRemind, setDontRemind] = useState(false);
+  useEffect(() => {
+    void hydrateSkip();
+  }, [hydrateSkip]);
+  const askToPack = (itemId: number, typeId: number) => {
+    const rigs = rigsOf(itemId);
+    if (rigs === 0 || skipRigWarning) onPackShip(itemId);
+    else {
+      setDontRemind(false);
+      setAsking({ itemId, typeId, rigs });
+    }
+  };
   const { plan, destinationSystem, destinationStation, pickupSystems } = state;
   const systemName = useSystemName(destinationSystem);
   if (plan.perCharacter.length === 0) {
@@ -76,6 +110,8 @@ export function PlanResult({
   const segments = splitSegments(pickups.map((p, i) => ({ key: i, m3: p.totalM3 })));
   const capacity = plan.suggested?.hull.capacityM3 ?? 0;
   const lanes = tripLanes(totals.totalM3, capacity);
+  /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
+  const flown = pickups.flatMap((p) => p.ships);
   const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
 
   return (
@@ -128,44 +164,51 @@ export function PlanResult({
           </ul>
         </Disclosure>
       )}
-      {segments.length > 0 && (
+      {(segments.length > 0 || flown.length > 0) && (
         <div className="flex flex-col gap-1.5">
-          <div
-            role="img"
-            aria-label={t('assets.movePlan.loadSplit')}
-            className="relative flex h-11 overflow-hidden rounded-xs border border-line"
-          >
-            {segments.map((s) => (
-              <i
-                key={s.key}
-                className="block h-full"
-                style={{
-                  width: `${s.share * 100}%`,
-                  background: pickupHueVar(hueOf(pickups[s.key].locationId)),
-                }}
-              />
-            ))}
-            {lanes.slice(0, -1).map((l) => (
-              <u
-                key={l.trip}
-                aria-hidden="true"
-                className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
-                style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
-              />
-            ))}
-          </div>
-          {lanes.length > 0 && (
-            <div className="flex text-xs text-text-dim" aria-hidden="true">
-              {lanes.map((l) => (
-                <span
+          {segments.length > 0 && (
+            <div
+              role="img"
+              aria-label={t('assets.movePlan.loadSplit')}
+              className="relative flex h-11 overflow-hidden rounded-xs border border-line"
+            >
+              {segments.map((s) => (
+                <i
+                  key={s.key}
+                  className="block h-full"
+                  style={{
+                    width: `${s.share * 100}%`,
+                    background: pickupHueVar(hueOf(pickups[s.key].locationId)),
+                  }}
+                />
+              ))}
+              {lanes.slice(0, -1).map((l) => (
+                <u
                   key={l.trip}
-                  className="truncate border-l-2 border-line-bright pt-0.5 pl-1.5 whitespace-nowrap"
-                  style={{ width: `${l.share * 100}%` }}
-                >
-                  {t('assets.movePlan.tripLane', { n: l.trip })} · {formatCubicMetres(l.m3)} m³
-                </span>
+                  aria-hidden="true"
+                  className="absolute inset-y-0 w-0 border-l-2 border-dashed border-panel no-underline"
+                  style={{ left: `${((l.trip * capacity) / totals.totalM3) * 100}%` }}
+                />
               ))}
             </div>
+          )}
+          {(lanes.length > 0 || flown.length > 0) && (
+            <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
+              {tripRuns(lanes).map((r) => (
+                <li key={r.from} className="tabular-nums">
+                  {r.from === r.to
+                    ? t('assets.movePlan.tripLane', { n: r.from })
+                    : t('assets.movePlan.tripRange', { from: r.from, to: r.to })}{' '}
+                  · {formatCubicMetres(r.m3)} m³
+                  {r.from === r.to ? '' : ` ${t('assets.movePlan.each')}`}
+                </li>
+              ))}
+              {flown.map((s) => (
+                <li key={s.itemId} className="font-semibold text-text">
+                  {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
@@ -252,7 +295,13 @@ export function PlanResult({
                             {t('assets.movePlan.flyIt')}
                           </span>
                         }
-                        trailing={null}
+                        trailing={
+                          canPack(s.typeId) ? (
+                            <Button size="sm" onClick={() => askToPack(s.itemId, s.typeId)}>
+                              {t('assets.movePlan.packInstead')}
+                            </Button>
+                          ) : null
+                        }
                       />
                     ))}
                   </ul>
@@ -270,7 +319,7 @@ export function PlanResult({
           </RailStop>
         )}
       </Rail>
-      <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
@@ -278,6 +327,36 @@ export function PlanResult({
           {t('assets.movePlan.done')}
         </Button>
       </div>
+      <Modal
+        open={asking !== null}
+        onClose={() => setAsking(null)}
+        title={t('assets.movePlan.packTitle', { ship: asking ? name(asking.typeId) : '' })}
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="m-0">{t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}</p>
+          <label className={`flex cursor-pointer items-center gap-2 ${tappableRowClassName}`}>
+            <Checkbox checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} />
+            {t('assets.movePlan.dontRemind')}
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAsking(null)}>
+              {t('assets.movePlan.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (asking) {
+                  if (dontRemind) void setSkipRigWarning(true);
+                  onPackShip(asking.itemId);
+                }
+                setAsking(null);
+              }}
+            >
+              {t('assets.movePlan.packAnyway')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -314,7 +393,7 @@ function PlanLine({
 }: {
   name: string;
   qty: ReactNode;
-  trailing: string | null;
+  trailing: ReactNode;
   dim?: boolean;
 }) {
   return (

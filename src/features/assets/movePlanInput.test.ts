@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { CharacterAsset } from '@/esi/endpoints';
-import { holdCapacityM3, pickerStacks, selectedPlanCharacters } from './movePlanInput';
+import {
+  fittedRigCounts,
+  holdCapacityM3,
+  pickerStacks,
+  selectedPlanCharacters,
+} from './movePlanInput';
 
 const asset = (over: Partial<CharacterAsset>): CharacterAsset =>
   ({
@@ -61,5 +66,33 @@ describe('holdCapacityM3', () => {
     ).toBe(100);
     expect(holdCapacityM3([{ kind: 'ice', capacityM3: 50 }] as never)).toBe(50);
     expect(holdCapacityM3([])).toBeNull();
+  });
+});
+
+describe('fittedRigCounts', () => {
+  it('counts the rigs fitted to each assembled ship, ignoring other fitted modules', () => {
+    const fit = (item_id: number, location_id: number, location_flag: string): CharacterAsset => ({
+      item_id,
+      type_id: 1,
+      quantity: 1,
+      location_id,
+      location_type: 'item',
+      location_flag,
+      is_singleton: false,
+    });
+    const counts = fittedRigCounts([
+      {
+        characterId: 1,
+        name: 'Alice',
+        assets: [
+          fit(11, 100, 'RigSlot0'),
+          fit(12, 100, 'RigSlot1'),
+          fit(13, 100, 'HiSlot0'),
+          fit(14, 200, 'LoSlot0'),
+        ],
+      },
+    ]);
+    expect(counts.get(100)).toBe(2);
+    expect(counts.has(200)).toBe(false);
   });
 });

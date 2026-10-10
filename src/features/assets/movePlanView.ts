@@ -53,6 +53,23 @@ export function tripLanes(totalM3: number, capacityM3: number): TripLane[] {
   return lanes;
 }
 
+export interface TripRun {
+  from: number;
+  to: number;
+  m3: number;
+}
+
+/** Neighbouring trips carrying the same volume folded into one range, so nine full holds read as one entry. */
+export function tripRuns(lanes: readonly TripLane[]): TripRun[] {
+  const runs: TripRun[] = [];
+  for (const l of lanes) {
+    const last = runs[runs.length - 1];
+    if (last && Math.abs(last.m3 - l.m3) < 1e-6) last.to = l.trip;
+    else runs.push({ from: l.trip, to: l.trip, m3: l.m3 });
+  }
+  return runs;
+}
+
 export interface PickedTotals {
   stacks: number;
   ships: number;
