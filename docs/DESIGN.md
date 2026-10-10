@@ -1213,6 +1213,8 @@ Every interactive element takes its states from one shared recipe in
   included.
   - Outset (`outline-offset-2`) on boxed controls and inline links.
   - Inset (`-outline-offset-2`) on full-bleed rows, tabs and nav items.
+  - `scroll-padding` keeps a focused row clear of sticky headers and the
+    phone tab bar (WCAG 2.4.11).
 - **Highlighted option:** the option a keyboard is on in a menu, Select,
   search picker or the command palette (the one Enter picks) takes the inset
   2px accent outline plus the `panel-2` fill, but the outline only while the
@@ -1222,8 +1224,6 @@ Every interactive element takes its states from one shared recipe in
   in the search box compose `activeOptionClassName` on the `aria-activedescendant`
   option; Radix menu items compose `highlightedOptionClassName` (via
   `menuItemClassName` / `SelectItem`). Neither may set `outline-none`.
-  - `scroll-padding` keeps a focused row clear of sticky headers and the
-    phone tab bar (WCAG 2.4.11).
 - **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason
   to show, use `aria-disabled` plus a tooltip instead of the native
   attribute.
