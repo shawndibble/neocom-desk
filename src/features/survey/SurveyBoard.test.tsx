@@ -297,7 +297,8 @@ describe('SurveyBoard', () => {
     it('is gone once the field is finished, owner or not', () => {
       const done = [...recent(), { at: Date.now() + 60_000, rocks: [] }];
       render(<SurveyBoard scans={done} url={URL} expiresAt={null} owned onFinish={vi.fn()} />);
-      expect(screen.getByText('Field cleared')).toBeTruthy();
+      expect(screen.queryByText('Field cleared')).toBeNull();
+      expect(screen.getByText('Done at')).toBeTruthy();
       expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
     });
 

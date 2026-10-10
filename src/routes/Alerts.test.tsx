@@ -413,6 +413,19 @@ describe('Alerts', () => {
       );
     }
 
+    it('puts the body link first in the row so it is the first Tab stop', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', characterId: KAELEN }),
+        entry({ id: 'b', characterId: SERA }),
+      ]);
+      renderPage();
+      await expandNewMail();
+      const bodies = await screen.findAllByText(/New Mail — body/);
+      const row = bodies[0].closest('li') as HTMLElement;
+      expect(row.firstElementChild?.tagName).toBe('A');
+      expect(row.firstElementChild).toHaveClass('order-4', 'sm:order-1');
+    });
+
     it('carries no character portrait', async () => {
       await db.notificationFeed.bulkPut([
         entry({ id: 'a', characterId: KAELEN }),

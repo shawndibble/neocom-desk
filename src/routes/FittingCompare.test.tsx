@@ -33,14 +33,14 @@ function renderAt(path: string) {
 describe('FittingCompare', () => {
   it('shows a remove control for a slot that failed to decode', async () => {
     renderAt('/ships/fittings/compare?f=not-a-real-code');
-    const removeButton = await screen.findByRole('button', { name: 'Remove' });
+    const removeButton = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     expect(removeButton.className).toContain('text-danger');
   });
 
   it('removes an error-only slot via its own Remove control', async () => {
     const user = userEvent.setup();
     renderAt('/ships/fittings/compare?f=not-a-real-code');
-    const removeButton = await screen.findByRole('button', { name: 'Remove' });
+    const removeButton = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     await user.click(removeButton);
     expect(await screen.findByText('Add a Fitting to start comparing.')).toBeInTheDocument();
   });

@@ -1,7 +1,7 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, Spinner, Tabs } from '@/components/ui';
+import { Button, IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
@@ -60,11 +60,13 @@ type PopularFitsSource = 'zkillboard' | 'workbench';
  */
 export function PopularFitsPanel(props: PopularFitsPanelProps) {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const [source, setSource] = useState<PopularFitsSource>('zkillboard');
 
   return (
     <section aria-label={t('fittings.popular.title')} className="space-y-2">
       <Tabs
+        tabsId={tabsId}
         label={t('fittings.popular.sourceLabel')}
         tabs={[
           { id: 'zkillboard', label: t('fittings.popular.tabZkillboard') },
@@ -73,7 +75,9 @@ export function PopularFitsPanel(props: PopularFitsPanelProps) {
         value={source}
         onChange={(id) => setSource(id as PopularFitsSource)}
       />
-      {source === 'zkillboard' ? <ZkillboardFits {...props} /> : <WorkbenchFits {...props} />}
+      <TabPanel tabsId={tabsId} tabId={source} className="space-y-2">
+        {source === 'zkillboard' ? <ZkillboardFits {...props} /> : <WorkbenchFits {...props} />}
+      </TabPanel>
     </section>
   );
 }
