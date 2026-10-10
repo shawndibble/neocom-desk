@@ -20,9 +20,9 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, InfoTooltip, Disclosure } from '@/components/ui';
+import { Modal, Button, InfoTooltip, Disclosure, LiveStatus } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
@@ -505,6 +505,7 @@ export function OrderDetailContent({
     sell.kind === 'known' && row.expiry !== null && sell.daysToClear > row.expiry.daysLeft;
 
   const showCheckDeeper = deep === null && !loadingDeep;
+  const whoTableRef = useRef<HTMLDivElement>(null);
   const allClean =
     !row.isBuyOrder &&
     station.kind === 'clear' &&
@@ -857,9 +858,11 @@ export function OrderDetailContent({
             reads as a table with column headers to assistive tech.
           */}
             <div
+              ref={whoTableRef}
+              tabIndex={-1}
               role="table"
               aria-label={whoLabel}
-              className="grid grid-cols-[auto_minmax(0,1fr)_auto] text-xs md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
+              className="grid focus:outline-none grid-cols-[auto_minmax(0,1fr)_auto] text-xs md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]"
             >
               <div role="row" className="contents">
                 <span
@@ -940,6 +943,7 @@ export function OrderDetailContent({
               </div>
             </div>
             <div className="px-3 pb-2">
+              <LiveStatus>{loadingDeep ? t('market.orders.checkingDeeper') : null}</LiveStatus>
               {allClean && (
                 <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
               )}
@@ -956,13 +960,22 @@ export function OrderDetailContent({
               )}
               {showCheckDeeper && (
                 <p className="pt-2">
-                  <Button size="sm" onClick={onCheckDeeper}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      // The button unmounts; keep focus inside the dialog.
+                      whoTableRef.current?.focus({ preventScroll: true });
+                      onCheckDeeper();
+                    }}
+                  >
                     {t('market.orders.checkDeeper')}
                   </Button>
                 </p>
               )}
               {loadingDeep && (
-                <p className="pt-1.5 text-xs text-text-dim">{t('market.orders.checkingDeeper')}</p>
+                <p aria-hidden="true" className="pt-1.5 text-xs text-text-dim">
+                  {t('market.orders.checkingDeeper')}
+                </p>
               )}
             </div>
           </Disclosure>

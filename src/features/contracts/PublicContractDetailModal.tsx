@@ -220,17 +220,17 @@ export function PublicContractDetailModal({
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-text-dim">{t('contractDetail.regionLabel')}</dt>
-          <dd className="truncate">{regionName}</dd>
+          <dd className="break-words">{regionName}</dd>
           {system && (
             <>
               <dt className="text-text-dim">{t('contractDetail.systemLabel')}</dt>
-              <dd className="truncate">
+              <dd className="break-words">
                 <SystemLink systemId={system.id}>{system.name}</SystemLink>
               </dd>
             </>
           )}
           <dt className="text-text-dim">{t('contractDetail.locationLabel')}</dt>
-          <dd className="truncate">
+          <dd className="break-words">
             {location === undefined ? (
               <Spinner />
             ) : (

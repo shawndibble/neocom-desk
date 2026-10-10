@@ -64,7 +64,10 @@ const KNOWN: RouteExposure = {
   ],
 };
 
-function renderModal(jumps: CourierJumps = { kind: 'known', count: 2 }) {
+function renderModal(
+  jumps: CourierJumps = { kind: 'known', count: 2 },
+  extra: { returnFocusFallback?: () => HTMLElement | null } = {}
+) {
   return render(
     <MemoryRouter>
       <CourierContractDetailModal
@@ -76,6 +79,7 @@ function renderModal(jumps: CourierJumps = { kind: 'known', count: 2 }) {
         reverseLane={{ kind: 'unresolved' }}
         onSearchReverseLane={() => {}}
         onClose={() => {}}
+        {...extra}
       />
     </MemoryRouter>
   );
@@ -150,5 +154,15 @@ describe('CourierContractDetailModal contract ID', () => {
     routeExposure.mockResolvedValue(KNOWN);
     renderModal();
     expect(screen.getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
+  });
+});
+
+describe('CourierContractDetailModal focus return', () => {
+  it('passes returnFocusFallback through to the modal', () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    const fallback = vi.fn(() => null);
+    const { unmount } = renderModal({ kind: 'known', count: 2 }, { returnFocusFallback: fallback });
+    unmount();
+    expect(fallback).toHaveBeenCalled();
   });
 });

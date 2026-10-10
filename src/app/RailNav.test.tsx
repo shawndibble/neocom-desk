@@ -168,6 +168,11 @@ describe('the rail', () => {
     expect(
       within(rail()).getByRole('button', { name: 'Show Mining in navigation' })
     ).toHaveAttribute('aria-pressed', 'false');
+    // Struck through, not faded: a fade drops the label below 4.5:1.
+    const miningLink = within(rail()).getByRole('link', { name: /mining/i });
+    expect(miningLink).toHaveClass('line-through');
+    expect(miningLink.className).not.toMatch(/opacity-/);
+    expect(miningLink.parentElement?.className).not.toMatch(/opacity-/);
     await user.click(within(rail()).getByRole('button', { name: 'Show Mining in navigation' }));
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual([]));
     expect(
@@ -178,6 +183,18 @@ describe('the rail', () => {
     expect(
       within(rail()).queryByRole('button', { name: 'Show Overview in navigation' })
     ).not.toBeInTheDocument();
+  });
+
+  it('hands focus to Done after Customize and back after Done, rather than dropping it to the page', async () => {
+    const user = userEvent.setup();
+    renderAt('/overview');
+
+    await user.click(within(rail()).getByRole('button', { name: 'Customize' }));
+    await waitFor(() => expect(within(rail()).getByRole('button', { name: 'Done' })).toHaveFocus());
+    await user.click(within(rail()).getByRole('button', { name: 'Done' }));
+    await waitFor(() =>
+      expect(within(rail()).getByRole('button', { name: 'Customize' })).toHaveFocus()
+    );
   });
 });
 
@@ -194,7 +211,7 @@ describe('the More sheet', () => {
     renderAt('/overview');
     const { sheet } = await openSheet();
 
-    expect(within(sheet).getByRole('link', { name: 'Market' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Wallet' })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: 'Travel' })).toBeInTheDocument();
     expect(within(sheet).queryByRole('link', { name: 'Appraisal' })).not.toBeInTheDocument();
   });
@@ -269,5 +286,9 @@ describe('the More sheet editor', () => {
     await user.click(within(sheet).getByRole('button', { name: /hide pages you don't use/i }));
     await user.click(within(sheet).getByRole('button', { name: 'Show Mining in navigation' }));
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
+    // No fade; an eye-slash glyph marks the hidden tile instead.
+    const tile = within(sheet).getByRole('link', { name: /mining/i }).parentElement!;
+    expect(tile.className).not.toMatch(/opacity-/);
+    expect(tile.querySelector(':scope > svg[aria-hidden="true"]')).not.toBeNull();
   });
 });

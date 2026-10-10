@@ -228,6 +228,35 @@ describe('Contracts', () => {
     expect(cue(finishedRow)).not.toBeInTheDocument();
   });
 
+  it('says what lapsed means in text, and lets the keyboard reach it', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') {
+          return HttpResponse.json(contractPage2, { headers: { 'X-Pages': '2' } });
+        }
+        return HttpResponse.json(
+          [
+            ...contractPage1,
+            {
+              ...contractPage1[0],
+              contract_id: 3,
+              title: 'Lapsed offer',
+              date_expired: '2020-01-01T00:00:00Z',
+            },
+          ],
+          { headers: { 'X-Pages': '2' } }
+        );
+      })
+    );
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const row = within(table).getByText('Lapsed offer').closest('tr') as HTMLElement;
+    const lapsed = within(row).getByText(/lapsed and unclaimed/i);
+    expect(lapsed.parentElement).toHaveAttribute('tabindex', '0');
+  });
+
   it('has no More-actions button: the title cell opens the detail modal', async () => {
     render(<App />);
     await screen.findByText('Rifter fit');

@@ -17,7 +17,7 @@ import type { AppRoutePath } from './routeScopes';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
 
-const SHEET_GROUPS = railGroups(true);
+const SHEET_GROUPS = railGroups();
 const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
 const ALL_CORP_VIEWS = { canReadMembers: true, canReadWallet: true, canReadAssets: true };
 
@@ -29,7 +29,6 @@ interface MobileMoreSheetProps {
   onClose: () => void;
   locked: ReadonlySet<AppRoutePath>;
   tabs: readonly MobileTabPath[];
-  unreadAlerts: number;
   /**
    * The active Character's portrait link, which `Layout` owns, given the page
    * to return to once a Character is picked (#1764).
@@ -58,7 +57,6 @@ export function MobileMoreSheet({
   onClose,
   locked,
   tabs,
-  unreadAlerts,
   renderCharacterLink,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -117,7 +115,6 @@ export function MobileMoreSheet({
         to={page.path}
         label={t(page.labelKey)}
         locked={page.gating === 'scope' && locked.has(page.path)}
-        badge={page.path === '/alerts' ? unreadAlerts : undefined}
         presentation="tile"
         onClick={onClose}
       />
@@ -125,8 +122,15 @@ export function MobileMoreSheet({
     if (!editing || !canHide(page.path)) return link;
     const pageHidden = hiddenSet.has(page.path);
     return (
-      <div key={page.path} className={pageHidden ? 'relative opacity-60' : 'relative'}>
+      <div key={page.path} className="relative">
         {link}
+        {pageHidden && (
+          <Icon.NavHidden
+            aria-hidden="true"
+            size={Icon.ICON_SIZE.sm}
+            className="pointer-events-none absolute top-1.5 left-1.5 text-text-dim"
+          />
+        )}
         <NavHideToggle
           path={page.path}
           label={t(page.labelKey)}

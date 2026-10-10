@@ -166,8 +166,12 @@ describe('PermissionsPanel — granting several at once', () => {
     expect(
       screen.getByRole('button', { name: `Grant selected (${SCOPE_GROUPS.length})` })
     ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Select none' }));
+    const selectNone = screen.getByRole('button', { name: 'Select none' });
+    await userEvent.click(selectNone);
     expect(screen.queryByRole('button', { name: /^grant selected/i })).not.toBeInTheDocument();
+    // Nothing left to clear, yet the pressed button keeps focus (issue #3365).
+    expect(selectNone).toHaveAttribute('aria-disabled', 'true');
+    expect(document.activeElement).toBe(selectNone);
   });
 
   it('shows no selection controls when nothing is missing', () => {

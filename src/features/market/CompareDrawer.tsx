@@ -21,6 +21,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 import {
   Button,
   DataTable,
@@ -137,6 +138,31 @@ export function CompareDrawer({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  // Fixed over the page bottom: publish what it covers so focus scrolls clear
+  // (WCAG 2.4.11).
+  useStickyClearance(wrapperRef, 'compare-drawer');
+  // Real bottom space for `main` (Layout.tsx), so the page tail can scroll
+  // above the bar. Normally all of the clearance. Desktop Expand covers the
+  // page and focus is inside it, so only the handle gets room, not 80vh.
+  const expanded = mode === 'full' && !narrow;
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    const handle = handleRef.current;
+    if (!expanded || !handle) {
+      rootStyle.setProperty('--compare-drawer-space', 'var(--compare-drawer-clearance, 0px)');
+      return () => rootStyle.removeProperty('--compare-drawer-space');
+    }
+    const publish = () => {
+      const covered = Math.max(0, window.innerHeight - handle.getBoundingClientRect().top);
+      rootStyle.setProperty('--compare-drawer-space', `calc(${covered}px + 0.75rem)`);
+    };
+    publish();
+    window.addEventListener('resize', publish);
+    return () => {
+      window.removeEventListener('resize', publish);
+      rootStyle.removeProperty('--compare-drawer-space');
+    };
+  }, [expanded]);
 
   // Every `openIn` is consumed once acted on — the one that mounted this
   // drawer here, later ones in the listener — so a remount after leaving
