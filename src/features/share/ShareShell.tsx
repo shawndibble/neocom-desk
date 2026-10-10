@@ -60,7 +60,7 @@ export function ShareShell({ title, hideTitle, actions, openInApp, children }: S
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-6 text-text">
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
           <LogoMark className="size-9" />
