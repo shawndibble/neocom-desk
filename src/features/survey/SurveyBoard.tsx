@@ -84,7 +84,7 @@ export function SurveyBoard({
   const orePrices = useOrePrices(oreNames);
   // The scanner's own ISK column is not trusted: rocks are valued at market.
   const summary = useMemo(
-    () => summarizeSurvey(priceScans(scans, orePrices.prices)),
+    () => summarizeSurvey(priceScans(scans, orePrices.prices), orePrices.prices),
     [scans, orePrices.prices]
   );
   const [outcome, setOutcome] = useCopyOutcome();
