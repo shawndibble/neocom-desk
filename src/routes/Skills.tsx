@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
   Caret,
   DataAgeBadge,
   EmptyState,
+  LiveStatus,
   Panel,
   SearchInput,
   SkillBar,
@@ -200,6 +202,8 @@ export function Skills() {
 
   const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
   const inspectorRef = useRef<HTMLDivElement>(null);
+  const rowButtons = useRef(new Map<number, HTMLButtonElement>());
+  const focusAfterCommit = useFocusAfterCommit();
 
   // The inspector renders above the sticky search bar and the row that
   // opened it, so a plain selection change can leave it off-screen.
@@ -376,6 +380,9 @@ export function Skills() {
         }
       />
       <SkillsSubNav />
+      <LiveStatus>
+        {inspector ? t('skills.inspector.shownAnnouncement', { name: inspector.name }) : null}
+      </LiveStatus>
 
       <StatChips>
         <StatChip
@@ -462,7 +469,11 @@ export function Skills() {
                 description={inspector.description}
                 prereqs={inspector.prereqs}
                 unlocks={inspector.unlocks}
-                onClose={() => setSelectedSkillTypeID(null)}
+                onClose={() => {
+                  const opener = selectedSkillTypeID;
+                  setSelectedSkillTypeID(null);
+                  if (opener !== null) focusAfterCommit(() => rowButtons.current.get(opener));
+                }}
                 planAction={
                   selectedSkill && (
                     <SkillPlanAdd
@@ -562,6 +573,10 @@ export function Skills() {
                             const row = (
                               <button
                                 type="button"
+                                ref={(el) => {
+                                  if (el) rowButtons.current.set(skill.skillTypeID, el);
+                                  else rowButtons.current.delete(skill.skillTypeID);
+                                }}
                                 aria-pressed={selected}
                                 onClick={() =>
                                   setSelectedSkillTypeID((current) =>
