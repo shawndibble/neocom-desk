@@ -197,7 +197,7 @@ describe('HaulingPanel trip summary', () => {
     });
     renderPanel();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Multibuy' }));
+    await user.click(screen.getByRole('button', { name: 'Copy multibuy list' }));
 
     expect(await screen.findByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
   });
