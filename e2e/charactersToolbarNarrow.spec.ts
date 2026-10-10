@@ -8,6 +8,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
+import { answerRailQuestion } from './support/login';
 import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -25,6 +26,7 @@ async function landOnCharactersAtPhoneWidth(page: Page) {
   await page.waitForLoadState('load');
   // A first-ever login lands on /overview (#1771); this file is about the list.
   await expect(page).toHaveURL(/\/overview$/);
+  await answerRailQuestion(page);
   await page.goto('./characters');
   await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
 }

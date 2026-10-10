@@ -38,7 +38,8 @@ import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
-import { useHiddenNav, useRecentNav } from './navPreferences';
+import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
+import { NavSetupQuestion } from './NavSetupQuestion';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
@@ -274,10 +275,12 @@ export function App() {
   // The rail's and More sheet's hidden pages and Recent row: same reason.
   const hydrateHiddenNav = useHiddenNav((state) => state.hydrate);
   const hydrateRecentNav = useRecentNav((state) => state.hydrate);
+  const hydrateNavSetup = useNavSetupAnswered((state) => state.hydrate);
   useEffect(() => {
     void hydrateHiddenNav();
     void hydrateRecentNav();
-  }, [hydrateHiddenNav, hydrateRecentNav]);
+    void hydrateNavSetup();
+  }, [hydrateHiddenNav, hydrateRecentNav, hydrateNavSetup]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
@@ -390,6 +393,7 @@ export function App() {
         <SkillDetailModal />
         <ItemInfoModal />
         <InstallPrompt />
+        <NavSetupQuestion />
       </BrowserRouter>
     </ErrorBoundary>
   );
