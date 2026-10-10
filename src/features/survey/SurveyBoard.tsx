@@ -161,7 +161,7 @@ export function SurveyBoard({
   if (summary === null) {
     return (
       <div className="space-y-4">
-        <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="pt-10" />
+        <EmptyState title={t('survey.emptyTitle')} hint={t('survey.emptyHint')} className="py-10" />
         <SurveyHowTo />
         {footerActions}
         {scanList}

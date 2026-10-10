@@ -4,8 +4,9 @@ import '@/i18n';
 import { SurveyHowTo } from './SurveyHowTo';
 
 describe('SurveyHowTo', () => {
-  it('lists the six steps in order, with a picture for the in-game ones', () => {
+  it('lists the six steps in one ordered list, with a picture for the in-game ones', () => {
     render(<SurveyHowTo />);
+    expect(screen.getAllByRole('list')).toHaveLength(1);
     const steps = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(steps).toEqual([
       '1Right-click the Mining Surveyor icon.',

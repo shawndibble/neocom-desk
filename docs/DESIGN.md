@@ -1265,6 +1265,8 @@ Every interactive element takes its states from one shared recipe in
   transitions, no smooth scroll and no pulse. A `Spinner` keeps turning at
   half speed because it carries status.
 
+**Numbered steps (not clickable).** A how-to that points at the game's own windows is one `<ol>` whose items lead with a round `bg-accent` badge (`size-5`, `text-xs font-bold`, `text-accent-contrast`, `aria-hidden`: the list supplies the number to assistive tech), and the screenshot carries the same numbers in the same cyan, so a pilot matches step to spot by number. The badge is a marker, not a control: it never takes focus or a hover state. First use: the Survey empty state (`SurveyHowTo.tsx`).
+
 ## 7. Accessibility
 
 - Contrast (WCAG AA ≥ 4.5:1 for text) — measured ratios:

@@ -4028,8 +4028,8 @@
     "emptyHint": "Paste a Survey Scanner copy or press Ctrl+V anywhere in the app, to start tracking this field. Paste a newer one later to update it.",
     "howTo": {
       "title": "How to copy a scan",
-      "menuAlt": "The Mining Surveyor icon with its right-click menu open. Marker 1 is the icon, marker 2 is Open Scan Results Window.",
-      "resultsAlt": "The Mining Survey Results window. Marker 3 is the Scan button, marker 4 the arrows that expand each ore, marker 5 the list to select and copy.",
+      "menuAlt": "The Mining Surveyor icon and its right-click menu, with Open Scan Results Window highlighted.",
+      "resultsAlt": "The Mining Survey Results window: the Scan button below a list of ores, each expanded.",
       "openMenu": "Right-click the Mining Surveyor icon.",
       "openResults": "Choose Open Scan Results Window.",
       "scan": "Click Scan in the new window.",
