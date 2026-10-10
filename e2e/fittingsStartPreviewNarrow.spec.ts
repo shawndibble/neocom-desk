@@ -84,7 +84,7 @@ test.describe('Fittings Start preview at desktop widths', () => {
   test('at 1440px the Ring stays beside the stats', async ({ page }) => {
     await openInGamePreview(page, { width: 1440, height: 900 });
 
-    const ring = (await page.getByLabel(/^High slots 1,/).boundingBox())!;
+    const ring = (await page.getByLabel(/^High slots 1[:,]/).boundingBox())!;
     const meters = (await page.getByRole('meter', { name: 'CPU' }).boundingBox())!;
     expect(ring.x + ring.width).toBeLessThanOrEqual(meters.x);
   });

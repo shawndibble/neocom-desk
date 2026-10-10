@@ -728,7 +728,7 @@ one badges each high-slot tile whose module takes that hardpoint. Scope decision
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
-- Accent = interactive/selected. Don't use accent for static decoration.
+- Accent = interactive/selected. Don't use accent for static decoration. Selected or current-row markers (e.g. "My order", "This item") stay accent; plain headings and eyebrows are `text-text-dim`.
 - **A box means "you can click this."** A small inline element drawn with a
   border (the edge of a `Button`, `Select`, `TextInput`, `FilterChip`) is how
   a reader recognises a control, so never draw one around static content: a
