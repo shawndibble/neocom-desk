@@ -49,3 +49,27 @@ for (const viewport of [
     }
   });
 }
+
+for (const { viewport, expected } of [
+  { viewport: { width: 1280, height: 720 }, expected: 'auto' },
+  { viewport: { width: 390, height: 844 }, expected: '56px' },
+]) {
+  test(`no bar mounted: scroll-padding-bottom is ${expected} at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      Object.defineProperty(Notification, 'permission', {
+        get: () => 'granted',
+        configurable: true,
+      })
+    );
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './overview');
+    await expect(page.getByRole('heading', { name: CHARACTER_NAME })).toBeVisible();
+    await expect(page.getByTestId('onboarding-banner')).toHaveCount(0);
+    const value = await page.evaluate(
+      () => getComputedStyle(document.documentElement).scrollPaddingBottom
+    );
+    expect(value).toBe(expected);
+  });
+}
