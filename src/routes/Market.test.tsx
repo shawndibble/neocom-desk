@@ -426,13 +426,28 @@ describe('Market Browser', () => {
     await screen.findByRole('button', SHIPS_GROUP);
     await user.type(screen.getByRole('searchbox'), 'ri');
 
-    expect(screen.getByText('Type 3+ characters to search.')).toBeInTheDocument();
+    expect(screen.getAllByText('Type 3+ characters to search.').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Ore')).toBeInTheDocument(); // full, unfiltered tree — still explicit about why
 
     await user.type(screen.getByRole('searchbox'), 'ft');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
     expect(screen.queryByText('Type 3+ characters to search.')).not.toBeInTheDocument();
+  });
+
+  it('announces the match count, and a miss, through a status region (issue #3354)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('button', SHIPS_GROUP);
+    await user.type(screen.getByRole('searchbox'), 'rifter');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 item matches'));
+
+    await user.clear(screen.getByRole('searchbox'));
+    await user.type(screen.getByRole('searchbox'), 'zzzzqqq');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('No items match your search.')
+    );
   });
 
   it('lets a matched group be collapsed and re-expanded while a search is active', async () => {
