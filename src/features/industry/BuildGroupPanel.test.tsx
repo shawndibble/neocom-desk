@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -20,6 +20,13 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import type { BuildGroup } from './buildGroups';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
+
+/** The toast's status region: the sr-only LiveStatus regions are empty here. */
+function toastStatus() {
+  const live = screen.getAllByRole('status').filter((el) => el.textContent);
+  expect(live).toHaveLength(1);
+  return live[0];
+}
 
 vi.mock('./useComparedBuildResults', async () => {
   const actual = await vi.importActual<typeof import('./useComparedBuildResults')>(
@@ -240,6 +247,23 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     expect(screen.getByRole('button', { name: 'Copy Amarr list' })).toBeTruthy();
   });
 
+  it('announces a whole-group copy in a status region', async () => {
+    configureClipboard(async () => {});
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('b', [material(35, 50)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita')]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((el) => el.textContent === 'Shopping list copied')
+      ).toBe(true)
+    );
+  });
+
   it('leaves the whole-group control disabled — no one list covers both hubs', () => {
     renderMixedGroup();
 
@@ -416,12 +440,11 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use none' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({});
-    // The toast message renders twice: the visible span and its live region.
-    expect(screen.getAllByText('Cleared Have on 1 material').length).toBeGreaterThan(0);
+    expect(toastStatus().textContent).toContain('Cleared Have on 1 material');
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({ 34: 40 });
-    expect(screen.queryAllByText('Cleared Have on 1 material')).toHaveLength(0);
+    expect(screen.queryAllByRole('status').filter((el) => el.textContent)).toHaveLength(0);
   });
 
   it('says so when "Use all" has nothing to fill', async () => {
@@ -432,7 +455,7 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use all' }));
     expect(onOwnedStockChange).not.toHaveBeenCalled();
-    expect(screen.getAllByText(/Nothing to fill/).length).toBeGreaterThan(0);
+    expect(toastStatus().textContent).toContain('Nothing to fill');
   });
 });
 
