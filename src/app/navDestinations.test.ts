@@ -54,11 +54,10 @@ describe('railGroups', () => {
 });
 
 describe('railGroups without the rail row', () => {
-  it('keeps Alerts out of the rail but lets the phone sheet list it, with no Intel group anywhere', () => {
+  it('keeps Alerts out of the rail, the phone bar choices and the phone sheet, with no Intel group anywhere', () => {
     const rail = railGroups().flatMap((group) => group.pages.map((page) => page.path));
     expect(rail).not.toContain('/alerts');
-    const sheet = railGroups(true).flatMap((group) => group.pages.map((page) => page.path));
-    expect(sheet).toContain('/alerts');
+    expect(NAV_PAGES.find((page) => page.path === '/alerts')?.mobileTab).toBe(false);
     expect(NAV_GROUPS.map((group) => group.id)).not.toContain('intel');
   });
 
