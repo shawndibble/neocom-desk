@@ -11,12 +11,18 @@ import { noteSubmittedScan } from './submitted';
 import { useSurveyHistory } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
 
-const { startSurvey, addSurveyScan, loadSurvey } = vi.hoisted(() => ({
+const { startSurvey, addSurveyScan, loadSurvey, setSurveyScanIgnored } = vi.hoisted(() => ({
   startSurvey: vi.fn(),
   addSurveyScan: vi.fn(),
   loadSurvey: vi.fn(),
+  setSurveyScanIgnored: vi.fn(),
 }));
-vi.mock('./surveyStore', () => ({ startSurvey, addSurveyScan, loadSurvey }));
+vi.mock('./surveyStore', () => ({
+  startSurvey,
+  addSurveyScan,
+  loadSurvey,
+  setSurveyScanIgnored,
+}));
 vi.mock('@/features/share/shareStore', () => ({
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
 }));
@@ -71,6 +77,8 @@ beforeEach(async () => {
   startSurvey.mockReset();
   addSurveyScan.mockReset();
   loadSurvey.mockReset();
+  setSurveyScanIgnored.mockReset();
+  setSurveyScanIgnored.mockResolvedValue(undefined);
   startSurvey.mockResolvedValue({
     id: ID,
     url: `https://neocomdesk.test/s/${ID}`,
@@ -79,6 +87,7 @@ beforeEach(async () => {
   addSurveyScan.mockResolvedValue(undefined);
   loadSurvey.mockResolvedValue({
     ok: true,
+    ignored: new Set(),
     expiresAt: EXPIRES,
     owner: 'Shawn Dibble',
     tax: null,
@@ -165,6 +174,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     beforeEach(async () => {
       loadSurvey.mockResolvedValue({
         ok: true,
+        ignored: new Set(),
         expiresAt: EXPIRES,
         owner: 'Shawn Dibble',
         tax: null,
@@ -248,6 +258,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
   it("starts a new survey at once for a different field when the survey in view isn't theirs", async () => {
     loadSurvey.mockResolvedValue({
       ok: true,
+      ignored: new Set(),
       expiresAt: EXPIRES,
       owner: 'Someone Else',
       tax: null,
@@ -309,6 +320,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
   it("shows another pilot's survey tax read-only, so theirs can't overwrite it", async () => {
     loadSurvey.mockResolvedValue({
       ok: true,
+      ignored: new Set(),
       expiresAt: EXPIRES,
       owner: 'Someone Else',
       tax: { name: 'Moon Corp', pct: 8 },
@@ -318,5 +330,53 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
     renderTab();
     expect((await screen.findByTestId('tax-readout')).textContent).toBe('Moon Corp');
     expect(screen.queryByTestId('tax-edit')).toBeNull();
+  });
+
+  describe('removing a scan', () => {
+    const twoScans = (owner: string) => ({
+      ok: true,
+      ignored: new Set(),
+      expiresAt: EXPIRES,
+      owner,
+      tax: null,
+      scans: [
+        { id: 'a', at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+        { id: 'b', at: Date.UTC(2026, 9, 8, 18, 5), rocks: parseSurveyScan(SHRUNK)! },
+      ],
+    });
+
+    it("lets the survey's owner remove a scan, storing it on the survey and reloading", async () => {
+      loadSurvey.mockResolvedValue(twoScans('Shawn Dibble'));
+      await useCurrentSurveyId.getState().setValue(ID);
+      renderTab();
+      fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+      fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+      await waitFor(() =>
+        expect(setSurveyScanIgnored).toHaveBeenCalledWith({
+          id: ID,
+          expiresAt: EXPIRES,
+          scanId: 'b',
+          ignored: true,
+        })
+      );
+    });
+
+    it('says so when the removal could not be stored', async () => {
+      loadSurvey.mockResolvedValue(twoScans('Shawn Dibble'));
+      setSurveyScanIgnored.mockRejectedValue(new Error('permission-denied'));
+      await useCurrentSurveyId.getState().setValue(ID);
+      renderTab();
+      fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+      fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+      expect((await screen.findByRole('alert')).textContent).toContain("Couldn't change that scan");
+    });
+
+    it("offers no removal on another pilot's survey", async () => {
+      loadSurvey.mockResolvedValue(twoScans('Someone Else'));
+      await useCurrentSurveyId.getState().setValue(ID);
+      const { container } = renderTab();
+      await screen.findByText(/mined/);
+      expect(container.querySelector('details')).toBeNull();
+    });
   });
 });

@@ -111,6 +111,7 @@ describe('firestore.indexes.json field overrides', () => {
       SHARES_COLLECTION,
       'surveyScans',
       'surveyTax',
+      'surveyIgnores',
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
@@ -139,6 +140,13 @@ describe('firestore.indexes.json field overrides', () => {
     expect(overridesFor('surveyTax')).toEqual([
       { collectionGroup: 'surveyTax', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyTax', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+    ]);
+  });
+
+  it('expires an ignored-scan doc with its survey, and indexes none of its fields', () => {
+    expect(overridesFor('surveyIgnores')).toEqual([
+      { collectionGroup: 'surveyIgnores', fieldPath: '*', ttl: false, indexes: [] },
+      { collectionGroup: 'surveyIgnores', fieldPath: 'expiresAt', ttl: true, indexes: [] },
     ]);
   });
 

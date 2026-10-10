@@ -9,7 +9,7 @@
  * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
  * rule every other categorical series follows, so no new palette.
  */
-import { useState } from 'react';
+import { useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -25,6 +25,12 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/ContextMenu';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
@@ -63,8 +69,26 @@ function volumeRows(summary: SurveySummary): VolumeRow[] {
   return rows;
 }
 
-export function SurveyCharts({ summary }: { summary: SurveySummary }) {
+/** What Recharts hands a custom dot. */
+interface NodeDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: { at?: number };
+}
+
+export function SurveyCharts({
+  summary,
+  onRemoveScan,
+}: {
+  summary: SurveySummary;
+  /** Offered to the survey's owner: the right-click menu on a scan's node removes it. */
+  onRemoveScan?: (at: number) => void;
+}) {
   const { t } = useTranslation();
+  // The node the pointer is on (so the menu only replaces the browser's own
+  // over a node), and the one the menu was opened for.
+  const [hoverAt, setHoverAt] = useState<number | null>(null);
+  const menuAt = useRef<number | null>(null);
   const [plotWidth, setPlotWidth] = useState(0);
   // A little past the finish, so its marker and label sit inside the plot.
   const end = summary.etaAt ?? summary.lastAt;
@@ -165,90 +189,140 @@ export function SurveyCharts({ summary }: { summary: SurveySummary }) {
     );
   }
 
+  // A scan's node, with a wider invisible target so a finger or a click lands on it.
+  function nodeDot({ cx, cy, payload }: NodeDotProps): ReactElement<SVGElement> {
+    const at = payload?.at;
+    if (typeof cx !== 'number' || typeof cy !== 'number' || at === undefined) {
+      return <g key={`empty-${at ?? 'x'}`} />;
+    }
+    const base = (
+      <circle r={3} fill="var(--color-panel)" stroke="var(--color-text)" strokeWidth={1.5} />
+    );
+    if (onRemoveScan === undefined) {
+      return (
+        <g key={at} transform={`translate(${cx} ${cy})`}>
+          {base}
+        </g>
+      );
+    }
+    return (
+      <g
+        key={at}
+        transform={`translate(${cx} ${cy})`}
+        aria-label={t('survey.chartNode', { time: formatEveClock(at) })}
+        onPointerEnter={() => setHoverAt(at)}
+        onPointerLeave={() => setHoverAt(null)}
+        onContextMenu={() => {
+          menuAt.current = at;
+        }}
+      >
+        <circle r={11} fill="transparent" />
+        {base}
+      </g>
+    );
+  }
+
+  const plot = (
+    <div className="h-56 w-full">
+      <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
+        <ComposedChart data={chartRows} margin={MARGIN}>
+          <CartesianGrid stroke="var(--color-line)" vertical={false} />
+          {xAxis(true)}
+          <YAxis
+            width={Y_AXIS_WIDTH}
+            tickFormatter={formatCompactNumber}
+            stroke="var(--color-line-bright)"
+            tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
+          />
+          {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
+          {summary.oreNames
+            .map((ore, i) => ({ ore, i }))
+            .reverse()
+            .map(({ ore, i }) => (
+              <Area
+                key={ore}
+                type="linear"
+                dataKey={ore}
+                name={ore}
+                stackId="ore"
+                stroke={oreTone(i)}
+                fill={oreTone(i)}
+                fillOpacity={0.45}
+                isAnimationActive={false}
+              />
+            ))}
+          <Line
+            type="linear"
+            dataKey="total"
+            stroke="var(--color-text-dim)"
+            strokeWidth={1}
+            dot={nodeDot}
+            isAnimationActive={false}
+            legendType="none"
+          >
+            <LabelList
+              dataKey="totalLabel"
+              position="top"
+              offset={8}
+              fill="var(--color-text)"
+              fontSize={10}
+              formatter={(value: unknown) =>
+                typeof value === 'number' ? formatCompactNumber(value) : ''
+              }
+            />
+          </Line>
+          <Line
+            type="linear"
+            dataKey="projected"
+            stroke="var(--color-text)"
+            strokeWidth={1.5}
+            strokeDasharray="5 4"
+            dot={false}
+            isAnimationActive={false}
+            legendType="none"
+          />
+          {summary.etaAt !== null && (
+            <ReferenceLine
+              x={summary.etaAt}
+              stroke="var(--color-line-bright)"
+              strokeDasharray="2 3"
+              label={{
+                value: t('survey.chartDone', { time: formatEveClock(summary.etaAt) }),
+                position: 'insideTopLeft',
+                textAnchor: 'end',
+                fill: 'var(--color-text)',
+                fontSize: 11,
+              }}
+            />
+          )}
+          <Tooltip content={VolumeTooltip} isAnimationActive={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
   return (
     <div className="space-y-1">
       <figure aria-label={t('survey.chartVolume')} className="m-0">
-        <div className="h-56 w-full">
-          <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
-            <ComposedChart data={chartRows} margin={MARGIN}>
-              <CartesianGrid stroke="var(--color-line)" vertical={false} />
-              {xAxis(true)}
-              <YAxis
-                width={Y_AXIS_WIDTH}
-                tickFormatter={formatCompactNumber}
-                stroke="var(--color-line-bright)"
-                tick={{ fill: 'var(--color-text-dim)', fontSize: 11 }}
-              />
-              {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top. */}
-              {summary.oreNames
-                .map((ore, i) => ({ ore, i }))
-                .reverse()
-                .map(({ ore, i }) => (
-                  <Area
-                    key={ore}
-                    type="linear"
-                    dataKey={ore}
-                    name={ore}
-                    stackId="ore"
-                    stroke={oreTone(i)}
-                    fill={oreTone(i)}
-                    fillOpacity={0.45}
-                    isAnimationActive={false}
-                  />
-                ))}
-              <Line
-                type="linear"
-                dataKey="total"
-                stroke="var(--color-text-dim)"
-                strokeWidth={1}
-                dot={{
-                  r: 3,
-                  fill: 'var(--color-panel)',
-                  stroke: 'var(--color-text)',
-                  strokeWidth: 1.5,
+        {onRemoveScan === undefined ? (
+          plot
+        ) : (
+          <ContextMenu>
+            {/* Disabled off a node, so the browser's own menu stays everywhere else. */}
+            <ContextMenuTrigger asChild disabled={hoverAt === null}>
+              {plot}
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onSelect={() => {
+                  if (menuAt.current !== null) onRemoveScan(menuAt.current);
                 }}
-                isAnimationActive={false}
-                legendType="none"
               >
-                <LabelList
-                  dataKey="totalLabel"
-                  position="top"
-                  offset={8}
-                  fill="var(--color-text)"
-                  fontSize={10}
-                  formatter={(value: unknown) =>
-                    typeof value === 'number' ? formatCompactNumber(value) : ''
-                  }
-                />
-              </Line>
-              <Line
-                type="linear"
-                dataKey="projected"
-                stroke="var(--color-text)"
-                strokeWidth={1.5}
-                strokeDasharray="5 4"
-                dot={false}
-                isAnimationActive={false}
-                legendType="none"
-              />
-              {summary.etaAt !== null && (
-                <ReferenceLine
-                  x={summary.etaAt}
-                  stroke="var(--color-line-bright)"
-                  strokeDasharray="2 3"
-                  label={{
-                    value: t('survey.chartDone', { time: formatEveClock(summary.etaAt) }),
-                    position: 'insideTopLeft',
-                    textAnchor: 'end',
-                    fill: 'var(--color-text)',
-                    fontSize: 11,
-                  }}
-                />
-              )}
-              <Tooltip content={VolumeTooltip} isAnimationActive={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+                {t('survey.removeScan')}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        )}
         <figcaption className="sr-only">{t('survey.chartVolume')}</figcaption>
       </figure>
 

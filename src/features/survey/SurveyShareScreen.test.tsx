@@ -38,6 +38,7 @@ beforeEach(() => {
   addSurveyScan.mockResolvedValue(undefined);
   loadSurvey.mockResolvedValue({
     ok: true,
+    ignored: new Set(),
     expiresAt: EXPIRES,
     scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
   });

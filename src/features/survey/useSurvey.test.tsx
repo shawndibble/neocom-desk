@@ -9,7 +9,12 @@ import { SURVEY_POLL_MS, useSurvey } from './useSurvey';
 
 const ID = 'abc123XYZ';
 const scan = (at: number): SurveyScan => ({ at, rocks: [{ ore: 'Veldspar', volume: 100 }] });
-const ok = (scans: SurveyScan[]) => ({ ok: true, expiresAt: 5, scans });
+const ok = (scans: SurveyScan[], ignored: string[] = []) => ({
+  ok: true,
+  expiresAt: 5,
+  scans,
+  ignored: new Set(ignored),
+});
 
 async function tick() {
   await act(async () => {
@@ -58,5 +63,16 @@ describe('useSurvey polling', () => {
     loadSurvey.mockResolvedValue({ ok: false, reason: 'failed' });
     await tick();
     expect(result.current.state.status).toBe('ready');
+  });
+
+  it('takes a poll where only the ignored set changed', async () => {
+    loadSurvey.mockResolvedValue(ok([scan(1), scan(2)]));
+    const { result } = renderHook(() => useSurvey(ID));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    loadSurvey.mockResolvedValue(ok([scan(1), scan(2)], ['x']));
+    await tick();
+    expect((result.current.state as { ignored: ReadonlySet<string> }).ignored.has('x')).toBe(true);
   });
 });

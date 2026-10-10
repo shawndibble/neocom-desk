@@ -4,6 +4,7 @@ import {
   loadSurvey,
   MAX_SCAN_BY,
   MAX_SCAN_TEXT,
+  setSurveyScanIgnored,
   setSurveyTax,
   startSurvey,
 } from './surveyStore';
@@ -131,6 +132,7 @@ describe('loadSurvey', () => {
       expiresAt: EXPIRES,
       owner: null,
       tax: null,
+      ignored: new Set(),
       scans: [
         { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
         { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
@@ -247,5 +249,88 @@ describe('moon tax', () => {
 
     getDocs.mockResolvedValue({ docs: [] });
     expect(await loadSurvey('abc123XYZ')).toMatchObject({ ok: true, tax: null });
+  });
+});
+
+describe('ignored scans', () => {
+  it('stores each ignore or restore as a new doc on the survey, expiring with it', async () => {
+    await setSurveyScanIgnored({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      scanId: 'scan1',
+      ignored: true,
+    });
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyIgnores' },
+      {
+        scanId: 'scan1',
+        ignored: true,
+        createdAt: 'SERVER_TIME',
+        expiresAt: FakeTimestamp.fromMillis(EXPIRES),
+      }
+    );
+  });
+
+  const survey = (ignores: unknown[]) => {
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1 }, expiresAt: EXPIRES },
+    });
+    getDocs.mockImplementation(async (ref: { path: string }) => {
+      if (ref.path.endsWith('surveyScans')) {
+        return {
+          docs: [
+            {
+              id: 'scan1',
+              data: () => ({ text: ROW(10, 5), createdAt: FakeTimestamp.fromMillis(1) }),
+            },
+          ],
+        };
+      }
+      return { docs: ref.path.endsWith('surveyIgnores') ? ignores : [] };
+    });
+  };
+  const ignore = (scanId: unknown, ignored: unknown, at: number) => ({
+    data: () => ({ scanId, ignored, createdAt: FakeTimestamp.fromMillis(at) }),
+  });
+
+  it('gives each loaded scan its doc id', async () => {
+    survey([]);
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans.map((s) => s.id)).toEqual(['scan1']);
+  });
+
+  it('loads the scans whose newest ignore doc says ignored, so a restore wins over an earlier ignore', async () => {
+    survey([
+      ignore('scan1', true, 1000),
+      ignore('scan1', false, 2000),
+      ignore('scan2', false, 1000),
+      ignore('scan2', true, 3000),
+      ignore('scan3', true, 1500),
+    ]);
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && [...result.ignored].sort()).toEqual(['scan2', 'scan3']);
+  });
+
+  it('skips malformed ignore docs', async () => {
+    survey([
+      ignore(7, true, 1000),
+      ignore('scan1', 'yes', 1000),
+      { data: () => ({ scanId: 'scan1', ignored: true }) },
+    ]);
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.ignored.size).toBe(0);
+  });
+
+  it('counts nothing as ignored when the ignores cannot be read, and still loads the scans', async () => {
+    survey([]);
+    const base = getDocs.getMockImplementation()!;
+    getDocs.mockImplementation(async (ref: { path: string }) => {
+      if (ref.path.endsWith('surveyIgnores')) throw new Error('offline');
+      return base(ref);
+    });
+    const result = await loadSurvey('abc123XYZ');
+    expect(result).toMatchObject({ ok: true, ignored: new Set() });
+    expect(result.ok && result.scans).toHaveLength(1);
   });
 });

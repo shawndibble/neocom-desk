@@ -20,6 +20,7 @@ beforeEach(async () => {
   loadSurvey.mockReset();
   loadSurvey.mockResolvedValue({
     ok: true,
+    ignored: new Set(),
     expiresAt: Date.UTC(2026, 9, 15),
     owner: null,
     scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
@@ -61,7 +62,7 @@ describe('SurveyPicker', () => {
       Promise.resolve(
         id === A
           ? { ok: false, reason: 'not-found' }
-          : { ok: true, expiresAt: 1, owner: null, scans: [] }
+          : { ok: true, expiresAt: 1, owner: null, ignored: new Set(), scans: [] }
       )
     );
     render(<SurveyPicker currentId={B} onPick={() => undefined} />);

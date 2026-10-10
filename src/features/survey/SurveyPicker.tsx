@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { summarizeSurvey } from '@/engine/survey/series';
+import { countedScans, summarizeSurvey } from '@/engine/survey/series';
 import { forgetSurvey, useSurveyHistory } from './surveyHistory';
 import { loadSurvey } from './surveyStore';
 
@@ -60,7 +60,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
           else requested.current.delete(entry.id);
           continue;
         }
-        const summary = summarizeSurvey(result.scans);
+        const summary = summarizeSurvey(countedScans(result.scans, result.ignored));
         const label =
           summary === null
             ? t('survey.historyEmpty', {

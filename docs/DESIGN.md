@@ -1109,6 +1109,10 @@ is clutter, and clutter hides the actions that matter.
   `RowActionsMenu` or `rowContextMenu` too), not hidden: a row without a ⋮
   has no custom right-click or touch-and-hold menu, and the browser's own
   menu still copies text.
+- **A chart mark may have a one-item right-click menu** when a visible,
+  keyboard-reachable control elsewhere does the same thing (the Survey's
+  "Remove scan" on a chart node, with Remove/Restore in the scan list below the
+  page). The menu is a shortcut, never the only way in; touch-and-hold opens it.
 - **One trailing control cluster per row**, at the right edge, never
   mid-row. A › caret beside a ⋮ is redundant: drop the caret. A destructive ×
   beside a ⋮ is a mis-tap hazard: fold Delete into the menu as a danger item,

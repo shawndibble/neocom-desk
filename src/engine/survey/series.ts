@@ -19,6 +19,8 @@ export interface SurveyRock {
 }
 
 export interface SurveyScan {
+  /** The stored scan's id, so the owner can set it aside; absent for a scan that was never stored. */
+  id?: string;
   /** When the scan was taken, epoch ms. */
   at: number;
   rocks: SurveyRock[];
@@ -125,6 +127,18 @@ function diffScans(
   }
   for (const list of unused.values()) for (const v of list) mined += v;
   return { mined, added, addedByOre };
+}
+
+/**
+ * The scans a Survey counts: all of them but the ones its owner set aside as bad
+ * pastes. Filtered before `summarizeSurvey`'s dedup, so a set-aside scan can't be
+ * the copy that dedup keeps.
+ */
+export function countedScans(
+  scans: readonly SurveyScan[],
+  ignored: ReadonlySet<string>
+): SurveyScan[] {
+  return scans.filter((s) => s.id === undefined || !ignored.has(s.id));
 }
 
 /** A scan's rocks as a comparable string, so a repaste of the same scan is recognised. */

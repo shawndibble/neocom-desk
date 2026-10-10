@@ -354,6 +354,32 @@ service cloud.firestore {
             == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
         allow update, delete: if false;
       }
+
+      // A Survey's ignored scans (src/features/survey/surveyStore.ts): the
+      // owner sets a bad paste aside, and the survey's totals then leave it
+      // out. One create-only doc per change, the newest for a `scanId`
+      // counting, so restoring is a newer doc with `ignored: false` and a scan
+      // is never edited or deleted. Any signed-in pilot may write one: as with
+      // the moon tax, rules can't check the survey's owner (named by Character
+      // name), so the app only offers it to the owner. Anyone with the link
+      // reads them. Same expiry rule as a scan, so the TTL policy on
+      // `surveyIgnores` removes them with the survey.
+      match /surveyIgnores/{ignoreId} {
+        allow get, list: if get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time;
+        allow create: if request.auth != null
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.type == 'survey'
+          && get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt > request.time
+          && request.resource.data.keys().hasOnly(['scanId', 'ignored', 'createdAt', 'expiresAt'])
+          && request.resource.data.keys().hasAll(['scanId', 'ignored', 'createdAt', 'expiresAt'])
+          && request.resource.data.scanId is string
+          && request.resource.data.scanId.size() > 0
+          && request.resource.data.scanId.size() <= 100
+          && request.resource.data.ignored is bool
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.expiresAt
+            == get(/databases/$(database)/documents/shares/$(shareId)).data.expiresAt;
+        allow update, delete: if false;
+      }
     }
     // Everything else: implicit deny.
   }

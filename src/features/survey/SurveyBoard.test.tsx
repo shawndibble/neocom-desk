@@ -167,4 +167,79 @@ describe('SurveyBoard', () => {
       expect(screen.getAllByText('Clear Icicle').length).toBeGreaterThan(0);
     });
   });
+
+  describe('removing a scan', () => {
+    const WITH_IDS = SCANS.map((s, i) => ({ ...s, id: `scan${i}` }));
+
+    it('shows the scan list only when the caller offers removal, and as the last thing on the page', () => {
+      const { container, unmount } = render(
+        <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} />
+      );
+      expect(container.querySelector('details')).toBeNull();
+      unmount();
+      const owner = render(
+        <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={() => {}} />
+      );
+      const list = screen.getByText('2 scans', { selector: 'summary' }).closest('details');
+      expect(list).toBeTruthy();
+      expect(owner.container.querySelector('details')).toBe(list);
+      expect(owner.container.firstElementChild?.lastElementChild).toBe(list);
+    });
+
+    it('removes a scan from the list with its Remove button', async () => {
+      const onSetIgnored = vi.fn();
+      render(
+        <SurveyBoard scans={WITH_IDS} url={URL} expiresAt={null} onSetIgnored={onSetIgnored} />
+      );
+      await userEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+      // Newest first.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+      expect(onSetIgnored).toHaveBeenCalledWith('scan1', true);
+    });
+
+    it('leaves a removed scan out of the totals, and offers to restore it', async () => {
+      const onSetIgnored = vi.fn();
+      render(
+        <SurveyBoard
+          scans={WITH_IDS}
+          ignored={new Set(['scan1'])}
+          url={URL}
+          expiresAt={null}
+          onSetIgnored={onSetIgnored}
+        />
+      );
+      // One counted scan: nothing mined yet, no chart.
+      expect(screen.getByText('0% mined')).toBeTruthy();
+      expect(screen.queryByTestId('charts')).toBeNull();
+      expect(screen.getByText('2 scans · 1 removed', { selector: 'summary' })).toBeTruthy();
+      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'summary' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+      expect(onSetIgnored).toHaveBeenCalledWith('scan1', false);
+    });
+
+    it('still offers Restore when every scan has been removed', async () => {
+      const onSetIgnored = vi.fn();
+      render(
+        <SurveyBoard
+          scans={WITH_IDS}
+          ignored={new Set(['scan0', 'scan1'])}
+          url={URL}
+          expiresAt={null}
+          onSetIgnored={onSetIgnored}
+        />
+      );
+      expect(screen.getByText('No survey yet')).toBeTruthy();
+      await userEvent.click(screen.getByText(/^2 scans/, { selector: 'summary' }));
+      await userEvent.click(screen.getAllByRole('button', { name: 'Restore' })[0]);
+      expect(onSetIgnored).toHaveBeenCalledWith('scan1', false);
+    });
+
+    it('a visitor with no removal offered still gets the totals without the removed scan', () => {
+      render(
+        <SurveyBoard scans={WITH_IDS} ignored={new Set(['scan1'])} url={URL} expiresAt={null} />
+      );
+      expect(screen.getByText('0% mined')).toBeTruthy();
+      expect(screen.queryByText(/removed/)).toBeNull();
+    });
+  });
 });
