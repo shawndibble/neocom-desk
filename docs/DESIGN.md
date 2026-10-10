@@ -1290,8 +1290,9 @@ Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
   without replacement).
   The exception is a non-interactive `tabIndex={-1}` target that only takes focus
   programmatically — a page's `<h1>`, the route outlet (`app/routeFocus.ts`) and a retried
-  read's result (`useRetryFocus`: Retry keeps focus while the read runs or fails again, then
-  focus moves to the result, never to `<body>`) —
+  read's result (`useRetryFocus` in `src/lib/useRetryFocus.ts`: Retry keeps focus while the
+  read runs or fails again, then focus moves to the result, never to `<body>`; after a
+  repeat failure the wrapper takes focus only when Retry itself is gone) —
   which uses `focus:outline-none`: a ring there reads as a control that isn't one.
 - When an action removes the control that ran it, focus moves to the next row, else the previous row, else the section heading. A control that swaps with its counterpart (Edit rail and Done, Add and Undo, a rename field and its Rename button) hands focus to the counterpart. Use `useFocusAfterCommit`, or `firstConnected` as a dialog's `returnFocusFallback`.
 - Color never the sole signal: ISK deltas keep signs, statuses keep words/icons,
