@@ -3,17 +3,10 @@
  * Character holds a blueprint for it, and one action that turns the
  * buildable part into a Build Group sized to cover each Shortfall.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  DataTable,
-  Disclosure,
-  Panel,
-  Spinner,
-  type DataTableColumn,
-} from '@/components/ui';
+import { Button, DataTable, Panel, Spinner, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { db } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -43,11 +36,14 @@ export function StockBuilderView({
   nameOf,
   listName,
   activeCharacterId,
+  viewSwitch,
 }: {
   rows: readonly StockRow[];
   nameOf: (typeId: number) => string;
   listName: string;
   activeCharacterId: number | null;
+  /** The Manager / Builder switch, which shares its row with this view's action. */
+  viewSwitch: ReactNode;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -56,7 +52,6 @@ export function StockBuilderView({
   const [blueprints, setBlueprints] = useState<CharacterBlueprint[] | null>(null);
   const [naming, setNaming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [needsOpen, setNeedsOpen] = useState(true);
   const buildGroups = useBuildGroups((state) => state.value);
   const setBuildGroups = useBuildGroups((state) => state.setValue);
   const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
@@ -115,7 +110,14 @@ export function StockBuilderView({
     };
   }, [catalog, blueprints, rows]);
 
-  if (!split) return <Spinner label={t('common.loading')} />;
+  if (!split) {
+    return (
+      <div className="space-y-3">
+        {viewSwitch}
+        <Spinner label={t('common.loading')} />
+      </div>
+    );
+  }
 
   async function addToBuildGroup(name: string) {
     if (activeCharacterId === null || !catalog || !blueprints || !split) return;
@@ -198,7 +200,7 @@ export function StockBuilderView({
             header: t('stockTargets.builder.timePerRun'),
             headerTooltip: t('stockTargets.builder.timePerRunHint'),
             align: 'right' as const,
-            headerCellClassName: 'sm:w-28',
+            headerCellClassName: 'sm:w-32 whitespace-nowrap',
             className: 'tabular-nums',
             stackAffix: { after: ` ${t('stockTargets.builder.perRunAffix')}` },
             render: (row: BuilderRow) =>
@@ -211,7 +213,7 @@ export function StockBuilderView({
       id: 'value',
       header: t('stockTargets.builder.marketValue'),
       align: 'right',
-      headerCellClassName: 'sm:w-32',
+      headerCellClassName: 'sm:w-36 whitespace-nowrap',
       className: 'tabular-nums whitespace-nowrap',
       render: (row) =>
         row.costToFill === null ? (
@@ -244,18 +246,15 @@ export function StockBuilderView({
     </Panel>
   );
 
-  if (split.buildable.length === 0 && split.needs.length === 0) {
-    return (
-      <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
-        {t('stockTargets.builder.nothingShort')}
-      </p>
-    );
-  }
+  const sectionHeadingClassName =
+    'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
   return (
     <div className="space-y-3">
-      {split.buildable.length > 0 && (
-        <div className="flex justify-end">
+      <div className="flex flex-wrap items-center gap-2">
+        {viewSwitch}
+        <span className="flex-1" />
+        {split.buildable.length > 0 && (
           <Button
             variant="primary"
             loading={busy}
@@ -264,37 +263,37 @@ export function StockBuilderView({
           >
             {t('stockTargets.builder.addToGroup', { count: split.buildable.length })}
           </Button>
-        </div>
-      )}
-      <section aria-labelledby="stock-builder-can" className="space-y-2">
-        <h2
-          id="stock-builder-can"
-          className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
-          {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
-        </h2>
-        {split.buildable.length > 0 ? (
-          table(split.buildable, t('stockTargets.builder.canBuildLabel'), true)
-        ) : (
-          <p className="text-sm text-text-dim">
-            <HintText content={t('stockTargets.builder.noneBuildableHint')}>
-              {t('stockTargets.builder.noneBuildable')}
-            </HintText>
-          </p>
         )}
-      </section>
-      {split.needs.length > 0 && (
-        <Disclosure
-          expanded={needsOpen}
-          onToggle={() => setNeedsOpen((open) => !open)}
-          label={
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('stockTargets.builder.needs', { count: split.needs.length })}
-            </span>
-          }
-        >
-          {table(split.needs, t('stockTargets.builder.needsLabel'), false)}
-        </Disclosure>
+      </div>
+      {split.buildable.length === 0 && split.needs.length === 0 ? (
+        <p className="rounded-xs border border-dashed border-line px-3 py-3 text-sm text-text-dim">
+          {t('stockTargets.builder.nothingShort')}
+        </p>
+      ) : (
+        <>
+          <section aria-labelledby="stock-builder-can" className="space-y-2">
+            <h2 id="stock-builder-can" className={sectionHeadingClassName}>
+              {t('stockTargets.builder.canBuild', { count: split.buildable.length })}
+            </h2>
+            {split.buildable.length > 0 ? (
+              table(split.buildable, t('stockTargets.builder.canBuildLabel'), true)
+            ) : (
+              <p className="text-sm text-text-dim">
+                <HintText content={t('stockTargets.builder.noneBuildableHint')}>
+                  {t('stockTargets.builder.noneBuildable')}
+                </HintText>
+              </p>
+            )}
+          </section>
+          {split.needs.length > 0 && (
+            <section aria-labelledby="stock-builder-needs" className="space-y-2">
+              <h2 id="stock-builder-needs" className={sectionHeadingClassName}>
+                {t('stockTargets.builder.needs', { count: split.needs.length })}
+              </h2>
+              {table(split.needs, t('stockTargets.builder.needsLabel'), false)}
+            </section>
+          )}
+        </>
       )}
       {naming && (
         <StockListNameDialog

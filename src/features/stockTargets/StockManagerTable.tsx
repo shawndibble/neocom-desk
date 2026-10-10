@@ -125,7 +125,6 @@ export function StockManagerTable({
       headerCellClassName: 'sm:w-32',
       stackEdge: 'below',
       render: (row) => <StockFillBar status={row.status} fill={row.fill} />,
-      sortValue: (row) => row.fill,
     },
     {
       id: 'shortfall',

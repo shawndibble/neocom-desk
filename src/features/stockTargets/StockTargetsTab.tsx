@@ -188,6 +188,17 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
   const filteredRows =
     statusFilter === null ? rows : rows.filter((row) => row.status === statusFilter);
   const countOf = (status: StockStatus) => rows.filter((row) => row.status === status).length;
+  const viewSwitch = (
+    <SegmentedControl<View>
+      label={t('stockTargets.view.label')}
+      value={view}
+      onChange={setView}
+      options={[
+        { value: 'manager', label: t('stockTargets.view.manager') },
+        { value: 'builder', label: t('stockTargets.view.builder') },
+      ]}
+    />
+  );
   const nameOf = (typeId: number) =>
     data?.names.get(typeId) ?? t('common.unknownType', { id: typeId });
 
@@ -287,40 +298,34 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SegmentedControl<View>
-          label={t('stockTargets.view.label')}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: 'manager', label: t('stockTargets.view.manager') },
-            { value: 'builder', label: t('stockTargets.view.builder') },
-          ]}
-        />
-        {view === 'manager' && rows.length > 0 && (
-          <div
-            role="group"
-            aria-label={t('stockTargets.filterLabel')}
-            className="flex flex-wrap items-center gap-1.5"
-          >
-            <FilterChip
-              label={t('stockTargets.filterAll')}
-              count={rows.length}
-              selected={statusFilter === null}
-              onToggle={() => setStatusFilter(null)}
-            />
-            {STOCK_STATUSES.map((status) => (
+      {view === 'manager' && (
+        <div className="flex flex-wrap items-center gap-2">
+          {viewSwitch}
+          {rows.length > 0 && (
+            <div
+              role="group"
+              aria-label={t('stockTargets.filterLabel')}
+              className="flex flex-wrap items-center gap-1.5"
+            >
               <FilterChip
-                key={status}
-                label={t(`stockTargets.status.${status}`)}
-                count={countOf(status)}
-                selected={statusFilter === status}
-                onToggle={() => setStatusFilter(statusFilter === status ? null : status)}
+                label={t('stockTargets.filterAll')}
+                count={rows.length}
+                selected={statusFilter === null}
+                onToggle={() => setStatusFilter(null)}
               />
-            ))}
-          </div>
-        )}
-      </div>
+              {STOCK_STATUSES.map((status) => (
+                <FilterChip
+                  key={status}
+                  label={t(`stockTargets.status.${status}`)}
+                  count={countOf(status)}
+                  selected={statusFilter === status}
+                  onToggle={() => setStatusFilter(statusFilter === status ? null : status)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <LiveStatus>
         {data && t('stockTargets.liveSummary', { out: summary?.out ?? 0, low: summary?.low ?? 0 })}
@@ -366,6 +371,7 @@ export function StockTargetsTab({ activeCharacterId }: { activeCharacterId: numb
           nameOf={nameOf}
           listName={list.name}
           activeCharacterId={activeCharacterId}
+          viewSwitch={viewSwitch}
         />
       )}
       {dialogs}
