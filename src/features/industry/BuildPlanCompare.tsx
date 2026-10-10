@@ -440,6 +440,7 @@ export function BuildPlanCompare({
             columnsById={columnsById}
             onToggle={toggle}
             onReset={reset}
+            size="sm"
             buttonLabel={t('common.columnsButton')}
             menuTitle={t('common.columnsMenuTitle')}
             resetLabel={t('common.resetColumns')}
