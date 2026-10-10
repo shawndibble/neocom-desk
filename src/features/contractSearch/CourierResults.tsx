@@ -11,7 +11,7 @@
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { HintText } from '@/components/ui/HintText';
 import { JumpsLink } from '@/features/travel/JumpsLink';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -76,6 +76,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { courierContractsCsvColumns } from './courierContractsCsv';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -1156,8 +1157,13 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
    * swapped. Through `changeFilter` rather than `setUiFilter`, so it is
    * remembered the way every other filter change is.
    */
+  const focusAfterCommit = useFocusAfterCommit();
+  const resultsRef = useRef<HTMLDivElement>(null);
+
   function searchReverseLane(row: CourierRouteRow) {
     setSelectedRow(null);
+    // The row that opened the detail is filtered out, so focus goes to the results.
+    focusAfterCommit(resultsRef);
     changeFilter({
       ...uiFilter,
       originRegionId: row.destination.regionId,
@@ -1484,54 +1490,56 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           </>
         }
       />
-      {displayRows.length === 0 ? (
-        <EmptyState
-          title={t('contractSearch.courierNoFilterMatches')}
-          hint={t(
-            excludedUnplacedDestinations
-              ? 'contractSearch.courierNoFilterMatchesUnplacedHint'
-              : 'contractSearch.courierNoFilterMatchesHint'
-          )}
-          className="py-8"
-          action={
-            <Button
-              size="sm"
-              onClick={() => changeFilter({ routeQuery: '', ...DEFAULT_COURIER_FILTER })}
-            >
-              {t('common.resetFilters')}
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          {jumps.kind === 'unknown' && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
-              {t('contractSearch.jumpsSnapshotUnavailable')}
-            </p>
-          )}
-          <DataTable
-            {...courierExport.tableProps}
-            label={t('contractSearch.courierTitle')}
-            columns={columns}
-            rows={displayRows}
-            // One row per contract here — unlike the offers snapshot, where one
-            // contract lists an item line per stack — so `contractId` alone is
-            // a unique key.
-            rowKey={(row) => String(row.contractId)}
-            {...courierSortProps}
-            onRowClick={setSelectedRow}
-            // Hundreds of hauls are scanned, not read: the dense two-line card
-            // fits three times the labelled one on a phone.
-            stackLayout="dense"
-            mobileSort
-            stackSummary={stackSummary}
-            groupBy={groupBy}
-            // Every haul the filters keep, windowed rather than capped. Phone
-            // lane grouping renders unwindowed — collapsed lanes mount nothing.
-            virtualize
+      <div ref={resultsRef} tabIndex={-1} className="focus:outline-none">
+        {displayRows.length === 0 ? (
+          <EmptyState
+            title={t('contractSearch.courierNoFilterMatches')}
+            hint={t(
+              excludedUnplacedDestinations
+                ? 'contractSearch.courierNoFilterMatchesUnplacedHint'
+                : 'contractSearch.courierNoFilterMatchesHint'
+            )}
+            className="py-8"
+            action={
+              <Button
+                size="sm"
+                onClick={() => changeFilter({ routeQuery: '', ...DEFAULT_COURIER_FILTER })}
+              >
+                {t('common.resetFilters')}
+              </Button>
+            }
           />
-        </>
-      )}
+        ) : (
+          <>
+            {jumps.kind === 'unknown' && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+                {t('contractSearch.jumpsSnapshotUnavailable')}
+              </p>
+            )}
+            <DataTable
+              {...courierExport.tableProps}
+              label={t('contractSearch.courierTitle')}
+              columns={columns}
+              rows={displayRows}
+              // One row per contract here — unlike the offers snapshot, where one
+              // contract lists an item line per stack — so `contractId` alone is
+              // a unique key.
+              rowKey={(row) => String(row.contractId)}
+              {...courierSortProps}
+              onRowClick={setSelectedRow}
+              // Hundreds of hauls are scanned, not read: the dense two-line card
+              // fits three times the labelled one on a phone.
+              stackLayout="dense"
+              mobileSort
+              stackSummary={stackSummary}
+              groupBy={groupBy}
+              // Every haul the filters keep, windowed rather than capped. Phone
+              // lane grouping renders unwindowed — collapsed lanes mount nothing.
+              virtualize
+            />
+          </>
+        )}
+      </div>
       {selectedRow && reverseLane && (
         <CourierContractDetailModal
           row={selectedRow}
@@ -1550,6 +1558,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           reverseLane={reverseLane}
           onSearchReverseLane={() => searchReverseLane(selectedRow)}
           onClose={() => setSelectedRow(null)}
+          returnFocusFallback={() => resultsRef.current}
         />
       )}
     </>
