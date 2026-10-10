@@ -785,7 +785,11 @@ describe('Industry: Build Opportunities waits for the pricing-settings hydration
     window.history.pushState({}, '', '/industry/opportunities');
     render(<App />);
 
-    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    // One `waitFor` so the find and the assert run in the same tick: the boot
+    // screen's own spinner is also "Loading" and unmounts as the route lands.
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
+    );
     expect(screen.queryByRole('heading', { name: 'Build Opportunities' })).not.toBeInTheDocument();
 
     // Resolves on its own once the (real, Dexie-backed) hydrate() call
