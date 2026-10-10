@@ -84,6 +84,10 @@ count had nothing honest to borrow: `warning` would make a data series read as
 an alert about the data, and a clock kind (below) names where a _deadline_ came
 from, so reusing one would give a single hue two meanings. It sits clear of
 `warning` on the orange side and of `kind-industry-job` on the saturated side.
+Price History's compared regions are the other case. They are a categorical set,
+one per region the reader picked, each named in the legend and drawn with its own
+dash. So they borrow clock kinds as the Net Worth layers do (below), rather than
+being one fixed series that would make a kind's hue mean something else.
 
 A second entry here is the start of the parallel palette this section forbids —
 so before adding one, try telling the new series apart by **form** instead:

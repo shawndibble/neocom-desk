@@ -79,6 +79,10 @@ type RegionHistoryState =
 
 const NO_REGIONS: readonly number[] = [];
 
+function regionNameOf(regions: readonly MarketRegionEntry[] | undefined, id: number): string {
+  return regions?.find((region) => region.id === id)?.name ?? String(id);
+}
+
 /**
  * Each compared region's full daily history, fetched only once that region is
  * picked — one `loadPriceHistory` per region, through the same cache (until
@@ -130,18 +134,19 @@ export function PriceHistoryPanel({
   compare,
 }: PriceHistoryPanelProps) {
   const { t } = useTranslation();
-  const rawCompareIds = compare?.regionIds ?? NO_REGIONS;
-  const compareKey = rawCompareIds.join(',');
-  // Keyed on the ids' text, not the array: the URL hands back a fresh array
-  // on every render, and the loader effect must not re-run for the same picks.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const compareIds = useMemo(
-    () => normalizeCompareRegions(rawCompareIds, regionId),
-    [compareKey, regionId]
+    () => normalizeCompareRegions(compare?.regionIds ?? NO_REGIONS, regionId),
+    [compare?.regionIds, regionId]
   );
-  const comparedHistories = useComparedHistories(typeId, compareIds);
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // Nothing is fetched for a compared region until the primary one has days
+  // to draw: an empty or failed primary shows its own state, with no chart
+  // for a comparison line to sit on.
+  const comparedHistories = useComparedHistories(
+    typeId,
+    points && points.length > 0 ? compareIds : NO_REGIONS
+  );
   // The window a trader reads in is a habit, not a property of the item, and
   // this panel remounts per item — so it comes from disk. Ungated on
   // `hydrated`, and hydrated above the early returns below so a loading or
@@ -264,24 +269,21 @@ function RangedHistory({
   comparedHistories,
 }: RangedHistoryProps) {
   const { t } = useTranslation();
-  const regionName = (id: number) =>
-    compare?.regions.find((region) => region.id === id)?.name ?? String(id);
+  const regions = compare?.regions;
   // The summary strip stays the primary region's; compared regions only add
   // their average line, cut to the same range.
   const comparisons = useMemo<ComparedRegionSeries[]>(
     () =>
       compareIds.map((regionId, i) => {
-        const state = comparedHistories[i]!;
-        const name =
-          compare?.regions.find((region) => region.id === regionId)?.name ?? String(regionId);
+        const state = comparedHistories[i] ?? { status: 'loading' };
         return {
           regionId,
-          name,
+          name: regionNameOf(regions, regionId),
           status: state.status,
           points: state.status === 'ready' ? filterPriceHistoryRange(state.points, range, now) : [],
         };
       }),
-    [compareIds, comparedHistories, compare?.regions, range, now]
+    [compareIds, comparedHistories, regions, range, now]
   );
   const filtered = useMemo(
     () =>
@@ -398,7 +400,7 @@ function RangedHistory({
           itemName={itemName}
           movingAverage={filteredMovingAverage}
           comparisons={comparisons}
-          primaryRegionName={compare ? regionName(primaryRegionId) : undefined}
+          primaryRegionName={regions ? regionNameOf(regions, primaryRegionId) : undefined}
         />
       </Suspense>
     </div>
