@@ -92,6 +92,18 @@ describe('PublicContractDetailModal — contents', () => {
     expect(rows[0]).toHaveTextContent('×5');
   });
 
+  it('wraps a long location name instead of cutting it off', async () => {
+    const long = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant '.repeat(2).trim();
+    loadContractLocationName.mockResolvedValue(long);
+    renderModal({ id: 30000142, name: 'Jita' });
+    const value = (await screen.findByText(long)).closest('dd')!;
+    expect(value).not.toHaveClass('truncate');
+    expect(value).toHaveClass('break-words');
+    for (const label of ['Region', 'System']) {
+      expect(screen.getByText(label).nextElementSibling).not.toHaveClass('truncate');
+    }
+  });
+
   it('gives every line the item icon', async () => {
     showItems([item({ record_id: 1 })]);
     renderModal();

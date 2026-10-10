@@ -297,7 +297,7 @@ export function NetWorthPanel({
         id,
         header: t(LAYER_LABEL_KEYS[id]),
         align: 'right',
-        className: cx('tabular-nums', hiddenLayers.includes(id) && 'opacity-50'),
+        className: cx('tabular-nums', hiddenLayers.includes(id) && 'text-text-dim'),
         render: (row) => {
           if (id === 'isk' && row.needsReauth) {
             return <span className="text-warning">{t('wallet.reauthTitle')}</span>;
@@ -450,7 +450,7 @@ export function NetWorthPanel({
             rows={tableRows}
             rowKey={(row) => row.characterId}
             responsive="table"
-            rowClassName={(row) => (row.covered ? 'group' : 'group opacity-70')}
+            rowClassName={() => 'group'}
             onRowClick={(row) => onDrill(row.characterId)}
           />
         )}
