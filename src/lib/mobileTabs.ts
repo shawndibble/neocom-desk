@@ -42,7 +42,7 @@ export const MOBILE_TAB_CHOICES: readonly MobileTabPath[] = NAV_PAGES.filter(
 /** Tabs in the bar, beside the "More" button that is always the fifth item. */
 export const MOBILE_TAB_COUNT = 4;
 
-/** What the bar held before it was settable, so nobody's phone moves unasked. */
+/** What the bar holds until the pilot picks their own four. */
 export const DEFAULT_MOBILE_TABS: readonly MobileTabPath[] = [
   '/overview',
   '/skills',
