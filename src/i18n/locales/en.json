@@ -4902,7 +4902,7 @@
     "forward": "Forward",
     "composeReplyHeading": "Reply",
     "composeForwardHeading": "Forward",
-    "recipientsLabel": "Recipients",
+    "toLabel": "To",
     "removeRecipient": "Remove {{name}}",
     "senderNotRemovable": "The sender can't be removed — remove every other recipient and this still sends as a reply.",
     "addRecipient": "Add recipient",
