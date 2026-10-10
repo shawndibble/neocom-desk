@@ -39,6 +39,8 @@ const BUTTON_STEP = 1.2;
 /** The faction panel's 14.5rem plus its 0.75rem inset and a gap. */
 const FACTION_PANEL_SPACE = 256;
 const MIN_FIT_WIDTH = 480;
+/** Long enough to cross the gap from a tile to its hover card. */
+const HOVER_CLOSE_DELAY_MS = 150;
 
 export function ShipTreeMap({
   source,
@@ -167,11 +169,30 @@ export function ShipTreeMap({
     },
     [onOpenShip]
   );
-  const hoverShip = useCallback(
-    (ship: ShipTreeShip | null, el?: HTMLElement) =>
-      setHover(ship && el ? { ship, rect: el.getBoundingClientRect() } : null),
-    []
-  );
+  // Leaving the tile closes the card after a beat, so the pointer can cross
+  // the gap onto the card (WCAG 1.4.13 "hoverable"); the card cancels it.
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const cancelClose = useCallback(() => clearTimeout(closeTimer.current), []);
+  const hoverShip = useCallback((ship: ShipTreeShip | null, el?: HTMLElement) => {
+    clearTimeout(closeTimer.current);
+    if (ship && el) setHover({ ship, rect: el.getBoundingClientRect() });
+    else closeTimer.current = setTimeout(() => setHover(null), HOVER_CLOSE_DELAY_MS);
+  }, []);
+  const closeHoverNow = useCallback(() => {
+    clearTimeout(closeTimer.current);
+    setHover(null);
+  }, []);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+  // Escape dismisses the card without moving the pointer (WCAG 1.4.13 "dismissible").
+  const hoverOpen = hover !== null;
+  useEffect(() => {
+    if (!hoverOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeHoverNow();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [hoverOpen, closeHoverNow]);
 
   function pickResult(ship: ShipTreeShip) {
     setHover(null);
@@ -298,6 +319,8 @@ export function ShipTreeMap({
           anchor={hover.rect}
           className={data.groups[String(hover.ship.treeGroupID)]?.name ?? ''}
           skillName={skillName}
+          onPointerEnter={cancelClose}
+          onPointerLeave={closeHoverNow}
         />
       )}
     </div>

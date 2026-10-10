@@ -152,6 +152,39 @@ describe('ShipTreeTab — map', () => {
     expect(within(card).getByText('5%')).toBeVisible();
   });
 
+  it('keeps the hover card open while the pointer crosses onto it, closes on leaving it', async () => {
+    renderTab();
+    const merlin = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    fireEvent.mouseEnter(merlin);
+    fireEvent.mouseLeave(merlin);
+    const card = screen.getByTestId('ship-tree-hover-card');
+    fireEvent.mouseEnter(card);
+    // Past the close delay the card is still there: the card cancelled it.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
+    fireEvent.mouseLeave(card);
+    expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
+  });
+
+  it('closes the hover card after a beat once the pointer leaves the tile', async () => {
+    renderTab();
+    const merlin = await screen.findByRole('button', { name: 'Merlin — Can fly' });
+    fireEvent.mouseEnter(merlin);
+    fireEvent.mouseLeave(merlin);
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument()
+    );
+  });
+
+  it('dismisses the hover card with Escape, pointer still over the tile', async () => {
+    renderTab();
+    fireEvent.mouseEnter(await screen.findByRole('button', { name: 'Merlin — Can fly' }));
+    expect(screen.getByTestId('ship-tree-hover-card')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByTestId('ship-tree-hover-card')).not.toBeInTheDocument();
+  });
+
   it('resets to 100% on a faction switch, even after the reader zoomed', async () => {
     const user = userEvent.setup();
     renderTab();
