@@ -58,20 +58,7 @@
     "morePages_one": "{{count}} more page",
     "morePages_other": "{{count}} more pages",
     "customize": "Customize",
-    "showPermanently": "Always show {{page}}",
-    "setup": {
-      "title": "What do you do in EVE?",
-      "hint": "Pick what you play and the rail starts with those pages. Everything else stays in Go to and under \"more pages\".",
-      "skip": "Skip",
-      "done": "Start",
-      "activity": {
-        "mining": "Mining",
-        "pi": "Planetary Industry",
-        "trading": "Trading",
-        "industry": "Industry",
-        "social": "Mail and contacts"
-      }
-    }
+    "showPermanently": "Always show {{page}}"
   },
   "reauth": {
     "navLocked": "Needs a new login",
@@ -1374,6 +1361,8 @@
       "title": "Compare Fittings",
       "addFitting": "Compare with…",
       "remove": "Remove",
+      "removeNamed": "Remove {{name}} from comparison",
+      "slotFallback": "Fitting {{n}}",
       "emptyTitle": "Nothing to compare yet",
       "emptyHint": "Add a Fitting to start comparing.",
       "differencesOnly": "Show differences only",
@@ -2027,8 +2016,16 @@
     "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterExpiresIn": "Time left",
-    "boosterUnit": { "days": "Days", "hours": "Hours", "minutes": "Minutes" },
-    "boosterUnitShort": { "days": "d", "hours": "h", "minutes": "m" },
+    "boosterUnit": {
+      "days": "Days",
+      "hours": "Hours",
+      "minutes": "Minutes"
+    },
+    "boosterUnitShort": {
+      "days": "d",
+      "hours": "h",
+      "minutes": "m"
+    },
     "boosterStartsAfterPrevious": "Starts when the accelerator before it runs out.",
     "boosterExpired": "Expired",
     "boosterOverlap": "This accelerator overlaps another one — EVE only has one booster slot, so they can't both run at once.",
@@ -3995,7 +3992,6 @@
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
     "addSecondScan": "Add another scan to see the chart",
-    "finished": "Field cleared",
     "scanCount_one": "{{count}} scan",
     "scanCount_other": "{{count}} scans",
     "copyChat": "Copy chat message",
@@ -8473,6 +8469,7 @@
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
+      "channelsLegend": "Delivery channels",
       "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Alerts notifications",
