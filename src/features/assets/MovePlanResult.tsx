@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, Disclosure } from '@/components/ui';
+import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { MovePlan } from '@/engine/assets/movePlan';
 import {
@@ -11,11 +11,18 @@ import {
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { routeToHref } from '@/features/travel/routeSafetyLink';
 import { formatCubicMetres } from '@/lib/volume';
+import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
 import { pickupHueVar, splitSegments, tripLanes } from './movePlanView';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
+
+/** "Don't remind me again" on the rig warning, ticked once for good. */
+const useSkipRigWarning = createLocalSetting<boolean>({
+  key: 'movePlanSkipPackRigWarning',
+  defaultValue: false,
+});
 
 export interface PlanState {
   plan: MovePlan;
@@ -33,6 +40,12 @@ interface PlanResultProps {
   onToggleCompare: () => void;
   onBack: () => void;
   onDone: () => void;
+  /** Haul this ship (itemID) packaged instead of flying it. */
+  onPackShip: (itemId: number) => void;
+  /** Rigs fitted to a ship; packing it means unfitting them, which destroys them. */
+  rigsOf: (itemId: number) => number;
+  /** Whether the ship type has a packaged volume to plan with. */
+  canPack: (typeId: number) => boolean;
   name: (typeId: number) => string;
   placeLabel: (id: number) => string;
   /** Palette slot of a pickup location. */
@@ -50,11 +63,32 @@ export function PlanResult({
   onToggleCompare,
   onBack,
   onDone,
+  onPackShip,
+  rigsOf,
+  canPack,
   name,
   placeLabel,
   hueOf,
 }: PlanResultProps) {
   const { t } = useTranslation();
+  const skipRigWarning = useSkipRigWarning((s) => s.value);
+  const setSkipRigWarning = useSkipRigWarning((s) => s.setValue);
+  const hydrateSkip = useSkipRigWarning((s) => s.hydrate);
+  const [asking, setAsking] = useState<{ itemId: number; typeId: number; rigs: number } | null>(
+    null
+  );
+  const [dontRemind, setDontRemind] = useState(false);
+  useEffect(() => {
+    void hydrateSkip();
+  }, [hydrateSkip]);
+  const askToPack = (itemId: number, typeId: number) => {
+    const rigs = rigsOf(itemId);
+    if (rigs === 0 || skipRigWarning) onPackShip(itemId);
+    else {
+      setDontRemind(false);
+      setAsking({ itemId, typeId, rigs });
+    }
+  };
   const { plan, destinationSystem, destinationStation, pickupSystems } = state;
   const systemName = useSystemName(destinationSystem);
   if (plan.perCharacter.length === 0) {
@@ -252,7 +286,13 @@ export function PlanResult({
                             {t('assets.movePlan.flyIt')}
                           </span>
                         }
-                        trailing={null}
+                        trailing={
+                          canPack(s.typeId) ? (
+                            <Button size="sm" onClick={() => askToPack(s.itemId, s.typeId)}>
+                              {t('assets.movePlan.packInstead')}
+                            </Button>
+                          ) : null
+                        }
                       />
                     ))}
                   </ul>
@@ -270,7 +310,7 @@ export function PlanResult({
           </RailStop>
         )}
       </Rail>
-      <div className="sticky bottom-0 mt-auto -mx-3 -mb-[calc(0.75rem_+_env(safe-area-inset-bottom))] flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
@@ -278,6 +318,36 @@ export function PlanResult({
           {t('assets.movePlan.done')}
         </Button>
       </div>
+      <Modal
+        open={asking !== null}
+        onClose={() => setAsking(null)}
+        title={t('assets.movePlan.packTitle', { ship: asking ? name(asking.typeId) : '' })}
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="m-0">{t('assets.movePlan.packRigWarning', { count: asking?.rigs ?? 0 })}</p>
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox checked={dontRemind} onChange={(e) => setDontRemind(e.target.checked)} />
+            {t('assets.movePlan.dontRemind')}
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setAsking(null)}>
+              {t('assets.movePlan.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (asking) {
+                  if (dontRemind) void setSkipRigWarning(true);
+                  onPackShip(asking.itemId);
+                }
+                setAsking(null);
+              }}
+            >
+              {t('assets.movePlan.packAnyway')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -314,7 +384,7 @@ function PlanLine({
 }: {
   name: string;
   qty: ReactNode;
-  trailing: string | null;
+  trailing: ReactNode;
   dim?: boolean;
 }) {
   return (

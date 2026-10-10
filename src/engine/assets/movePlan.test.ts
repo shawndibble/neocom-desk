@@ -128,4 +128,27 @@ describe('planMove', () => {
     ]);
     expect(result.perCharacter).toEqual([]);
   });
+
+  it('hauls a ship packed instead as cargo at its packaged volume', () => {
+    const withShip = (packed: number[]) =>
+      planMove({
+        destinationLocationIds: new Set([DEST]),
+        characters: [
+          {
+            characterId: 1,
+            name: 'Alice',
+            assets: [asset({ itemId: 9, typeId: SHIP, isSingleton: true })],
+          },
+        ],
+        unitM3: new Map([[SHIP, 500]]),
+        shipTypeIds: new Set([SHIP]),
+        packedShipIds: new Set(packed),
+        hulls: HULLS,
+      });
+    expect(withShip([]).totals).toMatchObject({ shipsToFly: 1, totalM3: 0 });
+    const packed = withShip([9]);
+    expect(packed.totals).toMatchObject({ shipsToFly: 0, totalM3: 500, stacks: 1 });
+    expect(packed.perCharacter[0].pickups[0].ships).toEqual([]);
+    expect(packed.perCharacter[0].pickups[0].lines[0]).toMatchObject({ typeId: SHIP, quantity: 1 });
+  });
 });

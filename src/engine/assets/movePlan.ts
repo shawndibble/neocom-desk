@@ -83,6 +83,8 @@ export function planMove(input: {
   unitM3: ReadonlyMap<number, number>;
   /** typeIDs that are ships: assembled ones are flown, not hauled. */
   shipTypeIds: ReadonlySet<number>;
+  /** Assembled ships (by itemID) to haul packaged instead of flying. */
+  packedShipIds?: ReadonlySet<number>;
   hulls: readonly MoveHull[];
 }): MovePlan {
   const perCharacter: MoveCharacterPlan[] = [];
@@ -93,10 +95,11 @@ export function planMove(input: {
       if (a.locationType === 'item' || a.locationType === 'solar_system') continue;
       if (input.destinationLocationIds.has(a.locationId)) continue;
       const isShip = a.isSingleton && input.shipTypeIds.has(a.typeId);
+      const packed = isShip && input.packedShipIds?.has(a.itemId) === true;
       if (!isShip && !isHangarStock(a)) continue;
       let group = groups.get(a.locationId);
       if (!group) groups.set(a.locationId, (group = { quantities: new Map(), ships: [] }));
-      if (isShip) group.ships.push({ itemId: a.itemId, typeId: a.typeId });
+      if (isShip && !packed) group.ships.push({ itemId: a.itemId, typeId: a.typeId });
       else group.quantities.set(a.typeId, (group.quantities.get(a.typeId) ?? 0) + a.quantity);
     }
     if (groups.size === 0) continue;

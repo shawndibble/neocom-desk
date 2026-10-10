@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MovePlan } from '@/engine/assets/movePlan';
@@ -50,6 +51,9 @@ describe('PlanResult', () => {
           onToggleCompare={vi.fn()}
           onBack={vi.fn()}
           onDone={vi.fn()}
+          onPackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
           name={() => 'Tritanium'}
           placeLabel={() => 'Jita 4-4'}
           hueOf={() => 0}
@@ -60,5 +64,65 @@ describe('PlanResult', () => {
     expect(screen.queryByRole('button', { name: /edit items/i })).toBeNull();
     expect(screen.getByText('Trip 1 · 100 m³')).toBeTruthy();
     expect(screen.getByText('Trip 2 · 50 m³')).toBeTruthy();
+  });
+
+  describe('Pack instead', () => {
+    const shipPlan = {
+      ...plan,
+      perCharacter: [
+        {
+          ...plan.perCharacter[0],
+          pickups: [
+            {
+              ...plan.perCharacter[0].pickups[0],
+              ships: [{ itemId: 77, typeId: 648 }],
+            },
+          ],
+        },
+      ],
+    } as MovePlan;
+    const setup = (rigs: number) => {
+      const onPackShip = vi.fn();
+      render(
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: shipPlan,
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            scope={{ characters: [], activeCharacterId: null } as never}
+            compareOpen={false}
+            onToggleCompare={vi.fn()}
+            onBack={vi.fn()}
+            onDone={vi.fn()}
+            onPackShip={onPackShip}
+            rigsOf={() => rigs}
+            canPack={() => true}
+            name={() => 'Badger'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+      return onPackShip;
+    };
+
+    it('packs a ship with no rigs straight away', async () => {
+      const onPackShip = setup(0);
+      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      expect(onPackShip).toHaveBeenCalledWith(77);
+    });
+
+    it('warns about fitted rigs first, and packs only once confirmed', async () => {
+      const onPackShip = setup(2);
+      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      expect(onPackShip).not.toHaveBeenCalled();
+      expect(await screen.findByText(/2 rigs fitted/)).toBeTruthy();
+      expect(screen.getByRole('checkbox', { name: "Don't remind me again" })).toBeTruthy();
+      await userEvent.click(screen.getByRole('button', { name: 'Pack anyway' }));
+      expect(onPackShip).toHaveBeenCalledWith(77);
+    });
   });
 });
