@@ -7,7 +7,17 @@
  * Laid out as the chart-led mockup: the percent leads, the legend and charts come next, and the big stat tiles sit
  * under the chart they summarise.
  */
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Children,
+  Fragment,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, Panel, Spinner, textActionClassName } from '@/components/ui';
 import { canFinishSurvey } from '@/engine/survey/finish';
@@ -216,18 +226,32 @@ export function SurveyBoard({
                 })}
               </p>
             )}
-            <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              {onFinish !== undefined && canFinishSurvey(summary, owned, now) && (
-                <button
-                  type="button"
-                  className={textActionClassName()}
-                  disabled={finishing === 'busy'}
-                  onClick={() => void finish()}
-                >
-                  {t('survey.markCleared')}
-                </button>
-              )}
-              {footerActions}
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {[
+                ...(onFinish !== undefined && canFinishSurvey(summary, owned, now)
+                  ? [
+                      <button
+                        key="finish"
+                        type="button"
+                        className={textActionClassName()}
+                        disabled={finishing === 'busy'}
+                        onClick={() => void finish()}
+                      >
+                        {t('survey.markCleared')}
+                      </button>,
+                    ]
+                  : []),
+                ...Children.toArray(footerActions),
+              ].map((action, index) => (
+                <Fragment key={index}>
+                  {index > 0 && (
+                    <span aria-hidden className="text-text-dim">
+                      ·
+                    </span>
+                  )}
+                  {action}
+                </Fragment>
+              ))}
             </span>
           </div>
           {finishing === 'failed' && (

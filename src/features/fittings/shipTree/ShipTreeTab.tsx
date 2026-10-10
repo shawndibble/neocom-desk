@@ -49,7 +49,7 @@ export function ShipTreeTab() {
       {characterId === null && (
         <p className="text-xs text-text-dim">{t('ships.tree.noCharacter')}</p>
       )}
-      <p className="text-[0.6875rem] text-text-faint">{t('ships.tree.credit')}</p>
+      <p className="text-[0.6875rem] text-text-dim">{t('ships.tree.credit')}</p>
     </div>
   );
 }

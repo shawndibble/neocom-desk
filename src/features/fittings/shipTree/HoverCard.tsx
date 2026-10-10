@@ -15,11 +15,17 @@ export function HoverCard({
   anchor,
   className,
   skillName,
+  onPointerEnter,
+  onPointerLeave,
 }: {
   ship: ShipTreeShip;
   anchor: DOMRect;
   className: string;
   skillName: (skillTypeID: number) => string;
+  /** The pointer reached the card: keep it open. */
+  onPointerEnter: () => void;
+  /** The pointer left the card: close it. */
+  onPointerLeave: () => void;
 }) {
   const { t } = useTranslation();
   const left = Math.min(
@@ -31,7 +37,9 @@ export function HoverCard({
     <div
       role="tooltip"
       data-testid="ship-tree-hover-card"
-      className="isis-hover-card pointer-events-none fixed z-50 border p-3 text-xs shadow-xl shadow-black/60"
+      onMouseEnter={onPointerEnter}
+      onMouseLeave={onPointerLeave}
+      className="isis-hover-card fixed z-50 border p-3 text-xs shadow-xl shadow-black/60"
       style={{
         width: WIDTH,
         left,

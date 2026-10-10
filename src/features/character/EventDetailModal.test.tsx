@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -275,5 +275,14 @@ describe('EventDetailModal', () => {
 
       expect(await screen.findByText('Not responded', { selector: 'p' })).toBeInTheDocument();
     });
+  });
+
+  it('names the RSVP buttons as one group', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.json(DETAIL))
+    );
+    render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+    const group = await screen.findByRole('group', { name: 'Your response' });
+    expect(within(group).getAllByRole('button')).toHaveLength(3);
   });
 });

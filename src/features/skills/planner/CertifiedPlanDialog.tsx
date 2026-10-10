@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Radio, Spinner, Tabs, type TabItem } from '@/components/ui';
+import {
+  Button,
+  Modal,
+  Radio,
+  Spinner,
+  TabPanel,
+  Tabs,
+  useTabsId,
+  type TabItem,
+} from '@/components/ui';
 import { rowInteractiveClassName, selectedRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { loadCertifiedPlans, loadSkills } from '@/sde/loadSde';
@@ -41,6 +50,7 @@ type LoadState =
  */
 export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedPlanDialogProps) {
   const { t } = useTranslation();
+  const tabsId = useTabsId();
   const { loaded, trainedSkills, trainedSkillsKnown } = usePlanEditorData(characterId);
   const trained = trainedSkillsKnown ? trainedSkills : null;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
@@ -131,6 +141,7 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
         {state.status === 'ready' && loaded && activePathId !== null && (
           <>
             <Tabs
+              tabsId={tabsId}
               tabs={tabs}
               value={String(activePathId)}
               onChange={(id) => {
@@ -139,59 +150,65 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
               }}
               label={t('plans.certified.careerPaths')}
             />
-            {visible.length === 0 && (
-              <p className="py-6 text-center text-sm text-text-dim">
-                {t('plans.certified.allComplete')}
-              </p>
-            )}
-            {visible.length > 0 && (
-              <ul className="divide-y divide-line border border-line">
-                {visible.map((plan) => {
-                  const isPicked = plan.id === pickedId;
-                  return (
-                    <li key={plan.id}>
-                      <label
-                        className={cx(
-                          'flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2',
-                          'text-text',
-                          rowInteractiveClassName,
-                          isPicked ? selectedRowClassName : 'border-l-2 border-l-transparent'
-                        )}
-                      >
-                        <Radio
-                          name="certified-plan"
-                          checked={isPicked}
-                          onChange={() => setPickedId(plan.id)}
-                          className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="dt-primary block font-medium">{plan.name}</span>
-                          <span className="block text-text-dim">
-                            {plan.factionName ?? t('plans.certified.anyFaction')}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-text-dim tabular-nums">
-                          {t('plans.certified.levels', {
-                            count: trained
-                              ? untrainedEntries(plan, trained).length
-                              : plan.entries.length,
-                          })}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {picked && (
-              <div className="space-y-1">
-                <p className="text-text-dim">
-                  {t('plans.certified.milestones', { count: picked.milestones.length })}
+            <TabPanel tabsId={tabsId} tabId={String(activePathId)} className="space-y-3">
+              {visible.length === 0 && (
+                <p className="py-6 text-center text-sm text-text-dim">
+                  {t('plans.certified.allComplete')}
                 </p>
-                <p className="whitespace-pre-line text-text">{picked.description}</p>
-              </div>
-            )}
+              )}
+              {visible.length > 0 && (
+                <ul
+                  role="radiogroup"
+                  aria-label={t('plans.certified.pickLabel')}
+                  className="divide-y divide-line border border-line"
+                >
+                  {visible.map((plan) => {
+                    const isPicked = plan.id === pickedId;
+                    return (
+                      <li key={plan.id}>
+                        <label
+                          className={cx(
+                            'flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2',
+                            'text-text',
+                            rowInteractiveClassName,
+                            isPicked ? selectedRowClassName : 'border-l-2 border-l-transparent'
+                          )}
+                        >
+                          <Radio
+                            name="certified-plan"
+                            checked={isPicked}
+                            onChange={() => setPickedId(plan.id)}
+                            className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="dt-primary block font-medium">{plan.name}</span>
+                            <span className="block text-text-dim">
+                              {plan.factionName ?? t('plans.certified.anyFaction')}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-text-dim tabular-nums">
+                            {t('plans.certified.levels', {
+                              count: trained
+                                ? untrainedEntries(plan, trained).length
+                                : plan.entries.length,
+                            })}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {picked && (
+                <div className="space-y-1">
+                  <p className="text-text-dim">
+                    {t('plans.certified.milestones', { count: picked.milestones.length })}
+                  </p>
+                  <p className="whitespace-pre-line text-text">{picked.description}</p>
+                </div>
+              )}
+            </TabPanel>
           </>
         )}
 

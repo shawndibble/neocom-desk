@@ -52,6 +52,8 @@ import { CaretRight } from '@phosphor-icons/react/dist/csr/CaretRight';
 import { CaretUpDown } from '@phosphor-icons/react/dist/csr/CaretUpDown';
 import { ChartLineUp } from '@phosphor-icons/react/dist/csr/ChartLineUp';
 import { Check } from '@phosphor-icons/react/dist/csr/Check';
+import { CloudCheck } from '@phosphor-icons/react/dist/csr/CloudCheck';
+import { CloudWarning } from '@phosphor-icons/react/dist/csr/CloudWarning';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { Checks } from '@phosphor-icons/react/dist/csr/Checks';
 import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
@@ -119,6 +121,7 @@ import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
+import { User } from '@phosphor-icons/react/dist/csr/User';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
@@ -179,6 +182,14 @@ export const Ascending = withWeight(ArrowUp);
 export const Descending = withWeight(ArrowDown);
 /** Re-fetch from ESI. */
 export const Refresh = withWeight(ArrowClockwise);
+/** Sync status: everything is saved to the cloud. One shape per state, so the sync dot never relies on colour alone. */
+export const SyncSynced = withWeight(CloudCheck);
+/** Sync status: a sync is in flight. Spins only where the caller opts in with `motion-safe`. */
+export const SyncSyncing = withWeight(ArrowClockwise);
+/** Sync status: the last sync failed; changes are still saved locally. */
+export const SyncError = withWeight(CloudWarning);
+/** Sync status: the browser is offline; changes sync on reconnect. */
+export const SyncOffline = withWeight(CloudSlash);
 /** Puts a field back to the value it would have had if nobody had touched it. Deliberately not `Refresh`, which fetches new data — these sit two controls apart on the Industry panel. */
 export const Revert = withWeight(ArrowCounterClockwise);
 /** Runs a local calculation right now — no fetch involved. Deliberately not `Refresh`, which re-fetches from ESI. */
@@ -219,6 +230,8 @@ export const Route = withWeight(ArrowsLeftRight);
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
+/** One of the pilot's own orders in the Order Book — beside the price, named "You". */
+export const MyOrder = withWeight(User);
 /** A Charge Picker row the player holds in cargo — not `ChargeLoaded`, which is what is fitted. */
 export const InCargo = withWeight(Backpack);
 /** The charge currently loaded in the weapon, in either Charge Picker. */

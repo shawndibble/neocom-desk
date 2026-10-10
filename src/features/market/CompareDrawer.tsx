@@ -21,6 +21,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useStickyClearance } from '@/lib/useStickyClearance';
 import {
   Button,
   DataTable,
@@ -134,7 +135,34 @@ export function CompareDrawer({
   const narrow = useIsNarrow();
   const fullScreen = narrow && mode !== 'closed';
   const handleRef = useRef<HTMLButtonElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  // Fixed over the page bottom: publish what it covers so focus scrolls clear
+  // (WCAG 2.4.11).
+  useStickyClearance(wrapperRef, 'compare-drawer');
+  // Real bottom space for `main` (Layout.tsx), so the page tail can scroll
+  // above the bar. Normally all of the clearance. Desktop Expand covers the
+  // page and focus is inside it, so only the handle gets room, not 80vh.
+  const expanded = mode === 'full' && !narrow;
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    const handle = handleRef.current;
+    if (!expanded || !handle) {
+      rootStyle.setProperty('--compare-drawer-space', 'var(--compare-drawer-clearance, 0px)');
+      return () => rootStyle.removeProperty('--compare-drawer-space');
+    }
+    const publish = () => {
+      const covered = Math.max(0, window.innerHeight - handle.getBoundingClientRect().top);
+      rootStyle.setProperty('--compare-drawer-space', `calc(${covered}px + 0.75rem)`);
+    };
+    publish();
+    window.addEventListener('resize', publish);
+    return () => {
+      window.removeEventListener('resize', publish);
+      rootStyle.removeProperty('--compare-drawer-space');
+    };
+  }, [expanded]);
 
   // Every `openIn` is consumed once acted on — the one that mounted this
   // drawer here, later ones in the listener — so a remount after leaving
@@ -210,6 +238,35 @@ export function CompareDrawer({
     focusHandleOnClose.current = false;
     handleRef.current?.focus();
   }, [mode]);
+
+  // A full-screen sheet takes focus on open — the heading, not Close, whose
+  // tooltip would pop open on a programmatic focus — so Tab and Escape start
+  // inside it however it opened (the handle, or a Variations "Compare" click).
+  useEffect(() => {
+    if (fullScreen) headingRef.current?.focus();
+  }, [fullScreen]);
+
+  // …and the page behind it is inert: every sibling along the wrapper's
+  // ancestor chain, so the sheet's own branch stays live. Only elements this
+  // effect set are cleared again.
+  useEffect(() => {
+    if (!fullScreen) return;
+    const marked: Element[] = [];
+    for (
+      let node: HTMLElement | null = wrapperRef.current;
+      node && node !== document.body;
+      node = node.parentElement
+    ) {
+      for (const sibling of node.parentElement?.children ?? []) {
+        if (sibling === node || sibling.hasAttribute('inert')) continue;
+        sibling.setAttribute('inert', '');
+        marked.push(sibling);
+      }
+    }
+    return () => {
+      for (const element of marked) element.removeAttribute('inert');
+    };
+  }, [fullScreen]);
 
   function close() {
     focusHandleOnClose.current = true;
@@ -382,6 +439,7 @@ export function CompareDrawer({
     // Raised over the bottom nav (`z-40`, Layout.tsx) while full-screen:
     // this wrapper is the stacking context, so the sheet's own z can't.
     <div
+      ref={wrapperRef}
       className={`fixed inset-x-0 bottom-16 flex flex-col-reverse items-stretch md:bottom-0 ${fullScreen ? 'z-50' : 'z-30'}`}
     >
       <button
@@ -431,7 +489,11 @@ export function CompareDrawer({
           )}
           <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
             <div className="flex items-center gap-2">
-              <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h2
+                ref={headingRef}
+                tabIndex={-1}
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+              >
                 {t('market.compare.handle', { count: items.length })}
               </h2>
               {/* An always-visible segmented toggle, not `HistoryViewSelect`'s select-on-desktop

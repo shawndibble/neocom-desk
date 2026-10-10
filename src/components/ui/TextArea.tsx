@@ -1,5 +1,6 @@
 import { forwardRef, type TextareaHTMLAttributes } from 'react';
 import { cx } from '@/lib/cx';
+import { useDescribedBy } from './fieldNote';
 import { isApplePlatform, isModChord } from '@/lib/shortcuts';
 import { fieldBaseClassName } from './controlStyles';
 
@@ -22,9 +23,17 @@ interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
  * with the caller — the paste boxes deliberately differ in density.
  */
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
-  { mono = false, className = '', onSubmitChord, onKeyDown, ...rest },
+  {
+    mono = false,
+    className = '',
+    onSubmitChord,
+    onKeyDown,
+    'aria-describedby': describedBy,
+    ...rest
+  },
   ref
 ) {
+  const described = useDescribedBy(describedBy);
   return (
     <textarea
       ref={ref}
@@ -37,6 +46,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
         onSubmitChord();
       }}
       {...rest}
+      aria-describedby={described}
     />
   );
 });

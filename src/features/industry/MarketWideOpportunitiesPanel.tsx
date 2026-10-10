@@ -30,6 +30,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  LiveStatus,
   Spinner,
   type DataTableColumn,
   type StatChipTone,
@@ -724,6 +725,15 @@ export function MarketWideOpportunitiesPanel({
       }
       actions={
         <span className="flex items-center gap-2">
+          <LiveStatus>
+            {hasRun && !loading
+              ? error
+                ? t('industry.marketOpportunitiesErrorTitle')
+                : rows.length === 0
+                  ? t('industry.marketOpportunitiesNoResultsTitle')
+                  : t('industry.marketOpportunitiesCount', { count: visibleRows.length })
+              : null}
+          </LiveStatus>
           {hasRun && !loading && !error && fetchedAt && <DataAgeBadge date={fetchedAt} />}
           {hasRun && !loading && visibleRows.length > 0 && (
             <TableActionsMenu
@@ -744,7 +754,12 @@ export function MarketWideOpportunitiesPanel({
             />
           )}
           {filterBar}
-          <Button size="sm" onClick={() => scan(filter)} disabled={loading || !trees || !catalog}>
+          <Button
+            size="sm"
+            onClick={() => scan(filter)}
+            disabled={!trees || !catalog}
+            aria-disabled={loading || undefined}
+          >
             {loading
               ? t('industry.marketOpportunitiesScanning')
               : t('industry.marketOpportunitiesRunScan')}

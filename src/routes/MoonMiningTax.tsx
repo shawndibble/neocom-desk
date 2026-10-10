@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Spinner, Tabs } from '@/components/ui';
+import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { MINING_TABS } from '@/app/pageTabs';
@@ -42,6 +42,7 @@ export function MoonMiningTax() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [tab, setTab] = usePageTab(MINING_TABS);
+  const tabsId = useTabsId();
 
   if (!hydrated) {
     return (
@@ -54,6 +55,7 @@ export function MoonMiningTax() {
 
   const tabBar = (
     <Tabs
+      tabsId={tabsId}
       label={t('miningTax.title')}
       value={tab}
       onChange={(id) => setTab(id as typeof tab)}
@@ -63,9 +65,9 @@ export function MoonMiningTax() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'overview' && <OverviewTab tabBar={tabBar} />}
-      {tab === 'tax' && <TaxTab tabBar={tabBar} />}
-      {tab === 'survey' && <SurveyTab tabBar={tabBar} />}
+      {tab === 'overview' && <OverviewTab tabBar={tabBar} tabsId={tabsId} />}
+      {tab === 'tax' && <TaxTab tabBar={tabBar} tabsId={tabsId} />}
+      {tab === 'survey' && <SurveyTab tabBar={tabBar} tabsId={tabsId} />}
     </div>
   );
 }
