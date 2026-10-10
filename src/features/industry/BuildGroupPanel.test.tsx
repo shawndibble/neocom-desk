@@ -416,11 +416,12 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use none' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({});
-    expect(screen.getByRole('status').textContent).toContain('Cleared Have on 1 material');
+    // The toast message renders twice: the visible span and its live region.
+    expect(screen.getAllByText('Cleared Have on 1 material').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onOwnedStockChange).toHaveBeenLastCalledWith({ 34: 40 });
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryAllByText('Cleared Have on 1 material')).toHaveLength(0);
   });
 
   it('says so when "Use all" has nothing to fill', async () => {
@@ -431,7 +432,7 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use all' }));
     expect(onOwnedStockChange).not.toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toContain('Nothing to fill');
+    expect(screen.getAllByText(/Nothing to fill/).length).toBeGreaterThan(0);
   });
 });
 

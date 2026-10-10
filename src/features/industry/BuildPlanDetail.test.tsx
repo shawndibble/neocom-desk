@@ -570,9 +570,10 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
+    // The toast message renders twice: the visible span and its live region.
     expect(
-      await screen.findByText('1 blueprint left out — buy it by contract')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('1 blueprint left out — buy it by contract')).length
+    ).toBeGreaterThan(0);
   });
 
   it('surfaces a denied clipboard instead of failing silently', async () => {
@@ -1522,9 +1523,9 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Filled Have on 1 material from your assets'
-    );
+    expect(
+      screen.getAllByText('Filled Have on 1 material from your assets').length
+    ).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
@@ -1582,7 +1583,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent(/^Nothing to fill/);
+    expect(screen.getAllByText(/^Nothing to fill/).length).toBeGreaterThan(0);
   });
 });
 

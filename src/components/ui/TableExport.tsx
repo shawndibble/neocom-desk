@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { exportRows, type ExportFormat } from '@/lib/downloadCsv';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './DropdownMenu';
 import { Button } from './Button';
+import { LiveStatus } from './LiveStatus';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from './RowActions';
@@ -172,51 +173,59 @@ export function TableActionsMenu<T>({
     copiedTimer.current = setTimeout(() => setCopied(null), 2000);
   };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {triggerText ? (
-          <Button
-            size={size}
-            aria-label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
-          >
-            {copied !== null ? <Icon.Done size={iconSize} /> : <Icon.CardsView size={iconSize} />}
-            <span aria-hidden>{triggerText}</span>
-            <Icon.Expanded size={iconSize} />
-          </Button>
-        ) : (
-          <IconButton
-            icon={
-              copied !== null ? (
-                <Icon.Done size={iconSize} />
-              ) : exportOnly ? (
-                <Icon.Download size={iconSize} />
-              ) : (
-                <Icon.More size={iconSize} />
-              )
-            }
-            label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
-            size={size}
-            visibleLabel={
-              showLabel && exportOnly && copied === null
-                ? t('common.tableExport.exportVerb')
-                : undefined
-            }
-          />
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <MenuKindContext.Provider value="dropdown">
-          {exportOnly ? (
-            <ExportTableItems tableExport={tableExport} onDone={onDone} />
+    <>
+      {/* Before the menu: keeps the trigger the last child for callers' space-x-* rules. */}
+      <LiveStatus>
+        {copied !== null && t('common.tableExport.copied', { count: copied })}
+      </LiveStatus>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          {triggerText ? (
+            <Button
+              size={size}
+              aria-label={
+                copied === null ? label : t('common.tableExport.copied', { count: copied })
+              }
+            >
+              {copied !== null ? <Icon.Done size={iconSize} /> : <Icon.CardsView size={iconSize} />}
+              <span aria-hidden>{triggerText}</span>
+              <Icon.Expanded size={iconSize} />
+            </Button>
           ) : (
-            <>
-              {children}
-              <MenuSeparator />
-              <ExportTableSub tableExport={tableExport} onDone={onDone} />
-            </>
+            <IconButton
+              icon={
+                copied !== null ? (
+                  <Icon.Done size={iconSize} />
+                ) : exportOnly ? (
+                  <Icon.Download size={iconSize} />
+                ) : (
+                  <Icon.More size={iconSize} />
+                )
+              }
+              label={copied === null ? label : t('common.tableExport.copied', { count: copied })}
+              size={size}
+              visibleLabel={
+                showLabel && exportOnly && copied === null
+                  ? t('common.tableExport.exportVerb')
+                  : undefined
+              }
+            />
           )}
-        </MenuKindContext.Provider>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <MenuKindContext.Provider value="dropdown">
+            {exportOnly ? (
+              <ExportTableItems tableExport={tableExport} onDone={onDone} />
+            ) : (
+              <>
+                {children}
+                <MenuSeparator />
+                <ExportTableSub tableExport={tableExport} onDone={onDone} />
+              </>
+            )}
+          </MenuKindContext.Provider>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
