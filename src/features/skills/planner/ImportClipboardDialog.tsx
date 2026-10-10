@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TabPanel, Tabs, TextArea, useTabsId, type TabItem } from '@/components/ui';
+import {
+  Button,
+  LiveStatus,
+  Modal,
+  TabPanel,
+  Tabs,
+  TextArea,
+  useTabsId,
+  type TabItem,
+} from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
@@ -186,7 +195,8 @@ export function ImportClipboardDialog({
                   size="sm"
                   variant="primary"
                   onClick={() => void handleParse()}
-                  disabled={parsing || text.trim() === ''}
+                  disabled={text.trim() === ''}
+                  aria-disabled={parsing || undefined}
                 >
                   {t('plans.importParse')}
                 </Button>
@@ -242,23 +252,39 @@ export function ImportClipboardDialog({
           )}
         </TabPanel>
 
-        <Button size="sm" onClick={onClose}>
-          {t('plans.importCancel')}
-        </Button>
+        {/* One wrapper: the status region sits beside Cancel, never as the
+            container's new last child while no preview shows. */}
+        <div className="flex">
+          <Button size="sm" onClick={onClose}>
+            {t('plans.importCancel')}
+          </Button>
+
+          <LiveStatus>
+            {preview && !preview.documentErrorCode
+              ? t('plans.importPreviewSummary', {
+                  ready: preview.entries.length,
+                  warnings: preview.warnings.length,
+                  errors: preview.errors.length,
+                })
+              : null}
+          </LiveStatus>
+        </div>
 
         {preview && (
           <div className="space-y-2 border-t border-line pt-2 text-xs">
-            <p className="font-semibold text-text-dim uppercase">
+            <p className="text-xs font-semibold tracking-widest text-text-dim uppercase">
               {t(IMPORT_MODE_KEYS[preview.mode])}
               {preview.planName ? ` — ${preview.planName}` : ''}
             </p>
 
             {preview.documentErrorCode ? (
-              <p className="text-danger">{t(DOCUMENT_ERROR_KEYS[preview.documentErrorCode])}</p>
+              <p role="alert" className="text-danger">
+                {t(DOCUMENT_ERROR_KEYS[preview.documentErrorCode])}
+              </p>
             ) : (
               <>
                 <div>
-                  <p className="font-semibold text-text-dim uppercase">
+                  <p className="text-xs font-semibold tracking-widest text-text-dim uppercase">
                     {t('plans.importPreview')}
                   </p>
                   {preview.entries.length === 0 ? (
@@ -289,7 +315,7 @@ export function ImportClipboardDialog({
 
                 {preview.warnings.length > 0 && (
                   <div>
-                    <p className="font-semibold text-warning uppercase">
+                    <p className="text-xs font-semibold tracking-widest text-warning uppercase">
                       {t('plans.importWarnings')}
                     </p>
                     <ul className="mt-1">
@@ -302,7 +328,9 @@ export function ImportClipboardDialog({
 
                 {preview.errors.length > 0 && (
                   <div>
-                    <p className="font-semibold text-danger uppercase">{t('plans.importErrors')}</p>
+                    <p className="text-xs font-semibold tracking-widest text-danger uppercase">
+                      {t('plans.importErrors')}
+                    </p>
                     <ul className="mt-1">
                       {preview.errors.map((err) => (
                         <li key={`${err.line}-${err.text}`}>

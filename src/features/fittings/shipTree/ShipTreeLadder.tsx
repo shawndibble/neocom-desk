@@ -107,6 +107,9 @@ export function ShipTreeLadder({ source, tree, onFaction, onOpenShip, viewSwitch
               )}
             >
               <FlyDot status={statuses.get(s.typeID)} />
+              {statuses.get(s.typeID) && (
+                <span className="sr-only">{flyLabel(t, statuses.get(s.typeID))}</span>
+              )}
               {s.name}
             </button>
           ))}

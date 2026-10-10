@@ -8,6 +8,7 @@
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger, SearchInput } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
@@ -139,7 +140,7 @@ export function SolarSystemPicker({
                   aria-selected={index === highlight}
                   className={cx(
                     'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2',
-                    index === highlight && 'bg-panel-2'
+                    index === highlight && `bg-panel-2 ${activeOptionClassName}`
                   )}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(system)}

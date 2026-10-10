@@ -28,7 +28,8 @@ import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyBoard } from './SurveyBoard';
 import { SurveyPicker } from './SurveyPicker';
-import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
+import { SurveyOwnerChange } from './SurveyOwnerChange';
+import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
 import { YourShareRow } from './YourShareRow';
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
@@ -43,6 +44,7 @@ import {
   loadSurvey,
   setSurveyScanIgnored,
   startSurvey,
+  type SurveyInfoShare,
   type SurveyTaxShare,
 } from './surveyStore';
 import { useSurvey } from './useSurvey';
@@ -300,19 +302,28 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               onSetIgnored={
                 owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
               }
-              onFinish={currentId !== null && state.status === 'ready' ? finish : undefined}
+              // Marking the field cleared is the owner's, like the controls beside it.
+              onFinish={
+                owned && currentId !== null && state.status === 'ready' ? finish : undefined
+              }
               owned={owned}
               viewerLine={(summary) => <YourShareRow characterId={characterId} summary={summary} />}
               afterPanel={(summary) =>
                 characterId !== null && (
-                  <MoonTaxLine
+                  <SurveyInfoLine
                     characterId={characterId}
                     oreNames={summary.oreNames}
                     owned={owned}
-                    published={state.status === 'ready' ? state.tax : null}
+                    tax={state.status === 'ready' ? state.tax : null}
+                    info={state.status === 'ready' ? state.info : null}
                     survey={
                       currentId !== null && state.status === 'ready'
-                        ? { id: currentId, expiresAt: state.expiresAt, published: state.tax }
+                        ? {
+                            id: currentId,
+                            expiresAt: state.expiresAt,
+                            published: state.tax,
+                            info: state.info,
+                          }
                         : undefined
                     }
                   />
@@ -321,15 +332,28 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
               url={currentId !== null && state.status === 'ready' ? shareUrl(currentId) : null}
               expiresAt={expiresAt}
               footerActions={
-                currentId !== null ? (
-                  <button
-                    type="button"
-                    className={textActionClassName()}
-                    onClick={() => void setCurrentId(null)}
-                  >
-                    {t('survey.newSurvey')}
-                  </button>
-                ) : undefined
+                currentId === null
+                  ? undefined
+                  : [
+                      ...(owned && characterId !== null
+                        ? [
+                            <SurveyOwnerChange
+                              key="owner"
+                              characterId={characterId}
+                              surveyId={currentId}
+                              onChanged={() => void refresh()}
+                            />,
+                          ]
+                        : []),
+                      <button
+                        key="new"
+                        type="button"
+                        className={textActionClassName()}
+                        onClick={() => void setCurrentId(null)}
+                      >
+                        {t('survey.newSurvey')}
+                      </button>,
+                    ]
               }
             />
           </>
@@ -340,25 +364,31 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
 }
 
 /**
- * The moon tax, only once the Survey shows a moon ore. The pilot who started the
- * Survey edits it and stores it on the Survey; anyone else opening it in the app
- * sees what the owner stored, read-only, so their own saved tax can't overwrite it.
+ * The Additional information panel: location, the moon tax (only once the Survey
+ * shows a moon ore) and notes. The pilot who started the Survey edits it and
+ * stores it on the Survey; anyone else opening it in the app sees what the owner
+ * stored, read-only, so their own saved tax can't overwrite it.
  */
-function MoonTaxLine({
+function SurveyInfoLine({
   characterId,
   oreNames,
   owned,
-  published,
+  tax,
+  info,
   survey,
 }: {
   characterId: number;
   oreNames: string[];
   owned: boolean;
-  published: SurveyTaxShare | null;
-  survey?: TaxSurvey;
+  tax: SurveyTaxShare | null;
+  info: SurveyInfoShare | null;
+  survey?: InfoSurvey;
 }) {
   const moon = useHasMoonOre(oreNames);
-  if (!moon) return null;
-  if (owned) return <MoonTaxRow key={survey?.id} characterId={characterId} survey={survey} />;
-  return published === null ? null : <MoonTaxReadout tax={published} />;
+  if (owned) {
+    return (
+      <SurveyInfoEditor key={survey?.id} characterId={characterId} survey={survey} moon={moon} />
+    );
+  }
+  return <SurveyInfoReadout info={info} tax={moon ? tax : null} />;
 }

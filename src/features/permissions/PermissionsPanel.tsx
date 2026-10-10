@@ -84,6 +84,8 @@ export function PermissionsPanel() {
 
   const groups = SCOPE_GROUPS.filter((group) => group !== 'corp' || corp.state !== 'none');
   const missing = groups.filter((group) => statusOf(group) === 'missing');
+  // Actionable rows first (stable: catalogue order within each half); a row still checking keeps the Granted half.
+  const rows = [...missing, ...groups.filter((group) => statusOf(group) !== 'missing')];
   // Derived from `missing`, so a row that gets granted (or hidden) drops out of the request.
   const chosen = missing.filter((group) => picked.has(group));
 
@@ -134,7 +136,7 @@ export function PermissionsPanel() {
             )}
             {/* Two columns from `xl`: one full-width list put each status a screen away from its name. */}
             <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">
-              {groups.map((group) => {
+              {rows.map((group) => {
                 const label = t(PERMISSIONS[group].labelKey);
                 const status = statusOf(group);
                 const note = group === 'corp' ? corpNote() : null;

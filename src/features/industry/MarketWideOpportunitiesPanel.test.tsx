@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
@@ -570,5 +570,35 @@ describe('MarketWideOpportunitiesPanel data age and failure (#2845)', () => {
     } finally {
       hookState.rows = null;
     }
+  });
+});
+
+describe('MarketWideOpportunitiesPanel scan outcome announcement', () => {
+  afterEach(() => {
+    hookState.rows = null;
+    hookState.error = false;
+  });
+  const statusText = () =>
+    screen
+      .getAllByRole('status')
+      .map((el) => el.textContent)
+      .join('|');
+
+  it('reads the product count when the scan has rows', async () => {
+    hookState.rows = [row(200, 'A'), row(201, 'B'), row(202, 'C')];
+    renderPanel();
+    await waitFor(() => expect(statusText()).toMatch(/3 products/));
+  });
+
+  it('reads the no-results title when the scan found nothing', async () => {
+    hookState.rows = [];
+    renderPanel();
+    await waitFor(() => expect(statusText()).toMatch(/No results|nothing/i));
+  });
+
+  it('reads the error title when the scan failed', async () => {
+    hookState.error = true;
+    renderPanel();
+    await waitFor(() => expect(statusText()).toMatch(/fail|couldn|error/i));
   });
 });

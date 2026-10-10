@@ -18,6 +18,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ratioMeterColor } from '@/engine/pilotList/meterColor';
 import { cx } from '@/lib/cx';
+import { useRetryFocus } from '@/lib/useRetryFocus';
 import type { PilotStats, PilotStatsResult, PilotTopShip } from '@/lib/zkillboard';
 import { killerRatio, type StatTileItem } from './zkillFigures';
 
@@ -145,10 +146,32 @@ export function ZkillStatsSection({
   onRetry?: () => void;
 }) {
   const { t } = useTranslation();
-  const status = <ZkillStatsStatus stats={stats} subject="pilot" onRetry={onRetry} />;
-  if (stats === null || stats.kind !== 'stats') return status;
+  const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
+    stats === null ? 'busy' : stats.kind === 'failed' ? 'failed' : 'ok',
+    null
+  );
+  // One wrapper in every state, so focus on Retry has somewhere to stay while the stats load.
+  const wrap = (children: ReactNode) => (
+    <div ref={resultRef} tabIndex={-1} className="outline-none">
+      {children}
+    </div>
+  );
+  if (stats === null || stats.kind !== 'stats')
+    return wrap(
+      <ZkillStatsStatus
+        stats={stats}
+        subject="pilot"
+        onRetry={
+          onRetry &&
+          (() => {
+            holdFocus();
+            onRetry();
+          })
+        }
+      />
+    );
   const s = stats.stats;
-  return (
+  return wrap(
     <section aria-label={t('travel.pilot.statsLabel')} className="space-y-1">
       <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-text-dim tabular-nums">
         <span>

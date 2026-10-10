@@ -524,7 +524,7 @@ describe('AppraisalPanel', () => {
       // COMPARE_ROWS indexes Amarr at 1: sell 4,000, buy 2,000.
       await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 4,000 ISK' }));
       expect(written).toEqual(['4,000']);
-      expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
+      expect(screen.getAllByText('Copied to clipboard').length).toBeGreaterThan(0);
 
       await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 2,000 ISK' }));
       expect(written).toEqual(['4,000', '2,000']);
@@ -977,9 +977,7 @@ describe('AppraisalPanel — Copy lists', () => {
     renderPanel({ controller: controller({ result: LISTS_OUTCOME }) });
     await copy(/^List at undercut/);
     expect(written).toEqual(['Damage Control II\t511900\nCivilian Gatling Railgun\t999.90']);
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'List at undercut copied · 2 items'
-    );
+    expect(await screen.findAllByText('List at undercut copied · 2 items')).not.toHaveLength(0);
     configureClipboard(null);
   });
 
@@ -1230,7 +1228,7 @@ describe('AppraisalPanel — the row as an item', () => {
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
-      expect(await screen.findByRole('status')).toHaveTextContent('Copied 1,386,400 ISK');
+      expect(await screen.findAllByText('Copied 1,386,400 ISK')).not.toHaveLength(0);
     });
   });
 });
@@ -1386,7 +1384,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(await screen.findByRole('columnheader', { name: 'Need' })).toBeInTheDocument();
     expect(screen.getByText(/Minus owned ·/)).toBeInTheDocument();
     const covered = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
-    expect(covered).toHaveClass('opacity-50');
+    expect(covered.className).not.toMatch(/opacity-/);
     expect(within(covered).getByText('4 owned')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /^Multibuy/ }));

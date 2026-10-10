@@ -164,7 +164,7 @@ Unconfirmed: whether the Variations "Fits" column counts CPU and PG or hull/slot
 - `/share/fitting?f=<code>` permanent URL; `/share/:shareId` short Share Link wraps same code (`routes/SharedLink.tsx` uses `FittingShareView`, shows expiry date). Outside `RequireCharacter`/`ScopeGate`.
 - Visitor with a Character is redirected into the editor on the code.
 - Logged out: banner "Shown at every skill level V, with no clone"; Fitting's own implant set applied if present (`resolveFittingShareView.ts`); read-only Ring, module list, stats sections, abyssal weather picker, target profiles.
-- Buttons: Open in Neocom Desk (sets login return-to), Copy Fitting (EFT, copied/failed feedback).
+- Renders in `ShareShell` (Log in + Choose permissions at the top); Copy Fitting in its actions slot (EFT, copied/failed feedback).
 - States: loading, invalid link, newer-version link, load failed.
 
 ## Data sources

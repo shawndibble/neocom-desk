@@ -169,6 +169,10 @@ describe('HaulingPanel trip summary', () => {
     await user.click(all);
     expect(row).not.toBeChecked();
     expect(screen.getByText('0 of 1')).toBeInTheDocument();
+    expect(row.closest('tr')?.className).not.toMatch(/opacity-/);
+    expect(
+      screen.getByRole('textbox', { name: 'Quantity of Damage Control II to bring' })
+    ).toHaveValue('');
     await user.click(all);
     expect(row).toBeChecked();
   });
@@ -193,7 +197,7 @@ describe('HaulingPanel trip summary', () => {
     });
     renderPanel();
 
-    await user.click(screen.getByRole('button', { name: 'Copy Multibuy' }));
+    await user.click(screen.getByRole('button', { name: 'Copy multibuy list' }));
 
     expect(await screen.findByLabelText('Multibuy list')).toHaveTextContent('Damage Control II');
   });

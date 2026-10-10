@@ -25,6 +25,13 @@ import {
   useReactionFacilityDefaults,
 } from './reactionFacilityDefaults';
 
+/** The toast's status region: the sr-only LiveStatus regions are empty here. */
+function toastStatus() {
+  const live = screen.getAllByRole('status').filter((el) => el.textContent);
+  expect(live).toHaveLength(1);
+  return live[0];
+}
+
 // BuildPlanDetail fetches a market snapshot in an effect on mount; a real
 // fetch would hit ESI/Fuzzwork and never resolve under MSW's default
 // handlers here. The panel only needs *a* resolved snapshot to stop showing
@@ -574,6 +581,32 @@ describe('BuildPlanDetail shopping list', () => {
     expect(await screen.findByRole('button', { name: 'Shopping list copied' })).toBeInTheDocument();
   });
 
+  it('announces a successful copy in a status region', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
+    render(<Harness />);
+    await user.click(copyButton());
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByRole('status')
+          .some((el) => /^Shopping list copied$/.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
+  });
+
+  it('announces a clipboard failure in a status region', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn<ClipboardWriter>().mockRejectedValue(new Error('denied')));
+    render(<Harness />);
+    await user.click(copyButton());
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('status').some((el) => /clipboard/i.test(el.textContent ?? ''))
+      ).toBe(true)
+    );
+  });
+
   it('names the Blueprint Acquisition row left out of the copied text (issue #1778)', async () => {
     const user = userEvent.setup();
     configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
@@ -583,9 +616,12 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
+    // findAll: Toast renders its message twice (visible span + live region), and
+    // the live region fills in a beat later — `findByText` throws on the
+    // two-match state and never recovers while the toast stays up.
     expect(
-      await screen.findByText('1 blueprint left out — buy it by contract')
-    ).toBeInTheDocument();
+      (await screen.findAllByText('1 blueprint left out — buy it by contract')).length
+    ).toBeGreaterThan(0);
   });
 
   it('surfaces a denied clipboard instead of failing silently', async () => {
@@ -1535,9 +1571,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Filled Have on 1 material from your assets'
-    );
+    expect(toastStatus()).toHaveTextContent('Filled Have on 1 material from your assets');
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 0 } }]);
@@ -1595,7 +1629,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).not.toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent(/^Nothing to fill/);
+    expect(toastStatus()).toHaveTextContent(/^Nothing to fill/);
   });
 });
 

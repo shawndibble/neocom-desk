@@ -92,7 +92,7 @@ import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
 import { CONTACTS_TABS } from '@/app/pageTabs';
 import { tabBarTabs } from '@/lib/pageTabs';
-import { ContactsStandings } from './ContactsStandings';
+import { useContactsStandings } from './ContactsStandings';
 
 interface Snapshot {
   contactsResult: CachedResult<CharacterContact[]> | null;
@@ -503,12 +503,6 @@ function acrossIdentity(row: AcrossCharactersRow): ContactIdentity {
 const ACROSS_PORTRAIT_COLUMN = portraitColumn<AcrossCharactersRow>(acrossIdentity);
 const CHARACTER_PORTRAIT_COLUMN = portraitColumn<CharacterContact>((contact) => contact);
 
-/**
- * A faction row has no Show Info (no public faction endpoint), so it must not
- * look clickable: the row's own `cursor-pointer` is overridden, not removed —
- * `onRowClick` is table-wide.
- */
-const NOT_CLICKABLE = 'cursor-default!';
 const ACROSS_SORT = { columnId: 'held', direction: 'asc' } as const;
 
 interface AcrossCharactersPanelProps {
@@ -730,9 +724,8 @@ function AcrossCharactersPanel({
             const kind = contactPublicInfoKind(acrossIdentity(row));
             if (kind) open(kind, row.contactId);
           }}
-          rowClassName={(row) =>
-            contactPublicInfoKind(acrossIdentity(row)) ? undefined : NOT_CLICKABLE
-          }
+          // A faction has no Show Info (no public faction endpoint): not a tab stop either.
+          rowClickable={(row) => contactPublicInfoKind(acrossIdentity(row)) !== null}
         />
       )}
     </Panel>
@@ -760,6 +753,7 @@ export function Contacts() {
     setFilterParams({ q: next.text, types: next.types, standing: next.standings });
   const [tab, setTab] = usePageTab(CONTACTS_TABS);
   const tabsId = useTabsId();
+  const standings = useContactsStandings(activeCharacterId ?? 0, tab === 'standings');
   const { open: openPublicInfo } = usePublicInfoModal();
 
   // Lifted out of `AcrossCharactersPanel` (issue #1282): its chip now lives in
@@ -1081,159 +1075,163 @@ export function Contacts() {
     <Tabs
       tabsId={tabsId}
       label={t('contacts.title')}
-      value={tab}
+      value={view === 'across' ? 'across' : tab === 'standings' ? 'standings' : 'character'}
       onChange={(id) => setTab(id as typeof tab)}
       tabs={tabBarTabs(CONTACTS_TABS)
         .filter((item) => item.id !== 'across' || acrossLists.length > 1)
         .map((item) => ({ id: item.id, label: t(item.labelKey) }))}
     />
   );
-  if (tab === 'standings') {
-    return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <ContactsStandings characterId={activeCharacterId} tabBar={tabBar} tabsId={tabsId} />
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('contacts.title')}
-        meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
+        meta={
+          tab === 'standings'
+            ? standings.meta
+            : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
+        }
         actions={
-          <>
-            {/* One character is the whole roster: nothing to compare it against,
+          tab === 'standings' ? (
+            standings.actions
+          ) : (
+            <>
+              {/* One character is the whole roster: nothing to compare it against,
                 so there is no "All characters" to offer. */}
-            {acrossLists.length > 1 && (
-              <CharacterFilterControl
-                activeCharacterId={activeCharacterId}
-                value={view === 'across' ? 'all' : 'current'}
-                onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
-                size="md"
+              {acrossLists.length > 1 && (
+                <CharacterFilterControl
+                  activeCharacterId={activeCharacterId}
+                  value={view === 'across' ? 'all' : 'current'}
+                  onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
+                  size="md"
+                />
+              )}
+              {view === 'across' ? (
+                <TableActionsMenu
+                  name={t('contacts.tabAcrossCharacters')}
+                  tableExport={acrossExport}
+                  size="md"
+                />
+              ) : (
+                <TableActionsMenu
+                  name={t('contacts.title')}
+                  tableExport={characterExport}
+                  size="md"
+                />
+              )}
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('contacts.refresh')}
+                onClick={refresh}
+                disabled={loading}
               />
-            )}
-            {view === 'across' ? (
-              <TableActionsMenu
-                name={t('contacts.tabAcrossCharacters')}
-                tableExport={acrossExport}
-                size="md"
-              />
-            ) : (
-              <TableActionsMenu
-                name={t('contacts.title')}
-                tableExport={characterExport}
-                size="md"
-              />
-            )}
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('contacts.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
-          </>
+            </>
+          )
         }
       />
 
       {tabBar}
 
       <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
-        {/* Shared with the second tab: a name typed into the box, or a type
+        {tab === 'standings' ? (
+          standings.content
+        ) : (
+          <>
+            {/* Shared with the second tab: a name typed into the box, or a type
           switched off, means the same thing on either. The standing chips do
           not — a row there carries several standings — so that tab ignores
           them and says so with a chip of its own. */}
-        {lastGoodCounts && (
-          <ContactsFilterBar
-            filter={filter}
-            onChange={setFilter}
-            counts={lastGoodCounts}
-            view={view}
-            disagreementsOnly={disagreementsOnly}
-            onDisagreementsOnlyChange={setDisagreementsOnly}
-            disagreementCount={disagreementCount}
-            actions={columnPickerActions}
-          />
-        )}
+            {lastGoodCounts && (
+              <ContactsFilterBar
+                filter={filter}
+                onChange={setFilter}
+                counts={lastGoodCounts}
+                view={view}
+                disagreementsOnly={disagreementsOnly}
+                onDisagreementsOnlyChange={setDisagreementsOnly}
+                disagreementCount={disagreementCount}
+                actions={columnPickerActions}
+              />
+            )}
 
-        {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : view === 'across' ? (
-          <AcrossCharactersPanel
-            lists={acrossLists}
-            names={contactNames}
-            filter={rowsFilter}
-            disagreementsOnly={disagreementsOnly}
-            onDisagreementCountChange={setDisagreementCount}
-            isColumnVisible={acrossColumnVisibility.isVisible}
-            onVisibleRowsChange={setAcrossVisibleRows}
-            onTruncatedChange={setAcrossTruncated}
-            tableExport={acrossExport}
-          />
-        ) : contactsNeedsReauth ? (
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterContacts']}
-            title={t('contacts.reauthTitle')}
-            hint={t('contacts.reauthHint')}
-            actionLabel={t('contacts.reauthAction')}
-          />
-        ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ) : !contactsResult || contacts.length === 0 ? (
-          <CachedEmptyState
-            result={contactsResult}
-            title={t('contacts.emptyTitle')}
-            hint={t('contacts.emptyHint')}
-            fetchedTitle={t('contacts.emptyFetchedTitle')}
-          />
-        ) : (
-          <Panel padded={false}>
-            {contactsResult.fromCache && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
-              </p>
-            )}
-            {contactsTruncated && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.incompleteTitle')}
-              </p>
-            )}
-            {filteredContacts.length === 0 ? (
-              <EmptyState
-                title={t('contacts.noResults')}
-                hint={t('contacts.noResultsHint')}
-                className="py-8"
-                action={
-                  activeContactsFilterCount(filter) > 0 ? (
-                    <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
-                      {t('common.resetFilters')}
-                    </Button>
-                  ) : undefined
-                }
+            {loading && !data ? (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
+            ) : view === 'across' ? (
+              <AcrossCharactersPanel
+                lists={acrossLists}
+                names={contactNames}
+                filter={rowsFilter}
+                disagreementsOnly={disagreementsOnly}
+                onDisagreementCountChange={setDisagreementCount}
+                isColumnVisible={acrossColumnVisibility.isVisible}
+                onVisibleRowsChange={setAcrossVisibleRows}
+                onTruncatedChange={setAcrossTruncated}
+                tableExport={acrossExport}
+              />
+            ) : contactsNeedsReauth ? (
+              <GrantBanner
+                characterId={activeCharacterId}
+                endpoints={['getCharacterContacts']}
+                title={t('contacts.reauthTitle')}
+                hint={t('contacts.reauthHint')}
+                actionLabel={t('contacts.reauthAction')}
+              />
+            ) : error ? (
+              <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+            ) : !contactsResult || contacts.length === 0 ? (
+              <CachedEmptyState
+                result={contactsResult}
+                title={t('contacts.emptyTitle')}
+                hint={t('contacts.emptyHint')}
+                fetchedTitle={t('contacts.emptyFetchedTitle')}
               />
             ) : (
-              <DataTable
-                {...characterExport.tableProps}
-                label={t('contacts.title')}
-                columns={columns}
-                rows={filteredContacts}
-                rowKey={(contact) => contact.contact_id}
-                {...characterSortProps}
-                mobileSort
-                stackLayout="dense"
-                onRowClick={(contact) => {
-                  const kind = contactPublicInfoKind(contact);
-                  if (kind) openPublicInfo(kind, contact.contact_id);
-                }}
-                rowClassName={(contact) =>
-                  contactPublicInfoKind(contact) ? undefined : NOT_CLICKABLE
-                }
-              />
+              <Panel padded={false}>
+                {contactsResult.fromCache && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t('common.offlineTitle')}
+                  </p>
+                )}
+                {contactsTruncated && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t('common.incompleteTitle')}
+                  </p>
+                )}
+                {filteredContacts.length === 0 ? (
+                  <EmptyState
+                    title={t('contacts.noResults')}
+                    hint={t('contacts.noResultsHint')}
+                    className="py-8"
+                    action={
+                      activeContactsFilterCount(filter) > 0 ? (
+                        <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
+                          {t('common.resetFilters')}
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <DataTable
+                    {...characterExport.tableProps}
+                    label={t('contacts.title')}
+                    columns={columns}
+                    rows={filteredContacts}
+                    rowKey={(contact) => contact.contact_id}
+                    {...characterSortProps}
+                    mobileSort
+                    stackLayout="dense"
+                    onRowClick={(contact) => {
+                      const kind = contactPublicInfoKind(contact);
+                      if (kind) openPublicInfo(kind, contact.contact_id);
+                    }}
+                    rowClickable={(contact) => contactPublicInfoKind(contact) !== null}
+                  />
+                )}
+              </Panel>
             )}
-          </Panel>
+          </>
         )}
       </TabPanel>
     </div>

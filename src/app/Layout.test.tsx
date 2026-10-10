@@ -127,7 +127,8 @@ describe('Layout sync status dot', () => {
   it('is hidden when sync is unconfigured', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // The shell's always-mounted notice regions exist but stay empty.
+    for (const region of screen.getAllByRole('status')) expect(region).toBeEmptyDOMElement();
   });
 
   it('is shown, subscribed to sync status, when sync is configured', () => {
@@ -290,6 +291,46 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     } finally {
       window.matchMedia = realMatchMedia;
     }
+  });
+
+  describe('skip link', () => {
+    function stubDesktop(matches: boolean) {
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (media: string) =>
+          ({
+            media,
+            matches,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          }) as unknown as MediaQueryList
+      );
+    }
+
+    it('is the first Tab stop at desktop widths, and Enter focuses the outlet', async () => {
+      mockIsSyncConfigured.mockReturnValue(false);
+      stubDesktop(true);
+      const user = userEvent.setup();
+      renderLayout();
+
+      await user.tab();
+      const link = screen.getByRole('link', { name: /skip to content/i });
+      expect(link).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+      expect(screen.getByText('page content').parentElement).toHaveFocus();
+    });
+
+    it('is not rendered below md, where there is no rail to skip', () => {
+      mockIsSyncConfigured.mockReturnValue(false);
+      stubDesktop(false);
+      renderLayout();
+
+      expect(screen.queryByRole('link', { name: /skip to content/i })).not.toBeInTheDocument();
+    });
   });
 });
 

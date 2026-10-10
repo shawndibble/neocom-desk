@@ -46,6 +46,7 @@ import { FOOTER_PAGES, viewPathFor } from './navRail';
 import { recordRecentNav } from './navPreferences';
 import { MOBILE_NAV_ACTIVE, MOBILE_NAV_IDLE, MOBILE_NAV_ITEM, NavItem } from './NavItem';
 import { RailNav } from './RailNav';
+import { ROUTE_OUTLET_ID, SkipLink } from './SkipLink';
 import { MobileMoreSheet, MORE_SHEET_ID } from './MobileMoreSheet';
 
 /**
@@ -286,7 +287,7 @@ function RouteOutlet() {
       `tabIndex={-1}`: where a page never renders an `<h1>`, route focus
       (`routeFocus.ts`) lands here instead.
     */
-    <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
+    <div ref={outletRef} id={ROUTE_OUTLET_ID} tabIndex={-1} className="focus:outline-none">
       {/* Routes are code-split (`routeChunks.ts`): the shell stays put
           while a page's chunk loads on its first visit, and a page that
           throws — or whose chunk will not load — fails inside the shell,
@@ -353,6 +354,8 @@ export const Layout = memo(function Layout() {
   return (
     <UnreadAlertsContext.Provider value={unreadAlerts}>
       <div className="flex min-h-screen bg-bg text-text">
+        {/* Only where the rail shows: below `md` there is nothing to skip. */}
+        {isDesktop && <SkipLink />}
         {/* Desktop left rail */}
         <aside className="sticky top-0 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
           <div className="flex items-center gap-2 border-b border-line px-3 py-3">
@@ -391,7 +394,7 @@ export const Layout = memo(function Layout() {
           <CharacterFooterLink activeCharacter={activeCharacter} />
         </aside>
 
-        <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
+        <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px))]">
           <AlertCharacterSwitch />
           <AuthFailureNotice />
           <StandingsScopeNotice />

@@ -123,6 +123,19 @@ describe('NetWorthPanel, several Characters', () => {
     expect(screen.getByText('Excludes Order escrow')).toBeInTheDocument();
   });
 
+  it('never fades text: an unshared Character row and a hidden layer stay at full opacity', async () => {
+    const user = userEvent.setup();
+    await seed({ covered: [1, 2] });
+    renderPanel();
+    const table = await screen.findByRole('table', { name: 'Balance by character' });
+    await within(table).findAllByText("This character hasn't granted wallet access");
+    await openSeries(user);
+    await user.click(await screen.findByRole('option', { name: 'Order escrow' }));
+    await screen.findByText('Excludes Order escrow');
+    expect(table.querySelector('tbody tr[class*="opacity-"], td[class*="opacity-"]')).toBeNull();
+    expect(table.querySelector('td.text-text-dim')).not.toBeNull();
+  });
+
   it('cannot switch off the last layer', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });

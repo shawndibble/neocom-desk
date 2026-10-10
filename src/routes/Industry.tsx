@@ -451,7 +451,7 @@ export function Industry() {
     const runsByPlanId = new Map((plans ?? []).map((plan) => [plan.id, plan.runs]));
     const planById = new Map((plans ?? []).map((plan) => [plan.id, plan]));
     // Reactions planned in highsec cannot run (issue #2908): the row reads
-    // "Fix location" and keeps its figures, dimmed.
+    // "Fix location" and keeps its figures (dim tone, warning glyph).
     const reactionsBlocked = (planId: string): boolean => {
       const plan = planById.get(planId);
       const entry = plan && catalog?.byBlueprintTypeID.get(plan.blueprintTypeID);

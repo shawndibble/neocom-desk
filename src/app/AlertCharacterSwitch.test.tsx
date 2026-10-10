@@ -33,7 +33,12 @@ describe('AlertCharacterSwitch', () => {
   it('switches to the alerted Character, says so, and strips the param', async () => {
     renderAt('/industry?highlight=9&character=2');
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Switched to Alt Indy');
+    expect(await screen.findByText('Switched to Alt Indy', { selector: 'p' })).not.toHaveAttribute(
+      'role'
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Switched to Alt Indy')
+    );
     expect(useActiveCharacter.getState().activeCharacterId).toBe(2);
     // Anchored: the unstripped URL also *contains* '/industry?highlight=9', so
     // a substring match passed before the param was gone (a CI flake).
@@ -46,7 +51,7 @@ describe('AlertCharacterSwitch', () => {
     renderAt('/mail?character=1');
 
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/mail$/));
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
   });
 
@@ -54,7 +59,7 @@ describe('AlertCharacterSwitch', () => {
     renderAt('/mail?character=99');
 
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/mail$/));
-    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
   });
 });

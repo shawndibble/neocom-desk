@@ -120,8 +120,15 @@ export function BuildPlanCompare({
   onOpenPlan,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
+  const hubChoice = useCompareHub((state) => state.value);
+  // One hub for every row prices each plan there, so the cost, revenue and profit
+  // columns follow the picker as well as the hub order-book ones.
+  const pricedPlans = useMemo(
+    () => (hubChoice === PLAN_HUB ? plans : plans.map((plan) => ({ ...plan, hubId: hubChoice }))),
+    [plans, hubChoice]
+  );
   const rows = useComparedBuildResults({
-    plans,
+    plans: pricedPlans,
     catalog,
     pi,
     ownedBlueprints,
@@ -133,7 +140,6 @@ export function BuildPlanCompare({
     useVisibleCompareColumns,
     COMPARE_DEFAULT_COLUMNS
   );
-  const hubChoice = useCompareHub((state) => state.value);
   const setHubChoice = useCompareHub((state) => state.setValue);
   const hydrateHubChoice = useCompareHub((state) => state.hydrate);
   useEffect(() => {
@@ -144,13 +150,13 @@ export function BuildPlanCompare({
   const showBookColumns = HUB_BOOK_COLUMN_IDS.some(isVisible);
   const targets = useMemo(() => {
     const byPlan = new Map<string, HubOrderTarget>();
-    for (const plan of plans) {
+    for (const plan of pricedPlans) {
       const typeId = catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productTypeID;
       if (typeId == null) continue;
-      byPlan.set(plan.id, { hubId: hubChoice === PLAN_HUB ? plan.hubId : hubChoice, typeId });
+      byPlan.set(plan.id, { hubId: plan.hubId, typeId });
     }
     return byPlan;
-  }, [plans, catalog, hubChoice]);
+  }, [pricedPlans, catalog]);
   const hubOrders = useHubOrderCounts([...targets.values()], showBookColumns);
   const hubCountsFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
@@ -416,24 +422,22 @@ export function BuildPlanCompare({
       title={t('industry.compareTitle')}
       actions={
         <span className="flex items-center gap-2">
-          {showHubColumns && (
-            <Select
-              value={hubChoice}
-              onValueChange={(value) => void setHubChoice(value as CompareHubChoice)}
-            >
-              <SelectTrigger size="sm" aria-label={t('industry.compareHubPicker')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={PLAN_HUB}>{t('industry.comparePlanHub')}</SelectItem>
-                {TRADE_HUBS.map((hub) => (
-                  <SelectItem key={hub.id} value={hub.id}>
-                    {hub.systemName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select
+            value={hubChoice}
+            onValueChange={(value) => void setHubChoice(value as CompareHubChoice)}
+          >
+            <SelectTrigger size="sm" aria-label={t('industry.compareHubPicker')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={PLAN_HUB}>{t('industry.comparePlanHub')}</SelectItem>
+              {TRADE_HUBS.map((hub) => (
+                <SelectItem key={hub.id} value={hub.id}>
+                  {hub.systemName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <ColumnPickerMenu
             available={COMPARE_COLUMN_IDS}
             visible={visible}

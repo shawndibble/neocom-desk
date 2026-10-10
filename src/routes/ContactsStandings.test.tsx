@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { ContactsStandings } from './ContactsStandings';
+import { useContactsStandings } from './ContactsStandings';
 
 const loadMock = vi.hoisted(() => vi.fn());
 
@@ -14,10 +14,23 @@ vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => fal
 
 const ENTRY = { from_id: 500001, from_type: 'faction', standing: 3.5 };
 
+/** The page's header, as `Contacts` lays it out around the hook's parts. */
+function StandingsHarness({ characterId }: { characterId: number }) {
+  const { meta, actions, content } = useContactsStandings(characterId, true);
+  return (
+    <>
+      <div>{meta}</div>
+      <div>{actions}</div>
+      <div>tab strip</div>
+      {content}
+    </>
+  );
+}
+
 function renderTab() {
   return render(
     <MemoryRouter>
-      <ContactsStandings characterId={91} tabBar={<div>tab strip</div>} tabsId="t" />
+      <StandingsHarness characterId={91} />
     </MemoryRouter>
   );
 }

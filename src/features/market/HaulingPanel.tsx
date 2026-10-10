@@ -722,7 +722,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   return (
     // No title bar: the Hauling tab right above already names the panel, and
-    // its old actions (ship, Copy Multibuy, export) live in the trip summary
+    // its old actions (ship, Copy multibuy list, export) live in the trip summary
     // row now, beside the totals they act on.
     <Panel padded={false}>
       {/*
@@ -1070,7 +1070,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                 </div>
               </div>
 
-              {/* The list Copy Multibuy copies, on request — and on its own
+              {/* The list Copy multibuy list copies, on request — and on its own
                   when the clipboard refused, so it can be copied by hand. */}
               {listShown && (
                 <div
@@ -1114,9 +1114,6 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                     ),
                     hideIcon: true,
                   }}
-                  rowClassName={(row) =>
-                    overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
-                  }
                 />
               </div>
 

@@ -534,7 +534,8 @@ describe('Wallet', () => {
 
     await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
 
-    const summary = await screen.findByText(/1 entry/);
+    // The sr-only live region repeats the line as plain text; the visible one is the <p>.
+    const summary = (await screen.findAllByText(/1 entry/)).find((el) => el.tagName === 'P')!;
     expect(summary).toHaveTextContent('1 entry · net -500');
     expect(within(summary).getByText('-500')).toHaveClass('text-isk-neg');
   });
@@ -824,6 +825,29 @@ describe('Wallet', () => {
         await screen.findByRole('table', { name: 'Balance by character' })
       ).toBeInTheDocument();
       await waitFor(() => expect(window.location.search).not.toContain('drill='));
+    });
+
+    it('moves focus to the drilled back button, then the Character row, never the body', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+      await waitFor(() => {
+        expect(document.activeElement?.tagName).toBe('BUTTON');
+        expect(document.activeElement).toHaveTextContent('All characters');
+      });
+
+      await user.click(document.activeElement as HTMLElement);
+      await waitFor(() =>
+        expect(document.activeElement?.closest('[data-row-key]')).toHaveAttribute(
+          'data-row-key',
+          '92'
+        )
+      );
     });
 
     it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {

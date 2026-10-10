@@ -117,7 +117,7 @@ const RailPage = memo(function RailPage({
           to={page.path}
           label={label}
           locked={locked}
-          className={cx('flex-1', pageHidden && 'line-through opacity-60')}
+          className={cx('flex-1', editing && pageHidden && 'line-through')}
         />
         {shownViews.length > 0 && (
           <IconButton
@@ -151,7 +151,7 @@ const RailPage = memo(function RailPage({
                   active
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text-dim hover:text-text active:bg-panel-2',
-                  viewHidden && 'line-through opacity-60'
+                  editing && viewHidden && 'line-through'
                 )}
               >
                 <span className="min-w-0 truncate">{view.label}</span>
@@ -327,7 +327,7 @@ const RailNavBody = memo(function RailNavBody({
                 {morePages.map((page) => {
                   const label = t(page.labelKey);
                   return (
-                    <li key={page.path} className="flex items-center gap-0.5 opacity-60">
+                    <li key={page.path} className="flex items-center gap-0.5">
                       <NavItem
                         to={page.path}
                         label={label}

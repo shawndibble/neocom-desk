@@ -2,13 +2,18 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Where keyboard focus goes after "ESI didn't answer" → Retry (WCAG 2.4.3).
- * Returns `[ref, arm]`: put `ref` on a `tabIndex={-1}` wrapper around the result
+ * Returns `[ref, arm, hold]`: put `ref` on a `tabIndex={-1}` wrapper around the result
  * (any element; pass `<section>` etc. as `T`) and call `arm` from Retry.
  *
  * - Read succeeds (`'ok'`): focus moves to the wrapper, never to `<body>`.
  * - Read fails again: a Retry that is still mounted keeps focus where it sits
  *   (PI: Retry is a sibling outside the wrapper). If Retry unmounted while
  *   loading, focus fell to `<body>`, so the wrapper takes it.
+ *
+ * `hold` is `arm` plus focusing the wrapper right away, for a Retry whose own
+ * button unmounts while loading: focus stays in the section throughout instead
+ * of sitting on `<body>` until the read settles. The wrapper must then be
+ * mounted in every state.
  *
  * The wrapper must be mounted in whichever state the read settles in (PI has it
  * only in the ok state, which is enough there). A `resetKey` change (another
@@ -39,5 +44,9 @@ export function useRetryFocus<T extends HTMLElement = HTMLDivElement>(
   const arm = () => {
     armed.current = true;
   };
-  return [ref, arm] as const;
+  const hold = () => {
+    armed.current = true;
+    ref.current?.focus({ preventScroll: true });
+  };
+  return [ref, arm, hold] as const;
 }

@@ -96,14 +96,25 @@ describe('FittingShared', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
     await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
-    expect(screen.getByRole('link', { name: 'Open in Neocom Desk' })).toHaveAttribute(
-      'href',
-      '/login'
-    );
+    expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open in Neocom Desk' })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
     expect(clipboardText).toContain('[Rifter, Rifter]');
     expect(clipboardText).toContain('125mm Gatling AutoCannon I');
+    // The button label swap alone is silent; the status region says it.
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/copied/i));
+  });
+
+  it('announces a failed copy', async () => {
+    const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
+    if (!encoded.ok) throw new Error('encode failed');
+    configureClipboard(() => Promise.reject(new Error('denied')));
+    renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/couldn't copy/i));
   });
 
   it('redirects into the editor instead, for a visitor who already has a Character, without computing stats first', async () => {
