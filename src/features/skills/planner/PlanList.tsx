@@ -1,7 +1,7 @@
 import { focusRingInsetClassName, selectedRowClassName } from '@/components/ui/controlStyles';
 import { Link } from 'react-router-dom';
 import { cx } from '@/lib/cx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -14,11 +14,13 @@ import {
   Modal,
   TextInput,
   Tooltip,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord, SkillPlanRecord } from '@/db';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 
 /** A plan's costed total and finish (`null` when there is nothing left to train). */
 export interface PlanRowStats {
@@ -31,7 +33,7 @@ interface PlanListProps {
   /** Where a plan's row goes: the row is a real link (DESIGN.md §6c). */
   planHref: (id: string) => string;
   onDuplicate: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onRename: (id: string, name: string) => void;
   /** The account's other characters; "Copy to character" shows only when there are any. */
   otherCharacters?: readonly Pick<CharacterRecord, 'characterId' | 'name'>[];
@@ -43,6 +45,8 @@ interface PlanListProps {
   /** A just-created plan whose row opens straight into rename; reported back via `onAutoRenameStarted`. */
   autoRenamePlanId?: string | null;
   onAutoRenameStarted?: () => void;
+  /** The Plans panel's title (its `headingRef`): where focus lands when the last plan is deleted. */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
 }
 
 function PlanRow({
@@ -56,8 +60,10 @@ function PlanRow({
   active,
   autoRename,
   onAutoRenameStarted,
+  registerLink,
 }: {
   plan: SkillPlanRecord;
+  registerLink: (id: string, el: HTMLAnchorElement | null) => void;
   active: boolean;
   autoRename: boolean;
   onAutoRenameStarted?: () => void;
@@ -68,7 +74,9 @@ function PlanRow({
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(autoRename);
   const [draftName, setDraftName] = useState(plan.name);
-  const renameChosen = useRef(false);
+  const rowMenu = useOpenAfterMenu();
+  const focusAfterCommit = useFocusAfterCommit();
+  const moreRef = useRef<HTMLButtonElement>(null);
   // The new plan's row can mount before or after the flag arrives, so both
   // orders must land in rename mode — adjusting state during render, not in an effect.
   const [seenAutoRename, setSeenAutoRename] = useState(autoRename);
@@ -87,6 +95,17 @@ function PlanRow({
     else setDraftName(plan.name);
   }
 
+  // Enter and Escape unmount the focused input; hand focus to the row's ⋮.
+  // Blur does not: the pilot is already moving on.
+  function endRename(commit: boolean) {
+    if (commit) commitRename();
+    else {
+      setDraftName(plan.name);
+      setRenaming(false);
+    }
+    focusAfterCommit(moreRef);
+  }
+
   return (
     <li
       className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? selectedRowClassName : ''}`}
@@ -100,17 +119,19 @@ function PlanRow({
           onChange={(e) => setDraftName(e.target.value)}
           onBlur={commitRename}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') {
-              setDraftName(plan.name);
-              setRenaming(false);
+            if (e.key === 'Enter') {
+              // Focus moves to a button mid-keystroke: its keypress must not click it.
+              e.preventDefault();
+              endRename(true);
             }
+            if (e.key === 'Escape') endRename(false);
           }}
           className="flex-1"
         />
       ) : (
         <Tooltip content={plan.name} className="min-w-0 flex-1">
           <Link
+            ref={(el) => registerLink(plan.id, el)}
             to={planHref(plan.id)}
             aria-current={active ? 'true' : undefined}
             className={cx(
@@ -141,28 +162,19 @@ function PlanRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <IconButton
+            ref={moreRef}
             size="sm"
             variant="plain"
             icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
             label={t('plans.moreActions', { name: plan.name })}
           />
         </DropdownMenuTrigger>
-        {/* Rename opens its input only once the menu has closed: opened earlier,
-              the menu's focus handling blurs it and cancels the rename. */}
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={(e) => {
-            if (renameChosen.current) {
-              e.preventDefault();
-              renameChosen.current = false;
-              setRenaming(true);
-            }
-          }}
-        >
+        {/* Rename, Copy and Delete open only once the menu has closed: opened
+              earlier, the menu's focus handling blurs the rename input and the
+              dialogs record an item that is about to unmount as their restore target. */}
+        <DropdownMenuContent align="end" onCloseAutoFocus={rowMenu.onCloseAutoFocus}>
           <DropdownMenuItem
-            onSelect={() => {
-              renameChosen.current = true;
-            }}
+            onSelect={() => rowMenu.run(() => setRenaming(true), { keepFocus: true })}
           >
             {t('plans.rename')}
           </DropdownMenuItem>
@@ -170,11 +182,14 @@ function PlanRow({
             {t('plans.duplicate')}
           </DropdownMenuItem>
           {onRequestCopy && (
-            <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
+            <DropdownMenuItem onSelect={() => rowMenu.run(() => onRequestCopy(plan))}>
               {t('plans.copyToCharacter')}
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem className="text-danger" onSelect={() => onRequestDelete(plan)}>
+          <DropdownMenuItem
+            className="text-danger"
+            onSelect={() => rowMenu.run(() => onRequestDelete(plan))}
+          >
             {t('plans.deleteMenu')}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -196,8 +211,30 @@ export function PlanList({
   activePlanId,
   autoRenamePlanId = null,
   onAutoRenameStarted,
+  headingRef,
 }: PlanListProps) {
   const { t } = useTranslation();
+  const focusAfterCommit = useFocusAfterCommit();
+  const linkRefs = useRef(new Map<string, HTMLAnchorElement>());
+  function registerLink(id: string, el: HTMLAnchorElement | null) {
+    if (el) linkRefs.current.set(id, el);
+    else linkRefs.current.delete(id);
+  }
+
+  // The row goes only after the dialog has closed (an awaited delete), so
+  // focus is requested once the delete resolves: the next plan's link, else
+  // the previous one's, else the panel title.
+  async function confirmDelete() {
+    const target = deletingPlan;
+    setDeletingPlan(null);
+    if (!target) return;
+    const index = plans.findIndex((plan) => plan.id === target.id);
+    const near = [plans[index + 1], plans[index - 1]].map(
+      (plan) => () => (plan ? linkRefs.current.get(plan.id) : null)
+    );
+    await onDelete(target.id);
+    focusAfterCommit(...near, headingRef);
+  }
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
   const [copyingPlan, setCopyingPlan] = useState<SkillPlanRecord | null>(null);
   const canCopy = otherCharacters.length > 0 && onCopyToCharacter !== undefined;
@@ -221,6 +258,7 @@ export function PlanList({
               active={plan.id === activePlanId}
               autoRename={plan.id === autoRenamePlanId}
               onAutoRenameStarted={onAutoRenameStarted}
+              registerLink={registerLink}
             />
           ))}
         </ul>
@@ -267,14 +305,7 @@ export function PlanList({
           <Button size="sm" onClick={() => setDeletingPlan(null)}>
             {t('plans.cancel')}
           </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => {
-              if (deletingPlan) onDelete(deletingPlan.id);
-              setDeletingPlan(null);
-            }}
-          >
+          <Button variant="danger" size="sm" onClick={() => void confirmDelete()}>
             {t('plans.delete')}
           </Button>
         </div>

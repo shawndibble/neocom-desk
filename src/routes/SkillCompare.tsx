@@ -46,6 +46,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { invalidateFreshness } from '@/esi/cache';
 import type { TrainedSkill } from '@/engine/types';
 import { useUrlParams } from '@/lib/useUrlState';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { skillCompareCsvColumns } from '@/features/skills/skillCompareCsv';
@@ -94,6 +95,7 @@ interface SavedComparisonRowProps {
   onLoad: (comparison: SavedComparison) => void;
   onRequestDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  registerLoad: (id: string, el: HTMLButtonElement | null) => void;
 }
 
 function SavedComparisonRow({
@@ -101,8 +103,11 @@ function SavedComparisonRow({
   onLoad,
   onRequestDelete,
   onRename,
+  registerLoad,
 }: SavedComparisonRowProps) {
   const { t } = useTranslation();
+  const focusAfterCommit = useFocusAfterCommit();
+  const renameButtonRef = useRef<HTMLButtonElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(comparison.name);
 
@@ -111,6 +116,17 @@ function SavedComparisonRow({
     const name = draftName.trim();
     if (name && name !== comparison.name) onRename(comparison.id, name);
     else setDraftName(comparison.name);
+  }
+
+  // Enter and Escape unmount the focused input; hand focus to the Rename button.
+  // Blur does not: the pilot is already moving on.
+  function endRename(commit: boolean) {
+    if (commit) commitRename();
+    else {
+      setDraftName(comparison.name);
+      setRenaming(false);
+    }
+    focusAfterCommit(renameButtonRef);
   }
 
   return (
@@ -124,17 +140,19 @@ function SavedComparisonRow({
           onChange={(e) => setDraftName(e.target.value)}
           onBlur={commitRename}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') {
-              setDraftName(comparison.name);
-              setRenaming(false);
+            if (e.key === 'Enter') {
+              // Focus moves to a button mid-keystroke: its keypress must not click it.
+              e.preventDefault();
+              endRename(true);
             }
+            if (e.key === 'Escape') endRename(false);
           }}
           className="flex-1"
         />
       ) : (
         <button
           type="button"
+          ref={(el) => registerLoad(comparison.id, el)}
           onClick={() => onLoad(comparison)}
           className={entityLinkClassName('flex-1 truncate text-left')}
         >
@@ -142,6 +160,7 @@ function SavedComparisonRow({
         </button>
       )}
       <IconButton
+        ref={renameButtonRef}
         size="sm"
         icon={<Icon.Rename />}
         label={`${t('skillCompare.rename')} ${comparison.name}`}
@@ -213,6 +232,13 @@ export function SkillCompare() {
   const [committedRefreshNonce, setCommittedRefreshNonce] = useState(refreshNonce);
   const [degradedNotice, setDegradedNotice] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const focusAfterCommit = useFocusAfterCommit();
+  const loadButtons = useRef(new Map<string, HTMLButtonElement>());
+  const savedHeadingRef = useRef<HTMLHeadingElement>(null);
+  function registerLoad(id: string, el: HTMLButtonElement | null) {
+    if (el) loadButtons.current.set(id, el);
+    else loadButtons.current.delete(id);
+  }
 
   useEffect(() => {
     void loadSkillCatalog().then(setCatalog);
@@ -319,11 +345,21 @@ export function SkillCompare() {
     setCompareParams({ ids: resolved, comparisonId: comparison.id });
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!deletingId) return;
-    void comparisonsSetValue(removeComparison(comparisonsValue, deletingId, Date.now()));
-    if (activeComparisonId === deletingId) setCompareParams({ comparisonId: null });
+    const id = deletingId;
+    const items = comparisonsValue.items;
+    const index = items.findIndex((item) => item.id === id);
+    // The row goes only after the dialog has closed (an awaited write), so
+    // focus is requested once the write resolves: the next comparison's name
+    // button, else the previous one's, else the section heading.
+    const near = [items[index + 1], items[index - 1]].map(
+      (item) => () => (item ? loadButtons.current.get(item.id) : null)
+    );
+    if (activeComparisonId === id) setCompareParams({ comparisonId: null });
     setDeletingId(null);
+    await comparisonsSetValue(removeComparison(comparisonsValue, id, Date.now()));
+    focusAfterCommit(...near, savedHeadingRef);
   }
 
   function handleRename(id: string, name: string) {
@@ -523,7 +559,11 @@ export function SkillCompare() {
       )}
 
       <div>
-        <h2 className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        <h2
+          ref={savedHeadingRef}
+          tabIndex={-1}
+          className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus:outline-none"
+        >
           {t('skillCompare.savedTitle')}
         </h2>
         {comparisonsValue.items.length === 0 ? (
@@ -541,6 +581,7 @@ export function SkillCompare() {
                 onLoad={(loaded) => void handleLoad(loaded)}
                 onRequestDelete={setDeletingId}
                 onRename={handleRename}
+                registerLoad={registerLoad}
               />
             ))}
           </ul>
@@ -557,7 +598,7 @@ export function SkillCompare() {
           <Button size="sm" onClick={() => setDeletingId(null)}>
             {t('skillCompare.cancel')}
           </Button>
-          <Button variant="danger" size="sm" onClick={handleConfirmDelete}>
+          <Button variant="danger" size="sm" onClick={() => void handleConfirmDelete()}>
             {t('skillCompare.delete')}
           </Button>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -144,6 +144,7 @@ export function PlanListPane({
     navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [certifiedOpen, setCertifiedOpen] = useState(false);
   const newPlanMenu = useOpenAfterMenu();
 
@@ -218,6 +219,7 @@ export function PlanListPane({
     <Panel
       className={className}
       title={t('plans.title')}
+      headingRef={headingRef}
       actions={
         // A split button: "New plan" stays one click for a blank plan, and the
         // caret holds the other starting points without costing the sidebar's
@@ -284,6 +286,7 @@ export function PlanListPane({
           </div>
         ) : (
           <PlanList
+            headingRef={headingRef}
             plans={plans}
             stats={stats}
             activePlanId={activePlanId}
