@@ -203,11 +203,12 @@ export function SkillPicker({
             <button
               type="button"
               className={inlineLinkClassName}
-              onClick={() =>
-                document
-                  .getElementById(jumpTargetId)
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }
+              onClick={() => {
+                const row = document.getElementById(jumpTargetId);
+                row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Focus moves with the view; the handle, not the <li>, so no row ring.
+                row?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+              }}
             >
               {t('plans.jumpToAdded')}
             </button>

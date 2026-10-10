@@ -18,9 +18,10 @@
  * some other way (synced from an older build, restored from an import), but
  * this component's whole point is to stop the user from typing one.
  */
-import { useState, type FocusEvent } from 'react';
+import { useRef, useState, type FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import {
   disabledClassName,
   focusRingClassName,
@@ -166,6 +167,7 @@ function BoosterRow({
         <span>{t('plans.boosterRowLabel', { position })}</span>
         <IconButton
           icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+          data-booster-remove={position}
           label={t('plans.boosterRemoveNamed', { position })}
           tooltip={t('plans.boosterRemove')}
           onClick={onRemove}
@@ -245,6 +247,8 @@ function BoosterRow({
 
 export function BoosterList({ boosters, detectedAccelerator, onChange }: BoosterListProps) {
   const { t } = useTranslation();
+  const listRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   function patchRow(index: number, patch: Partial<PlanBooster>): boolean {
     // Setting the first row's time left means it runs from now, whatever start an older build saved.
@@ -266,6 +270,11 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
     const reopened =
       index === 0 && rest.length > 0 ? [rebaseBooster(rest[0], null, now), ...rest.slice(1)] : rest;
     onChange(linkBoosterChain(reopened, now));
+    // The row's Remove button is gone: the previous row's, else "Add accelerator" (WCAG 2.4.3).
+    focusAfterCommit(
+      () => listRef.current?.querySelector<HTMLElement>(`[data-booster-remove="${index}"]`),
+      () => listRef.current?.querySelector<HTMLElement>('[data-booster-add]')
+    );
   }
 
   function addRow(): void {
@@ -276,7 +285,7 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
   }
 
   return (
-    <div className="space-y-2">
+    <div ref={listRef} className="space-y-2">
       <div className="flex items-center justify-between gap-1.5">
         <span>{t('plans.booster')}</span>
         <MarketGroupLink
@@ -304,7 +313,7 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
           />
         );
       })}
-      <Button size="sm" variant="ghost" onClick={addRow}>
+      <Button size="sm" variant="ghost" onClick={addRow} data-booster-add>
         <Icon.AddRow size={Icon.ICON_SIZE.sm} />
         {t('plans.boosterAdd')}
       </Button>
