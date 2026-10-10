@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { MenuItem, MenuSeparator, MenuSub, MenuSubContent, MenuSubTrigger } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import {
@@ -102,7 +103,14 @@ export function ChargePickerMenuItems({
                 )}
               >
                 <span className="truncate">
-                  {holds && '● '}
+                  {holds && (
+                    <Icon.ChargeLoaded
+                      size={Icon.ICON_SIZE.sm}
+                      className="mr-1 inline"
+                      aria-label={t('fittings.chargePicker.loadedLabel')}
+                      role="img"
+                    />
+                  )}
                   {chargeLabel(g.name)}
                   {rep.falloff > 0 && (
                     <span className="ml-1.5 text-[0.6875rem] text-text-dim">
@@ -127,7 +135,14 @@ export function ChargePickerMenuItems({
                   >
                     <span className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3">
                       <span className={cx('truncate', c.typeId === loaded && 'font-semibold')}>
-                        {c.typeId === loaded && '● '}
+                        {c.typeId === loaded && (
+                          <Icon.ChargeLoaded
+                            size={Icon.ICON_SIZE.sm}
+                            className="mr-1 inline"
+                            aria-label={t('fittings.chargePicker.loadedLabel')}
+                            role="img"
+                          />
+                        )}
                         {c.tier === 'faction'
                           ? c.faction
                           : t(`fittings.chargePicker.${c.tier === 'tech2' ? 'tech2' : 'tech1'}`)}

@@ -137,7 +137,7 @@ describe('Change charge (all N) — the Charge Picker as a menu', () => {
   it('lists the types long range first, each opening to its factions', async () => {
     const actions = renderMenu();
     await openSub('Change charge (all 2)');
-    const types = await screen.findAllByRole('menuitem', { name: /^(● )?(Lead|Antimatter)/ });
+    const types = await screen.findAllByRole('menuitem', { name: /^(loaded ?)?(Lead|Antimatter)/ });
     expect(types.map((el) => el.textContent)).toEqual([
       expect.stringMatching(/Lead/),
       expect.stringMatching(/Antimatter/),

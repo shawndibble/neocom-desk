@@ -60,6 +60,8 @@ import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
 import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
+import { Backpack } from '@phosphor-icons/react/dist/csr/Backpack';
+import { CaretUp } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
 import { Diamond } from '@phosphor-icons/react/dist/csr/Diamond';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
@@ -218,6 +220,12 @@ export const Route = withWeight(ArrowsLeftRight);
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
+/** A Charge Picker row the player holds in cargo — not `ChargeLoaded`, which is what is fitted. */
+export const InCargo = withWeight(Backpack);
+/** The charge currently loaded in the weapon, in either Charge Picker. */
+export const ChargeLoaded = withWeight(Crosshair);
+/** A Charge Picker price over 10× the Tech I cost per minute; pairs with a text name, colour is never the only signal. */
+export const PriceHigh = withWeight(CaretUp);
 /** Opens a longer explanation of the numbers on screen, e.g. a Build Plan's calculation breakdown. */
 export const Info = withWeight(InfoGlyph);
 /** Waiting on an answer or an outcome (an RSVP not yet given). A status glyph, never a button: ⓘ (`Info`) is reserved for Show Info and explanation modals (§6c). */

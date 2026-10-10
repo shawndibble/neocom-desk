@@ -1,3 +1,4 @@
+import * as Icon from '@/components/ui/icons';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -627,7 +628,14 @@ function TypeDetail({
                   <span className={cx('text-right', pricey && 'text-warning')}>
                     {perMin === null ? '—' : formatIsk(perMin)}
                     {/* Colour is never the only signal (DESIGN.md §7). */}
-                    {pricey && <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>}
+                    {pricey && (
+                      <Icon.PriceHigh
+                        size={Icon.ICON_SIZE.sm}
+                        className="ml-1 inline"
+                        aria-label={t('fittings.chargePicker.priceyLabel')}
+                        role="img"
+                      />
+                    )}
                   </span>
                   {(worse || c.skillMissing) && (
                     <span className="col-span-full text-text-dim">
@@ -709,7 +717,10 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
             {isOpen && (
               <div className="pb-1">
                 <div className="grid grid-cols-[5.6rem_minmax(0,1fr)_2.2rem_3.8rem] gap-1.5 py-0.5 pr-1.5 pl-3.5 text-[0.6875rem] text-text-dim">
-                  <span>{t('fittings.chargePicker.colCargo')}</span>
+                  <span>
+                    <Icon.InCargo size={Icon.ICON_SIZE.sm} className="mr-1 inline" aria-hidden />
+                    {t('fittings.chargePicker.colCargo')}
+                  </span>
                   <span>{t('fittings.chargePicker.colRange')}</span>
                   <span className="text-right">{t('fittings.chargePicker.dpsUnit')}</span>
                   <span className="text-right">{t('fittings.chargePicker.colIsk')}</span>
@@ -752,14 +763,26 @@ function FactionList({ choices, group, settings, maxReach, onLoad, wrap }: ListP
                           <span className="truncate">
                             {chargeLabel(c.baseName)}
                             {isLoaded && ` · ${t('fittings.add.loaded')}`}
-                            {c.cargo > 0 && <span className="text-text-dim"> ●</span>}
+                            {c.cargo > 0 && (
+                              <Icon.InCargo
+                                size={Icon.ICON_SIZE.sm}
+                                className="ml-1 inline text-text-dim"
+                                aria-label={t('fittings.chargePicker.inCargoLabel')}
+                                role="img"
+                              />
+                            )}
                           </span>
                           <RangeBar choice={c} maxReach={maxReach} distance={distance} />
                           <span className="text-right">{Math.round(score)}</span>
                           <span className={cx('text-right', pricey && 'text-warning')}>
                             {c.price === null ? '—' : formatIsk(c.price)}
                             {pricey && (
-                              <span aria-label={t('fittings.chargePicker.priceyLabel')}> ▲</span>
+                              <Icon.PriceHigh
+                                size={Icon.ICON_SIZE.sm}
+                                className="ml-1 inline"
+                                aria-label={t('fittings.chargePicker.priceyLabel')}
+                                role="img"
+                              />
                             )}
                           </span>
                         </button>
