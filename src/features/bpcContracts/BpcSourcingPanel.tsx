@@ -1742,7 +1742,7 @@ export function BpcSourcingPanel() {
               refresh();
               setMarketRefreshTick((tick) => tick + 1);
             }}
-            disabled={loading}
+            busy={loading}
           />
         </span>
       }

@@ -81,7 +81,7 @@ export function LogProductionFromJobDialog({
               size="sm"
               variant="primary"
               onClick={() => void handleCreate()}
-              disabled={creating}
+              aria-disabled={creating || undefined}
             >
               {t('industry.jobsLogProductionCreatePlan')}
             </Button>
