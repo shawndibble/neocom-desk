@@ -27,7 +27,7 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
     <details className="group rounded-xs border border-line bg-panel/60">
       <summary className="cursor-pointer select-none px-3 py-2 text-sm text-text-dim touch:py-3">
         {removed > 0
-          ? `${t('survey.scanList.title', { count: scans.length })} · ${t('survey.scanList.removedCount', { count: removed })}`
+          ? t('survey.scanList.titleWithRemoved', { count: scans.length, removed })
           : t('survey.scanList.title', { count: scans.length })}
       </summary>
       <div className="space-y-1 border-t border-line px-3 py-2">
@@ -44,7 +44,9 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
                 <span className={isRemoved ? 'text-text-dim line-through' : 'text-text'}>
                   {formatEveClock(scan.at)}
                 </span>
-                <span className="text-text-dim">{formatCompactNumber(volumeOf(scan))} m³</span>
+                <span className="text-text-dim">
+                  {t('survey.scanList.volume', { volume: formatCompactNumber(volumeOf(scan)) })}
+                </span>
                 <span className="min-w-0 truncate text-text-dim">
                   {t('survey.scannedBy', { name: scan.by ?? t('survey.anonymous') })}
                 </span>

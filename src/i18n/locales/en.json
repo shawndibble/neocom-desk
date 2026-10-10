@@ -3929,7 +3929,9 @@
     "scanList": {
       "title_one": "{{count}} scan",
       "title_other": "{{count}} scans",
-      "removedCount": "{{count}} removed",
+      "titleWithRemoved_one": "{{count}} scan · {{removed}} removed",
+      "titleWithRemoved_other": "{{count}} scans · {{removed}} removed",
+      "volume": "{{volume}} m³",
       "hint": "Remove a bad paste and the survey stops counting it. You can restore it here. On the chart, right-click a point, or press and hold it.",
       "remove": "Remove",
       "restore": "Restore",

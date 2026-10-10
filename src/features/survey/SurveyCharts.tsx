@@ -9,7 +9,7 @@
  * Ore layers borrow the clock-kind tokens (DESIGN.md "Clock kinds"): the same
  * rule every other categorical series follows, so no new palette.
  */
-import { useRef, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -25,17 +25,12 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui/ContextMenu';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { SurveyScanNode } from './SurveyScanNode';
 import { oreTone } from './surveyTones';
 
 /** Left edge shared by both charts so their time axes line up. */
@@ -85,10 +80,6 @@ export function SurveyCharts({
   onRemoveScan?: (at: number) => void;
 }) {
   const { t } = useTranslation();
-  // The node the pointer is on (so the menu only replaces the browser's own
-  // over a node), and the one the menu was opened for.
-  const [hoverAt, setHoverAt] = useState<number | null>(null);
-  const menuAt = useRef<number | null>(null);
   const [plotWidth, setPlotWidth] = useState(0);
   // A little past the finish, so its marker and label sit inside the plot.
   const end = summary.etaAt ?? summary.lastAt;
@@ -189,35 +180,14 @@ export function SurveyCharts({
     );
   }
 
-  // A scan's node, with a wider invisible target so a finger or a click lands on it.
   function nodeDot({ cx, cy, payload }: NodeDotProps): ReactElement<SVGElement> {
     const at = payload?.at;
     if (typeof cx !== 'number' || typeof cy !== 'number' || at === undefined) {
       return <g key={`empty-${at ?? 'x'}`} />;
     }
-    const base = (
-      <circle r={3} fill="var(--color-panel)" stroke="var(--color-text)" strokeWidth={1.5} />
-    );
-    if (onRemoveScan === undefined) {
-      return (
-        <g key={at} transform={`translate(${cx} ${cy})`}>
-          {base}
-        </g>
-      );
-    }
     return (
-      <g
-        key={at}
-        transform={`translate(${cx} ${cy})`}
-        aria-label={t('survey.chartNode', { time: formatEveClock(at) })}
-        onPointerEnter={() => setHoverAt(at)}
-        onPointerLeave={() => setHoverAt(null)}
-        onContextMenu={() => {
-          menuAt.current = at;
-        }}
-      >
-        <circle r={11} fill="transparent" />
-        {base}
+      <g key={at}>
+        <SurveyScanNode at={at} cx={cx} cy={cy} onRemove={onRemoveScan} />
       </g>
     );
   }
@@ -304,25 +274,7 @@ export function SurveyCharts({
   return (
     <div className="space-y-1">
       <figure aria-label={t('survey.chartVolume')} className="m-0">
-        {onRemoveScan === undefined ? (
-          plot
-        ) : (
-          <ContextMenu>
-            {/* Disabled off a node, so the browser's own menu stays everywhere else. */}
-            <ContextMenuTrigger asChild disabled={hoverAt === null}>
-              {plot}
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onSelect={() => {
-                  if (menuAt.current !== null) onRemoveScan(menuAt.current);
-                }}
-              >
-                {t('survey.removeScan')}
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        )}
+        {plot}
         <figcaption className="sr-only">{t('survey.chartVolume')}</figcaption>
       </figure>
 
