@@ -64,9 +64,9 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
-/** Ledger figure at full precision, with an explicit `+` on gains (the wallet reconciles against the game client). */
+/** Whole-ISK ledger figure, with an explicit `+` on gains (the wallet reconciles against the game client). */
 function formatIskSigned(value: number): string {
-  const text = formatIsk(value, 2);
+  const text = formatIsk(value);
   return value > 0 && !text.startsWith('-') ? `+${text}` : text;
 }
 
@@ -197,8 +197,8 @@ export function JournalTable({
             {row.income > 0 && row.expense > 0 && (
               <span className="block text-xs font-normal text-text-dim">
                 {t('wallet.journalBreakdownBothSides', {
-                  in: formatIsk(row.income, 2),
-                  out: formatIsk(row.expense, 2),
+                  in: formatIsk(row.income),
+                  out: formatIsk(row.expense),
                 })}
               </span>
             )}
@@ -213,11 +213,11 @@ export function JournalTable({
     <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
       <span>
         {t('wallet.journalBreakdownIn')}{' '}
-        <span className="text-isk-pos">{formatIsk(breakdown.totalIn, 2)}</span>
+        <span className="text-isk-pos">{formatIsk(breakdown.totalIn)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownOut')}{' '}
-        <span className="text-isk-neg">{formatIsk(breakdown.totalOut, 2)}</span>
+        <span className="text-isk-neg">{formatIsk(breakdown.totalOut)}</span>
       </span>
       <span>
         {t('wallet.journalBreakdownNet')}{' '}
@@ -305,12 +305,12 @@ export function JournalTable({
           <Trans
             i18nKey="wallet.journalFilteredSummary"
             count={filteredJournal.length}
-            values={{ net: signedIsk(filteredNet, 2) }}
+            values={{ net: signedIsk(filteredNet, 0) }}
             components={{
               net: (
                 <span
                   className={`tabular-nums ${
-                    clampIskZero(filteredNet, 2) === 0 ? '' : iskToneClass(filteredNet)
+                    clampIskZero(filteredNet, 0) === 0 ? '' : iskToneClass(filteredNet)
                   }`}
                 />
               ),

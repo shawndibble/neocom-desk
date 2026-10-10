@@ -125,7 +125,7 @@ export function useJournalColumnsBuilder(): (
         className: 'tabular-nums',
         cellClassName: (entry) => (entry.amount !== undefined ? iskToneClass(entry.amount) : ''),
         render: (entry) =>
-          entry.amount !== undefined ? formatIsk(entry.amount, 2) : t('common.unknown'),
+          entry.amount !== undefined ? formatIsk(entry.amount) : t('common.unknown'),
         sortValue: (entry) => entry.amount,
       },
       {
@@ -134,7 +134,7 @@ export function useJournalColumnsBuilder(): (
         align: 'right',
         className: 'tabular-nums text-text-dim',
         render: (entry) =>
-          entry.balance !== undefined ? formatIsk(entry.balance, 2) : t('common.unknown'),
+          entry.balance !== undefined ? formatIsk(entry.balance) : t('common.unknown'),
         sortValue: (entry) => entry.balance,
       },
     ],
