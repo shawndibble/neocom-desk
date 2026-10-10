@@ -10,6 +10,7 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
+  LiveStatus,
   Modal,
   Spinner,
   TextInput,
@@ -502,6 +503,8 @@ export function SkillCompare() {
       {degradedNotice && (
         <p className="text-[0.6875rem] text-warning uppercase">{t('skillCompare.someRemoved')}</p>
       )}
+
+      <LiveStatus>{degradedNotice ? t('skillCompare.someRemoved') : null}</LiveStatus>
 
       {selectedIds.length === 0 ? (
         <EmptyState

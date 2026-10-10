@@ -188,3 +188,22 @@ describe('BoosterList quick picks', () => {
     ]);
   });
 });
+
+describe('BoosterList overlap warning', () => {
+  it('announces the overlap and ties it to the inputs', () => {
+    renderList([ROW({ expiresAt: 9000 }), ROW({ startsAt: 1000, expiresAt: 5000 })]);
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts[0]).toHaveTextContent(/overlaps another one/i);
+    const hours = screen.getAllByRole('textbox', { name: /hours/i })[0];
+    expect(hours).toHaveAttribute('aria-invalid', 'true');
+    expect(hours).toHaveAttribute('aria-describedby', alerts[0].id);
+  });
+
+  it('stays silent without an overlap', () => {
+    renderList([ROW({ expiresAt: 5000 })]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getAllByRole('textbox', { name: /hours/i })[0]).not.toHaveAttribute(
+      'aria-invalid'
+    );
+  });
+});

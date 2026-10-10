@@ -533,6 +533,19 @@ describe('Skills', () => {
     }
   });
 
+  it('announces the match count, and no matches, for a search', async () => {
+    const statusTexts = () => screen.getAllByRole('status').map((el) => el.textContent ?? '');
+    render(<App />);
+    await screen.findByRole('button', { name: /Spaceship Command/ });
+    const search = screen.getByPlaceholderText('Search skills…');
+    fireEvent.change(search, { target: { value: 'frigate' } });
+    await waitFor(() =>
+      expect(statusTexts()).toContainEqual(expect.stringMatching(/\d+ skills? match/i))
+    );
+    fireEvent.change(search, { target: { value: 'zzzqqq' } });
+    await waitFor(() => expect(statusTexts()).toContain('No skills match your search.'));
+  });
+
   it('exports only the skills a search leaves on screen', async () => {
     render(<App />);
     await screen.findByRole('button', { name: /Spaceship Command/ });
