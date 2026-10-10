@@ -4232,7 +4232,7 @@
       "dismissed": "Dismissed"
     },
     "needsReviewHint": "This entry grew after you settled it. Open the row to review the new total.",
-    "selectForBulkAction": "Select this row",
+    "selectRow": "Select {{date}}, {{system}}",
     "selectionCount": "{{count}} selected",
     "selectAllAction": "Select all",
     "selectAllBlockedHint": "Every selectable entry in view is already checked.",
