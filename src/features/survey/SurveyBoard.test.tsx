@@ -62,7 +62,7 @@ describe('SurveyBoard', () => {
     render(<SurveyBoard scans={SCANS} url={URL} expiresAt={Date.UTC(2026, 9, 15)} />);
     expect(screen.getByText('13% mined')).toBeTruthy();
     expect(screen.getByText('2 scans')).toBeTruthy();
-    expect(screen.getByText('43.3 m³/s')).toBeTruthy();
+    expect(screen.getByText('43.3')).toBeTruthy();
     // 169,000 of the 195,000 m³ the scans have shown of this ore is left.
     expect(screen.getByText(/87% left/)).toBeTruthy();
     // 169 units left at the market price, summed (the scanner's own ISK is ignored).
@@ -152,7 +152,7 @@ describe('SurveyBoard', () => {
       expect(row?.textContent).toMatch(/1 rock · 5\.3K m³ · .*570K.* ISK · 100% left/);
     });
 
-    it('has one Copy chat message button, in the header on a desktop and under the chart on a phone', () => {
+    it('has one Copy chat message button, in the header, on a phone too', () => {
       const { unmount } = render(<SurveyBoard scans={SCANS} url={URL} expiresAt={null} />);
       expect(screen.getAllByRole('button', { name: 'Copy chat message' })).toHaveLength(1);
       unmount();

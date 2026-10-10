@@ -67,7 +67,7 @@ export function ShareShell({ title, hideTitle, actions, openInApp, children }: S
           {t('share.brand')}
         </Link>
         {signedOut ? (
-          <div className="flex flex-col items-end gap-1 max-sm:w-full max-sm:items-stretch">
+          <div className="flex flex-col items-end gap-1">
             <Button variant="accent" size="sm" loading={loggingIn} onClick={logIn}>
               {t('share.logIn')}
             </Button>

@@ -81,11 +81,11 @@ describe('Shared D-Scan', () => {
         />
       </MemoryRouter>
     );
-    expect(await screen.findByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Log in' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
     const banner = screen.getByRole('banner');
     expect(within(banner).getByRole('link', { name: 'Neocom Desk' })).toHaveAttribute('href', '/');
-    expect(within(banner).getByRole('button', { name: 'Log in with EVE Online' })).toBeTruthy();
+    expect(within(banner).getByRole('button', { name: 'Log in' })).toBeTruthy();
     expect(within(banner).getByRole('button', { name: 'Choose permissions…' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Open Neocom Desk' })).toBeNull();
   });
